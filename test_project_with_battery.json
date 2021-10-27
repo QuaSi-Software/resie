@@ -1,0 +1,73 @@
+{
+    "name": "Test Project",
+    "details": {},
+    "blocks": [
+        {
+            "name": "Block 01",
+            "details": {},
+            "bas_prefix": "TP_01",
+            "equipment": [
+                {
+                    "type": "PVPlant",
+                    "specification_key": "pv_plant",
+                    "bas_key": "PV_01",
+                    "priority": 90,
+                    "area": 20,
+                    "azimuth": 0,
+                    "angle": 0.7853981,
+                    "pv_efficiency": 0.2,
+                    "conversion_coeff": 0.9,
+                    "gr_profile": "GR Springfield 2018",
+                    "connections": [
+                        "TP_01_B_NAC_01"
+                    ]
+                },
+                {
+                    "type": "Battery",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "battery_nac",
+                    "bas_key": "BAT_NAC_01",
+                    "priority": 100,
+                    "initial_charge": 0.0,
+                    "charge_rate": 1.0,
+                    "capacity": 100.0,
+                    "input_efficiency": 0.95,
+                    "output_efficiency": 0.95,
+                    "connections": [
+                        "TP_01_B_NAC_01"
+                    ]
+                },
+                {
+                    "type": "Bus",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "bus_nac",
+                    "bas_key": "B_NAC_01",
+                    "priority": 50,
+                    "connections": [
+                        "TP_01_L_NAC_01",
+                        "TP_01_G_NAC_01",
+                        "TP_01_BAT_NAC_01"
+                    ]
+                },
+                {
+                    "type": "StaticLoad",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "static load 230V AC",
+                    "bas_key": "L_NAC_01",
+                    "priority": 100,
+                    "load": 2000
+                },
+                {
+                    "type": "GridConnection",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "grid_nac",
+                    "bas_key": "G_NAC_01",
+                    "priority": 100,
+                    "connections": [
+                        "TP_01_B_NAC_01"
+                    ]
+                }
+            ]
+        }
+    ]
+}

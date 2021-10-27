@@ -1,0 +1,53 @@
+{
+    "name": "Test Project",
+    "details": {},
+    "blocks": [
+        {
+            "name": "Block 01",
+            "details": {},
+            "bas_prefix": "TP_01",
+            "equipment": [
+                {
+                    "type": "PVPlant",
+                    "specification_key": "pv_plant",
+                    "bas_key": "PV_01",
+                    "area": 30,
+                    "azimuth": 0,
+                    "angle": 0.7853981,
+                    "pv_efficiency": 0.2,
+                    "conversion_coeff": 0.9,
+                    "gr_profile": "GR Springfield 2018",
+                    "connections": [
+                        "TP_01_B_NAC_01"
+                    ]
+                },
+                {
+                    "type": "Bus",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "bus_nac",
+                    "bas_key": "B_NAC_01",
+                    "connections": [
+                        "TP_01_L_NAC_01",
+                        "TP_01_G_NAC_01"
+                    ]
+                },
+                {
+                    "type": "StaticLoad",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "static load 230V AC",
+                    "bas_key": "L_NAC_01",
+                    "load": 2000
+                },
+                {
+                    "type": "GridConnection",
+                    "subtype": "ELECTRIC.E_230V_AC",
+                    "specification_key": "grid_nac",
+                    "bas_key": "G_NAC_01",
+                    "connections": [
+                        "TP_01_B_NAC_01"
+                    ]
+                }
+            ]
+        }
+    ]
+}

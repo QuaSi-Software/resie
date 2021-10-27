@@ -1,0 +1,12 @@
+{
+    "project_file": "./test_project.json",
+    "profile_root_dir": "./profiles",
+    "time_start": "2018-11-01 00:00:00",
+    "time_end": "2018-11-02 00:00:00",
+    "time_step": 900,
+    "logged_variables": [
+        ["TP_01_G_NAC_01", "power_input"],
+        ["TP_01_G_NAC_01", "power_output"],
+        ["TP_01_PV_01", "power_output"]
+    ]
+}
