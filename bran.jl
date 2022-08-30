@@ -1,6 +1,9 @@
 const TIME_STEP = UInt(900)
 
-struct Condition
+abstract type EnergySystem end
+abstract type ControlledSystem <: EnergySystem end
+
+Base.@kwdef struct Condition
     name :: String
 end
 
@@ -9,83 +12,123 @@ Base.@kwdef struct TruthTable
     table_data :: Dict{Tuple, UInt}
 end
 
-Base.@kwdef mutable struct BufferTank
-    capacity :: Float64
-    load :: Float64
-end
-
-Base.@kwdef mutable struct PVPlant
-    amplitude :: Float64
-end
-
-Base.@kwdef mutable struct CHPP
+Base.@kwdef mutable struct StateMachine
     state :: UInt = 1
     state_names :: Dict{UInt, String}
     transitions :: Dict{UInt, TruthTable}
     time_in_state :: UInt = 0
+end
+
+Base.@kwdef mutable struct BufferTank <: ControlledSystem
+    controller :: StateMachine
+
+    capacity :: Float64
+    load :: Float64
+
+    function BufferTank(capacity :: Float64, load :: Float64)
+        return new(
+            StateMachine( # BufferTank.controller
+                state=1,
+                state_names=Dict(1=>"Default"),
+                transitions=Dict(1=>TruthTable(
+                    conditions=Vector(),
+                    table_data=Dict()
+                ))
+            ),
+            capacity, # BufferTank.capacity
+            load # BufferTank.load
+        )
+    end
+end
+
+Base.@kwdef mutable struct PVPlant <: ControlledSystem
+    controller :: StateMachine
+
+    amplitude :: Float64
+
+    function PVPlant(amplitude :: Float64)
+        return new(
+            StateMachine( # PVPlant.controller
+                state=1,
+                state_names=Dict(1=>"Default"),
+                transitions=Dict(1=>TruthTable(
+                    conditions=Vector(),
+                    table_data=Dict()
+                ))
+            ),
+            amplitude # PVPlant.amplitude
+        )
+    end
+end
+
+Base.@kwdef mutable struct CHPP <: ControlledSystem
+    controller :: StateMachine
 
     min_run_time :: UInt = 1800
 
     function CHPP(strategy::String)
         if (strategy == "Heat-driven")
             return new(
-                1, # starting state
+                StateMachine( # CHPP.controller
+                    state=1,
+                    state_names=Dict{UInt, String}(
+                        1 => "Off",
+                        2 => "Load",
+                        3 => "Produce"
+                    ),
+                    time_in_state=0,
+                    transitions=Dict{UInt, TruthTable}(
+                        1 => TruthTable( # State: Off
+                            conditions=[
+                                Condition("PS < 50%"),
+                                Condition("Produce while space")
+                            ],
+                            table_data=Dict{Tuple, UInt}(
+                                (false, false) => 1,
+                                (false, true) => 3,
+                                (true, false) => 2,
+                                (true, true) => 1
+                            )
+                        ),
 
-                Dict{UInt, String}( # state names
-                    1 => "Off",
-                    2 => "Load",
-                    3 => "Produce"
+                        2 => TruthTable( # State: Load
+                            conditions=[
+                                Condition("PS < 100%")
+                            ],
+                            table_data=Dict{Tuple, UInt}(
+                                (false,) => 1,
+                                (true,) => 2
+                            )
+                        ),
+
+                        3 => TruthTable( # State: Produce
+                            conditions=[
+                                Condition("Min time"),
+                                Condition("PS < 100%"),
+                                Condition("Profitability")
+                            ],
+                            table_data=Dict{Tuple, UInt}(
+                                (false, false, false) => 1,
+                                (false, false, true) => 1,
+                                (false, true, false) => 3,
+                                (true, false, false) => 1,
+                                (false, true, true) => 3,
+                                (true, false, true) => 1,
+                                (true, true, false) => 1,
+                                (true, true, true) => 3,
+                            )
+                        ),
+                    )
                 ),
-
-                Dict{UInt, TruthTable}( # transitions
-                    1 => TruthTable( # State: Off
-                        conditions=[
-                            Condition("PS < 50%"),
-                            Condition("Produce while space")
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false) => 1,
-                            (false, true) => 3,
-                            (true, false) => 2,
-                            (true, true) => 1
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Load
-                        conditions=[
-                            Condition("PS < 100%")
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false,) => 1,
-                            (true,) => 2
-                        )
-                    ),
-
-                    3 => TruthTable( # State: Produce
-                        conditions=[
-                            Condition("Min time"),
-                            Condition("PS < 100%"),
-                            Condition("Profitability")
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false, false) => 1,
-                            (false, false, true) => 1,
-                            (false, true, false) => 3,
-                            (true, false, false) => 1,
-                            (false, true, true) => 3,
-                            (true, false, true) => 1,
-                            (true, true, false) => 1,
-                            (true, true, true) => 3,
-                        )
-                    ),
-                )
+                1800 # CHPP.min_run_time
             )
         end
     end
 end
 
 function check(
-    condition :: Condition, chpp :: CHPP,
+    condition :: Condition,
+    chpp :: CHPP,
     buffer :: BufferTank,
     pv_plant :: PVPlant,
     time :: Int,
@@ -98,7 +141,7 @@ function check(
     elseif (condition.name == "PS < 100%")
         return buffer.load < 0.99 * buffer.capacity
     elseif (condition.name == "Min time")
-        return chpp.time_in_state * TIME_STEP >= chpp.min_run_time
+        return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
     elseif (condition.name == "Profitability")
         return (20000 - production(pv_plant, time)) / 20000 > price_factor
     end
@@ -117,28 +160,28 @@ function move_state(
     pv_plant :: PVPlant,
     time :: Int
 )
-    old_state = chpp.state
-    table = chpp.transitions[chpp.state]
+    old_state = chpp.controller.state
+    table = chpp.controller.transitions[chpp.controller.state]
     evaluations = Tuple(check(condition, chpp, buffer, pv_plant, time, 0.5) for condition in table.conditions)
     new_state = table.table_data[evaluations]
-    chpp.state = new_state
+    chpp.controller.state = new_state
     if (old_state == new_state)
-        chpp.time_in_state += 1
+        chpp.controller.time_in_state += 1
     else
-        chpp.time_in_state = 1
+        chpp.controller.time_in_state = 1
     end
 end
 
 function run_simulation()
     plant = CHPP("Heat-driven")
-    buffer = BufferTank(capacity=40000, load=21000)
-    pv_plant = PVPlant(amplitude=30000)
+    buffer = BufferTank(40000.0, 21000.0)
+    pv_plant = PVPlant(30000.0)
     time = Int(0)
-    println("Starting state is ", plant.state_names[plant.state])
+    println("Starting state is ", plant.controller.state_names[plant.controller.state])
 
     for i = 1:96
         move_state(plant, buffer, pv_plant, time)
-        println("State is ", plant.state_names[plant.state])
+        println("State is ", plant.controller.state_names[plant.controller.state])
         time += Int(TIME_STEP)
     end
 end
