@@ -13,52 +13,33 @@ Base.@kwdef struct TruthTable
 end
 
 Base.@kwdef mutable struct StateMachine
-    state :: UInt = 1
+    state :: UInt
     state_names :: Dict{UInt, String}
     transitions :: Dict{UInt, TruthTable}
-    time_in_state :: UInt = 0
+    time_in_state :: UInt
 end
 
+StateMachine() = StateMachine(
+    1, # StateMachine.state
+    Dict(1=>"Default"), # StateMachine.state_names
+    Dict(1=>TruthTable( # StateMachine.transitions
+        conditions=Vector(),
+        table_data=Dict()
+    )),
+    0 # StateMachine.time_in_state
+)
+
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
-    controller :: StateMachine
+    controller :: StateMachine = StateMachine()
 
     capacity :: Float64
     load :: Float64
-
-    function BufferTank(capacity :: Float64, load :: Float64)
-        return new(
-            StateMachine( # BufferTank.controller
-                state=1,
-                state_names=Dict(1=>"Default"),
-                transitions=Dict(1=>TruthTable(
-                    conditions=Vector(),
-                    table_data=Dict()
-                ))
-            ),
-            capacity, # BufferTank.capacity
-            load # BufferTank.load
-        )
-    end
 end
 
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
-    controller :: StateMachine
+    controller :: StateMachine = StateMachine()
 
     amplitude :: Float64
-
-    function PVPlant(amplitude :: Float64)
-        return new(
-            StateMachine( # PVPlant.controller
-                state=1,
-                state_names=Dict(1=>"Default"),
-                transitions=Dict(1=>TruthTable(
-                    conditions=Vector(),
-                    table_data=Dict()
-                ))
-            ),
-            amplitude # PVPlant.amplitude
-        )
-    end
 end
 
 Base.@kwdef mutable struct CHPP <: ControlledSystem
@@ -70,13 +51,13 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
         if (strategy == "Heat-driven")
             return new(
                 StateMachine( # CHPP.controller
-                    state=1,
+                    state=UInt(1),
                     state_names=Dict{UInt, String}(
                         1 => "Off",
                         2 => "Load",
                         3 => "Produce"
                     ),
-                    time_in_state=0,
+                    time_in_state=UInt(0),
                     transitions=Dict{UInt, TruthTable}(
                         1 => TruthTable( # State: Off
                             conditions=[
@@ -176,8 +157,8 @@ end
 function run_simulation()
     system = [
         CHPP("Heat-driven"),
-        BufferTank(40000.0, 21000.0),
-        PVPlant(30000.0)
+        BufferTank(capacity=40000.0, load=21000.0),
+        PVPlant(amplitude=30000.0)
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
