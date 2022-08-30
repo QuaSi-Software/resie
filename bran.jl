@@ -128,12 +128,14 @@ end
 
 function check(
     condition :: Condition,
-    chpp :: CHPP,
-    buffer :: BufferTank,
-    pv_plant :: PVPlant,
-    time :: Int,
-    price_factor :: Float64
+    unit :: ControlledSystem,
+    system :: Vector{ControlledSystem},
+    parameters :: Dict{String, Any}
 ) :: Bool
+    buffer = [u for u in system if typeof(u) <: BufferTank][1]
+    chpp = [u for u in system if typeof(u) <: CHPP][1]
+    pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
+
     if (condition.name == "PS < 50%")
         return buffer.load < 0.5 * buffer.capacity
     elseif (condition.name == "Produce while space")
@@ -143,7 +145,7 @@ function check(
     elseif (condition.name == "Min time")
         return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
     elseif (condition.name == "Profitability")
-        return (20000 - production(pv_plant, time)) / 20000 > price_factor
+        return (20000 - production(pv_plant, parameters["time"])) / 20000 > parameters["price_factor"]
     end
 end
 
@@ -155,34 +157,39 @@ function production(plant :: PVPlant, time :: Int) :: Float64
 end
 
 function move_state(
-    chpp :: CHPP,
-    buffer :: BufferTank,
-    pv_plant :: PVPlant,
-    time :: Int
+    unit :: ControlledSystem,
+    system :: Vector{ControlledSystem},
+    parameters :: Dict{String, Any}
 )
-    old_state = chpp.controller.state
-    table = chpp.controller.transitions[chpp.controller.state]
-    evaluations = Tuple(check(condition, chpp, buffer, pv_plant, time, 0.5) for condition in table.conditions)
+    old_state = unit.controller.state
+    table = unit.controller.transitions[unit.controller.state]
+    evaluations = Tuple(check(condition, unit, system, parameters) for condition in table.conditions)
     new_state = table.table_data[evaluations]
-    chpp.controller.state = new_state
+    unit.controller.state = new_state
     if (old_state == new_state)
-        chpp.controller.time_in_state += 1
+        unit.controller.time_in_state += 1
     else
-        chpp.controller.time_in_state = 1
+        unit.controller.time_in_state = 1
     end
 end
 
 function run_simulation()
-    plant = CHPP("Heat-driven")
-    buffer = BufferTank(40000.0, 21000.0)
-    pv_plant = PVPlant(30000.0)
-    time = Int(0)
+    system = [
+        CHPP("Heat-driven"),
+        BufferTank(40000.0, 21000.0),
+        PVPlant(30000.0)
+    ]
+    parameters = Dict{String, Any}(
+        "time" => 0,
+        "price_factor" => 0.5
+    )
+    plant = [u for u in system if typeof(u) <: CHPP][1]
     println("Starting state is ", plant.controller.state_names[plant.controller.state])
 
     for i = 1:96
-        move_state(plant, buffer, pv_plant, time)
+        move_state(plant, system, parameters)
         println("State is ", plant.controller.state_names[plant.controller.state])
-        time += Int(TIME_STEP)
+        parameters["time"] += Int(TIME_STEP)
     end
 end
 
