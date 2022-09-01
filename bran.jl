@@ -144,9 +144,18 @@ function move_state(
 )
     old_state = unit.controller.state
     table = unit.controller.transitions[unit.controller.state]
-    evaluations = Tuple(check(condition, unit, system, parameters) for condition in table.conditions)
-    new_state = table.table_data[evaluations]
-    unit.controller.state = new_state
+
+    if (length(table.conditions) > 0)
+        evaluations = Tuple(
+            check(condition, unit, system, parameters)
+            for condition in table.conditions
+        )
+        new_state = table.table_data[evaluations]
+        unit.controller.state = new_state
+    else
+        new_state = old_state
+    end
+
     if (old_state == new_state)
         unit.controller.time_in_state += 1
     else
@@ -168,8 +177,10 @@ function run_simulation()
     println("Starting state is ", plant.controller.state_names[plant.controller.state])
 
     for i = 1:96
-        move_state(plant, system, parameters)
-        println("State is ", plant.controller.state_names[plant.controller.state])
+        for unit in system
+            move_state(unit, system, parameters)
+            println("State is ", unit.controller.state_names[unit.controller.state])
+        end
         parameters["time"] += Int(TIME_STEP)
     end
 end
