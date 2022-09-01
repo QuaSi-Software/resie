@@ -48,7 +48,7 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt = 1800
 
     function CHPP(strategy::String)
-        if (strategy == "Heat-driven")
+        if strategy == "Heat-driven"
             return new(
                 StateMachine( # CHPP.controller
                     state=UInt(1),
@@ -117,15 +117,15 @@ function check(
     chpp = [u for u in system if typeof(u) <: CHPP][1]
     pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
 
-    if (condition.name == "PS < 50%")
+    if condition.name == "PS < 50%"
         return buffer.load < 0.5 * buffer.capacity
-    elseif (condition.name == "Produce while space")
+    elseif condition.name == "Produce while space"
         return buffer.load < 0.95 * buffer.capacity
-    elseif (condition.name == "PS < 100%")
+    elseif condition.name == "PS < 100%"
         return buffer.load < 0.99 * buffer.capacity
-    elseif (condition.name == "Min time")
+    elseif condition.name == "Min time"
         return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
-    elseif (condition.name == "Profitability")
+    elseif condition.name == "Profitability"
         return (20000 - production(pv_plant, parameters["time"])) / 20000 > parameters["price_factor"]
     end
 end
@@ -145,7 +145,7 @@ function move_state(
     old_state = unit.controller.state
     table = unit.controller.transitions[unit.controller.state]
 
-    if (length(table.conditions) > 0)
+    if length(table.conditions) > 0
         evaluations = Tuple(
             check(condition, unit, system, parameters)
             for condition in table.conditions
@@ -156,7 +156,7 @@ function move_state(
         new_state = old_state
     end
 
-    if (old_state == new_state)
+    if old_state == new_state
         unit.controller.time_in_state += 1
     else
         unit.controller.time_in_state = 1
