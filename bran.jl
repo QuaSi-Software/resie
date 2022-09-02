@@ -36,10 +36,18 @@ Base.@kwdef mutable struct BufferTank <: ControlledSystem
     load :: Float64
 end
 
+function specific_values(unit :: BufferTank) :: String
+    return "$(unit.load)/$(unit.capacity)"
+end
+
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
     controller :: StateMachine = StateMachine()
 
     amplitude :: Float64
+end
+
+function specific_values(unit :: PVPlant) :: String
+    return ""
 end
 
 Base.@kwdef mutable struct CHPP <: ControlledSystem
@@ -107,6 +115,19 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     end
 end
 
+function specific_values(unit :: CHPP) :: String
+    return ""
+end
+
+function represent(unit :: ControlledSystem) :: String
+    return string(
+        "$(typeof(unit)) ($(unit.controller.state_names[unit.controller.state])) ",
+        "$(specific_values(unit))"
+    )
+end
+
+pprint(unit :: ControlledSystem) = print(represent(unit))
+
 function check(
     condition :: Condition,
     unit :: ControlledSystem,
@@ -163,6 +184,15 @@ function move_state(
     end
 end
 
+function print_system_state(system :: Vector{ControlledSystem}, time :: Int)
+    println("Time is ", time)
+    for unit in system
+        pprint(unit)
+        print(" | ")
+    end
+    print("\n")
+end
+
 function run_simulation()
     system = [
         CHPP("Heat-driven"),
@@ -173,14 +203,16 @@ function run_simulation()
         "time" => 0,
         "price_factor" => 0.5
     )
-    plant = [u for u in system if typeof(u) <: CHPP][1]
-    println("Starting state is ", plant.controller.state_names[plant.controller.state])
+
+    print_system_state(system, parameters["time"])
 
     for i = 1:96
         for unit in system
+            # control
             move_state(unit, system, parameters)
-            println("State is ", unit.controller.state_names[unit.controller.state])
         end
+
+        print_system_state(system, parameters["time"])
         parameters["time"] += Int(TIME_STEP)
     end
 end
