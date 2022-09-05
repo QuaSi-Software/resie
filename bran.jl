@@ -29,6 +29,32 @@ StateMachine() = StateMachine(
     0 # StateMachine.time_in_state
 )
 
+Base.@kwdef mutable struct Demand <: ControlledSystem
+    controller :: StateMachine = StateMachine()
+
+    load :: Float64
+end
+
+function specific_values(unit :: Demand) :: String
+    return "$(unit.load)"
+end
+
+Base.@kwdef mutable struct GridConnection <: ControlledSystem
+    controller :: StateMachine = StateMachine()
+end
+
+function specific_values(unit :: GridConnection) :: String
+    return ""
+end
+
+Base.@kwdef mutable struct Bus <: ControlledSystem
+    controller :: StateMachine = StateMachine()
+end
+
+function specific_values(unit :: Bus) :: String
+    return ""
+end
+
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine = StateMachine()
 
@@ -195,9 +221,14 @@ end
 
 function run_simulation()
     system = [
+        GridConnection(),
+        GridConnection(),
         CHPP("Heat-driven"),
         BufferTank(capacity=40000.0, load=21000.0),
-        PVPlant(amplitude=30000.0)
+        PVPlant(amplitude=30000.0),
+        Bus(),
+        Demand(load=10000),
+        Demand(load=20000),
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
