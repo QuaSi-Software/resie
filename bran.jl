@@ -5,6 +5,10 @@ const TIME_STEP = UInt(900)
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
 
+function Wh(watts :: Float64) :: Float64
+    return Float64(TIME_STEP) * watts / 3600.0
+end
+
 Base.@kwdef struct Condition
     name :: String
 end
@@ -186,6 +190,58 @@ function check(
     end
 end
 
+function produce(
+    system :: Vector{ControlledSystem},
+    parameters :: Dict{String, Any}
+)
+    grid_e = [u for u in system if (typeof(u) <: GridConnection && u.medium == m_e_ac_230v)][1]
+    demand_h = [u for u in system if (typeof(u) <: Demand && u.medium == m_h_w_60c)][1]
+    demand_e = [u for u in system if (typeof(u) <: Demand && u.medium == m_e_ac_230v)][1]
+    buffer = [u for u in system if typeof(u) <: BufferTank][1]
+    e_bus = [u for u in system if (typeof(u) <: Bus && u.medium == m_e_ac_230v)][1]
+    chpp = [u for u in system if typeof(u) <: CHPP][1]
+    pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
+
+    # reset balances
+    e_bus.balance = 0.0
+    chpp.last_produced_e = 0.0
+    chpp.last_produced_h = 0.0
+    pv_plant.last_produced_e = 0.0
+
+    # unload buffer
+    buffer.load -= Wh(demand_h.load)
+
+    # run chpp
+    if chpp.controller.state == 2
+        space_in_buffer = buffer.capacity - buffer.load
+        max_produce_h = Wh(chpp.power * (1.0 - chpp.electricity_fraction))
+        max_produce_e = Wh(chpp.power * chpp.electricity_fraction)
+
+        if space_in_buffer > max_produce_h
+            usage_fraction = 1.0
+        else
+            usage_fraction = space_in_buffer / max_produce_h
+        end
+
+        buffer.load += max_produce_h * usage_fraction
+        e_bus.balance += max_produce_e * usage_fraction
+        chpp.last_produced_e = chpp.power * chpp.electricity_fraction * usage_fraction
+        chpp.last_produced_h = chpp.power * (1.0 - chpp.electricity_fraction) * usage_fraction
+    end
+
+    # electricity demand and PV plant
+    e_bus.balance -= Wh(demand_e.load)
+    e_bus.balance += Wh(production(pv_plant, parameters["time"]))
+    pv_plant.last_produced_e = Wh(production(pv_plant, parameters["time"]))
+
+    # balance electricity bus
+    if e_bus.balance >= 0
+        grid_e.load_sum += e_bus.balance
+    else
+        grid_e.draw_sum += e_bus.balance
+    end
+end
+
 function production(plant :: PVPlant, time :: Int) :: Float64
     seconds_in_day = 60 * 60 * 24
     return plant.amplitude * Base.Math.sin(
@@ -234,7 +290,7 @@ function run_simulation()
         GridConnection(medium=m_e_ac_230v),
         make_CHPP("Ensure storage", 20000.0),
         BufferTank(capacity=40000.0, load=20000.0),
-        PVPlant(amplitude=30000.0),
+        PVPlant(amplitude=20000.0),
         Bus(medium=m_e_ac_230v),
         Demand(medium=m_h_w_60c, load=10000),
         Demand(medium=m_e_ac_230v, load=20000),
@@ -252,6 +308,10 @@ function run_simulation()
             move_state(unit, system, parameters)
         end
 
+        # production
+        produce(system, parameters)
+
+        # output and simulation update
         print_system_state(system, parameters["time"])
         parameters["time"] += Int(TIME_STEP)
     end
