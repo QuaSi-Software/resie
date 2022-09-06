@@ -1,5 +1,7 @@
 const TIME_STEP = UInt(900)
 
+@enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
+
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
 
@@ -31,6 +33,7 @@ StateMachine() = StateMachine(
 
 Base.@kwdef mutable struct Demand <: ControlledSystem
     controller :: StateMachine = StateMachine()
+    medium :: MediumCategory
 
     load :: Float64
 end
@@ -41,6 +44,10 @@ end
 
 Base.@kwdef mutable struct GridConnection <: ControlledSystem
     controller :: StateMachine = StateMachine()
+    medium :: MediumCategory
+
+    draw_sum :: Float64 = 0.0
+    load_sum :: Float64 = 0.0
 end
 
 function specific_values(unit :: GridConnection) :: String
@@ -49,6 +56,9 @@ end
 
 Base.@kwdef mutable struct Bus <: ControlledSystem
     controller :: StateMachine = StateMachine()
+    medium :: MediumCategory
+
+    balance :: Float64 = 0.0
 end
 
 function specific_values(unit :: Bus) :: String
@@ -209,14 +219,14 @@ end
 
 function run_simulation()
     system = [
-        GridConnection(),
-        GridConnection(),
+        GridConnection(medium=m_c_g_natgas),
+        GridConnection(medium=m_e_ac_230v),
         CHPP(strategy="Ensure storage", power=20000.0),
         BufferTank(capacity=40000.0, load=20000.0),
         PVPlant(amplitude=30000.0),
-        Bus(),
-        Demand(load=10000),
-        Demand(load=20000),
+        Bus(medium=m_e_ac_230v),
+        Demand(medium=m_h_w_60c, load=10000),
+        Demand(medium=m_e_ac_230v, load=20000),
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
