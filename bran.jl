@@ -79,62 +79,52 @@ end
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
 
+    power :: Float64
+    min_power_fraction :: Float64
     min_run_time :: UInt = 1800
 
-    function CHPP(strategy::String)
-        if strategy == "Heat-driven"
+    function CHPP(strategy :: String, power :: Float64)
+        if strategy == "Ensure storage"
             return new(
                 StateMachine( # CHPP.controller
                     state=UInt(1),
                     state_names=Dict{UInt, String}(
                         1 => "Off",
                         2 => "Load",
-                        3 => "Produce"
                     ),
                     time_in_state=UInt(0),
                     transitions=Dict{UInt, TruthTable}(
                         1 => TruthTable( # State: Off
                             conditions=[
-                                Condition("PS < 50%"),
-                                Condition("Produce while space")
+                                Condition("PS < 20%"),
                             ],
                             table_data=Dict{Tuple, UInt}(
-                                (false, false) => 1,
-                                (false, true) => 3,
-                                (true, false) => 2,
-                                (true, true) => 1
+                                (false,) => 1,
+                                (true,) => 2,
                             )
                         ),
 
                         2 => TruthTable( # State: Load
                             conditions=[
-                                Condition("PS < 100%")
-                            ],
-                            table_data=Dict{Tuple, UInt}(
-                                (false,) => 1,
-                                (true,) => 2
-                            )
-                        ),
-
-                        3 => TruthTable( # State: Produce
-                            conditions=[
+                                Condition("PS >= 60%"),
                                 Condition("Min time"),
-                                Condition("PS < 100%"),
-                                Condition("Profitability")
+                                Condition("Would overfill"),
                             ],
                             table_data=Dict{Tuple, UInt}(
-                                (false, false, false) => 1,
-                                (false, false, true) => 1,
-                                (false, true, false) => 3,
-                                (true, false, false) => 1,
-                                (false, true, true) => 3,
-                                (true, false, true) => 1,
+                                (false, false, false) => 2,
+                                (false, true, false) => 2,
+                                (true, false, false) => 2,
                                 (true, true, false) => 1,
-                                (true, true, true) => 3,
+                                (false, false, true) => 1,
+                                (false, true, true) => 1,
+                                (true, false, true) => 1,
+                                (true, true, true) => 1,
                             )
                         ),
                     )
                 ),
+                power, # CHPP.power
+                0.2, # CHPP.min_power_fraction
                 1800 # CHPP.min_run_time
             )
         end
@@ -164,16 +154,14 @@ function check(
     chpp = [u for u in system if typeof(u) <: CHPP][1]
     pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
 
-    if condition.name == "PS < 50%"
-        return buffer.load < 0.5 * buffer.capacity
-    elseif condition.name == "Produce while space"
-        return buffer.load < 0.95 * buffer.capacity
-    elseif condition.name == "PS < 100%"
-        return buffer.load < 0.99 * buffer.capacity
+    if condition.name == "PS < 20%"
+        return buffer.load < 0.2 * buffer.capacity
+    elseif condition.name == "PS >= 60%"
+        return buffer.load >= 0.6 * buffer.capacity
     elseif condition.name == "Min time"
         return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
-    elseif condition.name == "Profitability"
-        return (20000 - production(pv_plant, parameters["time"])) / 20000 > parameters["price_factor"]
+    elseif condition.name == "Would overfill"
+        return buffer.capacity - buffer.load < chpp.power * chpp.min_power_fraction
     end
 end
 
@@ -223,8 +211,8 @@ function run_simulation()
     system = [
         GridConnection(),
         GridConnection(),
-        CHPP("Heat-driven"),
-        BufferTank(capacity=40000.0, load=21000.0),
+        CHPP(strategy="Ensure storage", power=20000.0),
+        BufferTank(capacity=40000.0, load=20000.0),
         PVPlant(amplitude=30000.0),
         Bus(),
         Demand(load=10000),
