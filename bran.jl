@@ -98,53 +98,57 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     electricity_fraction :: Float64 = 0.4
     min_power_fraction :: Float64
     min_run_time :: UInt = 1800
+end
 
-    function CHPP(strategy :: String, power :: Float64)
-        if strategy == "Ensure storage"
-            return new(
-                StateMachine( # CHPP.controller
-                    state=UInt(1),
-                    state_names=Dict{UInt, String}(
-                        1 => "Off",
-                        2 => "Load",
-                    ),
-                    time_in_state=UInt(0),
-                    transitions=Dict{UInt, TruthTable}(
-                        1 => TruthTable( # State: Off
-                            conditions=[
-                                Condition("PS < 20%"),
-                            ],
-                            table_data=Dict{Tuple, UInt}(
-                                (false,) => 1,
-                                (true,) => 2,
-                            )
-                        ),
-
-                        2 => TruthTable( # State: Load
-                            conditions=[
-                                Condition("PS >= 60%"),
-                                Condition("Min time"),
-                                Condition("Would overfill"),
-                            ],
-                            table_data=Dict{Tuple, UInt}(
-                                (false, false, false) => 2,
-                                (false, true, false) => 2,
-                                (true, false, false) => 2,
-                                (true, true, false) => 1,
-                                (false, false, true) => 1,
-                                (false, true, true) => 1,
-                                (true, false, true) => 1,
-                                (true, true, true) => 1,
-                            )
-                        ),
-                    )
+function make_CHPP(strategy :: String, power :: Float64) :: CHPP
+    if strategy == "Ensure storage"
+        return CHPP(
+            StateMachine( # CHPP.controller
+                state=UInt(1),
+                state_names=Dict{UInt, String}(
+                    1 => "Off",
+                    2 => "Load",
                 ),
-                power, # CHPP.power
-                0.4, # CHPP.electricity_fraction
-                0.2, # CHPP.min_power_fraction
-                1800 # CHPP.min_run_time
-            )
-        end
+                time_in_state=UInt(0),
+                transitions=Dict{UInt, TruthTable}(
+                    1 => TruthTable( # State: Off
+                        conditions=[
+                            Condition("PS < 20%"),
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (false,) => 1,
+                            (true,) => 2,
+                        )
+                    ),
+
+                    2 => TruthTable( # State: Load
+                        conditions=[
+                            Condition("PS >= 60%"),
+                            Condition("Min time"),
+                            Condition("Would overfill"),
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (false, false, false) => 2,
+                            (false, true, false) => 2,
+                            (true, false, false) => 2,
+                            (true, true, false) => 1,
+                            (false, false, true) => 1,
+                            (false, true, true) => 1,
+                            (true, false, true) => 1,
+                            (true, true, true) => 1,
+                        )
+                    ),
+                )
+            ),
+            0.0, # CHPP.last_produced_e
+            0.0, # CHPP.last_produced_h
+            power, # CHPP.power
+            0.4, # CHPP.electricity_fraction
+            0.2, # CHPP.min_power_fraction
+            1800 # CHPP.min_run_time
+        )
+    else
+        return CHPP(controller=StateMachine(), power=power)
     end
 end
 
@@ -228,7 +232,7 @@ function run_simulation()
     system = [
         GridConnection(medium=m_c_g_natgas),
         GridConnection(medium=m_e_ac_230v),
-        CHPP(strategy="Ensure storage", power=20000.0),
+        make_CHPP("Ensure storage", 20000.0),
         BufferTank(capacity=40000.0, load=20000.0),
         PVPlant(amplitude=30000.0),
         Bus(medium=m_e_ac_230v),
