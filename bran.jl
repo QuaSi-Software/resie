@@ -51,7 +51,7 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
 end
 
 function specific_values(unit :: GridConnection) :: String
-    return ""
+    return "$(unit.draw_sum)/$(unit.load_sum)"
 end
 
 Base.@kwdef mutable struct Bus <: ControlledSystem
@@ -62,7 +62,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 end
 
 function specific_values(unit :: Bus) :: String
-    return ""
+    return "$(unit.balance)"
 end
 
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
@@ -79,17 +79,23 @@ end
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
     controller :: StateMachine = StateMachine()
 
+    last_produced_e :: Float64 = 0.0
+
     amplitude :: Float64
 end
 
 function specific_values(unit :: PVPlant) :: String
-    return ""
+    return "$(unit.last_produced_e)"
 end
 
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
 
+    last_produced_e :: Float64 = 0.0
+    last_produced_h :: Float64 = 0.0
+
     power :: Float64
+    electricity_fraction :: Float64 = 0.4
     min_power_fraction :: Float64
     min_run_time :: UInt = 1800
 
@@ -134,6 +140,7 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
                     )
                 ),
                 power, # CHPP.power
+                0.4, # CHPP.electricity_fraction
                 0.2, # CHPP.min_power_fraction
                 1800 # CHPP.min_run_time
             )
@@ -142,7 +149,7 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
 end
 
 function specific_values(unit :: CHPP) :: String
-    return ""
+    return "$(unit.last_produced_e)/$(unit.last_produced_h)"
 end
 
 function represent(unit :: ControlledSystem) :: String
