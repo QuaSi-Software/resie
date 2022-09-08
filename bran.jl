@@ -160,6 +160,67 @@ function specific_values(unit :: CHPP) :: String
     return "$(unit.last_produced_e)/$(unit.last_produced_h)"
 end
 
+Base.@kwdef mutable struct HeatPump <: ControlledSystem
+    controller :: StateMachine = StateMachine()
+
+    last_consumed_e :: Float64 = 0.0
+    last_produced_h :: Float64 = 0.0
+
+    power :: Float64
+    min_power_fraction :: Float64 = 0.2
+    cop :: Float64
+end
+
+function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
+    if strategy == "Ensure storage"
+        return HeatPump(
+            StateMachine( # HeatPump.controller
+                state=UInt(1),
+                state_names=Dict{UInt, String}(
+                    1 => "Off",
+                    2 => "Load"
+                ),
+                time_in_state=UInt(0),
+                transitions=Dict{UInt, TruthTable}(
+                    1 => TruthTable( # State: Off
+                        conditions=[
+                            Condition("PS < 10%")
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (true,) => 2,
+                            (false,) => 1
+                        )
+                    ),
+
+                    1 => TruthTable( # State: Load
+                        conditions=[
+                            Condition("PS >= 50%"),
+                            Condition("Would overfill HP")
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (false, false) => 2,
+                            (false, true) => 1,
+                            (true, false) => 1,
+                            (true, true) => 1,
+                        )
+                    ),
+                )
+            ),
+            0.0, # HeatPump.last_consumed_e
+            0.0, # HeatPump.last_produced_h
+            power, # HeatPump.power
+            0.2, # HeatPump.min_power_fraction
+            cop, # HeatPump.electricity_fraction
+        )
+    else
+        return HeatPump(controller=StateMachine(), power=power, cop=cop)
+    end
+end
+
+function specific_values(unit :: HeatPump) :: String
+    return "$(unit.last_consumed_e)/$(unit.last_produced_h)"
+end
+
 function represent(unit :: ControlledSystem) :: String
     return string(
         "$(typeof(unit)) ($(unit.controller.state_names[unit.controller.state])) ",
@@ -177,6 +238,7 @@ function check(
 ) :: Bool
     buffer = [u for u in system if typeof(u) <: BufferTank][1]
     chpp = [u for u in system if typeof(u) <: CHPP][1]
+    hp = [u for u in system if typeof(u) <: HeatPump][1]
     pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
 
     if condition.name == "PS < 20%"
@@ -192,7 +254,7 @@ function check(
     elseif condition.name == "Would overfill CHPP"
         return buffer.capacity - buffer.load < chpp.power * chpp.min_power_fraction
     elseif condition.name == "Would overfill HP"
-        return buffer.capacity - buffer.load < hp.power * hp.cop * hp.min_power_fraction
+        return buffer.capacity - buffer.load < hp.power * hp.min_power_fraction
     end
 end
 
@@ -206,12 +268,15 @@ function produce(
     buffer = [u for u in system if typeof(u) <: BufferTank][1]
     e_bus = [u for u in system if (typeof(u) <: Bus && u.medium == m_e_ac_230v)][1]
     chpp = [u for u in system if typeof(u) <: CHPP][1]
+    hp = [u for u in system if typeof(u) <: HeatPump][1]
     pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
 
     # reset balances
     e_bus.balance = 0.0
     chpp.last_produced_e = 0.0
     chpp.last_produced_h = 0.0
+    hp.last_consumed_e = 0.0
+    hp.last_produced_h = 0.0
     pv_plant.last_produced_e = 0.0
 
     # unload buffer
@@ -239,6 +304,23 @@ function produce(
     e_bus.balance -= Wh(demand_e.load)
     e_bus.balance += Wh(production(pv_plant, parameters["time"]))
     pv_plant.last_produced_e = Wh(production(pv_plant, parameters["time"]))
+
+    # run heat pump
+    if hp.controller.state == 2
+        space_in_buffer = buffer.capacity - buffer.load
+        max_produce_h = Wh(hp.power)
+
+        if space_in_buffer > max_produce_h
+            usage_fraction = 1.0
+        else
+            usage_fraction = space_in_buffer / max_produce_h
+        end
+
+        buffer.load += max_produce_h * usage_fraction
+        e_bus.balance -= max_produce_h * usage_fraction / hp.cop
+        hp.last_consumed_e = max_produce_h * usage_fraction / hp.cop
+        hp.last_produced_h = max_produce_h * usage_fraction
+    end
 
     # balance electricity bus
     if e_bus.balance >= 0
@@ -314,6 +396,7 @@ function run_simulation()
         GridConnection(medium=m_c_g_natgas),
         GridConnection(medium=m_e_ac_230v),
         make_CHPP("Ensure storage", 20000.0),
+        make_HeatPump("Ensure storage", 20000.0, 3.0),
         BufferTank(capacity=40000.0, load=20000.0),
         PVPlant(amplitude=20000.0),
         Bus(medium=m_e_ac_230v),
