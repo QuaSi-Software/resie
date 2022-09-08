@@ -127,9 +127,9 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
 
                     2 => TruthTable( # State: Load
                         conditions=[
-                            Condition("PS >= 60%"),
+                            Condition("PS >= 90%"),
                             Condition("Min time"),
-                            Condition("Would overfill"),
+                            Condition("Would overfill CHPP"),
                         ],
                         table_data=Dict{Tuple, UInt}(
                             (false, false, false) => 2,
@@ -181,12 +181,18 @@ function check(
 
     if condition.name == "PS < 20%"
         return buffer.load < 0.2 * buffer.capacity
-    elseif condition.name == "PS >= 60%"
-        return buffer.load >= 0.6 * buffer.capacity
+    elseif condition.name == "PS >= 90%"
+        return buffer.load >= 0.9 * buffer.capacity
+    elseif condition.name == "PS < 10%"
+        return buffer.load < 0.1 * buffer.capacity
+    elseif condition.name == "PS >= 50%"
+        return buffer.load >= 0.5 * buffer.capacity
     elseif condition.name == "Min time"
         return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
-    elseif condition.name == "Would overfill"
+    elseif condition.name == "Would overfill CHPP"
         return buffer.capacity - buffer.load < chpp.power * chpp.min_power_fraction
+    elseif condition.name == "Would overfill HP"
+        return buffer.capacity - buffer.load < hp.power * hp.cop * hp.min_power_fraction
     end
 end
 
