@@ -284,6 +284,25 @@ function print_system_state(system :: Vector{ControlledSystem}, time :: Int)
     print("\n")
 end
 
+function reset_file()
+    open("./out.csv", "w") do file_handle
+        write(file_handle, "")
+    end
+end
+
+function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
+    open("./out.csv", "a") do file_handle
+        write(file_handle, "$time")
+        for unit in system
+            write(file_handle, replace(
+                replace(";$(specific_values(unit))", "/" => ";"),
+                "." => ","
+            ))
+        end
+        write(file_handle, "\n")
+    end
+end
+
 function run_simulation()
     system = [
         GridConnection(medium=m_c_g_natgas),
@@ -301,6 +320,7 @@ function run_simulation()
     )
 
     print_system_state(system, parameters["time"])
+    reset_file()
 
     for i = 1:96
         for unit in system
@@ -313,6 +333,7 @@ function run_simulation()
 
         # output and simulation update
         print_system_state(system, parameters["time"])
+        write_to_file(system, parameters["time"])
         parameters["time"] += Int(TIME_STEP)
     end
 end
