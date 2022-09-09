@@ -351,8 +351,10 @@ end
 
 function production(plant :: PVPlant, time :: Int) :: Float64
     seconds_in_day = 60 * 60 * 24
-    return plant.amplitude * Base.Math.sin(
-        Base.MathConstants.pi * (time % seconds_in_day) / seconds_in_day
+    base_sine = Base.Math.sin(Base.MathConstants.pi * (time % seconds_in_day) / seconds_in_day)
+    return Base.Math.max(
+        plant.amplitude,
+        1.3 * plant.amplitude * base_sine * base_sine
     )
 end
 
