@@ -43,7 +43,7 @@ Base.@kwdef mutable struct Demand <: ControlledSystem
 end
 
 function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
-    return [("Load", "$(load_at_time(unit, time))")]
+    return [("Load", "$(Wh(load_at_time(unit, time)))")]
 end
 
 function load_at_time(unit :: Demand, time :: Int)
@@ -332,12 +332,12 @@ function produce(
 
         buffer.load += max_produce_h * usage_fraction
         e_bus.balance += max_produce_e * usage_fraction
-        chpp.last_produced_e = chpp.power * chpp.electricity_fraction * usage_fraction
-        chpp.last_produced_h = chpp.power * (1.0 - chpp.electricity_fraction) * usage_fraction
+        chpp.last_produced_e = max_produce_e * usage_fraction
+        chpp.last_produced_h = max_produce_h * usage_fraction
     end
 
     # electricity demand and PV plant
-    e_bus.balance -= Wh(demand_e.load)
+    e_bus.balance -= Wh(load_at_time(demand_e, parameters["time"]))
     e_bus.balance += Wh(production(pv_plant, parameters["time"]))
     pv_plant.last_produced_e = Wh(production(pv_plant, parameters["time"]))
 
