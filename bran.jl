@@ -73,7 +73,7 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
     load_sum :: Float64 = 0.0
 end
 
-function specific_values(unit :: GridConnection) :: String
+function specific_values(unit :: GridConnection, time :: Int) :: String
     return "$(unit.draw_sum)/$(unit.load_sum)"
 end
 
@@ -84,7 +84,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     balance :: Float64 = 0.0
 end
 
-function specific_values(unit :: Bus) :: String
+function specific_values(unit :: Bus, time :: Int) :: String
     return "$(unit.balance)"
 end
 
@@ -95,7 +95,7 @@ Base.@kwdef mutable struct BufferTank <: ControlledSystem
     load :: Float64
 end
 
-function specific_values(unit :: BufferTank) :: String
+function specific_values(unit :: BufferTank, time :: Int) :: String
     return "$(unit.load)/$(unit.capacity)"
 end
 
@@ -107,7 +107,7 @@ Base.@kwdef mutable struct PVPlant <: ControlledSystem
     amplitude :: Float64
 end
 
-function specific_values(unit :: PVPlant) :: String
+function specific_values(unit :: PVPlant, time :: Int) :: String
     return "$(unit.last_produced_e)"
 end
 
@@ -175,7 +175,7 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
     end
 end
 
-function specific_values(unit :: CHPP) :: String
+function specific_values(unit :: CHPP, time :: Int) :: String
     return "$(unit.last_produced_e)/$(unit.last_produced_h)"
 end
 
@@ -236,18 +236,18 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
     end
 end
 
-function specific_values(unit :: HeatPump) :: String
+function specific_values(unit :: HeatPump, time :: Int) :: String
     return "$(unit.last_consumed_e)/$(unit.last_produced_h)"
 end
 
-function represent(unit :: ControlledSystem) :: String
+function represent(unit :: ControlledSystem, time :: Int) :: String
     return string(
         "$(typeof(unit)) ($(unit.controller.state_names[unit.controller.state])) ",
-        "$(specific_values(unit))"
+        "$(specific_values(unit, time))"
     )
 end
 
-pprint(unit :: ControlledSystem) = print(represent(unit))
+pprint(unit :: ControlledSystem, time :: Int) = print(represent(unit, time))
 
 function check(
     condition :: Condition,
@@ -385,7 +385,7 @@ end
 function print_system_state(system :: Vector{ControlledSystem}, time :: Int)
     println("Time is ", time)
     for unit in system
-        pprint(unit)
+        pprint(unit, time)
         print(" | ")
     end
     print("\n")
@@ -402,7 +402,7 @@ function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
         write(file_handle, "$time")
         for unit in system
             write(file_handle, replace(
-                replace(";$(specific_values(unit))", "/" => ";"),
+                replace(";$(specific_values(unit, time))", "/" => ";"),
                 "." => ","
             ))
         end
@@ -440,7 +440,7 @@ function run_simulation()
         produce(system, parameters)
 
         # output and simulation update
-        print_system_state(system, parameters["time"])
+        # print_system_state(system, parameters["time"])
         write_to_file(system, parameters["time"])
         parameters["time"] += Int(TIME_STEP)
     end
