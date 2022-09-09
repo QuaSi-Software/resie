@@ -211,7 +211,7 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                         )
                     ),
 
-                    1 => TruthTable( # State: Load
+                    2 => TruthTable( # State: Load
                         conditions=[
                             Condition("PS >= 50%"),
                             Condition("Would overfill HP")
@@ -416,13 +416,13 @@ function run_simulation()
     system = [
         GridConnection(medium=m_c_g_natgas),
         GridConnection(medium=m_e_ac_230v),
-        make_CHPP("Ensure storage", 20000.0),
+        make_CHPP("Ensure storage", 12500.0),
         make_HeatPump("Ensure storage", 20000.0, 3.0),
         BufferTank(capacity=40000.0, load=20000.0),
-        PVPlant(amplitude=20000.0),
+        PVPlant(amplitude=15000.0),
         Bus(medium=m_e_ac_230v),
         Demand(medium=m_h_w_60c, load=10000),
-        Demand(medium=m_e_ac_230v, load=20000),
+        Demand(medium=m_e_ac_230v, load=10000),
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
@@ -432,7 +432,7 @@ function run_simulation()
     print_system_state(system, parameters["time"])
     reset_file()
 
-    for i = 1:96
+    for i = 1:(96*7)
         for unit in system
             # control
             move_state(unit, system, parameters)
