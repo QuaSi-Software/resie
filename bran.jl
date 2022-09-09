@@ -42,8 +42,8 @@ Base.@kwdef mutable struct Demand <: ControlledSystem
     load :: Float64
 end
 
-function specific_values(unit :: Demand, time :: Int) :: String
-    return "$(load_at_time(unit, time))"
+function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
+    return [("Load", "$(load_at_time(unit, time))")]
 end
 
 function load_at_time(unit :: Demand, time :: Int)
@@ -73,8 +73,11 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
     load_sum :: Float64 = 0.0
 end
 
-function specific_values(unit :: GridConnection, time :: Int) :: String
-    return "$(unit.draw_sum)/$(unit.load_sum)"
+function specific_values(unit :: GridConnection, time :: Int) :: Vector{Tuple}
+    return [
+        ("Draw sum", "$(unit.draw_sum)"),
+        ("Load sum", "$(unit.load_sum)")
+    ]
 end
 
 Base.@kwdef mutable struct Bus <: ControlledSystem
@@ -84,8 +87,8 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     balance :: Float64 = 0.0
 end
 
-function specific_values(unit :: Bus, time :: Int) :: String
-    return "$(unit.balance)"
+function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
+    return [("Balance", "$(unit.balance)")]
 end
 
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
@@ -95,8 +98,11 @@ Base.@kwdef mutable struct BufferTank <: ControlledSystem
     load :: Float64
 end
 
-function specific_values(unit :: BufferTank, time :: Int) :: String
-    return "$(unit.load)/$(unit.capacity)"
+function specific_values(unit :: BufferTank, time :: Int) :: Vector{Tuple}
+    return [
+        ("Load", "$(unit.load)"),
+        ("Capacity", "$(unit.capacity)")
+    ]
 end
 
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
@@ -107,8 +113,8 @@ Base.@kwdef mutable struct PVPlant <: ControlledSystem
     amplitude :: Float64
 end
 
-function specific_values(unit :: PVPlant, time :: Int) :: String
-    return "$(unit.last_produced_e)"
+function specific_values(unit :: PVPlant, time :: Int) :: Vector{Tuple}
+    return [("Production E", "$(unit.last_produced_e)")]
 end
 
 Base.@kwdef mutable struct CHPP <: ControlledSystem
@@ -175,8 +181,11 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
     end
 end
 
-function specific_values(unit :: CHPP, time :: Int) :: String
-    return "$(unit.last_produced_e)/$(unit.last_produced_h)"
+function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
+    return [
+        ("Production E", "$(unit.last_produced_e)"),
+        ("Production H", "$(unit.last_produced_h)")
+    ]
 end
 
 Base.@kwdef mutable struct HeatPump <: ControlledSystem
@@ -236,14 +245,22 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
     end
 end
 
-function specific_values(unit :: HeatPump, time :: Int) :: String
-    return "$(unit.last_consumed_e)/$(unit.last_produced_h)"
+function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
+    return [
+        ("Consumption E", "$(unit.last_consumed_e)"),
+        ("Production H", "$(unit.last_produced_h)")
+    ]
 end
 
 function represent(unit :: ControlledSystem, time :: Int) :: String
+    repr = ""
+    for val in specific_values(unit, time)
+        repr = repr * " $(val[1]) $(val[2])"
+    end
     return string(
-        "$(typeof(unit)) ($(unit.controller.state_names[unit.controller.state])) ",
-        "$(specific_values(unit, time))"
+        "$(typeof(unit)) ",
+        "($(unit.controller.state_names[unit.controller.state]))",
+        repr
     )
 end
 
@@ -393,9 +410,15 @@ function print_system_state(system :: Vector{ControlledSystem}, time :: Int)
     print("\n")
 end
 
-function reset_file()
+function reset_file(system :: Vector{ControlledSystem})
     open("./out.csv", "w") do file_handle
-        write(file_handle, "")
+        write(file_handle, "Time")
+        for unit in system
+            for val in specific_values(unit, Int(0))
+                write(file_handle, ";$(typeof(unit)) $(val[1])")
+            end
+        end
+        write(file_handle, "\n")
     end
 end
 
@@ -403,10 +426,12 @@ function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
     open("./out.csv", "a") do file_handle
         write(file_handle, "$time")
         for unit in system
-            write(file_handle, replace(
-                replace(";$(specific_values(unit, time))", "/" => ";"),
-                "." => ","
-            ))
+            for val in specific_values(unit, time)
+                write(file_handle, replace(
+                    replace(";$(val[2])", "/" => ";"),
+                    "." => ","
+                ))
+            end
         end
         write(file_handle, "\n")
     end
@@ -430,7 +455,7 @@ function run_simulation()
     )
 
     print_system_state(system, parameters["time"])
-    reset_file()
+    reset_file(system)
 
     for i = 1:(96*7)
         for unit in system
