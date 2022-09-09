@@ -369,10 +369,10 @@ end
 function production(plant :: PVPlant, time :: Int) :: Float64
     seconds_in_day = 60 * 60 * 24
     base_sine = Base.Math.sin(Base.MathConstants.pi * (time % seconds_in_day) / seconds_in_day)
-    return Base.Math.max(
+    return Base.Math.max(0.0, Base.Math.min(
         plant.amplitude,
-        1.3 * plant.amplitude * base_sine * base_sine
-    )
+        1.4 * plant.amplitude * base_sine * base_sine * base_sine - 0.2 * plant.amplitude
+    ))
 end
 
 function move_state(
@@ -447,7 +447,7 @@ function run_simulation()
         PVPlant(amplitude=15000.0),
         Bus(medium=m_e_ac_230v),
         Demand(medium=m_h_w_60c, load=10000),
-        Demand(medium=m_e_ac_230v, load=10000),
+        Demand(medium=m_e_ac_230v, load=15000),
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
