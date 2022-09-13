@@ -1,0 +1,11 @@
+# IDE files
+.vscode
+
+# Auto-generated files
+__pycache__
+
+# output files
+*.csv
+
+# input files (test data and templates are added separately)
+*.json
