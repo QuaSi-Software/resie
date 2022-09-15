@@ -54,6 +54,7 @@ function run_simulation()
     ]
     parameters = Dict{String, Any}(
         "time" => 0,
+        "time_step_seconds" => TIME_STEP,
         "price_factor" => 0.5
     )
 
