@@ -12,6 +12,12 @@ abstract type ControlledSystem <: EnergySystem end
 
 Base.@kwdef struct Condition
     name :: String
+    parameters :: Dict{String, Any}
+    linked_systems :: Dict{String, Tuple{ControlledSystem, MediumCategory}}
+end
+
+function rel(condition :: Condition, name :: String) :: ControlledSystem
+    return condition.linked_systems[name][1]
 end
 
 Base.@kwdef struct TruthTable
@@ -60,7 +66,7 @@ function move_state(
 
     if length(table.conditions) > 0
         evaluations = Tuple(
-            check(condition, unit, system, parameters)
+            check(condition, unit, parameters)
             for condition in table.conditions
         )
         new_state = table.table_data[evaluations]
@@ -91,29 +97,26 @@ include("pv_plant.jl")
 function check(
     condition :: Condition,
     unit :: ControlledSystem,
-    system :: Vector{ControlledSystem},
     parameters :: Dict{String, Any}
 ) :: Bool
-    buffer = [u for u in system if typeof(u) <: BufferTank][1]
-    chpp = [u for u in system if typeof(u) <: CHPP][1]
-    hp = [u for u in system if typeof(u) <: HeatPump][1]
-    pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
-
-    if condition.name == "PS < 20%"
-        return buffer.load < 0.2 * buffer.capacity
-    elseif condition.name == "PS >= 90%"
-        return buffer.load >= 0.9 * buffer.capacity
-    elseif condition.name == "PS < 10%"
-        return buffer.load < 0.1 * buffer.capacity
-    elseif condition.name == "PS >= 50%"
-        return buffer.load >= 0.5 * buffer.capacity
-    elseif condition.name == "Min time"
-        return chpp.controller.time_in_state * TIME_STEP >= chpp.min_run_time
-    elseif condition.name == "Would overfill CHPP"
-        return buffer.capacity - buffer.load < chpp.power * chpp.min_power_fraction
-    elseif condition.name == "Would overfill HP"
-        return buffer.capacity - buffer.load < hp.power * hp.min_power_fraction
+    if condition.name == "Buffer < X%"
+        return (rel(condition, "buffer").load
+            < condition.parameters["percentage"]
+            * rel(condition, "buffer").capacity)
+    elseif condition.name == "Buffer >= X%"
+        return (rel(condition, "buffer").load
+            >= condition.parameters["percentage"]
+            * rel(condition, "buffer").capacity)
+    elseif condition.name == "Min run time"
+        return (unit.controller.time_in_state
+            * parameters["time_step_seconds"]
+            >= unit.min_run_time)
+    elseif condition.name == "Would overfill thermal buffer"
+        return (rel(condition, "buffer").capacity
+            - rel(condition, "buffer").load
+            < unit.power * unit.min_power_fraction)
     end
+    throw(KeyError(condition.name))
 end
 
 function produce(
