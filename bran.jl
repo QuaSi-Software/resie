@@ -41,12 +41,13 @@ function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
 end
 
 function run_simulation()
+    buffer = BufferTank(capacity=40000.0, load=20000.0)
     system = [
         GridConnection(medium=EnergySystems.m_c_g_natgas),
         GridConnection(medium=EnergySystems.m_e_ac_230v),
-        make_CHPP("Ensure storage", 12500.0),
-        make_HeatPump("Ensure storage", 20000.0, 3.0),
-        BufferTank(capacity=40000.0, load=20000.0),
+        buffer,
+        make_CHPP("Ensure storage", 12500.0, buffer),
+        make_HeatPump("Ensure storage", 20000.0, 3.0, buffer),
         PVPlant(amplitude=15000.0),
         Bus(medium=EnergySystems.m_e_ac_230v),
         Demand(medium=EnergySystems.m_h_w_60c, load=10000),

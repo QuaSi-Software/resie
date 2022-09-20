@@ -10,7 +10,7 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt = 1800
 end
 
-function make_CHPP(strategy :: String, power :: Float64) :: CHPP
+function make_CHPP(strategy :: String, power :: Float64, buffer :: BufferTank) :: CHPP
     if strategy == "Ensure storage"
         return CHPP(
             StateMachine( # CHPP.controller
@@ -23,7 +23,15 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                 transitions=Dict{UInt, TruthTable}(
                     1 => TruthTable( # State: Off
                         conditions=[
-                            Condition("PS < 20%"),
+                            Condition(
+                                name="Buffer < X%",
+                                parameters=Dict{String, Any}(
+                                    "percentage" => 0.2
+                                ),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
                         ],
                         table_data=Dict{Tuple, UInt}(
                             (false,) => 1,
@@ -33,9 +41,27 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
 
                     2 => TruthTable( # State: Load
                         conditions=[
-                            Condition("PS >= 90%"),
-                            Condition("Min time"),
-                            Condition("Would overfill CHPP"),
+                            Condition(
+                                name="Buffer >= X%",
+                                parameters=Dict{String, Any}(
+                                    "percentage" => 0.9
+                                ),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
+                            Condition(
+                                name="Min run time",
+                                parameters=Dict{String, Any}(),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}()
+                            ),
+                            Condition(
+                                name="Would overfill thermal buffer",
+                                parameters=Dict{String, Any}(),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
                         ],
                         table_data=Dict{Tuple, UInt}(
                             (false, false, false) => 2,

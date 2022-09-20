@@ -9,7 +9,7 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 end
 
-function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
+function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64, buffer :: BufferTank) :: HeatPump
     if strategy == "Ensure storage"
         return HeatPump(
             StateMachine( # HeatPump.controller
@@ -22,7 +22,15 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                 transitions=Dict{UInt, TruthTable}(
                     1 => TruthTable( # State: Off
                         conditions=[
-                            Condition("PS < 10%")
+                            Condition(
+                                name="Buffer < X%",
+                                parameters=Dict{String, Any}(
+                                    "percentage" => 0.1
+                                ),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
                         ],
                         table_data=Dict{Tuple, UInt}(
                             (true,) => 2,
@@ -32,8 +40,22 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
 
                     2 => TruthTable( # State: Load
                         conditions=[
-                            Condition("PS >= 50%"),
-                            Condition("Would overfill HP")
+                            Condition(
+                                name="Buffer >= X%",
+                                parameters=Dict{String, Any}(
+                                    "percentage" => 0.5
+                                ),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
+                            Condition(
+                                name="Would overfill thermal buffer",
+                                parameters=Dict{String, Any}(),
+                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
+                                    "buffer" => (buffer, m_h_w_60c)
+                                )
+                            ),
                         ],
                         table_data=Dict{Tuple, UInt}(
                             (false, false) => 2,
