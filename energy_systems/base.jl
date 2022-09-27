@@ -10,14 +10,60 @@ const TIME_STEP = UInt(900)
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
 
-Base.@kwdef struct Condition
+struct Condition
     name :: String
     parameters :: Dict{String, Any}
-    linked_systems :: Dict{String, Tuple{ControlledSystem, MediumCategory}}
+    required_systems :: Dict{String, Tuple{Type, MediumCategory}}
+    linked_systems :: Dict{String, ControlledSystem}
 end
 
 function rel(condition :: Condition, name :: String) :: ControlledSystem
     return condition.linked_systems[name][1]
+end
+
+function Condition(
+    name :: String,
+    parameters :: Dict{String, Any}
+) :: Condition
+    required_systems = Dict{String, Tuple{Type, MediumCategory}}()
+    default_params = Dict{String, Any}()
+
+    if name == "Buffer < X%"
+        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+        default_params["percentage"] = 0.5
+    elseif name == "Buffer >= X%"
+        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+        default_params["percentage"] = 0.5
+    elseif name == "Min run time"
+        # nothing to do
+    elseif name == "Would overfill thermal buffer"
+        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+    else
+        throw(KeyError(name))
+    end
+
+    return Condition(
+        name,
+        merge(default_params, parameters),
+        required_systems,
+        Dict{String, ControlledSystem}()
+    )
+end
+
+function link(condition :: Condition, systems :: Array{ControlledSystem})
+    for (name, req_unit) in pairs(condition.required_systems)
+        found_link = false
+        for unit in systems
+            if typeof(unit) == req_unit[1] && unit.medium == req_unit[2]
+                condition.linked_systems[name] = unit
+            end
+        end
+
+        if !found_link
+            throw(KeyError("Could not find match for required system $name "
+                * "for condition $(condition.name)"))
+        end
+    end
 end
 
 Base.@kwdef struct TruthTable
