@@ -10,7 +10,7 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt = 1800
 end
 
-function make_CHPP(strategy :: String, power :: Float64, buffer :: BufferTank) :: CHPP
+function make_CHPP(strategy :: String, power :: Float64) :: CHPP
     if strategy == "Ensure storage"
         return CHPP(
             StateMachine( # CHPP.controller
@@ -24,12 +24,9 @@ function make_CHPP(strategy :: String, power :: Float64, buffer :: BufferTank) :
                     1 => TruthTable( # State: Off
                         conditions=[
                             Condition(
-                                name="Buffer < X%",
-                                parameters=Dict{String, Any}(
+                                "Buffer < X%",
+                                Dict{String, Any}(
                                     "percentage" => 0.2
-                                ),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
                                 )
                             ),
                         ],
@@ -42,25 +39,18 @@ function make_CHPP(strategy :: String, power :: Float64, buffer :: BufferTank) :
                     2 => TruthTable( # State: Load
                         conditions=[
                             Condition(
-                                name="Buffer >= X%",
-                                parameters=Dict{String, Any}(
+                                "Buffer >= X%",
+                                Dict{String, Any}(
                                     "percentage" => 0.9
-                                ),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
                                 )
                             ),
                             Condition(
-                                name="Min run time",
-                                parameters=Dict{String, Any}(),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}()
+                                "Min run time",
+                                Dict{String, Any}()
                             ),
                             Condition(
-                                name="Would overfill thermal buffer",
-                                parameters=Dict{String, Any}(),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
-                                )
+                                "Would overfill thermal buffer",
+                                Dict{String, Any}()
                             ),
                         ],
                         table_data=Dict{Tuple, UInt}(
@@ -88,6 +78,14 @@ function make_CHPP(strategy :: String, power :: Float64, buffer :: BufferTank) :
     end
 end
 
+function link_with(unit :: CHPP, systems :: Array{ControlledSystem})
+    for table in unit.controller.transitions
+        for condition in table.conditions
+            link(condition, systems)
+        end
+    end
+end
+
 function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
     return [
         ("Production E", "$(unit.last_produced_e)"),
@@ -95,4 +93,4 @@ function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
     ]
 end
 
-export CHPP, specific_values, make_CHPP
+export CHPP, link_with, make_CHPP, specific_values

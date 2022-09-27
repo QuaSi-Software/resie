@@ -9,7 +9,7 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 end
 
-function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64, buffer :: BufferTank) :: HeatPump
+function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
     if strategy == "Ensure storage"
         return HeatPump(
             StateMachine( # HeatPump.controller
@@ -23,12 +23,9 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64, buf
                     1 => TruthTable( # State: Off
                         conditions=[
                             Condition(
-                                name="Buffer < X%",
-                                parameters=Dict{String, Any}(
+                                "Buffer < X%",
+                                Dict{String, Any}(
                                     "percentage" => 0.1
-                                ),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
                                 )
                             ),
                         ],
@@ -41,20 +38,14 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64, buf
                     2 => TruthTable( # State: Load
                         conditions=[
                             Condition(
-                                name="Buffer >= X%",
-                                parameters=Dict{String, Any}(
+                                "Buffer >= X%",
+                                Dict{String, Any}(
                                     "percentage" => 0.5
-                                ),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
                                 )
                             ),
                             Condition(
-                                name="Would overfill thermal buffer",
-                                parameters=Dict{String, Any}(),
-                                linked_systems=Dict{String, Tuple{ControlledSystem, MediumCategory}}(
-                                    "buffer" => (buffer, m_h_w_60c)
-                                )
+                                "Would overfill thermal buffer",
+                                Dict{String, Any}()
                             ),
                         ],
                         table_data=Dict{Tuple, UInt}(
@@ -77,6 +68,14 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64, buf
     end
 end
 
+function link_with(unit :: HeatPump, systems :: Array{ControlledSystem})
+    for table in unit.controller.transitions
+        for condition in table.conditions
+            link(condition, systems)
+        end
+    end
+end
+
 function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
     return [
         ("Consumption E", "$(unit.last_consumed_e)"),
@@ -84,4 +83,4 @@ function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
     ]
 end
 
-export HeatPump, make_HeatPump, specific_values
+export HeatPump, link_with, make_HeatPump, specific_values
