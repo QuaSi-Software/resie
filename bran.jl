@@ -41,39 +41,42 @@ function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
 end
 
 function run_simulation()
-    buffer = BufferTank(capacity=40000.0, load=20000.0)
-    system = [
-        GridConnection(medium=EnergySystems.m_c_g_natgas),
-        GridConnection(medium=EnergySystems.m_e_ac_230v),
-        buffer,
-        make_CHPP("Ensure storage", 12500.0, buffer),
-        make_HeatPump("Ensure storage", 20000.0, 3.0, buffer),
-        PVPlant(amplitude=15000.0),
-        Bus(medium=EnergySystems.m_e_ac_230v),
-        Demand(medium=EnergySystems.m_h_w_60c, load=10000),
-        Demand(medium=EnergySystems.m_e_ac_230v, load=15000),
-    ]
+    systems = Dict{String, ControlledSystem}(
+        "TST_01_HZG_01_GRD" => GridConnection(medium=EnergySystems.m_c_g_natgas),
+        "TST_01_ELT_01_GRD" => GridConnection(medium=EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_BFT" => BufferTank(capacity=40000.0, load=20000.0),
+        "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
+        "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
+        "TST_01_ELT_01_PVP" => PVPlant(amplitude=15000.0),
+        "TST_01_ELT_01_BUS" => Bus(medium=EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_DEM" => Demand(medium=EnergySystems.m_h_w_60c, load=10000),
+        "TST_01_ELT_01_DEM" => Demand(medium=EnergySystems.m_e_ac_230v, load=15000),
+    )
+
+    link_with(systems["TST_01_HZG_01_CHP"], [systems["TST_01_HZG_01_BFT"]])
+    link_with(systems["TST_01_HZG_01_HTP"], [systems["TST_01_HZG_01_BFT"]])
+
     parameters = Dict{String, Any}(
         "time" => 0,
         "time_step_seconds" => TIME_STEP,
         "price_factor" => 0.5
     )
 
-    print_system_state(system, parameters["time"])
-    reset_file(system)
+    print_system_state(values(systems), parameters["time"])
+    reset_file(values(systems))
 
     for i = 1:(96*7)
-        for unit in system
+        for unit in systems
             # control
-            move_state(unit, system, parameters)
+            move_state(unit, systems, parameters)
         end
 
         # production
-        produce(system, parameters)
+        produce(systems, parameters)
 
         # output and simulation update
         # print_system_state(system, parameters["time"])
-        write_to_file(system, parameters["time"])
+        write_to_file(systems, parameters["time"])
         parameters["time"] += Int(TIME_STEP)
     end
 end
