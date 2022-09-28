@@ -1,7 +1,7 @@
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    move_state, represent, pprint, check, produce, production
+    control, represent, pprint, check, produce, production, link_with
 
 const TIME_STEP = UInt(900)
 
@@ -126,6 +126,14 @@ function move_state(
     else
         unit.controller.time_in_state = 1
     end
+end
+
+function control(
+    unit :: ControlledSystem,
+    system :: Base.ValueIterator,
+    parameters :: Dict{String, Any}
+)
+    move_state(unit, system, parameters)
 end
 
 function Wh(watts :: Float64) :: Float64

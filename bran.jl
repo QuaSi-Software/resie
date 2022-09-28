@@ -67,8 +67,7 @@ function run_simulation()
 
     for i = 1:(96*7)
         for unit in systems
-            # control
-            move_state(unit, systems, parameters)
+            control(unit, systems, parameters)
         end
 
         # production
