@@ -50,18 +50,27 @@ function Condition(
     )
 end
 
-function link(condition :: Condition, systems :: Array{ControlledSystem})
+function link(condition :: Condition, systems :: Vector{ControlledSystem})
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
         for unit in systems
             if typeof(unit) == req_unit[1] && unit.medium == req_unit[2]
                 condition.linked_systems[name] = unit
+                found_link = true
             end
         end
 
         if !found_link
             throw(KeyError("Could not find match for required system $name "
                 * "for condition $(condition.name)"))
+        end
+    end
+end
+
+function link_with(unit :: ControlledSystem, systems :: Vector{ControlledSystem})
+    for table in values(unit.controller.transitions)
+        for condition in table.conditions
+            link(condition, systems)
         end
     end
 end

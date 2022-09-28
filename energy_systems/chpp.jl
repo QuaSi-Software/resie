@@ -78,14 +78,6 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
     end
 end
 
-function link_with(unit :: CHPP, systems :: Array{ControlledSystem})
-    for table in unit.controller.transitions
-        for condition in table.conditions
-            link(condition, systems)
-        end
-    end
-end
-
 function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
     return [
         ("Production E", "$(unit.last_produced_e)"),
@@ -93,4 +85,4 @@ function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
     ]
 end
 
-export CHPP, link_with, make_CHPP, specific_values
+export CHPP, make_CHPP, specific_values

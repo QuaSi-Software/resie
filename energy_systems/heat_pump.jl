@@ -68,14 +68,6 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
     end
 end
 
-function link_with(unit :: HeatPump, systems :: Array{ControlledSystem})
-    for table in unit.controller.transitions
-        for condition in table.conditions
-            link(condition, systems)
-        end
-    end
-end
-
 function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
     return [
         ("Consumption E", "$(unit.last_consumed_e)"),
@@ -83,4 +75,4 @@ function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
     ]
 end
 
-export HeatPump, link_with, make_HeatPump, specific_values
+export HeatPump, make_HeatPump, specific_values
