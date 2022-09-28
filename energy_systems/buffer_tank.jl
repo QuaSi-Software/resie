@@ -1,5 +1,6 @@
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine = StateMachine()
+    medium = m_h_w_60c
 
     capacity :: Float64
     load :: Float64
