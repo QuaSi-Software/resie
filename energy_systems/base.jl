@@ -1,7 +1,7 @@
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    control, represent, pprint, check, produce, production, link_with
+    control, represent, pprint, check, produce, production, link_with, each, Grouping
 
 const TIME_STEP = UInt(900)
 
@@ -10,15 +10,21 @@ const TIME_STEP = UInt(900)
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
 
+const Grouping = Dict{String, ControlledSystem}
+
+function each(systems :: Grouping) :: Base.ValueIterator
+    return values(systems)
+end
+
 struct Condition
     name :: String
     parameters :: Dict{String, Any}
     required_systems :: Dict{String, Tuple{Type, MediumCategory}}
-    linked_systems :: Dict{String, ControlledSystem}
+    linked_systems :: Grouping
 end
 
 function rel(condition :: Condition, name :: String) :: ControlledSystem
-    return condition.linked_systems[name][1]
+    return condition.linked_systems[name]
 end
 
 function Condition(
@@ -46,14 +52,14 @@ function Condition(
         name,
         merge(default_params, parameters),
         required_systems,
-        Dict{String, ControlledSystem}()
+        Grouping()
     )
 end
 
-function link(condition :: Condition, systems :: Vector{ControlledSystem})
+function link(condition :: Condition, systems :: Grouping)
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
-        for unit in systems
+        for unit in each(systems)
             if typeof(unit) == req_unit[1] && unit.medium == req_unit[2]
                 condition.linked_systems[name] = unit
                 found_link = true
@@ -67,7 +73,7 @@ function link(condition :: Condition, systems :: Vector{ControlledSystem})
     end
 end
 
-function link_with(unit :: ControlledSystem, systems :: Vector{ControlledSystem})
+function link_with(unit :: ControlledSystem, systems :: Grouping)
     for table in values(unit.controller.transitions)
         for condition in table.conditions
             link(condition, systems)
@@ -113,7 +119,7 @@ pprint(unit :: ControlledSystem, time :: Int) = print(represent(unit, time))
 
 function move_state(
     unit :: ControlledSystem,
-    system :: Vector{ControlledSystem},
+    systems :: Grouping,
     parameters :: Dict{String, Any}
 )
     old_state = unit.controller.state
@@ -139,10 +145,10 @@ end
 
 function control(
     unit :: ControlledSystem,
-    system :: Base.ValueIterator,
+    systems :: Grouping,
     parameters :: Dict{String, Any}
 )
-    move_state(unit, system, parameters)
+    move_state(unit, systems, parameters)
 end
 
 function Wh(watts :: Float64) :: Float64
@@ -183,17 +189,17 @@ function check(
 end
 
 function produce(
-    system :: Vector{ControlledSystem},
+    systems :: Grouping,
     parameters :: Dict{String, Any}
 )
-    grid_e = [u for u in system if (typeof(u) <: GridConnection && u.medium == m_e_ac_230v)][1]
-    demand_h = [u for u in system if (typeof(u) <: Demand && u.medium == m_h_w_60c)][1]
-    demand_e = [u for u in system if (typeof(u) <: Demand && u.medium == m_e_ac_230v)][1]
-    buffer = [u for u in system if typeof(u) <: BufferTank][1]
-    e_bus = [u for u in system if (typeof(u) <: Bus && u.medium == m_e_ac_230v)][1]
-    chpp = [u for u in system if typeof(u) <: CHPP][1]
-    hp = [u for u in system if typeof(u) <: HeatPump][1]
-    pv_plant = [u for u in system if typeof(u) <: PVPlant][1]
+    grid_e = [u for u in each(systems) if (typeof(u) <: GridConnection && u.medium == m_e_ac_230v)][1]
+    demand_h = [u for u in each(systems) if (typeof(u) <: Demand && u.medium == m_h_w_60c)][1]
+    demand_e = [u for u in each(systems) if (typeof(u) <: Demand && u.medium == m_e_ac_230v)][1]
+    buffer = [u for u in each(systems) if typeof(u) <: BufferTank][1]
+    e_bus = [u for u in each(systems) if (typeof(u) <: Bus && u.medium == m_e_ac_230v)][1]
+    chpp = [u for u in each(systems) if typeof(u) <: CHPP][1]
+    hp = [u for u in each(systems) if typeof(u) <: HeatPump][1]
+    pv_plant = [u for u in each(systems) if typeof(u) <: PVPlant][1]
 
     # reset balances
     e_bus.balance = 0.0

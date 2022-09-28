@@ -4,19 +4,19 @@ include("energy_systems/base.jl")
 
 using .EnergySystems
 
-function print_system_state(system :: Vector{ControlledSystem}, time :: Int)
+function print_system_state(systems :: Grouping, time :: Int)
     println("Time is ", time)
-    for unit in system
+    for unit in each(systems)
         pprint(unit, time)
         print(" | ")
     end
     print("\n")
 end
 
-function reset_file(system :: Vector{ControlledSystem})
+function reset_file(systems :: Grouping)
     open("./out.csv", "w") do file_handle
         write(file_handle, "Time")
-        for unit in system
+        for unit in each(systems)
             for val in specific_values(unit, Int(0))
                 write(file_handle, ";$(typeof(unit)) $(val[1])")
             end
@@ -25,10 +25,10 @@ function reset_file(system :: Vector{ControlledSystem})
     end
 end
 
-function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
+function write_to_file(systems :: Grouping, time :: Int)
     open("./out.csv", "a") do file_handle
         write(file_handle, "$time")
-        for unit in system
+        for unit in each(systems)
             for val in specific_values(unit, time)
                 write(file_handle, replace(
                     replace(";$(val[2])", "/" => ";"),
@@ -41,7 +41,7 @@ function write_to_file(system :: Vector{ControlledSystem}, time :: Int)
 end
 
 function run_simulation()
-    systems = Dict{String, ControlledSystem}(
+    systems = Grouping(
         "TST_01_HZG_01_GRD" => GridConnection(medium=EnergySystems.m_c_g_natgas),
         "TST_01_ELT_01_GRD" => GridConnection(medium=EnergySystems.m_e_ac_230v),
         "TST_01_HZG_01_BFT" => BufferTank(capacity=40000.0, load=20000.0),
@@ -53,8 +53,8 @@ function run_simulation()
         "TST_01_ELT_01_DEM" => Demand(medium=EnergySystems.m_e_ac_230v, load=15000),
     )
 
-    link_with(systems["TST_01_HZG_01_CHP"], [systems["TST_01_HZG_01_BFT"]])
-    link_with(systems["TST_01_HZG_01_HTP"], [systems["TST_01_HZG_01_BFT"]])
+    link_with(systems["TST_01_HZG_01_CHP"], Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]))
+    link_with(systems["TST_01_HZG_01_HTP"], Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]))
 
     parameters = Dict{String, Any}(
         "time" => 0,
@@ -62,11 +62,11 @@ function run_simulation()
         "price_factor" => 0.5
     )
 
-    print_system_state(values(systems), parameters["time"])
-    reset_file(values(systems))
+    print_system_state(systems, parameters["time"])
+    reset_file(systems)
 
     for i = 1:(96*7)
-        for unit in systems
+        for unit in each(systems)
             control(unit, systems, parameters)
         end
 
