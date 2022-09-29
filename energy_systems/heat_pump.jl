@@ -1,5 +1,9 @@
 Base.@kwdef mutable struct HeatPump <: ControlledSystem
     controller :: StateMachine = StateMachine()
+    inputs :: Dict{MediumCategory, ControlledSystem}
+    outputs :: Dict{MediumCategory, ControlledSystem}
+    accepted_inputs :: Vector{MediumCategory}
+    accepted_outputs :: Vector{MediumCategory}
 
     last_consumed_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
@@ -57,6 +61,10 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                     ),
                 )
             ),
+            Dict{MediumCategory, ControlledSystem}(), # HeatPump.inputs
+            Dict{MediumCategory, ControlledSystem}(), # HeatPump.outputs
+            [m_e_ac_230v], # HeatPump.accepted_inputs
+            [m_h_w_60c], # HeatPump.accepted_outputs
             0.0, # HeatPump.last_consumed_e
             0.0, # HeatPump.last_produced_h
             power, # HeatPump.power

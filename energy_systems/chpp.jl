@@ -1,5 +1,9 @@
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
+    inputs :: Dict{MediumCategory, ControlledSystem}
+    outputs :: Dict{MediumCategory, ControlledSystem}
+    accepted_inputs :: Vector{MediumCategory}
+    accepted_outputs :: Vector{MediumCategory}
 
     last_produced_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
@@ -66,6 +70,10 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                     ),
                 )
             ),
+            Dict{MediumCategory, ControlledSystem}(), # CHPP.inputs
+            Dict{MediumCategory, ControlledSystem}(), # CHPP.outputs
+            [m_c_g_natgas], # CHPP.accepted_inputs
+            [m_h_w_60c, m_e_ac_230v], # CHPP.accepted_outputs
             0.0, # CHPP.last_produced_e
             0.0, # CHPP.last_produced_h
             power, # CHPP.power

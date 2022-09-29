@@ -1,6 +1,10 @@
 Base.@kwdef mutable struct Demand <: ControlledSystem
     controller :: StateMachine = StateMachine()
     medium :: MediumCategory
+    inputs :: Dict{MediumCategory, ControlledSystem} = Dict{MediumCategory, ControlledSystem}()
+    outputs :: Dict{MediumCategory, ControlledSystem} = Dict{MediumCategory, ControlledSystem}()
+    accepted_inputs :: Vector{MediumCategory}
+    accepted_outputs :: Vector{MediumCategory}
 
     load :: Float64
 end
