@@ -1,7 +1,7 @@
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    control, represent, pprint, check, produce, production, link_with, each, Grouping
+    control, represent, pprint, check, produce, production, link_control_with, each, Grouping
 
 const TIME_STEP = UInt(900)
 
@@ -73,7 +73,7 @@ function link(condition :: Condition, systems :: Grouping)
     end
 end
 
-function link_with(unit :: ControlledSystem, systems :: Grouping)
+function link_control_with(unit :: ControlledSystem, systems :: Grouping)
     for table in values(unit.controller.transitions)
         for condition in table.conditions
             link(condition, systems)

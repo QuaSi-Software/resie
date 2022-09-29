@@ -53,8 +53,14 @@ function run_simulation()
         "TST_01_ELT_01_DEM" => Demand(medium=EnergySystems.m_e_ac_230v, load=15000),
     )
 
-    link_with(systems["TST_01_HZG_01_CHP"], Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]))
-    link_with(systems["TST_01_HZG_01_HTP"], Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]))
+    link_control_with(
+        systems["TST_01_HZG_01_CHP"],
+        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
+    )
+    link_control_with(
+        systems["TST_01_HZG_01_HTP"],
+        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
+    )
 
     parameters = Dict{String, Any}(
         "time" => 0,
