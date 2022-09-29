@@ -1,7 +1,8 @@
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    control, represent, pprint, check, produce, production, link_control_with, each, Grouping
+    control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
+    link_production_with
 
 const TIME_STEP = UInt(900)
 
@@ -186,6 +187,36 @@ function check(
             < unit.power * unit.min_power_fraction)
     end
     throw(KeyError(condition.name))
+end
+
+function link_production_with(unit :: ControlledSystem, systems :: Grouping)
+    for output_medium in unit.accepted_outputs
+        found_matching_input = false
+
+        for system in each(systems)
+            for input_medium in system.accepted_inputs
+                if output_medium == input_medium
+                    found_matching_input = true
+
+                    if isa(system, Bus)
+                        push!(system.inputs, unit)
+                    else
+                        system.inputs[input_medium] = unit
+                    end
+
+                    if isa(unit, Bus)
+                        push!(unit.outputs, system)
+                    else
+                        unit.outputs[output_medium] = system
+                    end
+                end
+            end
+        end
+
+        if !found_matching_input
+            throw(KeyError("Could not find system with matching input"))
+        end
+    end
 end
 
 function produce(

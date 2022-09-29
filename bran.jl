@@ -42,15 +42,37 @@ end
 
 function run_simulation()
     systems = Grouping(
-        "TST_01_HZG_01_GRD" => GridConnection(medium=EnergySystems.m_c_g_natgas),
-        "TST_01_ELT_01_GRD" => GridConnection(medium=EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_GRD" => GridConnection(
+            medium=EnergySystems.m_c_g_natgas,
+            accepted_inputs=[],
+            accepted_outputs=[EnergySystems.m_c_g_natgas]
+        ),
+        "TST_01_ELT_01_GRD" => GridConnection(
+            medium=EnergySystems.m_e_ac_230v,
+            accepted_inputs=[EnergySystems.m_e_ac_230v],
+            accepted_outputs=[EnergySystems.m_e_ac_230v]
+        ),
         "TST_01_HZG_01_BFT" => BufferTank(capacity=40000.0, load=20000.0),
         "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
         "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
         "TST_01_ELT_01_PVP" => PVPlant(amplitude=15000.0),
-        "TST_01_ELT_01_BUS" => Bus(medium=EnergySystems.m_e_ac_230v),
-        "TST_01_HZG_01_DEM" => Demand(medium=EnergySystems.m_h_w_60c, load=10000),
-        "TST_01_ELT_01_DEM" => Demand(medium=EnergySystems.m_e_ac_230v, load=15000),
+        "TST_01_ELT_01_BUS" => Bus(
+            medium=EnergySystems.m_e_ac_230v,
+            accepted_inputs=[EnergySystems.m_e_ac_230v],
+            accepted_outputs=[EnergySystems.m_e_ac_230v]
+        ),
+        "TST_01_HZG_01_DEM" => Demand(
+            medium=EnergySystems.m_h_w_60c,
+            accepted_inputs=[EnergySystems.m_h_w_60c],
+            accepted_outputs=[],
+            load=10000
+        ),
+        "TST_01_ELT_01_DEM" => Demand(
+            medium=EnergySystems.m_e_ac_230v,
+            accepted_inputs=[EnergySystems.m_e_ac_230v],
+            accepted_outputs=[],
+            load=15000
+        ),
     )
 
     link_control_with(
@@ -60,6 +82,42 @@ function run_simulation()
     link_control_with(
         systems["TST_01_HZG_01_HTP"],
         Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
+    )
+
+    link_production_with(
+        systems["TST_01_HZG_01_GRD"],
+        Grouping("TST_01_HZG_01_CHP" => systems["TST_01_HZG_01_CHP"])
+    )
+    link_production_with(
+        systems["TST_01_ELT_01_GRD"],
+        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
+    )
+    link_production_with(
+        systems["TST_01_HZG_01_BFT"],
+        Grouping("TST_01_HZG_01_DEM" => systems["TST_01_HZG_01_DEM"])
+    )
+    link_production_with(
+        systems["TST_01_HZG_01_CHP"],
+        Grouping(
+            "TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"],
+            "TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"]
+        )
+    )
+    link_production_with(
+        systems["TST_01_HZG_01_HTP"],
+        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
+    )
+    link_production_with(
+        systems["TST_01_ELT_01_PVP"],
+        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
+    )
+    link_production_with(
+        systems["TST_01_ELT_01_BUS"],
+        Grouping(
+            "TST_01_ELT_01_DEM" => systems["TST_01_ELT_01_DEM"],
+            "TST_01_HZG_01_HTP" => systems["TST_01_HZG_01_HTP"],
+            "TST_01_ELT_01_GRD" => systems["TST_01_ELT_01_GRD"]
+        )
     )
 
     parameters = Dict{String, Any}(
