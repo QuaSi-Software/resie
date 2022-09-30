@@ -42,8 +42,9 @@ end
 
 function run_simulation()
     systems = Grouping(
-        "TST_01_HZG_01_GRD" => make_GridConnection(EnergySystems.m_c_g_natgas),
-        "TST_01_ELT_01_GRD" => make_GridConnection(EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_GRI" => make_GridConnection(EnergySystems.m_c_g_natgas, true),
+        "TST_01_ELT_01_GRI" => make_GridConnection(EnergySystems.m_e_ac_230v, true),
+        "TST_01_ELT_01_GRO" => make_GridConnection(EnergySystems.m_e_ac_230v, false),
         "TST_01_HZG_01_BFT" => make_BufferTank(40000.0, 20000.0),
         "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
         "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
@@ -63,11 +64,11 @@ function run_simulation()
     )
 
     link_production_with(
-        systems["TST_01_HZG_01_GRD"],
+        systems["TST_01_HZG_01_GRI"],
         Grouping("TST_01_HZG_01_CHP" => systems["TST_01_HZG_01_CHP"])
     )
     link_production_with(
-        systems["TST_01_ELT_01_GRD"],
+        systems["TST_01_ELT_01_GRI"],
         Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
     )
     link_production_with(
@@ -94,7 +95,7 @@ function run_simulation()
         Grouping(
             "TST_01_ELT_01_DEM" => systems["TST_01_ELT_01_DEM"],
             "TST_01_HZG_01_HTP" => systems["TST_01_HZG_01_HTP"],
-            "TST_01_ELT_01_GRD" => systems["TST_01_ELT_01_GRD"]
+            "TST_01_ELT_01_GRO" => systems["TST_01_ELT_01_GRO"]
         )
     )
 
