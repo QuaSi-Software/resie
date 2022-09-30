@@ -1,8 +1,8 @@
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
     controller :: StateMachine
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     last_produced_e :: Float64
 
@@ -12,9 +12,9 @@ end
 function make_PVPlant(amplitude :: Float64) :: PVPlant
     return PVPlant(
         StateMachine(), # controller
-        Dict{MediumCategory, SystemInterface}(), # input_interfaces
-        Dict{MediumCategory, SystemInterface}( # output_interfaces
-            m_h_w_60c => SystemInterface()
+        InterfaceMap(), # input_interfaces
+        InterfaceMap( # output_interfaces
+            m_h_w_60c => nothing
         ),
         0.0, # last_produced_e
         amplitude, # amplitude

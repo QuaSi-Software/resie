@@ -23,6 +23,8 @@ Base.@kwdef mutable struct SystemInterface
     balance :: Float64 = 0.0
 end
 
+const InterfaceMap = Dict{MediumCategory, Union{Nothing, SystemInterface}}
+
 struct Condition
     name :: String
     parameters :: Dict{String, Any}
@@ -200,35 +202,35 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
         for system in each(systems)
             if isa(system, Bus)
                 if out_medium == system.medium
-                    push!(system.input_interfaces, SystemInterface(left=unit, right=system))
-                    push!(unit.output_interfaces, SystemInterface(left=unit, right=system))
+                    connection = SystemInterface(left=unit, right=system)
+                    push!(system.input_interfaces, connection)
+                    push!(unit.output_interfaces, connection)
                 end
             else
-                for (in_medium, in_face) in system.input_interfaces
+                for in_medium in keys(system.input_interfaces)
                     if in_medium == unit.medium
-                        in_face.left = unit
-                        in_face.right = system
-                        push!(unit.output_interfaces, SystemInterface(left=unit, right=system))
+                        connection = SystemInterface(left=unit, right=system)
+                        system.input_interfaces[in_medium] = connection
+                        push!(unit.output_interfaces, connection)
                     end
                 end
             end
         end
     else
-        for (out_medium, out_face) in unit.output_interfaces
+        for out_medium in keys(unit.output_interfaces)
             for system in each(systems)
                 if isa(system, Bus)
                     if out_medium == system.medium
-                        push!(system.input_interfaces, SystemInterface(left=unit, right=system))
-                        out_face.left = unit
-                        out_face.right = system
+                        connection = SystemInterface(left=unit, right=system)
+                        push!(system.input_interfaces, connection)
+                        unit.output_interfaces[out_medium] = connection
                     end
                 else
-                    for (in_medium, in_face) in system.input_interfaces
+                    for in_medium in keys(system.input_interfaces)
                         if out_medium == in_medium
-                            out_face.left = unit
-                            out_face.right = system
-                            in_face.left = unit
-                            in_face.right = system
+                            connection = SystemInterface(left=unit, right=system)
+                            unit.output_interfaces[out_medium] = connection
+                            system.input_interfaces[in_medium] = connection
                         end
                     end
                 end

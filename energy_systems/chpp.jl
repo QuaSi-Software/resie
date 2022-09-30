@@ -1,8 +1,8 @@
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     last_produced_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
@@ -69,12 +69,12 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                     ),
                 )
             ),
-            Dict{MediumCategory, SystemInterface}( # input_interfaces
-                m_c_g_natgas => SystemInterface()
+            InterfaceMap( # input_interfaces
+                m_c_g_natgas => nothing
             ),
-            Dict{MediumCategory, SystemInterface}( # output_interfaces
-                m_h_w_60c => SystemInterface(),
-                m_e_ac_230v => SystemInterface()
+            InterfaceMap( # output_interfaces
+                m_h_w_60c => nothing,
+                m_e_ac_230v => nothing
             ),
             0.0, # last_produced_e
             0.0, # last_produced_h

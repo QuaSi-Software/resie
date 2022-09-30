@@ -2,8 +2,8 @@ Base.@kwdef mutable struct Demand <: ControlledSystem
     controller :: StateMachine
     medium :: MediumCategory
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     load :: Float64
 end
@@ -12,11 +12,11 @@ function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
     return Demand(
         StateMachine(), # controller
         medium, # medium
-        Dict{MediumCategory, SystemInterface}( # input_interfaces
-            medium => SystemInterface()
+        InterfaceMap( # input_interfaces
+            medium => nothing
         ),
-        Dict{MediumCategory, SystemInterface}( # output_interfaces
-            medium => SystemInterface()
+        InterfaceMap( # output_interfaces
+            medium => nothing
         ),
         load, # load
     )

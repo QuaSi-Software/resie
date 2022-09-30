@@ -1,8 +1,8 @@
 Base.@kwdef mutable struct HeatPump <: ControlledSystem
-    controller :: StateMachine = StateMachine()
+    controller :: StateMachine
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     last_consumed_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
@@ -60,11 +60,11 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                     ),
                 )
             ),
-            Dict{MediumCategory, SystemInterface}( # input_interfaces
-                m_e_ac_230v => SystemInterface()
+            InterfaceMap( # input_interfaces
+                m_e_ac_230v => nothing
             ),
-            Dict{MediumCategory, SystemInterface}( # output_interfaces
-                m_h_w_60c => SystemInterface()
+            InterfaceMap( # output_interfaces
+                m_h_w_60c => nothing
             ),
             0.0, # last_consumed_e
             0.0, # last_produced_h

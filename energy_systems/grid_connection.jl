@@ -2,8 +2,8 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
     controller :: StateMachine
     medium :: MediumCategory
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     draw_sum :: Float64
     load_sum :: Float64
@@ -13,11 +13,11 @@ function make_GridConnection(medium :: MediumCategory) :: GridConnection
     return GridConnection(
         StateMachine(), # controller
         medium, # medium
-        Dict{MediumCategory, SystemInterface}( # input_interfaces
-            medium => SystemInterface()
+        InterfaceMap( # input_interfaces
+            medium => nothing
         ),
-        Dict{MediumCategory, SystemInterface}( # output_interfaces
-            medium => SystemInterface()
+        InterfaceMap( # output_interfaces
+            medium => nothing
         ),
         0.0, # draw_sum,
         0.0, # load_sum

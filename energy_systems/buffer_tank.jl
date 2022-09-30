@@ -1,8 +1,8 @@
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: InterfaceMap
+    output_interfaces :: InterfaceMap
 
     capacity :: Float64
     load :: Float64
@@ -11,11 +11,11 @@ end
 function make_BufferTank(capacity :: Float64, load :: Float64) :: BufferTank
     return BufferTank(
         StateMachine(), # controller
-        Dict{MediumCategory, SystemInterface}( # input_interfaces
-            m_h_w_60c => SystemInterface()
+        InterfaceMap( # input_interfaces
+            m_h_w_60c => nothing
         ),
-        Dict{MediumCategory, SystemInterface}( # output_interfaces
-            m_h_w_60c => SystemInterface()
+        InterfaceMap( # output_interfaces
+            m_h_w_60c => nothing
         ),
         capacity, # capacity
         load # load
