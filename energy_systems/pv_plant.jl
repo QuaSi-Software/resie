@@ -1,9 +1,5 @@
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
     controller :: StateMachine
-    inputs :: Dict{MediumCategory, ControlledSystem}
-    outputs :: Dict{MediumCategory, ControlledSystem}
-    accepted_inputs :: Vector{MediumCategory}
-    accepted_outputs :: Vector{MediumCategory}
 
     input_interfaces :: Dict{MediumCategory, SystemInterface}
     output_interfaces :: Dict{MediumCategory, SystemInterface}
@@ -16,10 +12,6 @@ end
 function make_PVPlant(amplitude :: Float64) :: PVPlant
     return PVPlant(
         StateMachine(), # controller
-        Dict{MediumCategory, ControlledSystem}(), # inputs
-        Dict{MediumCategory, ControlledSystem}(), # outputs
-        [], # accepted_inputs
-        [m_e_ac_230v], # accepted_outputs
         Dict{MediumCategory, SystemInterface}(), # input_interfaces
         Dict{MediumCategory, SystemInterface}( # output_interfaces
             m_h_w_60c => SystemInterface()

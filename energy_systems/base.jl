@@ -67,7 +67,7 @@ function link(condition :: Condition, systems :: Grouping)
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
         for unit in each(systems)
-            if typeof(unit) == req_unit[1] && req_unit[2] in unit.accepted_inputs
+            if isa(unit, req_unit[1]) && req_unit[2] in keys(unit.input_interfaces)
                 condition.linked_systems[name] = unit
                 found_link = true
             end
@@ -196,31 +196,43 @@ function check(
 end
 
 function link_production_with(unit :: ControlledSystem, systems :: Grouping)
-    for output_medium in unit.accepted_outputs
-        found_matching_input = false
-
+    if isa(unit, Bus)
         for system in each(systems)
-            for input_medium in system.accepted_inputs
-                if output_medium == input_medium
-                    found_matching_input = true
-
-                    if isa(system, Bus)
-                        push!(system.inputs, unit)
-                    else
-                        system.inputs[input_medium] = unit
-                    end
-
-                    if isa(unit, Bus)
-                        push!(unit.outputs, system)
-                    else
-                        unit.outputs[output_medium] = system
+            if isa(system, Bus)
+                if out_medium == system.medium
+                    push!(system.input_interfaces, SystemInterface(left=unit, right=system))
+                    push!(unit.output_interfaces, SystemInterface(left=unit, right=system))
+                end
+            else
+                for (in_medium, in_face) in system.input_interfaces
+                    if in_medium == unit.medium
+                        in_face.left = unit
+                        in_face.right = system
+                        push!(unit.output_interfaces, SystemInterface(left=unit, right=system))
                     end
                 end
             end
         end
-
-        if !found_matching_input
-            throw(KeyError("Could not find system with matching input"))
+    else
+        for (out_medium, out_face) in unit.output_interfaces
+            for system in each(systems)
+                if isa(system, Bus)
+                    if out_medium == system.medium
+                        push!(system.input_interfaces, SystemInterface(left=unit, right=system))
+                        out_face.left = unit
+                        out_face.right = system
+                    end
+                else
+                    for (in_medium, in_face) in system.input_interfaces
+                        if out_medium == in_medium
+                            out_face.left = unit
+                            out_face.right = system
+                            in_face.left = unit
+                            in_face.right = system
+                        end
+                    end
+                end
+            end
         end
     end
 end

@@ -1,13 +1,9 @@
 Base.@kwdef mutable struct Bus <: ControlledSystem
     controller :: StateMachine
     medium :: MediumCategory
-    inputs :: Vector{ControlledSystem}
-    outputs :: Vector{ControlledSystem}
-    accepted_inputs :: Vector{MediumCategory}
-    accepted_outputs :: Vector{MediumCategory}
 
-    input_interfaces :: Dict{MediumCategory, SystemInterface}
-    output_interfaces :: Dict{MediumCategory, SystemInterface}
+    input_interfaces :: Vector{SystemInterface}
+    output_interfaces :: Vector{SystemInterface}
 
     balance :: Float64
 end
@@ -16,17 +12,9 @@ function make_Bus(medium :: MediumCategory) :: Bus
     return Bus(
         StateMachine(), # controller
         medium, # medium
-        [], # inputs
-        [], # outputs
-        [medium], # accepted_inputs
-        [medium], # accepted_outputs
-        Dict{MediumCategory, SystemInterface}( # input_interfaces
-            medium => SystemInterface()
-        ),
-        Dict{MediumCategory, SystemInterface}( # output_interfaces
-            medium => SystemInterface()
-        ),
-        0.0, # balance
+        [], # input_interfaces
+        [], # output_interfaces
+        0.0 # balance
     )
 end
 

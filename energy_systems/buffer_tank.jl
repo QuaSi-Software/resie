@@ -1,9 +1,5 @@
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine
-    inputs :: Dict{MediumCategory, ControlledSystem}
-    outputs :: Dict{MediumCategory, ControlledSystem}
-    accepted_inputs :: Vector{MediumCategory}
-    accepted_outputs :: Vector{MediumCategory}
 
     input_interfaces :: Dict{MediumCategory, SystemInterface}
     output_interfaces :: Dict{MediumCategory, SystemInterface}
@@ -15,10 +11,6 @@ end
 function make_BufferTank(capacity :: Float64, load :: Float64) :: BufferTank
     return BufferTank(
         StateMachine(), # controller
-        Dict{MediumCategory, ControlledSystem}(), # inputs
-        Dict{MediumCategory, ControlledSystem}(), # outputs
-        [m_h_w_60c], # accepted_inputs
-        [m_h_w_60c], # accepted_outputs
         Dict{MediumCategory, SystemInterface}( # input_interfaces
             m_h_w_60c => SystemInterface()
         ),
