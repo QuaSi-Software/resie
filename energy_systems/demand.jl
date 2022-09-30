@@ -1,12 +1,33 @@
 Base.@kwdef mutable struct Demand <: ControlledSystem
-    controller :: StateMachine = StateMachine()
+    controller :: StateMachine
     medium :: MediumCategory
-    inputs :: Dict{MediumCategory, ControlledSystem} = Dict{MediumCategory, ControlledSystem}()
-    outputs :: Dict{MediumCategory, ControlledSystem} = Dict{MediumCategory, ControlledSystem}()
+    inputs :: Dict{MediumCategory, ControlledSystem}
+    outputs :: Dict{MediumCategory, ControlledSystem}
     accepted_inputs :: Vector{MediumCategory}
     accepted_outputs :: Vector{MediumCategory}
 
+    input_interfaces :: Dict{MediumCategory, SystemInterface}
+    output_interfaces :: Dict{MediumCategory, SystemInterface}
+
     load :: Float64
+end
+
+function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
+    return Demand(
+        StateMachine(), # controller
+        medium, # medium
+        Dict{MediumCategory, ControlledSystem}(), # inputs
+        Dict{MediumCategory, ControlledSystem}(), # outputs
+        [medium], # accepted_inputs
+        [medium], # accepted_outputs
+        Dict{MediumCategory, SystemInterface}( # input_interfaces
+            medium => SystemInterface()
+        ),
+        Dict{MediumCategory, SystemInterface}( # output_interfaces
+            medium => SystemInterface()
+        ),
+        load, # load
+    )
 end
 
 function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
@@ -32,4 +53,4 @@ function load_at_time(unit :: Demand, time :: Int)
     end
 end
 
-export Demand, specific_values, load_at_time
+export Demand, specific_values, load_at_time, make_Demand

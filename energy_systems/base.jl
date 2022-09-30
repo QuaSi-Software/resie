@@ -17,6 +17,12 @@ function each(systems :: Grouping) :: Base.ValueIterator
     return values(systems)
 end
 
+Base.@kwdef mutable struct SystemInterface
+    left :: Union{Nothing, ControlledSystem} = nothing
+    right :: Union{Nothing, ControlledSystem} = nothing
+    balance :: Float64 = 0.0
+end
+
 struct Condition
     name :: String
     parameters :: Dict{String, Any}

@@ -42,37 +42,15 @@ end
 
 function run_simulation()
     systems = Grouping(
-        "TST_01_HZG_01_GRD" => GridConnection(
-            medium=EnergySystems.m_c_g_natgas,
-            accepted_inputs=[],
-            accepted_outputs=[EnergySystems.m_c_g_natgas]
-        ),
-        "TST_01_ELT_01_GRD" => GridConnection(
-            medium=EnergySystems.m_e_ac_230v,
-            accepted_inputs=[EnergySystems.m_e_ac_230v],
-            accepted_outputs=[EnergySystems.m_e_ac_230v]
-        ),
-        "TST_01_HZG_01_BFT" => BufferTank(capacity=40000.0, load=20000.0),
+        "TST_01_HZG_01_GRD" => make_GridConnection(EnergySystems.m_c_g_natgas),
+        "TST_01_ELT_01_GRD" => make_GridConnection(EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_BFT" => make_BufferTank(40000.0, 20000.0),
         "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
         "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
-        "TST_01_ELT_01_PVP" => PVPlant(amplitude=15000.0),
-        "TST_01_ELT_01_BUS" => Bus(
-            medium=EnergySystems.m_e_ac_230v,
-            accepted_inputs=[EnergySystems.m_e_ac_230v],
-            accepted_outputs=[EnergySystems.m_e_ac_230v]
-        ),
-        "TST_01_HZG_01_DEM" => Demand(
-            medium=EnergySystems.m_h_w_60c,
-            accepted_inputs=[EnergySystems.m_h_w_60c],
-            accepted_outputs=[],
-            load=10000
-        ),
-        "TST_01_ELT_01_DEM" => Demand(
-            medium=EnergySystems.m_e_ac_230v,
-            accepted_inputs=[EnergySystems.m_e_ac_230v],
-            accepted_outputs=[],
-            load=15000
-        ),
+        "TST_01_ELT_01_PVP" => make_PVPlant(15000.0),
+        "TST_01_ELT_01_BUS" => make_Bus(EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_DEM" => make_Demand(EnergySystems.m_h_w_60c, 10000.0),
+        "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
     )
 
     link_control_with(

@@ -5,6 +5,9 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     accepted_inputs :: Vector{MediumCategory}
     accepted_outputs :: Vector{MediumCategory}
 
+    input_interfaces :: Dict{MediumCategory, SystemInterface}
+    output_interfaces :: Dict{MediumCategory, SystemInterface}
+
     last_consumed_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
 
@@ -61,15 +64,21 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                     ),
                 )
             ),
-            Dict{MediumCategory, ControlledSystem}(), # HeatPump.inputs
-            Dict{MediumCategory, ControlledSystem}(), # HeatPump.outputs
-            [m_e_ac_230v], # HeatPump.accepted_inputs
-            [m_h_w_60c], # HeatPump.accepted_outputs
-            0.0, # HeatPump.last_consumed_e
-            0.0, # HeatPump.last_produced_h
-            power, # HeatPump.power
-            0.2, # HeatPump.min_power_fraction
-            cop, # HeatPump.electricity_fraction
+            Dict{MediumCategory, ControlledSystem}(), # inputs
+            Dict{MediumCategory, ControlledSystem}(), # outputs
+            [m_e_ac_230v], # accepted_inputs
+            [m_h_w_60c], # accepted_outputs
+            Dict{MediumCategory, SystemInterface}( # input_interfaces
+                m_e_ac_230v => SystemInterface()
+            ),
+            Dict{MediumCategory, SystemInterface}( # output_interfaces
+                m_h_w_60c => SystemInterface()
+            ),
+            0.0, # last_consumed_e
+            0.0, # last_produced_h
+            power, # power
+            0.2, # min_power_fraction
+            cop, # electricity_fraction
         )
     else
         return HeatPump(controller=StateMachine(), power=power, cop=cop)

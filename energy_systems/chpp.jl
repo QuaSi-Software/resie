@@ -5,6 +5,9 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     accepted_inputs :: Vector{MediumCategory}
     accepted_outputs :: Vector{MediumCategory}
 
+    input_interfaces :: Dict{MediumCategory, SystemInterface}
+    output_interfaces :: Dict{MediumCategory, SystemInterface}
+
     last_produced_e :: Float64 = 0.0
     last_produced_h :: Float64 = 0.0
 
@@ -70,16 +73,23 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                     ),
                 )
             ),
-            Dict{MediumCategory, ControlledSystem}(), # CHPP.inputs
-            Dict{MediumCategory, ControlledSystem}(), # CHPP.outputs
-            [m_c_g_natgas], # CHPP.accepted_inputs
-            [m_h_w_60c, m_e_ac_230v], # CHPP.accepted_outputs
-            0.0, # CHPP.last_produced_e
-            0.0, # CHPP.last_produced_h
-            power, # CHPP.power
-            0.4, # CHPP.electricity_fraction
-            0.2, # CHPP.min_power_fraction
-            1800 # CHPP.min_run_time
+            Dict{MediumCategory, ControlledSystem}(), # inputs
+            Dict{MediumCategory, ControlledSystem}(), # outputs
+            [m_c_g_natgas], # accepted_inputs
+            [m_h_w_60c, m_e_ac_230v], # accepted_outputs
+            Dict{MediumCategory, SystemInterface}( # input_interfaces
+                m_c_g_natgas => SystemInterface()
+            ),
+            Dict{MediumCategory, SystemInterface}( # output_interfaces
+                m_h_w_60c => SystemInterface(),
+                m_e_ac_230v => SystemInterface()
+            ),
+            0.0, # last_produced_e
+            0.0, # last_produced_h
+            power, # power
+            0.4, # electricity_fraction
+            0.2, # min_power_fraction
+            1800 # min_run_time
         )
     else
         return CHPP(controller=StateMachine(), power=power)
