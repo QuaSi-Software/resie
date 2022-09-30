@@ -61,7 +61,7 @@ function link(condition :: Condition, systems :: Grouping)
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
         for unit in each(systems)
-            if typeof(unit) == req_unit[1] && unit.medium == req_unit[2]
+            if typeof(unit) == req_unit[1] && req_unit[2] in unit.accepted_inputs
                 condition.linked_systems[name] = unit
                 found_link = true
             end
