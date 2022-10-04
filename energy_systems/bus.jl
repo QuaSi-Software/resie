@@ -1,5 +1,6 @@
 Base.@kwdef mutable struct Bus <: ControlledSystem
     controller :: StateMachine
+    is_storage :: Bool
     medium :: MediumCategory
 
     input_interfaces :: Vector{SystemInterface}
@@ -11,6 +12,7 @@ end
 function make_Bus(medium :: MediumCategory) :: Bus
     return Bus(
         StateMachine(), # controller
+        false, # is_storage
         medium, # medium
         [], # input_interfaces
         [], # output_interfaces

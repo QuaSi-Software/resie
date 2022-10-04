@@ -1,5 +1,6 @@
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
+    is_storage :: Bool
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
@@ -69,6 +70,7 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                     ),
                 )
             ),
+            false, # is_storage
             InterfaceMap( # input_interfaces
                 m_c_g_natgas => nothing
             ),

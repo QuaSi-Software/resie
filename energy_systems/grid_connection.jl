@@ -1,5 +1,6 @@
 Base.@kwdef mutable struct GridConnection <: ControlledSystem
     controller :: StateMachine
+    is_storage :: Bool
     medium :: MediumCategory
 
     input_interfaces :: InterfaceMap
@@ -14,6 +15,7 @@ end
 function make_GridConnection(medium :: MediumCategory, is_source) :: GridConnection
     return GridConnection(
         StateMachine(), # controller
+        false, # is_storage
         medium, # medium
         InterfaceMap( # input_interfaces
             medium => nothing
