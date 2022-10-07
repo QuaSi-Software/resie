@@ -91,16 +91,21 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
 end
 
 function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
-    max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
+    if unit.controller.state == 2
+        max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
+        max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
-    usage_fraction = 1.0 # @TODO: implement partial load depending on space in buffer
+        usage_fraction = 1.0 # @TODO: implement partial load depending on space in buffer
 
-    unit.output_interfaces[m_e_ac_230v].balance += max_produce_e * usage_fraction
-    unit.output_interfaces[m_h_w_60c].balance += max_produce_h * usage_fraction
-    unit.input_interfaces[m_c_g_natgas].balance -= unit.power * usage_fraction
-    unit.last_produced_e = max_produce_e * usage_fraction
-    unit.last_produced_h = max_produce_h * usage_fraction
+        unit.output_interfaces[m_e_ac_230v].balance += max_produce_e * usage_fraction
+        unit.output_interfaces[m_h_w_60c].balance += max_produce_h * usage_fraction
+        unit.input_interfaces[m_c_g_natgas].balance -= unit.power * usage_fraction
+        unit.last_produced_e = max_produce_e * usage_fraction
+        unit.last_produced_h = max_produce_h * usage_fraction
+    else
+        unit.last_produced_e = 0.0
+        unit.last_produced_h = 0.0
+    end
 end
 
 function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
