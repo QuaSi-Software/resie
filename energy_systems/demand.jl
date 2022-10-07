@@ -25,7 +25,7 @@ function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
 end
 
 function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
-    return [("Load", "$(Wh(load_at_time(unit, time)))")]
+    return []
 end
 
 function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)

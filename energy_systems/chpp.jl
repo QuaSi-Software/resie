@@ -5,9 +5,6 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    last_produced_e :: Float64 = 0.0
-    last_produced_h :: Float64 = 0.0
-
     power :: Float64
     electricity_fraction :: Float64 = 0.4
     min_power_fraction :: Float64
@@ -78,8 +75,6 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
                 m_h_w_60c => nothing,
                 m_e_ac_230v => nothing
             ),
-            0.0, # last_produced_e
-            0.0, # last_produced_h
             power, # power
             0.4, # electricity_fraction
             0.2, # min_power_fraction
@@ -100,19 +95,11 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
         add!(unit.output_interfaces[m_e_ac_230v], max_produce_e * usage_fraction)
         add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_c_g_natgas], unit.power * usage_fraction)
-        unit.last_produced_e = max_produce_e * usage_fraction
-        unit.last_produced_h = max_produce_h * usage_fraction
-    else
-        unit.last_produced_e = 0.0
-        unit.last_produced_h = 0.0
     end
 end
 
 function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
-    return [
-        ("Production E", "$(unit.last_produced_e)"),
-        ("Production H", "$(unit.last_produced_h)")
-    ]
+    return []
 end
 
 export CHPP, make_CHPP, specific_values

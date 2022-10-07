@@ -15,12 +15,26 @@ end
 
 function reset_file(systems :: Grouping)
     open("./out.csv", "w") do file_handle
-        write(file_handle, "Time")
-        for unit in each(systems)
+        write(file_handle, "Time [s]")
+
+        for (key, unit) in pairs(systems)
             for val in specific_values(unit, Int(0))
-                write(file_handle, ";$(typeof(unit)) $(val[1])")
+                write(file_handle, ";$key $(val[1])")
+            end
+
+            if isa(unit, Bus) continue end
+
+            for (medium, inface) in pairs(unit.input_interfaces)
+                if inface === nothing continue end
+                write(file_handle, ";$key $medium IN")
+            end
+
+            for (medium, outface) in pairs(unit.output_interfaces)
+                if outface === nothing continue end
+                write(file_handle, ";$key $medium OUT")
             end
         end
+
         write(file_handle, "\n")
     end
 end
@@ -28,14 +42,35 @@ end
 function write_to_file(systems :: Grouping, time :: Int)
     open("./out.csv", "a") do file_handle
         write(file_handle, "$time")
+
         for unit in each(systems)
+
             for val in specific_values(unit, time)
                 write(file_handle, replace(
                     replace(";$(val[2])", "/" => ";"),
                     "." => ","
                 ))
             end
+
+            if isa(unit, Bus) continue end
+
+            for inface in values(unit.input_interfaces)
+                if inface === nothing continue end
+                write(file_handle, replace(
+                    replace(";$(inface.sum_abs_change * 0.5)", "/" => ";"),
+                    "." => ","
+                ))
+            end
+
+            for outface in values(unit.output_interfaces)
+                if outface === nothing continue end
+                write(file_handle, replace(
+                    replace(";$(outface.sum_abs_change * 0.5)", "/" => ";"),
+                    "." => ","
+                ))
+            end
         end
+
         write(file_handle, "\n")
     end
 end

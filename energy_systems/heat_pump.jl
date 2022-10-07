@@ -5,9 +5,6 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    last_consumed_e :: Float64 = 0.0
-    last_produced_h :: Float64 = 0.0
-
     power :: Float64
     min_power_fraction :: Float64 = 0.2
     cop :: Float64
@@ -68,8 +65,6 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
             InterfaceMap( # output_interfaces
                 m_h_w_60c => nothing
             ),
-            0.0, # last_consumed_e
-            0.0, # last_produced_h
             power, # power
             0.2, # min_power_fraction
             cop, # electricity_fraction
@@ -87,19 +82,11 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
 
         add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_e_ac_230v], unit.power * usage_fraction / unit.cop)
-        unit.last_consumed_e = max_produce_h * usage_fraction / unit.cop
-        unit.last_produced_h = max_produce_h * usage_fraction
-    else
-        unit.last_consumed_e = 0.0
-        unit.last_produced_h = 0.0
     end
 end
 
 function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
-    return [
-        ("Consumption E", "$(unit.last_consumed_e)"),
-        ("Production H", "$(unit.last_produced_h)")
-    ]
+    return []
 end
 
 export HeatPump, make_HeatPump, specific_values

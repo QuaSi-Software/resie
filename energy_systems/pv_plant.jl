@@ -5,8 +5,6 @@ Base.@kwdef mutable struct PVPlant <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    last_produced_e :: Float64
-
     amplitude :: Float64
 end
 
@@ -18,19 +16,17 @@ function make_PVPlant(amplitude :: Float64) :: PVPlant
         InterfaceMap( # output_interfaces
             m_e_ac_230v => nothing
         ),
-        0.0, # last_produced_e
         amplitude, # amplitude
     )
 end
 
 function specific_values(unit :: PVPlant, time :: Int) :: Vector{Tuple}
-    return [("Production E", "$(unit.last_produced_e)")]
+    return []
 end
 
 function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_e_ac_230v]
     add!(outface, watt_to_wh(power_at_time(unit, parameters["time"])))
-    unit.last_produced_e = watt_to_wh(power_at_time(unit, parameters["time"]))
 end
 
 function power_at_time(plant :: PVPlant, time :: Int) :: Float64
