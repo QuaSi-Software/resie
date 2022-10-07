@@ -28,6 +28,11 @@ function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
     return [("Load", "$(Wh(load_at_time(unit, time)))")]
 end
 
+function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    inface = unit.input_interfaces[unit.medium]
+    inface.balance -= watt_to_wh(load_at_time(unit, parameters["time"]))
+end
+
 function load_at_time(unit :: Demand, time :: Int)
     if unit.medium == m_e_ac_230v
         return unit.load

@@ -79,6 +79,17 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
     end
 end
 
+function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    max_produce_h = watt_to_wh(unit.power)
+
+    usage_fraction = 1.0 # @TODO: implement partial load depending on space in buffer
+
+    unit.output_interfaces[m_h_w_60c].balance += max_produce_h * usage_fraction
+    unit.input_interfaces[m_e_ac_230v].balance -= unit.power * usage_fraction / unit.cop
+    unit.last_consumed_e = max_produce_h * usage_fraction / unit.cop
+    unit.last_produced_h = max_produce_h * usage_fraction
+end
+
 function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
     return [
         ("Consumption E", "$(unit.last_consumed_e)"),

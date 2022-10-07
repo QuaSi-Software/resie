@@ -29,6 +29,20 @@ function make_GridConnection(medium :: MediumCategory, is_source) :: GridConnect
     )
 end
 
+function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    if unit.is_source
+        outface = unit.output_interfaces[unit.medium]
+        gather_from_all!(outface, outface.right)
+        unit.draw_sum += outface.balance
+        outface.balance = 0.0
+    else
+        inface = unit.input_interfaces[unit.medium]
+        gather_from_all!(inface, inface.left)
+        unit.load_sum += inface.balance
+        inface.balance = 0.0
+    end
+end
+
 function specific_values(unit :: GridConnection, time :: Int) :: Vector{Tuple}
     return [
         ("Draw sum", "$(unit.draw_sum)"),
