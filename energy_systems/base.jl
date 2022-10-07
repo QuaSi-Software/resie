@@ -181,11 +181,13 @@ function Wh(watts :: Float64) :: Float64
     return Float64(TIME_STEP) * watts / 3600.0
 end
 
-include("buffer_tank.jl")
-include("bus.jl")
-include("chpp.jl")
+# the order matters here as some energy systems require the definition of certain
+# basic systems such as a bus or a grid connection
 include("demand.jl")
 include("grid_connection.jl")
+include("bus.jl")
+include("buffer_tank.jl")
+include("chpp.jl")
 include("heat_pump.jl")
 include("pv_plant.jl")
 
