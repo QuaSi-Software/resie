@@ -25,6 +25,23 @@ end
 
 const InterfaceMap = Dict{MediumCategory, Union{Nothing, SystemInterface}}
 
+function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem)
+    return # the default implementation is to do nothing
+end
+
+function reset(unit :: ControlledSystem)
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing
+            inface.balance = 0.0
+        end
+    end
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing
+            outface.balance = 0.0
+        end
+    end
+end
+
 struct Condition
     name :: String
     parameters :: Dict{String, Any}
