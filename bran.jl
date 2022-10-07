@@ -50,6 +50,7 @@ function run_simulation()
         "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
         "TST_01_ELT_01_PVP" => make_PVPlant(15000.0),
         "TST_01_ELT_01_BUS" => make_Bus(EnergySystems.m_e_ac_230v),
+        "TST_01_HZG_01_BUS" => make_Bus(EnergySystems.m_h_w_60c),
         "TST_01_HZG_01_DEM" => make_Demand(EnergySystems.m_h_w_60c, 10000.0),
         "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
     )
@@ -73,22 +74,29 @@ function run_simulation()
     )
     link_production_with(
         systems["TST_01_HZG_01_BFT"],
-        Grouping("TST_01_HZG_01_DEM" => systems["TST_01_HZG_01_DEM"])
+        Grouping("TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"])
     )
     link_production_with(
         systems["TST_01_HZG_01_CHP"],
         Grouping(
-            "TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"],
+            "TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"],
             "TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"]
         )
     )
     link_production_with(
         systems["TST_01_HZG_01_HTP"],
-        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
+        Grouping("TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"])
     )
     link_production_with(
         systems["TST_01_ELT_01_PVP"],
         Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
+    )
+    link_production_with(
+        systems["TST_01_HZG_01_BUS"],
+        Grouping(
+            "TST_01_HZG_01_DEM" => systems["TST_01_HZG_01_DEM"],
+            "TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]
+        )
     )
     link_production_with(
         systems["TST_01_ELT_01_BUS"],
