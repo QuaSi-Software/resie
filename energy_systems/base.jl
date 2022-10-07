@@ -258,6 +258,16 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
     end
 end
 
+function control(
+    systems :: Grouping,
+    order :: Vector{String},
+    parameters :: Dict{String, Any}
+)
+    for key in order
+        control(systems[key], systems, parameters)
+    end
+end
+
 function produce(
     systems :: Grouping,
     order :: Vector{String},

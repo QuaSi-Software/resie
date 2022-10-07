@@ -145,11 +145,7 @@ function run_simulation()
     reset_file(systems)
 
     for i = 1:(96*7)
-        for key in control_order
-            control(systems[key], systems, parameters)
-        end
-
-        # production
+        control(systems, control_order, parameters)
         produce(systems, production_order, parameters)
 
         # output and simulation update
