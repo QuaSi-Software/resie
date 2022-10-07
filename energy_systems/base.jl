@@ -4,8 +4,6 @@ export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, St
     control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
     link_production_with, check_balances
 
-const TIME_STEP = UInt(900)
-
 @enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
 
 abstract type EnergySystem end
@@ -197,10 +195,6 @@ function control(
     parameters :: Dict{String, Any}
 )
     move_state(unit, systems, parameters)
-end
-
-function Wh(watts :: Float64) :: Float64
-    return Float64(TIME_STEP) * watts / 3600.0
 end
 
 # the order matters here as some energy systems require the definition of certain
