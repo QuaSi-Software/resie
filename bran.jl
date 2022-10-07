@@ -55,6 +55,34 @@ function run_simulation()
         "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
     )
 
+    control_order = [
+        "TST_01_HZG_01_GRI",
+        "TST_01_ELT_01_GRI",
+        "TST_01_ELT_01_GRO",
+        "TST_01_HZG_01_BFT",
+        "TST_01_HZG_01_CHP",
+        "TST_01_HZG_01_HTP",
+        "TST_01_ELT_01_PVP",
+        "TST_01_ELT_01_BUS",
+        "TST_01_HZG_01_BUS",
+        "TST_01_HZG_01_DEM",
+        "TST_01_ELT_01_DEM",
+    ]
+
+    production_order = [
+        "TST_01_HZG_01_DEM",
+        "TST_01_ELT_01_DEM",
+        "TST_01_ELT_01_PVP",
+        "TST_01_HZG_01_BUS",
+        "TST_01_HZG_01_BFT",
+        "TST_01_HZG_01_CHP",
+        "TST_01_HZG_01_HTP",
+        "TST_01_ELT_01_BUS",
+        "TST_01_HZG_01_GRI",
+        "TST_01_ELT_01_GRI",
+        "TST_01_ELT_01_GRO",
+    ]
+
     link_control_with(
         systems["TST_01_HZG_01_CHP"],
         Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
@@ -117,12 +145,12 @@ function run_simulation()
     reset_file(systems)
 
     for i = 1:(96*7)
-        for unit in each(systems)
-            control(unit, systems, parameters)
+        for key in control_order
+            control(systems[key], systems, parameters)
         end
 
         # production
-        produce(systems, parameters)
+        produce(systems, production_order, parameters)
 
         # output and simulation update
         # print_system_state(system, parameters["time"])

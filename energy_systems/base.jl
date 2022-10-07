@@ -260,6 +260,7 @@ end
 
 function produce(
     systems :: Grouping,
+    order :: Vector{String},
     parameters :: Dict{String, Any}
 )
     grid_e = [u for u in each(systems) if (typeof(u) <: GridConnection && u.medium == m_e_ac_230v)][1]
