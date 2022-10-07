@@ -138,19 +138,30 @@ function run_simulation()
     parameters = Dict{String, Any}(
         "time" => 0,
         "time_step_seconds" => TIME_STEP,
-        "price_factor" => 0.5
+        "price_factor" => 0.5,
+        "epsilon" => 1e-9
     )
 
     print_system_state(systems, parameters["time"])
     reset_file(systems)
 
     for i = 1:(96*7)
+        # perform the simulation
         control(systems, control_order, parameters)
         produce(systems, production_order, parameters)
 
-        # output and simulation update
-        # print_system_state(system, parameters["time"])
+        warnings = check_balances(systems, parameters["epsilon"])
+        if length(warnings) > 0
+            print("Time is $(parameters["time"])\n")
+            for (key, balance) in warnings
+                print("Warning: Balance for system $key was not zero: $balance\n")
+            end
+        end
+
+        # output
         write_to_file(systems, parameters["time"])
+
+        # simulation update
         parameters["time"] += Int(TIME_STEP)
     end
 end

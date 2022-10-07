@@ -46,15 +46,22 @@ function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Fun
     # nothing to do
 end
 
-function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
+function check_balance(unit :: Bus) :: Float64
     balance = 0.0
+
     for inface in unit.input_interfaces
         balance += inface.balance
     end
+
     for outface in unit.output_interfaces
         balance += outface.balance
     end
-    return [("Balance", "$balance")]
+
+    return balance
+end
+
+function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
+    return [("Balance", "$(check_balance(unit))")]
 end
 
 export Bus, specific_values, make_Bus, gather_from_all!, reset

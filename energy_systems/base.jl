@@ -2,7 +2,7 @@ module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
     control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
-    link_production_with
+    link_production_with, check_balances
 
 const TIME_STEP = UInt(900)
 
@@ -256,6 +256,36 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
             end
         end
     end
+end
+
+function check_balances(
+    systems :: Grouping,
+    epsilon :: Float64
+) :: Vector{Tuple{String, Float64}}
+    warnings = []
+
+    for (key, unit) in pairs(systems)
+        balance = check_balance(unit)
+        if balance > epsilon || balance < -epsilon
+            push!(warnings, (key, balance))
+        end
+    end
+
+    return warnings
+end
+
+function check_balance(unit :: ControlledSystem) :: Float64
+    balance = 0.0
+
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing balance += inface.balance end
+    end
+
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing balance += outface.balance end
+    end
+
+    return balance
 end
 
 function control(
