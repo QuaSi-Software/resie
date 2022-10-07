@@ -22,12 +22,12 @@ function gather_from_all!(interface :: SystemInterface, unit :: Bus)
 
     for inface in unit.input_interfaces
         balance += inface.balance
-        inface.balance = 0.0
+        set!(inface, 0.0)
     end
 
     for outface in unit.output_interfaces
         balance += outface.balance
-        outface.balance = 0.0
+        set!(outface, 0.0)
     end
 
     interface.balance = balance
@@ -35,10 +35,10 @@ end
 
 function reset(unit :: Bus)
     for inface in unit.input_interfaces
-        inface.balance = 0.0
+        reset!(inface)
     end
     for outface in unit.output_interfaces
-        outface.balance = 0.0
+        reset!(outface)
     end
 end
 

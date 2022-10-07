@@ -85,8 +85,8 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
 
         usage_fraction = 1.0 # @TODO: implement partial load depending on space in buffer
 
-        unit.output_interfaces[m_h_w_60c].balance += max_produce_h * usage_fraction
-        unit.input_interfaces[m_e_ac_230v].balance -= unit.power * usage_fraction / unit.cop
+        add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
+        sub!(unit.input_interfaces[m_e_ac_230v], unit.power * usage_fraction / unit.cop)
         unit.last_consumed_e = max_produce_h * usage_fraction / unit.cop
         unit.last_produced_h = max_produce_h * usage_fraction
     else

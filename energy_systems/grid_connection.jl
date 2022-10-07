@@ -34,12 +34,12 @@ function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_t
         outface = unit.output_interfaces[unit.medium]
         gather_from_all!(outface, outface.right)
         unit.draw_sum += outface.balance
-        outface.balance = 0.0
+        set!(outface, 0.0)
     else
         inface = unit.input_interfaces[unit.medium]
         gather_from_all!(inface, inface.left)
         unit.load_sum += inface.balance
-        inface.balance = 0.0
+        set!(inface, 0.0)
     end
 end
 

@@ -29,7 +29,7 @@ end
 
 function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_e_ac_230v]
-    outface.balance += watt_to_wh(power_at_time(unit, parameters["time"]))
+    add!(outface, watt_to_wh(power_at_time(unit, parameters["time"])))
     unit.last_produced_e = watt_to_wh(power_at_time(unit, parameters["time"]))
 end
 
