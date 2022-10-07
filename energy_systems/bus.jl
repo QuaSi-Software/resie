@@ -5,8 +5,6 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 
     input_interfaces :: Vector{SystemInterface}
     output_interfaces :: Vector{SystemInterface}
-
-    balance :: Float64
 end
 
 function make_Bus(medium :: MediumCategory) :: Bus
@@ -16,7 +14,6 @@ function make_Bus(medium :: MediumCategory) :: Bus
         medium, # medium
         [], # input_interfaces
         [], # output_interfaces
-        0.0 # balance
     )
 end
 
@@ -50,7 +47,14 @@ function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Fun
 end
 
 function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
-    return [("Balance", "$(unit.balance)")]
+    balance = 0.0
+    for inface in unit.input_interfaces
+        balance += inface.balance
+    end
+    for outface in unit.output_interfaces
+        balance += outface.balance
+    end
+    return [("Balance", "$balance")]
 end
 
 export Bus, specific_values, make_Bus, gather_from_all!, reset
