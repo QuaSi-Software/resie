@@ -19,32 +19,27 @@ Base.@kwdef mutable struct SystemInterface
     left :: Union{Nothing, ControlledSystem} = nothing
     right :: Union{Nothing, ControlledSystem} = nothing
     balance :: Float64 = 0.0
-    min :: Float64 = 0.0
-    max :: Float64 = 0.0
+    sum_abs_change :: Float64 = 0.0
 end
 
 function add!(interface :: SystemInterface, change :: Float64)
     interface.balance += change
-    interface.min = min(interface.min, interface.balance)
-    interface.max = max(interface.max, interface.balance)
+    interface.sum_abs_change += abs(change)
 end
 
 function sub!(interface :: SystemInterface, change :: Float64)
     interface.balance -= change
-    interface.min = min(interface.min, interface.balance)
-    interface.max = max(interface.max, interface.balance)
+    interface.sum_abs_change += abs(change)
 end
 
 function set!(interface :: SystemInterface, new_val :: Float64)
+    interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
-    interface.min = min(interface.min, new_val)
-    interface.max = max(interface.max, new_val)
 end
 
 function reset!(interface :: SystemInterface)
     interface.balance = 0.0
-    interface.min = 0.0
-    interface.max = 0.0
+    interface.sum_abs_change = 0.0
 end
 
 const InterfaceMap = Dict{MediumCategory, Union{Nothing, SystemInterface}}
