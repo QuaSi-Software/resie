@@ -30,7 +30,7 @@ function gather_from_all!(interface :: SystemInterface, unit :: Bus)
         set!(outface, 0.0)
     end
 
-    interface.balance = balance
+    set!(interface, balance)
 end
 
 function reset(unit :: Bus)
