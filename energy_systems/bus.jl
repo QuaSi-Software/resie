@@ -78,4 +78,4 @@ function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
     return [("Balance", "$(check_balance(unit))")]
 end
 
-export Bus, specific_values, make_Bus, gather_from_all!, reset
+export Bus, specific_values, make_Bus, gather_from_all!, reset, gather_from_all
