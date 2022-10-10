@@ -26,11 +26,17 @@ end
 
 function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_h_w_60c]
-    gather_from_all!(outface, outface.right)
+    balance = gather_from_all(outface, outface.right)
 
-    if outface.balance >= 0.0
+    if balance >= 0.0
         return # produce is only concerned with moving energy to the target
     end
+
+    # first we only check if there is a balance that produce needs to handle
+    # without already gathering energy in the output interface. otherwise,
+    # when the balance is positive, no energy is moved but the act of calling
+    # gather_from_all! has incorrectly recorded a move of energy
+    gather_from_all!(outface, outface.right)
 
     if unit.load > outface.balance
         unit.load += outface.balance
