@@ -94,7 +94,7 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
 
         add!(unit.output_interfaces[m_e_ac_230v], max_produce_e * usage_fraction)
         add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[m_c_g_natgas], unit.power * usage_fraction)
+        sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
     end
 end
 
