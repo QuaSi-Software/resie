@@ -33,6 +33,20 @@ function gather_from_all!(interface :: SystemInterface, unit :: Bus)
     set!(interface, balance)
 end
 
+function gather_from_all(interface :: SystemInterface, unit :: ControlledSystem) :: Float64
+    balance = 0.0
+
+    for inface in unit.input_interfaces
+        balance += inface.balance
+    end
+
+    for outface in unit.output_interfaces
+        balance += outface.balance
+    end
+
+    return balance
+end
+
 function reset(unit :: Bus)
     for inface in unit.input_interfaces
         reset!(inface)

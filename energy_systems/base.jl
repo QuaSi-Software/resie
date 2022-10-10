@@ -48,6 +48,10 @@ function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem
     return # the default implementation is to do nothing
 end
 
+function gather_from_all(interface :: SystemInterface, unit :: ControlledSystem) :: Float64
+    return interface.balance
+end
+
 function reset(unit :: ControlledSystem)
     for inface in values(unit.input_interfaces)
         if inface !== nothing reset!(inface) end
