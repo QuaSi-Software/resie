@@ -2,7 +2,7 @@ module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
     control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
-    link_production_with, check_balances
+    link_production_with, check_balances, reset
 
 @enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
 
@@ -303,6 +303,12 @@ function check_balance(unit :: ControlledSystem) :: Float64
     return balance
 end
 
+function reset(systems :: Grouping)
+    for unit in each(systems)
+        reset(unit)
+    end
+end
+
 function control(
     systems :: Grouping,
     order :: Vector{String},
@@ -320,10 +326,6 @@ function produce(
 )
     watt_to_wh = function (watts :: Float64)
         watts * Float64(parameters["time_step_seconds"]) / 3600.0
-    end
-
-    for unit in each(systems)
-        reset(unit)
     end
 
     for key in order

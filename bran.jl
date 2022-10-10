@@ -173,7 +173,6 @@ function run_simulation()
     parameters = Dict{String, Any}(
         "time" => 0,
         "time_step_seconds" => TIME_STEP,
-        "price_factor" => 0.5,
         "epsilon" => 1e-9
     )
 
@@ -182,9 +181,11 @@ function run_simulation()
 
     for i = 1:(96*7)
         # perform the simulation
+        EnergySystems.reset(systems)
         control(systems, control_order, parameters)
         produce(systems, production_order, parameters)
 
+        # check if any energy system was not balanced
         warnings = check_balances(systems, parameters["epsilon"])
         if length(warnings) > 0
             print("Time is $(parameters["time"])\n")
