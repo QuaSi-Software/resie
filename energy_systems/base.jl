@@ -48,7 +48,7 @@ function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem
     return # the default implementation is to do nothing
 end
 
-function gather_from_all(interface :: SystemInterface, unit :: ControlledSystem) :: Float64
+function check_balance(interface :: SystemInterface, unit :: ControlledSystem) :: Float64
     return interface.balance
 end
 

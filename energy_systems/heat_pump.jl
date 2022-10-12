@@ -78,7 +78,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     if unit.controller.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
-        potential = gather_from_all(
+        potential = check_balance(
             unit.output_interfaces[m_h_w_60c],
             unit.output_interfaces[m_h_w_60c].target
         )
