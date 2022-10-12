@@ -5,6 +5,8 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 
     input_interfaces :: Vector{SystemInterface}
     output_interfaces :: Vector{SystemInterface}
+
+    storage_space :: Float64
 end
 
 function make_Bus(medium :: MediumCategory) :: Bus
@@ -13,7 +15,8 @@ function make_Bus(medium :: MediumCategory) :: Bus
         false, # is_storage
         medium, # medium
         [], # input_interfaces
-        [], # output_interfaces
+        [], # output_interfaces,
+        0.0 # storage_space
     )
 end
 
@@ -40,10 +43,15 @@ function reset(unit :: Bus)
     for outface in unit.output_interfaces
         reset!(outface)
     end
+    unit.storage_space = 0.0
 end
 
 function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    # nothing to do
+    for inface in unit.input_interfaces
+        if inface.source.is_storage
+            unit.storage_space += inface.source.capacity - inface.source.load
+        end
+    end
 end
 
 function check_balance(interface :: SystemInterface, unit :: Bus) :: Float64
@@ -57,7 +65,8 @@ function check_balance(interface :: SystemInterface, unit :: Bus) :: Float64
         balance += outface.balance
     end
 
-    return balance
+    # negative means demand, but storage_space is positive
+    return balance - unit.storage_space
 end
 
 function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
