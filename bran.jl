@@ -105,17 +105,17 @@ function run_simulation()
     ]
 
     production_order = [
-        "TST_01_HZG_01_DEM",
-        "TST_01_ELT_01_DEM",
-        "TST_01_ELT_01_PVP",
-        "TST_01_HZG_01_BUS",
-        "TST_01_HZG_01_CHP",
-        "TST_01_HZG_01_HTP",
-        "TST_01_HZG_01_BFT",
-        "TST_01_ELT_01_BUS",
-        "TST_01_HZG_01_GRI",
-        "TST_01_ELT_01_GRI",
-        "TST_01_ELT_01_GRO",
+        "TST_01_ELT_01_PVP", # limited_source
+        "TST_01_HZG_01_DEM", # limited_sink
+        "TST_01_ELT_01_DEM", # limited_sink
+        "TST_01_HZG_01_BUS", # bus
+        "TST_01_ELT_01_BUS", # bus
+        "TST_01_HZG_01_CHP", # transformer
+        "TST_01_HZG_01_HTP", # transformer
+        "TST_01_HZG_01_BFT", # storage
+        "TST_01_HZG_01_GRI", # infinite_source
+        "TST_01_ELT_01_GRI", # infinite_source
+        "TST_01_ELT_01_GRO", # infinite_sink
     ]
 
     link_control_with(
