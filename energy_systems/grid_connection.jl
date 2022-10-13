@@ -1,12 +1,10 @@
 Base.@kwdef mutable struct GridConnection <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
     medium :: MediumCategory
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
-
-    is_source :: Bool
 
     draw_sum :: Float64
     load_sum :: Float64
@@ -15,7 +13,7 @@ end
 function make_GridConnection(medium :: MediumCategory, is_source) :: GridConnection
     return GridConnection(
         StateMachine(), # controller
-        false, # is_storage
+        if is_source infinite_source else infinite_sink end, # sys_function
         medium, # medium
         InterfaceMap( # input_interfaces
             medium => nothing
@@ -23,14 +21,13 @@ function make_GridConnection(medium :: MediumCategory, is_source) :: GridConnect
         InterfaceMap( # output_interfaces
             medium => nothing
         ),
-        is_source, # is_source
         0.0, # draw_sum,
         0.0, # load_sum
     )
 end
 
 function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.is_source
+    if unit.sys_function === infinite_source
         outface = unit.output_interfaces[unit.medium]
         gather_from_all!(outface, outface.target)
         unit.draw_sum += outface.balance

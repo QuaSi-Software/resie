@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct HeatPump <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
@@ -58,7 +58,7 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
                     ),
                 )
             ),
-            false, # is_storage
+            transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
             ),

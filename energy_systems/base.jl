@@ -6,6 +6,8 @@ export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, St
 
 @enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
 
+@enum SystemFunction infinite_sink infinite_source limited_sink limited_source transformer storage bus
+
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
 
@@ -192,7 +194,7 @@ function produce(
 
     for key in order
         unit = systems[key]
-        if unit.is_storage
+        if unit.sys_function === storage
             load(unit, parameters, watt_to_wh)
         end
     end

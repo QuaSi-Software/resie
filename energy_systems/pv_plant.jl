@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
@@ -11,7 +11,7 @@ end
 function make_PVPlant(amplitude :: Float64) :: PVPlant
     return PVPlant(
         StateMachine(), # controller
-        false, # is_storage
+        limited_source, # sys_function
         InterfaceMap(), # input_interfaces
         InterfaceMap( # output_interfaces
             m_e_ac_230v => nothing

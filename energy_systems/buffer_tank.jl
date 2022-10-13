@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
@@ -12,7 +12,7 @@ end
 function make_BufferTank(capacity :: Float64, load :: Float64) :: BufferTank
     return BufferTank(
         StateMachine(), # controller
-        true, # is_storage
+        storage, # sys_function
         InterfaceMap( # input_interfaces
             m_h_w_60c => nothing
         ),

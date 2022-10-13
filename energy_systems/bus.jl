@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct Bus <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
     medium :: MediumCategory
 
     input_interfaces :: Vector{SystemInterface}
@@ -12,7 +12,7 @@ end
 function make_Bus(medium :: MediumCategory) :: Bus
     return Bus(
         StateMachine(), # controller
-        false, # is_storage
+        bus, # sys_function
         medium, # medium
         [], # input_interfaces
         [], # output_interfaces,
@@ -48,7 +48,7 @@ end
 
 function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     for inface in unit.input_interfaces
-        if inface.source.is_storage
+        if inface.source.sys_function === storage
             unit.storage_space += inface.source.capacity - inface.source.load
         end
     end

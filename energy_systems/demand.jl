@@ -1,6 +1,6 @@
 Base.@kwdef mutable struct Demand <: ControlledSystem
     controller :: StateMachine
-    is_storage :: Bool
+    sys_function :: SystemFunction
     medium :: MediumCategory
 
     input_interfaces :: InterfaceMap
@@ -12,7 +12,7 @@ end
 function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
     return Demand(
         StateMachine(), # controller
-        false, # is_storage
+        limited_sink, # sys_function
         medium, # medium
         InterfaceMap( # input_interfaces
             medium => nothing
