@@ -20,13 +20,31 @@ function Condition(
     if name == "Buffer < X%"
         required_systems["buffer"] = (BufferTank, m_h_w_60c)
         default_params["percentage"] = 0.5
+
     elseif name == "Buffer >= X%"
         required_systems["buffer"] = (BufferTank, m_h_w_60c)
         default_params["percentage"] = 0.5
+
     elseif name == "Min run time"
         # nothing to do
+
     elseif name == "Would overfill thermal buffer"
         required_systems["buffer"] = (BufferTank, m_h_w_60c)
+
+    elseif name == "Little PV power"
+        required_systems["pv_plant"] = (PVPlant, m_e_ac_230v)
+        default_params["threshold"] = 1000
+
+    elseif name == "Much PV power"
+        required_systems["pv_plant"] = (PVPlant, m_e_ac_230v)
+        default_params["threshold"] = 1000
+
+    elseif name == "Sufficient charge"
+        default_params["threshold"] = 0.2
+
+    elseif name == "Insufficient charge"
+        default_params["threshold"] = 0.05
+
     else
         throw(KeyError(name))
     end
@@ -121,19 +139,43 @@ function check(
         return (rel(condition, "buffer").load
             < condition.parameters["percentage"]
             * rel(condition, "buffer").capacity)
+
     elseif condition.name == "Buffer >= X%"
         return (rel(condition, "buffer").load
             >= condition.parameters["percentage"]
             * rel(condition, "buffer").capacity)
+
     elseif condition.name == "Min run time"
         return (unit.controller.time_in_state
             * parameters["time_step_seconds"]
             >= unit.min_run_time)
+
     elseif condition.name == "Would overfill thermal buffer"
         return (rel(condition, "buffer").capacity
             - rel(condition, "buffer").load
             < unit.power * unit.min_power_fraction)
+
+    elseif condition.name == "Little PV power"
+        # by subtracting the balance we avoid the problem of checking the amount of
+        # produced electricity if it has been consumed already, leading to double the
+        # amount of changes. if nothing was consumed yet, the balance is 0
+        return (rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].sum_abs_change
+            - rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].balance
+            < parameters["threshold"])
+
+    elseif condition.name == "Much PV power"
+        # see condition "Little PV power" for how this works
+        return (rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].sum_abs_change
+            - rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].balance
+            >= parameters["threshold"])
+
+    elseif condition.name == "Sufficient charge"
+        return unit.load >= parameters["threshold"]
+
+    elseif condition.name == "Insufficient charge"
+        return unit.load < parameters["threshold"]
     end
+
     throw(KeyError(condition.name))
 end
 
