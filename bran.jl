@@ -81,6 +81,7 @@ function run_simulation()
         "TST_01_ELT_01_GRI" => make_GridConnection(EnergySystems.m_e_ac_230v, true),
         "TST_01_ELT_01_GRO" => make_GridConnection(EnergySystems.m_e_ac_230v, false),
         "TST_01_HZG_01_BFT" => make_BufferTank(40000.0, 20000.0),
+        "TST_01_ELT_01_BAT" => make_Battery("Economical discharge", 10000.0, 5000.0),
         "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
         "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
         "TST_01_ELT_01_PVP" => make_PVPlant(15000.0),
@@ -95,9 +96,10 @@ function run_simulation()
         "TST_01_ELT_01_GRI",
         "TST_01_ELT_01_GRO",
         "TST_01_HZG_01_BFT",
+        "TST_01_ELT_01_PVP",
+        "TST_01_ELT_01_BAT",
         "TST_01_HZG_01_CHP",
         "TST_01_HZG_01_HTP",
-        "TST_01_ELT_01_PVP",
         "TST_01_ELT_01_BUS",
         "TST_01_HZG_01_BUS",
         "TST_01_HZG_01_DEM",
@@ -113,6 +115,7 @@ function run_simulation()
         "TST_01_HZG_01_CHP", # transformer
         "TST_01_HZG_01_HTP", # transformer
         "TST_01_HZG_01_BFT", # storage
+        "TST_01_ELT_01_BAT", # storage
         "TST_01_HZG_01_GRI", # infinite_source
         "TST_01_ELT_01_GRI", # infinite_source
         "TST_01_ELT_01_GRO", # infinite_sink
@@ -126,6 +129,10 @@ function run_simulation()
         systems["TST_01_HZG_01_HTP"],
         Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
     )
+    link_control_with(
+        systems["TST_01_ELT_01_BAT"],
+        Grouping("TST_01_ELT_01_PVP" => systems["TST_01_ELT_01_PVP"])
+    )
 
     link_production_with(
         systems["TST_01_HZG_01_GRI"],
@@ -138,6 +145,10 @@ function run_simulation()
     link_production_with(
         systems["TST_01_HZG_01_BFT"],
         Grouping("TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"])
+    )
+    link_production_with(
+        systems["TST_01_ELT_01_BAT"],
+        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
     )
     link_production_with(
         systems["TST_01_HZG_01_CHP"],
@@ -166,6 +177,7 @@ function run_simulation()
         Grouping(
             "TST_01_ELT_01_DEM" => systems["TST_01_ELT_01_DEM"],
             "TST_01_HZG_01_HTP" => systems["TST_01_HZG_01_HTP"],
+            "TST_01_ELT_01_BAT" => systems["TST_01_ELT_01_BAT"],
             "TST_01_ELT_01_GRO" => systems["TST_01_ELT_01_GRO"]
         )
     )
