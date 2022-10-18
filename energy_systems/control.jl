@@ -164,24 +164,24 @@ function check(
             < unit.power * unit.min_power_fraction)
 
     elseif condition.name == "Little PV power"
-        # by subtracting the balance we avoid the problem of checking the amount of
-        # produced electricity if it has been consumed already, leading to double the
-        # amount of changes. if nothing was consumed yet, the balance is 0
-        return (rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].sum_abs_change
-            - rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].balance
-            < parameters["threshold"])
+        # by checking the current balance of the output interface we avoid the problem
+        # that changes are counted doubled when the energy already has been consumed
+        # but only once if the energy is still "within" the interface
+        outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
+        return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
+            < condition.parameters["threshold"])
 
     elseif condition.name == "Much PV power"
         # see condition "Little PV power" for how this works
-        return (rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].sum_abs_change
-            - rel(condition, "pv_plant").output_interfaces[m_e_ac_230v].balance
-            >= parameters["threshold"])
+        outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
+        return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
+            >= condition.parameters["threshold"])
 
     elseif condition.name == "Sufficient charge"
-        return unit.load >= parameters["threshold"]
+        return unit.load >= condition.parameters["threshold"]
 
     elseif condition.name == "Insufficient charge"
-        return unit.load < parameters["threshold"]
+        return unit.load < condition.parameters["threshold"]
     end
 
     throw(KeyError(condition.name))
