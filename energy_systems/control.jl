@@ -2,7 +2,7 @@
 struct Condition
     name :: String
     parameters :: Dict{String, Any}
-    required_systems :: Dict{String, Tuple{Type, MediumCategory}}
+    required_systems :: Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
     linked_systems :: Grouping
 end
 
@@ -14,29 +14,29 @@ function Condition(
     name :: String,
     parameters :: Dict{String, Any}
 ) :: Condition
-    required_systems = Dict{String, Tuple{Type, MediumCategory}}()
+    required_systems = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}()
     default_params = Dict{String, Any}()
 
     if name == "Buffer < X%"
-        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+        required_systems["buffer"] = (BufferTank, nothing)
         default_params["percentage"] = 0.5
 
     elseif name == "Buffer >= X%"
-        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+        required_systems["buffer"] = (BufferTank, nothing)
         default_params["percentage"] = 0.5
 
     elseif name == "Min run time"
         # nothing to do
 
     elseif name == "Would overfill thermal buffer"
-        required_systems["buffer"] = (BufferTank, m_h_w_60c)
+        required_systems["buffer"] = (BufferTank, nothing)
 
     elseif name == "Little PV power"
-        required_systems["pv_plant"] = (PVPlant, m_e_ac_230v)
+        required_systems["pv_plant"] = (PVPlant, nothing)
         default_params["threshold"] = 1000
 
     elseif name == "Much PV power"
-        required_systems["pv_plant"] = (PVPlant, m_e_ac_230v)
+        required_systems["pv_plant"] = (PVPlant, nothing)
         default_params["threshold"] = 1000
 
     elseif name == "Sufficient charge"
@@ -61,9 +61,17 @@ function link(condition :: Condition, systems :: Grouping)
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
         for unit in each(systems)
-            if isa(unit, req_unit[1]) && req_unit[2] in keys(unit.input_interfaces)
-                condition.linked_systems[name] = unit
-                found_link = true
+            if isa(unit, req_unit[1])
+                if (req_unit[2] !== nothing
+                    && hasfield(typeof(unit), Symbol("medium"))
+                    && unit.medium == req_unit[2]
+                )
+                    condition.linked_systems[name] = unit
+                    found_link = true
+                elseif req_unit[2] === nothing
+                    condition.linked_systems[name] = unit
+                    found_link = true
+                end
             end
         end
 
