@@ -102,7 +102,7 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
     # gather_from_all! has incorrectly recorded a move of energy
     gather_from_all!(outface, outface.target)
 
-    if unit.load > outface.balance
+    if unit.load > abs(outface.balance)
         unit.load += outface.balance
         set!(outface, 0.0)
     else
