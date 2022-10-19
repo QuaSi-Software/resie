@@ -85,6 +85,10 @@ function make_Battery(strategy :: String, capacity :: Float64, load :: Float64) 
 end
 
 function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    if unit.controller.state != 2
+        return
+    end
+
     outface = unit.output_interfaces[m_e_ac_230v]
     balance = check_balance(outface, outface.target)
 
@@ -108,6 +112,10 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
 end
 
 function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    if unit.controller.state != 1
+        return
+    end
+
     inface = unit.input_interfaces[m_e_ac_230v]
     gather_from_all!(inface, inface.source)
 
