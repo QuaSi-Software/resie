@@ -26,7 +26,7 @@ end
 
 function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_h_w_60c]
-    balance = check_balance(outface, outface.target)
+    balance = balance_on(outface, outface.target)
 
     if balance >= 0.0
         return # produce is only concerned with moving energy to the target

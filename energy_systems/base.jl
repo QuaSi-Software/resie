@@ -50,8 +50,8 @@ function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem
     return # the default implementation is to do nothing
 end
 
-function check_balance(interface :: SystemInterface, unit :: ControlledSystem) :: Float64
-    return interface.balance
+function balance_on(interface :: SystemInterface, unit :: ControlledSystem) :: (Float64, Float64)
+    return interface.balance, 0.0
 end
 
 function reset(unit :: ControlledSystem)
@@ -141,7 +141,7 @@ function check_balances(
     warnings = []
 
     for (key, unit) in pairs(systems)
-        balance = check_balance(unit)
+        balance = balance(unit)
         if balance > epsilon || balance < -epsilon
             push!(warnings, (key, balance))
         end
@@ -150,7 +150,7 @@ function check_balances(
     return warnings
 end
 
-function check_balance(unit :: ControlledSystem) :: Float64
+function balance(unit :: ControlledSystem) :: Float64
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
