@@ -90,7 +90,7 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
     end
 
     outface = unit.output_interfaces[m_e_ac_230v]
-    balance = balance_on(outface, outface.target)
+    balance, potential = balance_on(outface, outface.target)
 
     if balance >= 0.0
         return # produce is only concerned with moving energy to the target

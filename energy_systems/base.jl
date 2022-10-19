@@ -50,7 +50,10 @@ function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem
     return # the default implementation is to do nothing
 end
 
-function balance_on(interface :: SystemInterface, unit :: ControlledSystem) :: (Float64, Float64)
+function balance_on(
+    interface :: SystemInterface,
+    unit :: ControlledSystem
+) :: Tuple{Float64, Float64}
     return interface.balance, 0.0
 end
 
@@ -134,22 +137,6 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
     end
 end
 
-function check_balances(
-    systems :: Grouping,
-    epsilon :: Float64
-) :: Vector{Tuple{String, Float64}}
-    warnings = []
-
-    for (key, unit) in pairs(systems)
-        balance = balance(unit)
-        if balance > epsilon || balance < -epsilon
-            push!(warnings, (key, balance))
-        end
-    end
-
-    return warnings
-end
-
 function balance(unit :: ControlledSystem) :: Float64
     balance = 0.0
 
@@ -162,6 +149,22 @@ function balance(unit :: ControlledSystem) :: Float64
     end
 
     return balance
+end
+
+function check_balances(
+    systems :: Grouping,
+    epsilon :: Float64
+) :: Vector{Tuple{String, Float64}}
+    warnings = []
+
+    for (key, unit) in pairs(systems)
+        unit_balance = balance(unit)
+        if unit_balance > epsilon || unit_balance < -epsilon
+            push!(warnings, (key, unit_balance))
+        end
+    end
+
+    return warnings
 end
 
 function reset(systems :: Grouping)

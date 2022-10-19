@@ -78,15 +78,15 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     if unit.controller.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
-        potential = balance_on(
+        balance, potential = balance_on(
             unit.output_interfaces[m_h_w_60c],
             unit.output_interfaces[m_h_w_60c].target
         )
-        if potential >= 0.0
+        if balance + potential >= 0.0
             return # don't add to a surplus of energy
         end
 
-        usage_fraction = min(1.0, abs(potential) / max_produce_h)
+        usage_fraction = min(1.0, abs(balance + potential) / max_produce_h)
         if usage_fraction < unit.min_power_fraction
             return
         end

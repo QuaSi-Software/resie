@@ -54,7 +54,7 @@ function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Fun
     end
 end
 
-function balance_on(interface :: SystemInterface, unit :: Bus) :: Float64
+function balance(unit :: Bus) :: Float64
     balance = 0.0
 
     for inface in unit.input_interfaces
@@ -65,11 +65,18 @@ function balance_on(interface :: SystemInterface, unit :: Bus) :: Float64
         balance += outface.balance
     end
 
-    return balance, unit.storage_space
+    return balance
+end
+
+function balance_on(
+    interface :: SystemInterface,
+    unit :: Bus
+) :: Tuple{Float64, Float64}
+    return balance(unit), -unit.storage_space #  negative is demand
 end
 
 function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
     return [("Balance", "$(balance(unit))")]
 end
 
-export Bus, specific_values, make_Bus, gather_from_all!, reset, balance_on
+export Bus, specific_values, make_Bus, gather_from_all!, reset, balance, balance_on
