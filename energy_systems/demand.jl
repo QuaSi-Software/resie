@@ -34,12 +34,20 @@ function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: 
 end
 
 function load_at_time(unit :: Demand, time :: Int)
-    if unit.medium == m_e_ac_230v
-        return unit.load
-    end
-
     seconds_in_day = 60 * 60 * 24
     time_of_day = Float64(time % seconds_in_day) / seconds_in_day
+
+    if unit.medium == m_e_ac_230v
+        if time_of_day < 0.25 || time_of_day >= 0.9
+            return unit.load * 0.2
+        elseif time_of_day >= 0.25 && time_of_day < 0.292
+            return unit.load * 1.2
+        elseif time_of_day >= 0.75 && time_of_day < 0.9
+            return unit.load * 1.5
+        else
+            return unit.load * 0.5
+        end
+    end
 
     if time_of_day < 0.25 || time_of_day >= 0.8333
         return unit.load * 0.3
