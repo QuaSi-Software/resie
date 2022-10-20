@@ -91,34 +91,35 @@ function run_simulation()
         "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
     )
 
-    control_order = [
-        "TST_01_HZG_01_GRI",
-        "TST_01_ELT_01_GRI",
-        "TST_01_ELT_01_GRO",
-        "TST_01_HZG_01_BFT",
-        "TST_01_ELT_01_PVP",
-        "TST_01_ELT_01_BAT",
-        "TST_01_HZG_01_CHP",
-        "TST_01_HZG_01_HTP",
-        "TST_01_ELT_01_BUS",
-        "TST_01_HZG_01_BUS",
-        "TST_01_HZG_01_DEM",
-        "TST_01_ELT_01_DEM",
-    ]
-
-    production_order = [
-        "TST_01_ELT_01_PVP", # limited_source
-        "TST_01_HZG_01_DEM", # limited_sink
-        "TST_01_ELT_01_DEM", # limited_sink
-        "TST_01_HZG_01_BUS", # bus
-        "TST_01_ELT_01_BUS", # bus
-        "TST_01_HZG_01_CHP", # transformer
-        "TST_01_HZG_01_HTP", # transformer
-        "TST_01_HZG_01_BFT", # storage
-        "TST_01_ELT_01_BAT", # storage
-        "TST_01_HZG_01_GRI", # infinite_source
-        "TST_01_ELT_01_GRI", # infinite_source
-        "TST_01_ELT_01_GRO", # infinite_sink
+    simulation_order = [
+        ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
+        ["TST_01_HZG_01_DEM", EnergySystems.s_reset], # limited_sink
+        ["TST_01_ELT_01_DEM", EnergySystems.s_reset], # limited_sink
+        ["TST_01_HZG_01_BUS", EnergySystems.s_reset], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_reset], # bus
+        ["TST_01_HZG_01_CHP", EnergySystems.s_reset], # transformer
+        ["TST_01_HZG_01_HTP", EnergySystems.s_reset], # transformer
+        ["TST_01_HZG_01_BFT", EnergySystems.s_reset], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_reset], # storage
+        ["TST_01_HZG_01_GRI", EnergySystems.s_reset], # infinite_source
+        ["TST_01_ELT_01_GRI", EnergySystems.s_reset], # infinite_source
+        ["TST_01_ELT_01_GRO", EnergySystems.s_reset], # infinite_sink
+        ["TST_01_ELT_01_PVP", EnergySystems.s_control, EnergySystems.s_produce], # limited_source
+        ["TST_01_HZG_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
+        ["TST_01_ELT_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
+        ["TST_01_HZG_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
+        ["TST_01_HZG_01_CHP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
+        ["TST_01_HZG_01_HTP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
+        ["TST_01_HZG_01_BFT", EnergySystems.s_control, EnergySystems.s_produce], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_control, EnergySystems.s_produce], # storage
+        ["TST_01_HZG_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
+        ["TST_01_ELT_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
+        ["TST_01_ELT_01_GRO", EnergySystems.s_control, EnergySystems.s_produce], # infinite_sink
+        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
+        ["TST_01_HZG_01_BUS", EnergySystems.s_distribute], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_distribute], # bus
     ]
 
     link_control_with(
@@ -193,10 +194,7 @@ function run_simulation()
 
     for i = 1:(96*7)
         # perform the simulation
-        EnergySystems.reset(systems)
-        control(systems, control_order, parameters)
-        produce(systems, production_order, parameters)
-        distribute(systems, production_order)
+        perform_steps(systems, simulation_order, parameters)
 
         # check if any energy system was not balanced
         warnings = check_balances(systems, parameters["epsilon"])

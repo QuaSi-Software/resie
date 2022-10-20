@@ -1,12 +1,14 @@
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
-    link_production_with, check_balances, reset, distribute
+    represent, pprint, link_control_with, each, Grouping, link_production_with, check_balances,
+    perform_steps
 
 @enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
 
 @enum SystemFunction infinite_sink infinite_source limited_sink limited_source transformer storage bus
+
+@enum Step s_reset s_control s_produce s_load s_distribute
 
 abstract type EnergySystem end
 abstract type ControlledSystem <: EnergySystem end
@@ -53,6 +55,20 @@ function balance_on(
     return interface.balance, 0.0
 end
 
+function balance(unit :: ControlledSystem) :: Float64
+    balance = 0.0
+
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing balance += inface.balance end
+    end
+
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing balance += outface.balance end
+    end
+
+    return balance
+end
+
 function reset(unit :: ControlledSystem)
     for inface in values(unit.input_interfaces)
         if inface !== nothing reset!(inface) end
@@ -60,6 +76,34 @@ function reset(unit :: ControlledSystem)
     for outface in values(unit.output_interfaces)
         if outface !== nothing reset!(outface) end
     end
+end
+
+function control(
+    unit :: ControlledSystem,
+    systems :: Grouping,
+    parameters :: Dict{String, Any}
+)
+    move_state(unit, systems, parameters)
+end
+
+function produce(
+    unit :: ControlledSystem,
+    parameters :: Dict{String, Any},
+    watt_to_wh :: Function
+)
+    # default implementation is to do nothing
+end
+
+function load(
+    unit :: ControlledSystem,
+    parameters :: Dict{String, Any},
+    watt_to_wh :: Function
+)
+    # default implementation is to do nothing
+end
+
+function distribute!(unit :: ControlledSystem)
+    # default implementation is to do nothing
 end
 
 function represent(unit :: ControlledSystem, time :: Int) :: String
@@ -133,20 +177,6 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
     end
 end
 
-function balance(unit :: ControlledSystem) :: Float64
-    balance = 0.0
-
-    for inface in values(unit.input_interfaces)
-        if inface !== nothing balance += inface.balance end
-    end
-
-    for outface in values(unit.output_interfaces)
-        if outface !== nothing balance += outface.balance end
-    end
-
-    return balance
-end
-
 function check_balances(
     systems :: Grouping,
     epsilon :: Float64
@@ -163,51 +193,33 @@ function check_balances(
     return warnings
 end
 
-function reset(systems :: Grouping)
-    for unit in each(systems)
-        reset(unit)
-    end
-end
-
-function control(
+function perform_steps(
     systems :: Grouping,
-    order :: Vector{String},
-    parameters :: Dict{String, Any}
-)
-    for key in order
-        control(systems[key], systems, parameters)
-    end
-end
-
-function produce(
-    systems :: Grouping,
-    order :: Vector{String},
+    order_of_steps :: Vector{Vector{Any}},
     parameters :: Dict{String, Any}
 )
     watt_to_wh = function (watts :: Float64)
         watts * Float64(parameters["time_step_seconds"]) / 3600.0
     end
 
-    for key in order
-        produce(systems[key], parameters, watt_to_wh)
-    end
-
-    for key in order
-        unit = systems[key]
-        if unit.sys_function === storage
-            load(unit, parameters, watt_to_wh)
+    for entry in order_of_steps
+        if length(entry) < 2
+            continue
         end
-    end
-end
+        unit = systems[entry[1]]
 
-function distribute(
-    systems :: Grouping,
-    order :: Vector{String}
-)
-    for key in order
-        unit = systems[key]
-        if unit.sys_function === bus
-            distribute!(unit)
+        for step in entry[2:lastindex(entry)]
+            if step == s_reset
+                reset(unit)
+            elseif step == s_control
+                control(unit, systems, parameters)
+            elseif step == s_produce
+                produce(unit, parameters, watt_to_wh)
+            elseif step == s_load
+                load(unit, parameters, watt_to_wh)
+            elseif step == s_distribute
+                distribute!(unit)
+            end
         end
     end
 end

@@ -186,11 +186,3 @@ function check(
 
     throw(KeyError(condition.name))
 end
-
-function control(
-    unit :: ControlledSystem,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
-)
-    move_state(unit, systems, parameters)
-end
