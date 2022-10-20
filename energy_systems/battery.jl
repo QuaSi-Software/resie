@@ -98,7 +98,7 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
 
     if unit.load > abs(balance)
         unit.load += balance
-        set!(outface, 0.0)
+        add!(outface, abs(balance))
     else
         add!(outface, unit.load)
         unit.load = 0.0
@@ -118,7 +118,7 @@ function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     end
 
     unit.load += balance # @TODO: check if loading exceeds capacity
-    set!(inface, 0.0)
+    sub!(inface, balance)
 end
 
 function specific_values(unit :: Battery, time :: Int) :: Vector{Tuple}

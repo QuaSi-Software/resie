@@ -34,7 +34,7 @@ function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh
 
     if unit.load > abs(balance)
         unit.load += balance
-        set!(outface, 0.0)
+        add!(outface, abs(balance))
     else
         add!(outface, unit.load)
         unit.load = 0.0
@@ -50,7 +50,7 @@ function load(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh ::
     end
 
     unit.load += balance # @TODO: check if loading exceeds capacity
-    set!(inface, 0.0)
+    sub!(inface, balance)
 end
 
 function specific_values(unit :: BufferTank, time :: Int) :: Vector{Tuple}
