@@ -49,8 +49,14 @@ function load(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh ::
         return # load is only concerned with receiving energy from the target
     end
 
-    unit.load += balance # @TODO: check if loading exceeds capacity
-    sub!(inface, balance)
+    diff = unit.capacity - unit.load
+    if diff > balance
+        unit.load += balance
+        sub!(inface, balance)
+    else
+        unit.load = unit.capacity
+        sub!(inface, diff)
+    end
 end
 
 function specific_values(unit :: BufferTank, time :: Int) :: Vector{Tuple}
