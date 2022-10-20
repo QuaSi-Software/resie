@@ -196,6 +196,7 @@ function run_simulation()
         EnergySystems.reset(systems)
         control(systems, control_order, parameters)
         produce(systems, production_order, parameters)
+        distribute(systems, production_order)
 
         # check if any energy system was not balanced
         warnings = check_balances(systems, parameters["epsilon"])

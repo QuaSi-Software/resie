@@ -2,7 +2,7 @@ module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
     control, represent, pprint, check, produce, production, link_control_with, each, Grouping,
-    link_production_with, check_balances, reset
+    link_production_with, check_balances, reset, distribute
 
 @enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
 
@@ -196,6 +196,18 @@ function produce(
         unit = systems[key]
         if unit.sys_function === storage
             load(unit, parameters, watt_to_wh)
+        end
+    end
+end
+
+function distribute(
+    systems :: Grouping,
+    order :: Vector{String}
+)
+    for key in order
+        unit = systems[key]
+        if unit.sys_function === bus
+            distribute!(unit)
         end
     end
 end
