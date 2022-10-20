@@ -46,10 +46,6 @@ end
 
 const InterfaceMap = Dict{MediumCategory, Union{Nothing, SystemInterface}}
 
-function gather_from_all!(interface :: SystemInterface, unit :: ControlledSystem)
-    return # the default implementation is to do nothing
-end
-
 function balance_on(
     interface :: SystemInterface,
     unit :: ControlledSystem

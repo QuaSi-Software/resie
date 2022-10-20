@@ -29,13 +29,15 @@ end
 function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     if unit.sys_function === infinite_source
         outface = unit.output_interfaces[unit.medium]
-        gather_from_all!(outface, outface.target)
-        unit.draw_sum += outface.balance
+        # @TODO: if grids should be allowed to load storage systems, then the potential
+        # must be handled here instead of being ignored
+        balance, _ = balance_on(outface, outface.target)
+        unit.draw_sum += balance
         set!(outface, 0.0)
     else
         inface = unit.input_interfaces[unit.medium]
-        gather_from_all!(inface, inface.source)
-        unit.load_sum += inface.balance
+        balance, _ = balance_on(inface, inface.source)
+        unit.load_sum += balance
         set!(inface, 0.0)
     end
 end

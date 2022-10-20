@@ -20,22 +20,6 @@ function make_Bus(medium :: MediumCategory) :: Bus
     )
 end
 
-function gather_from_all!(interface :: SystemInterface, unit :: Bus)
-    balance = 0.0
-
-    for inface in unit.input_interfaces
-        balance += inface.balance
-        set!(inface, 0.0)
-    end
-
-    for outface in unit.output_interfaces
-        balance += outface.balance
-        set!(outface, 0.0)
-    end
-
-    set!(interface, balance)
-end
-
 function reset(unit :: Bus)
     for inface in unit.input_interfaces
         reset!(inface)
@@ -79,4 +63,4 @@ function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
     return [("Balance", "$(balance(unit))")]
 end
 
-export Bus, specific_values, make_Bus, gather_from_all!, reset, balance, balance_on
+export Bus, specific_values, make_Bus, reset, balance, balance_on
