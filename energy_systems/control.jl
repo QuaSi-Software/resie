@@ -169,19 +169,11 @@ function check(
         # but only once if the energy is still "within" the interface
         outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
         return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
-            < condition.parameters["threshold"])
-
-    elseif condition.name == "Much PV power"
-        # see condition "Little PV power" for how this works
-        outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
-        return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
-            >= condition.parameters["threshold"])
+            < condition.parameters["threshold"] * rel(condition, "pv_plant").amplitude * 0.25)
 
     elseif condition.name == "Sufficient charge"
-        return unit.load >= condition.parameters["threshold"]
+        return unit.load >= condition.parameters["threshold"] * unit.capacity
 
-    elseif condition.name == "Insufficient charge"
-        return unit.load < condition.parameters["threshold"]
     end
 
     throw(KeyError(condition.name))

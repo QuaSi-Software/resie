@@ -24,7 +24,7 @@ function make_Battery(strategy :: String, capacity :: Float64, load :: Float64) 
                         Condition(
                             "Little PV power",
                             Dict{String, Any}(
-                                "threshold" => capacity * 0.05
+                                "threshold" => 0.15
                             )
                         ),
                         Condition(
@@ -45,23 +45,23 @@ function make_Battery(strategy :: String, capacity :: Float64, load :: Float64) 
                 2 => TruthTable( # State: Discharge
                     conditions=[
                         Condition(
-                            "Much PV power",
+                            "Little PV power",
                             Dict{String, Any}(
-                                "threshold" => capacity * 0.05
+                                "threshold" => 0.15
                             )
                         ),
                         Condition(
-                            "Insufficient charge",
+                            "Sufficient charge",
                             Dict{String, Any}(
                                 "threshold" => 0.05
                             )
                         )
                     ],
                     table_data=Dict{Tuple, UInt}(
-                            (false,false) => 2,
+                            (false,false) => 1,
                             (false,true) => 1,
                             (true,false) => 1,
-                            (true,true) => 1,
+                            (true,true) => 2,
                         )
                 ),
             )

@@ -113,11 +113,11 @@ function run_simulation()
         ["TST_01_HZG_01_HTP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
         ["TST_01_HZG_01_BFT", EnergySystems.s_control, EnergySystems.s_produce], # storage
         ["TST_01_ELT_01_BAT", EnergySystems.s_control, EnergySystems.s_produce], # storage
+        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
         ["TST_01_HZG_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
         ["TST_01_ELT_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
         ["TST_01_ELT_01_GRO", EnergySystems.s_control, EnergySystems.s_produce], # infinite_sink
-        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
         ["TST_01_HZG_01_BUS", EnergySystems.s_distribute], # bus
         ["TST_01_ELT_01_BUS", EnergySystems.s_distribute], # bus
     ]
