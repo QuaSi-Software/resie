@@ -3,6 +3,7 @@
 
 # Auto-generated files
 __pycache__
+deps/build.log
 
 # output files
 *.csv

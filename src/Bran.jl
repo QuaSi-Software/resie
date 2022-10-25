@@ -1,0 +1,3 @@
+module Bran
+
+end # module
