@@ -1,3 +1,13 @@
+"""
+Implementation of an energy system modeling the connection to a public grid of a certain medium.
+
+Public grids are considered to have an unlimited amount of energy they can provide, but
+might be limited in the power they can provide, although this behaviour is not yet
+implemented. They exist to model real connections to a public grid that can provide any
+remaining demand of energy or take in any excess of energy. To make it possible to model a
+one-way connection they are split into two instances for providing or receiving energy and
+must be handled as such in the input for constructing a project.
+"""
 Base.@kwdef mutable struct GridConnection <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction

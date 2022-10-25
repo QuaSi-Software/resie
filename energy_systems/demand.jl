@@ -1,3 +1,12 @@
+"""
+Implementation of an energy system that models the demand consumers in a building require.
+
+As the simulation does not encompass demand calculations, this is usually taken from other
+tools that calculate the demand before a simulation of the energy systems is done. For the
+moment this remains a simple implementation that does not consider any external profile
+and instead approximates a demand profile with peaks in the morning and evening. The load
+parameter is a scaling factor, but does not correspond to an average demand load.
+"""
 Base.@kwdef mutable struct Demand <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction

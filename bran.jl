@@ -1,9 +1,19 @@
+"""
+The time step, in seconds, used by the simulation.
+
+@TODO: Move this into the input parameters to make it customizable at runtime.
+"""
 const TIME_STEP = UInt(900)
 
 include("energy_systems/base.jl")
 
 using .EnergySystems
 
+"""
+    print_system_state(system, time)
+
+Pretty-print the state of the given systems at the given time to the console.
+"""
 function print_system_state(systems :: Grouping, time :: Int)
     println("Time is ", time)
     for unit in each(systems)
@@ -13,6 +23,11 @@ function print_system_state(systems :: Grouping, time :: Int)
     print("\n")
 end
 
+"""
+    reset_file(systems)
+
+Reset the output file and add headers for the given systems
+"""
 function reset_file(systems :: Grouping)
     open("./out.csv", "w") do file_handle
         write(file_handle, "Time [s]")
@@ -39,6 +54,11 @@ function reset_file(systems :: Grouping)
     end
 end
 
+"""
+    write_to_file(systems, time)
+
+Write the energy transfer values and additional state to the output file.
+"""
 function write_to_file(systems :: Grouping, time :: Int)
     open("./out.csv", "a") do file_handle
         write(file_handle, "$time")
@@ -75,6 +95,15 @@ function write_to_file(systems :: Grouping, time :: Int)
     end
 end
 
+"""
+    run_simulation()
+
+Read inputs, perform the simulation calculation and write outputs.
+
+This is the entry point to the simulation engine. Due to the complexity of required inputs
+and how the outputs are written (to file), this function doesn't take any arguments and
+returns nothing.
+"""
 function run_simulation()
     systems = Grouping(
         "TST_01_HZG_01_GRI" => make_GridConnection(EnergySystems.m_c_g_natgas, true),

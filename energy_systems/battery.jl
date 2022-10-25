@@ -1,3 +1,10 @@
+"""
+Implementation of a battery energy system holding electric charge.
+
+For the moment the implementation remains simple with only one state (its charge) and one
+parameters (its capacity). However the default operation strategy is more complex and
+toggles the production of the battery dependant on available PV power and its own charge.
+"""
 Base.@kwdef mutable struct Battery <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction

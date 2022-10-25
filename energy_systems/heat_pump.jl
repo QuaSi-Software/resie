@@ -1,3 +1,15 @@
+"""
+Implementation of a heat pump energy system.
+
+For the moment this remains a simple implementation that requires no heat input and
+produces heat of medium m_h_w_60c from electricity. Has a fixed coefficient of performance
+(COP) of 3 and a minimum power fraction of 20%. The power parameters is considered the
+maximum power of heat output the heat pump can produce.
+
+The only currently implemented operation strategy involves checking the load of a linked
+buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
+overfill shutoff condition.
+"""
 Base.@kwdef mutable struct HeatPump <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction

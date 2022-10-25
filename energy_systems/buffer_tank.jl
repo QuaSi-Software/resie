@@ -1,3 +1,11 @@
+"""
+Implementation of a buffer tank holding hot water for heating or DHW purposes.
+
+For the moment this remains a very simple implementation that only has a load (how much
+energy is stored) and a capacity, with no temperatures being considered. Given how the
+simulation engine works, there will likely always be the need to deal with energy being
+transfered with water temperature being secondary input variables.
+"""
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction

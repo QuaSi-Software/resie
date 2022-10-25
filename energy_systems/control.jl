@@ -1,15 +1,48 @@
+"""
+A boolean decision variable for a transition in a state machine.
 
+Because the implementation of conditions can be arbitrary but require the values of certain
+energy systems, a condition must be parameterized with its requirements. This is part of
+the input to the simulation and cannot be derived otherwise.
+"""
 struct Condition
+    """An identifiable name."""
     name :: String
+
+    """Parameters the condition requires and holds the values after loading."""
     parameters :: Dict{String, Any}
+
+    """Defines which systems the condition requires, indexed by an internal name.
+
+    For some systems a medium is required as they can take varying values.
+    """
     required_systems :: Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
+
+    """The systems linked to the condition indexed by an internal name."""
     linked_systems :: Grouping
 end
 
+"""
+    rel(condition, name)
+
+Get the linked system of the given name for a condition.
+"""
 function rel(condition :: Condition, name :: String) :: ControlledSystem
     return condition.linked_systems[name]
 end
 
+"""
+Constructor for Condition.
+
+# Arguments
+- `name::String`: The name of the condition
+- `parameters::Dict{String, Any]`: Parameters for the condition. Not to be confused with
+    the project-wide parameters for the entire simulation.
+
+# Returns
+- `Condition`: A Condition instance with default parameter values and information on which
+    energy systems are required, but systems have been linked yet
+"""
 function Condition(
     name :: String,
     parameters :: Dict{String, Any}
@@ -57,6 +90,14 @@ function Condition(
     )
 end
 
+"""
+    link(condition, systems)
+
+Look for the condition's required systems in the given set and link the condition to them.
+
+For example, if a condition required a system "grid_out" of type GridConnection and medium
+m_e_ac_230v, it will look through the set of given systems and link to the first match.
+"""
 function link(condition :: Condition, systems :: Grouping)
     for (name, req_unit) in pairs(condition.required_systems)
         found_link = false
@@ -82,6 +123,13 @@ function link(condition :: Condition, systems :: Grouping)
     end
 end
 
+"""
+    link_control_with(unit, systems)
+
+Link the given systems with all conditions of the given unit.
+
+See also [`link`](@ref)
+"""
 function link_control_with(unit :: ControlledSystem, systems :: Grouping)
     for table in values(unit.controller.transitions)
         for condition in table.conditions
@@ -90,18 +138,63 @@ function link_control_with(unit :: ControlledSystem, systems :: Grouping)
     end
 end
 
+"""
+Maps a vector of boolean values to integers.
+
+This is used to define the transitions of a StateMachine by defining which values of
+conditions lead to which state.
+
+# Examples
+```
+table = TruthTable(
+    conditions=[Condition("foo is big"), Condition("bar is small")],
+    table_data=Dict{Tuple, UInt}(
+        (false, false) => 1,
+        (false, true) => 1,
+        (true, false) => 2,
+        (true, true) => 1,
+    )
+)
+```
+This example defines a transitions for a state machine with two states. If the condition
+"foo is big" is true and the condition "bar is small" is false, the new state should be the
+second state, otherwise the first.
+"""
 Base.@kwdef struct TruthTable
     conditions :: Vector{Condition}
     table_data :: Dict{Tuple, UInt}
 end
 
+"""
+Implementation of state machines with generalized conditions instead of an input alphabet.
+
+Similar to the state machines used in regular languages, a state machine is always in one
+of its states and certain conditions define how transitions between states occurs. Instead
+of checking against characters in an input alphabet, these state machines are typically
+checked once every time step of a simulation and the conditions can have arbitrary
+implementations that require the simulation state as input.
+"""
 Base.@kwdef mutable struct StateMachine
+    """The current state of the state machine."""
     state :: UInt
+
+    """A map of state names indexes by their ID."""
     state_names :: Dict{UInt, String}
+
+    """Maps states to a TruthTable that define the transitions in that state."""
     transitions :: Dict{UInt, TruthTable}
+
+    """
+    The number of steps the state machine has been in the current state.
+
+    Starts counting at 1.
+    """
     time_in_state :: UInt
 end
 
+"""
+Default constructor of StateMachine that creates a state machine with only one state.
+"""
 StateMachine() = StateMachine(
     1, # StateMachine.state
     Dict(1=>"Default"), # StateMachine.state_names
@@ -112,6 +205,11 @@ StateMachine() = StateMachine(
     0 # StateMachine.time_in_state
 )
 
+"""
+    move_state(unit, systems, parameters)
+
+Checks the controller of the given unit and moves the state machine to its new state.
+"""
 function move_state(
     unit :: ControlledSystem,
     systems :: Grouping,
@@ -138,6 +236,11 @@ function move_state(
     end
 end
 
+"""
+    check(condition, unit, parameters)
+
+Check the condition of the given unit and return the result.
+"""
 function check(
     condition :: Condition,
     unit :: ControlledSystem,

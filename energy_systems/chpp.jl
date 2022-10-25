@@ -1,3 +1,16 @@
+"""
+Implementation of a combined-heat-power-plant (CHPP) energy system.
+
+For the moment this remains a simple implementation that converts natural gas into
+electricity and heat (as medium m_h_w_60c) at a defined ratio of 1:0.4:0.6. Has a minimum
+run time of 1800s taken into consideration in its control behaviour and a minimum power
+fraction of 20%. The power is considered the maximum amount of both heat and electricity
+that the CHPP can produce.
+
+The only currently implemented operation strategy involves checking the load of a linked
+buffer tank and en-/disabling the CHPP when a threshold is reached, in addition to an
+overfill shutoff condition.
+"""
 Base.@kwdef mutable struct CHPP <: ControlledSystem
     controller :: StateMachine
     sys_function :: SystemFunction
