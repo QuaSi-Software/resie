@@ -9,6 +9,19 @@ const TIME_STEP = UInt(900)
 include("energy_systems/base.jl")
 
 using .EnergySystems
+import JSON
+
+"""
+    read_JSON(filepath)
+
+Read and parse the JSON-encoded Dict in the given file.
+"""
+function read_JSON(filepath :: String) :: Dict{AbstractString, Any}
+    open(filepath, "r") do file_handle
+        content = read(file_handle, String)
+        return JSON.parse(content)
+    end
+end
 
 """
     print_system_state(system, time)
@@ -105,7 +118,7 @@ This is the entry point to the simulation engine. Due to the complexity of requi
 and how the outputs are written (to file), this function doesn't take any arguments and
 returns nothing.
 """
-function run_simulation()
+function run_simulation(project_config :: Dict{AbstractString, Any})
     systems = Grouping(
         "TST_01_HZG_01_GRI" => make_GridConnection(EnergySystems.m_c_g_natgas, true),
         "TST_01_ELT_01_GRI" => make_GridConnection(EnergySystems.m_e_ac_230v, true),
@@ -243,6 +256,42 @@ function run_simulation()
     end
 end
 
-run_simulation()
+"""
+    main()
+
+Entry point into the simulation engine. The simulation is controlled and configured by a
+config file.
+
+# Command line arguments
+## Positional arguments
+- `String`: Filepath to the project config file (see documentation on file format). Can be
+a path relative to the CWD of the caller.
+"""
+function main()
+    if length(ARGS) > 0
+        filepath = ARGS[1]
+        if filepath !== nothing && filepath != ""
+            project_config = nothing
+
+            try
+                project_config = read_JSON(abspath(filepath))
+            catch exc
+                if isa(exc, MethodError)
+                    println("Could not parse project config file")
+                    return
+                end
+            end
+
+            run_simulation(project_config)
+            return
+        end
+
+        println("Could not find or access project config file")
+        return
+    end
+
+    println("No project config file argument given")
+end
+main()
 
 end # module
