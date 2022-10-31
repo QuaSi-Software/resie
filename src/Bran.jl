@@ -12,6 +12,56 @@ using .EnergySystems
 import JSON
 
 """
+Holds the options which output values should be recorded.
+
+This is a specific data structure intended to speed up recording output by avoiding the
+need to parse the user-submitted config options for every time step.
+"""
+Base.@kwdef struct OutputKey
+    unit :: EnergySystem
+    medium :: Union{Nothing, MediumCategory}
+    value_key :: String
+end
+
+"""
+    output_keys(from_config)
+
+Transform the output keys definition in the project config file into a list of OutputKey
+items. This is done to speed up selection of values for the output in each time step,
+as this transformation has to be done only once at the beginning.
+"""
+function output_keys(
+    systems :: Grouping,
+    from_config :: Dict{String, Any}
+) :: Vector{OutputKey}
+    outputs = Vector{OutputKey}()
+
+    for unit_key in keys(from_config)
+        unit = systems[unit_key]
+
+        for entry in from_config[unit_key]
+            splitted = split(String(entry))
+            if length(splitted) > 1
+                medium_key = splitted[1]
+                medium = getproperty(EnergySystems, Symbol(String(medium_key)))
+                value_key = splitted[2]
+            else
+                medium = nothing
+                value_key = splitted[1]
+            end
+
+            push!(outputs, OutputKey(
+                unit=unit,
+                medium=medium,
+                value_key=value_key
+            ))
+        end
+    end
+
+    return outputs
+end
+
+"""
     read_JSON(filepath)
 
 Read and parse the JSON-encoded Dict in the given file.
@@ -234,6 +284,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
 
     print_system_state(systems, parameters["time"])
     reset_file(systems)
+    outputs = output_keys(systems, project_config["output_keys"])
 
     for i = 1:(96*7)
         # perform the simulation
