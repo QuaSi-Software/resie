@@ -74,20 +74,6 @@ function read_JSON(filepath :: String) :: Dict{AbstractString, Any}
 end
 
 """
-    print_system_state(system, time)
-
-Pretty-print the state of the given systems at the given time to the console.
-"""
-function print_system_state(systems :: Grouping, time :: Int)
-    println("Time is ", time)
-    for unit in each(systems)
-        pprint(unit, time)
-        print(" | ")
-    end
-    print("\n")
-end
-
-"""
     reset_file(systems)
 
 Reset the output file and add headers for the given systems
@@ -282,7 +268,6 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         "epsilon" => 1e-9
     )
 
-    print_system_state(systems, parameters["time"])
     reset_file(systems)
     outputs = output_keys(systems, project_config["output_keys"])
 

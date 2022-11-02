@@ -151,11 +151,4 @@ function output_value(unit :: Battery, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: Battery, time :: Int) :: Vector{Tuple}
-    return [
-        ("Load", "$(unit.load)"),
-        ("Capacity", "$(unit.capacity)")
-    ]
-end
-
-export Battery, specific_values, make_Battery
+export Battery, make_Battery, output_values, output_value

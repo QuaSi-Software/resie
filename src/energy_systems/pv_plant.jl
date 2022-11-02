@@ -42,10 +42,6 @@ function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: PVPlant, time :: Int) :: Vector{Tuple}
-    return []
-end
-
 function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_e_ac_230v]
     add!(outface, watt_to_wh(power_at_time(unit, parameters["time"])))
@@ -60,4 +56,4 @@ function power_at_time(plant :: PVPlant, time :: Int) :: Float64
     ))
 end
 
-export PVPlant, specific_values, make_PVPlant
+export PVPlant, make_PVPlant, output_values, output_value

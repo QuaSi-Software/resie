@@ -73,11 +73,4 @@ function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: GridConnection, time :: Int) :: Vector{Tuple}
-    return [
-        ("Draw sum", "$(unit.draw_sum)"),
-        ("Load sum", "$(unit.load_sum)")
-    ]
-end
-
-export GridConnection, specific_values, make_GridConnection
+export GridConnection, make_GridConnection, output_values, output_value

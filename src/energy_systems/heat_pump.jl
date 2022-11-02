@@ -108,8 +108,4 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     end
 end
 
-function specific_values(unit :: HeatPump, time :: Int) :: Vector{Tuple}
-    return []
-end
-
-export HeatPump, make_HeatPump, specific_values
+export HeatPump, make_HeatPump, output_values, output_value

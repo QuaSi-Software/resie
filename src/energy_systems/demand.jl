@@ -46,10 +46,6 @@ function output_value(unit :: Demand, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
-    return []
-end
-
 function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, watt_to_wh(load_at_time(unit, parameters["time"])))
@@ -82,4 +78,4 @@ function load_at_time(unit :: Demand, time :: Int)
     end
 end
 
-export Demand, specific_values, load_at_time, make_Demand
+export Demand, load_at_time, make_Demand, output_values, output_value

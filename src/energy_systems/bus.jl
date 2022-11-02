@@ -122,8 +122,4 @@ function output_value(unit :: Bus, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
-    return [("Balance", "$(balance(unit))")]
-end
-
-export Bus, specific_values, make_Bus, reset, balance, balance_on, distribute!, produce
+export Bus, make_Bus, reset, balance, balance_on, distribute!, produce, output_values, output_value

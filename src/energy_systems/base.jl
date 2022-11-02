@@ -336,41 +336,6 @@ function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-"""
-    represent(unit, time)
-
-Represent the state of a unit and any values apart from the energy balance.
-
-# Arguments
-- `unit::ControlledSystem`: The energy system to represent
-- `time::Int`: The time of the simulation in second. Used mostly for time-dependant values
-
-# Returns
-- `String`: A short representation of the given unit
-"""
-function represent(unit :: ControlledSystem, time :: Int) :: String
-    repr = ""
-    for val in specific_values(unit, time)
-        repr = repr * " $(val[1]) $(val[2])"
-    end
-    return string(
-        "$(typeof(unit)) ",
-        "($(unit.controller.state_names[unit.controller.state]))",
-        repr
-    )
-end
-
-"""
-    pprint(unit, time)
-
-Print a representation of the given unit to the console output.
-
-# Arguments
-- `unit::ControlledSystem`: The energy system to print
-- `time::Int`: The time of the simulation in second. Used mostly for time-dependant values
-"""
-pprint(unit :: ControlledSystem, time :: Int) = print(represent(unit, time))
-
 # for the moment control must be an include as it contains circular dependencies
 # of definitions
 include("control.jl")

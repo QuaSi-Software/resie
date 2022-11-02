@@ -84,11 +84,4 @@ function output_value(unit :: BufferTank, key :: OutputKey) :: Float64
     raise(KeyError(key.key_value))
 end
 
-function specific_values(unit :: BufferTank, time :: Int) :: Vector{Tuple}
-    return [
-        ("Load", "$(unit.load)"),
-        ("Capacity", "$(unit.capacity)")
-    ]
-end
-
-export BufferTank, specific_values, make_BufferTank
+export BufferTank, make_BufferTank, output_values, output_value

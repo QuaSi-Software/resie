@@ -122,8 +122,4 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     end
 end
 
-function specific_values(unit :: CHPP, time :: Int) :: Vector{Tuple}
-    return []
-end
-
-export CHPP, make_CHPP, specific_values
+export CHPP, make_CHPP, output_values, output_value
