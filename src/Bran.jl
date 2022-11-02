@@ -12,18 +12,6 @@ using .EnergySystems
 import JSON
 
 """
-Holds the options which output values should be recorded.
-
-This is a specific data structure intended to speed up recording output by avoiding the
-need to parse the user-submitted config options for every time step.
-"""
-Base.@kwdef struct OutputKey
-    unit :: EnergySystem
-    medium :: Union{Nothing, MediumCategory}
-    value_key :: String
-end
-
-"""
     output_keys(from_config)
 
 Transform the output keys definition in the project config file into a list of OutputKey
@@ -33,8 +21,8 @@ as this transformation has to be done only once at the beginning.
 function output_keys(
     systems :: Grouping,
     from_config :: Dict{String, Any}
-) :: Vector{OutputKey}
-    outputs = Vector{OutputKey}()
+) :: Vector{EnergySystems.OutputKey}
+    outputs = Vector{EnergySystems.OutputKey}()
 
     for unit_key in keys(from_config)
         unit = systems[unit_key]
@@ -50,7 +38,7 @@ function output_keys(
                 value_key = splitted[1]
             end
 
-            push!(outputs, OutputKey(
+            push!(outputs, EnergySystems.OutputKey(
                 unit=unit,
                 medium=medium,
                 value_key=value_key

@@ -77,6 +77,18 @@ Convenience alias to a dict mapping UAC keys to an energy system.
 const Grouping = Dict{String, ControlledSystem}
 
 """
+Holds the options which output values should be recorded.
+
+This is a specific data structure intended to speed up recording output by avoiding the
+need to parse the user-submitted config options for every time step.
+"""
+Base.@kwdef struct OutputKey
+    unit :: EnergySystem
+    medium :: Union{Nothing, MediumCategory}
+    value_key :: String
+end
+
+"""
     each(systems :: Grouping)
 
 Generator over each of the energy systems in the given grouping.
