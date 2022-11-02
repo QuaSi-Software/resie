@@ -62,16 +62,16 @@ function output_values(unit :: GridConnection) :: Vector{String}
 end
 
 function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
-    if key.key_value == "IN"
+    if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "OUT"
+    elseif key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "Draw sum"
+    elseif key.value_key == "Draw sum"
         return unit.draw_sum
-    elseif key.key_value == "Load sum"
+    elseif key.value_key == "Load sum"
         return unit.load_sum
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 export GridConnection, make_GridConnection, output_values, output_value

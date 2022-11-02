@@ -340,12 +340,12 @@ Raises:
 - `KeyError`: The key value requested must be one the energy system can provide
 """
 function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
-    if key.key_value == "IN"
+    if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "OUT"
+    elseif key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 # for the moment control must be an include as it contains circular dependencies

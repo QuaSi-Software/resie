@@ -117,10 +117,10 @@ function output_values(unit :: Bus) :: Vector{String}
 end
 
 function output_value(unit :: Bus, key :: OutputKey) :: Float64
-    if key.key_value == "Balance"
+    if key.value_key == "Balance"
         return balance(unit)
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 export Bus, make_Bus, reset, balance, balance_on, distribute!, produce, output_values, output_value

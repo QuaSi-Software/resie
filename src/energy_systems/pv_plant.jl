@@ -35,12 +35,12 @@ function output_values(unit :: PVPlant) :: Vector{String}
 end
 
 function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
-    if key.key_value == "OUT"
+    if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "Power"
+    elseif key.value_key == "Power"
         return unit.power # @TODO: Save the last calculated value and return it
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)

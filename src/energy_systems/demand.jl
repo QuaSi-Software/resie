@@ -39,12 +39,12 @@ function output_values(unit :: Demand) :: Vector{String}
 end
 
 function output_value(unit :: Demand, key :: OutputKey) :: Float64
-    if key.key_value == "IN"
+    if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "Load"
+    elseif key.value_key == "Load"
         return unit.load # @TODO: Save the last calculated values and return it
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)

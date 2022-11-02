@@ -73,16 +73,16 @@ function output_values(unit :: BufferTank) :: Vector{String}
 end
 
 function output_value(unit :: BufferTank, key :: OutputKey) :: Float64
-    if key.key_value == "IN"
+    if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "OUT"
+    elseif key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.key_value == "Load"
+    elseif key.value_key == "Load"
         return unit.load
-    elseif key.key_value == "Capacity"
+    elseif key.value_key == "Capacity"
         return unit.capacity
     end
-    raise(KeyError(key.key_value))
+    raise(KeyError(key.value_key))
 end
 
 export BufferTank, make_BufferTank, output_values, output_value
