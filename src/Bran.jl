@@ -62,12 +62,15 @@ function read_JSON(filepath :: String) :: Dict{AbstractString, Any}
 end
 
 """
-    reset_file(output_keys)
+    reset_file(filepath, output_keys)
 
 Reset the output file and add headers for the given outputs.
 """
-function reset_file(output_keys :: Vector{EnergySystems.OutputKey})
-    open("./out.csv", "w") do file_handle
+function reset_file(
+    filepath :: String,
+    output_keys :: Vector{EnergySystems.OutputKey}
+)
+    open(abspath(filepath), "w") do file_handle
         write(file_handle, "Time [s]")
 
         for outkey in output_keys
@@ -84,15 +87,16 @@ function reset_file(output_keys :: Vector{EnergySystems.OutputKey})
 end
 
 """
-    write_to_file(output_keys, time)
+    write_to_file(filepath, output_keys, time)
 
 Write the given outputs for the given time to file.
 """
 function write_to_file(
+    filepath :: String,
     output_keys :: Vector{EnergySystems.OutputKey},
     time :: Int
 )
-    open("./out.csv", "a") do file_handle
+    open(abspath(filepath), "a") do file_handle
         write(file_handle, "$time")
 
         for outkey in output_keys
@@ -252,8 +256,8 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         "epsilon" => 1e-9
     )
 
-    outputs = output_keys(systems, project_config["output_keys"])
-    reset_file(outputs)
+    outputs = output_keys(systems, project_config["io_settings"]["output_keys"])
+    reset_file(project_config["io_settings"]["output_file"], outputs)
 
     for i = 1:(96*7)
         # perform the simulation
@@ -269,7 +273,11 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         end
 
         # output
-        write_to_file(outputs, parameters["time"])
+        write_to_file(
+            project_config["io_settings"]["output_file"],
+            outputs,
+            parameters["time"]
+        )
 
         # simulation update
         parameters["time"] += Int(TIME_STEP)
