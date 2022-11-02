@@ -12,6 +12,7 @@ buffer tank and en-/disabling the CHPP when a threshold is reached, in addition 
 overfill shutoff condition.
 """
 Base.@kwdef mutable struct CHPP <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
 

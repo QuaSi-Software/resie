@@ -8,6 +8,7 @@ and instead approximates a demand profile with peaks in the morning and evening.
 parameter is a scaling factor, but does not correspond to an average demand load.
 """
 Base.@kwdef mutable struct Demand <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
     medium :: MediumCategory

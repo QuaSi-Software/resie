@@ -8,6 +8,7 @@ some system losses. The amplitude parameter is a scaling factor, but is not an a
 power value.
 """
 Base.@kwdef mutable struct PVPlant <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
 

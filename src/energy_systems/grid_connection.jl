@@ -9,6 +9,7 @@ one-way connection they are split into two instances for providing or receiving 
 must be handled as such in the input for constructing a project.
 """
 Base.@kwdef mutable struct GridConnection <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
     medium :: MediumCategory

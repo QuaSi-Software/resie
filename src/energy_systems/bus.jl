@@ -10,6 +10,7 @@ connection between both systems.
 The function and purpose is described in more detail in the accompanying documentation.
 """
 Base.@kwdef mutable struct Bus <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
     medium :: MediumCategory

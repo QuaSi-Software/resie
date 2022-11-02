@@ -170,6 +170,10 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
     )
 
+    for (key, unit) in pairs(systems)
+        unit.uac = key
+    end
+
     simulation_order = [
         ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
         ["TST_01_HZG_01_DEM", EnergySystems.s_reset], # limited_sink

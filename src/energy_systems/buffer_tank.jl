@@ -7,6 +7,7 @@ simulation engine works, there will likely always be the need to deal with energ
 transfered with water temperature being secondary input variables.
 """
 Base.@kwdef mutable struct BufferTank <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
 

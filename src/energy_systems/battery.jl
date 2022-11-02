@@ -6,6 +6,7 @@ parameters (its capacity). However the default operation strategy is more comple
 toggles the production of the battery dependant on available PV power and its own charge.
 """
 Base.@kwdef mutable struct Battery <: ControlledSystem
+    uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
 
