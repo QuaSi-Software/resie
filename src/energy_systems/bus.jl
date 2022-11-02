@@ -111,6 +111,17 @@ function distribute!(unit :: Bus)
     unit.remainder = remainder
 end
 
+function output_values(unit :: Bus) :: Vector{String}
+    return ["Balance"]
+end
+
+function output_value(unit :: Bus, key :: OutputKey) :: Float64
+    if key.key_value == "Balance"
+        return balance(unit)
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: Bus, time :: Int) :: Vector{Tuple}
     return [("Balance", "$(balance(unit))")]
 end

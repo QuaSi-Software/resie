@@ -33,6 +33,19 @@ function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
     )
 end
 
+function output_values(unit :: Demand) :: Vector{String}
+    return ["IN", "Load"]
+end
+
+function output_value(unit :: Demand, key :: OutputKey) :: Float64
+    if key.key_value == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "Load"
+        return unit.load # @TODO: Save the last calculated values and return it
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: Demand, time :: Int) :: Vector{Tuple}
     return []
 end

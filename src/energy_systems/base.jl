@@ -298,6 +298,45 @@ function distribute!(unit :: ControlledSystem)
 end
 
 """
+    output_values(unit)
+
+Specify which outputs an energy system can provide.
+
+For the special values "IN" and "OUT" a medium category is required for fetching the actual
+value, while this method only specifies that there is an input or output.
+"""
+function output_values(unit :: EnergySystem) :: Vector{String}
+    return ["IN", "OUT"]
+end
+
+"""
+    output_value(unit, key)
+
+Return the value for the output with the given output key.
+
+Note that for the "IN" and "OUT" output values, the value corresponds to the sum of
+absolute changes of the system interfaces and divided by 2. This behaviour is part of the
+expected use of the method.
+
+Args:
+- `unit::EnergySystem`: The energy system for which to fetch the output
+- `key::OutputKey`: An OutputKey specifying which output to return. This should be one of
+    the options provided by `output_values()` as well as "IN" or "OUT"
+Returns:
+- `Float64`: The value of the desired output
+Raises:
+- `KeyError`: The key value requested must be one the energy system can provide
+"""
+function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
+    if key.key_value == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    end
+    raise(KeyError(key.key_value))
+end
+
+"""
     represent(unit, time)
 
 Represent the state of a unit and any values apart from the energy balance.

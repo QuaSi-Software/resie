@@ -56,6 +56,23 @@ function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_t
     end
 end
 
+function output_values(unit :: GridConnection) :: Vector{String}
+    return ["IN", "OUT", "Draw sum", "Load sum"]
+end
+
+function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
+    if key.key_value == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "Draw sum"
+        return unit.draw_sum
+    elseif key.key_value == "Load sum"
+        return unit.load_sum
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: GridConnection, time :: Int) :: Vector{Tuple}
     return [
         ("Draw sum", "$(unit.draw_sum)"),

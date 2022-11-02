@@ -134,6 +134,23 @@ function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     end
 end
 
+function output_values(unit :: Battery) :: Vector{String}
+    return ["IN", "OUT", "Load", "Capacity"]
+end
+
+function output_value(unit :: Battery, key :: OutputKey) :: Float64
+    if key.key_value == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "Load"
+        return unit.load
+    elseif key.key_value == "Capacity"
+        return unit.capacity
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: Battery, time :: Int) :: Vector{Tuple}
     return [
         ("Load", "$(unit.load)"),

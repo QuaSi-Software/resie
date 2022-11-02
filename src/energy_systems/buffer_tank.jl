@@ -67,6 +67,23 @@ function load(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh ::
     end
 end
 
+function output_values(unit :: BufferTank) :: Vector{String}
+    return ["IN", "OUT", "Load", "Capacity"]
+end
+
+function output_value(unit :: BufferTank, key :: OutputKey) :: Float64
+    if key.key_value == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "Load"
+        return unit.load
+    elseif key.key_value == "Capacity"
+        return unit.capacity
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: BufferTank, time :: Int) :: Vector{Tuple}
     return [
         ("Load", "$(unit.load)"),

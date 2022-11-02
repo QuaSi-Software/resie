@@ -29,6 +29,19 @@ function make_PVPlant(amplitude :: Float64) :: PVPlant
     )
 end
 
+function output_values(unit :: PVPlant) :: Vector{String}
+    return ["OUT", "Power"]
+end
+
+function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
+    if key.key_value == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.key_value == "Power"
+        return unit.power # @TODO: Save the last calculated value and return it
+    end
+    raise(KeyError(key.key_value))
+end
+
 function specific_values(unit :: PVPlant, time :: Int) :: Vector{Tuple}
     return []
 end
