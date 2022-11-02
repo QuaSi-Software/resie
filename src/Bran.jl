@@ -62,30 +62,21 @@ function read_JSON(filepath :: String) :: Dict{AbstractString, Any}
 end
 
 """
-    reset_file(systems)
+    reset_file(output_keys)
 
-Reset the output file and add headers for the given systems
+Reset the output file and add headers for the given outputs.
 """
-function reset_file(systems :: Grouping)
+function reset_file(output_keys :: Vector{EnergySystems.OutputKey})
     open("./out.csv", "w") do file_handle
         write(file_handle, "Time [s]")
 
-        for (key, unit) in pairs(systems)
-            for val in specific_values(unit, Int(0))
-                write(file_handle, ";$key $(val[1])")
+        for outkey in output_keys
+            if outkey.medium === nothing
+                header = "$(outkey.unit.uac) $(outkey.value_key)"
+            else
+                header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
             end
-
-            if isa(unit, Bus) continue end
-
-            for (medium, inface) in pairs(unit.input_interfaces)
-                if inface === nothing continue end
-                write(file_handle, ";$key $medium IN")
-            end
-
-            for (medium, outface) in pairs(unit.output_interfaces)
-                if outface === nothing continue end
-                write(file_handle, ";$key $medium OUT")
-            end
+            write(file_handle, ";$header")
         end
 
         write(file_handle, "\n")
@@ -93,40 +84,21 @@ function reset_file(systems :: Grouping)
 end
 
 """
-    write_to_file(systems, time)
+    write_to_file(output_keys, time)
 
-Write the energy transfer values and additional state to the output file.
+Write the given outputs for the given time to file.
 """
-function write_to_file(systems :: Grouping, time :: Int)
+function write_to_file(
+    output_keys :: Vector{EnergySystems.OutputKey},
+    time :: Int
+)
     open("./out.csv", "a") do file_handle
         write(file_handle, "$time")
 
-        for unit in each(systems)
-
-            for val in specific_values(unit, time)
-                write(file_handle, replace(
-                    replace(";$(val[2])", "/" => ";"),
-                    "." => ","
-                ))
-            end
-
-            if isa(unit, Bus) continue end
-
-            for inface in values(unit.input_interfaces)
-                if inface === nothing continue end
-                write(file_handle, replace(
-                    replace(";$(inface.sum_abs_change * 0.5)", "/" => ";"),
-                    "." => ","
-                ))
-            end
-
-            for outface in values(unit.output_interfaces)
-                if outface === nothing continue end
-                write(file_handle, replace(
-                    replace(";$(outface.sum_abs_change * 0.5)", "/" => ";"),
-                    "." => ","
-                ))
-            end
+        for outkey in output_keys
+            value = output_value(outkey.unit, outkey)
+            value = replace("$value", "." => ",")
+            write(file_handle, ";$value")
         end
 
         write(file_handle, "\n")
@@ -280,8 +252,8 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         "epsilon" => 1e-9
     )
 
-    reset_file(systems)
     outputs = output_keys(systems, project_config["output_keys"])
+    reset_file(outputs)
 
     for i = 1:(96*7)
         # perform the simulation
@@ -297,7 +269,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         end
 
         # output
-        write_to_file(systems, parameters["time"])
+        write_to_file(outputs, parameters["time"])
 
         # simulation update
         parameters["time"] += Int(TIME_STEP)
