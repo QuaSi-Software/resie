@@ -144,23 +144,43 @@ returns nothing.
 """
 function run_simulation(project_config :: Dict{AbstractString, Any})
     systems = Grouping(
-        "TST_01_HZG_01_GRI" => make_GridConnection(EnergySystems.m_c_g_natgas, true),
-        "TST_01_ELT_01_GRI" => make_GridConnection(EnergySystems.m_e_ac_230v, true),
-        "TST_01_ELT_01_GRO" => make_GridConnection(EnergySystems.m_e_ac_230v, false),
-        "TST_01_HZG_01_BFT" => make_BufferTank(40000.0, 20000.0),
-        "TST_01_ELT_01_BAT" => make_Battery("Economical discharge", 10000.0, 5000.0),
-        "TST_01_HZG_01_CHP" => make_CHPP("Ensure storage", 12500.0),
-        "TST_01_HZG_01_HTP" => make_HeatPump("Ensure storage", 20000.0, 3.0),
-        "TST_01_ELT_01_PVP" => make_PVPlant(15000.0),
-        "TST_01_ELT_01_BUS" => make_Bus(EnergySystems.m_e_ac_230v),
-        "TST_01_HZG_01_BUS" => make_Bus(EnergySystems.m_h_w_60c),
-        "TST_01_HZG_01_DEM" => make_Demand(EnergySystems.m_h_w_60c, 10000.0),
-        "TST_01_ELT_01_DEM" => make_Demand(EnergySystems.m_e_ac_230v, 15000.0),
+        "TST_01_HZG_01_GRI" => make_GridConnection(
+            "TST_01_HZG_01_GRI", EnergySystems.m_c_g_natgas, true
+        ),
+        "TST_01_ELT_01_GRI" => make_GridConnection(
+            "TST_01_ELT_01_GRI", EnergySystems.m_e_ac_230v, true
+        ),
+        "TST_01_ELT_01_GRO" => make_GridConnection(
+            "TST_01_ELT_01_GRO", EnergySystems.m_e_ac_230v, false
+        ),
+        "TST_01_HZG_01_BFT" => make_BufferTank(
+            "TST_01_HZG_01_BFT", 40000.0, 20000.0
+        ),
+        "TST_01_ELT_01_BAT" => make_Battery(
+            "TST_01_ELT_01_BAT", "Economical discharge", 10000.0, 5000.0
+        ),
+        "TST_01_HZG_01_CHP" => make_CHPP(
+            "TST_01_HZG_01_CHP", "Ensure storage", 12500.0
+        ),
+        "TST_01_HZG_01_HTP" => make_HeatPump(
+            "TST_01_HZG_01_HTP", "Ensure storage", 20000.0, 3.0
+        ),
+        "TST_01_ELT_01_PVP" => make_PVPlant(
+            "TST_01_ELT_01_PVP", 15000.0
+        ),
+        "TST_01_ELT_01_BUS" => make_Bus(
+            "TST_01_ELT_01_BUS", EnergySystems.m_e_ac_230v
+        ),
+        "TST_01_HZG_01_BUS" => make_Bus(
+            "TST_01_HZG_01_BUS", EnergySystems.m_h_w_60c
+        ),
+        "TST_01_HZG_01_DEM" => make_Demand(
+            "TST_01_HZG_01_DEM", EnergySystems.m_h_w_60c, 10000.0
+        ),
+        "TST_01_ELT_01_DEM" => make_Demand(
+            "TST_01_ELT_01_DEM", EnergySystems.m_e_ac_230v, 15000.0
+        ),
     )
-
-    for (key, unit) in pairs(systems)
-        unit.uac = key
-    end
 
     simulation_order = [
         ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source

@@ -17,7 +17,7 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
     load :: Float64
 end
 
-function make_Battery(strategy :: String, capacity :: Float64, load :: Float64) :: Battery
+function make_Battery(uac :: String, strategy :: String, capacity :: Float64, load :: Float64) :: Battery
     if strategy == "Economical discharge"
         controller = StateMachine(
             state=UInt(1),
@@ -79,6 +79,7 @@ function make_Battery(strategy :: String, capacity :: Float64, load :: Float64) 
     end
 
     return Battery(
+        uac, # uac
         controller, # controller
         storage, # sys_function
         InterfaceMap( # input_interfaces

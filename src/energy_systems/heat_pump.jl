@@ -23,9 +23,10 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 end
 
-function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
+function make_HeatPump(uac :: String, strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
     if strategy == "Ensure storage"
         return HeatPump(
+            uac, # uac
             StateMachine( # HeatPump.controller
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
@@ -83,7 +84,7 @@ function make_HeatPump(strategy :: String, power :: Float64, cop :: Float64) :: 
             cop, # electricity_fraction
         )
     else
-        return HeatPump(controller=StateMachine(), power=power, cop=cop)
+        return HeatPump(uac, controller=StateMachine(), power=power, cop=cop)
     end
 end
 

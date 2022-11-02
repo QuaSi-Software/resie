@@ -19,8 +19,9 @@ Base.@kwdef mutable struct Demand <: ControlledSystem
     load :: Float64
 end
 
-function make_Demand(medium :: MediumCategory, load :: Float64) :: Demand
+function make_Demand(uac :: String, medium :: MediumCategory, load :: Float64) :: Demand
     return Demand(
+        uac, # uac
         StateMachine(), # controller
         limited_sink, # sys_function
         medium, # medium

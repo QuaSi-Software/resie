@@ -22,8 +22,9 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     remainder :: Float64
 end
 
-function make_Bus(medium :: MediumCategory) :: Bus
+function make_Bus(uac :: String, medium :: MediumCategory) :: Bus
     return Bus(
+        uac, # uac
         StateMachine(), # controller
         bus, # sys_function
         medium, # medium

@@ -18,8 +18,9 @@ Base.@kwdef mutable struct BufferTank <: ControlledSystem
     load :: Float64
 end
 
-function make_BufferTank(capacity :: Float64, load :: Float64) :: BufferTank
+function make_BufferTank(uac :: String, capacity :: Float64, load :: Float64) :: BufferTank
     return BufferTank(
+        uac, # uac
         StateMachine(), # controller
         storage, # sys_function
         InterfaceMap( # input_interfaces

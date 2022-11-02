@@ -18,8 +18,9 @@ Base.@kwdef mutable struct PVPlant <: ControlledSystem
     amplitude :: Float64
 end
 
-function make_PVPlant(amplitude :: Float64) :: PVPlant
+function make_PVPlant(uac :: String, amplitude :: Float64) :: PVPlant
     return PVPlant(
+        uac, # uac
         StateMachine(), # controller
         limited_source, # sys_function
         InterfaceMap(), # input_interfaces

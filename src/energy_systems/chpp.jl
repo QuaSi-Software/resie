@@ -25,9 +25,10 @@ Base.@kwdef mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt = 1800
 end
 
-function make_CHPP(strategy :: String, power :: Float64) :: CHPP
+function make_CHPP(uac :: String, strategy :: String, power :: Float64) :: CHPP
     if strategy == "Ensure storage"
         return CHPP(
+            uac, # uac
             StateMachine( # CHPP.controller
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
@@ -95,7 +96,7 @@ function make_CHPP(strategy :: String, power :: Float64) :: CHPP
             1800 # min_run_time
         )
     else
-        return CHPP(controller=StateMachine(), power=power)
+        return CHPP(uac, controller=StateMachine(), power=power)
     end
 end
 

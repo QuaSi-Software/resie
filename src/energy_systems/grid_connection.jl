@@ -21,8 +21,9 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
     load_sum :: Float64
 end
 
-function make_GridConnection(medium :: MediumCategory, is_source :: Bool) :: GridConnection
+function make_GridConnection(uac :: String, medium :: MediumCategory, is_source :: Bool) :: GridConnection
     return GridConnection(
+        uac, # uac
         StateMachine(), # controller
         if is_source infinite_source else infinite_sink end, # sys_function
         medium, # medium
