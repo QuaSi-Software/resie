@@ -1,0 +1,73 @@
+{
+    "io_settings": {
+        "output_file": "./out.csv",
+        "output_keys": {
+            "TST_01_HZG_01_BFT": ["Load"],
+            "TST_01_HZG_01_CHP": ["m_h_w_60c OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_60c OUT"],
+            "TST_01_HZG_01_BUS": ["Balance"],
+            "TST_01_HZG_01_DEM": ["m_h_w_60c IN"]
+        }
+    },
+    "energy_systems": {
+        "TST_01_ELT_01_PVP": {
+            "type": "PVPlant",
+            "power": 15000
+        },
+        "TST_01_HZG_01_DEM": {
+            "type": "Demand",
+            "medium": "m_h_w_60c",
+            "scale": 10000.0
+        },
+        "TST_01_ELT_01_DEM": {
+            "type": "Demand",
+            "medium": "m_e_ac_230v",
+            "scale": 15000
+        },
+        "TST_01_HZG_01_BUS": {
+            "type": "Bus",
+            "medium": "m_h_w_60c"
+        },
+        "TST_01_ELT_01_BUS": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v"
+        },
+        "TST_01_HZG_01_CHP": {
+            "type": "CHPP",
+            "strategy": "Ensure storage",
+            "power": 12500
+        },
+        "TST_01_HZG_01_HTP": {
+            "type": "HeatPump",
+            "strategy": "Ensure storage",
+            "power": 20000,
+            "cop": 3.0
+        },
+        "TST_01_HZG_01_BFT": {
+            "type": "BufferTank",
+            "capacity": 40000,
+            "load": 20000
+        },
+        "TST_01_ELT_01_BAT": {
+            "type": "Battery",
+            "strategy": "Economical discharge",
+            "capacity": 10000,
+            "load": 5000
+        },
+        "TST_01_HZG_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_c_g_natgas",
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRO": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "is_source": false
+        }
+    }
+}
