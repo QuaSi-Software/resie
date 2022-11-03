@@ -114,49 +114,21 @@ end
 
 Read inputs, perform the simulation calculation and write outputs.
 
-This is the entry point to the simulation engine. Due to the complexity of required inputs
-and how the outputs are written (to file), this function doesn't take any arguments and
-returns nothing.
+Due to the complexity of required inputs of a simulation and how the outputs are persisted
+(to file), this function takes only one argument, namely the project config, and returns
+nothing.
 """
 function run_simulation(project_config :: Dict{AbstractString, Any})
-    systems = Grouping(
-        "TST_01_HZG_01_GRI" => make_GridConnection(
-            "TST_01_HZG_01_GRI", EnergySystems.m_c_g_natgas, true
-        ),
-        "TST_01_ELT_01_GRI" => make_GridConnection(
-            "TST_01_ELT_01_GRI", EnergySystems.m_e_ac_230v, true
-        ),
-        "TST_01_ELT_01_GRO" => make_GridConnection(
-            "TST_01_ELT_01_GRO", EnergySystems.m_e_ac_230v, false
-        ),
-        "TST_01_HZG_01_BFT" => make_BufferTank(
-            "TST_01_HZG_01_BFT", 40000.0, 20000.0
-        ),
-        "TST_01_ELT_01_BAT" => make_Battery(
-            "TST_01_ELT_01_BAT", "Economical discharge", 10000.0, 5000.0
-        ),
-        "TST_01_HZG_01_CHP" => make_CHPP(
-            "TST_01_HZG_01_CHP", "Ensure storage", 12500.0
-        ),
-        "TST_01_HZG_01_HTP" => make_HeatPump(
-            "TST_01_HZG_01_HTP", "Ensure storage", 20000.0, 3.0
-        ),
-        "TST_01_ELT_01_PVP" => make_PVPlant(
-            "TST_01_ELT_01_PVP", 15000.0
-        ),
-        "TST_01_ELT_01_BUS" => make_Bus(
-            "TST_01_ELT_01_BUS", EnergySystems.m_e_ac_230v
-        ),
-        "TST_01_HZG_01_BUS" => make_Bus(
-            "TST_01_HZG_01_BUS", EnergySystems.m_h_w_60c
-        ),
-        "TST_01_HZG_01_DEM" => make_Demand(
-            "TST_01_HZG_01_DEM", EnergySystems.m_h_w_60c, 10000.0
-        ),
-        "TST_01_ELT_01_DEM" => make_Demand(
-            "TST_01_ELT_01_DEM", EnergySystems.m_e_ac_230v, 15000.0
-        ),
-    )
+    systems = Grouping()
+
+    for (unit_key, entry) in pairs(project_config["energy_systems"])
+        symbol = Symbol(String(entry["type"]))
+        unit_class = getproperty(EnergySystems, symbol)
+        if unit_class <: EnergySystems.EnergySystem
+            instance = unit_class(unit_key, entry)
+            systems[unit_key] = instance
+        end
+    end
 
     simulation_order = [
         ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
