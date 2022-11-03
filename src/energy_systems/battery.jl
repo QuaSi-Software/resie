@@ -153,4 +153,4 @@ function output_value(unit :: Battery, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export Battery, output_values, output_value
+export Battery

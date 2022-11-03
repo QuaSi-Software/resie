@@ -76,4 +76,4 @@ function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export GridConnection, output_values, output_value
+export GridConnection

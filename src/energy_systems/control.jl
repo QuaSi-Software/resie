@@ -281,3 +281,6 @@ function check(
 
     throw(KeyError(condition.name))
 end
+
+
+export Condition, TruthTable, StateMachine, link_control_with

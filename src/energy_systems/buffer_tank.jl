@@ -86,4 +86,4 @@ function output_value(unit :: BufferTank, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export BufferTank, output_values, output_value
+export BufferTank

@@ -112,4 +112,4 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     end
 end
 
-export HeatPump, output_values, output_value
+export HeatPump

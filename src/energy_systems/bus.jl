@@ -125,4 +125,4 @@ function output_value(unit :: Bus, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export Bus, reset, balance, balance_on, distribute!, produce, output_values, output_value
+export Bus

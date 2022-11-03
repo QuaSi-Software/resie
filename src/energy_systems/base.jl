@@ -19,9 +19,8 @@ to the simulation as a whole as well as provide functionality on groups of energ
 """
 module EnergySystems
 
-export MediumCategory, EnergySystem, ControlledSystem, Condition, TruthTable, StateMachine,
-    represent, pprint, link_control_with, each, Grouping, link_production_with, check_balances,
-    perform_steps
+export MediumCategory, EnergySystem, ControlledSystem, each, Grouping,
+    link_production_with, check_balances, perform_steps, output_values, output_value
 
 """
 Categories that each represent a physical medium in conjunction with additional attributes,

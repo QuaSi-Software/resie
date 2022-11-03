@@ -81,4 +81,4 @@ function load_at_time(unit :: Demand, time :: Int)
     end
 end
 
-export Demand, load_at_time, output_values, output_value
+export Demand

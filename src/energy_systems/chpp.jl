@@ -126,4 +126,4 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     end
 end
 
-export CHPP, output_values, output_value
+export CHPP

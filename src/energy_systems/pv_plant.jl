@@ -58,4 +58,4 @@ function power_at_time(plant :: PVPlant, time :: Int) :: Float64
     ))
 end
 
-export PVPlant, output_values, output_value
+export PVPlant
