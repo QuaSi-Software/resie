@@ -25,7 +25,7 @@ mutable struct GridConnection <: ControlledSystem
         return new(
             uac, # uac
             StateMachine(), # controller
-            if Bool(config["is_source"]) infinite_source else infinite_sink end, # sys_function
+            if Bool(config["is_source"]) sf_dispatchable_source else sf_dispatchable_sink end, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing
@@ -40,7 +40,7 @@ mutable struct GridConnection <: ControlledSystem
 end
 
 function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.sys_function === infinite_source
+    if unit.sys_function === sf_dispatchable_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
         # must be handled here instead of being ignored

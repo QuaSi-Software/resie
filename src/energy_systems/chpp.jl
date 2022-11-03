@@ -86,7 +86,7 @@ mutable struct CHPP <: ControlledSystem
         return new(
             uac, # uac
             controller, # controller
-            transformer, # sys_function
+            sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_c_g_natgas => nothing
             ),

@@ -76,7 +76,7 @@ mutable struct HeatPump <: ControlledSystem
         return new(
             uac, # uac
             controller, # controller
-            transformer, # sys_function
+            sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
             ),

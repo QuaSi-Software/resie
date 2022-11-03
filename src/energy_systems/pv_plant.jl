@@ -21,7 +21,7 @@ mutable struct PVPlant <: ControlledSystem
         return new(
             uac, # uac
             StateMachine(), # controller
-            limited_source, # sys_function
+            sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces
                 m_e_ac_230v => nothing

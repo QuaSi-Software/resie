@@ -26,7 +26,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
         return new(
             uac, # uac
             StateMachine(), # controller
-            bus, # sys_function
+            sf_bus, # sys_function
             medium, # medium
             [], # input_interfaces
             [], # output_interfaces,
@@ -61,7 +61,7 @@ See also [`produce`](@ref)
 """
 function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     for inface in unit.input_interfaces
-        if inface.source.sys_function === storage
+        if inface.source.sys_function === sf_storage
             unit.storage_space += inface.source.capacity - inface.source.load
         end
     end

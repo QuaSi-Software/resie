@@ -23,7 +23,7 @@ mutable struct Demand <: ControlledSystem
         return new(
             uac, # uac
             StateMachine(), # controller
-            limited_sink, # sys_function
+            sf_fixed_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing

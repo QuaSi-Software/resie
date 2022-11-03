@@ -21,7 +21,7 @@ mutable struct BufferTank <: ControlledSystem
         return new(
             uac, # uac
             StateMachine(), # controller
-            storage, # sys_function
+            sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 m_h_w_60c => nothing
             ),
