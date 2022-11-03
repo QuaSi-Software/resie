@@ -7,7 +7,7 @@ seperate tool, a proper implemention would mostly just load a profile and consid
 some system losses. The amplitude parameter is a scaling factor, but is not an average
 power value.
 """
-Base.@kwdef mutable struct PVPlant <: ControlledSystem
+mutable struct PVPlant <: ControlledSystem
     uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
@@ -16,19 +16,19 @@ Base.@kwdef mutable struct PVPlant <: ControlledSystem
     output_interfaces :: InterfaceMap
 
     amplitude :: Float64
-end
 
-function make_PVPlant(uac :: String, amplitude :: Float64) :: PVPlant
-    return PVPlant(
-        uac, # uac
-        StateMachine(), # controller
-        limited_source, # sys_function
-        InterfaceMap(), # input_interfaces
-        InterfaceMap( # output_interfaces
-            m_e_ac_230v => nothing
-        ),
-        amplitude, # amplitude
-    )
+    function PVPlant(uac :: String, config :: Dict{String, Any})
+        return new(
+            uac, # uac
+            StateMachine(), # controller
+            limited_source, # sys_function
+            InterfaceMap(), # input_interfaces
+            InterfaceMap( # output_interfaces
+                m_e_ac_230v => nothing
+            ),
+            config["power"], # amplitude
+        )
+    end
 end
 
 function output_values(unit :: PVPlant) :: Vector{String}
@@ -58,4 +58,4 @@ function power_at_time(plant :: PVPlant, time :: Int) :: Float64
     ))
 end
 
-export PVPlant, make_PVPlant, output_values, output_value
+export PVPlant, output_values, output_value

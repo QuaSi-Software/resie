@@ -6,7 +6,7 @@ energy is stored) and a capacity, with no temperatures being considered. Given h
 simulation engine works, there will likely always be the need to deal with energy being
 transfered with water temperature being secondary input variables.
 """
-Base.@kwdef mutable struct BufferTank <: ControlledSystem
+mutable struct BufferTank <: ControlledSystem
     uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
@@ -16,22 +16,22 @@ Base.@kwdef mutable struct BufferTank <: ControlledSystem
 
     capacity :: Float64
     load :: Float64
-end
 
-function make_BufferTank(uac :: String, capacity :: Float64, load :: Float64) :: BufferTank
-    return BufferTank(
-        uac, # uac
-        StateMachine(), # controller
-        storage, # sys_function
-        InterfaceMap( # input_interfaces
-            m_h_w_60c => nothing
-        ),
-        InterfaceMap( # output_interfaces
-            m_h_w_60c => nothing
-        ),
-        capacity, # capacity
-        load # load
-    )
+    function BufferTank(uac :: String, config :: Dict{String, Any})
+        return new(
+            uac, # uac
+            StateMachine(), # controller
+            storage, # sys_function
+            InterfaceMap( # input_interfaces
+                m_h_w_60c => nothing
+            ),
+            InterfaceMap( # output_interfaces
+                m_h_w_60c => nothing
+            ),
+            config["capacity"], # capacity
+            config["load"] # load
+        )
+    end
 end
 
 function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
@@ -86,4 +86,4 @@ function output_value(unit :: BufferTank, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export BufferTank, make_BufferTank, output_values, output_value
+export BufferTank, output_values, output_value

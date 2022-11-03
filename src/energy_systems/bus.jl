@@ -20,19 +20,20 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 
     storage_space :: Float64
     remainder :: Float64
-end
 
-function make_Bus(uac :: String, medium :: MediumCategory) :: Bus
-    return Bus(
-        uac, # uac
-        StateMachine(), # controller
-        bus, # sys_function
-        medium, # medium
-        [], # input_interfaces
-        [], # output_interfaces,
-        0.0, # storage_space
-        0.0 # remainder
-    )
+    function Bus(uac :: String, config :: Dict{String, Any})
+        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        return new(
+            uac, # uac
+            StateMachine(), # controller
+            bus, # sys_function
+            medium, # medium
+            [], # input_interfaces
+            [], # output_interfaces,
+            0.0, # storage_space
+            0.0 # remainder
+        )
+    end
 end
 
 function reset(unit :: Bus)
@@ -124,4 +125,4 @@ function output_value(unit :: Bus, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export Bus, make_Bus, reset, balance, balance_on, distribute!, produce, output_values, output_value
+export Bus, reset, balance, balance_on, distribute!, produce, output_values, output_value

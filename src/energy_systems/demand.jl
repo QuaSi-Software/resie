@@ -7,7 +7,7 @@ moment this remains a simple implementation that does not consider any external 
 and instead approximates a demand profile with peaks in the morning and evening. The load
 parameter is a scaling factor, but does not correspond to an average demand load.
 """
-Base.@kwdef mutable struct Demand <: ControlledSystem
+mutable struct Demand <: ControlledSystem
     uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
@@ -17,22 +17,23 @@ Base.@kwdef mutable struct Demand <: ControlledSystem
     output_interfaces :: InterfaceMap
 
     load :: Float64
-end
 
-function make_Demand(uac :: String, medium :: MediumCategory, load :: Float64) :: Demand
-    return Demand(
-        uac, # uac
-        StateMachine(), # controller
-        limited_sink, # sys_function
-        medium, # medium
-        InterfaceMap( # input_interfaces
-            medium => nothing
-        ),
-        InterfaceMap( # output_interfaces
-            medium => nothing
-        ),
-        load, # load
-    )
+    function Demand(uac :: String, config :: Dict{String, Any})
+        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        return new(
+            uac, # uac
+            StateMachine(), # controller
+            limited_sink, # sys_function
+            medium, # medium
+            InterfaceMap( # input_interfaces
+                medium => nothing
+            ),
+            InterfaceMap( # output_interfaces
+                medium => nothing
+            ),
+            config["scale"], # load
+        )
+    end
 end
 
 function output_values(unit :: Demand) :: Vector{String}
@@ -80,4 +81,4 @@ function load_at_time(unit :: Demand, time :: Int)
     end
 end
 
-export Demand, load_at_time, make_Demand, output_values, output_value
+export Demand, load_at_time, output_values, output_value

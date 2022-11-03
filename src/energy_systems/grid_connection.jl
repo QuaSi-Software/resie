@@ -8,7 +8,7 @@ remaining demand of energy or take in any excess of energy. To make it possible 
 one-way connection they are split into two instances for providing or receiving energy and
 must be handled as such in the input for constructing a project.
 """
-Base.@kwdef mutable struct GridConnection <: ControlledSystem
+mutable struct GridConnection <: ControlledSystem
     uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
@@ -19,23 +19,24 @@ Base.@kwdef mutable struct GridConnection <: ControlledSystem
 
     draw_sum :: Float64
     load_sum :: Float64
-end
 
-function make_GridConnection(uac :: String, medium :: MediumCategory, is_source :: Bool) :: GridConnection
-    return GridConnection(
-        uac, # uac
-        StateMachine(), # controller
-        if is_source infinite_source else infinite_sink end, # sys_function
-        medium, # medium
-        InterfaceMap( # input_interfaces
-            medium => nothing
-        ),
-        InterfaceMap( # output_interfaces
-            medium => nothing
-        ),
-        0.0, # draw_sum,
-        0.0, # load_sum
-    )
+    function GridConnection(uac :: String, config :: Dict{String, Any})
+        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        return new(
+            uac, # uac
+            StateMachine(), # controller
+            if Bool(config["is_source"]) infinite_source else infinite_sink end, # sys_function
+            medium, # medium
+            InterfaceMap( # input_interfaces
+                medium => nothing
+            ),
+            InterfaceMap( # output_interfaces
+                medium => nothing
+            ),
+            0.0, # draw_sum,
+            0.0, # load_sum
+        )
+    end
 end
 
 function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
@@ -75,4 +76,4 @@ function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
     raise(KeyError(key.value_key))
 end
 
-export GridConnection, make_GridConnection, output_values, output_value
+export GridConnection, output_values, output_value

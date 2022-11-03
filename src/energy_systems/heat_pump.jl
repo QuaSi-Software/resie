@@ -10,7 +10,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-Base.@kwdef mutable struct HeatPump <: ControlledSystem
+mutable struct HeatPump <: ControlledSystem
     uac :: String
     controller :: StateMachine
     sys_function :: SystemFunction
@@ -19,59 +19,63 @@ Base.@kwdef mutable struct HeatPump <: ControlledSystem
     output_interfaces :: InterfaceMap
 
     power :: Float64
-    min_power_fraction :: Float64 = 0.2
+    min_power_fraction :: Float64
     cop :: Float64
-end
 
-function make_HeatPump(uac :: String, strategy :: String, power :: Float64, cop :: Float64) :: HeatPump
-    if strategy == "Ensure storage"
-        return HeatPump(
-            uac, # uac
-            StateMachine( # HeatPump.controller
-                state=UInt(1),
-                state_names=Dict{UInt, String}(
-                    1 => "Off",
-                    2 => "Load"
-                ),
-                time_in_state=UInt(0),
-                transitions=Dict{UInt, TruthTable}(
-                    1 => TruthTable( # State: Off
-                        conditions=[
-                            Condition(
-                                "Buffer < X%",
-                                Dict{String, Any}(
-                                    "percentage" => 0.1
-                                )
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (true,) => 2,
-                            (false,) => 1
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Load
-                        conditions=[
-                            Condition(
-                                "Buffer >= X%",
-                                Dict{String, Any}(
-                                    "percentage" => 0.5
-                                )
-                            ),
-                            Condition(
-                                "Would overfill thermal buffer",
-                                Dict{String, Any}()
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false) => 2,
-                            (false, true) => 1,
-                            (true, false) => 1,
-                            (true, true) => 1,
-                        )
-                    ),
-                )
+    function HeatPump(uac :: String, config :: Dict{String, Any})
+        if config["strategy"] == "Ensure storage"
+            controller = StateMachine(
+            state=UInt(1),
+            state_names=Dict{UInt, String}(
+                1 => "Off",
+                2 => "Load"
             ),
+            time_in_state=UInt(0),
+            transitions=Dict{UInt, TruthTable}(
+                1 => TruthTable( # State: Off
+                    conditions=[
+                        Condition(
+                            "Buffer < X%",
+                            Dict{String, Any}(
+                                "percentage" => 0.1
+                            )
+                        ),
+                    ],
+                    table_data=Dict{Tuple, UInt}(
+                        (true,) => 2,
+                        (false,) => 1
+                    )
+                ),
+
+                2 => TruthTable( # State: Load
+                    conditions=[
+                        Condition(
+                            "Buffer >= X%",
+                            Dict{String, Any}(
+                                "percentage" => 0.5
+                            )
+                        ),
+                        Condition(
+                            "Would overfill thermal buffer",
+                            Dict{String, Any}()
+                        ),
+                    ],
+                    table_data=Dict{Tuple, UInt}(
+                        (false, false) => 2,
+                        (false, true) => 1,
+                        (true, false) => 1,
+                        (true, true) => 1,
+                    )
+                ),
+            )
+        )
+        else
+            controller = StateMachine()
+        end
+
+        return new(
+            uac, # uac
+            controller, # controller
             transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
@@ -79,12 +83,10 @@ function make_HeatPump(uac :: String, strategy :: String, power :: Float64, cop 
             InterfaceMap( # output_interfaces
                 m_h_w_60c => nothing
             ),
-            power, # power
+            config["power"], # power
             0.2, # min_power_fraction
-            cop, # electricity_fraction
+            3.0 # cop
         )
-    else
-        return HeatPump(uac, controller=StateMachine(), power=power, cop=cop)
     end
 end
 
@@ -110,4 +112,4 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     end
 end
 
-export HeatPump, make_HeatPump, output_values, output_value
+export HeatPump, output_values, output_value
