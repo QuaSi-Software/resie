@@ -110,18 +110,30 @@ function write_to_file(
 end
 
 """
-    run_simulation()
+    load_systems(config)
 
-Read inputs, perform the simulation calculation and write outputs.
+Construct instances of energy systems from the given config.
 
-Due to the complexity of required inputs of a simulation and how the outputs are persisted
-(to file), this function takes only one argument, namely the project config, and returns
-nothing.
+The config must have the structure:
+```
+{
+    "UAC key": {
+        "type": "PVPlant",
+        ...
+    },
+    ...
+}
+```
+
+The required parameters to construct an energy system from one entry in the config must
+match what is required for the particular system. The `type` parameter must be present and
+must match the symbol of the energy system class exactly. The structure is described in
+more detail in the accompanying documentation on the project file.
 """
-function run_simulation(project_config :: Dict{AbstractString, Any})
+function load_systems(config :: Dict{String, Any}) :: Grouping
     systems = Grouping()
 
-    for (unit_key, entry) in pairs(project_config["energy_systems"])
+    for (unit_key, entry) in pairs(config)
         symbol = Symbol(String(entry["type"]))
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.EnergySystem
@@ -129,37 +141,6 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
             systems[unit_key] = instance
         end
     end
-
-    simulation_order = [
-        ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
-        ["TST_01_HZG_01_DEM", EnergySystems.s_reset], # limited_sink
-        ["TST_01_ELT_01_DEM", EnergySystems.s_reset], # limited_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_reset], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_reset], # bus
-        ["TST_01_HZG_01_CHP", EnergySystems.s_reset], # transformer
-        ["TST_01_HZG_01_HTP", EnergySystems.s_reset], # transformer
-        ["TST_01_HZG_01_BFT", EnergySystems.s_reset], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_reset], # storage
-        ["TST_01_HZG_01_GRI", EnergySystems.s_reset], # infinite_source
-        ["TST_01_ELT_01_GRI", EnergySystems.s_reset], # infinite_source
-        ["TST_01_ELT_01_GRO", EnergySystems.s_reset], # infinite_sink
-        ["TST_01_ELT_01_PVP", EnergySystems.s_control, EnergySystems.s_produce], # limited_source
-        ["TST_01_HZG_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
-        ["TST_01_ELT_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
-        ["TST_01_HZG_01_CHP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
-        ["TST_01_HZG_01_HTP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
-        ["TST_01_HZG_01_BFT", EnergySystems.s_control, EnergySystems.s_produce], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_control, EnergySystems.s_produce], # storage
-        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
-        ["TST_01_HZG_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
-        ["TST_01_ELT_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
-        ["TST_01_ELT_01_GRO", EnergySystems.s_control, EnergySystems.s_produce], # infinite_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_distribute], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_distribute], # bus
-    ]
 
     link_control_with(
         systems["TST_01_HZG_01_CHP"],
@@ -221,6 +202,52 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
             "TST_01_ELT_01_GRO" => systems["TST_01_ELT_01_GRO"]
         )
     )
+
+    return systems
+end
+
+"""
+    run_simulation()
+
+Read inputs, perform the simulation calculation and write outputs.
+
+Due to the complexity of required inputs of a simulation and how the outputs are persisted
+(to file), this function takes only one argument, namely the project config, and returns
+nothing.
+"""
+function run_simulation(project_config :: Dict{AbstractString, Any})
+    systems = load_systems(project_config["energy_systems"])
+
+    simulation_order = [
+        ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
+        ["TST_01_HZG_01_DEM", EnergySystems.s_reset], # limited_sink
+        ["TST_01_ELT_01_DEM", EnergySystems.s_reset], # limited_sink
+        ["TST_01_HZG_01_BUS", EnergySystems.s_reset], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_reset], # bus
+        ["TST_01_HZG_01_CHP", EnergySystems.s_reset], # transformer
+        ["TST_01_HZG_01_HTP", EnergySystems.s_reset], # transformer
+        ["TST_01_HZG_01_BFT", EnergySystems.s_reset], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_reset], # storage
+        ["TST_01_HZG_01_GRI", EnergySystems.s_reset], # infinite_source
+        ["TST_01_ELT_01_GRI", EnergySystems.s_reset], # infinite_source
+        ["TST_01_ELT_01_GRO", EnergySystems.s_reset], # infinite_sink
+        ["TST_01_ELT_01_PVP", EnergySystems.s_control, EnergySystems.s_produce], # limited_source
+        ["TST_01_HZG_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
+        ["TST_01_ELT_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
+        ["TST_01_HZG_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
+        ["TST_01_HZG_01_CHP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
+        ["TST_01_HZG_01_HTP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
+        ["TST_01_HZG_01_BFT", EnergySystems.s_control, EnergySystems.s_produce], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_control, EnergySystems.s_produce], # storage
+        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
+        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
+        ["TST_01_HZG_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
+        ["TST_01_ELT_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
+        ["TST_01_ELT_01_GRO", EnergySystems.s_control, EnergySystems.s_produce], # infinite_sink
+        ["TST_01_HZG_01_BUS", EnergySystems.s_distribute], # bus
+        ["TST_01_ELT_01_BUS", EnergySystems.s_distribute], # bus
+    ]
 
     parameters = Dict{String, Any}(
         "time" => 0,
