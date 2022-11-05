@@ -142,18 +142,12 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
         end
     end
 
-    link_control_with(
-        systems["TST_01_HZG_01_CHP"],
-        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
-    )
-    link_control_with(
-        systems["TST_01_HZG_01_HTP"],
-        Grouping("TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"])
-    )
-    link_control_with(
-        systems["TST_01_ELT_01_BAT"],
-        Grouping("TST_01_ELT_01_PVP" => systems["TST_01_ELT_01_PVP"])
-    )
+    for (unit_key, entry) in pairs(config)
+        if length(entry["control_refs"]) > 0
+            others = Grouping(key => systems[key] for key in entry["control_refs"])
+            link_control_with(systems[unit_key], others)
+        end
+    end
 
     link_production_with(
         systems["TST_01_HZG_01_GRI"],

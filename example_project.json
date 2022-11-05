@@ -12,44 +12,53 @@
     "energy_systems": {
         "TST_01_ELT_01_PVP": {
             "type": "PVPlant",
+            "control_refs": [],
             "power": 15000
         },
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
             "medium": "m_h_w_60c",
+            "control_refs": [],
             "scale": 10000.0
         },
         "TST_01_ELT_01_DEM": {
             "type": "Demand",
             "medium": "m_e_ac_230v",
+            "control_refs": [],
             "scale": 15000
         },
         "TST_01_HZG_01_BUS": {
             "type": "Bus",
-            "medium": "m_h_w_60c"
+            "medium": "m_h_w_60c",
+            "control_refs": []
         },
         "TST_01_ELT_01_BUS": {
             "type": "Bus",
-            "medium": "m_e_ac_230v"
+            "medium": "m_e_ac_230v",
+            "control_refs": []
         },
         "TST_01_HZG_01_CHP": {
             "type": "CHPP",
+            "control_refs": ["TST_01_HZG_01_BFT"],
             "strategy": "Ensure storage",
             "power": 12500
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
+            "control_refs": ["TST_01_HZG_01_BFT"],
             "strategy": "Ensure storage",
             "power": 20000,
             "cop": 3.0
         },
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",
+            "control_refs": [],
             "capacity": 40000,
             "load": 20000
         },
         "TST_01_ELT_01_BAT": {
             "type": "Battery",
+            "control_refs": ["TST_01_ELT_01_PVP"],
             "strategy": "Economical discharge",
             "capacity": 10000,
             "load": 5000
@@ -57,16 +66,19 @@
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
+            "control_refs": [],
             "is_source": true
         },
         "TST_01_ELT_01_GRI": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
+            "control_refs": [],
             "is_source": true
         },
         "TST_01_ELT_01_GRO": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
+            "control_refs": [],
             "is_source": false
         }
     }
