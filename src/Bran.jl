@@ -147,55 +147,12 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
             others = Grouping(key => systems[key] for key in entry["control_refs"])
             link_control_with(systems[unit_key], others)
         end
-    end
 
-    link_production_with(
-        systems["TST_01_HZG_01_GRI"],
-        Grouping("TST_01_HZG_01_CHP" => systems["TST_01_HZG_01_CHP"])
-    )
-    link_production_with(
-        systems["TST_01_ELT_01_GRI"],
-        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
-    )
-    link_production_with(
-        systems["TST_01_HZG_01_BFT"],
-        Grouping("TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"])
-    )
-    link_production_with(
-        systems["TST_01_ELT_01_BAT"],
-        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
-    )
-    link_production_with(
-        systems["TST_01_HZG_01_CHP"],
-        Grouping(
-            "TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"],
-            "TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"]
-        )
-    )
-    link_production_with(
-        systems["TST_01_HZG_01_HTP"],
-        Grouping("TST_01_HZG_01_BUS" => systems["TST_01_HZG_01_BUS"])
-    )
-    link_production_with(
-        systems["TST_01_ELT_01_PVP"],
-        Grouping("TST_01_ELT_01_BUS" => systems["TST_01_ELT_01_BUS"])
-    )
-    link_production_with(
-        systems["TST_01_HZG_01_BUS"],
-        Grouping(
-            "TST_01_HZG_01_DEM" => systems["TST_01_HZG_01_DEM"],
-            "TST_01_HZG_01_BFT" => systems["TST_01_HZG_01_BFT"]
-        )
-    )
-    link_production_with(
-        systems["TST_01_ELT_01_BUS"],
-        Grouping(
-            "TST_01_ELT_01_DEM" => systems["TST_01_ELT_01_DEM"],
-            "TST_01_HZG_01_HTP" => systems["TST_01_HZG_01_HTP"],
-            "TST_01_ELT_01_BAT" => systems["TST_01_ELT_01_BAT"],
-            "TST_01_ELT_01_GRO" => systems["TST_01_ELT_01_GRO"]
-        )
-    )
+        if length(entry["production_refs"]) > 0
+            others = Grouping(key => systems[key] for key in entry["production_refs"])
+            link_production_with(systems[unit_key], others)
+        end
+    end
 
     return systems
 end
