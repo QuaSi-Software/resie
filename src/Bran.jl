@@ -158,6 +158,86 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
 end
 
 """
+    order_of_steps(systems)
+
+Calculate the order of steps that need to be performed to simulate the given systems.
+
+This function works by an algorithm described in more detail in the accompanying
+documentation. The result of this are step-by-step instructions telling the simulation
+engine in which order the system functions are performed for each unit. This algorithm is
+not trivial and might not work for each possible grouping of systems.
+
+# Args
+- `system::Grouping`: The systems for which an order is required
+# Returns
+- `Vector{Vector{Any}}`: The order in the structure:
+    ```
+    [
+        ["UAC Key", s_step, ...],
+        ...
+    ]
+    ```
+    In cases where there are multiple entries of steps for a unit, this means that the
+    steps should be performed in that order for that unit before the next entry is handled.
+"""
+function order_of_steps(systems :: Grouping) :: Vector{Vector{Any}}
+    systems_by_function = [
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_fixed_source],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_fixed_sink],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_bus],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_transformer],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_storage],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_dispatchable_source],
+        [unit for unit in each(systems)
+            if unit.sys_function == EnergySystems.sf_dispatchable_sink],
+    ]
+
+    simulation_order = []
+
+    # reset all systems, order doesn't matter
+    for sf_order = 1:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [unit.uac, EnergySystems.s_reset])
+        end
+    end
+
+    # control/produce all systems except dispatchable sources/sinks. the order corresponds
+    # to the general order of system functions
+    for sf_order = 1:5
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [unit.uac, EnergySystems.s_control])
+            push!(simulation_order, [unit.uac, EnergySystems.s_produce])
+        end
+    end
+
+    # sandwich loading of storage systems between the other systems and dispatchable ones
+    for unit in values(systems_by_function[5])
+        push!(simulation_order, [unit.uac, EnergySystems.s_load])
+    end
+
+    # handle dispatchable sources/sinks
+    for sf_order = 6:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [unit.uac, EnergySystems.s_control])
+            push!(simulation_order, [unit.uac, EnergySystems.s_produce])
+        end
+    end
+
+    # finally, distribute bus systems
+    for unit in values(systems_by_function[3])
+        push!(simulation_order, [unit.uac, EnergySystems.s_distribute])
+    end
+
+    return simulation_order
+end
+
+"""
     run_simulation()
 
 Read inputs, perform the simulation calculation and write outputs.
@@ -168,37 +248,7 @@ nothing.
 """
 function run_simulation(project_config :: Dict{AbstractString, Any})
     systems = load_systems(project_config["energy_systems"])
-
-    simulation_order = [
-        ["TST_01_ELT_01_PVP", EnergySystems.s_reset], # limited_source
-        ["TST_01_HZG_01_DEM", EnergySystems.s_reset], # limited_sink
-        ["TST_01_ELT_01_DEM", EnergySystems.s_reset], # limited_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_reset], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_reset], # bus
-        ["TST_01_HZG_01_CHP", EnergySystems.s_reset], # transformer
-        ["TST_01_HZG_01_HTP", EnergySystems.s_reset], # transformer
-        ["TST_01_HZG_01_BFT", EnergySystems.s_reset], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_reset], # storage
-        ["TST_01_HZG_01_GRI", EnergySystems.s_reset], # infinite_source
-        ["TST_01_ELT_01_GRI", EnergySystems.s_reset], # infinite_source
-        ["TST_01_ELT_01_GRO", EnergySystems.s_reset], # infinite_sink
-        ["TST_01_ELT_01_PVP", EnergySystems.s_control, EnergySystems.s_produce], # limited_source
-        ["TST_01_HZG_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
-        ["TST_01_ELT_01_DEM", EnergySystems.s_control, EnergySystems.s_produce], # limited_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_control, EnergySystems.s_produce], # bus
-        ["TST_01_HZG_01_CHP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
-        ["TST_01_HZG_01_HTP", EnergySystems.s_control, EnergySystems.s_produce], # transformer
-        ["TST_01_HZG_01_BFT", EnergySystems.s_control, EnergySystems.s_produce], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_control, EnergySystems.s_produce], # storage
-        ["TST_01_HZG_01_BFT", EnergySystems.s_load], # storage
-        ["TST_01_ELT_01_BAT", EnergySystems.s_load], # storage
-        ["TST_01_HZG_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
-        ["TST_01_ELT_01_GRI", EnergySystems.s_control, EnergySystems.s_produce], # infinite_source
-        ["TST_01_ELT_01_GRO", EnergySystems.s_control, EnergySystems.s_produce], # infinite_sink
-        ["TST_01_HZG_01_BUS", EnergySystems.s_distribute], # bus
-        ["TST_01_ELT_01_BUS", EnergySystems.s_distribute], # bus
-    ]
+    step_order = order_of_steps(systems)
 
     parameters = Dict{String, Any}(
         "time" => 0,
@@ -211,7 +261,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
 
     for i = 1:(96*7)
         # perform the simulation
-        perform_steps(systems, simulation_order, parameters)
+        perform_steps(systems, step_order, parameters)
 
         # check if any energy system was not balanced
         warnings = check_balances(systems, parameters["epsilon"])
