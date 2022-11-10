@@ -17,7 +17,7 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
     load :: Float64
 
     function Battery(uac :: String, config :: Dict{String, Any})
-        if config["strategy"] == "Economical discharge"
+        if config["strategy"]["name"] == "Economical discharge"
             controller = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(

@@ -17,7 +17,7 @@ mutable struct GasBoiler <: ControlledSystem
     min_power_fraction :: Float64
 
     function GasBoiler(uac :: String, config :: Dict{String, Any})
-        if config["strategy"] == "Ensure storage"
+        if config["strategy"]["name"] == "Ensure storage"
             controller = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
@@ -31,7 +31,7 @@ mutable struct GasBoiler <: ControlledSystem
                             Condition(
                                 "Buffer < X%",
                                 Dict{String, Any}(
-                                    "percentage" => 0.1
+                                    "percentage" => config["strategy"]["low_threshold"]
                                 )
                             ),
                         ],
@@ -46,7 +46,7 @@ mutable struct GasBoiler <: ControlledSystem
                             Condition(
                                 "Buffer >= X%",
                                 Dict{String, Any}(
-                                    "percentage" => 0.5
+                                    "percentage" => config["strategy"]["high_threshold"]
                                 )
                             ),
                             Condition(

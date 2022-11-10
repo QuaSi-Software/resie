@@ -25,7 +25,7 @@ mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt
 
     function CHPP(uac :: String, config :: Dict{String, Any})
-        if config["strategy"] == "Ensure storage"
+        if config["strategy"]["name"] == "Ensure storage"
             controller = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
@@ -39,7 +39,7 @@ mutable struct CHPP <: ControlledSystem
                             Condition(
                                 "Buffer < X%",
                                 Dict{String, Any}(
-                                    "percentage" => 0.2
+                                    "percentage" => config["strategy"]["low_threshold"]
                                 )
                             ),
                         ],
@@ -54,7 +54,7 @@ mutable struct CHPP <: ControlledSystem
                             Condition(
                                 "Buffer >= X%",
                                 Dict{String, Any}(
-                                    "percentage" => 0.9
+                                    "percentage" => config["strategy"]["high_threshold"]
                                 )
                             ),
                             Condition(
