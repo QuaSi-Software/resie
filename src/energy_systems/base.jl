@@ -360,6 +360,7 @@ include("bus.jl")
 include("battery.jl")
 include("buffer_tank.jl")
 include("chpp.jl")
+include("gas_boiler.jl")
 include("heat_pump.jl")
 include("pv_plant.jl")
 
