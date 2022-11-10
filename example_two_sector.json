@@ -100,6 +100,15 @@
             ],
             "is_source": true
         },
+        "TST_01_HZG_02_GRI": {
+            "type": "GridConnection",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_HTP"
+            ],
+            "is_source": true
+        },
         "TST_01_ELT_01_GRI": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",

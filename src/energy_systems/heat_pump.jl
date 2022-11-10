@@ -1,10 +1,10 @@
 """
 Implementation of a heat pump energy system.
 
-For the moment this remains a simple implementation that requires no heat input and
-produces heat of medium m_h_w_ht1 from electricity. Has a fixed coefficient of performance
-(COP) of 3 and a minimum power fraction of 20%. The power parameters is considered the
-maximum power of heat output the heat pump can produce.
+For the moment this remains a simple implementation that requires a low temperature heat
+and electricity input and produces high temperature heat. Has a fixed coefficient of
+performance (COP) of 3 and a minimum power fraction of 20%. The power parameter is
+considered the maximum power of heat output the heat pump can produce.
 
 The only currently implemented operation strategy involves checking the load of a linked
 buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
@@ -78,6 +78,7 @@ mutable struct HeatPump <: ControlledSystem
             controller, # controller
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
+                m_h_w_lt1 => nothing,
                 m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
@@ -109,6 +110,10 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
 
         add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        sub!(
+            unit.input_interfaces[m_h_w_lt1],
+            max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
+        )
     end
 end
 
