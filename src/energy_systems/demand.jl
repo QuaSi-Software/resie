@@ -68,16 +68,29 @@ function load_at_time(unit :: Demand, time :: Int)
         else
             return unit.load * 0.5
         end
-    end
 
-    if time_of_day < 0.25 || time_of_day >= 0.8333
-        return unit.load * 0.3
-    elseif time_of_day >= 0.25 && time_of_day < 0.292
-        return unit.load * 3.0
-    elseif time_of_day >= 0.75 && time_of_day < 0.8333
-        return unit.load * 2.0
+    elseif unit.medium == m_h_w_ht1
+        if time_of_day < 0.25 || time_of_day >= 0.8333
+            return unit.load * 0.3
+        elseif time_of_day >= 0.25 && time_of_day < 0.292
+            return unit.load * 3.0
+        elseif time_of_day >= 0.75 && time_of_day < 0.8333
+            return unit.load * 2.0
+        else
+            return unit.load * 0.6
+        end
+
+    elseif unit.medium == m_c_g_h2
+        if time_of_day >= 0.3 && time_of_day < 0.45
+            return unit.load * 1.5
+        elseif time_of_day >= 0.65 && time_of_day < 0.8
+            return unit.load * 0.5
+        else
+            return 0.0
+        end
+
     else
-        return unit.load * 0.6
+        return unit.load
     end
 end
 
