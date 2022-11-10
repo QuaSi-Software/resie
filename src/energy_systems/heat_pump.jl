@@ -92,7 +92,7 @@ mutable struct HeatPump <: ControlledSystem
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state == 2
+    if unit.strategy == "Ensure storage" && unit.controller.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(
@@ -114,6 +114,21 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             unit.input_interfaces[m_h_w_lt1],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
+
+    elseif unit.strategy == "Consume all"
+        balance, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
+
+        if balance < parameters["epsilon"]
+            return # do nothing if there is no heat to consume
+        end
+
+        max_consume_h = min(unit.power * (1.0 - 1.0 / unit.cop), balance)
+        consume_e = max_consume_h / (unit.cop - 1.0)
+        produce_h = max_consume_h + consume_e
+
+        add!(unit.output_interfaces[m_h_w_ht1], produce_h)
+        sub!(unit.input_interfaces[m_h_w_lt1], max_consume_h)
+        sub!(unit.input_interfaces[m_e_ac_230v], consume_e)
     end
 end
 
