@@ -89,7 +89,7 @@ A type describing an energy system that has control functionality.
 
 Because Julia does not have interface->implementation like OOP languages such as Java,
 types implementing this abstract type are further to be assumed to have the fields required
-by all energy systems, in particular the field `controller` of type `StateMachine`.
+by all energy systems, in particular the field `controller` of type `Controller`.
 """
 abstract type ControlledSystem <: EnergySystem end
 

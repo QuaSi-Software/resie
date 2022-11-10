@@ -8,7 +8,7 @@ transfered with water temperature being secondary input variables.
 """
 mutable struct SeasonalThermalStorage <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -20,7 +20,7 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     function SeasonalThermalStorage(uac :: String, config :: Dict{String, Any})
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 m_h_w_ht1 => nothing

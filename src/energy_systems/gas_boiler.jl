@@ -7,7 +7,7 @@ overfill shutoff condition.
 """
 mutable struct GasBoiler <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -18,7 +18,9 @@ mutable struct GasBoiler <: ControlledSystem
 
     function GasBoiler(uac :: String, config :: Dict{String, Any})
         if config["strategy"]["name"] == "Ensure storage"
-            controller = StateMachine(
+            strategy = config["strategy"]["name"]
+
+            machine = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
                     1 => "Off",
@@ -64,12 +66,13 @@ mutable struct GasBoiler <: ControlledSystem
                 )
             )
         else
-            controller = StateMachine()
+            strategy = "Default"
+            machine = StateMachine()
         end
 
         return new(
             uac, # uac
-            controller, # controller
+            Controller(strategy, machine), # controller
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_c_g_natgas => nothing
@@ -84,7 +87,7 @@ mutable struct GasBoiler <: ControlledSystem
 end
 
 function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state == 2
+    if unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(

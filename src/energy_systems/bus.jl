@@ -11,7 +11,7 @@ The function and purpose is described in more detail in the accompanying documen
 """
 Base.@kwdef mutable struct Bus <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
     medium :: MediumCategory
 
@@ -25,7 +25,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             sf_bus, # sys_function
             medium, # medium
             [], # input_interfaces

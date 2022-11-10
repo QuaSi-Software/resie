@@ -9,7 +9,7 @@ parameter is a scaling factor, but does not correspond to an average demand load
 """
 mutable struct Demand <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
     medium :: MediumCategory
 
@@ -22,7 +22,7 @@ mutable struct Demand <: ControlledSystem
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             sf_fixed_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

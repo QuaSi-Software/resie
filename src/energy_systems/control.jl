@@ -131,7 +131,7 @@ Link the given systems with all conditions of the given unit.
 See also [`link`](@ref)
 """
 function link_control_with(unit :: ControlledSystem, systems :: Grouping)
-    for table in values(unit.controller.transitions)
+    for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
             link(condition, systems)
         end
@@ -206,6 +206,17 @@ StateMachine() = StateMachine(
 )
 
 """
+Wraps around the mechanism of control for the operation strategy of an EnergySystem.
+
+For now this merely the StateMachine handling the controller state and the name of the
+operation strategy, but this can be easily extended.
+"""
+Base.@kwdef mutable struct Controller
+    strategy :: String
+    state_machine :: StateMachine
+end
+
+"""
     move_state(unit, systems, parameters)
 
 Checks the controller of the given unit and moves the state machine to its new state.
@@ -215,8 +226,9 @@ function move_state(
     systems :: Grouping,
     parameters :: Dict{String, Any}
 )
-    old_state = unit.controller.state
-    table = unit.controller.transitions[unit.controller.state]
+    machine = unit.controller.state_machine
+    old_state = machine.state
+    table = machine.transitions[machine.state]
 
     if length(table.conditions) > 0
         evaluations = Tuple(
@@ -224,15 +236,15 @@ function move_state(
             for condition in table.conditions
         )
         new_state = table.table_data[evaluations]
-        unit.controller.state = new_state
+        machine.state = new_state
     else
         new_state = old_state
     end
 
     if old_state == new_state
-        unit.controller.time_in_state += 1
+        machine.time_in_state += 1
     else
-        unit.controller.time_in_state = 1
+        machine.time_in_state = 1
     end
 end
 
@@ -257,7 +269,7 @@ function check(
             * rel(condition, "buffer").capacity)
 
     elseif condition.name == "Min run time"
-        return (unit.controller.time_in_state
+        return (unit.controller.state_machine.time_in_state
             * parameters["time_step_seconds"]
             >= unit.min_run_time)
 

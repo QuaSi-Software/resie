@@ -12,7 +12,7 @@ overfill shutoff condition.
 """
 mutable struct HeatPump <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -24,58 +24,61 @@ mutable struct HeatPump <: ControlledSystem
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
         if config["strategy"]["name"] == "Ensure storage"
-            controller = StateMachine(
-            state=UInt(1),
-            state_names=Dict{UInt, String}(
-                1 => "Off",
-                2 => "Load"
-            ),
-            time_in_state=UInt(0),
-            transitions=Dict{UInt, TruthTable}(
-                1 => TruthTable( # State: Off
-                    conditions=[
-                        Condition(
-                            "Buffer < X%",
-                            Dict{String, Any}(
-                                "percentage" => config["strategy"]["low_threshold"]
-                            )
-                        ),
-                    ],
-                    table_data=Dict{Tuple, UInt}(
-                        (true,) => 2,
-                        (false,) => 1
-                    )
-                ),
+            strategy = config["strategy"]["name"]
 
-                2 => TruthTable( # State: Load
-                    conditions=[
-                        Condition(
-                            "Buffer >= X%",
-                            Dict{String, Any}(
-                                "percentage" => config["strategy"]["high_threshold"]
-                            )
-                        ),
-                        Condition(
-                            "Would overfill thermal buffer",
-                            Dict{String, Any}()
-                        ),
-                    ],
-                    table_data=Dict{Tuple, UInt}(
-                        (false, false) => 2,
-                        (false, true) => 1,
-                        (true, false) => 1,
-                        (true, true) => 1,
-                    )
+            machine = StateMachine(
+                state=UInt(1),
+                state_names=Dict{UInt, String}(
+                    1 => "Off",
+                    2 => "Load"
                 ),
+                time_in_state=UInt(0),
+                transitions=Dict{UInt, TruthTable}(
+                    1 => TruthTable( # State: Off
+                        conditions=[
+                            Condition(
+                                "Buffer < X%",
+                                Dict{String, Any}(
+                                    "percentage" => config["strategy"]["low_threshold"]
+                                )
+                            ),
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (true,) => 2,
+                            (false,) => 1
+                        )
+                    ),
+
+                    2 => TruthTable( # State: Load
+                        conditions=[
+                            Condition(
+                                "Buffer >= X%",
+                                Dict{String, Any}(
+                                    "percentage" => config["strategy"]["high_threshold"]
+                                )
+                            ),
+                            Condition(
+                                "Would overfill thermal buffer",
+                                Dict{String, Any}()
+                            ),
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (false, false) => 2,
+                            (false, true) => 1,
+                            (true, false) => 1,
+                            (true, true) => 1,
+                        )
+                    ),
+                )
             )
-        )
         else
-            controller = StateMachine()
+            strategy = "Default"
+            machine = StateMachine()
         end
 
         return new(
             uac, # uac
-            controller, # controller
+            Controller(strategy, machine), # controller
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_h_w_lt1 => nothing,
@@ -92,7 +95,7 @@ mutable struct HeatPump <: ControlledSystem
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.strategy == "Ensure storage" && unit.controller.state == 2
+    if unit.controller.strategy == "Ensure storage" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(
@@ -115,7 +118,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
-    elseif unit.strategy == "Consume all"
+    elseif unit.controller.strategy == "Consume all"
         balance, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
 
         if balance < parameters["epsilon"]

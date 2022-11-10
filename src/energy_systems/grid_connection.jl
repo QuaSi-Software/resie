@@ -10,7 +10,7 @@ must be handled as such in the input for constructing a project.
 """
 mutable struct GridConnection <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
     medium :: MediumCategory
 
@@ -24,7 +24,7 @@ mutable struct GridConnection <: ControlledSystem
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             if Bool(config["is_source"]) sf_dispatchable_source else sf_dispatchable_sink end, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

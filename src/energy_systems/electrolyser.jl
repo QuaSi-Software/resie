@@ -12,7 +12,7 @@ electrolyser is controlled by the demand it is linked to requires.
 """
 mutable struct Electrolyser <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -26,7 +26,7 @@ mutable struct Electrolyser <: ControlledSystem
     function Electrolyser(uac :: String, config :: Dict{String, Any})
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
@@ -45,7 +45,7 @@ mutable struct Electrolyser <: ControlledSystem
 end
 
 function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state == 2
+    if unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
         max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 

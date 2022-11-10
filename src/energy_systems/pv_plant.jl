@@ -9,7 +9,7 @@ power value.
 """
 mutable struct PVPlant <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -20,7 +20,7 @@ mutable struct PVPlant <: ControlledSystem
     function PVPlant(uac :: String, config :: Dict{String, Any})
         return new(
             uac, # uac
-            StateMachine(), # controller
+            Controller("Default", StateMachine()), # controller
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces

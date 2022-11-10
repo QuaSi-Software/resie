@@ -7,7 +7,7 @@ toggles the production of the battery dependant on available PV power and its ow
 """
 Base.@kwdef mutable struct Battery <: ControlledSystem
     uac :: String
-    controller :: StateMachine
+    controller :: Controller
     sys_function :: SystemFunction
 
     input_interfaces :: InterfaceMap
@@ -18,7 +18,9 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
 
     function Battery(uac :: String, config :: Dict{String, Any})
         if config["strategy"]["name"] == "Economical discharge"
-            controller = StateMachine(
+            strategy = config["strategy"]["name"]
+
+            machine = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
                     1 => "Load",
@@ -74,12 +76,13 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
                 )
             )
         else
-            controller = StateMachine()
+            strategy = "Default"
+            machine = StateMachine()
         end
 
         return new(
             uac, # uac
-            controller, # controller
+            Controller(strategy, machine), # controller
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
@@ -94,7 +97,7 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
 end
 
 function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state != 2
+    if unit.controller.state_machine.state != 2
         return
     end
 
@@ -115,7 +118,7 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
 end
 
 function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state != 1
+    if unit.controller.state_machine.state != 1
         return
     end
 
