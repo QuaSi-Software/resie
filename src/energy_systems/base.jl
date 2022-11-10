@@ -37,9 +37,31 @@ The names are structured in a composite of segments. For example, these are:
     1. m: This segment is used to distinguish its symbols from the symbols of other types
     2. e: The energy type, in this case electricity
     3. ac: The physical medium, in this case AC current
-    4. 230v: Additional attributes of nominal value, in this case 230V
+    4. 230v: Additional attributes of nominal value or ranges numbered through
 """
-@enum MediumCategory m_e_ac_230v m_c_g_natgas m_h_w_60c
+@enum(MediumCategory,
+    # electricity
+    m_e_ac_230v,
+
+    # chemicals - gasses
+    m_c_g_natgas,
+    m_c_g_h2,
+    m_c_g_o2,
+
+    # heat - low temperature water
+    m_h_w_lt1,
+    m_h_w_lt2,
+    m_h_w_lt3,
+    m_h_w_lt4,
+    m_h_w_lt5,
+
+    # heat - high temperature water
+    m_h_w_ht1,
+    m_h_w_ht2,
+    m_h_w_ht3,
+    m_h_w_ht4,
+    m_h_w_ht5,
+)
 
 """
 Enumerations of the archetype of an energy system describing its general function.

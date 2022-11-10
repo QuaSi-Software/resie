@@ -2,7 +2,7 @@
 Implementation of an electrolyser, turning electricity and water into H2, O2 and heat.
 
 For the moment this remains a simple implementation that converts electricity into
-the gases and heat (as medium m_h_w_60c) at a defined ratio of 1:0.6:0.4. Has a minimum
+the gases and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.6:0.4. Has a minimum
 run time of 3600s taken into consideration in its control behaviour and a minimum power
 fraction of 20%. The power is considered the maximum amount of electricity that the
 electrolyser can consume.
@@ -32,7 +32,7 @@ mutable struct Electrolyser <: ControlledSystem
                 m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_60c => nothing,
+                m_h_w_ht1 => nothing,
                 m_c_g_h2 => nothing,
                 m_c_g_o2 => nothing
             ),
@@ -50,8 +50,8 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
         max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
         balance, potential = balance_on(
-            unit.output_interfaces[m_h_w_60c],
-            unit.output_interfaces[m_h_w_60c].target
+            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[m_h_w_ht1].target
         )
         if balance + potential >= 0.0
             return # don't add to a surplus of energy
@@ -63,7 +63,7 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
         end
 
         add!(unit.output_interfaces[m_e_ac_230v], max_produce_e * usage_fraction)
-        add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
+        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
     end
 end

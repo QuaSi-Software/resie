@@ -3,10 +3,10 @@
         "output_file": "./out.csv",
         "output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
-            "TST_01_HZG_01_CHP": ["m_h_w_60c OUT"],
-            "TST_01_HZG_01_HTP": ["m_h_w_60c OUT"],
+            "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_01_BUS": ["Balance"],
-            "TST_01_HZG_01_DEM": ["m_h_w_60c IN"]
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
         }
     },
     "energy_systems": {
@@ -20,7 +20,7 @@
         },
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
-            "medium": "m_h_w_60c",
+            "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [],
             "scale": 10000.0
@@ -34,7 +34,7 @@
         },
         "TST_01_HZG_01_BUS": {
             "type": "Bus",
-            "medium": "m_h_w_60c",
+            "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_DEM",

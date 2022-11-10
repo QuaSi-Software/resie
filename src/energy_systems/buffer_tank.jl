@@ -23,10 +23,10 @@ mutable struct BufferTank <: ControlledSystem
             StateMachine(), # controller
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
-                m_h_w_60c => nothing
+                m_h_w_ht1 => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_60c => nothing
+                m_h_w_ht1 => nothing
             ),
             config["capacity"], # capacity
             config["load"] # load
@@ -35,7 +35,7 @@ mutable struct BufferTank <: ControlledSystem
 end
 
 function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    outface = unit.output_interfaces[m_h_w_60c]
+    outface = unit.output_interfaces[m_h_w_ht1]
     balance, _ = balance_on(outface, outface.target)
 
     if balance >= 0.0
@@ -52,7 +52,7 @@ function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh
 end
 
 function load(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    inface = unit.input_interfaces[m_h_w_60c]
+    inface = unit.input_interfaces[m_h_w_ht1]
     balance, _ = balance_on(inface, inface.source)
 
     if balance <= 0.0

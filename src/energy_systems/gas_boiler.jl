@@ -75,7 +75,7 @@ mutable struct GasBoiler <: ControlledSystem
                 m_c_g_natgas => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_60c => nothing
+                m_h_w_ht1 => nothing
             ),
             config["power"], # power
             0.1, # min_power_fraction
@@ -88,8 +88,8 @@ function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh 
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(
-            unit.output_interfaces[m_h_w_60c],
-            unit.output_interfaces[m_h_w_60c].target
+            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[m_h_w_ht1].target
         )
         if balance + potential >= 0.0
             return # don't add to a surplus of energy
@@ -100,7 +100,7 @@ function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh 
             return
         end
 
-        add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
+        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
     end
 end

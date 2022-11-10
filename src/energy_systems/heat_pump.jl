@@ -2,7 +2,7 @@
 Implementation of a heat pump energy system.
 
 For the moment this remains a simple implementation that requires no heat input and
-produces heat of medium m_h_w_60c from electricity. Has a fixed coefficient of performance
+produces heat of medium m_h_w_ht1 from electricity. Has a fixed coefficient of performance
 (COP) of 3 and a minimum power fraction of 20%. The power parameters is considered the
 maximum power of heat output the heat pump can produce.
 
@@ -81,7 +81,7 @@ mutable struct HeatPump <: ControlledSystem
                 m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_60c => nothing
+                m_h_w_ht1 => nothing
             ),
             config["power"], # power
             0.2, # min_power_fraction
@@ -95,8 +95,8 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(
-            unit.output_interfaces[m_h_w_60c],
-            unit.output_interfaces[m_h_w_60c].target
+            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[m_h_w_ht1].target
         )
         if balance + potential >= 0.0
             return # don't add to a surplus of energy
@@ -107,7 +107,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             return
         end
 
-        add!(unit.output_interfaces[m_h_w_60c], max_produce_h * usage_fraction)
+        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
         sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
     end
 end
