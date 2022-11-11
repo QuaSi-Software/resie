@@ -71,6 +71,9 @@ mutable struct HeatPump <: ControlledSystem
                     ),
                 )
             )
+        elseif config["strategy"]["name"] == "Consume all"
+            strategy = config["strategy"]["name"]
+            machine = StateMachine()
         else
             strategy = "Default"
             machine = StateMachine()
