@@ -85,7 +85,7 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
                 m_h_w_ht1 => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing
+                m_h_w_lt1 => nothing
             ),
             config["capacity"], # capacity
             config["load"] # load
@@ -94,7 +94,7 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
 end
 
 function produce(unit :: SeasonalThermalStorage, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    outface = unit.output_interfaces[m_h_w_ht1]
+    outface = unit.output_interfaces[m_h_w_lt1]
     balance, _ = balance_on(outface, outface.target)
 
     if balance >= 0.0
