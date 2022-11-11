@@ -78,6 +78,9 @@ function Condition(
     elseif name == "Insufficient charge"
         default_params["threshold"] = 0.05
 
+    elseif name == "HP is running"
+        required_systems["heat_pump"] = (HeatPump, nothing)
+
     else
         throw(KeyError(name))
     end
@@ -288,6 +291,10 @@ function check(
 
     elseif condition.name == "Sufficient charge"
         return unit.load >= condition.parameters["threshold"] * unit.capacity
+
+    elseif condition.name == "HP is running"
+        return (rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change
+            > parameters["epsilon"])
 
     end
 

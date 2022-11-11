@@ -18,9 +18,68 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     load :: Float64
 
     function SeasonalThermalStorage(uac :: String, config :: Dict{String, Any})
+        if config["strategy"]["name"] == "No cycle loading"
+            strategy = config["strategy"]["name"]
+
+            machine = StateMachine(
+                state=UInt(1),
+                state_names=Dict{UInt, String}(
+                    1 => "Load",
+                    2 => "Produce",
+                ),
+                time_in_state=UInt(0),
+                transitions=Dict{UInt, TruthTable}(
+                    1 => TruthTable( # State: Load
+                        conditions=[
+                            Condition(
+                                "Buffer >= X%",
+                                Dict{String, Any}(
+                                    "percentage" => config["strategy"]["percentage"]
+                                )
+                            ),
+                            Condition(
+                                "HP is running",
+                                Dict{String, Any}()
+                            )
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                            (false,false) => 2,
+                            (false,true) => 2,
+                            (true,false) => 1,
+                            (true,true) => 2,
+                        )
+                    ),
+
+                    2 => TruthTable( # State: Produce
+                        conditions=[
+                            Condition(
+                                "Buffer >= X%",
+                                Dict{String, Any}(
+                                    "percentage" => config["strategy"]["percentage"]
+                                )
+                            ),
+                            Condition(
+                                "HP is running",
+                                Dict{String, Any}()
+                            )
+                        ],
+                        table_data=Dict{Tuple, UInt}(
+                                (false,false) => 2,
+                                (false,true) => 2,
+                                (true,false) => 1,
+                                (true,true) => 2,
+                            )
+                    ),
+                )
+            )
+        else
+            strategy = "Default"
+            machine = StateMachine()
+        end
+
         return new(
             uac, # uac
-            Controller("Default", StateMachine()), # controller
+            Controller(strategy, machine), # controller
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 m_h_w_ht1 => nothing
