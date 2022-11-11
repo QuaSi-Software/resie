@@ -1,0 +1,156 @@
+{
+    "io_settings": {
+        "output_file": "./out.csv",
+        "__heating_output_keys": {
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_BFT": ["Load"],
+            "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
+        },
+        "output_keys": {
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_BFT": ["Load"],
+            "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
+        }
+    },
+    "energy_systems": {
+        "TST_01_HZG_01_DEM": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "scale": 10000.0
+        },
+        "TST_01_HZG_02_DEM": {
+            "type": "Demand",
+            "medium": "m_c_g_h2",
+            "control_refs": [],
+            "production_refs": [],
+            "scale": 10000.0
+        },
+        "TST_01_HZG_01_BUS": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_DEM",
+                "TST_01_HZG_01_BFT",
+                "TST_01_HZG_01_STS"
+            ]
+        },
+        "TST_01_ELT_01_BUS": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_HTP",
+                "TST_01_HZG_02_HTP",
+                "TST_01_ELT_01_ELY"
+            ]
+        },
+        "TST_01_HZG_01_HTP": {
+            "type": "HeatPump",
+            "control_refs": ["TST_01_ELT_01_ELY"],
+            "production_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "strategy": {
+                "name": "Consume all"
+            },
+            "power": 20000,
+            "cop": 3.0
+        },
+        "TST_01_HZG_02_HTP": {
+            "type": "HeatPump",
+            "control_refs": ["TST_01_HZG_01_BFT"],
+            "production_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "strategy": {
+                "name": "Ensure storage",
+                "high_threshold": 0.9,
+                "low_threshold": 0.2
+            },
+            "power": 20000,
+            "cop": 3.0
+        },
+        "TST_01_HZG_01_BFT": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "capacity": 40000,
+            "load": 20000
+        },
+        "TST_01_HZG_01_GBO": {
+            "type": "GasBoiler",
+            "control_refs": ["TST_01_HZG_01_BFT"],
+            "production_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "strategy": {
+                "name": "Ensure storage",
+                "high_threshold": 0.5,
+                "low_threshold": 0.1
+            },
+            "power": 40000
+        },
+        "TST_01_ELT_01_ELY": {
+            "type": "Electrolyser",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_HTP",
+                "TST_01_HZG_02_DEM",
+                "TST_01_ELT_01_GRO"
+            ],
+            "power": 40000
+        },
+        "TST_01_HZG_01_STS": {
+            "type": "SeasonalThermalStorage",
+            "control_refs": [
+                "TST_01_HZG_01_BFT",
+                "TST_01_HZG_02_HTP"
+            ],
+            "production_refs": [
+                "TST_01_HZG_02_HTP"
+            ],
+            "strategy": {
+                "name": "No cycle loading",
+                "percentage": 0.9
+            },
+            "capacity": 4000000,
+            "load": 2000000
+        },
+        "TST_01_HZG_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_GBO"
+            ],
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_ELT_01_BUS"
+            ],
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRO": {
+            "type": "GridConnection",
+            "medium": "m_c_g_o2",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        }
+    }
+}
