@@ -20,7 +20,8 @@ to the simulation as a whole as well as provide functionality on groups of energ
 module EnergySystems
 
 export MediumCategory, EnergySystem, ControlledSystem, each, Grouping,
-    link_production_with, check_balances, perform_steps, output_values, output_value
+    link_production_with, check_balances, perform_steps, output_values, output_value,
+    StepInstruction, StepInstructions
 
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
@@ -78,6 +79,16 @@ Enumerations of a simulation step that can be performed on an energy system.
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
 @enum Step s_reset s_control s_produce s_load s_distribute
+
+"""
+Convenience type for holding the instruction for one system and one step.
+"""
+const StepInstruction = Tuple{String, Step}
+
+"""
+Holds the order of steps as instructions for how to perform the simulation.
+"""
+const StepInstructions = Vector{StepInstruction}
 
 """
 The basic type of all energy systems.
@@ -507,7 +518,7 @@ system B and finally production of system A.
 """
 function perform_steps(
     systems :: Grouping,
-    order_of_steps :: Vector{Vector{Any}},
+    order_of_steps :: StepInstructions,
     parameters :: Dict{String, Any}
 )
     watt_to_wh = function (watts :: Float64)
@@ -515,23 +526,19 @@ function perform_steps(
     end
 
     for entry in order_of_steps
-        if length(entry) < 2
-            continue
-        end
         unit = systems[entry[1]]
+        step = entry[2]
 
-        for step in entry[2:lastindex(entry)]
-            if step == s_reset
-                reset(unit)
-            elseif step == s_control
-                control(unit, systems, parameters)
-            elseif step == s_produce
-                produce(unit, parameters, watt_to_wh)
-            elseif step == s_load
-                load(unit, parameters, watt_to_wh)
-            elseif step == s_distribute
-                distribute!(unit)
-            end
+        if step == s_reset
+            reset(unit)
+        elseif step == s_control
+            control(unit, systems, parameters)
+        elseif step == s_produce
+            produce(unit, parameters, watt_to_wh)
+        elseif step == s_load
+            load(unit, parameters, watt_to_wh)
+        elseif step == s_distribute
+            distribute!(unit)
         end
     end
 end

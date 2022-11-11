@@ -168,19 +168,15 @@ general to find out why the systems behave in the simulation as they do.
 function dump_info(
     file_path :: String,
     systems :: Grouping,
-    order_of_steps :: Vector{Vector{Any}},
+    order_of_steps :: StepInstructions,
     parameters :: Dict{String, Any}
 )
     open(abspath(file_path), "w") do file_handle
         write(file_handle, "# Simulation step order\n")
 
         for entry in order_of_steps
-            if length(entry) < 2
-                continue
-            end
-
             for step in entry[2:lastindex(entry)]
-                write(file_handle, "1. `$(entry[1]) $step`\n")
+                write(file_handle, "1. `$(entry[1]) $(entry[2])`\n")
             end
         end
     end
@@ -199,17 +195,15 @@ not trivial and might not work for each possible grouping of systems.
 # Args
 - `system::Grouping`: The systems for which an order is required
 # Returns
-- `Vector{Vector{Any}}`: The order in the structure:
+- `StepInstructions`: The order in the structure:
     ```
     [
-        ["UAC Key", s_step, ...],
+        ["UAC Key", s_step],
         ...
     ]
     ```
-    In cases where there are multiple entries of steps for a unit, this means that the
-    steps should be performed in that order for that unit before the next entry is handled.
 """
-function order_of_steps(systems :: Grouping) :: Vector{Vector{Any}}
+function order_of_steps(systems :: Grouping) :: StepInstructions
     systems_by_function = [
         [unit for unit in each(systems)
             if unit.sys_function == EnergySystems.sf_fixed_source],
@@ -232,7 +226,7 @@ function order_of_steps(systems :: Grouping) :: Vector{Vector{Any}}
     # reset all systems, order doesn't matter
     for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [unit.uac, EnergySystems.s_reset])
+            push!(simulation_order, (unit.uac, EnergySystems.s_reset))
         end
     end
 
@@ -240,27 +234,27 @@ function order_of_steps(systems :: Grouping) :: Vector{Vector{Any}}
     # to the general order of system functions
     for sf_order = 1:5
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [unit.uac, EnergySystems.s_control])
-            push!(simulation_order, [unit.uac, EnergySystems.s_produce])
+            push!(simulation_order, (unit.uac, EnergySystems.s_control))
+            push!(simulation_order, (unit.uac, EnergySystems.s_produce))
         end
     end
 
     # sandwich loading of storage systems between the other systems and dispatchable ones
     for unit in values(systems_by_function[5])
-        push!(simulation_order, [unit.uac, EnergySystems.s_load])
+        push!(simulation_order, (unit.uac, EnergySystems.s_load))
     end
 
     # handle dispatchable sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [unit.uac, EnergySystems.s_control])
-            push!(simulation_order, [unit.uac, EnergySystems.s_produce])
+            push!(simulation_order, (unit.uac, EnergySystems.s_control))
+            push!(simulation_order, (unit.uac, EnergySystems.s_produce))
         end
     end
 
     # finally, distribute bus systems
     for unit in values(systems_by_function[3])
-        push!(simulation_order, [unit.uac, EnergySystems.s_distribute])
+        push!(simulation_order, (unit.uac, EnergySystems.s_distribute))
     end
 
     return simulation_order
