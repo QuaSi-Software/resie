@@ -1,6 +1,8 @@
 {
     "io_settings": {
         "output_file": "./out.csv",
+        "dump_info": true,
+        "dump_info_file": "./info_dump.md",
         "output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],

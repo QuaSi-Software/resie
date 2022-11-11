@@ -158,6 +158,35 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
 end
 
 """
+    dump_info(file_path, systems, order_of_steps, parameters)
+
+Dump a bunch of information to file that might be useful to explain the result of a run.
+
+This is mostly used for debugging and development purposes, but might prove useful in
+general to find out why the systems behave in the simulation as they do.
+"""
+function dump_info(
+    file_path :: String,
+    systems :: Grouping,
+    order_of_steps :: Vector{Vector{Any}},
+    parameters :: Dict{String, Any}
+)
+    open(abspath(file_path), "w") do file_handle
+        write(file_handle, "# Simulation step order\n")
+
+        for entry in order_of_steps
+            if length(entry) < 2
+                continue
+            end
+
+            for step in entry[2:lastindex(entry)]
+                write(file_handle, "1. `$(entry[1]) $step`\n")
+            end
+        end
+    end
+end
+
+"""
     order_of_steps(systems)
 
 Calculate the order of steps that need to be performed to simulate the given systems.
@@ -258,6 +287,13 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
 
     outputs = output_keys(systems, project_config["io_settings"]["output_keys"])
     reset_file(project_config["io_settings"]["output_file"], outputs)
+
+    if project_config["io_settings"]["dump_info"]
+        dump_info(
+            project_config["io_settings"]["dump_info_file"],
+            systems, step_order, parameters
+        )
+    end
 
     for i = 1:(96*7)
         # perform the simulation

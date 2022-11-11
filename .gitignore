@@ -6,6 +6,7 @@ deps/build.log
 
 # output files
 *.csv
+info_dump.md
 
 # input files (test data and templates are added separately)
 *.json
