@@ -32,7 +32,7 @@ mutable struct Electrolyser <: ControlledSystem
                 m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing,
+                m_h_w_lt1 => nothing,
                 m_c_g_h2 => nothing,
                 m_c_g_o2 => nothing
             ),
@@ -45,27 +45,27 @@ mutable struct Electrolyser <: ControlledSystem
 end
 
 function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state_machine.state == 2
-        max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
-        max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
+    max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
+    max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
 
-        balance, potential = balance_on(
-            unit.output_interfaces[m_h_w_ht1],
-            unit.output_interfaces[m_h_w_ht1].target
-        )
-        if balance + potential >= 0.0
-            return # don't add to a surplus of energy
-        end
-
-        usage_fraction = min(1.0, abs(balance + potential) / max_produce_h)
-        if usage_fraction < unit.min_power_fraction
-            return
-        end
-
-        add!(unit.output_interfaces[m_e_ac_230v], max_produce_e * usage_fraction)
-        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    balance, potential = balance_on(
+        unit.output_interfaces[m_c_g_h2],
+        unit.output_interfaces[m_c_g_h2].target
+    )
+    if balance + potential >= 0.0
+        return # don't add to a surplus of h2
     end
+
+    usage_fraction = min(1.0, abs(balance + potential) / max_produce_g)
+    if usage_fraction < unit.min_power_fraction
+        return
+    end
+
+    # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
+    add!(unit.output_interfaces[m_c_g_h2], max_produce_g * usage_fraction)
+    add!(unit.output_interfaces[m_c_g_o2], max_produce_g * usage_fraction * 0.5)
+    add!(unit.output_interfaces[m_h_w_lt1], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[m_e_ac_230v], watt_to_wh(unit.power * usage_fraction))
 end
 
 export Electrolyser
