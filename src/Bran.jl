@@ -222,11 +222,13 @@ function order_of_steps(systems :: Grouping) :: StepInstructions
     ]
 
     simulation_order = []
+    initial_nr = length(systems) * 7
 
     # reset all systems, order doesn't matter
     for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (unit.uac, EnergySystems.s_reset))
+            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_reset)))
+            initial_nr -= 1
         end
     end
 
@@ -234,30 +236,37 @@ function order_of_steps(systems :: Grouping) :: StepInstructions
     # to the general order of system functions
     for sf_order = 1:5
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (unit.uac, EnergySystems.s_control))
-            push!(simulation_order, (unit.uac, EnergySystems.s_produce))
+            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_control)))
+            initial_nr -= 1
+            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_produce)))
+            initial_nr -= 1
         end
     end
 
     # sandwich loading of storage systems between the other systems and dispatchable ones
     for unit in values(systems_by_function[5])
-        push!(simulation_order, (unit.uac, EnergySystems.s_load))
+        push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_load)))
+        initial_nr -= 1
     end
 
     # handle dispatchable sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (unit.uac, EnergySystems.s_control))
-            push!(simulation_order, (unit.uac, EnergySystems.s_produce))
+            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_control)))
+            initial_nr -= 1
+            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_produce)))
+            initial_nr -= 1
         end
     end
 
     # finally, distribute bus systems
     for unit in values(systems_by_function[3])
-        push!(simulation_order, (unit.uac, EnergySystems.s_distribute))
+        push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_distribute)))
+        initial_nr -= 1
     end
 
-    return simulation_order
+    fn_first = function(entry) return entry[1] end
+    return [u[2] for u in sort(simulation_order, by=fn_first, rev=true)]
 end
 
 """
