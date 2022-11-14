@@ -43,6 +43,12 @@
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT",
                 "TST_01_HZG_01_STS"
+            ],
+            "input_priorities": [
+                "TST_01_HZG_01_HTP",
+                "TST_01_HZG_02_HTP",
+                "TST_01_HZG_01_BFT",
+                "TST_01_HZG_01_GBO"
             ]
         },
         "TST_01_ELT_01_BUS": {
@@ -53,6 +59,9 @@
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_HTP",
                 "TST_01_ELT_01_ELY"
+            ],
+            "input_priorities": [
+                "TST_01_ELT_01_GRI"
             ]
         },
         "TST_01_HZG_01_HTP": {
