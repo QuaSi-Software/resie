@@ -11,6 +11,9 @@
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
         }
     },
+    "simulation_parameters": {
+        "time_step_seconds": 900
+    },
     "energy_systems": {
         "TST_01_ELT_01_PVP": {
             "type": "PVPlant",

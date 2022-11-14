@@ -1,10 +1,4 @@
 module Bran
-"""
-The time step, in seconds, used by the simulation.
-
-@TODO: Move this into the input parameters to make it customizable at runtime.
-"""
-const TIME_STEP = UInt(900)
 
 # note: includes that contain their own module, which have to be submodules of the Bran
 # module, are included first, then can be accessed with the "using" keyword. files that
@@ -33,9 +27,14 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
     systems = load_systems(project_config["energy_systems"])
     step_order = order_of_steps(systems)
 
+    time_step = 900
+    if "time_step_seconds" in keys(project_config["simulation_parameters"])
+        time_step = UInt(project_config["simulation_parameters"]["time_step_seconds"])
+    end
+
     parameters = Dict{String, Any}(
         "time" => 0,
-        "time_step_seconds" => TIME_STEP,
+        "time_step_seconds" => time_step,
         "epsilon" => 1e-9
     )
 
@@ -70,7 +69,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         )
 
         # simulation update
-        parameters["time"] += Int(TIME_STEP)
+        parameters["time"] += Int(parameters["time_step_seconds"])
     end
 end
 
