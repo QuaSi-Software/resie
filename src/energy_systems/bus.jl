@@ -18,6 +18,9 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     input_interfaces :: Vector{SystemInterface}
     output_interfaces :: Vector{SystemInterface}
 
+    input_priorities :: Vector{String}
+    output_priorities :: Vector{String}
+
     storage_space :: Float64
     remainder :: Float64
 
@@ -30,6 +33,8 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
             medium, # medium
             [], # input_interfaces
             [], # output_interfaces,
+            config["input_priorities"],
+            config["production_refs"],
             0.0, # storage_space
             0.0 # remainder
         )
