@@ -109,7 +109,7 @@ function order_of_steps(systems :: Grouping) :: StepInstructions
     # reset all systems, order doesn't matter
     for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_reset)))
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_reset)])
             initial_nr -= 1
         end
     end
@@ -118,33 +118,74 @@ function order_of_steps(systems :: Grouping) :: StepInstructions
     # to the general order of system functions
     for sf_order = 1:5
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_control)))
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_control)])
             initial_nr -= 1
-            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_produce)))
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
         end
     end
 
     # sandwich loading of storage systems between the other systems and dispatchable ones
     for unit in values(systems_by_function[5])
-        push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_load)))
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_load)])
         initial_nr -= 1
     end
 
     # handle dispatchable sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_control)))
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_control)])
             initial_nr -= 1
-            push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_produce)))
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
         end
     end
 
     # finally, distribute bus systems
     for unit in values(systems_by_function[3])
-        push!(simulation_order, (initial_nr, (unit.uac, EnergySystems.s_distribute)))
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_distribute)])
         initial_nr -= 1
+    end
+
+    # helper function to find certain steps in the simulation order
+    idx_of = function(order, uac, step)
+        for idx in eachindex(order)
+            if order[idx][2][1] == uac && order[idx][2][2] == step
+                return idx
+            end
+        end
+        return 0
+    end
+
+    # reorder systems connected to a bus so they match the input priority:
+    for bus in values(systems_by_function[3])
+        # for each system in the bus' input priority...
+        for own_idx = 1:length(bus.input_priorities)
+            own_uac = bus.input_priorities[own_idx]
+            own_ctrl_idx = idx_of(simulation_order, own_uac, EnergySystems.s_control)
+            own_prod_idx = idx_of(simulation_order, own_uac, EnergySystems.s_produce)
+
+            # ...make sure every system following after...
+            for other_idx = own_idx:length(bus.input_priorities)
+                other_uac = bus.input_priorities[other_idx]
+                other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
+                other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
+
+                # ...is of a lower priority. if not, swap the control steps...
+                if simulation_order[own_ctrl_idx][1] < simulation_order[other_ctrl_idx][1]
+                    tmp = simulation_order[own_ctrl_idx][1]
+                    simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
+                    simulation_order[other_ctrl_idx][1] = tmp
+                end
+
+                # ...and swap the production too.
+                if simulation_order[own_prod_idx][1] < simulation_order[other_prod_idx][1]
+                    tmp = simulation_order[own_prod_idx][1]
+                    simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
+                    simulation_order[other_prod_idx][1] = tmp
+                end
+            end
+        end
     end
 
     fn_first = function(entry) return entry[1] end
