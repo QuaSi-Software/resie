@@ -17,7 +17,7 @@ mutable struct GasBoiler <: ControlledSystem
     min_power_fraction :: Float64
 
     function GasBoiler(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Ensure storage"
+        if config["strategy"]["name"] == "Storage-driven"
             strategy = config["strategy"]["name"]
 
             machine = StateMachine(

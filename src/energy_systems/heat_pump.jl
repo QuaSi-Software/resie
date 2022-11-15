@@ -23,7 +23,7 @@ mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Ensure storage"
+        if config["strategy"]["name"] == "Storage-driven"
             strategy = config["strategy"]["name"]
 
             machine = StateMachine(
@@ -98,7 +98,7 @@ mutable struct HeatPump <: ControlledSystem
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.strategy == "Ensure storage" && unit.controller.state_machine.state == 2
+    if unit.controller.strategy == "Storage-driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(
