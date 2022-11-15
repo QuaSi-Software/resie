@@ -74,7 +74,7 @@
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
-                "name": "Consume all"
+                "name": "Supply-driven"
             },
             "power": 20000,
             "cop": 3.0

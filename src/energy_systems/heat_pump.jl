@@ -71,7 +71,7 @@ mutable struct HeatPump <: ControlledSystem
                     ),
                 )
             )
-        elseif config["strategy"]["name"] == "Consume all"
+        elseif config["strategy"]["name"] == "Supply-driven"
             strategy = config["strategy"]["name"]
             machine = StateMachine()
         else
@@ -121,7 +121,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
-    elseif unit.controller.strategy == "Consume all"
+    elseif unit.controller.strategy == "Supply-driven"
         balance, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
 
         if balance < parameters["epsilon"]
