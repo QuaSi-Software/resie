@@ -23,9 +23,9 @@ mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Storage-driven"
-            strategy = config["strategy"]["name"]
+        strategy = config["strategy"]["name"]
 
+        if strategy == "Storage-driven"
             machine = StateMachine(
                 state=UInt(1),
                 state_names=Dict{UInt, String}(
@@ -71,11 +71,7 @@ mutable struct HeatPump <: ControlledSystem
                     ),
                 )
             )
-        elseif config["strategy"]["name"] == "Supply-driven"
-            strategy = config["strategy"]["name"]
-            machine = StateMachine()
         else
-            strategy = "Default"
             machine = StateMachine()
         end
 
@@ -135,6 +131,29 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         add!(unit.output_interfaces[m_h_w_ht1], produce_h)
         sub!(unit.input_interfaces[m_h_w_lt1], max_consume_h)
         sub!(unit.input_interfaces[m_e_ac_230v], consume_e)
+
+    elseif unit.controller.strategy == "Demand-driven"
+        max_produce_h = watt_to_wh(unit.power)
+
+        balance, _ = balance_on(
+            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[m_h_w_ht1].target
+        )
+        if balance >= 0.0
+            return # don't add to a surplus of energy
+        end
+
+        usage_fraction = min(1.0, abs(balance) / max_produce_h)
+        if usage_fraction < unit.min_power_fraction
+            return
+        end
+
+        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
+        sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        sub!(
+            unit.input_interfaces[m_h_w_lt1],
+            max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
+        )
     end
 end
 
