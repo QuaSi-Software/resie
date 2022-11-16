@@ -85,7 +85,10 @@ not trivial and might not work for each possible grouping of systems.
 ]
 ```
 """
-function order_of_steps(systems :: Grouping) :: StepInstructions
+function order_of_steps(
+    systems :: Grouping,
+    config :: Dict{String, Any}
+) :: StepInstructions
     systems_by_function = [
         [unit for unit in each(systems)
             if unit.sys_function == EnergySystems.sf_fixed_source],
@@ -184,6 +187,34 @@ function order_of_steps(systems :: Grouping) :: StepInstructions
                     simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
                     simulation_order[other_prod_idx][1] = tmp
                 end
+            end
+        end
+    end
+
+    # reorder systems such that their control dependencies are handled first, but only if
+    # these are not storage systems (which are handled differently)
+    for unit in values(systems)
+        for other_uac in config[unit.uac]["control_refs"]
+            other_unit = systems[other_uac]
+            if other_unit.sys_function == EnergySystems.sf_storage
+                continue
+            end
+
+            own_ctrl_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_control)
+            own_prod_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_produce)
+            other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
+            other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
+
+            if simulation_order[own_ctrl_idx] > simulation_order[other_ctrl_idx]
+                tmp = simulation_order[own_ctrl_idx][1]
+                simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
+                simulation_order[other_ctrl_idx][1] = tmp
+            end
+
+            if simulation_order[own_prod_idx][1] > simulation_order[other_prod_idx][1]
+                tmp = simulation_order[own_prod_idx][1]
+                simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
+                simulation_order[other_prod_idx][1] = tmp
             end
         end
     end
