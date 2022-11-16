@@ -387,17 +387,17 @@ include("control.jl")
 
 # the order of includes of the individual systems matters here as some energy systems
 # require the definition of certain basic systems such as a bus or a grid connection
-include("demand.jl")
-include("grid_connection.jl")
-include("bus.jl")
-include("battery.jl")
-include("buffer_tank.jl")
-include("seasonal_thermal_storage.jl")
-include("chpp.jl")
-include("electrolyser.jl")
-include("gas_boiler.jl")
-include("heat_pump.jl")
-include("pv_plant.jl")
+include("connections/demand.jl")
+include("connections/grid_connection.jl")
+include("connections/bus.jl")
+include("storage/battery.jl")
+include("storage/buffer_tank.jl")
+include("storage/seasonal_thermal_storage.jl")
+include("electric_producers/chpp.jl")
+include("others/electrolyser.jl")
+include("heat_producers/gas_boiler.jl")
+include("heat_producers/heat_pump.jl")
+include("electric_producers/pv_plant.jl")
 
 """
     link_production_with(unit, systems)
