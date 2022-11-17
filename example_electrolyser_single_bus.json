@@ -83,14 +83,12 @@
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
-            "control_refs": ["TST_01_HZG_01_BFT"],
+            "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
-                "name": "Storage-driven",
-                "high_threshold": 0.9,
-                "low_threshold": 0.2
+                "name": "Demand-driven"
             },
             "power": 20000,
             "cop": 3.0
