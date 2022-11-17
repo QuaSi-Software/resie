@@ -1,6 +1,6 @@
 module Profiles
 
-export Profile
+export Profile, power_at_time, work_at_time
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
@@ -33,7 +33,7 @@ mutable struct Profile
                     splitted = split(strip(line, '#'), ';')
                     if strip(splitted[1]) == "time_step"
                         time_step = parse(Int, splitted[2])
-                    elseif strip(splitted[1] == "is_power")
+                    elseif strip(splitted[1]) == "is_power"
                         is_power = parse(Bool, splitted[2])
                     end
 
@@ -50,6 +50,34 @@ mutable struct Profile
             is_power, # is_power
             parsed # data
         )
+    end
+end
+
+"""
+    power_at_time(profile, time)
+
+Get the power value of the profile at the given time.
+"""
+function power_at_time(profile :: Profile, time :: Int)
+    step_nr = Int(round(time / profile.time_step) + 1)
+    if profile.is_power
+        return profile.data[step_nr]
+    else
+        return profile.data[step_nr] * (3600 / profile.time_step)
+    end
+end
+
+"""
+    work_at_time(profile, time)
+
+Get the work value of the profile at the given time.
+"""
+function work_at_time(profile :: Profile, time :: Int)
+    step_nr = Int(round(time / profile.time_step) + 1)
+    if profile.is_power
+        return profile.data[step_nr] * (profile.time_step / 3600)
+    else
+        return profile.data[step_nr]
     end
 end
 
