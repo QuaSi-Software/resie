@@ -13,6 +13,9 @@ mutable struct Profile
     """Time step, in seconds, of the profile."""
     time_step :: Int
 
+    """Indicates whether the profile values are power or work."""
+    is_power :: Bool
+
     """Holds the profile values indexed by the time step number"""
     data :: Vector{Float64}
 
@@ -20,6 +23,7 @@ mutable struct Profile
     function Profile(file_path :: String)
         parsed = Vector{Float64}()
         time_step = 900
+        is_power = false
 
         open(abspath(file_path), "r") do file_handle
             for line in readlines(file_handle)
@@ -29,6 +33,8 @@ mutable struct Profile
                     splitted = split(strip(line, '#'), ';')
                     if strip(splitted[1]) == "time_step"
                         time_step = parse(Int, splitted[2])
+                    elseif strip(splitted[1] == "is_power")
+                        is_power = parse(Bool, splitted[2])
                     end
 
                 else
@@ -41,6 +47,7 @@ mutable struct Profile
 
         return new(
             time_step, # time_step
+            is_power, # is_power
             parsed # data
         )
     end
