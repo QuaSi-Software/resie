@@ -21,22 +21,21 @@ mutable struct Profile
         parsed = Vector{Float64}()
         time_step = 900
 
-        open(file_path, "r") do file_handle
-            line = strip(readline(file_handle))
+        open(abspath(file_path), "r") do file_handle
+            for line in readlines(file_handle)
+                line = strip(line)
 
-            if line[1] == '#'
-                splitted = split(strip(line, '#'), ';')
-                if strip(splitted[1]) == "time_step"
-                    time_step = parse(Int, splitted[2])
+                if line[1] == '#'
+                    splitted = split(strip(line, '#'), ';')
+                    if strip(splitted[1]) == "time_step"
+                        time_step = parse(Int, splitted[2])
+                    end
+
+                else
+                    splitted = split(line, ';')
+                    value = parse(Float64, splitted[2])
+                    push!(parsed, value)
                 end
-
-            else
-                splitted = split(line, ';')
-                time = parse(Float64, splitted[1])
-                value = parse(Float64, splitted[2])
-
-                step_nr = Int(round(time / time_step))
-                push!(parsed, (step_nr, value))
             end
         end
 
