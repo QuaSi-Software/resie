@@ -7,8 +7,10 @@ module Bran
 # this is done so the latter files can access the symbols of the submodules the same as
 # if the code was inside this file.
 
-include("energy_systems/base.jl")
+include("profiles/base.jl")
+using .Profiles
 
+include("energy_systems/base.jl")
 using .EnergySystems
 
 include("project_loading.jl")

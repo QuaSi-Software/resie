@@ -385,6 +385,8 @@ end
 # of definitions
 include("control.jl")
 
+using ..Profiles
+
 # the order of includes of the individual systems matters here as some energy systems
 # require the definition of certain basic systems such as a bus or a grid connection
 include("connections/demand.jl")
