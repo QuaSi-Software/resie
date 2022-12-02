@@ -28,7 +28,9 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
-            Controller("Default", StateMachine()), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_bus, # sys_function
             medium, # medium
             [], # input_interfaces

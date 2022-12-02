@@ -41,10 +41,11 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
     systems = Grouping()
 
     for (unit_key, entry) in pairs(config)
-        symbol = Symbol(String(entry["type"]))
+        unit_config = merge(entry, {"strategy" => {"name" => "default"}})
+        symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.EnergySystem
-            instance = unit_class(unit_key, entry)
+            instance = unit_class(unit_key, unit_config)
             systems[unit_key] = instance
         end
     end

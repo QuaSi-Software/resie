@@ -26,7 +26,9 @@ mutable struct Electrolyser <: ControlledSystem
     function Electrolyser(uac :: String, config :: Dict{String, Any})
         return new(
             uac, # uac
-            Controller("Default", StateMachine()), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing

@@ -24,7 +24,9 @@ mutable struct Demand <: ControlledSystem
 
         return new(
             uac, # uac
-            Controller("Default", StateMachine()), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_fixed_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

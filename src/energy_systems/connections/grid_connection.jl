@@ -24,7 +24,9 @@ mutable struct GridConnection <: ControlledSystem
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
-            Controller("Default", StateMachine()), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             if Bool(config["is_source"]) sf_dispatchable_source else sf_dispatchable_sink end, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
