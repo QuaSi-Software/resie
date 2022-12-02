@@ -17,72 +17,11 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
     load :: Float64
 
     function Battery(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Economical discharge"
-            strategy = config["strategy"]["name"]
-
-            machine = StateMachine(
-                state=UInt(1),
-                state_names=Dict{UInt, String}(
-                    1 => "Load",
-                    2 => "Discharge",
-                ),
-                time_in_state=UInt(0),
-                transitions=Dict{UInt, TruthTable}(
-                    1 => TruthTable( # State: Load
-                        conditions=[
-                            Condition(
-                                "Little PV power",
-                                Dict{String, Any}(
-                                    "threshold" => 0.15
-                                )
-                            ),
-                            Condition(
-                                "Sufficient charge",
-                                Dict{String, Any}(
-                                    "threshold" => 0.2
-                                )
-                            )
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false,false) => 1,
-                            (false,true) => 1,
-                            (true,false) => 1,
-                            (true,true) => 2,
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Discharge
-                        conditions=[
-                            Condition(
-                                "Little PV power",
-                                Dict{String, Any}(
-                                    "threshold" => 0.15
-                                )
-                            ),
-                            Condition(
-                                "Sufficient charge",
-                                Dict{String, Any}(
-                                    "threshold" => 0.05
-                                )
-                            )
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                                (false,false) => 1,
-                                (false,true) => 1,
-                                (true,false) => 1,
-                                (true,true) => 2,
-                            )
-                    ),
-                )
-            )
-        else
-            strategy = "Default"
-            machine = StateMachine()
-        end
-
         return new(
             uac, # uac
-            Controller(strategy, machine), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 m_e_ac_230v => nothing
