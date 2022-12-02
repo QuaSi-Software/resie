@@ -301,5 +301,30 @@ function check(
     throw(KeyError(condition.name))
 end
 
+STRT_SM_PARAMS = Dict{String, Dict{String, Any}}()
+STRT_SM_FUNCS = Dict{String, Function}()
 
-export Condition, TruthTable, StateMachine, link_control_with
+"""
+    controller_for_strategy(strategy, parameters)
+
+Construct the controller for the strategy of the given name using the given parameters.
+
+# Arguments
+- `strategy::String`: Must be an exact match to the name defined in the strategy's code file.
+- `parameters::Dict{String, Any}`: Parameters for the configuration of the strategy. The
+    names must match those in the default parameter values dictionary defined in the
+    strategy's code file. Given values override default values.
+# Returns
+- `Controller`: The constructed controller for the given strategy.
+"""
+function controller_for_strategy(strategy :: String, parameters :: Dict{String, Any}) :: Controller
+    if !(strategy in keys(STRT_SM_FUNCS) && strategy in keys(STRT_SM_PARAMS))
+        throw(ArgumentError("Unknown strategy $strategy"))
+    end
+
+    params = merge(STRT_SM_PARAMS[strategy], parameters)
+    machine = STRT_SM_FUNCS[strategy](params)
+    return Controller(strategy, machine)
+end
+
+export Condition, TruthTable, StateMachine, link_control_with, controller_for_strategy
