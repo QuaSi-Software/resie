@@ -94,7 +94,7 @@ mutable struct HeatPump <: ControlledSystem
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.strategy == "Storage-driven" && unit.controller.state_machine.state == 2
+    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
         balance, potential = balance_on(

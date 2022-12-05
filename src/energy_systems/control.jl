@@ -305,6 +305,7 @@ STRT_SM_PARAMS = Dict{String, Dict{String, Any}}()
 STRT_SM_FUNCS = Dict{String, Function}()
 
 include("strategies/economical_discharge.jl")
+include("strategies/storage_driven.jl")
 
 """
     controller_for_strategy(strategy, parameters)

@@ -25,70 +25,11 @@ mutable struct CHPP <: ControlledSystem
     min_run_time :: UInt
 
     function CHPP(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Storage-driven"
-            strategy = config["strategy"]["name"]
-
-            machine = StateMachine(
-                state=UInt(1),
-                state_names=Dict{UInt, String}(
-                    1 => "Off",
-                    2 => "Load",
-                ),
-                time_in_state=UInt(0),
-                transitions=Dict{UInt, TruthTable}(
-                    1 => TruthTable( # State: Off
-                        conditions=[
-                            Condition(
-                                "Buffer < X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["low_threshold"]
-                                )
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false,) => 1,
-                            (true,) => 2,
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Load
-                        conditions=[
-                            Condition(
-                                "Buffer >= X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["high_threshold"]
-                                )
-                            ),
-                            Condition(
-                                "Min run time",
-                                Dict{String, Any}()
-                            ),
-                            Condition(
-                                "Would overfill thermal buffer",
-                                Dict{String, Any}()
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false, false) => 2,
-                            (false, true, false) => 2,
-                            (true, false, false) => 2,
-                            (true, true, false) => 1,
-                            (false, false, true) => 1,
-                            (false, true, true) => 1,
-                            (true, false, true) => 1,
-                            (true, true, true) => 1,
-                        )
-                    ),
-                )
-            )
-        else
-            strategy = "Default"
-            machine = StateMachine()
-        end
-
         return new(
             uac, # uac
-            Controller(strategy, machine), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_c_g_natgas => nothing

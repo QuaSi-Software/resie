@@ -95,7 +95,7 @@
                 "TST_01_ELT_01_BUS"
             ],
             "strategy": {
-                "name": "Storage-driven",
+                "name": "storage_driven",
                 "high_threshold": 0.9,
                 "low_threshold": 0.2
             },
@@ -108,7 +108,7 @@
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
-                "name": "Storage-driven",
+                "name": "storage_driven",
                 "high_threshold": 0.5,
                 "low_threshold": 0.1
             },

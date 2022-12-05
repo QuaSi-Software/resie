@@ -15,64 +15,14 @@ mutable struct GasBoiler <: ControlledSystem
 
     power :: Float64
     min_power_fraction :: Float64
+    min_run_time :: Float64
 
     function GasBoiler(uac :: String, config :: Dict{String, Any})
-        if config["strategy"]["name"] == "Storage-driven"
-            strategy = config["strategy"]["name"]
-
-            machine = StateMachine(
-                state=UInt(1),
-                state_names=Dict{UInt, String}(
-                    1 => "Off",
-                    2 => "Load",
-                ),
-                time_in_state=UInt(0),
-                transitions=Dict{UInt, TruthTable}(
-                    1 => TruthTable( # State: Off
-                        conditions=[
-                            Condition(
-                                "Buffer < X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["low_threshold"]
-                                )
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false,) => 1,
-                            (true,) => 2,
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Load
-                        conditions=[
-                            Condition(
-                                "Buffer >= X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["high_threshold"]
-                                )
-                            ),
-                            Condition(
-                                "Would overfill thermal buffer",
-                                Dict{String, Any}()
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false) => 2,
-                            (false, true) => 1,
-                            (true, false) => 1,
-                            (true, true) => 1,
-                        )
-                    ),
-                )
-            )
-        else
-            strategy = "Default"
-            machine = StateMachine()
-        end
-
         return new(
             uac, # uac
-            Controller(strategy, machine), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_c_g_natgas => nothing
@@ -82,6 +32,7 @@ mutable struct GasBoiler <: ControlledSystem
             ),
             config["power"], # power
             0.1, # min_power_fraction
+            0, # min_run_time
         )
     end
 end
