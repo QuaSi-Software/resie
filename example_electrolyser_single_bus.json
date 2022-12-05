@@ -135,7 +135,7 @@
                 "TST_01_HZG_02_HTP"
             ],
             "strategy": {
-                "name": "No cycle loading",
+                "name": "use_surplus_in_cycle",
                 "percentage": 0.9
             },
             "capacity": 4000000,
