@@ -320,7 +320,7 @@ Construct the controller for the strategy of the given name using the given para
 - `Controller`: The constructed controller for the given strategy.
 """
 function controller_for_strategy(strategy :: String, parameters :: Dict{String, Any}) :: Controller
-    if lower(strategy) == "default"
+    if lowercase(strategy) == "default"
         return Controller("default", StateMachine())
     end
 
