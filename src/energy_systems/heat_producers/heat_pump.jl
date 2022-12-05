@@ -20,6 +20,7 @@ mutable struct HeatPump <: ControlledSystem
 
     power :: Float64
     min_power_fraction :: Float64
+    min_run_time :: UInt
     cop :: Float64
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
@@ -88,6 +89,7 @@ mutable struct HeatPump <: ControlledSystem
             ),
             config["power"], # power
             0.2, # min_power_fraction
+            0, # min_run_time
             3.0 # cop
         )
     end

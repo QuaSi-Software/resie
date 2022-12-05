@@ -15,7 +15,7 @@ mutable struct GasBoiler <: ControlledSystem
 
     power :: Float64
     min_power_fraction :: Float64
-    min_run_time :: Float64
+    min_run_time :: UInt
 
     function GasBoiler(uac :: String, config :: Dict{String, Any})
         return new(
