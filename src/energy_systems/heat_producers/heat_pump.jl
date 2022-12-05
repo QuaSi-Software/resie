@@ -24,61 +24,11 @@ mutable struct HeatPump <: ControlledSystem
     cop :: Float64
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
-        strategy = config["strategy"]["name"]
-
-        if strategy == "Storage-driven"
-            machine = StateMachine(
-                state=UInt(1),
-                state_names=Dict{UInt, String}(
-                    1 => "Off",
-                    2 => "Load"
-                ),
-                time_in_state=UInt(0),
-                transitions=Dict{UInt, TruthTable}(
-                    1 => TruthTable( # State: Off
-                        conditions=[
-                            Condition(
-                                "Buffer < X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["low_threshold"]
-                                )
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (true,) => 2,
-                            (false,) => 1
-                        )
-                    ),
-
-                    2 => TruthTable( # State: Load
-                        conditions=[
-                            Condition(
-                                "Buffer >= X%",
-                                Dict{String, Any}(
-                                    "percentage" => config["strategy"]["high_threshold"]
-                                )
-                            ),
-                            Condition(
-                                "Would overfill thermal buffer",
-                                Dict{String, Any}()
-                            ),
-                        ],
-                        table_data=Dict{Tuple, UInt}(
-                            (false, false) => 2,
-                            (false, true) => 1,
-                            (true, false) => 1,
-                            (true, true) => 1,
-                        )
-                    ),
-                )
-            )
-        else
-            machine = StateMachine()
-        end
-
         return new(
             uac, # uac
-            Controller(strategy, machine), # controller
+            controller_for_strategy( # controller
+                config["strategy"]["name"], config["strategy"]
+            ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_h_w_lt1 => nothing,
@@ -119,7 +69,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
-    elseif unit.controller.strategy == "Supply-driven"
+    elseif unit.controller.strategy == "supply_driven"
         balance, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
 
         if balance < parameters["epsilon"]
@@ -134,7 +84,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         sub!(unit.input_interfaces[m_h_w_lt1], max_consume_h)
         sub!(unit.input_interfaces[m_e_ac_230v], consume_e)
 
-    elseif unit.controller.strategy == "Demand-driven"
+    elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
 
         balance, _ = balance_on(

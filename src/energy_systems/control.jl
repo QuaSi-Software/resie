@@ -306,6 +306,8 @@ STRT_SM_FUNCS = Dict{String, Function}()
 
 include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
+include("strategies/demand_driven.jl")
+include("strategies/supply_driven.jl")
 
 """
     controller_for_strategy(strategy, parameters)
