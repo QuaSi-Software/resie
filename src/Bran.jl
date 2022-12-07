@@ -34,8 +34,20 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         time_step = UInt(project_config["simulation_parameters"]["time_step_seconds"])
     end
 
+    start_timestamp = 0
+    if "start" in keys(project_config["simulation_parameters"])
+        start_timestamp = Integer(project_config["simulation_parameters"]["start"])
+    end
+
+    end_timestamp = 900
+    if "end" in keys(project_config["simulation_parameters"])
+        end_timestamp = Integer(project_config["simulation_parameters"]["end"])
+    end
+
+    nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
+
     parameters = Dict{String, Any}(
-        "time" => 0,
+        "time" => start_timestamp,
         "time_step_seconds" => time_step,
         "epsilon" => 1e-9
     )
@@ -50,7 +62,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         )
     end
 
-    for i = 1:(96*7)
+    for _ = 1:nr_of_steps
         # perform the simulation
         perform_steps(systems, step_order, parameters)
 

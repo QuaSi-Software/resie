@@ -29,6 +29,8 @@
         }
     },
     "simulation_parameters": {
+        "start": 0,
+        "end": 604800,
         "time_step_seconds": 900
     },
     "energy_systems": {
