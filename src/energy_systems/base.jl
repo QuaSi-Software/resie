@@ -390,6 +390,7 @@ using ..Profiles
 # the order of includes of the individual systems matters here as some energy systems
 # require the definition of certain basic systems such as a bus or a grid connection
 include("connections/demand.jl")
+include("connections/fixed_supply.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
