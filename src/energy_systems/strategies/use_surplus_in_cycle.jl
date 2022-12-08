@@ -1,12 +1,11 @@
 function strt_sm_use_surplus_in_cycle(parameters :: Dict{String, Any}) :: StateMachine
     StateMachine(
-        state=UInt(1),
-        state_names=Dict{UInt, String}(
+        UInt(1), # state
+        Dict{UInt, String}( # state_names
             1 => "Load",
             2 => "Produce",
         ),
-        time_in_state=UInt(0),
-        transitions=Dict{UInt, TruthTable}(
+        Dict{UInt, TruthTable}( # transitions
             1 => TruthTable( # State: Load
                 conditions=[
                     Condition(

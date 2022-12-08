@@ -177,7 +177,7 @@ of checking against characters in an input alphabet, these state machines are ty
 checked once every time step of a simulation and the conditions can have arbitrary
 implementations that require the simulation state as input.
 """
-Base.@kwdef mutable struct StateMachine
+mutable struct StateMachine
     """The current state of the state machine."""
     state :: UInt
 
@@ -196,16 +196,29 @@ Base.@kwdef mutable struct StateMachine
 end
 
 """
-Default constructor of StateMachine that creates a state machine with only one state.
+Constructor for non-default fields.
+"""
+StateMachine(
+    state :: UInt,
+    state_names :: Dict{UInt, String},
+    transitions :: Dict{UInt, TruthTable}
+) = StateMachine(
+    state,
+    state_names,
+    transitions,
+    UInt(0)
+)
+
+"""
+Default constructor that creates a state machine with only one state called "Default".
 """
 StateMachine() = StateMachine(
-    1, # StateMachine.state
-    Dict(1=>"Default"), # StateMachine.state_names
-    Dict(1=>TruthTable( # StateMachine.transitions
+    UInt(1),
+    Dict(UInt(1)=>"Default"),
+    Dict(UInt(1)=>TruthTable(
         conditions=Vector(),
         table_data=Dict()
-    )),
-    0 # StateMachine.time_in_state
+    ))
 )
 
 """

@@ -1,12 +1,11 @@
 function strt_sm_economical_discharge(parameters :: Dict{String, Any}) :: StateMachine
     return StateMachine(
-        state=UInt(1),
-        state_names=Dict{UInt, String}(
+        UInt(1), # state
+        Dict{UInt, String}( # state_names
             1 => "Load",
             2 => "Discharge",
         ),
-        time_in_state=UInt(0),
-        transitions=Dict{UInt, TruthTable}(
+        Dict{UInt, TruthTable}( # transitions
             1 => TruthTable( # State: Load
                 conditions=[
                     Condition(
