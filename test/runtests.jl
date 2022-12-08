@@ -8,3 +8,4 @@ end
 # that is being tested in earlier test sets, in particular the project loading methods
 include("tests_project_loading.jl")
 include("tests_control.jl")
+include("tests_energy_systems.jl")
