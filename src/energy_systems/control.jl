@@ -1,3 +1,6 @@
+"""Convenience type alias for requirements of energy systems."""
+const EnSysRequirements = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
+
 """
 A boolean decision variable for a transition in a state machine.
 
@@ -16,7 +19,7 @@ struct Condition
 
     For some systems a medium is required as they can take varying values.
     """
-    required_systems :: Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
+    required_systems :: EnSysRequirements
 
     """The systems linked to the condition indexed by an internal name."""
     linked_systems :: Grouping
@@ -47,7 +50,7 @@ function Condition(
     name :: String,
     parameters :: Dict{String, Any}
 ) :: Condition
-    required_systems = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}()
+    required_systems = EnSysRequirements()
     default_params = Dict{String, Any}()
 
     if name == "Buffer < X%"
