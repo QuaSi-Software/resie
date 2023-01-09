@@ -51,6 +51,29 @@ function strt_sm_use_surplus_in_cycle(parameters :: Dict{String, Any}) :: StateM
     )
 end
 
+strt_desc_use_surplus_in_cycle = """Use surplus in cycle
+------------------------
+A special strategy used for ensuring that a long-term thermal storage system does not store
+energy when a heat pump, which is fed by the LTTSS, is running at the same time. This would
+make little sense as this cycle can only destroy energy and would never be implemented in
+a real energy network.
+"""
+
+OP_STRATS["use_surplus_in_cycle"] = OperationalStrategyType(
+    name="use_surplus_in_cycle",
+    description=strt_desc_use_surplus_in_cycle,
+    sm_constructor=strt_sm_use_surplus_in_cycle,
+    conditions=[
+        "Buffer >= X%",
+        "HP is running",
+        "Buffer >= X%",
+    ],
+    strategy_parameters=Dict{String, Any}(
+        "percentage" => 0.95,
+    ),
+    required_systems=EnSysRequirements()
+)
+
 STRT_SM_FUNCS["use_surplus_in_cycle"] = strt_sm_use_surplus_in_cycle
 STRT_SM_PARAMS["use_surplus_in_cycle"] = Dict{String, Any}(
     "percentage" => 0.95,

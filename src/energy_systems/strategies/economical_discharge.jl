@@ -55,6 +55,28 @@ function strt_sm_economical_discharge(parameters :: Dict{String, Any}) :: StateM
     )
 end
 
+strt_desc_economical_discharge = """Economical discharge
+------------------------
+Discharges a battery when a linked PV plant produces little power and the battery has
+sufficient charge to provide substantial amounts of energy.
+"""
+
+OP_STRATS["economical_discharge"] = OperationalStrategyType(
+    name="economical_discharge",
+    description=strt_desc_economical_discharge,
+    sm_constructor=strt_sm_economical_discharge,
+    conditions=[
+        "Little PV power",
+        "Sufficient charge"
+    ],
+    strategy_parameters=Dict{String, Any}(
+        "pv_threshold" => 0.15,
+        "min_charge" => 0.2,
+        "discharge_limit" => 0.05,
+    ),
+    required_systems=EnSysRequirements()
+)
+
 STRT_SM_FUNCS["economical_discharge"] = strt_sm_economical_discharge
 STRT_SM_PARAMS["economical_discharge"] = Dict{String, Any}(
     "pv_threshold" => 0.15,

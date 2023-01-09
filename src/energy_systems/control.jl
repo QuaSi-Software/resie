@@ -317,6 +317,34 @@ function check(
     throw(KeyError(condition.name))
 end
 
+"""
+A type of operational strategy that defines which parameters and systems a strategy requires.
+"""
+Base.@kwdef struct OperationalStrategyType
+    """Machine-readable name of the strategy."""
+    name :: String
+
+    """Human-readable description that explains how to use the strategy."""
+    description :: String
+
+    """Constructor method for the state machine used by the strategy."""
+    sm_constructor :: Function
+
+    """A list of condition names that the strategy uses."""
+    conditions :: Vector{String}
+
+    """Required parameters for the strategy including those for the conditions."""
+    strategy_parameters :: Dict{String, Any}
+
+    """Energy systems that the strategy requires for the correct order of execution.
+
+    This differs from the system the conditions of the strategy require.
+    """
+    required_systems :: EnSysRequirements
+end
+
+OP_STRATS = Dict{String, OperationalStrategyType}()
+
 STRT_SM_PARAMS = Dict{String, Dict{String, Any}}()
 STRT_SM_FUNCS = Dict{String, Function}()
 
