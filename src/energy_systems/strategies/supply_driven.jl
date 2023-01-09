@@ -20,6 +20,3 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
     strategy_parameters=Dict{String, Any}(),
     required_systems=EnSysRequirements()
 )
-
-STRT_SM_FUNCS["supply_driven"] = strt_sm_supply_driven
-STRT_SM_PARAMS["supply_driven"] = Dict{String, Any}()

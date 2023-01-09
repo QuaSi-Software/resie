@@ -76,9 +76,3 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
     ),
     required_systems=EnSysRequirements()
 )
-
-STRT_SM_FUNCS["storage_driven"] = strt_sm_storage_driven
-STRT_SM_PARAMS["storage_driven"] = Dict{String, Any}(
-    "low_threshold" => 0.2,
-    "high_threshold" => 0.95,
-)

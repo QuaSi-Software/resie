@@ -73,8 +73,3 @@ OP_STRATS["use_surplus_in_cycle"] = OperationalStrategyType(
     ),
     required_systems=EnSysRequirements()
 )
-
-STRT_SM_FUNCS["use_surplus_in_cycle"] = strt_sm_use_surplus_in_cycle
-STRT_SM_PARAMS["use_surplus_in_cycle"] = Dict{String, Any}(
-    "percentage" => 0.95,
-)

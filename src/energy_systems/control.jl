@@ -345,9 +345,6 @@ end
 
 OP_STRATS = Dict{String, OperationalStrategyType}()
 
-STRT_SM_PARAMS = Dict{String, Dict{String, Any}}()
-STRT_SM_FUNCS = Dict{String, Function}()
-
 include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 include("strategies/demand_driven.jl")
@@ -372,12 +369,12 @@ function controller_for_strategy(strategy :: String, parameters :: Dict{String, 
         return Controller("default", StateMachine())
     end
 
-    if !(strategy in keys(STRT_SM_FUNCS) && strategy in keys(STRT_SM_PARAMS))
+    if !(strategy in keys(OP_STRATS))
         throw(ArgumentError("Unknown strategy $strategy"))
     end
 
-    params = merge(STRT_SM_PARAMS[strategy], parameters)
-    machine = STRT_SM_FUNCS[strategy](params)
+    params = merge(OP_STRATS[strategy].strategy_parameters, parameters)
+    machine = OP_STRATS[strategy].sm_constructor(params)
     return Controller(strategy, machine)
 end
 

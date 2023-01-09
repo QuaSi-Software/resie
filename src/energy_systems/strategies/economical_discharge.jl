@@ -76,10 +76,3 @@ OP_STRATS["economical_discharge"] = OperationalStrategyType(
     ),
     required_systems=EnSysRequirements()
 )
-
-STRT_SM_FUNCS["economical_discharge"] = strt_sm_economical_discharge
-STRT_SM_PARAMS["economical_discharge"] = Dict{String, Any}(
-    "pv_threshold" => 0.15,
-    "min_charge" => 0.2,
-    "discharge_limit" => 0.05,
-)

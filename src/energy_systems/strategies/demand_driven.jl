@@ -20,6 +20,3 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
     strategy_parameters=Dict{String, Any}(),
     required_systems=EnSysRequirements()
 )
-
-STRT_SM_FUNCS["demand_driven"] = strt_sm_demand_driven
-STRT_SM_PARAMS["demand_driven"] = Dict{String, Any}()
