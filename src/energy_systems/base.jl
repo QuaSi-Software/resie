@@ -402,6 +402,8 @@ include("heat_producers/gas_boiler.jl")
 include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
+load_condition_prototypes()
+
 """
     link_production_with(unit, systems)
 

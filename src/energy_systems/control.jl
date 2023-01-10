@@ -1,6 +1,24 @@
 """Convenience type alias for requirements of energy systems."""
 const EnSysRequirements = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
 
+struct ConditionPrototype
+    """An identifiable name."""
+    name :: String
+
+    """Parameters the condition requires."""
+    parameters :: Dict{String, Any}
+
+    """Defines which systems the condition requires, indexed by an internal name.
+
+    For some systems a medium is required as they can take varying values.
+    """
+    required_systems :: EnSysRequirements
+end
+
+CONDITION_PROTOTYPES = Dict{String, ConditionPrototype}()
+
+include("conditions/base.jl")
+
 """
 A boolean decision variable for a transition in a state machine.
 
