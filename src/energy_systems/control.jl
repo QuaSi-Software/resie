@@ -22,6 +22,9 @@ struct ConditionPrototype
     For some systems a medium is required as they can take varying values.
     """
     required_systems :: EnSysRequirements
+
+    """Implementation of the boolean expression the condition represents."""
+    check_function :: Function
 end
 
 CONDITION_PROTOTYPES = Dict{String, ConditionPrototype}()
@@ -233,7 +236,7 @@ function move_state(
 
     if length(table.conditions) > 0
         evaluations = Tuple(
-            check(condition, unit, parameters)
+            condition.prototype.check_function(condition, unit, parameters)
             for condition in table.conditions
         )
         new_state = table.table_data[evaluations]
@@ -247,56 +250,6 @@ function move_state(
     else
         machine.time_in_state = 1
     end
-end
-
-"""
-    check(condition, unit, parameters)
-
-Check the condition of the given unit and return the result.
-"""
-function check(
-    condition :: Condition,
-    unit :: ControlledSystem,
-    parameters :: Dict{String, Any}
-) :: Bool
-    if condition.prototype.name == "Buffer < X%"
-        return (rel(condition, "buffer").load
-            < condition.parameters["percentage"]
-            * rel(condition, "buffer").capacity)
-
-    elseif condition.prototype.name == "Buffer >= X%"
-        return (rel(condition, "buffer").load
-            >= condition.parameters["percentage"]
-            * rel(condition, "buffer").capacity)
-
-    elseif condition.prototype.name == "Min run time"
-        return (unit.controller.state_machine.time_in_state
-            * parameters["time_step_seconds"]
-            >= unit.min_run_time)
-
-    elseif condition.prototype.name == "Would overfill thermal buffer"
-        return (rel(condition, "buffer").capacity
-            - rel(condition, "buffer").load
-            < unit.power * unit.min_power_fraction)
-
-    elseif condition.prototype.name == "Little PV power"
-        # by checking the current balance of the output interface we avoid the problem
-        # that changes are counted doubled when the energy already has been consumed
-        # but only once if the energy is still "within" the interface
-        outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
-        return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
-            < condition.parameters["threshold"] * rel(condition, "pv_plant").amplitude * 0.25)
-
-    elseif condition.prototype.name == "Sufficient charge"
-        return unit.load >= condition.parameters["threshold"] * unit.capacity
-
-    elseif condition.prototype.name == "HP is running"
-        return (rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change
-            > parameters["epsilon"])
-
-    end
-
-    throw(KeyError(condition.prototype.name))
 end
 
 """
