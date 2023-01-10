@@ -1,6 +1,15 @@
 """Convenience type alias for requirements of energy systems."""
 const EnSysRequirements = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
 
+"""
+Prototype for Condition, from which instances of the latter are derived.
+
+See Condition for how they are used. The prototype defines which energy systems a
+condition requires to calculate its truth value, as well parameters for this calculation.
+The selection of energy system for the condition is considered an input to the simulation
+as it cannot be derived from other inputs. It is up to the user to decide which systems are
+required for operational strategies (and therefore conditions) to work.
+"""
 struct ConditionPrototype
     """An identifiable name."""
     name :: String
@@ -22,22 +31,15 @@ include("conditions/base.jl")
 """
 A boolean decision variable for a transition in a state machine.
 
-Because the implementation of conditions can be arbitrary but require the values of certain
-energy systems, a condition must be parameterized with its requirements. This is part of
-the input to the simulation and cannot be derived otherwise.
+A Condition instance is constructed from its corresponding prototype, which invokes certain
+required parameters and energy systems.
 """
 struct Condition
-    """An identifiable name."""
-    name :: String
+    """From which prototype the condition is derived."""
+    prototype :: ConditionPrototype
 
-    """Parameters the condition requires and holds the values after loading."""
+    """Hold parameters the condition requires."""
     parameters :: Dict{String, Any}
-
-    """Defines which systems the condition requires, indexed by an internal name.
-
-    For some systems a medium is required as they can take varying values.
-    """
-    required_systems :: EnSysRequirements
 
     """The systems linked to the condition indexed by an internal name."""
     linked_systems :: Grouping
@@ -68,48 +70,10 @@ function Condition(
     name :: String,
     parameters :: Dict{String, Any}
 ) :: Condition
-    required_systems = EnSysRequirements()
-    default_params = Dict{String, Any}()
-
-    if name == "Buffer < X%"
-        required_systems["buffer"] = (BufferTank, nothing)
-        default_params["percentage"] = 0.5
-
-    elseif name == "Buffer >= X%"
-        required_systems["buffer"] = (BufferTank, nothing)
-        default_params["percentage"] = 0.5
-
-    elseif name == "Min run time"
-        # nothing to do
-
-    elseif name == "Would overfill thermal buffer"
-        required_systems["buffer"] = (BufferTank, nothing)
-
-    elseif name == "Little PV power"
-        required_systems["pv_plant"] = (PVPlant, nothing)
-        default_params["threshold"] = 1000
-
-    elseif name == "Much PV power"
-        required_systems["pv_plant"] = (PVPlant, nothing)
-        default_params["threshold"] = 1000
-
-    elseif name == "Sufficient charge"
-        default_params["threshold"] = 0.2
-
-    elseif name == "Insufficient charge"
-        default_params["threshold"] = 0.05
-
-    elseif name == "HP is running"
-        required_systems["heat_pump"] = (HeatPump, nothing)
-
-    else
-        throw(KeyError(name))
-    end
-
+    prototype = CONDITION_PROTOTYPES[name]
     return Condition(
-        name,
-        merge(default_params, parameters),
-        required_systems,
+        prototype,
+        merge(prototype.parameters, parameters),
         Grouping()
     )
 end
@@ -123,7 +87,7 @@ For example, if a condition required a system "grid_out" of type GridConnection 
 m_e_ac_230v, it will look through the set of given systems and link to the first match.
 """
 function link(condition :: Condition, systems :: Grouping)
-    for (name, req_unit) in pairs(condition.required_systems)
+    for (name, req_unit) in pairs(condition.prototype.required_systems)
         found_link = false
         for unit in each(systems)
             if isa(unit, req_unit[1])
@@ -142,7 +106,7 @@ function link(condition :: Condition, systems :: Grouping)
 
         if !found_link
             throw(KeyError("Could not find match for required system $name "
-                * "for condition $(condition.name)"))
+                * "for condition $(condition.prototype.name)"))
         end
     end
 end
@@ -295,27 +259,27 @@ function check(
     unit :: ControlledSystem,
     parameters :: Dict{String, Any}
 ) :: Bool
-    if condition.name == "Buffer < X%"
+    if condition.prototype.name == "Buffer < X%"
         return (rel(condition, "buffer").load
             < condition.parameters["percentage"]
             * rel(condition, "buffer").capacity)
 
-    elseif condition.name == "Buffer >= X%"
+    elseif condition.prototype.name == "Buffer >= X%"
         return (rel(condition, "buffer").load
             >= condition.parameters["percentage"]
             * rel(condition, "buffer").capacity)
 
-    elseif condition.name == "Min run time"
+    elseif condition.prototype.name == "Min run time"
         return (unit.controller.state_machine.time_in_state
             * parameters["time_step_seconds"]
             >= unit.min_run_time)
 
-    elseif condition.name == "Would overfill thermal buffer"
+    elseif condition.prototype.name == "Would overfill thermal buffer"
         return (rel(condition, "buffer").capacity
             - rel(condition, "buffer").load
             < unit.power * unit.min_power_fraction)
 
-    elseif condition.name == "Little PV power"
+    elseif condition.prototype.name == "Little PV power"
         # by checking the current balance of the output interface we avoid the problem
         # that changes are counted doubled when the energy already has been consumed
         # but only once if the energy is still "within" the interface
@@ -323,16 +287,16 @@ function check(
         return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
             < condition.parameters["threshold"] * rel(condition, "pv_plant").amplitude * 0.25)
 
-    elseif condition.name == "Sufficient charge"
+    elseif condition.prototype.name == "Sufficient charge"
         return unit.load >= condition.parameters["threshold"] * unit.capacity
 
-    elseif condition.name == "HP is running"
+    elseif condition.prototype.name == "HP is running"
         return (rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change
             > parameters["epsilon"])
 
     end
 
-    throw(KeyError(condition.name))
+    throw(KeyError(condition.prototype.name))
 end
 
 """
