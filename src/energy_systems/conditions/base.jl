@@ -68,19 +68,6 @@ function load_condition_prototypes()
         end
     )
 
-    CONDITION_PROTOTYPES["Much PV power"] = ConditionPrototype(
-        "Much PV power", # name
-        Dict{String, Any}( # parameters
-            "threshold" => 1000
-        ),
-        EnSysRequirements( # required_systems
-            "pv_plant" => (PVPlant, nothing)
-        ),
-        function (condition, unit, simulation_parameters) # check_function
-            
-        end
-    )
-
     CONDITION_PROTOTYPES["Sufficient charge"] = ConditionPrototype(
         "Sufficient charge", # name
         Dict{String, Any}( # parameters
@@ -89,17 +76,6 @@ function load_condition_prototypes()
         EnSysRequirements(), # required_systems
         function (condition, unit, simulation_parameters) # check_function
             return unit.load >= condition.parameters["threshold"] * unit.capacity
-        end
-    )
-
-    CONDITION_PROTOTYPES["Insufficient charge"] = ConditionPrototype(
-        "Insufficient charge", # name
-        Dict{String, Any}( # parameters
-            "threshold" => 0.05
-        ),
-        EnSysRequirements(), # required_systems
-        function (condition, unit, simulation_parameters) # check_function
-            
         end
     )
 
