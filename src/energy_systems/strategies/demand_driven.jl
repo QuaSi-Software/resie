@@ -18,5 +18,7 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
     sm_constructor=strt_sm_demand_driven,
     conditions=[],
     strategy_parameters=Dict{String, Any}(),
-    required_systems=EnSysRequirements()
+    required_systems=EnSysRequirements(
+        "receiver" => (EnergySystem, nothing)
+    )
 )

@@ -117,14 +117,41 @@ end
 """
     link_control_with(unit, systems)
 
-Link the given systems with all conditions of the given unit.
+Link the given systems with the control mechanisms of the given unit.
 
-See also [`link`](@ref)
+The systems are the same as the control_refs project config entry, meaning this is user
+input, but correction configuration should have been checked beforehand by automated
+mechanisms. See also [`link`](@ref) for how linking conditions works.
 """
 function link_control_with(unit :: ControlledSystem, systems :: Grouping)
     for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
             link(condition, systems)
+        end
+    end
+
+    # @TODO: if a strategy requires multiple systems of general description, the first
+    # system in the grouping will be matched multiple times, instead of each being matched
+    # only once
+    strategy_type = OP_STRATS[unit.controller.strategy]
+    for (req_type, medium) in values(strategy_type.required_systems)
+        for other_unit in values(systems)
+            if typeof(other_unit) <: req_type
+                if medium === nothing || (
+                    hasfield(typeof(other_unit), Symbol("medium"))
+                    && other_unit.medium == medium
+                )
+                    unit.controller.linked_systems[other_unit.uac] = other_unit
+                end
+            end
+        end
+    end
+
+    for table in values(unit.controller.state_machine.transitions)
+        for condition in table.conditions
+            for other_unit in values(condition.linked_systems)
+                unit.controller.linked_systems[other_unit.uac] = other_unit
+            end
         end
     end
 end
@@ -211,13 +238,11 @@ StateMachine() = StateMachine(
 
 """
 Wraps around the mechanism of control for the operation strategy of an EnergySystem.
-
-For now this merely the StateMachine handling the controller state and the name of the
-operation strategy, but this can be easily extended.
 """
 Base.@kwdef mutable struct Controller
     strategy :: String
     state_machine :: StateMachine
+    linked_systems :: Grouping
 end
 
 """
@@ -301,7 +326,7 @@ Construct the controller for the strategy of the given name using the given para
 """
 function controller_for_strategy(strategy :: String, parameters :: Dict{String, Any}) :: Controller
     if lowercase(strategy) == "default"
-        return Controller("default", StateMachine())
+        return Controller("default", StateMachine(), Grouping())
     end
 
     if !(strategy in keys(OP_STRATS))
@@ -310,7 +335,7 @@ function controller_for_strategy(strategy :: String, parameters :: Dict{String, 
 
     params = merge(OP_STRATS[strategy].strategy_parameters, parameters)
     machine = OP_STRATS[strategy].sm_constructor(params)
-    return Controller(strategy, machine)
+    return Controller(strategy, machine, Grouping())
 end
 
 export Condition, TruthTable, StateMachine, link_control_with, controller_for_strategy
