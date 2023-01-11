@@ -1,8 +1,8 @@
 {
     "io_settings": {
-        "output_file": "./out.csv",
+        "output_file": "../output/out.csv",
         "dump_info": true,
-        "dump_info_file": "./info_dump.md",
+        "dump_info_file": "../output/info_dump.md",
         "__heating_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
@@ -28,7 +28,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [],
-            "profile_file_path": "./profiles/tests/demand_heating.prf",
+            "profile_file_path": "../profiles/tests/demand_heating.prf",
             "scale": 10000.0
         },
         "TST_01_HZG_02_DEM": {
@@ -36,7 +36,7 @@
             "medium": "m_c_g_h2",
             "control_refs": [],
             "production_refs": [],
-            "profile_file_path": "./profiles/tests/demand_h2.prf",
+            "profile_file_path": "../profiles/tests/demand_h2.prf",
             "scale": 10000.0
         },
         "TST_01_ELT_01_BUS": {
