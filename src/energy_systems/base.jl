@@ -156,36 +156,70 @@ Base.@kwdef mutable struct SystemInterface
 
     """The sum of absolute changes to the interface's balance"""
     sum_abs_change :: Float64 = 0.0
+
+    """Current temperature of the medium on this interface"""
+    temperature :: Float64 = 0.0
 end
 
 """
-    add!(interface, change)
+    add!(interface, change, temperature)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
 """
-function add!(interface :: SystemInterface, change :: Float64)
+function add!(
+    interface :: SystemInterface,
+    change :: Float64,
+    temperature :: Float64 = -300.0
+)
     interface.balance += change
     interface.sum_abs_change += abs(change)
+
+    if (
+        interface.temperature != -300.0
+        && interface.temperature != temperature
+    )
+        println("Warning: Mixing temperatures on interface $(interface.left.uac)"
+            *"->$(interface.right.uac)")
+    end
+    interface.temperature = temperature
 end
 
 """
-    sub!(interface, change)
+    sub!(interface, change, temperature)
 
 Subtract the given amount of energy (in Wh) from the balance of the interface.
 """
-function sub!(interface :: SystemInterface, change :: Float64)
+function sub!(
+    interface :: SystemInterface,
+    change :: Float64,
+    temperature :: Float64 = -300.0
+)
     interface.balance -= change
     interface.sum_abs_change += abs(change)
+
+    if (
+        interface.temperature != -300.0
+        && interface.temperature != temperature
+    )
+        println("Warning: Mixing temperatures on interface $(interface.left.uac)"
+            *"->$(interface.right.uac)")
+    end
+    interface.temperature = temperature
 end
 
 """
-    set!(interface, new_val)
+    set!(interface, new_val, temperature)
 
 Set the balance of the interface to the given new value.
 """
-function set!(interface :: SystemInterface, new_val :: Float64)
+function set!(
+    interface :: SystemInterface,
+    new_val :: Float64,
+    temperature :: Float64 = -300.0
+)
     interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
+    interface.temperature = temperature
 end
 
 """
@@ -196,6 +230,7 @@ Reset the interface back to zero.
 function reset!(interface :: SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
+    interface.temperature = -300.0
 end
 
 """
