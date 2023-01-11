@@ -27,7 +27,7 @@ nothing.
 """
 function run_simulation(project_config :: Dict{AbstractString, Any})
     systems = load_systems(project_config["energy_systems"])
-    step_order = order_of_steps(systems, project_config["energy_systems"])
+    step_order = order_of_steps(systems)
 
     time_step = 900
     if "time_step_seconds" in keys(project_config["simulation_parameters"])

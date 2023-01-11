@@ -90,10 +90,7 @@ not trivial and might not work for each possible grouping of systems.
 ]
 ```
 """
-function order_of_steps(
-    systems :: Grouping,
-    config :: Dict{String, Any}
-) :: StepInstructions
+function order_of_steps(systems :: Grouping) :: StepInstructions
     systems_by_function = [
         [unit for unit in each(systems)
             if unit.sys_function == EnergySystems.sf_fixed_source],
@@ -199,7 +196,7 @@ function order_of_steps(
     # reorder systems such that their control dependencies are handled first, but only if
     # these are not storage systems (which are handled differently)
     for unit in values(systems)
-        for other_uac in config[unit.uac]["control_refs"]
+        for other_uac in keys(unit.controller.linked_systems)
             other_unit = systems[other_uac]
             if other_unit.sys_function == EnergySystems.sf_storage
                 continue
