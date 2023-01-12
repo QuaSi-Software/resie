@@ -15,11 +15,18 @@ mutable struct Demand <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    profile :: Profile
+    energy_profile :: Profile
+    temperature_profile :: Union{Profile, Nothing}
     scaling_factor :: Float64
 
+    last_load :: Float64
+    last_temperature :: Float64
+
     function Demand(uac :: String, config :: Dict{String, Any})
-        profile = Profile(config["profile_file_path"])
+        energy_profile = Profile(config["energy_profile_file_path"])
+        temperature_profile = "temperature_profile_file_path" in keys(config) ?
+            Profile(config["temperature_profile_file_path"]) :
+            nothing
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
 
         return new(
@@ -35,8 +42,11 @@ mutable struct Demand <: ControlledSystem
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
-            profile, # profile
+            energy_profile, # energy_profile
+            temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
+            0.0, # last_load
+            -300.0, # last_temperature
         )
     end
 end
@@ -49,14 +59,26 @@ function output_value(unit :: Demand, key :: OutputKey) :: Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Load"
-        return unit.scaling_factor # @TODO: Save the last calculated values and return it
+        return unit.last_load
     end
     raise(KeyError(key.value_key))
 end
 
+function control(
+    unit :: Demand,
+    systems :: Grouping,
+    parameters :: Dict{String, Any}
+)
+    move_state(unit, systems, parameters)
+    unit.last_load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    if unit.temperature_profile !== nothing
+        unit.last_temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+    end
+end
+
 function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     inface = unit.input_interfaces[unit.medium]
-    sub!(inface, unit.scaling_factor * work_at_time(unit.profile, parameters["time"]))
+    sub!(inface, unit.last_load, unit.last_temperature)
 end
 
 export Demand

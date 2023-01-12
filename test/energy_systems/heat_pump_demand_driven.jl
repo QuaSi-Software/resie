@@ -5,7 +5,8 @@
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => [],
-            "profile_file_path" => "../profiles/tests/demand_heating.prf",
+            "energy_profile_file_path" => "../profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path" => "../profiles/tests/demand_heating_temperature.prf",
             "scale" => 18000
         ),
         "TST_GRI_01" => Dict{String, Any}(
