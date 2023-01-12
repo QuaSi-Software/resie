@@ -38,7 +38,7 @@ end
 
 function produce(unit :: SeasonalThermalStorage, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_h_w_lt1]
-    balance, _ = balance_on(outface, outface.target)
+    balance, _, _ = balance_on(outface, outface.target)
 
     if balance >= 0.0
         return # produce is only concerned with moving energy to the target
@@ -55,7 +55,7 @@ end
 
 function load(unit :: SeasonalThermalStorage, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     inface = unit.input_interfaces[m_h_w_ht1]
-    balance, _ = balance_on(inface, inface.source)
+    balance, _, _ = balance_on(inface, inface.source)
 
     if balance <= 0.0
         return # load is only concerned with receiving energy from the target

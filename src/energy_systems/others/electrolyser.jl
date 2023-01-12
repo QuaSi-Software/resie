@@ -50,7 +50,7 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
     max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
     max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
 
-    balance, potential = balance_on(
+    balance, potential, _ = balance_on(
         unit.output_interfaces[m_c_g_h2],
         unit.output_interfaces[m_c_g_h2].target
     )

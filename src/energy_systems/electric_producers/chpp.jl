@@ -51,7 +51,7 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
         max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
         max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
-        balance, potential = balance_on(
+        balance, potential, _ = balance_on(
             unit.output_interfaces[m_h_w_ht1],
             unit.output_interfaces[m_h_w_ht1].target
         )

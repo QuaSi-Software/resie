@@ -91,8 +91,17 @@ end
 function balance_on(
     interface :: SystemInterface,
     unit :: Bus
-) :: Tuple{Float64, Float64}
-    return balance(unit), -unit.storage_space #  negative is demand
+) :: Tuple{Float64, Float64, Float64}
+    sum_temp = 0.0
+    count_temp = 0
+    for interface in [unit.input_interfaces; unit.output_interfaces]
+        if interface.temperature != -300.0
+            sum_temp += interface.temperature
+            count_temp += 1
+        end
+    end
+
+    return balance(unit), -unit.storage_space, sum_temp / count_temp #  negative is demand
 end
 
 """

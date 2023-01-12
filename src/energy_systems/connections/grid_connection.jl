@@ -46,14 +46,14 @@ function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_t
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
         # must be handled here instead of being ignored
-        balance, _ = balance_on(outface, outface.target)
+        balance, _, _ = balance_on(outface, outface.target)
         if balance < 0.0
             unit.draw_sum += balance
             add!(outface, abs(balance))
         end
     else
         inface = unit.input_interfaces[unit.medium]
-        balance, _ = balance_on(inface, inface.source)
+        balance, _, _ = balance_on(inface, inface.source)
         if balance > 0.0
             unit.load_sum += balance
             sub!(inface, balance)

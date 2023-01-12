@@ -41,7 +41,7 @@ function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh 
     if unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
-        balance, potential = balance_on(
+        balance, potential, _ = balance_on(
             unit.output_interfaces[m_h_w_ht1],
             unit.output_interfaces[m_h_w_ht1].target
         )

@@ -261,12 +261,13 @@ without having to check if its connected to a Bus or directly to a system.
     system
 - `Float64`: An additional demand that covers the free storage space connected to the
     target system
+- `Float64`: The temperature of the interface
 """
 function balance_on(
     interface :: SystemInterface,
     unit :: ControlledSystem
-) :: Tuple{Float64, Float64}
-    return interface.balance, 0.0
+) :: Tuple{Float64, Float64, Float64}
+    return interface.balance, 0.0, interface.temperature
 end
 
 """

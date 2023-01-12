@@ -49,7 +49,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
-        balance, potential = balance_on(
+        balance, potential, _ = balance_on(
             unit.output_interfaces[m_h_w_ht1],
             unit.output_interfaces[m_h_w_ht1].target
         )
@@ -70,7 +70,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         )
 
     elseif unit.controller.strategy == "supply_driven"
-        balance, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
+        balance, _, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
 
         if balance < parameters["epsilon"]
             return # do nothing if there is no heat to consume
@@ -87,7 +87,7 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
 
-        balance, _ = balance_on(
+        balance, _, _ = balance_on(
             unit.output_interfaces[m_h_w_ht1],
             unit.output_interfaces[m_h_w_ht1].target
         )
