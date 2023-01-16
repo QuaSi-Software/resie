@@ -174,14 +174,13 @@ function add!(
     interface.balance += change
     interface.sum_abs_change += abs(change)
 
-    if (
-        interface.temperature != -300.0
-        && interface.temperature != temperature
-    )
-        println("Warning: Mixing temperatures on interface $(interface.left.uac)"
-            *"->$(interface.right.uac)")
+    if temperature != -300.0
+        if interface.temperature != -300.0 && interface.temperature != temperature
+            println("Warning: Mixing temperatures on interface $(interface.source.uac)"
+                *"->$(interface.target.uac)")
+        end
+        interface.temperature = temperature
     end
-    interface.temperature = temperature
 end
 
 """
@@ -197,14 +196,13 @@ function sub!(
     interface.balance -= change
     interface.sum_abs_change += abs(change)
 
-    if (
-        interface.temperature != -300.0
-        && interface.temperature != temperature
-    )
-        println("Warning: Mixing temperatures on interface $(interface.left.uac)"
-            *"->$(interface.right.uac)")
+    if temperature != -300.0
+        if interface.temperature != -300.0 && interface.temperature != temperature
+            println("Warning: Mixing temperatures on interface $(interface.source.uac)"
+                *"->$(interface.target.uac)")
+        end
+        interface.temperature = temperature
     end
-    interface.temperature = temperature
 end
 
 """
