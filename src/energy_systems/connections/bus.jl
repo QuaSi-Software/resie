@@ -95,7 +95,7 @@ function balance_on(
     sum_temp = 0.0
     count_temp = 0
     for interface in [unit.input_interfaces; unit.output_interfaces]
-        if interface.temperature != -300.0
+        if interface.temperature !== nothing
             sum_temp += interface.temperature
             count_temp += 1
         end

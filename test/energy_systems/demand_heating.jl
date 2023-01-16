@@ -32,7 +32,7 @@ end
     EnergySystems.reset(demand)
 
     @test demand.last_load == 0.0
-    @test demand.last_temperature == -300.0
+    @test demand.last_temperature === nothing
 
     EnergySystems.control(demand, systems, simulation_parameters)
 

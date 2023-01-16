@@ -110,6 +110,11 @@ Convenience alias to a dict mapping UAC keys to an energy system.
 const Grouping = Dict{String, ControlledSystem}
 
 """
+Convenience alias for temperatures which can be a number or "nothing".
+"""
+const Temperature = Union{Nothing, Float64}
+
+"""
 Holds the options which output values should be recorded.
 
 This is a specific data structure intended to speed up recording output by avoiding the
@@ -158,7 +163,7 @@ Base.@kwdef mutable struct SystemInterface
     sum_abs_change :: Float64 = 0.0
 
     """Current temperature of the medium on this interface"""
-    temperature :: Float64 = -300.0
+    temperature :: Temperature = nothing
 end
 
 """
@@ -169,13 +174,13 @@ Add the given amount of energy (in Wh) to the balance of the interface.
 function add!(
     interface :: SystemInterface,
     change :: Float64,
-    temperature :: Float64 = -300.0
+    temperature :: Temperature = nothing
 )
     interface.balance += change
     interface.sum_abs_change += abs(change)
 
-    if temperature != -300.0
-        if interface.temperature != -300.0 && interface.temperature != temperature
+    if temperature !== nothing
+        if interface.temperature !== nothing && interface.temperature != temperature
             println("Warning: Mixing temperatures on interface $(interface.source.uac)"
                 *"->$(interface.target.uac)")
         end
@@ -191,13 +196,13 @@ Subtract the given amount of energy (in Wh) from the balance of the interface.
 function sub!(
     interface :: SystemInterface,
     change :: Float64,
-    temperature :: Float64 = -300.0
+    temperature :: Temperature = nothing
 )
     interface.balance -= change
     interface.sum_abs_change += abs(change)
 
-    if temperature != -300.0
-        if interface.temperature != -300.0 && interface.temperature != temperature
+    if temperature !== nothing
+        if interface.temperature !== nothing && interface.temperature != temperature
             println("Warning: Mixing temperatures on interface $(interface.source.uac)"
                 *"->$(interface.target.uac)")
         end
@@ -213,7 +218,7 @@ Set the balance of the interface to the given new value.
 function set!(
     interface :: SystemInterface,
     new_val :: Float64,
-    temperature :: Float64 = -300.0
+    temperature :: Temperature = nothing
 )
     interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
@@ -228,7 +233,7 @@ Reset the interface back to zero.
 function reset!(interface :: SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
-    interface.temperature = -300.0
+    interface.temperature = nothing
 end
 
 """
@@ -264,7 +269,7 @@ without having to check if its connected to a Bus or directly to a system.
 function balance_on(
     interface :: SystemInterface,
     unit :: ControlledSystem
-) :: Tuple{Float64, Float64, Float64}
+) :: Tuple{Float64, Float64, Temperature}
     return interface.balance, 0.0, interface.temperature
 end
 

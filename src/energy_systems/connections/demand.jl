@@ -20,7 +20,7 @@ mutable struct Demand <: ControlledSystem
     scaling_factor :: Float64
 
     last_load :: Float64
-    last_temperature :: Float64
+    last_temperature :: Temperature
 
     function Demand(uac :: String, config :: Dict{String, Any})
         energy_profile = Profile(config["energy_profile_file_path"])
@@ -46,7 +46,7 @@ mutable struct Demand <: ControlledSystem
             temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
             0.0, # last_load
-            -300.0, # last_temperature
+            nothing, # last_temperature
         )
     end
 end
