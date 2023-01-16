@@ -4,6 +4,13 @@ end
 
 @testset "demand_heating_temperature_values" begin
     systems_config = Dict{String, Any}(
+        "TST_GRI_01" => Dict{String, Any}(
+            "type" => "GridConnection",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "production_refs" => ["TST_DEM_01"],
+            "is_source" => true,
+        ),
         "TST_DEM_01" => Dict{String, Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -22,16 +29,18 @@ end
         "time" => 0,
     )
 
-    @test demand.last_load == 0.0
-    @test demand.last_temperature == 0.0
+    EnergySystems.reset(demand)
 
-    Bran.EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.last_load == 0.0
+    @test demand.last_temperature == -300.0
+
+    EnergySystems.control(demand, systems, simulation_parameters)
 
     @test demand.last_load == 75.0
     @test demand.last_temperature == 55.0
 
-    Bran.EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
-    @test demand.input_interfaces[m_h_w_ht1].balance == -75.0
-    @test demand.input_interfaces[m_h_w_ht1].temperature == 55.0
+    @test demand.input_interfaces[EnergySystems.m_h_w_ht1].balance == -75.0
+    @test demand.input_interfaces[EnergySystems.m_h_w_ht1].temperature == 55.0
 end
