@@ -158,7 +158,7 @@ Base.@kwdef mutable struct SystemInterface
     sum_abs_change :: Float64 = 0.0
 
     """Current temperature of the medium on this interface"""
-    temperature :: Float64 = 0.0
+    temperature :: Float64 = -300.0
 end
 
 """
