@@ -19,8 +19,8 @@ mutable struct Demand <: ControlledSystem
     temperature_profile :: Union{Profile, Nothing}
     scaling_factor :: Float64
 
-    last_load :: Float64
-    last_temperature :: Temperature
+    load :: Float64
+    temperature :: Temperature
 
     function Demand(uac :: String, config :: Dict{String, Any})
         energy_profile = Profile(config["energy_profile_file_path"])
@@ -45,21 +45,23 @@ mutable struct Demand <: ControlledSystem
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
-            0.0, # last_load
-            nothing, # last_temperature
+            0.0, # load
+            nothing, # temperature
         )
     end
 end
 
 function output_values(unit :: Demand) :: Vector{String}
-    return ["IN", "Load"]
+    return ["IN", "Load", "Temperature"]
 end
 
 function output_value(unit :: Demand, key :: OutputKey) :: Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Load"
-        return unit.last_load
+        return unit.load
+    elseif key.value_key == "Temperature"
+        return unit.temperature
     end
     raise(KeyError(key.value_key))
 end
@@ -70,15 +72,15 @@ function control(
     parameters :: Dict{String, Any}
 )
     move_state(unit, systems, parameters)
-    unit.last_load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    unit.load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     if unit.temperature_profile !== nothing
-        unit.last_temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+        unit.temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
     end
 end
 
 function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     inface = unit.input_interfaces[unit.medium]
-    sub!(inface, unit.last_load, unit.last_temperature)
+    sub!(inface, unit.load, unit.temperature)
 end
 
 export Demand

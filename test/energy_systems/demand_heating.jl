@@ -31,13 +31,13 @@ end
 
     EnergySystems.reset(demand)
 
-    @test demand.last_load == 0.0
-    @test demand.last_temperature === nothing
+    @test demand.load == 0.0
+    @test demand.temperature === nothing
 
     EnergySystems.control(demand, systems, simulation_parameters)
 
-    @test demand.last_load == 75.0
-    @test demand.last_temperature == 55.0
+    @test demand.load == 75.0
+    @test demand.temperature == 55.0
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
