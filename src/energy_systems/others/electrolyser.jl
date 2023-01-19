@@ -39,9 +39,15 @@ mutable struct Electrolyser <: ControlledSystem
                 m_c_g_o2 => nothing
             ),
             config["power"], # power
-            0.4, # heat_fraction
-            0.2, # min_power_fraction
-            3600 # min_run_time
+            "heat_fraction" in keys(config) # heat_fraction
+                ? config["heat_fraction"]
+                : 0.4,
+            "min_power_fraction" in keys(config) # min_power_fraction
+                ? config["min_power_fraction"]
+                : 0.2,
+            "min_run_time" in keys(config) # min_run_time
+                ? config["min_run_time"]
+                : 3600,
         )
     end
 end

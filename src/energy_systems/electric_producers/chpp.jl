@@ -39,9 +39,15 @@ mutable struct CHPP <: ControlledSystem
                 m_e_ac_230v => nothing
             ),
             config["power"], # power
-            0.4, # electricity_fraction
-            0.2, # min_power_fraction
-            1800 # min_run_time
+            "electricity_fraction" in keys(config) # electricity_fraction
+                ? config["electricity_fraction"]
+                : 0.4,
+            "min_power_fraction" in keys(config) # min_power_fraction
+                ? config["min_power_fraction"]
+                : 0.2,
+            "min_run_time" in keys(config) # min_run_time
+                ? config["min_run_time"]
+                : 1800,
         )
     end
 end

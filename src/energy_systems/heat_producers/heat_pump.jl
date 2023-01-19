@@ -38,9 +38,15 @@ mutable struct HeatPump <: ControlledSystem
                 m_h_w_ht1 => nothing
             ),
             config["power"], # power
-            0.2, # min_power_fraction
-            0, # min_run_time
-            3.0 # cop
+            "min_power_fraction" in keys(config) # min_power_fraction
+                ? config["min_power_fraction"]
+                : 0.2,
+            "min_run_time" in keys(config) # min_run_time
+                ? config["min_run_time"]
+                : 0,
+            "cop" in keys(config) # cop
+                ? config["cop"]
+                : 3.0,
         )
     end
 end
