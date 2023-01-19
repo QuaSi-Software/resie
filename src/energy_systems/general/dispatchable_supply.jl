@@ -22,7 +22,7 @@ mutable struct DispatchableSupply <: ControlledSystem
     max_power :: Float64
     temperature :: Temperature
 
-    function FixedSupply(uac :: String, config :: Dict{String, Any})
+    function DispatchableSupply(uac :: String, config :: Dict{String, Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
             Profile(config["temperature_profile_file_path"]) :
@@ -67,7 +67,7 @@ function output_value(unit :: DispatchableSupply, key :: OutputKey) :: Float64
 end
 
 function control(
-    unit :: Demand,
+    unit :: DispatchableSupply,
     systems :: Grouping,
     parameters :: Dict{String, Any}
 )
@@ -85,10 +85,9 @@ function produce(unit :: DispatchableSupply, parameters :: Dict{String, Any}, wa
     # 2. we also ignore the temperature of the interface as the source defines that itself
     balance, _, _ = balance_on(outface, outface.target)
     if balance < 0.0
-        unit.draw_sum += balance
         add!(
             outface,
-            min(abs(balance), watt_to_wh(unit.max_power))
+            min(abs(balance), watt_to_wh(unit.max_power)),
             unit.temperature
         )
     end

@@ -430,6 +430,7 @@ using ..Profiles
 # require the definition of certain basic systems such as a bus or a grid connection
 include("general/demand.jl")
 include("general/fixed_supply.jl")
+include("general/dispatchable_supply.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")

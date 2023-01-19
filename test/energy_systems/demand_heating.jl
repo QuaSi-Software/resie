@@ -1,5 +1,5 @@
 watt_to_wh = function (watts :: Float64)
-    watts * Float64(parameters["time_step_seconds"]) / 3600.0
+    watts * 900 / 3600.0
 end
 
 @testset "demand_heating_temperature_values" begin
