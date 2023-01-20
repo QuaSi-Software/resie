@@ -87,7 +87,7 @@ function write_to_file(
 end
 
 """
-dump_info(file_path, systems, order_of_steps, parameters)
+dump_info(file_path, systems, order_of_operations, parameters)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
@@ -97,13 +97,13 @@ general to find out why the systems behave in the simulation as they do.
 function dump_info(
     file_path :: String,
     systems :: Grouping,
-    order_of_steps :: StepInstructions,
+    order_of_operations :: StepInstructions,
     parameters :: Dict{String, Any}
 )
     open(abspath(file_path), "w") do file_handle
         write(file_handle, "# Simulation step order\n")
 
-        for entry in order_of_steps
+        for entry in order_of_operations
             for step in entry[2:lastindex(entry)]
                 write(file_handle, "1. `$(entry[1]) $(entry[2])`\n")
             end

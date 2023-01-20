@@ -70,7 +70,7 @@ function load_systems(config :: Dict{String, Any}) :: Grouping
 end
 
 """
-order_of_steps(systems)
+order_of_operations(systems)
 
 Calculate the order of steps that need to be performed to simulate the given systems.
 
@@ -90,7 +90,7 @@ not trivial and might not work for each possible grouping of systems.
 ]
 ```
 """
-function order_of_steps(systems :: Grouping) :: StepInstructions
+function order_of_operations(systems :: Grouping) :: StepInstructions
     systems_by_function = [
         [unit for unit in each(systems)
             if unit.sys_function == EnergySystems.sf_fixed_source],

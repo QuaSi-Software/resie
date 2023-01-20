@@ -91,7 +91,7 @@ using Bran.EnergySystems
         ]
 
         systems = Bran.load_systems(systems_config)
-        ooo = Bran.order_of_steps(systems)
+        ooo = Bran.order_of_operations(systems)
         @test all(ooo .== expected)
     end
 end

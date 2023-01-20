@@ -530,13 +530,13 @@ function check_balances(
 end
 
 """
-    perform_steps(systems, order_of_steps, parameters)
+    perform_steps(systems, order_of_operations, parameters)
 
 Perform the simulation steps of one time step for the given systems in the given order.
 
 # Arguments
 - `systems::Grouping`: The entirety of the energy systems
-- `order_of_steps::Vector{Vector{Any}}`: Defines which steps are performed in which order.
+- `order_of_operations::Vector{Vector{Any}}`: Defines which steps are performed in which order.
     Each system must go through the simulation steps defined in EnergySystems.Step, but the
     order is not the same for all simulations. Determining the order must be handled
     elsewhere, as this function only goes through and calls the appropriate functions. The
@@ -563,14 +563,14 @@ system B and finally production of system A.
 """
 function perform_steps(
     systems :: Grouping,
-    order_of_steps :: StepInstructions,
+    order_of_operations :: StepInstructions,
     parameters :: Dict{String, Any}
 )
     watt_to_wh = function (watts :: Float64)
         watts * Float64(parameters["time_step_seconds"]) / 3600.0
     end
 
-    for entry in order_of_steps
+    for entry in order_of_operations
         unit = systems[entry[1]]
         step = entry[2]
 
