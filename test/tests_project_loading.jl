@@ -1,5 +1,5 @@
-using Bran
-using Bran.EnergySystems
+using Resie
+using Resie.EnergySystems
 
 @testset "project_loading_tests" begin
 
@@ -29,10 +29,10 @@ using Bran.EnergySystems
             ),
         )
 
-        systems = Bran.load_systems(systems_config)
+        systems = Resie.load_systems(systems_config)
         @test length(keys(systems)) == 2
-        @test typeof(systems["TST_BT_01"]) == Bran.EnergySystems.BufferTank
-        @test systems["TST_BT_01"].sys_function == Bran.EnergySystems.sf_storage
+        @test typeof(systems["TST_BT_01"]) == Resie.EnergySystems.BufferTank
+        @test systems["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
         @test systems["TST_HP_01"].power == 20000
     end
 
@@ -90,8 +90,8 @@ using Bran.EnergySystems
             ("TST_GRI_01", EnergySystems.s_produce),
         ]
 
-        systems = Bran.load_systems(systems_config)
-        ooo = Bran.order_of_operations(systems)
+        systems = Resie.load_systems(systems_config)
+        ooo = Resie.order_of_operations(systems)
         @test all(ooo .== expected)
     end
 end

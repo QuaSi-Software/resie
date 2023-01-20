@@ -1,6 +1,6 @@
-# Bran - simulation engine for district-scale networks of energy systems
+# Resie - simulation engine for district-scale networks of energy systems
 
-Use of Bran is described in more detail in the accompanying documentation. You can find a rendered version online at [TBD](http://example.com). This document describes installation and basic instructions, particularly for developers.
+Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [TBD](http://example.com). This document describes installation and basic instructions, particularly for developers.
 
 ## Installation
 
@@ -10,18 +10,18 @@ Use of Bran is described in more detail in the accompanying documentation. You c
 
 ### Instructions
 
-1. Get a copy: `git clone git@bran.example.com`
+1. Get a copy: `git clone git@resie.example.com`
 1. Switch into project directory: `cd /path/to/repo`
 1. Start the julia REPL with `julia`
 1. Switch to the package REPL with `]` (no enter necessary)
-1. Activate the environment and precompile Bran with `activate .`
+1. Activate the environment and precompile Resie with `activate .`
 1. Exit out of the package REPL with shortcut `Ctrl+c`
 1. Exit out of the julia REPL with `exit()`
 
 ## Usage
 
-1. Switch into project directory: `cd /path/to/bran`
-1. Run the simulation with `julia src/Bran.jl examples/example_two_sector.json`
+1. Switch into project directory: `cd /path/to/resie`
+1. Run the simulation with `julia src/Resie.jl examples/example_two_sector.json`
 1. Outputs of the example projects can be found in `output/out.csv` and `output/info_dump.md`
 
 ## Testing
@@ -32,18 +32,18 @@ There are two ways to run tests, one using just the command line and one using t
 
 ### Using the command-line
 
-1. Switch into project directory: `cd /path/to/bran`
+1. Switch into project directory: `cd /path/to/resie`
 1. Run the tests with `julia --project=. test/runtests.jl`
 
 **Note: At the moment this produces an erroneous output of "No project config file given", but as this does not affect test results, this can be ignored.**
 
 ### Using the REPL
 
-1. Switch into project directory: `cd /path/to/bran`
+1. Switch into project directory: `cd /path/to/resie`
 1. Start the julia REPL with `julia`
 1. Switch to the package REPL with `]` (no enter necessary)
-1. Activate the environment and precompile Bran with `activate .`
-1. Run the test suite with `test Bran`
+1. Activate the environment and precompile Resie with `activate .`
+1. Run the test suite with `test Resie`
 
 ### Enable testing in the VS Code debugger
 
@@ -52,10 +52,10 @@ Open `launch.json` (via the gear wheel in the run config dropdown in the debug t
 {
     "type": "julia",
     "request": "launch",
-    "name": "Run Bran tests",
-    "program": "path/to/bran/test/runtests.jl",
+    "name": "Run Resie tests",
+    "program": "path/to/resie/test/runtests.jl",
     "stopOnEntry": false,
-    "cwd": "path/to/bran/",
+    "cwd": "path/to/resie/",
     "juliaEnv": ".",
     "args": []
 }

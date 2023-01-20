@@ -1,4 +1,4 @@
-using Bran.EnergySystems
+using Resie.EnergySystems
 
 @testset "control_tests" begin
     systems_config = Dict{String, Any}(
@@ -25,7 +25,7 @@ using Bran.EnergySystems
             "cop" => 3.0
         ),
     )
-    systems = Bran.load_systems(systems_config)
+    systems = Resie.load_systems(systems_config)
     buffer_tank = systems["TST_BT_01"]
     heat_pump = systems["TST_HP_01"]
 

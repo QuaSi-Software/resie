@@ -40,7 +40,7 @@ end
             "cop" => 3.0
         ),
     )
-    systems = Bran.load_systems(systems_config)
+    systems = Resie.load_systems(systems_config)
     heat_pump = systems["TST_HP_01"]
     source = systems["TST_SRC_01"]
     demand = systems["TST_DEM_01"]

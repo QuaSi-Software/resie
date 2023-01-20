@@ -1,9 +1,9 @@
-module Bran
+module Resie
 
-# note: includes that contain their own module, which have to be submodules of the Bran
+# note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
-# of the Bran module), are included after the "using" statements have been declared.
+# of the Resie module), are included after the "using" statements have been declared.
 # this is done so the latter files can access the symbols of the submodules the same as
 # if the code was inside this file.
 

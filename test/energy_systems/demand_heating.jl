@@ -21,7 +21,7 @@ end
             "scale" => 1000
         ),
     )
-    systems = Bran.load_systems(systems_config)
+    systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
 
     simulation_parameters = Dict{String, Any}(
