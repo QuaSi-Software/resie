@@ -52,13 +52,13 @@ mutable struct DispatchableSupply <: ControlledSystem
 end
 
 function output_values(unit :: DispatchableSupply) :: Vector{String}
-    return ["OUT", "Max. Power", "Temperature"]
+    return ["OUT", "Max_Power", "Temperature"]
 end
 
 function output_value(unit :: DispatchableSupply, key :: OutputKey) :: Float64
     if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.value_key == "Max. Power"
+    elseif key.value_key == "Max_Power"
         return unit.max_power
     elseif key.value_key == "Temperature"
         return unit.temperature
