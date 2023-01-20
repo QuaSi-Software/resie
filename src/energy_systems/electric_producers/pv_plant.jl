@@ -43,7 +43,7 @@ function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
     elseif key.value_key == "Power"
         return unit.power # @TODO: Save the last calculated value and return it
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)

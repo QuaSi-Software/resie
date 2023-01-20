@@ -85,7 +85,7 @@ function output_value(unit :: SeasonalThermalStorage, key :: OutputKey) :: Float
     elseif key.value_key == "Capacity"
         return unit.capacity
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 export SeasonalThermalStorage

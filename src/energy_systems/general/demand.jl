@@ -63,7 +63,7 @@ function output_value(unit :: Demand, key :: OutputKey) :: Float64
     elseif key.value_key == "Temperature"
         return unit.temperature
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 function control(

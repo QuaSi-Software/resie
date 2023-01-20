@@ -75,7 +75,7 @@ function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
     elseif key.value_key == "Load sum"
         return unit.load_sum
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 export GridConnection

@@ -408,7 +408,7 @@ Args:
     the options provided by `output_values()` as well as "IN" or "OUT"
 Returns:
 - `Float64`: The value of the desired output
-Raises:
+Throws:
 - `KeyError`: The key value requested must be one the energy system can provide
 """
 function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
@@ -417,7 +417,7 @@ function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
     elseif key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 # for the moment control must be an include as it contains circular dependencies

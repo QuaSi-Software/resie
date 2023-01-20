@@ -138,7 +138,7 @@ function output_value(unit :: Bus, key :: OutputKey) :: Float64
     if key.value_key == "Balance"
         return balance(unit)
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 export Bus

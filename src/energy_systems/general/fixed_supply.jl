@@ -51,7 +51,7 @@ function output_value(unit :: FixedSupply, key :: OutputKey) :: Float64
     if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 function produce(unit :: FixedSupply, parameters :: Dict{String, Any}, watt_to_wh :: Function)

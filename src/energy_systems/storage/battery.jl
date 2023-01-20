@@ -92,7 +92,7 @@ function output_value(unit :: Battery, key :: OutputKey) :: Float64
     elseif key.value_key == "Capacity"
         return unit.capacity
     end
-    raise(KeyError(key.value_key))
+    throw(KeyError(key.value_key))
 end
 
 export Battery
