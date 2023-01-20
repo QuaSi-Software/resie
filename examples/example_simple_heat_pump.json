@@ -1,0 +1,67 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+			"TST_HP_01": [
+                "m_h_w_lt1 IN",
+                "m_h_w_ht1 OUT",
+                "m_e_ac_230v IN"
+            ],
+            "TST_DEM_01": ["Temperature"],
+            "TST_SRC_01": ["Temperature", "Max_Power"]
+        }
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 86400,
+        "time_step_seconds": 900
+    },
+    "energy_systems": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "scale": 1500
+        },
+        "TST_SRC_01": {
+            "type": "DispatchableSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_HP_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "temperature_profile_file_path": "./profiles/tests/source_heat_temperature.prf",
+            "scale": 6000
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "control_refs": [
+                "TST_DEM_01"
+            ],
+            "production_refs": [
+                "TST_DEM_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 9000,
+            "cop": 3.0,
+            "min_power_fraction": 0.0
+        }
+    }
+}

@@ -1,0 +1,35 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
+        }
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 900,
+        "time_step_seconds": 900
+    },
+    "energy_systems": {
+        "TST_01_HZG_01_DEM": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "scale": 10000.0
+        },
+        "TST_01_HZG_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_01_HZG_01_DEM"
+            ],
+            "is_source": true
+        }
+    }
+}
