@@ -75,6 +75,7 @@ function control(
     unit.load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     if unit.temperature_profile !== nothing
         unit.temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+        unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
 end
 
