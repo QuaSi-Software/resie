@@ -81,12 +81,12 @@ using Resie.EnergySystems
             ("TST_SRC_01", EnergySystems.s_reset),
             ("TST_GRI_01", EnergySystems.s_reset),
             ("TST_DEM_01", EnergySystems.s_control),
-            ("TST_DEM_01", EnergySystems.s_produce),
             ("TST_HP_01", EnergySystems.s_control),
-            ("TST_HP_01", EnergySystems.s_produce),
             ("TST_SRC_01", EnergySystems.s_control),
-            ("TST_SRC_01", EnergySystems.s_produce),
             ("TST_GRI_01", EnergySystems.s_control),
+            ("TST_DEM_01", EnergySystems.s_produce),
+            ("TST_HP_01", EnergySystems.s_produce),
+            ("TST_SRC_01", EnergySystems.s_produce),
             ("TST_GRI_01", EnergySystems.s_produce),
         ]
 

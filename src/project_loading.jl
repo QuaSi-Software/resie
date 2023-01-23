@@ -109,7 +109,7 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
     ]
 
     simulation_order = []
-    initial_nr = length(systems) * 7
+    initial_nr = length(systems) * 100
 
     # reset all systems, order doesn't matter
     for sf_order = 1:7
@@ -119,12 +119,20 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
         end
     end
 
-    # control/produce all systems except dispatchable sources/sinks. the order corresponds
-    # to the general order of system functions
-    for sf_order = 1:5
+
+    # calculate control of all systems. the order corresponds to the general order of
+    # system functions
+    for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
             push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
             initial_nr -= 1
+        end
+    end
+
+    # produce all systems except dispatchable sources/sinks. the order corresponds
+    # to the general order of system functions
+    for sf_order = 1:5
+        for unit in values(systems_by_function[sf_order])
             push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
             initial_nr -= 1
         end
@@ -139,8 +147,6 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
     # handle dispatchable sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
-            initial_nr -= 1
             push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
             initial_nr -= 1
         end
