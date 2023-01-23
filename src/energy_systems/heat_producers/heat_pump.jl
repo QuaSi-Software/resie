@@ -67,6 +67,10 @@ function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    delta_t = (unit.output_interfaces[m_h_w_ht1].temperature
+        - unit.input_interfaces[m_h_w_lt1].temperature)
+    unit.cop = 8.0 * exp(-0.08 * delta_t) + 1
+
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
