@@ -51,6 +51,21 @@ mutable struct HeatPump <: ControlledSystem
     end
 end
 
+function output_values(unit :: HeatPump) :: Vector{String}
+    return ["OUT", "Max_Power", "Temperature"]
+end
+
+function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
+    if key.value_key == "IN"
+        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.value_key == "OUT"
+        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.value_key == "COP"
+        return unit.cop
+    end
+    throw(KeyError(key.value_key))
+end
+
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)

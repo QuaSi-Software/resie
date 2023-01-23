@@ -7,7 +7,8 @@
 			"TST_HP_01": [
                 "m_h_w_lt1 IN",
                 "m_h_w_ht1 OUT",
-                "m_e_ac_230v IN"
+                "m_e_ac_230v IN",
+                "COP"
             ],
             "TST_DEM_01": ["Temperature"],
             "TST_SRC_01": ["Temperature", "Max_Power"]
