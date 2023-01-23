@@ -88,7 +88,7 @@
                 "name": "supply_driven"
             },
             "power": 20000,
-            "cop": 3.0
+            "fixed_cop": 3.0
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -100,7 +100,7 @@
                 "name": "demand_driven"
             },
             "power": 20000,
-            "cop": 3.0
+            "fixed_cop": 3.0
         },
         "TST_01_HZG_01_GBO": {
             "type": "GasBoiler",

@@ -61,7 +61,7 @@
                 "name": "demand_driven"
             },
             "power": 9000,
-            "cop": 3.0,
+            "fixed_cop": 3.0,
             "min_power_fraction": 0.0
         }
     }

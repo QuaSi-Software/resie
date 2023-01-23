@@ -25,7 +25,7 @@ using Resie.EnergySystems
                     "low_threshold" => 0.1
                 ),
                 "power" => 20000,
-                "cop" => 3.0
+                "fixed_cop" => 3.0
             ),
         )
 
@@ -71,7 +71,7 @@ using Resie.EnergySystems
                     "name" => "demand_driven",
                 ),
                 "power" => 12000,
-                "cop" => 3.0
+                "fixed_cop" => 3.0
             ),
         )
 

@@ -22,7 +22,7 @@ using Resie.EnergySystems
                 "low_threshold" => 0.2
             ),
             "power" => 20000,
-            "cop" => 3.0
+            "fixed_cop" => 3.0
         ),
     )
     systems = Resie.load_systems(systems_config)

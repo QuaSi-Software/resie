@@ -37,7 +37,7 @@ end
                 "name" => "demand_driven",
             ),
             "power" => 12000,
-            "cop" => 3.0
+            "fixed_cop" => 3.0
         ),
     )
     systems = Resie.load_systems(systems_config)

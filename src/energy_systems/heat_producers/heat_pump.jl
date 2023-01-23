@@ -21,6 +21,7 @@ mutable struct HeatPump <: ControlledSystem
     power :: Float64
     min_power_fraction :: Float64
     min_run_time :: UInt
+    fixed_cop :: Float64
     cop :: Float64
 
     function HeatPump(uac :: String, config :: Dict{String, Any})
@@ -44,9 +45,10 @@ mutable struct HeatPump <: ControlledSystem
             "min_run_time" in keys(config) # min_run_time
                 ? config["min_run_time"]
                 : 0,
-            "cop" in keys(config) # cop
-                ? config["cop"]
+            "fixed_cop" in keys(config) # fixed_cop
+                ? config["fixed_cop"]
                 : 3.0,
+            0.0, # cop
         )
     end
 end
@@ -66,10 +68,22 @@ function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
     throw(KeyError(key.value_key))
 end
 
-function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function dynamic_cop(unit :: HeatPump) :: Union{Nothing, Float64}
+    if (
+        unit.output_interfaces[m_h_w_ht1].temperature === nothing
+        || unit.input_interfaces[m_h_w_lt1].temperature === nothing
+    )
+        return nothing
+    end
+
     delta_t = (unit.output_interfaces[m_h_w_ht1].temperature
         - unit.input_interfaces[m_h_w_lt1].temperature)
-    unit.cop = 8.0 * exp(-0.08 * delta_t) + 1
+    return 8.0 * exp(-0.08 * delta_t) + 1
+end
+
+function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    cop = dynamic_cop(unit)
+    unit.cop = cop === nothing ? unit.fixed_cop : cop
 
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)

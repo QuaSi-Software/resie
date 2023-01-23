@@ -116,7 +116,7 @@
                 "low_threshold": 0.1
             },
             "power": 20000,
-            "cop": 3.0
+            "fixed_cop": 3.0
         },
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",
