@@ -1,10 +1,8 @@
 """
 Implementation of a buffer tank holding hot water for heating or DHW purposes.
 
-For the moment this remains a very simple implementation that only has a load (how much
-energy is stored) and a capacity, with no temperatures being considered. Given how the
-simulation engine works, there will likely always be the need to deal with energy being
-transfered with water temperature being secondary input variables.
+This is a simplified model, which mostly deals with amounts of energy and considers
+temperatures only for the available temperature as the tank is depleted.
 """
 mutable struct BufferTank <: ControlledSystem
     uac :: String
@@ -38,7 +36,7 @@ mutable struct BufferTank <: ControlledSystem
             "high_temperature" in keys(config) # high_temperature
                 ? config["high_temperature"]
                 : 75.0,
-            "low_temperature" in keys(config) # high_temperature
+            "low_temperature" in keys(config) # low_temperature
                 ? config["low_temperature"]
                 : 20.0
         )
