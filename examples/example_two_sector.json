@@ -6,7 +6,7 @@
         "__heating_output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT", "COP"],
             "TST_01_HZG_01_BUS": ["Balance"],
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
         },
@@ -23,7 +23,7 @@
         "output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT", "COP"],
             "TST_01_HZG_01_BUS": ["Balance"],
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
         }
@@ -48,6 +48,7 @@
             "control_refs": [],
             "production_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_electricity.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 10000.0
         },
         "TST_01_ELT_01_DEM": {
@@ -56,7 +57,6 @@
             "control_refs": [],
             "production_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
-            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 15000
         },
         "TST_01_HZG_01_BUS": {
@@ -151,14 +151,16 @@
             ],
             "is_source": true
         },
-        "TST_01_HZG_02_GRI": {
-            "type": "GridConnection",
+        "TST_01_HZG_02_SRC": {
+            "type": "DispatchableSupply",
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_HTP"
             ],
-            "is_source": true
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "temperature_profile_file_path": "./profiles/tests/source_heat_temperature.prf",
+            "scale": 25000
         },
         "TST_01_ELT_01_GRI": {
             "type": "GridConnection",
