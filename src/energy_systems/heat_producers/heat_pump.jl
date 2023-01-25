@@ -68,35 +68,37 @@ function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
     throw(KeyError(key.value_key))
 end
 
-function dynamic_cop(unit :: HeatPump) :: Union{Nothing, Float64}
-    if (
-        unit.output_interfaces[m_h_w_ht1].temperature === nothing
-        || unit.input_interfaces[m_h_w_lt1].temperature === nothing
-    )
+function dynamic_cop(in_temp :: Temperature, out_temp :: Temperature) :: Union{Nothing, Float64}
+    if (in_temp === nothing || out_temp === nothing)
         return nothing
     end
 
-    delta_t = (unit.output_interfaces[m_h_w_ht1].temperature
-        - unit.input_interfaces[m_h_w_lt1].temperature)
+    delta_t = out_temp - in_temp
     return 8.0 * exp(-0.08 * delta_t) + 1
 end
 
 function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    cop = dynamic_cop(unit)
+    in_blnc, _, in_temp = balance_on(
+        unit.input_interfaces[m_h_w_lt1],
+        unit
+    )
+
+    out_blnc, out_pot, out_temp = balance_on(
+        unit.output_interfaces[m_h_w_ht1],
+        unit.output_interfaces[m_h_w_ht1].target
+    )
+
+    cop = dynamic_cop(in_temp, out_temp)
     unit.cop = cop === nothing ? unit.fixed_cop : cop
 
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         max_produce_h = watt_to_wh(unit.power)
 
-        balance, potential, _ = balance_on(
-            unit.output_interfaces[m_h_w_ht1],
-            unit.output_interfaces[m_h_w_ht1].target
-        )
-        if balance + potential >= 0.0
+        if out_blnc + out_pot >= 0.0
             return # don't add to a surplus of energy
         end
 
-        usage_fraction = min(1.0, abs(balance + potential) / max_produce_h)
+        usage_fraction = min(1.0, abs(out_blnc + out_pot) / max_produce_h)
         if usage_fraction < unit.min_power_fraction
             return
         end
@@ -109,13 +111,11 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         )
 
     elseif unit.controller.strategy == "supply_driven"
-        balance, _, _ = balance_on(unit.input_interfaces[m_h_w_lt1], unit)
-
-        if balance < parameters["epsilon"]
+        if in_blnc < parameters["epsilon"]
             return # do nothing if there is no heat to consume
         end
 
-        max_consume_h = min(unit.power * (1.0 - 1.0 / unit.cop), balance)
+        max_consume_h = min(unit.power * (1.0 - 1.0 / unit.cop), in_blnc)
         consume_e = max_consume_h / (unit.cop - 1.0)
         produce_h = max_consume_h + consume_e
 
@@ -126,20 +126,20 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
 
-        balance, _, _ = balance_on(
-            unit.output_interfaces[m_h_w_ht1],
-            unit.output_interfaces[m_h_w_ht1].target
-        )
-        if balance >= 0.0
+        if out_blnc >= 0.0
             return # don't add to a surplus of energy
         end
 
-        usage_fraction = min(1.0, abs(balance) / max_produce_h)
+        usage_fraction = min(1.0, abs(out_blnc) / max_produce_h)
         if usage_fraction < unit.min_power_fraction
             return
         end
 
-        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
+        add!(
+            unit.output_interfaces[m_h_w_ht1],
+            max_produce_h * usage_fraction,
+            out_temp
+        )
         sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
         sub!(
             unit.input_interfaces[m_h_w_lt1],
