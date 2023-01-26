@@ -17,11 +17,18 @@ mutable struct FixedSupply <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    profile :: Profile
+    energy_profile :: Profile
+    temperature_profile :: Union{Profile, Nothing}
     scaling_factor :: Float64
 
+    supply :: Float64
+    temperature :: Temperature
+
     function FixedSupply(uac :: String, config :: Dict{String, Any})
-        profile = Profile(config["profile_file_path"])
+        energy_profile = Profile(config["energy_profile_file_path"])
+        temperature_profile = "temperature_profile_file_path" in keys(config) ?
+            Profile(config["temperature_profile_file_path"]) :
+            nothing
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
 
         return new(
@@ -37,26 +44,46 @@ mutable struct FixedSupply <: ControlledSystem
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
-            profile, # profile
+            energy_profile, # energy_profile
+            temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
+            0.0, # supply
+            nothing # temperature
         )
     end
 end
 
 function output_values(unit :: FixedSupply) :: Vector{String}
-    return ["OUT"]
+    return ["OUT", "Supply", "Temperature"]
 end
 
 function output_value(unit :: FixedSupply, key :: OutputKey) :: Float64
     if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+    elseif key.value_key == "Supply"
+        return unit.supply
+    elseif key.value_key == "Temperature"
+        return unit.temperature
     end
     throw(KeyError(key.value_key))
 end
 
+function control(
+    unit :: FixedSupply,
+    systems :: Grouping,
+    parameters :: Dict{String, Any}
+)
+    move_state(unit, systems, parameters)
+    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    if unit.temperature_profile !== nothing
+        unit.temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+        unit.output_interfaces[unit.medium].temperature = unit.temperature
+    end
+end
+
 function produce(unit :: FixedSupply, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[unit.medium]
-    add!(outface, unit.scaling_factor * work_at_time(unit.profile, parameters["time"]))
+    add!(outface, unit.supply, unit.temperature)
 end
 
 export FixedSupply
