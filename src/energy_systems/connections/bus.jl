@@ -67,9 +67,9 @@ storage with excess energy.
 See also [`produce`](@ref)
 """
 function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    for inface in unit.input_interfaces
-        if inface.source.sys_function === sf_storage
-            unit.storage_space += inface.source.capacity - inface.source.load
+    for outface in unit.output_interfaces
+        if outface.target.sys_function === sf_storage
+            unit.storage_space += outface.target.capacity - outface.target.load
         end
     end
 end
