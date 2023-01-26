@@ -64,12 +64,14 @@ end
 
     demand.load = 900
     demand.temperature = 45
+    demand.input_interfaces[EnergySystems.m_h_w_ht1].temperature = 45
 
     @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].temperature === nothing
     EnergySystems.control(source, systems, simulation_parameters)
 
-    source.max_power = 2500
+    source.max_power = 5000
     source.temperature = 35
+    source.output_interfaces[EnergySystems.m_h_w_lt1].temperature = 35
 
     EnergySystems.control(heat_pump, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
@@ -82,19 +84,19 @@ end
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].balance ≈ 0
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change ≈ 1800
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].temperature == 45
-    @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].balance ≈ -300
+    @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].balance ≈ -195.88077047954445
     @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].temperature === nothing
-    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -600
-    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].temperature == 55
+    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -704.1192295204555
+    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].temperature == 35
 
     EnergySystems.produce(source, simulation_parameters, watt_to_wh)
     @test source.output_interfaces[EnergySystems.m_h_w_lt1].balance ≈ 0
-    @test source.output_interfaces[EnergySystems.m_h_w_lt1].sum_abs_change ≈ 1200
+    @test source.output_interfaces[EnergySystems.m_h_w_lt1].sum_abs_change ≈ 1408.238459040911
     @test source.output_interfaces[EnergySystems.m_h_w_lt1].temperature == 35
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].balance ≈ 0
-    @test grid.output_interfaces[EnergySystems.m_e_ac_230v].sum_abs_change ≈ 600
+    @test grid.output_interfaces[EnergySystems.m_e_ac_230v].sum_abs_change ≈ 391.7615409590889
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].temperature === nothing
 
     # second step: demand is above max power of source (adjusted for additional input
@@ -108,6 +110,7 @@ end
 
     demand.load = 2100
     demand.temperature = 75
+    demand.input_interfaces[EnergySystems.m_h_w_ht1].temperature = 75
 
     @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].temperature === nothing
     EnergySystems.control(source, systems, simulation_parameters)
@@ -127,18 +130,18 @@ end
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].balance ≈ 0
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change ≈ 4200
     @test heat_pump.output_interfaces[EnergySystems.m_h_w_ht1].temperature == 75
-    @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].balance ≈ -700
+    @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].balance ≈ -1583.5938090824318
     @test heat_pump.input_interfaces[EnergySystems.m_e_ac_230v].temperature === nothing
-    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -1400
+    @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -516.4061909175681
     @test heat_pump.input_interfaces[EnergySystems.m_h_w_lt1].temperature == 35
 
     EnergySystems.produce(source, simulation_parameters, watt_to_wh)
-    @test source.output_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -900
-    @test source.output_interfaces[EnergySystems.m_h_w_lt1].sum_abs_change ≈ 1900
+    @test source.output_interfaces[EnergySystems.m_h_w_lt1].balance ≈ -16.406190917568097
+    @test source.output_interfaces[EnergySystems.m_h_w_lt1].sum_abs_change ≈ 1016.4061909175681
     @test source.output_interfaces[EnergySystems.m_h_w_lt1].temperature == 35
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].balance ≈ 0
-    @test grid.output_interfaces[EnergySystems.m_e_ac_230v].sum_abs_change ≈ 1400
+    @test grid.output_interfaces[EnergySystems.m_e_ac_230v].sum_abs_change ≈ 3167.1876181648636
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].temperature === nothing
 end
