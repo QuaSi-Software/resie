@@ -7,6 +7,7 @@ Manifest.toml
 
 # output files
 *.csv
+*.html
 info_dump.md
 
 # input files (test data and templates are added separately)

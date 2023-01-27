@@ -16,6 +16,8 @@ using .EnergySystems
 include("project_loading.jl")
 include("file_output.jl")
 
+using PlotlyJS
+
 """
     run_simulation()
 
@@ -55,6 +57,20 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
     outputs = output_keys(systems, project_config["io_settings"]["output_keys"])
     reset_file(project_config["io_settings"]["output_file"], outputs)
 
+    # check if plot should be created (checks if output_plot is present or if it is "nothing")
+    plot_bool = !( !(haskey(project_config["io_settings"], "output_plot")) ||  project_config["io_settings"]["output_plot"] === "nothing" )
+
+    if plot_bool
+        # set keys for output plots    
+        outputs_plot_keys = Vector{EnergySystems.OutputKey}()
+        for plot in project_config["io_settings"]["output_plot"]
+            append!(outputs_plot_keys, output_keys(systems, plot[2]["key"]))
+        end
+
+        # prepare array for output plots
+        outputs_plot_data = zeros(Float64, nr_of_steps, 1 + length(outputs_plot_keys))
+    end
+
     if project_config["io_settings"]["dump_info"]
         dump_info(
             project_config["io_settings"]["dump_info_file"],
@@ -62,7 +78,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         )
     end
 
-    for _ = 1:nr_of_steps
+    for steps = 1:nr_of_steps
         # perform the simulation
         perform_steps(systems, step_order, parameters)
 
@@ -75,15 +91,28 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
             end
         end
 
-        # output
+        # output to file
         write_to_file(
             project_config["io_settings"]["output_file"],
             outputs,
             parameters["time"]
         )
 
+        if plot_bool
+            # gather data for plots
+            outputs_plot_data[steps,:]  = geather_output_data(
+                outputs_plot_keys,
+                parameters["time"]
+            )
+        end
+
         # simulation update
         parameters["time"] += Int(parameters["time_step_seconds"])
+    end
+
+    if plot_bool
+        # create plots
+        create_plots(outputs_plot_data, outputs_plot_keys, project_config["io_settings"]["output_plot"])
     end
 end
 
