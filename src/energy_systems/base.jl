@@ -447,6 +447,7 @@ using ..Profiles
 include("general/demand.jl")
 include("general/fixed_supply.jl")
 include("general/dispatchable_supply.jl")
+include("general/dispatchable_sink.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
