@@ -6,7 +6,7 @@ Use of Resie is described in more detail in the accompanying documentation. You 
 
 ### **Requirements**
 
-* Julia v1.7.2 or later
+* Julia v1.8.5 or later
 
 ### Instructions
 
@@ -21,7 +21,7 @@ Use of Resie is described in more detail in the accompanying documentation. You 
 ## Usage
 
 1. Switch into project directory: `cd /path/to/resie`
-1. Run the simulation with `julia src/Resie.jl examples/example_two_sector.json`
+1. Run the simulation with `julia --project=. src/Resie.jl examples/example_two_sector.json`
 1. Outputs of the example projects can be found in `output/out.csv` and `output/info_dump.md`
 
 ## Testing
