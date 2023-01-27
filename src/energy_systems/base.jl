@@ -164,6 +164,9 @@ Base.@kwdef mutable struct SystemInterface
 
     """Current temperature of the medium on this interface"""
     temperature :: Temperature = nothing
+
+    """Maximum power the source can provide in the current timestep"""
+    max_power :: Union{Nothing, Float64} = nothing
 end
 
 """
@@ -226,6 +229,18 @@ function set!(
 end
 
 """
+    set_max_power!(interface, value)
+
+Set the maximum power that can be delivered to the given value.
+"""
+function set_max_power!(
+    interface :: SystemFunction,
+    value :: Union{Nothing, Float64}
+)
+    interface.max_power = value
+end
+
+"""
     reset!(interface)
 
 Reset the interface back to zero.
@@ -234,6 +249,7 @@ function reset!(interface :: SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
     interface.temperature = nothing
+    interface.max_power = nothing
 end
 
 """
