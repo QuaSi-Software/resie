@@ -22,6 +22,7 @@ mutable struct Electrolyser <: ControlledSystem
     heat_fraction :: Float64
     min_power_fraction :: Float64
     min_run_time :: UInt
+    output_temperature :: Temperature
 
     function Electrolyser(uac :: String, config :: Dict{String, Any})
         return new(
@@ -48,6 +49,9 @@ mutable struct Electrolyser <: ControlledSystem
             "min_run_time" in keys(config) # min_run_time
                 ? config["min_run_time"]
                 : 3600,
+            "output_temperature" in keys(config) # output_temperature
+                ? config["output_temperature"]
+                : 55.0
         )
     end
 end
@@ -72,7 +76,11 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
     # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
     add!(unit.output_interfaces[m_c_g_h2], max_produce_g * usage_fraction)
     add!(unit.output_interfaces[m_c_g_o2], max_produce_g * usage_fraction * 0.5)
-    add!(unit.output_interfaces[m_h_w_lt1], max_produce_h * usage_fraction)
+    add!(
+        unit.output_interfaces[m_h_w_lt1],
+        max_produce_h * usage_fraction,
+        unit.output_temperature
+    )
     sub!(unit.input_interfaces[m_e_ac_230v], watt_to_wh(unit.power * usage_fraction))
 end
 
