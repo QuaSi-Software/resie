@@ -234,7 +234,7 @@ end
 Set the maximum power that can be delivered to the given value.
 """
 function set_max_power!(
-    interface :: SystemFunction,
+    interface :: SystemInterface,
     value :: Union{Nothing, Float64}
 )
     interface.max_power = value
