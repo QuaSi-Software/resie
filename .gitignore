@@ -3,6 +3,7 @@
 
 # Auto-generated files
 deps/build.log
+Manifest.toml
 
 # output files
 *.csv
