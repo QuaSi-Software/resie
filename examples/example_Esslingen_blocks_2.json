@@ -189,14 +189,40 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [
-                "ESS_BFT_TH_01",
-                "ESS_BFT_TH_02",
+                "ESS_BUS_TH_02",
+                "ESS_BUS_TH_03",
                 "ESS_BFT_TH_03"
             ],
             "input_priorities": [
                 "ESS_ELY_01",
                 "ESS_CHP_01",
                 "ESS_GBO_01"
+            ]
+        },
+        "ESS_BUS_TH_02": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_DEM_TH_01",
+                "ESS_BFT_TH_01"
+            ],
+            "input_priorities": [
+                "ESS_BUS_TH_01",
+                "ESS_BFT_TH_01"
+            ]
+        },
+        "ESS_BUS_TH_03": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_DEM_TH_02",
+                "ESS_BFT_TH_02"
+            ],
+            "input_priorities": [
+                "ESS_BUS_TH_01",
+                "ESS_BFT_TH_02"
             ]
         },
         "ESS_ELY_01": {
@@ -239,7 +265,7 @@
             "type": "BufferTank",
             "control_refs": [],
             "production_refs": [
-                "ESS_DEM_TH_01"
+                "ESS_BUS_TH_02"
             ],
             "capacity": 40000,
             "load": 0
@@ -248,7 +274,7 @@
             "type": "BufferTank",
             "control_refs": [],
             "production_refs": [
-                "ESS_DEM_TH_02"
+                "ESS_BUS_TH_03"
             ],
             "capacity": 40000,
             "load": 40000
