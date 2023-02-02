@@ -64,7 +64,7 @@ function load_condition_prototypes()
         function (condition, unit, simulation_parameters) # check_function
             outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
             return (if outface.balance != 0.0 outface.sum_abs_change else outface.sum_abs_change * 0.5 end
-                < condition.parameters["threshold"] * rel(condition, "pv_plant").amplitude * 0.25)
+                < condition.parameters["threshold"] * rel(condition, "pv_plant").supply * 0.25)
         end
     )
 
