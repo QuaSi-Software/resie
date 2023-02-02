@@ -134,6 +134,33 @@
                 "ESS_GBO_01"],
             "is_source": true
         },
+        "ESS_PVP_EL_01": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_01"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_01.prf",
+            "scale": 1
+        },
+        "ESS_PVP_EL_02": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_02"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_02.prf",
+            "scale": 1
+        },
+        "ESS_PVP_EL_03": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_02"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_03.prf",
+            "scale": 1
+        },
         "ESS_BUS_EL_01": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
