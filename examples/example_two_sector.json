@@ -26,6 +26,56 @@
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT", "COP"],
             "TST_01_HZG_01_BUS": ["Balance"],
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
+        },
+        "output_plot": {
+            "1": {
+                "key": {"TST_01_HZG_01_BFT": ["Load"]},
+                "axis": "right",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_01_HZG_01_BUS": ["Balance"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_01_ELT_01_PVP": ["m_e_ac_230v OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"TST_01_ELT_01_BUS": ["Balance"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "8": {
+                "key": {"TST_01_ELT_01_BAT": ["Load"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            }
         }
     },
     "simulation_parameters": {
@@ -40,7 +90,8 @@
             "production_refs": [
                 "TST_01_ELT_01_BUS"
             ],
-            "power": 15000
+            "energy_profile_file_path": "./profiles/tests/source_power_pv.prf",
+            "scale": 20000
         },
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
