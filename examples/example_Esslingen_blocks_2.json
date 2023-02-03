@@ -104,12 +104,26 @@
             "production_refs": ["ESS_BUS_EL_01"],
             "is_source": true
         },
+        "ESS_GRI_EL_01_out": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        },
         "ESS_GRI_EL_02": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
             "production_refs": ["ESS_BUS_EL_02"],
             "is_source": true
+        },
+        "ESS_GRI_EL_02_out": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
         },
         "ESS_GRI_H2_01": {
             "type": "GridConnection",
@@ -130,8 +144,7 @@
             "medium": "m_c_g_natgas",
             "control_refs": [],
             "production_refs": [
-                "ESS_CHP_01",
-                "ESS_GBO_01"],
+                "ESS_BUS_GAS_01"],
             "is_source": true
         },
         "ESS_PVP_EL_01": {
@@ -166,7 +179,7 @@
             "medium": "m_e_ac_230v",
             "control_refs": [],
             "production_refs": [
-                "ESS_GRI_EL_01",
+                "ESS_GRI_EL_01_out",
                 "ESS_DEM_EL_01"
             ],
             "input_priorities": [ ]
@@ -178,7 +191,7 @@
             "production_refs": [
                 "ESS_DEM_EL_02",
                 "ESS_ELY_01",
-                "ESS_GRI_EL_02"
+                "ESS_GRI_EL_02_out"
             ],
             "input_priorities": [
                 "ESS_GRI_EL_02"
@@ -224,6 +237,16 @@
                 "ESS_BUS_TH_01",
                 "ESS_BFT_TH_02"
             ]
+        },
+        "ESS_BUS_GAS_01": {
+            "type": "Bus",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_CHP_01",
+                "ESS_GBO_01"
+            ],
+            "input_priorities": [ ]
         },
         "ESS_ELY_01": {
             "type": "Electrolyser",
