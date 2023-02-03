@@ -133,11 +133,11 @@ end
 
 
 """
-create_plots(data, keys, user_input)
+create_profile_line_plots(data, keys, user_input)
 
 create a line plot with data and label. user_input is dict from input file
 """
-function create_plots(
+function create_profile_line_plots(
     outputs_plot_data :: Matrix{Float64}, 
     outputs_plot_keys :: Vector{EnergySystems.OutputKey},
     user_input :: Dict{String, Any}
@@ -188,3 +188,67 @@ function create_plots(
     savefig(p, "output/output_plot.html") 
 
 end    
+
+
+"""
+create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
+
+create a sankey plot. 
+Inputs:
+output_all_sourcenames and *sinknames are vectors with names of the source and sink of each interface
+output_all_values are logs with data from each timestep in the shape [timestep,interface].
+medium_of_interface is a vector of the medium corresponding to each interface
+nr_of_interfaces is the total number of iterfaces in the current system topology
+"""
+function create_sankey(
+    output_all_sourcenames :: Vector{Any}, 
+    output_all_targetnames :: Vector{Any}, 
+    output_all_values :: Matrix{Float64}, 
+    medium_of_interfaces :: Vector{Any}, 
+    nr_of_interfaces :: Int64, 
+    )
+ 
+    # sum up data of each interface
+    output_all_value_sum = zeros(Float64, nr_of_interfaces)
+    for interface in 1:nr_of_interfaces
+        output_all_value_sum[interface] = sum(output_all_values[:,interface])
+    end
+
+    # prepare data for sankey diagram and create sankey
+    # set label of blocks
+    block_labels = union(output_all_sourcenames, output_all_targetnames)
+    block_labels_unique = Dict(blockname => i for (i, blockname) in enumerate(block_labels))
+    output_all_source_num = [block_labels_unique[blockname] for blockname in output_all_sourcenames]
+    output_all_target_num = [block_labels_unique[blockname] for blockname in output_all_targetnames]
+
+    # set label and colour of interfaces
+    medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
+    unique_medium_labels = unique(medium_labels)
+    colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1)./(length(unique_medium_labels)-1))
+    color_map = Dict(zip(unique_medium_labels, colors))
+    colors_for_medium_labels = map(x -> color_map[x], medium_labels)
+    
+    # create plot
+    p = plot(sankey(
+        node = attr(
+        pad = 25,
+        thickness = 20,
+        line = attr(color = "black", width = 0.5),
+        label = block_labels,
+        color = "blue"
+        ),
+        link = attr(
+            source = output_all_source_num.-1, # indices correspond to block_labels starting from index 0
+            target = output_all_target_num.-1, # indices correspond to block_labels starting from index 0
+            value = output_all_value_sum,
+            label = medium_labels,
+            color = colors_for_medium_labels
+            )),
+        Layout(title_text="Sankey diagram of system topology and energy flows", font_size=14)
+        )
+
+    # save plot
+    savefig(p, "output/output_sankey.html") 
+
+
+end

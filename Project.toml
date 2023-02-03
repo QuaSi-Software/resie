@@ -4,6 +4,7 @@ authors = ["Etienne Ott <etienne.ott@siz-energieplus.de>", "Heiner Steinacker <h
 version = "0.2.0"
 
 [deps]
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 PlotlyJS = "f0f68f2c-4968-5e81-91da-67840de0976a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
