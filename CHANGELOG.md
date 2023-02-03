@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.1:
+* added automated generation of sankey diagram in output. Requires additional package "ColorSchemes" from Plotly.
+
 ### Version 0.2.0:
 * changed PV-System input from power (sin-function) to given power/energy profile scaled by scale factor
 
