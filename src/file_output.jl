@@ -224,9 +224,13 @@ function create_sankey(
     # set label and colour of interfaces
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
-    colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1)./(length(unique_medium_labels)-1))
-    color_map = Dict(zip(unique_medium_labels, colors))
-    colors_for_medium_labels = map(x -> color_map[x], medium_labels)
+    if length(unique_medium_labels) > 1 
+        colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1)./(length(unique_medium_labels)-1))
+        color_map = Dict(zip(unique_medium_labels, colors))
+        colors_for_medium_labels = map(x -> color_map[x], medium_labels)    
+    else # account for cases with only one medium in the system topology
+        colors_for_medium_labels = get(ColorSchemes.roma,0.5)
+    end
     
     # create plot
     p = plot(sankey(

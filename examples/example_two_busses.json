@@ -1,0 +1,55 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {   },
+        "output_plot": {   }    
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 86400,
+        "time_step_seconds": 900
+    },
+    "energy_systems": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "scale": 1500
+        },
+        "TST_SRC_01": {
+            "type": "DispatchableSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_TH_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "temperature_profile_file_path": "./profiles/tests/source_heat_temperature.prf",
+            "scale": 6000
+        },
+        "ESS_BUS_TH_01": {
+            "type": "Bus",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_TH_02"
+            ],
+            "input_priorities": [ ]
+        },
+        "ESS_BUS_TH_02": {
+            "type": "Bus",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_DEM_01"
+            ],
+            "input_priorities": [ ]
+        }
+
+    }
+}

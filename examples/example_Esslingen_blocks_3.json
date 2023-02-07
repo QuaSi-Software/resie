@@ -58,7 +58,7 @@
             "production_refs": [],
             "energy_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_01_Energie.prf",
             "temperature_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_01_Temp.prf",
-            "scale": 1
+            "scale": 0.2
         },
         "ESS_DEM_TH_02": {
             "type": "Demand",
@@ -67,7 +67,7 @@
             "production_refs": [],
             "energy_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_02_Energie.prf",
             "temperature_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_02_Temp.prf",
-            "scale": 1
+            "scale": 0.2
         },
         "ESS_DEM_EL_01": {
             "type": "Demand",
@@ -268,7 +268,7 @@
                 "ESS_BUS_TH_01"
             ],
             "capacity": 400000,
-            "load": 0
+            "load": 20000
         }
     }
 }
