@@ -14,6 +14,10 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.2:
+* fixed bug with coloring of the medium in Sankey occuring in file_output.jl when only one medium is present in energy topology
+* added example input file with one medium and two busses in paralell (currently not working!)
+
 ### Version 0.2.1:
 * added automated generation of sankey diagram in output. Requires additional package "ColorSchemes" from Plotly.
 

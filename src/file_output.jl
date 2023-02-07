@@ -231,7 +231,7 @@ function create_sankey(
     else # account for cases with only one medium in the system topology
         colors_for_medium_labels = get(ColorSchemes.roma,0.5)
     end
-    
+
     # create plot
     p = plot(sankey(
         node = attr(
