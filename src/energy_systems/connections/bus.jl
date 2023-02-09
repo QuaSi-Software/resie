@@ -119,6 +119,35 @@ function balance_nr(unit :: Bus, caller :: Bus)
     return balance + unit.remainder
 end
 
+"""
+    balance_direct(unit)
+
+Energy balance on a bus system without considering any other connected bus systems.
+"""
+function balance_direct(unit :: Bus) :: Float64
+    balance = 0.0
+
+    for inface in unit.input_interfaces
+        if isa(inface.source, Bus)
+            continue
+        else
+            supply, _, _ = balance_on(inface, inface.source)
+            balance += supply
+        end
+    end
+
+    for outface in unit.output_interfaces
+        if isa(outface.target, Bus)
+            continue
+        else
+            demand, _, _ = balance_on(outface, outface.target)
+            balance += demand
+        end
+    end
+
+    return balance + unit.remainder
+end
+
 function balance(unit :: Bus) :: Float64
     # we can use the non-recursive version of the method as a bus will never
     # be connected to itself... right?
@@ -160,7 +189,7 @@ might have changed and should always consider the correct energy balance regardl
 or how often it was called.
 """
 function distribute!(unit :: Bus)
-    remainder = balance(unit)
+    remainder = balance_direct(unit)
 
     for inface in unit.input_interfaces
         set!(inface, 0.0, inface.temperature)
