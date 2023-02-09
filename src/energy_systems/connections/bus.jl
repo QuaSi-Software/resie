@@ -74,18 +74,55 @@ function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Fun
     end
 end
 
-function balance(unit :: Bus) :: Float64
+"""
+    balance_nr(unit, caller)
+
+Variant of [`balance`](@ref) that includes other connected bus systems and their energy
+balance, but does so in a non-recursive manner such that any bus in the chain of connected
+bus systems is only considered once.
+"""
+function balance_nr(unit :: Bus, caller :: Bus)
     balance = 0.0
 
     for inface in unit.input_interfaces
-        balance += inface.balance
+        if inface.source == caller
+            continue
+        end
+
+        if isa(inface.source, Bus)
+            supply = balance_nr(inface.source, unit)
+            if supply < 0.0
+                continue
+            end
+        else
+            supply, _, _ = balance_on(inface, inface.source)
+        end
+        balance += supply
     end
 
     for outface in unit.output_interfaces
-        balance += outface.balance
+        if outface.target == caller
+            continue
+        end
+
+        if isa(outface.target, Bus)
+            demand = balance_nr(outface.target, unit)
+            if demand > 0.0
+                continue
+            end
+        else
+            demand, _, _ = balance_on(outface, outface.target)
+        end
+        balance += demand
     end
 
     return balance + unit.remainder
+end
+
+function balance(unit :: Bus) :: Float64
+    # we can use the non-recursive version of the method as a bus will never
+    # be connected to itself... right?
+    return balance_nr(unit, unit)
 end
 
 function balance_on(
