@@ -478,7 +478,7 @@ function link_production_with(unit :: ControlledSystem, systems :: Grouping)
     if isa(unit, Bus)
         for system in each(systems)
             if isa(system, Bus)
-                if out_medium == system.medium
+                if unit.medium == system.medium
                     connection = SystemInterface(source=unit, target=system)
                     push!(system.input_interfaces, connection)
                     push!(unit.output_interfaces, connection)
