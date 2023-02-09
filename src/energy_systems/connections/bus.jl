@@ -126,11 +126,11 @@ function distribute!(unit :: Bus)
     remainder = balance(unit)
 
     for inface in unit.input_interfaces
-        set!(inface, 0.0)
+        set!(inface, 0.0, inface.temperature)
     end
 
     for outface in unit.output_interfaces
-        set!(outface, 0.0)
+        set!(outface, 0.0, outface.temperature)
     end
 
     unit.remainder = remainder
