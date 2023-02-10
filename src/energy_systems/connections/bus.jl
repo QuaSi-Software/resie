@@ -69,7 +69,8 @@ See also [`produce`](@ref)
 function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     for outface in unit.output_interfaces
         if outface.target.sys_function === sf_storage
-            unit.storage_space += outface.target.capacity - outface.target.load
+            _, potential, _ = balance_on(outface, outface.target)
+            unit.storage_space += potential
         end
     end
 end
