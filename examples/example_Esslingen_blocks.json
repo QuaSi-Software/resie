@@ -1,0 +1,289 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+			"ESS_DEM_TH_01":  ["m_h_w_ht1 IN"]
+        },
+        "output_plot": {
+            "1": {
+                "key": {"ESS_DEM_TH_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"ESS_DEM_TH_02": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"ESS_BFT_TH_01": ["Load"]},
+                "axis": "right",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"ESS_BFT_TH_02": ["Load"]},
+                "axis": "right",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"ESS_BFT_TH_03": ["Load"]},
+                "axis": "right",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"ESS_ELY_01": ["m_c_g_h2 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"ESS_CHP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "8": {
+                "key": {"ESS_GBO_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 604800,
+        "time_step_seconds": 900
+    },
+    "energy_systems": {
+        "ESS_DEM_TH_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_01_Energie.prf",
+            "temperature_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_01_Temp.prf",
+            "scale": 1
+        },
+        "ESS_DEM_TH_02": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_02_Energie.prf",
+            "temperature_profile_file_path": "./profiles/Esslingen/demand_Heizung_und_TWW_02_Temp.prf",
+            "scale": 1
+        },
+        "ESS_DEM_EL_01": {
+            "type": "Demand",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/Esslingen/demand_Strom_gesamt_01.prf",
+            "scale": 1
+        },   
+        "ESS_DEM_EL_02": {
+            "type": "Demand",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/Esslingen/demand_Strom_gesamt_02.prf",
+            "scale": 1
+        }, 
+        "ESS_GRI_EL_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": ["ESS_BUS_EL_01"],
+            "is_source": true
+        },
+        "ESS_GRI_EL_01_out": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        },
+        "ESS_GRI_EL_02": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": ["ESS_BUS_EL_02"],
+            "is_source": true
+        },
+        "ESS_GRI_EL_02_out": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        },
+        "ESS_GRI_H2_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_h2",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        },
+        "ESS_GRI_O2_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_o2",
+            "control_refs": [],
+            "production_refs": [],
+            "is_source": false
+        },
+        "ESS_GRI_EG_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_GAS_01"],
+            "is_source": true
+        },
+        "ESS_PVP_EL_01": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_01"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_01.prf",
+            "scale": 1
+        },
+        "ESS_PVP_EL_02": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_02"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_02.prf",
+            "scale": 1
+        },
+        "ESS_PVP_EL_03": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_EL_02"
+            ],
+            "energy_profile_file_path": "./profiles/Esslingen/PV_03.prf",
+            "scale": 1
+        },
+        "ESS_BUS_EL_01": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_GRI_EL_01_out",
+                "ESS_DEM_EL_01"
+            ],
+            "input_priorities": [ ]
+        },
+        "ESS_BUS_EL_02": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_DEM_EL_02",
+                "ESS_ELY_01",
+                "ESS_GRI_EL_02_out"
+            ],
+            "input_priorities": [
+                "ESS_GRI_EL_02"
+            ]
+        },
+        "ESS_BUS_TH_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BFT_TH_01",
+                "ESS_BFT_TH_02",
+                "ESS_BFT_TH_03"
+            ],
+            "input_priorities": [
+                "ESS_ELY_01",
+                "ESS_CHP_01",
+                "ESS_GBO_01"
+            ]
+        },
+        "ESS_BUS_GAS_01": {
+            "type": "Bus",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_CHP_01",
+                "ESS_GBO_01"
+            ],
+            "input_priorities": [ ]
+        },
+        "ESS_ELY_01": {
+            "type": "Electrolyser",
+            "control_refs": ["ESS_BUS_TH_01"],
+            "production_refs": [
+                "ESS_GRI_H2_01",
+                "ESS_GRI_O2_01",
+                "ESS_BUS_TH_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 40000
+        },
+        "ESS_CHP_01": {
+            "type": "CHPP",
+            "control_refs": ["ESS_BUS_TH_01"],
+            "production_refs": [
+                "ESS_BUS_TH_01",
+                "ESS_BUS_EL_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 12500
+        },
+        "ESS_GBO_01": {
+            "type": "GasBoiler",
+            "control_refs": ["ESS_BUS_TH_01"],
+            "production_refs": [
+                "ESS_BUS_TH_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 40000
+        },
+        "ESS_BFT_TH_01": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_DEM_TH_01"
+            ],
+            "capacity": 40000,
+            "load": 0
+        },
+        "ESS_BFT_TH_02": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_DEM_TH_02"
+            ],
+            "capacity": 40000,
+            "load": 40000
+        },
+        "ESS_BFT_TH_03": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_TH_01"
+            ],
+            "capacity": 40000,
+            "load": 0
+        }
+    }
+}
