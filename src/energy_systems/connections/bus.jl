@@ -21,7 +21,6 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     input_priorities :: Vector{String}
     output_priorities :: Vector{String}
 
-    storage_space :: Float64
     remainder :: Float64
 
     function Bus(uac :: String, config :: Dict{String, Any})
@@ -37,7 +36,6 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
             [], # output_interfaces,
             config["input_priorities"],
             config["production_refs"],
-            0.0, # storage_space
             0.0 # remainder
         )
     end
@@ -50,29 +48,7 @@ function reset(unit :: Bus)
     for outface in unit.output_interfaces
         reset!(outface)
     end
-    unit.storage_space = 0.0
     unit.remainder = 0.0
-end
-
-"""
-    produce(unit, parameters, watt_to_wh)
-
-Bus-specific implementation of produce.
-
-The production of a bus does not generate or consume energy, but calculates the potential
-of storage systems connected to the bus and saves that value, which is later required to
-distinguish between the actual demand of consuming energy systems and the potential to load
-storage with excess energy.
-
-See also [`produce`](@ref)
-"""
-function produce(unit :: Bus, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    for outface in unit.output_interfaces
-        if outface.target.sys_function === sf_storage
-            _, potential, _ = balance_on(outface, outface.target)
-            unit.storage_space += potential
-        end
-    end
 end
 
 """
@@ -160,19 +136,25 @@ function balance_on(
     unit :: Bus
 ) :: Tuple{Float64, Float64, Temperature}
     highest_demand_temp = -1e9
-    for interface in unit.output_interfaces
-        if interface.temperature !== nothing && interface.balance < 0
+    storage_space = 0.0
+
+    for outface in unit.output_interfaces
+        if outface.temperature !== nothing && outface.balance < 0
             highest_demand_temp = (
-                interface.temperature > highest_demand_temp
-                ? interface.temperature
+                outface.temperature > highest_demand_temp
+                ? outface.temperature
                 : highest_demand_temp
             )
+        end
+        if outface.target.sys_function === sf_storage
+            _, potential, _ = balance_on(outface, outface.target)
+            storage_space += potential
         end
     end
 
     return (
         balance(unit),
-        -unit.storage_space,
+        -storage_space, # negative because it represents a demand
         highest_demand_temp <= -1e9 ? nothing : highest_demand_temp
     )
 end
