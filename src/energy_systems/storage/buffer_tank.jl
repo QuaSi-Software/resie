@@ -49,6 +49,13 @@ function temperature_at_load(unit :: BufferTank) :: Temperature
     return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
 end
 
+function balance_on(
+    interface :: SystemInterface,
+    unit :: BufferTank
+) :: Tuple{Float64, Float64, Temperature}
+    return interface.balance, unit.capacity - unit.load, interface.temperature
+end
+
 function produce(unit :: BufferTank, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     outface = unit.output_interfaces[m_h_w_ht1]
     balance, _, demand_temp = balance_on(outface, outface.target)
