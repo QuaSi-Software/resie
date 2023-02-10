@@ -155,17 +155,17 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
             for each_outputinterface in each_system[2].output_interfaces
                 if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                     if isdefined(each_outputinterface[2], :target)
-                        output_all_values[steps,n] = each_outputinterface[2].sum_abs_change #@ToDo: divide by 2???
+                        output_all_values[steps,n] = (each_outputinterface[2].sum_abs_change + each_outputinterface[2].balance) / 2 #@ToDo: correct???
                         n += 1
                     end
                 elseif isdefined(each_outputinterface, :target)
-                    output_all_values[steps,n] = each_outputinterface.sum_abs_change #@ToDo: divide by 2???
+                    output_all_values[steps,n] = (each_outputinterface.sum_abs_change + each_outputinterface.balance) / 2 #@ToDo: correct???
                     n += 1
                 end
             end
         end
 
-        # gather data for proifle line plot (@ToDo: may extract from all data in post processing)
+        # gather data for profile line plot (@ToDo: may extract from all data in post processing)
         if plot_bool
             outputs_plot_data[steps,:]  = geather_output_data(
                 outputs_plot_keys,
