@@ -139,22 +139,30 @@ function balance_on(
     storage_space = 0.0
 
     for outface in unit.output_interfaces
-        if outface.temperature !== nothing && outface.balance < 0
+        if outface.target.sys_function === sf_bus
+            balance, potential, temperature = balance_on(outface, outface.target)
+        else
+            balance = outface.balance
+            temperature = outface.temperature
+            if outface.target.sys_function === sf_storage
+                _, potential, _ = balance_on(outface, outface.target)
+            else
+                potential = 0.0
+            end
+        end
+
+        if temperature !== nothing && balance < 0
             highest_demand_temp = (
-                outface.temperature > highest_demand_temp
-                ? outface.temperature
-                : highest_demand_temp
+                temperature > highest_demand_temp ? temperature : highest_demand_temp
             )
         end
-        if outface.target.sys_function === sf_storage
-            _, potential, _ = balance_on(outface, outface.target)
-            storage_space += potential
-        end
+
+        storage_space += potential
     end
 
     return (
         balance(unit),
-        -storage_space, # negative because it represents a demand
+        storage_space,
         highest_demand_temp <= -1e9 ? nothing : highest_demand_temp
     )
 end
