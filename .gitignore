@@ -11,4 +11,4 @@ Manifest.toml
 info_dump.md
 
 # input files (test data and templates are added separately)
-# *.json
+*.json
