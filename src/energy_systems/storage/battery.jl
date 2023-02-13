@@ -39,7 +39,7 @@ function balance_on(
     interface :: SystemInterface,
     unit :: Battery
 ) :: Tuple{Float64, Float64, Temperature}
-    return interface.balance, unit.capacity - unit.load, interface.temperature
+    return interface.balance, -unit.capacity + unit.load, interface.temperature
 end
 
 function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
