@@ -35,6 +35,13 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
     end
 end
 
+function balance_on(
+    interface :: SystemInterface,
+    unit :: Battery
+) :: Tuple{Float64, Float64, Temperature}
+    return interface.balance, -unit.capacity + unit.load, interface.temperature
+end
+
 function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     if unit.controller.state_machine.state != 2
         return
