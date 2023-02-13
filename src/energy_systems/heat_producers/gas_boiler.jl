@@ -42,25 +42,34 @@ mutable struct GasBoiler <: ControlledSystem
 end
 
 function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh :: Function)
-    if unit.controller.state_machine.state == 2
-        max_produce_h = watt_to_wh(unit.power)
-
-        balance, potential, _ = balance_on(
-            unit.output_interfaces[m_h_w_ht1],
-            unit.output_interfaces[m_h_w_ht1].target
-        )
-        if balance + potential >= 0.0
-            return # don't add to a surplus of energy
-        end
-
-        usage_fraction = min(1.0, abs(balance + potential) / max_produce_h)
-        if usage_fraction < unit.min_power_fraction
-            return
-        end
-
-        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    strategy = unit.controller.strategy
+    if strategy == "storage_driven" && unit.controller.state_machine.state != 2
+        return
     end
+
+    max_produce_h = watt_to_wh(unit.power)
+
+    balance, potential, _ = balance_on(
+        unit.output_interfaces[m_h_w_ht1],
+        unit.output_interfaces[m_h_w_ht1].target
+    )
+
+    demand_to_meet = (
+        strategy == "storage_driven"
+        ? balance + potential
+        : balance
+    )
+    if demand_to_meet >= 0.0
+        return
+    end
+
+    usage_fraction = min(1.0, abs(demand_to_meet) / max_produce_h)
+    if usage_fraction < unit.min_power_fraction
+        return
+    end
+
+    add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
 end
 
 export GasBoiler
