@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.5:
+* Refactor and fix how the storage loading potential and temperatures are transfered across busses, in partiular when multiple busses are connected in series
+
 ### Version 0.2.4:
 * added example of system topology Esslingen in different variantes
 * added profiles for PV, heat demand
