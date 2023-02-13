@@ -14,6 +14,12 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.4:
+* added example of system topology Esslingen in different variantes
+* added profiles for PV, heat demand
+* removed deprecated code in pv_plant.jl
+* bugfix in Resie.jl in collecting data of all interfaces (added div 2 for sum_abs_change and correct results for non-balanced interfaces)
+
 ### Version 0.2.3:
 * Fix energy balance and distribution calculations of busses not working correctly for system topologies in which two bus systems are connected directly
 * Fix distribution overwriting temperatures on system interfaces
