@@ -214,6 +214,9 @@ function create_sankey(
         output_all_value_sum[interface] = sum(output_all_values[:,interface])
     end
 
+    # add 0.000001 to all interfaces to display interfaces that are zero
+    output_all_value_sum = output_all_value_sum .+ 0.000001
+
     # prepare data for sankey diagram and create sankey
     # set label of blocks
     block_labels = union(output_all_sourcenames, output_all_targetnames)
