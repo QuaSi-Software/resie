@@ -198,7 +198,8 @@
             "input_priorities": [
                 "TST_ELY_01",
                 "TST_CHP_01",
-                "TST_GBO_01"
+                "TST_GBO_01",
+                "TST_BFT_TH_03"
             ]
         },
         "TST_BUS_GAS_01": {
@@ -222,7 +223,9 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 180000
+            "power": 180000,
+            "min_power_fraction": 0,
+            "min_run_time": 0
         },
         "TST_HP_01": {
             "type": "HeatPump",
@@ -257,7 +260,7 @@
             "strategy": {
                 "name": "storage_driven",
                 "high_threshold": 0.5,
-                "low_threshold": 0.1
+                "low_threshold": 0.5
             },
             "power": 100000
         },
@@ -267,8 +270,10 @@
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
-            "capacity": 400000,
-            "load": 20000
+            "capacity": 4000000,
+            "load": 0,
+            "high_temperature": 95,
+            "low_temperature": 20
         }
     }
 }
