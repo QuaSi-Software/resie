@@ -199,6 +199,43 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
         end
     end
 
+    # helper function to check if target system ois bus
+    uac_is_bus = function(energysystem,uac)
+        bool = false
+        for output_interface in energysystem.output_interfaces
+            if output_interface.target.uac === uac
+                if output_interface.target.sys_function === EnergySystems.sf_bus
+                    bool = true
+                end
+            end
+        end
+        return bool    
+    end
+
+    # reorder distribution of busses connected to a bus so the order of distribution match the order given in production refs of the source bus:
+    for bus in values(systems_by_function[3])
+        # for bus in the bus' production refs...
+        for own_idx = 1:length(bus.output_priorities)
+            own_uac = bus.output_priorities[own_idx]
+            if uac_is_bus(bus, own_uac)
+                own_dist_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
+
+                # ...make sure every system following after...
+                for other_idx = own_idx:length(bus.output_priorities)
+                    other_uac = bus.output_priorities[other_idx]
+                    other_dist_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
+
+                    # ...is of a lower priority. if not, swap the distribute steps.
+                    if simulation_order[own_dist_idx][1] < simulation_order[other_dist_idx][1]
+                        tmp = simulation_order[own_dist_idx][1]
+                        simulation_order[own_dist_idx][1] = simulation_order[other_dist_idx][1]
+                        simulation_order[other_dist_idx][1] = tmp
+                    end
+                end
+            end
+        end
+    end
+
     # reorder systems such that their control dependencies are handled first, but only if
     # these are not storage systems (which are handled differently)
     for unit in values(systems)
