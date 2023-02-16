@@ -206,8 +206,8 @@ function distribute!(unit :: Bus)
             # write energy flow from source to target into sum_abs_change
             outface.sum_abs_change = sum_abs_change
 
-            # adjust remainder on outface target bus
-            outface.target.remainder += outface.sum_abs_change/2
+            ## adjust remainder on outface target bus
+            # outface.target.remainder += outface.sum_abs_change/2
         end
         
         # reset output interface
