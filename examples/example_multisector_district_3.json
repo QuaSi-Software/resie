@@ -253,14 +253,12 @@
         },
         "TST_GBO_01": {
             "type": "GasBoiler",
-            "control_refs": ["TST_BFT_TH_03"],
+            "control_refs": ["TST_BUS_TH_01"],
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
             "strategy": {
-                "name": "storage_driven",
-                "high_threshold": 0.5,
-                "low_threshold": 0.5
+                "name": "demand_driven"
             },
             "power": 100000
         },
@@ -270,7 +268,7 @@
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
-            "capacity": 4000000,
+            "capacity": 400000,
             "load": 0,
             "high_temperature": 95,
             "low_temperature": 20
