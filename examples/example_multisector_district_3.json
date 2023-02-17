@@ -177,8 +177,8 @@
             "medium": "m_e_ac_230v",
             "control_refs": [],
             "production_refs": [
-                "TST_DEM_EL_02",
                 "TST_ELY_01",
+                "TST_DEM_EL_02",
                 "TST_GRI_EL_02_out",
                 "TST_HP_01"
             ],
@@ -198,8 +198,8 @@
             "input_priorities": [
                 "TST_ELY_01",
                 "TST_CHP_01",
-                "TST_GBO_01",
-                "TST_BFT_TH_03"
+                "TST_BFT_TH_03",
+                "TST_GBO_01"
             ]
         },
         "TST_BUS_GAS_01": {
@@ -245,9 +245,7 @@
                 "TST_BUS_EL_01"
             ],
             "strategy": {
-                "name": "storage_driven",
-                "high_threshold": 1.0,
-                "low_threshold": 0.99
+                "name": "demand_driven"
             },
             "power": 32500
         },
@@ -260,7 +258,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 100000
+            "power": 50000
         },
         "TST_BFT_TH_03": {
             "type": "BufferTank",

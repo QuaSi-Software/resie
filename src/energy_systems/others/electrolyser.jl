@@ -59,16 +59,45 @@ end
 function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_wh :: Function)
     max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
     max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
+    max_available_e = unit.power
 
-    balance, potential, _ = balance_on(
+    # heat
+    balance_h, potential_h, _ = balance_on(
+        unit.output_interfaces[m_h_w_lt1],
+        unit.output_interfaces[m_h_w_lt1].target
+    )
+
+    # hydrogen
+    balance_g, potential_g, _ = balance_on(
         unit.output_interfaces[m_c_g_h2],
         unit.output_interfaces[m_c_g_h2].target
+    )   
+
+    # electricity 
+    balance_e, potential_e, _ = balance_on(
+        unit.input_interfaces[m_e_ac_230v],
+        unit.input_interfaces[m_e_ac_230v].target
     )
-    if balance + potential >= 0.0
-        return # don't add to a surplus of h2
+
+    if balance_h + potential_h >= 0.0 
+        return # don't add to a surplus of h2 
     end
 
-    usage_fraction = min(1.0, abs(balance + potential) / max_produce_g)
+    # --> currently not working as potential of unlimited sinks are not written into interface  @ToDo
+    # if  balance_g + potential_g >= 0.0 
+    #     return # don't add to a surplus of heat
+    # end
+
+    # --> currently not working as potential of unlimited sources are not written into interface @ToDo
+    # if balance_e + potential_e <= 0.0
+    #     return  # no elecricity available
+    # end   
+
+    # --> currently not working as balances are not calculated correctly for unlimited gas and electricity @ToDo
+    #usage_fraction = min(1.0, abs(balance_h + potential_h) / max_produce_h, abs(balance_g + potential_g) / max_produce_g, abs(balance_e + potential_e) / max_available_e)
+    # for now, use only heat balance and potential:
+    usage_fraction = min(1.0, abs(balance_h + potential_h) / max_produce_h)
+
     if usage_fraction < unit.min_power_fraction
         return
     end
@@ -82,6 +111,7 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
         unit.output_temperature
     )
     sub!(unit.input_interfaces[m_e_ac_230v], watt_to_wh(unit.power * usage_fraction))
+
 end
 
 export Electrolyser
