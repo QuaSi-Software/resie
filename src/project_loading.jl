@@ -199,7 +199,7 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
         end
     end
 
-    # helper function to check if target system ois bus
+    # helper function to check if target system is bus
     uac_is_bus = function(energysystem,uac)
         bool = false
         for output_interface in energysystem.output_interfaces
