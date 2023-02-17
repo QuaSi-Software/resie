@@ -214,6 +214,20 @@ function create_sankey(
         output_all_value_sum[interface] = sum(output_all_values[:,interface])
     end
 
+    # remove oxygen from data as the energy of oxygen is considered to be zero
+    interface_new = 1
+    for _ in 1:nr_of_interfaces
+        if medium_of_interfaces[interface_new] == EnergySystems.m_c_g_o2
+            deleteat!(output_all_sourcenames, interface_new)
+            deleteat!(output_all_targetnames, interface_new)
+            deleteat!(output_all_value_sum, interface_new)
+            deleteat!(medium_of_interfaces, interface_new)
+            interface_new -= 1
+            nr_of_interfaces -= 1
+        end    
+        interface_new += 1
+    end
+
     # add 0.000001 to all interfaces to display interfaces that are zero
     output_all_value_sum = output_all_value_sum .+ 0.000001
 
