@@ -75,7 +75,7 @@ function control(
     unit.max_power = unit.scaling_factor * Profiles.power_at_time(unit.max_power_profile, parameters["time"])
     set_max_power!(unit.output_interfaces[unit.medium], unit.max_power)
     if unit.temperature_profile !== nothing
-        unit.temperature = Profiles.temperature_at_time(unit.temperature_profile, parameters["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.output_interfaces[unit.medium].temperature = unit.temperature
     end
 end

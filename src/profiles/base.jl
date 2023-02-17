@@ -1,6 +1,6 @@
 module Profiles
 
-export Profile, power_at_time, work_at_time, temperature_at_time
+export Profile, power_at_time, work_at_time, value_at_time
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
@@ -82,12 +82,12 @@ function work_at_time(profile :: Profile, time :: Int)
 end
 
 """
-    temperature_at_time(profile, time)
+    value_at_time(profile, time)
 
-Get the temperature value of the profile at the given time.
+Get the value of the profile at the given time without any conversion.
 The flag is_power will be ignored.
 """
-function temperature_at_time(profile :: Profile, time :: Int)
+function value_at_time(profile :: Profile, time :: Int)
     step_nr = Int(round(time / profile.time_step) + 1)
     return profile.data[step_nr]
 end
