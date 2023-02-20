@@ -15,6 +15,8 @@ mutable struct BufferTank <: ControlledSystem
     capacity :: Float64
     load :: Float64
 
+    use_adaptive_temperature :: Bool
+    switch_point :: Float64
     high_temperature :: Float64
     low_temperature :: Float64
 
@@ -33,6 +35,12 @@ mutable struct BufferTank <: ControlledSystem
             ),
             config["capacity"], # capacity
             config["load"], # load
+            "use_adaptive_temperature" in keys(config) # use_adaptive_temperature
+                ? Bool(config["use_adaptive_temperature"])
+                : false,
+            "switch_point" in keys(config) # switch_point
+                ? config["switch_point"]
+                : 0.15,
             "high_temperature" in keys(config) # high_temperature
                 ? config["high_temperature"]
                 : 75.0,
@@ -44,9 +52,12 @@ mutable struct BufferTank <: ControlledSystem
 end
 
 function temperature_at_load(unit :: BufferTank) :: Temperature
-    switch_point = 0.15
-    partial_load = min(1.0, unit.load / (unit.capacity * switch_point))
-    return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
+    if unit.use_adaptive_temperature
+        partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))
+        return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
+    else
+        return unit.high_temperature
+    end
 end
 
 function balance_on(

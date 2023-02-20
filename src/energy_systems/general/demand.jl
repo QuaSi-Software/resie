@@ -96,7 +96,7 @@ function control(
         unit.temperature = unit.static_temperature
         unit.input_interfaces[unit.medium].temperature = unit.static_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
 end
