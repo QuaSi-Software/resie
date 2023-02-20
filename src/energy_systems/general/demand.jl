@@ -15,15 +15,20 @@ mutable struct Demand <: ControlledSystem
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
 
-    energy_profile :: Profile
+    energy_profile :: Union{Profile, Nothing}
     temperature_profile :: Union{Profile, Nothing}
     scaling_factor :: Float64
 
     load :: Float64
     temperature :: Temperature
 
+    static_load :: Union{Nothing, Float64}
+    static_temperature :: Temperature
+
     function Demand(uac :: String, config :: Dict{String, Any})
-        energy_profile = Profile(config["energy_profile_file_path"])
+        energy_profile = "energy_profile_file_path" in keys(config) ?
+            Profile(config["energy_profile_file_path"]) :
+            nothing
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
             Profile(config["temperature_profile_file_path"]) :
             nothing
@@ -47,6 +52,12 @@ mutable struct Demand <: ControlledSystem
             config["scale"], # scaling_factor
             0.0, # load
             nothing, # temperature
+            "static_load" in keys(config) ?
+                config["static_load"] :
+                nothing, # static_load
+            "static_temperature" in keys(config) ?
+                config["static_temperature"] :
+                nothing, # static_temperature
         )
     end
 end
@@ -72,9 +83,20 @@ function control(
     parameters :: Dict{String, Any}
 )
     move_state(unit, systems, parameters)
-    unit.load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
-    if unit.temperature_profile !== nothing
-        unit.temperature = Profiles.power_at_time(unit.temperature_profile, parameters["time"])
+
+    if unit.static_load !== nothing
+        unit.load = unit.static_load
+    elseif unit.energy_profile !== nothing
+        unit.load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    else
+        unit.load = 0.0
+    end
+
+    if unit.static_temperature !== nothing
+        unit.temperature = unit.static_temperature
+        unit.input_interfaces[unit.medium].temperature = unit.static_temperature
+    elseif unit.temperature_profile !== nothing
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
 end

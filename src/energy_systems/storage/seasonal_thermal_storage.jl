@@ -33,20 +33,29 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
             ),
             config["capacity"], # capacity
             config["load"], # load
+            "use_adaptive_temperature" in keys(config) # use_adaptive_temperature
+                ? Bool(config["use_adaptive_temperature"])
+                : false,
+            "switch_point" in keys(config) # switch_point
+                ? config["switch_point"]
+                : 0.25,
             "high_temperature" in keys(config) # high_temperature
                 ? config["high_temperature"]
                 : 90.0,
             "low_temperature" in keys(config) # low_temperature
                 ? config["low_temperature"]
-                : 20.0
+                : 15.0
         )
     end
 end
 
 function temperature_at_load(unit :: SeasonalThermalStorage) :: Temperature
-    switch_point = 0.25
-    partial_load = min(1.0, unit.load / (unit.capacity * switch_point))
-    return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
+    if unit.use_adaptive_temperature
+        partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))
+        return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
+    else
+        return unit.high_temperature
+    end
 end
 
 function balance_on(
