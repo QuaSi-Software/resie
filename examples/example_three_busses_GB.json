@@ -45,14 +45,17 @@
         },
         "ESS_GBO_01": {
             "type": "GasBoiler",
-            "control_refs": ["ESS_BUS_TH_01"],
+            "control_refs": ["TST_BFT_TH_01"],
             "production_refs": [
                 "ESS_BUS_TH_01"
             ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "storage_driven",
+                "high_threshold": 1,
+                "low_threshold": 1
             },
-            "power": 40000
+            "min_power_fraction": 0,
+            "power": 2000
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",
@@ -69,19 +72,44 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [
-                "TST_DEM_01"
+                "TST_DEM_01",
+                "TST_BFT_TH_01"
             ],
-            "input_priorities": [ ]
-        }
-        ,
+            "input_priorities": [
+                "ESS_BUS_TH_01",
+                "TST_BFT_TH_01"
+             ]
+        },
         "ESS_BUS_TH_03": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "production_refs": [
-                "TST_DEM_02"
+                "TST_DEM_02",
+                "TST_BFT_TH_02"
             ],
-            "input_priorities": [ ]
+            "input_priorities": [
+                "ESS_BUS_TH_01",
+                "TST_BFT_TH_02"
+             ]
+        },
+        "TST_BFT_TH_01": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_TH_02"
+            ],
+            "capacity": 4000,
+            "load": 2000
+        },
+        "TST_BFT_TH_02": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "production_refs": [
+                "ESS_BUS_TH_03"
+            ],
+            "capacity": 4000,
+            "load": 2000
         }
 
     }
