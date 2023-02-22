@@ -15,6 +15,8 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     capacity :: Float64
     load :: Float64
 
+    use_adaptive_temperature :: Bool
+    switch_point :: Float64
     high_temperature :: Float64
     low_temperature :: Float64
 
