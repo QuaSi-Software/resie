@@ -1,5 +1,6 @@
 using Debugger
 using Test
+using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
