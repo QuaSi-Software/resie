@@ -1,8 +1,14 @@
+using Debugger
+using Test
+using Resie
+using Resie.EnergySystems
+using Resie.Profiles
+
 watt_to_wh = function (watts :: Float64)
     watts * 900 / 3600.0
 end
 
-@testset "heat_pump_demand_driven_correct_order" begin
+function test_heat_pump_demand_driven_correct_order()
     systems_config = Dict{String, Any}(
         "TST_DEM_01" => Dict{String, Any}(
             "type" => "Demand",
@@ -144,4 +150,8 @@ end
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].balance ≈ 0
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].sum_abs_change ≈ 3167.1876181648636
     @test grid.output_interfaces[EnergySystems.m_e_ac_230v].temperature === nothing
+end
+
+@testset "heat_pump_demand_driven_correct_order" begin
+    test_heat_pump_demand_driven_correct_order()
 end
