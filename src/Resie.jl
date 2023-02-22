@@ -150,16 +150,18 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         )
 
         # get all data of all interfaces in every timestep for Sankey
+        # if the balance of an interface was not zero, the actual energy that was flowing is written to the outputs.
+        # Attention: This can lead to overfilling of demands which is currenlty not visible in the sankey diagram!
         n = 1
         for each_system in systems
             for each_outputinterface in each_system[2].output_interfaces
                 if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                     if isdefined(each_outputinterface[2], :target)
-                        output_all_values[steps,n] = (each_outputinterface[2].sum_abs_change + abs(each_outputinterface[2].balance)) / 2 #@ToDo: correct???
+                        output_all_values[steps,n] = (each_outputinterface[2].sum_abs_change + each_outputinterface[2].balance) / 2 #@ToDo: correct???
                         n += 1
                     end
                 elseif isdefined(each_outputinterface, :target)
-                    output_all_values[steps,n] = (each_outputinterface.sum_abs_change + abs(each_outputinterface.balance)) / 2 #@ToDo: correct???
+                    output_all_values[steps,n] = (each_outputinterface.sum_abs_change + each_outputinterface.balance) / 2 #@ToDo: correct???
                     n += 1
                 end
             end
