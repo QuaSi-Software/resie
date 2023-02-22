@@ -1,8 +1,13 @@
+using Debugger
+using Test
+using Resie.EnergySystems
+using Resie.Profiles
+
 watt_to_wh = function (watts :: Float64)
     watts * 900 / 3600.0
 end
 
-@testset "busses_communicate_demand" begin
+function test_busses_communicate_demand()
     systems_config = Dict{String, Any}(
         "TST_GRI_01" => Dict{String, Any}(
             "type" => "GridConnection",
@@ -96,7 +101,11 @@ end
     @test grid.output_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change == 150.0
 end
 
-@testset "demand_over_busses_supply_is_transformer" begin
+@testset "busses_communicate_demand" begin
+    test_busses_communicate_demand()
+end
+
+function test_demand_over_busses_supply_is_transformer()
     systems_config = Dict{String, Any}(
         "TST_GRI_01" => Dict{String, Any}(
             "type" => "GridConnection",
@@ -199,7 +208,11 @@ end
     @test grid.output_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change == 150.0
 end
 
-@testset "busses_communicate_storage_potential" begin
+@testset "demand_over_busses_supply_is_transformer" begin
+    test_demand_over_busses_supply_is_transformer()
+end
+
+function test_busses_communicate_storage_potential()
     systems_config = Dict{String, Any}(
         "TST_GRI_01" => Dict{String, Any}(
             "type" => "GridConnection",
@@ -323,4 +336,8 @@ end
     @test balance == 0.0
     @test potential == -30075.0
     @test temperature === nothing
+end
+
+@testset "busses_communicate_storage_potential" begin
+    test_busses_communicate_storage_potential()
 end

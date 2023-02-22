@@ -1,8 +1,13 @@
+using Debugger
+using Test
+using Resie.EnergySystems
+using Resie.Profiles
+
 watt_to_wh = function (watts :: Float64)
     watts * 900 / 3600.0
 end
 
-@testset "primary_producer_can_load_storage" begin
+function test_primary_producer_can_load_storage()
     systems_config = Dict{String, Any}(
         "TST_GRI_01" => Dict{String, Any}(
             "type" => "GridConnection",
@@ -136,4 +141,8 @@ end
     @test balance == 0.0
     @test potential == -30075.0
     @test temperature === nothing
+end
+
+@testset "primary_producer_can_load_storage" begin
+    test_primary_producer_can_load_storage()
 end

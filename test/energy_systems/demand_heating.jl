@@ -1,8 +1,13 @@
+using Debugger
+using Test
+using Resie.EnergySystems
+using Resie.Profiles
+
 watt_to_wh = function (watts :: Float64)
     watts * 900 / 3600.0
 end
 
-@testset "demand_heating_temperature_values" begin
+function test_demand_heating_temperature_values()
     systems_config = Dict{String, Any}(
         "TST_GRI_01" => Dict{String, Any}(
             "type" => "GridConnection",
@@ -43,4 +48,8 @@ end
 
     @test demand.input_interfaces[EnergySystems.m_h_w_ht1].balance == -75.0
     @test demand.input_interfaces[EnergySystems.m_h_w_ht1].temperature == 55.0
+end
+
+@testset "demand_heating_temperature_values" begin
+    test_demand_heating_temperature_values()
 end
