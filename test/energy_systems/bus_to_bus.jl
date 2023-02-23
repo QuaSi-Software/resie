@@ -237,8 +237,8 @@ function test_demand_over_busses_supply_is_transformer()
     @test grid.output_interfaces[EnergySystems.m_c_g_natgas].balance == 0.0
 
     EnergySystems.distribute!(bus_2)
-    EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_3)
+    EnergySystems.distribute!(bus_1)
 
     @test demand_1.input_interfaces[EnergySystems.m_h_w_ht1].balance == 0.0
     @test demand_1.input_interfaces[EnergySystems.m_h_w_ht1].temperature == 60.0
@@ -315,8 +315,8 @@ function test_demand_over_busses_supply_is_transformer()
     @test grid.output_interfaces[EnergySystems.m_c_g_natgas].balance == 0.0
 
     EnergySystems.distribute!(bus_2)
-    EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_3)
+    EnergySystems.distribute!(bus_1)
 
     @test demand_1.input_interfaces[EnergySystems.m_h_w_ht1].balance == 0.0
     @test demand_1.input_interfaces[EnergySystems.m_h_w_ht1].temperature == 60.0
