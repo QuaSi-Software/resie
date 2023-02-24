@@ -29,7 +29,7 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 nothing.
 """
 function run_simulation(project_config :: Dict{AbstractString, Any})
-    systems = load_systems(project_config["energy_systems"])
+    systems = load_systems(project_config["energy_systems"], ("user_defined_media" in keys(project_config) ? project_config["user_defined_media"] : Array{Any}(undef,0)) )
     step_order = order_of_operations(systems)
 
     time_step = 900

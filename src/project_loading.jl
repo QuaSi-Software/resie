@@ -37,8 +37,25 @@ match what is required for the particular system. The `type` parameter must be p
 must match the symbol of the energy system class exactly. The structure is described in
 more detail in the accompanying documentation on the project file.
 """
-function load_systems(config :: Dict{String, Any}) :: Grouping
+function load_systems(config :: Dict{String, Any}, user_medium :: Array{Any}) :: Grouping
     systems = Grouping()
+    
+    # set dictionary to map the medium names as string to the medium names as Type MediumCategory
+    n = 1
+    for medium in instances(MediumCategory)
+        if string(medium)[1:6] == "m_user" && length(user_medium) >=n # user defined media names
+            EnergySystems.MediumCategoryMap[user_medium[n]] = medium
+            n += 1
+            if n >= 11
+                println("Input Error: Max. number of user-defined media is 10!")
+                # @ToDo integrate in error handling
+            end    
+        elseif string(medium)[1:6] == "m_user"  # no (more) user-defined media names given
+            continue
+        else   # general predefined media names
+            EnergySystems.MediumCategoryMap[string(medium)] = medium
+        end
+    end
 
     for (unit_key, entry) in pairs(config)
         default_dict = Dict{String, Any}(

@@ -62,6 +62,10 @@
         "end": 604800,
         "time_step_seconds": 900
     },
+    "user_defined_media": [
+        "medium_temperature_heating_grid",
+        "testmedium2"
+    ],
     "energy_systems": {
         "TST_DEM_TH_01": {
             "type": "Demand",
@@ -259,7 +263,10 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 400000,
+            "medium_names": {
+                "heat_out": "m_h_w_ht1"
+            }
         },
         "TST_CHP_01": {
             "type": "CHPP",
@@ -271,7 +278,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 12500
+            "power": 125000
         },
         "TST_GBO_01": {
             "type": "GasBoiler",
@@ -282,7 +289,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 400000
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",
@@ -308,7 +315,7 @@
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
-            "capacity": 40000,
+            "capacity": 4000000,
             "load": 0
         }
     }

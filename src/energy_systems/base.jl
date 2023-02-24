@@ -62,7 +62,25 @@ The names are structured in a composite of segments. For example, these are:
     m_h_w_ht3,
     m_h_w_ht4,
     m_h_w_ht5,
+
+    # user-defined medium_names, limited to 10 for now
+    m_user_01,
+    m_user_02,
+    m_user_03,
+    m_user_04,
+    m_user_05,
+    m_user_06,
+    m_user_07,
+    m_user_08,
+    m_user_09,
+    m_user_10,
+
 )
+
+"""
+Convenience type for mapping the medium names as string to the medium names as Type MediumCategory
+"""
+const MediumCategoryMap = Dict{String, MediumCategory}()
 
 """
 Enumerations of the archetype of an energy system describing its general function.
