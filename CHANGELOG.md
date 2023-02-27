@@ -14,6 +14,10 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.7:
+* Restructure test cases so that each case can be debugged
+* Update existing and add new tests to highlight several problems that occur when bus systems are connected
+
 ### Version 0.2.6:
 * Refactor operational strategies for GasBoiler, CHPP, Electrolyser
 * Implement way to track the energy flow between connected busses
