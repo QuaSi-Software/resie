@@ -14,6 +14,15 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.8
+* Bugfix in calculation of energy flow between two interconnected busses
+* Added reordering of Load() functions for storages 
+* Bugfix in determination of order of Distribute() of busses
+* Added user-definable medium names in input file (only for electrolyser for now)
+* Bugfix in SeasonalThermalStorage (missing declaration)
+* Revice of exemplary system frameworks
+* Adapted testcases to meet the changes
+
 ### Version 0.2.7:
 * Restructure test cases so that each case can be debugged
 * Update existing and add new tests to highlight several problems that occur when bus systems are connected
