@@ -41,6 +41,7 @@ function test_busses_communicate_demand()
             "scale" => 1000
         ),
     )
+    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
@@ -96,8 +97,8 @@ function test_busses_communicate_demand()
     @test demand.input_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change == 150.0
     @test EnergySystems.balance(bus_1) == 0.0
     @test EnergySystems.balance(bus_2) == 0.0
-    @test bus_1.remainder == 75.0
-    @test bus_2.remainder == -75.0
+    @test bus_1.remainder == 0.0
+    @test bus_2.remainder == 0.0
     @test grid.output_interfaces[EnergySystems.m_h_w_ht1].balance == 0.0
     @test grid.output_interfaces[EnergySystems.m_h_w_ht1].sum_abs_change == 150.0
 end
@@ -164,6 +165,7 @@ function test_demand_over_busses_supply_is_transformer()
             "scale" => 1
         ),
     )
+    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     demand_1 = systems["TST_DEM_01"]
     demand_2 = systems["TST_DEM_02"]
@@ -387,6 +389,7 @@ function test_busses_communicate_storage_potential()
             "scale" => 1000
         ),
     )
+    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
