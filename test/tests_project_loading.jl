@@ -355,8 +355,8 @@ function test_ooo_bus_output_priorities()
         ("TST_GBO_01", EnergySystems.s_produce),
         ("TST_GRI_01", EnergySystems.s_produce),
         ("TST_BUS_02", EnergySystems.s_distribute),
-        ("TST_BUS_01", EnergySystems.s_distribute),
         ("TST_BUS_03", EnergySystems.s_distribute),
+        ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
     systems = Resie.load_systems(systems_config)

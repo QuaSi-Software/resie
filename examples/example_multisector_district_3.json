@@ -214,7 +214,7 @@
         },
         "TST_ELY_01": {
             "type": "Electrolyser",
-            "control_refs": ["TST_DEM_TH_01"],
+            "control_refs": [],
             "production_refs": [
                 "TST_GRI_H2_01",
                 "TST_GRI_O2_01",
@@ -229,7 +229,7 @@
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [ "TST_DEM_TH_01"  ],
+            "control_refs": [  ],
             "production_refs": ["TST_BUS_TH_01" ],
             "strategy": {
                 "name": "demand_driven"
@@ -239,7 +239,7 @@
         },
         "TST_CHP_01": {
             "type": "CHPP",
-            "control_refs": ["TST_BFT_TH_03"],
+            "control_refs": [],
             "production_refs": [
                 "TST_BUS_TH_01",
                 "TST_BUS_EL_01"
@@ -251,14 +251,15 @@
         },
         "TST_GBO_01": {
             "type": "GasBoiler",
-            "control_refs": ["TST_BUS_TH_01"],
+            "control_refs": [],
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 50000
+            "power": 50000,
+            "min_power_fraction": 0
         },
         "TST_BFT_TH_03": {
             "type": "BufferTank",

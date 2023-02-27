@@ -17,6 +17,7 @@ mutable struct Electrolyser <: ControlledSystem
 
     input_interfaces :: InterfaceMap
     output_interfaces :: InterfaceMap
+    medium_names :: Dict{String, String}
 
     power :: Float64
     heat_fraction :: Float64
@@ -32,13 +33,26 @@ mutable struct Electrolyser <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_e_ac_230v => nothing
+                MediumCategoryMap["el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v"] => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_lt1 => nothing,
-                m_c_g_h2 => nothing,
-                m_c_g_o2 => nothing
+                MediumCategoryMap["heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1"] => nothing,
+                MediumCategoryMap["h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2"] => nothing,
+                MediumCategoryMap["o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"] => nothing
             ),
+            "medium_names" in keys(config) ? # medium_names for input and outputs
+                Dict{String, String}(
+                    "el_in" => "el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v",
+                    "heat_out" => "heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1",
+                    "h2_out" => "h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2",
+                    "o2_out" => "o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"
+                ) :
+                Dict{String, String}(  # default medium_names if no "medium_names" dict is given in input file
+                    "el_in" => "m_e_ac_230v",
+                    "heat_out" => "m_h_w_lt1",
+                    "h2_out" => "m_c_g_h2",
+                    "o2_out" =>  "m_c_g_o2"
+                ),
             config["power"], # power
             "heat_fraction" in keys(config) # heat_fraction
                 ? config["heat_fraction"]
@@ -57,26 +71,32 @@ mutable struct Electrolyser <: ControlledSystem
 end
 
 function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+    # abbreviations for media types of input and outputs
+    heat_out = MediumCategoryMap[unit.medium_names["heat_out"]]
+    h2_out = MediumCategoryMap[unit.medium_names["h2_out"]]
+    o2_out = MediumCategoryMap[unit.medium_names["h2_out"]]
+    el_in = MediumCategoryMap[unit.medium_names["el_in"]]
+
     max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
     max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
     max_available_e = unit.power
 
     # heat
     balance_h, potential_h, _ = balance_on(
-        unit.output_interfaces[m_h_w_lt1],
-        unit.output_interfaces[m_h_w_lt1].target
+        unit.output_interfaces[heat_out],
+        unit.output_interfaces[heat_out].target
     )
 
     # hydrogen
     balance_g, potential_g, _ = balance_on(
-        unit.output_interfaces[m_c_g_h2],
-        unit.output_interfaces[m_c_g_h2].target
+        unit.output_interfaces[h2_out],
+        unit.output_interfaces[h2_out].target
     )   
 
     # electricity 
     balance_e, potential_e, _ = balance_on(
-        unit.input_interfaces[m_e_ac_230v],
-        unit.input_interfaces[m_e_ac_230v].target
+        unit.input_interfaces[el_in],
+        unit.input_interfaces[el_in].target
     )
 
     if balance_h + potential_h >= 0.0 
@@ -103,14 +123,14 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
     end
 
     # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
-    add!(unit.output_interfaces[m_c_g_h2], max_produce_g * usage_fraction)
-    add!(unit.output_interfaces[m_c_g_o2], max_produce_g * usage_fraction * 0.5)
+    add!(unit.output_interfaces[h2_out], max_produce_g * usage_fraction)
+    add!(unit.output_interfaces[o2_out], max_produce_g * usage_fraction * 0.5)
     add!(
-        unit.output_interfaces[m_h_w_lt1],
+        unit.output_interfaces[heat_out],
         max_produce_h * usage_fraction,
         unit.output_temperature
     )
-    sub!(unit.input_interfaces[m_e_ac_230v], watt_to_wh(unit.power * usage_fraction))
+    sub!(unit.input_interfaces[el_in], watt_to_wh(unit.power * usage_fraction))
 
 end
 

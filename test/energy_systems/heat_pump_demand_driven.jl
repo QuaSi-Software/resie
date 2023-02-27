@@ -46,6 +46,7 @@ function test_heat_pump_demand_driven_correct_order()
             "fixed_cop" => 3.0
         ),
     )
+    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     heat_pump = systems["TST_HP_01"]
     source = systems["TST_SRC_01"]

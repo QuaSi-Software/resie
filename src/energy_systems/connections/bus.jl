@@ -181,38 +181,50 @@ or how often it was called.
 """
 function distribute!(unit :: Bus)
     remainder = balance_direct(unit)
-
+    
     for inface in unit.input_interfaces
         set!(inface, 0.0, inface.temperature)
     end
 
-    for outface in unit.output_interfaces
-        if outface.target.sys_function === outface.source.sys_function  # both input and output are busses
-            # calculate energy balance on current bus (outface.source) in order to write
-            # sum_abs_change into interface to following bus (outface.taget) 
-            sum_abs_change = 0
-            for input_interface in outface.source.input_interfaces
-                sum_abs_change += input_interface.sum_abs_change
-            end
-            for output_interface in outface.source.output_interfaces
-                sum_abs_change -= output_interface.sum_abs_change
-            end
-            # check if sum_abs_change is bigger than need in outface.target to handel multiple busses on unit
-            if (sum_abs_change/2) > abs(outface.target.remainder) 
-                # order of distribution into multiple busses is equal to order of simulations for now (last buss will get least energy)
-                sum_abs_change = 2 * abs(outface.target.remainder)
-            end
+    for output_uac in unit.output_priorities # for every output UAC (to enshure the correct order)...
+        for outface in unit.output_interfaces  # ...seach corresponding output inferface by...
+            if outface.target.sys_function === outface.source.sys_function  # ...making sure the output interface is from type bus...
+                if outface.target.uac === output_uac # ...and is corresponding to the uac given in the output_priority
+                    # calculate energy balance on current bus (outface.source) in order to write
+                    # sum_abs_change into interface to following bus (outface.taget) 
+                    sum_abs_change = 0
+                    for input_interface in outface.source.input_interfaces
+                        sum_abs_change += input_interface.sum_abs_change
+                    end
+                    for output_interface in outface.source.output_interfaces
+                        sum_abs_change -= output_interface.sum_abs_change
+                    end
+                    # check if sum_abs_change is bigger than need in outface.target to handel multiple busses on unit
+                    if (sum_abs_change/2) > abs(outface.target.remainder) 
+                        # order of distribution into multiple busses is equal to order of simulations for now (last buss will get least energy)
+                        sum_abs_change = 2 * abs(outface.target.remainder)
+                    end
 
-            # write energy flow from source to target into sum_abs_change
-            outface.sum_abs_change = sum_abs_change
+                    # write energy flow from source to target into sum_abs_change
+                    outface.sum_abs_change = sum_abs_change
+                    
+                    # adjust remainder on outface target bus
+                    outface.target.remainder += outface.sum_abs_change/2
 
-            ## adjust remainder on outface target bus
-            # outface.target.remainder += outface.sum_abs_change/2
+                    # update remainder of current bus
+                    remainder = balance_direct(unit)
+
+                    # reset output interfaces
+                    # set!(outface, 0.0, outface.temperature)
+                end
+            end    
         end
-        
-        # reset output interface
-        set!(outface, 0.0, outface.temperature)
     end                
+
+    # reset all output interfaces
+    for outface in unit.output_interfaces
+        set!(outface, 0.0, outface.temperature)  
+    end
 
     unit.remainder = remainder
 end

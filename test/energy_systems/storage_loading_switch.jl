@@ -76,7 +76,7 @@ function test_primary_producer_can_load_storage()
             "static_temperature" => 60
         ),
     )
-
+    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid_1 = systems["TST_GRI_01"]

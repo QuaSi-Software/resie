@@ -16,6 +16,50 @@ function read_JSON(filepath :: String) :: Dict{AbstractString, Any}
     end
 end
 
+
+
+"""
+load_medien(user_medium)
+
+Fills global mapping dict (EnergySystems.MediumCategoryMap) to map input media (user_medium) to media list of enums.
+
+The media from the config file must have the following structure but can also be 
+an empty array if no user-defined media are given:
+```
+{
+...    
+"user_defined_media": [
+    "medium_temperature_heating_grid",
+    "testmedium2",
+    ...
+],
+...
+}
+```
+
+All user-defined media used in energy systems in the input file must be listed in the "user-defined-media" entry.
+"""
+function load_medien(user_medium :: Array{Any})
+    
+    # fill dictionary to map the medium names as string to the medium names as Type MediumCategory from enum
+    n = 1
+    for medium in instances(MediumCategory)
+        if string(medium)[1:6] == "m_user" && length(user_medium) >=n # user defined media names
+            EnergySystems.MediumCategoryMap[user_medium[n]] = medium
+            n += 1
+            if n >= 11
+                println("Input Error: Max. number of user-defined media is 10!")
+                # @ToDo integrate in error handling
+            end    
+        elseif string(medium)[1:6] == "m_user"  # no (more) user-defined media names given
+            continue
+        else   # general predefined media names
+            EnergySystems.MediumCategoryMap[string(medium)] = medium
+        end
+    end
+
+end
+
 """
 load_systems(config)
 
@@ -39,7 +83,6 @@ more detail in the accompanying documentation on the project file.
 """
 function load_systems(config :: Dict{String, Any}) :: Grouping
     systems = Grouping()
-
     for (unit_key, entry) in pairs(config)
         default_dict = Dict{String, Any}(
             "strategy" => Dict{String, Any}("name" => "default")
@@ -212,13 +255,51 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
         return bool    
     end
 
-    # reorder distribution of busses connected to a bus so the order of distribution match the order given in production refs of the source bus:
+    # reorder distribution of busses and load of storages
     for bus in values(systems_by_function[3])
-        # for bus in the bus' production refs...
+        # make sure that every following bus connected to a fist bus is calculated earlier than the first bus (only distribute here)
+        own_uac = bus.uac
+        own_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
+        # for every bus in the bus' output_interface...
+        for other_unit in bus.output_interfaces
+            if other_unit.target.sys_function == EnergySystems.sf_bus  # consider only busses
+                other_uac = other_unit.target.uac
+                other_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
+
+                # ...check if it is of a lower priority. If not, swap the distribute steps.
+                if simulation_order[own_idx][1] > simulation_order[other_idx][1]
+                    tmp = simulation_order[own_idx][1]
+                    simulation_order[own_idx][1] = simulation_order[other_idx][1]
+                    simulation_order[other_idx][1] = tmp
+                end
+            end
+        end
+
+        # make sure the order of distribution match the order according to the production_refs of the first bus
+        # also make sure that the order of the load() function of the storages connected to the following busses have the same order than the busses
+        #
+        # for bus in the first bus' production refs...
         for own_idx = 1:length(bus.output_priorities)
             own_uac = bus.output_priorities[own_idx]
+
+            # predefine indexes for storages, set to zero
+            own_storage_idx = 0
+            other_storage_idx = 0
+
             if uac_is_bus(bus, own_uac) # consider only busses
                 own_dist_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
+
+                # check if a storage is connected to own bus
+                for bus_output_interface in bus.output_interfaces # seach interfaces for own bus
+                    if bus_output_interface.target.uac == own_uac  # found correct interface
+                        for own_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach interface.targets for storage
+                            if own_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
+                                own_storage_uac = own_bus_output_interfaces.target.uac
+                                own_storage_idx = idx_of(simulation_order, own_storage_uac, EnergySystems.s_load)
+                            end
+                        end
+                    end
+                end
 
                 # ...make sure every bus following after...
                 for other_idx = own_idx:length(bus.output_priorities)
@@ -232,10 +313,31 @@ function order_of_operations(systems :: Grouping) :: StepInstructions
                             simulation_order[own_dist_idx][1] = simulation_order[other_dist_idx][1]
                             simulation_order[other_dist_idx][1] = tmp
                         end
+
+                        # check if a storage is connected to other bus
+                        for bus_output_interface in bus.output_interfaces # seach interfaces for other bus
+                            if bus_output_interface.target.uac == other_uac  # found correct interface
+                                for other_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach interface.targets for storage
+                                    if other_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
+                                        other_storage_uac = other_bus_output_interfaces.target.uac
+                                        other_storage_idx = idx_of(simulation_order, other_storage_uac, EnergySystems.s_load)
+                                    end
+                                end
+                            end
+                        end
+                                                
+                        #... and check if load() of storage of other bus is on lower index than own storage. If not, swap the load steps
+                        if own_storage_idx > 0 && other_storage_idx > 0
+                            if simulation_order[own_storage_idx][1] < simulation_order[other_storage_idx][1]
+                                tmp = simulation_order[own_storage_idx][1]
+                                simulation_order[own_storage_idx][1] = simulation_order[other_storage_idx][1]
+                                simulation_order[other_storage_idx][1] = tmp
+                            end
+                        end
                     end
                 end
             end
-        end
+        end      
     end
 
     # reorder systems such that their control dependencies are handled first, but only if
