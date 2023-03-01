@@ -33,39 +33,31 @@ mutable struct Electrolyser <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                MediumCategoryMap["el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v"] => nothing
+                MediumCategoryMap[default(config["medium_names"], "el_in", "m_e_ac_230v")] => nothing
             ),
             InterfaceMap( # output_interfaces
-                MediumCategoryMap["heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1"] => nothing,
-                MediumCategoryMap["h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2"] => nothing,
-                MediumCategoryMap["o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"] => nothing
+                MediumCategoryMap[default(config["medium_names"], "heat_out", "m_h_w_lt1")] => nothing,
+                MediumCategoryMap[default(config["medium_names"], "h2_out", "m_c_g_h2")] => nothing,
+                MediumCategoryMap[default(config["medium_names"], "o2_out", "m_c_g_o2")] => nothing,
             ),
-            "medium_names" in keys(config) ? # medium_names for input and outputs
-            Dict{String,String}(
-                "el_in" => "el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v",
-                "heat_out" => "heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1",
-                "h2_out" => "h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2",
-                "o2_out" => "o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"
-            ) :
-            Dict{String,String}(  # default medium_names if no "medium_names" dict is given in input file
-                "el_in" => "m_e_ac_230v",
-                "heat_out" => "m_h_w_lt1",
-                "h2_out" => "m_c_g_h2",
-                "o2_out" => "m_c_g_o2"
-            ),
+            "medium_names" in keys(config) # medium_names for input and outputs
+                ? Dict{String,String}(
+                    "el_in" => default(config["medium_names"], "el_in", "m_e_ac_230v"),
+                    "heat_out" => default(config["medium_names"], "heat_out", "m_h_w_lt1"),
+                    "h2_out" => default(config["medium_names"], "h2_out", "m_c_g_h2"),
+                    "o2_out" => default(config["medium_names"], "o2_out", "m_c_g_o2"),
+                )
+                : Dict{String,String}(  # default medium_names if no "medium_names" dict is given in input file
+                    "el_in" => "m_e_ac_230v",
+                    "heat_out" => "m_h_w_lt1",
+                    "h2_out" => "m_c_g_h2",
+                    "o2_out" => "m_c_g_o2"
+                ),
             config["power"], # power
-            "heat_fraction" in keys(config) # heat_fraction
-                ? config["heat_fraction"]
-                : 0.4,
-            "min_power_fraction" in keys(config) # min_power_fraction
-                ? config["min_power_fraction"]
-                : 0.2,
-            "min_run_time" in keys(config) # min_run_time
-                ? config["min_run_time"]
-                : 3600,
-            "output_temperature" in keys(config) # output_temperature
-                ? config["output_temperature"]
-                : 55.0
+            default(config, "heat_fraction", 0.4),
+            default(config, "min_power_fraction", 0.2),
+            default(config, "min_run_time", 3600),
+            default(config, "output_temperature", 55.0),
         )
     end
 end

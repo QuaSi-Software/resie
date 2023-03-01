@@ -24,6 +24,12 @@ export MediumCategory, EnergySystem, ControlledSystem, each, Grouping,
     StepInstruction, StepInstructions
 
 """
+Convenience function to get the value of a key from a config dict using a default value.
+"""
+default(config::Dict{String,Any}, name::String, default_val::Any)::Any =
+    return name in keys(config) ? config[name] : default_val
+
+"""
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
 considered the nominal range. For example, a heating system might circulate water anywhere

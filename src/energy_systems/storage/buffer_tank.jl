@@ -35,18 +35,10 @@ mutable struct BufferTank <: ControlledSystem
             ),
             config["capacity"], # capacity
             config["load"], # load
-            "use_adaptive_temperature" in keys(config) # use_adaptive_temperature
-                ? Bool(config["use_adaptive_temperature"])
-                : false,
-            "switch_point" in keys(config) # switch_point
-                ? config["switch_point"]
-                : 0.15,
-            "high_temperature" in keys(config) # high_temperature
-                ? config["high_temperature"]
-                : 75.0,
-            "low_temperature" in keys(config) # low_temperature
-                ? config["low_temperature"]
-                : 20.0
+            default(config, "use_adaptive_temperature", false),
+            default(config, "switch_point", 0.15),
+            default(config, "high_temperature", 75.0),
+            default(config, "low_temperature", 20),
         )
     end
 end

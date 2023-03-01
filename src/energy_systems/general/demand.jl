@@ -52,12 +52,8 @@ mutable struct Demand <: ControlledSystem
             config["scale"], # scaling_factor
             0.0, # load
             nothing, # temperature
-            "static_load" in keys(config) ?
-                config["static_load"] :
-                nothing, # static_load
-            "static_temperature" in keys(config) ?
-                config["static_temperature"] :
-                nothing, # static_temperature
+            default(config, "static_load", nothing),
+            default(config, "static_temperature", nothing),
         )
     end
 end
