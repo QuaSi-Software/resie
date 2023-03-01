@@ -8,11 +8,8 @@ function load_condition_prototypes()
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            return (rel(condition, "buffer").load
-                    <
-                    condition.parameters["percentage"]
-                    *
-                    rel(condition, "buffer").capacity)
+            return rel(condition, "buffer").load <
+                   condition.parameters["percentage"] * rel(condition, "buffer").capacity
         end
     )
 
@@ -25,11 +22,8 @@ function load_condition_prototypes()
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            return (rel(condition, "buffer").load
-                    >=
-                    condition.parameters["percentage"]
-                    *
-                    rel(condition, "buffer").capacity)
+            return rel(condition, "buffer").load >=
+                   condition.parameters["percentage"] * rel(condition, "buffer").capacity
         end
     )
 
@@ -38,11 +32,9 @@ function load_condition_prototypes()
         Dict{String,Any}(), # parameters
         EnSysRequirements(), # required_systems
         function (condition, unit, simulation_parameters) # check_function
-            return (unit.controller.state_machine.time_in_state
-                    *
-                    simulation_parameters["time_step_seconds"]
-                    >=
-                    unit.min_run_time)
+            return unit.controller.state_machine.time_in_state *
+                   simulation_parameters["time_step_seconds"] >=
+                   unit.min_run_time
         end
     )
 
@@ -53,11 +45,8 @@ function load_condition_prototypes()
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            return (rel(condition, "buffer").capacity
-                    -
-                    rel(condition, "buffer").load
-                    <
-                    unit.power * unit.min_power_fraction)
+            return rel(condition, "buffer").capacity - rel(condition, "buffer").load <
+                   unit.power * unit.min_power_fraction
         end
     )
 
@@ -71,13 +60,11 @@ function load_condition_prototypes()
         ),
         function (condition, unit, simulation_parameters) # check_function
             outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
-            return (if outface.balance != 0.0
-                outface.sum_abs_change
-            else
-                outface.sum_abs_change * 0.5
-            end
-                    <
-                    condition.parameters["threshold"] * rel(condition, "pv_plant").supply * 0.25)
+            return (outface.balance != 0.0 ?
+                    outface.sum_abs_change :
+                    outface.sum_abs_change * 0.5
+            ) <
+                   condition.parameters["threshold"] * rel(condition, "pv_plant").supply * 0.25
         end
     )
 
@@ -99,9 +86,8 @@ function load_condition_prototypes()
             "heat_pump" => (HeatPump, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            return (rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change
-                    >
-                    simulation_parameters["epsilon"])
+            return rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change >
+                   simulation_parameters["epsilon"]
         end
     )
 end

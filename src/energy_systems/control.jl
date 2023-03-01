@@ -108,9 +108,10 @@ function link(condition::Condition, systems::Grouping)
         end
 
         if !found_link
-            throw(KeyError("Could not find match for required system $name "
-                           *
-                           "for condition $(condition.prototype.name)"))
+            throw(KeyError(
+                    "Could not find match for required system $name "
+                    * "for condition $(condition.prototype.name)"
+            ))
         end
     end
 end
