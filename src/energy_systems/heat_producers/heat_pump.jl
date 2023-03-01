@@ -32,11 +32,11 @@ mutable struct HeatPump <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_h_w_lt1 => nothing,
-                m_e_ac_230v => nothing
+                :m_h_w_lt1 => nothing,
+                :m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing
+                :m_h_w_ht1 => nothing
             ),
             config["power"], # power
             default(config, "min_power_fraction", 0.2),
@@ -73,13 +73,13 @@ end
 
 function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
     in_blnc, _, in_temp = balance_on(
-        unit.input_interfaces[m_h_w_lt1],
+        unit.input_interfaces[:m_h_w_lt1],
         unit
     )
 
     out_blnc, out_pot, out_temp = balance_on(
-        unit.output_interfaces[m_h_w_ht1],
-        unit.output_interfaces[m_h_w_ht1].target
+        unit.output_interfaces[:m_h_w_ht1],
+        unit.output_interfaces[:m_h_w_ht1].target
     )
 
     cop = dynamic_cop(in_temp, out_temp)
@@ -97,10 +97,10 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
             return
         end
 
-        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
+        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[m_h_w_lt1],
+            unit.input_interfaces[:m_h_w_lt1],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
@@ -113,9 +113,9 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         consume_e = max_consume_h / (unit.cop - 1.0)
         produce_h = max_consume_h + consume_e
 
-        add!(unit.output_interfaces[m_h_w_ht1], produce_h)
-        sub!(unit.input_interfaces[m_h_w_lt1], max_consume_h)
-        sub!(unit.input_interfaces[m_e_ac_230v], consume_e)
+        add!(unit.output_interfaces[:m_h_w_ht1], produce_h)
+        sub!(unit.input_interfaces[:m_h_w_lt1], max_consume_h)
+        sub!(unit.input_interfaces[:m_e_ac_230v], consume_e)
 
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
@@ -130,13 +130,13 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         end
 
         add!(
-            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[:m_h_w_ht1],
             max_produce_h * usage_fraction,
             out_temp
         )
-        sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[m_h_w_lt1],
+            unit.input_interfaces[:m_h_w_lt1],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
     end

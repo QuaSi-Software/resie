@@ -59,7 +59,7 @@ function load_condition_prototypes()
             "pv_plant" => (PVPlant, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            outface = rel(condition, "pv_plant").output_interfaces[m_e_ac_230v]
+            outface = rel(condition, "pv_plant").output_interfaces[:m_e_ac_230v]
             return (outface.balance != 0.0 ?
                     outface.sum_abs_change :
                     outface.sum_abs_change * 0.5
@@ -86,7 +86,7 @@ function load_condition_prototypes()
             "heat_pump" => (HeatPump, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
-            return rel(condition, "heat_pump").output_interfaces[m_h_w_ht1].sum_abs_change >
+            return rel(condition, "heat_pump").output_interfaces[:m_h_w_ht1].sum_abs_change >
                    simulation_parameters["epsilon"]
         end
     )

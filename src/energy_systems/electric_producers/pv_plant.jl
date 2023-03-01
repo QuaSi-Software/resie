@@ -33,7 +33,7 @@ mutable struct PVPlant <: ControlledSystem
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces
-                m_e_ac_230v => nothing
+                :m_e_ac_230v => nothing
             ),
             energy_profile, # energy_profile
             config["scale"], # scaling_factor
@@ -67,7 +67,7 @@ end
 
 
 function produce(unit::PVPlant, parameters::Dict{String,Any}, watt_to_wh::Function)
-    outface = unit.output_interfaces[m_e_ac_230v]
+    outface = unit.output_interfaces[:m_e_ac_230v]
     add!(outface, unit.supply)
 end
 

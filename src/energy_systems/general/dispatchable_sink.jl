@@ -22,7 +22,7 @@ mutable struct DispatchableSink <: ControlledSystem
 
     function DispatchableSink(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        medium = Symbol(config["medium"])
 
         return new(
             uac, # uac

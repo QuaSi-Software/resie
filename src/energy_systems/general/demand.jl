@@ -32,7 +32,7 @@ mutable struct Demand <: ControlledSystem
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
                               Profile(config["temperature_profile_file_path"]) :
                               nothing
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        medium = Symbol(config["medium"])
 
         return new(
             uac, # uac

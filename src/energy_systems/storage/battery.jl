@@ -24,10 +24,10 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
-                m_e_ac_230v => nothing
+                :m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_e_ac_230v => nothing
+                :m_e_ac_230v => nothing
             ),
             config["capacity"], # capacity
             config["load"] # load
@@ -47,7 +47,7 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
         return
     end
 
-    outface = unit.output_interfaces[m_e_ac_230v]
+    outface = unit.output_interfaces[:m_e_ac_230v]
     balance, _, _ = balance_on(outface, outface.target)
 
     if balance >= 0.0
@@ -68,7 +68,7 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
         return
     end
 
-    inface = unit.input_interfaces[m_e_ac_230v]
+    inface = unit.input_interfaces[:m_e_ac_230v]
     balance, _, _ = balance_on(inface, inface.source)
 
     if balance <= 0.0

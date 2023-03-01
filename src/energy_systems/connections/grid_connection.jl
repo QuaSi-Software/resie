@@ -21,7 +21,7 @@ mutable struct GridConnection <: ControlledSystem
     load_sum::Float64
 
     function GridConnection(uac::String, config::Dict{String,Any})
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        medium = Symbol(config["medium"])
         return new(
             uac, # uac
             controller_for_strategy( # controller

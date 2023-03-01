@@ -25,10 +25,10 @@ mutable struct GasBoiler <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_c_g_natgas => nothing
+                :m_c_g_natgas => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing
+                :m_h_w_ht1 => nothing
             ),
             config["power"], # power
             default(config, "min_power_fraction", 0.1),
@@ -46,8 +46,8 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
     max_produce_h = watt_to_wh(unit.power)
 
     balance, potential, _ = balance_on(
-        unit.output_interfaces[m_h_w_ht1],
-        unit.output_interfaces[m_h_w_ht1].target
+        unit.output_interfaces[:m_h_w_ht1],
+        unit.output_interfaces[:m_h_w_ht1].target
     )
 
     demand_to_meet = (
@@ -64,8 +64,8 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
         return
     end
 
-    add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-    sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[:m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
 end
 
 export GasBoiler

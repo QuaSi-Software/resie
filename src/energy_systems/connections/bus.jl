@@ -24,7 +24,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     remainder::Float64
 
     function Bus(uac::String, config::Dict{String,Any})
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        medium = Symbol(config["medium"])
         return new(
             uac, # uac
             controller_for_strategy( # controller
