@@ -11,21 +11,21 @@ At the moment there is no operation strategy is implemented and the production o
 electrolyser is controlled by the demand it is linked to requires.
 """
 mutable struct Electrolyser <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
-    medium_names :: Dict{String, String}
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
+    medium_names::Dict{String,String}
 
-    power :: Float64
-    heat_fraction :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
-    output_temperature :: Temperature
+    power::Float64
+    heat_fraction::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
+    output_temperature::Temperature
 
-    function Electrolyser(uac :: String, config :: Dict{String, Any})
+    function Electrolyser(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -41,18 +41,18 @@ mutable struct Electrolyser <: ControlledSystem
                 MediumCategoryMap["o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"] => nothing
             ),
             "medium_names" in keys(config) ? # medium_names for input and outputs
-                Dict{String, String}(
-                    "el_in" => "el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v",
-                    "heat_out" => "heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1",
-                    "h2_out" => "h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2",
-                    "o2_out" => "o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"
-                ) :
-                Dict{String, String}(  # default medium_names if no "medium_names" dict is given in input file
-                    "el_in" => "m_e_ac_230v",
-                    "heat_out" => "m_h_w_lt1",
-                    "h2_out" => "m_c_g_h2",
-                    "o2_out" =>  "m_c_g_o2"
-                ),
+            Dict{String,String}(
+                "el_in" => "el_in" in keys(config["medium_names"]) ? config["medium_names"]["el_in"] : "m_e_ac_230v",
+                "heat_out" => "heat_out" in keys(config["medium_names"]) ? config["medium_names"]["heat_out"] : "m_h_w_lt1",
+                "h2_out" => "h2_out" in keys(config["medium_names"]) ? config["medium_names"]["h2_out"] : "m_c_g_h2",
+                "o2_out" => "o2_out" in keys(config["medium_names"]) ? config["medium_names"]["o2_out"] : "m_c_g_o2"
+            ) :
+            Dict{String,String}(  # default medium_names if no "medium_names" dict is given in input file
+                "el_in" => "m_e_ac_230v",
+                "heat_out" => "m_h_w_lt1",
+                "h2_out" => "m_c_g_h2",
+                "o2_out" => "m_c_g_o2"
+            ),
             config["power"], # power
             "heat_fraction" in keys(config) # heat_fraction
                 ? config["heat_fraction"]
@@ -70,7 +70,7 @@ mutable struct Electrolyser <: ControlledSystem
     end
 end
 
-function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
     # abbreviations for media types of input and outputs
     heat_out = MediumCategoryMap[unit.medium_names["heat_out"]]
     h2_out = MediumCategoryMap[unit.medium_names["h2_out"]]
@@ -91,7 +91,7 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
     balance_g, potential_g, _ = balance_on(
         unit.output_interfaces[h2_out],
         unit.output_interfaces[h2_out].target
-    )   
+    )
 
     # electricity 
     balance_e, potential_e, _ = balance_on(
@@ -99,7 +99,7 @@ function produce(unit :: Electrolyser, parameters :: Dict{String, Any}, watt_to_
         unit.input_interfaces[el_in].target
     )
 
-    if balance_h + potential_h >= 0.0 
+    if balance_h + potential_h >= 0.0
         return # don't add to a surplus of h2 
     end
 

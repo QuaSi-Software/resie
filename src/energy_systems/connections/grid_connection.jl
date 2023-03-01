@@ -9,25 +9,29 @@ one-way connection they are split into two instances for providing or receiving 
 must be handled as such in the input for constructing a project.
 """
 mutable struct GridConnection <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
-    medium :: MediumCategory
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
+    medium::MediumCategory
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    draw_sum :: Float64
-    load_sum :: Float64
+    draw_sum::Float64
+    load_sum::Float64
 
-    function GridConnection(uac :: String, config :: Dict{String, Any})
+    function GridConnection(uac::String, config::Dict{String,Any})
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
         return new(
             uac, # uac
             controller_for_strategy( # controller
                 config["strategy"]["name"], config["strategy"]
             ),
-            if Bool(config["is_source"]) sf_dispatchable_source else sf_dispatchable_sink end, # sys_function
+            if Bool(config["is_source"])
+                sf_dispatchable_source
+            else
+                sf_dispatchable_sink
+            end, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing
@@ -41,7 +45,7 @@ mutable struct GridConnection <: ControlledSystem
     end
 end
 
-function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::GridConnection, parameters::Dict{String,Any}, watt_to_wh::Function)
     if unit.sys_function === sf_dispatchable_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
@@ -61,11 +65,11 @@ function produce(unit :: GridConnection, parameters :: Dict{String, Any}, watt_t
     end
 end
 
-function output_values(unit :: GridConnection) :: Vector{String}
+function output_values(unit::GridConnection)::Vector{String}
     return ["IN", "OUT", "Draw sum", "Load sum"]
 end
 
-function output_value(unit :: GridConnection, key :: OutputKey) :: Float64
+function output_value(unit::GridConnection, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "OUT"

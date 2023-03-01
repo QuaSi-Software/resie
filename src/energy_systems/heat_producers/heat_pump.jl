@@ -11,20 +11,20 @@ buffer tank and en-/disabling the heat pump when a threshold is reached, in addi
 overfill shutoff condition.
 """
 mutable struct HeatPump <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    power :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
-    fixed_cop :: Float64
-    cop :: Float64
+    power::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
+    fixed_cop::Float64
+    cop::Float64
 
-    function HeatPump(uac :: String, config :: Dict{String, Any})
+    function HeatPump(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -53,11 +53,11 @@ mutable struct HeatPump <: ControlledSystem
     end
 end
 
-function output_values(unit :: HeatPump) :: Vector{String}
+function output_values(unit::HeatPump)::Vector{String}
     return ["OUT", "Max_Power", "Temperature"]
 end
 
-function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
+function output_value(unit::HeatPump, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "OUT"
@@ -68,7 +68,7 @@ function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
     throw(KeyError(key.value_key))
 end
 
-function dynamic_cop(in_temp :: Temperature, out_temp :: Temperature) :: Union{Nothing, Float64}
+function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
     if (in_temp === nothing || out_temp === nothing)
         return nothing
     end
@@ -77,7 +77,7 @@ function dynamic_cop(in_temp :: Temperature, out_temp :: Temperature) :: Union{N
     return 8.0 * exp(-0.08 * delta_t) + 1
 end
 
-function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
     in_blnc, _, in_temp = balance_on(
         unit.input_interfaces[m_h_w_lt1],
         unit

@@ -6,18 +6,18 @@ buffer tank and en-/disabling the boiler when a threshold is reached, in additio
 overfill shutoff condition.
 """
 mutable struct GasBoiler <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    power :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
+    power::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
 
-    function GasBoiler(uac :: String, config :: Dict{String, Any})
+    function GasBoiler(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -41,7 +41,7 @@ mutable struct GasBoiler <: ControlledSystem
     end
 end
 
-function produce(unit :: GasBoiler, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Function)
     strategy = unit.controller.strategy
     if strategy == "storage_driven" && unit.controller.state_machine.state != 2
         return

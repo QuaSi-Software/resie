@@ -6,17 +6,17 @@ parameters (its capacity). However the default operation strategy is more comple
 toggles the production of the battery dependant on available PV power and its own charge.
 """
 Base.@kwdef mutable struct Battery <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    capacity :: Float64
-    load :: Float64
+    capacity::Float64
+    load::Float64
 
-    function Battery(uac :: String, config :: Dict{String, Any})
+    function Battery(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -36,13 +36,13 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
 end
 
 function balance_on(
-    interface :: SystemInterface,
-    unit :: Battery
-) :: Tuple{Float64, Float64, Temperature}
+    interface::SystemInterface,
+    unit::Battery
+)::Tuple{Float64,Float64,Temperature}
     return interface.balance, -unit.capacity + unit.load, interface.temperature
 end
 
-function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     if unit.controller.state_machine.state != 2
         return
     end
@@ -63,7 +63,7 @@ function produce(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh ::
     end
 end
 
-function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     if unit.controller.state_machine.state != 1
         return
     end
@@ -85,11 +85,11 @@ function load(unit :: Battery, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     end
 end
 
-function output_values(unit :: Battery) :: Vector{String}
+function output_values(unit::Battery)::Vector{String}
     return ["IN", "OUT", "Load", "Capacity"]
 end
 
-function output_value(unit :: Battery, key :: OutputKey) :: Float64
+function output_value(unit::Battery, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "OUT"

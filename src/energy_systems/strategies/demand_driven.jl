@@ -1,4 +1,4 @@
-function strt_sm_demand_driven(parameters :: Dict{String, Any}) :: StateMachine
+function strt_sm_demand_driven(parameters::Dict{String,Any})::StateMachine
     return StateMachine()
 end
 
@@ -17,7 +17,7 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
     description=strt_desc_demand_driven,
     sm_constructor=strt_sm_demand_driven,
     conditions=[],
-    strategy_parameters=Dict{String, Any}(),
+    strategy_parameters=Dict{String,Any}(),
     required_systems=EnSysRequirements(
         "receiver" => (EnergySystem, nothing)
     )

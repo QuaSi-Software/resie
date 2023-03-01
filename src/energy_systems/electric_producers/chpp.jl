@@ -12,19 +12,19 @@ buffer tank and en-/disabling the CHPP when a threshold is reached, in addition 
 overfill shutoff condition.
 """
 mutable struct CHPP <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    power :: Float64
-    electricity_fraction :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
+    power::Float64
+    electricity_fraction::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
 
-    function CHPP(uac :: String, config :: Dict{String, Any})
+    function CHPP(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -52,7 +52,7 @@ mutable struct CHPP <: ControlledSystem
     end
 end
 
-function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     strategy = unit.controller.strategy
     if strategy == "storage_driven" && unit.controller.state_machine.state != 2
         return

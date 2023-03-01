@@ -7,31 +7,31 @@ profiles usually are normalized to some degree, therefore Demand instances requi
 factor to turn the relative values to absolute values of required energy.
 """
 mutable struct Demand <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
-    medium :: MediumCategory
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
+    medium::MediumCategory
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    energy_profile :: Union{Profile, Nothing}
-    temperature_profile :: Union{Profile, Nothing}
-    scaling_factor :: Float64
+    energy_profile::Union{Profile,Nothing}
+    temperature_profile::Union{Profile,Nothing}
+    scaling_factor::Float64
 
-    load :: Float64
-    temperature :: Temperature
+    load::Float64
+    temperature::Temperature
 
-    static_load :: Union{Nothing, Float64}
-    static_temperature :: Temperature
+    static_load::Union{Nothing,Float64}
+    static_temperature::Temperature
 
-    function Demand(uac :: String, config :: Dict{String, Any})
+    function Demand(uac::String, config::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
-            Profile(config["energy_profile_file_path"]) :
-            nothing
+                         Profile(config["energy_profile_file_path"]) :
+                         nothing
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
-            Profile(config["temperature_profile_file_path"]) :
-            nothing
+                              Profile(config["temperature_profile_file_path"]) :
+                              nothing
         medium = getproperty(EnergySystems, Symbol(config["medium"]))
 
         return new(
@@ -62,11 +62,11 @@ mutable struct Demand <: ControlledSystem
     end
 end
 
-function output_values(unit :: Demand) :: Vector{String}
+function output_values(unit::Demand)::Vector{String}
     return ["IN", "Load", "Temperature"]
 end
 
-function output_value(unit :: Demand, key :: OutputKey) :: Float64
+function output_value(unit::Demand, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Load"
@@ -78,9 +78,9 @@ function output_value(unit :: Demand, key :: OutputKey) :: Float64
 end
 
 function control(
-    unit :: Demand,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::Demand,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
 
@@ -101,7 +101,7 @@ function control(
     end
 end
 
-function produce(unit :: Demand, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::Demand, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.load, unit.temperature)
 end

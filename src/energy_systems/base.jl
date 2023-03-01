@@ -73,14 +73,12 @@ The names are structured in a composite of segments. For example, these are:
     m_user_07,
     m_user_08,
     m_user_09,
-    m_user_10,
-
-)
+    m_user_10,)
 
 """
 Convenience type for mapping the medium names as string to the medium names as Type MediumCategory
 """
-const MediumCategoryMap = Dict{String, MediumCategory}()
+const MediumCategoryMap = Dict{String,MediumCategory}()
 
 """
 Enumerations of the archetype of an energy system describing its general function.
@@ -101,7 +99,7 @@ The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
 Convenience type for holding the instruction for one system and one step.
 """
-const StepInstruction = Tuple{String, Step}
+const StepInstruction = Tuple{String,Step}
 
 """
 Holds the order of steps as instructions for how to perform the simulation.
@@ -125,12 +123,12 @@ abstract type ControlledSystem <: EnergySystem end
 """
 Convenience alias to a dict mapping UAC keys to an energy system.
 """
-const Grouping = Dict{String, ControlledSystem}
+const Grouping = Dict{String,ControlledSystem}
 
 """
 Convenience alias for temperatures which can be a number or "nothing".
 """
-const Temperature = Union{Nothing, Float64}
+const Temperature = Union{Nothing,Float64}
 
 """
 Holds the options which output values should be recorded.
@@ -139,9 +137,9 @@ This is a specific data structure intended to speed up recording output by avoid
 need to parse the user-submitted config options for every time step.
 """
 Base.@kwdef struct OutputKey
-    unit :: EnergySystem
-    medium :: Union{Nothing, MediumCategory}
-    value_key :: String
+    unit::EnergySystem
+    medium::Union{Nothing,MediumCategory}
+    value_key::String
 end
 
 """
@@ -149,7 +147,7 @@ end
 
 Generator over each of the energy systems in the given grouping.
 """
-function each(systems :: Grouping) :: Base.ValueIterator
+function each(systems::Grouping)::Base.ValueIterator
     return values(systems)
 end
 
@@ -169,22 +167,22 @@ interface's field "sum_abs_change" will have a value of twice the total energy t
 """
 Base.@kwdef mutable struct SystemInterface
     """The source system providing energy"""
-    source :: Union{Nothing, ControlledSystem} = nothing
+    source::Union{Nothing,ControlledSystem} = nothing
 
     """The target system receiving energy"""
-    target :: Union{Nothing, ControlledSystem} = nothing
+    target::Union{Nothing,ControlledSystem} = nothing
 
     """The current balance of the interface"""
-    balance :: Float64 = 0.0
+    balance::Float64 = 0.0
 
     """The sum of absolute changes to the interface's balance"""
-    sum_abs_change :: Float64 = 0.0
+    sum_abs_change::Float64 = 0.0
 
     """Current temperature of the medium on this interface"""
-    temperature :: Temperature = nothing
+    temperature::Temperature = nothing
 
     """Maximum power the source can provide in the current timestep"""
-    max_power :: Union{Nothing, Float64} = nothing
+    max_power::Union{Nothing,Float64} = nothing
 end
 
 """
@@ -193,9 +191,9 @@ end
 Add the given amount of energy (in Wh) to the balance of the interface.
 """
 function add!(
-    interface :: SystemInterface,
-    change :: Float64,
-    temperature :: Temperature = nothing
+    interface::SystemInterface,
+    change::Float64,
+    temperature::Temperature=nothing
 )
     interface.balance += change
     interface.sum_abs_change += abs(change)
@@ -203,7 +201,8 @@ function add!(
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature != temperature
             println("Warning: Mixing temperatures on interface $(interface.source.uac)"
-                *"->$(interface.target.uac)")
+                    *
+                    "->$(interface.target.uac)")
         end
         interface.temperature = temperature
     end
@@ -215,9 +214,9 @@ end
 Subtract the given amount of energy (in Wh) from the balance of the interface.
 """
 function sub!(
-    interface :: SystemInterface,
-    change :: Float64,
-    temperature :: Temperature = nothing
+    interface::SystemInterface,
+    change::Float64,
+    temperature::Temperature=nothing
 )
     interface.balance -= change
     interface.sum_abs_change += abs(change)
@@ -225,7 +224,8 @@ function sub!(
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature != temperature
             println("Warning: Mixing temperatures on interface $(interface.source.uac)"
-                *"->$(interface.target.uac)")
+                    *
+                    "->$(interface.target.uac)")
         end
         interface.temperature = temperature
     end
@@ -237,9 +237,9 @@ end
 Set the balance of the interface to the given new value.
 """
 function set!(
-    interface :: SystemInterface,
-    new_val :: Float64,
-    temperature :: Temperature = nothing
+    interface::SystemInterface,
+    new_val::Float64,
+    temperature::Temperature=nothing
 )
     interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
@@ -252,8 +252,8 @@ end
 Set the maximum power that can be delivered to the given value.
 """
 function set_max_power!(
-    interface :: SystemInterface,
-    value :: Union{Nothing, Float64}
+    interface::SystemInterface,
+    value::Union{Nothing,Float64}
 )
     interface.max_power = value
 end
@@ -263,7 +263,7 @@ end
 
 Reset the interface back to zero.
 """
-function reset!(interface :: SystemInterface)
+function reset!(interface::SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
     interface.temperature = nothing
@@ -277,7 +277,7 @@ To simultaneously define what is required and then hold references to instances 
 whole system has been loaded, it maps a medium category to either nothing (before systems
 are linked) or a SystemInterface instance.
 """
-const InterfaceMap = Dict{MediumCategory, Union{Nothing, SystemInterface}}
+const InterfaceMap = Dict{MediumCategory,Union{Nothing,SystemInterface}}
 
 """
     balance_on(interface, unit)
@@ -301,9 +301,9 @@ without having to check if its connected to a Bus or directly to a system.
 - `Float64`: The temperature of the interface
 """
 function balance_on(
-    interface :: SystemInterface,
-    unit :: ControlledSystem
-) :: Tuple{Float64, Float64, Temperature}
+    interface::SystemInterface,
+    unit::ControlledSystem
+)::Tuple{Float64,Float64,Temperature}
     return interface.balance, 0.0, interface.temperature
 end
 
@@ -317,15 +317,19 @@ the end of it. If it is not zero, either the simulation failed to correctly calc
 energy balance of the entire system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
-function balance(unit :: ControlledSystem) :: Float64
+function balance(unit::ControlledSystem)::Float64
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
-        if inface !== nothing balance += inface.balance end
+        if inface !== nothing
+            balance += inface.balance
+        end
     end
 
     for outface in values(unit.output_interfaces)
-        if outface !== nothing balance += outface.balance end
+        if outface !== nothing
+            balance += outface.balance
+        end
     end
 
     return balance
@@ -339,12 +343,16 @@ Reset the given energy system back to zero.
 For most energy systems this only resets the balances on the system interfaces but some
 systems might require more complex reset handling.
 """
-function reset(unit :: ControlledSystem)
+function reset(unit::ControlledSystem)
     for inface in values(unit.input_interfaces)
-        if inface !== nothing reset!(inface) end
+        if inface !== nothing
+            reset!(inface)
+        end
     end
     for outface in values(unit.output_interfaces)
-        if outface !== nothing reset!(outface) end
+        if outface !== nothing
+            reset!(outface)
+        end
     end
 end
 
@@ -359,9 +367,9 @@ Perform the control calculations for the given energy system.
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function control(
-    unit :: ControlledSystem,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::ControlledSystem,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
 end
@@ -377,9 +385,9 @@ Perform the production calculations for the given energy system.
 - `watt_to_wh::Function`: Utility function to calculate work from a given power
 """
 function produce(
-    unit :: ControlledSystem,
-    parameters :: Dict{String, Any},
-    watt_to_wh :: Function
+    unit::ControlledSystem,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function
 )
     # default implementation is to do nothing
 end
@@ -397,9 +405,9 @@ For non-storage systems this function does nothing.
 - `watt_to_wh::Function`: Utility function to calculate work from a given power
 """
 function load(
-    unit :: ControlledSystem,
-    parameters :: Dict{String, Any},
-    watt_to_wh :: Function
+    unit::ControlledSystem,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function
 )
     # default implementation is to do nothing
 end
@@ -411,7 +419,7 @@ Distribute the energy inputs and outputs of a bus.
 
 For non-bus systems this function does nothing.
 """
-function distribute!(unit :: ControlledSystem)
+function distribute!(unit::ControlledSystem)
     # default implementation is to do nothing
 end
 
@@ -423,7 +431,7 @@ Specify which outputs an energy system can provide.
 For the special values "IN" and "OUT" a medium category is required for fetching the actual
 value, while this method only specifies that there is an input or output.
 """
-function output_values(unit :: EnergySystem) :: Vector{String}
+function output_values(unit::EnergySystem)::Vector{String}
     return ["IN", "OUT"]
 end
 
@@ -445,7 +453,7 @@ Returns:
 Throws:
 - `KeyError`: The key value requested must be one the energy system can provide
 """
-function output_value(unit :: EnergySystem, key :: OutputKey) :: Float64
+function output_value(unit::EnergySystem, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "OUT"
@@ -492,7 +500,7 @@ determines which systems provide energy to which other systems.
 - `systems::Grouping`: A set of systems receiving energy. As systems might have multiple
     outputs, this is used to set them all at once.
 """
-function link_production_with(unit :: ControlledSystem, systems :: Grouping)
+function link_production_with(unit::ControlledSystem, systems::Grouping)
     if isa(unit, Bus)
         for system in each(systems)
             if isa(system, Bus)
@@ -549,9 +557,9 @@ Check the energy balance of the given systems and return warnings of any violati
     system that has a non-zero energy balance and the value of that balance.
 """
 function check_balances(
-    systems :: Grouping,
-    epsilon :: Float64
-) :: Vector{Tuple{String, Float64}}
+    systems::Grouping,
+    epsilon::Float64
+)::Vector{Tuple{String,Float64}}
     warnings = []
 
     for (key, unit) in pairs(systems)
@@ -597,11 +605,11 @@ In this example the control of system A is performed first, then control and pro
 system B and finally production of system A.
 """
 function perform_steps(
-    systems :: Grouping,
-    order_of_operations :: StepInstructions,
-    parameters :: Dict{String, Any}
+    systems::Grouping,
+    order_of_operations::StepInstructions,
+    parameters::Dict{String,Any}
 )
-    watt_to_wh = function (watts :: Float64)
+    watt_to_wh = function (watts::Float64)
         watts * Float64(parameters["time_step_seconds"]) / 3600.0
     end
 

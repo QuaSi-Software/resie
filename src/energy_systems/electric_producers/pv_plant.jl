@@ -8,19 +8,19 @@ some system losses. The amplitude parameter is a scaling factor, but is not an a
 power value.
 """
 mutable struct PVPlant <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    energy_profile :: Profile
-    scaling_factor :: Float64
+    energy_profile::Profile
+    scaling_factor::Float64
 
-    supply :: Float64
+    supply::Float64
 
-    function PVPlant(uac :: String, config :: Dict{String, Any})
+    function PVPlant(uac::String, config::Dict{String,Any})
 
         # load energy profile from path
         energy_profile = Profile(config["energy_profile_file_path"])
@@ -42,11 +42,11 @@ mutable struct PVPlant <: ControlledSystem
     end
 end
 
-function output_values(unit :: PVPlant) :: Vector{String}
+function output_values(unit::PVPlant)::Vector{String}
     return ["OUT", "Supply"]
 end
 
-function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
+function output_value(unit::PVPlant, key::OutputKey)::Float64
     if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Supply"
@@ -56,17 +56,17 @@ function output_value(unit :: PVPlant, key :: OutputKey) :: Float64
 end
 
 function control(
-    unit :: PVPlant,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::PVPlant,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
-   
+
 end
 
 
-function produce(unit :: PVPlant, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::PVPlant, parameters::Dict{String,Any}, watt_to_wh::Function)
     outface = unit.output_interfaces[m_e_ac_230v]
     add!(outface, unit.supply)
 end
