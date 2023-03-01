@@ -4,13 +4,13 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts :: Float64)
+watt_to_wh = function (watts::Float64)
     watts * 900 / 3600.0
 end
 
 function test_heat_pump_demand_driven_correct_order()
-    systems_config = Dict{String, Any}(
-        "TST_DEM_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -19,7 +19,7 @@ function test_heat_pump_demand_driven_correct_order()
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
         ),
-        "TST_SRC_01" => Dict{String, Any}(
+        "TST_SRC_01" => Dict{String,Any}(
             "type" => "DispatchableSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
@@ -28,32 +28,32 @@ function test_heat_pump_demand_driven_correct_order()
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 6000
         ),
-        "TST_GRI_01" => Dict{String, Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
             "production_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
-        "TST_HP_01" => Dict{String, Any}(
+        "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "production_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
             "power" => 12000,
             "fixed_cop" => 3.0
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
+    _ = Resie.load_medien(Array{Any}(undef, 0))
     systems = Resie.load_systems(systems_config)
     heat_pump = systems["TST_HP_01"]
     source = systems["TST_SRC_01"]
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )

@@ -4,22 +4,22 @@ using Resie
 using Resie.EnergySystems
 
 function test_load_from_dict()
-    systems_config = Dict{String, Any}(
-        "TST_BT_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [],
             "capacity" => 40000,
             "load" => 20000,
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "Default"
             )
         ),
-        "TST_HP_01" => Dict{String, Any}(
+        "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_BT_01"],
             "production_refs" => [],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
@@ -37,8 +37,8 @@ function test_load_from_dict()
 end
 
 function test_ooo_for_heat_pumps_wrong()
-    systems_config = Dict{String, Any}(
-        "TST_DEM_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -47,7 +47,7 @@ function test_ooo_for_heat_pumps_wrong()
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
         ),
-        "TST_SRC_01" => Dict{String, Any}(
+        "TST_SRC_01" => Dict{String,Any}(
             "type" => "DispatchableSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
@@ -56,18 +56,18 @@ function test_ooo_for_heat_pumps_wrong()
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 6000
         ),
-        "TST_GRI_01" => Dict{String, Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
             "production_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
-        "TST_HP_01" => Dict{String, Any}(
+        "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "production_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
             "power" => 12000,
@@ -96,22 +96,22 @@ function test_ooo_for_heat_pumps_wrong()
 end
 
 function test_ooo_bus_to_bus()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "input_priorities" => ["TST_BFT_01", "TST_GRI_01"]
         ),
-        "TST_BFT_01" => Dict{String, Any}(
+        "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -120,14 +120,14 @@ function test_ooo_bus_to_bus()
             "capacity" => 40000,
             "load" => 20000
         ),
-        "TST_BUS_02" => Dict{String, Any}(
+        "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "input_priorities" => ["TST_BFT_02", "TST_BUS_01"]
         ),
-        "TST_BFT_02" => Dict{String, Any}(
+        "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -136,7 +136,7 @@ function test_ooo_bus_to_bus()
             "capacity" => 20000,
             "load" => 10000
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -178,51 +178,51 @@ function test_ooo_bus_to_bus()
 end
 
 function test_ooo_storage_loading_switch()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
-        "TST_GRI_02" => Dict{String, Any}(
+        "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_02"],
             "is_source" => true,
         ),
-        "TST_GBO_01" => Dict{String, Any}(
+        "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
             "production_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
             "power" => 40000
         ),
-        "TST_GBO_02" => Dict{String, Any}(
+        "TST_GBO_02" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
             "production_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
             "power" => 40000
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01", "TST_BFT_01"],
             "input_priorities" => ["TST_GBO_01", "TST_BFT_01", "TST_GBO_02"]
         ),
-        "TST_BFT_01" => Dict{String, Any}(
+        "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -231,7 +231,7 @@ function test_ooo_storage_loading_switch()
             "capacity" => 40000,
             "load" => 0
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -274,45 +274,45 @@ function test_ooo_storage_loading_switch()
 end
 
 function test_ooo_bus_output_priorities()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
-        "TST_GBO_01" => Dict{String, Any}(
+        "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BUS_01"],
             "production_refs" => ["TST_BUS_01"],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
             "power" => 10000
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02", "TST_BUS_03"],
             "input_priorities" => ["TST_GBO_01"]
         ),
-        "TST_BUS_02" => Dict{String, Any}(
+        "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01"],
             "input_priorities" => ["TST_BUS_01"]
         ),
-        "TST_BUS_03" => Dict{String, Any}(
+        "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_02"],
             "input_priorities" => ["TST_BUS_01"]
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -321,7 +321,7 @@ function test_ooo_bus_output_priorities()
             "static_temperature" => 60,
             "scale" => 1
         ),
-        "TST_DEM_02" => Dict{String, Any}(
+        "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],

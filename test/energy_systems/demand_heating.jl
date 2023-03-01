@@ -4,20 +4,20 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts :: Float64)
+watt_to_wh = function (watts::Float64)
     watts * 900 / 3600.0
 end
 
 function test_demand_heating_temperature_values()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01"],
             "is_source" => true,
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -27,11 +27,11 @@ function test_demand_heating_temperature_values()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
+    _ = Resie.load_medien(Array{Any}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )

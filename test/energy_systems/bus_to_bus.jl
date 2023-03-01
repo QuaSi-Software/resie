@@ -4,34 +4,34 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts :: Float64)
+watt_to_wh = function (watts::Float64)
     watts * 900 / 3600.0
 end
 
 function test_busses_communicate_demand()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02"],
             "input_priorities" => ["TST_GRI_01"]
         ),
-        "TST_BUS_02" => Dict{String, Any}(
+        "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01"],
             "input_priorities" => ["TST_BUS_01"]
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -41,14 +41,14 @@ function test_busses_communicate_demand()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
+    _ = Resie.load_medien(Array{Any}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
     bus_1 = systems["TST_BUS_01"]
     bus_2 = systems["TST_BUS_02"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )
@@ -108,45 +108,45 @@ end
 end
 
 function test_demand_over_busses_supply_is_transformer()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
-        "TST_GBO_01" => Dict{String, Any}(
+        "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BUS_01"],
             "production_refs" => ["TST_BUS_01"],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
             "power" => 10000
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02", "TST_BUS_03"],
             "input_priorities" => ["TST_GBO_01"]
         ),
-        "TST_BUS_02" => Dict{String, Any}(
+        "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01"],
             "input_priorities" => ["TST_BUS_01"]
         ),
-        "TST_BUS_03" => Dict{String, Any}(
+        "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_02"],
             "input_priorities" => ["TST_BUS_01"]
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -155,7 +155,7 @@ function test_demand_over_busses_supply_is_transformer()
             "static_temperature" => 60,
             "scale" => 1
         ),
-        "TST_DEM_02" => Dict{String, Any}(
+        "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -165,7 +165,7 @@ function test_demand_over_busses_supply_is_transformer()
             "scale" => 1
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
+    _ = Resie.load_medien(Array{Any}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand_1 = systems["TST_DEM_01"]
     demand_2 = systems["TST_DEM_02"]
@@ -175,7 +175,7 @@ function test_demand_over_busses_supply_is_transformer()
     bus_2 = systems["TST_BUS_02"]
     bus_3 = systems["TST_BUS_03"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )
@@ -339,22 +339,22 @@ end
 end
 
 function test_busses_communicate_storage_potential()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "input_priorities" => ["TST_BFT_01", "TST_GRI_01"]
         ),
-        "TST_BFT_01" => Dict{String, Any}(
+        "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -363,14 +363,14 @@ function test_busses_communicate_storage_potential()
             "capacity" => 40000,
             "load" => 20000
         ),
-        "TST_BUS_02" => Dict{String, Any}(
+        "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "input_priorities" => ["TST_BFT_02", "TST_BUS_01"]
         ),
-        "TST_BFT_02" => Dict{String, Any}(
+        "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -379,7 +379,7 @@ function test_busses_communicate_storage_potential()
             "capacity" => 20000,
             "load" => 10000
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -389,7 +389,7 @@ function test_busses_communicate_storage_potential()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
+    _ = Resie.load_medien(Array{Any}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
@@ -398,7 +398,7 @@ function test_busses_communicate_storage_potential()
     tank_1 = systems["TST_BFT_01"]
     tank_2 = systems["TST_BFT_02"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )
