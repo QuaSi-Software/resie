@@ -28,8 +28,10 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 (to file), this function takes only one argument, namely the project config, and returns
 nothing.
 """
-function run_simulation(project_config :: Dict{AbstractString, Any})
-    _ = load_medien( ("user_defined_media" in keys(project_config) ? project_config["user_defined_media"] : Array{Any}(undef,0)) )
+function run_simulation(project_config::Dict{AbstractString,Any})
+    _ = load_medien(("user_defined_media" in keys(project_config)
+                     ? project_config["user_defined_media"]
+                     : Array{Any}(undef, 0)))
     systems = load_systems(project_config["energy_systems"])
     step_order = order_of_operations(systems)
 
@@ -50,7 +52,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
 
     nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
 
-    parameters = Dict{String, Any}(
+    parameters = Dict{String,Any}(
         "time" => start_timestamp,
         "time_step_seconds" => time_step,
         "epsilon" => 1e-9
@@ -60,8 +62,13 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
     reset_file(project_config["io_settings"]["output_file"], outputs)
 
     ### set data for profile line plot
-    # check if profile line plot should be created (checks if output_plot is present or if it is "nothing")
-    plot_bool = !( !(haskey(project_config["io_settings"], "output_plot")) ||  project_config["io_settings"]["output_plot"] === "nothing" )
+    # check if profile line plot should be created (checks if output_plot is present or if
+    # it is "nothing")
+    plot_bool = !(
+        !(haskey(project_config["io_settings"], "output_plot"))
+        ||
+        project_config["io_settings"]["output_plot"] === "nothing"
+    )
 
     if plot_bool
         # set keys for output plots    
@@ -75,7 +82,8 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
     end
 
     ### prepare array for output of all energy flow of all system interfaces
-    # get number of system interfaces for preallocation and medium, source and target of each interface for sankey diagram
+    # get number of system interfaces for preallocation and medium, source and target of
+    # each interface for sankey diagram
     nr_of_interfaces = 0
     medium_of_interfaces = []
     output_all_sourcenames = []
@@ -90,7 +98,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
                     #get name of source and sink
                     push!(output_all_sourcenames, each_outputinterface[2].source.uac)
                     push!(output_all_targetnames, each_outputinterface[2].target.uac)
-                    
+
                     # get name of medium
                     if isdefined(each_outputinterface[2].target, :medium)
                         push!(medium_of_interfaces, each_outputinterface[2].target.medium)
@@ -107,7 +115,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
                 #get name of source and sink
                 push!(output_all_sourcenames, each_outputinterface.source.uac)
                 push!(output_all_targetnames, each_outputinterface.target.uac)
-                
+
                 # get name of medium
                 if isdefined(each_outputinterface.target, :medium)
                     push!(medium_of_interfaces, each_outputinterface.target.medium)
@@ -119,7 +127,11 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
             end
         end
     end
-    println(length(medium_of_interfaces) !== nr_of_interfaces ? "Warning: error in extracting information from input file for sankey plot." : "")
+    println(
+        length(medium_of_interfaces) !== nr_of_interfaces
+        ? "Warning: error in extracting information from input file for sankey plot."
+        : ""
+    )
     # preallocate for speed: Matrix with data of interfaces in every timestep
     output_all_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
 
@@ -151,18 +163,20 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
         )
 
         # get all data of all interfaces in every timestep for Sankey
-        # if the balance of an interface was not zero, the actual energy that was flowing is written to the outputs.
-        # Attention: This can lead to overfilling of demands which is currenlty not visible in the sankey diagram!
+        # if the balance of an interface was not zero, the actual energy that was flowing
+        # is written to the outputs.
+        # Attention: This can lead to overfilling of demands which is currenlty not visible
+        # in the sankey diagram!
         n = 1
         for each_system in systems
             for each_outputinterface in each_system[2].output_interfaces
                 if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                     if isdefined(each_outputinterface[2], :target)
-                        output_all_values[steps,n] = (each_outputinterface[2].sum_abs_change + each_outputinterface[2].balance) / 2 #@ToDo: correct???
+                        output_all_values[steps, n] = (each_outputinterface[2].sum_abs_change + each_outputinterface[2].balance) / 2 #@ToDo: correct???
                         n += 1
                     end
                 elseif isdefined(each_outputinterface, :target)
-                    output_all_values[steps,n] = (each_outputinterface.sum_abs_change + each_outputinterface.balance) / 2 #@ToDo: correct???
+                    output_all_values[steps, n] = (each_outputinterface.sum_abs_change + each_outputinterface.balance) / 2 #@ToDo: correct???
                     n += 1
                 end
             end
@@ -170,7 +184,7 @@ function run_simulation(project_config :: Dict{AbstractString, Any})
 
         # gather data for profile line plot (@ToDo: may extract from all data in post processing)
         if plot_bool
-            outputs_plot_data[steps,:]  = geather_output_data(
+            outputs_plot_data[steps, :] = geather_output_data(
                 outputs_plot_keys,
                 parameters["time"]
             )
