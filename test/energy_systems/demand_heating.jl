@@ -27,7 +27,7 @@ function test_demand_heating_temperature_values()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_medien(Array{Any}(undef, 0))
+    _ = Resie.load_media(Array{String}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
 
@@ -48,8 +48,8 @@ function test_demand_heating_temperature_values()
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
-    @test demand.input_interfaces[EnergySystems.m_h_w_ht1].balance == -75.0
-    @test demand.input_interfaces[EnergySystems.m_h_w_ht1].temperature == 55.0
+    @test demand.input_interfaces[:m_h_w_ht1].balance == -75.0
+    @test demand.input_interfaces[:m_h_w_ht1].temperature == 55.0
 end
 
 @testset "demand_heating_temperature_values" begin

@@ -217,7 +217,7 @@ function create_sankey(
     # remove oxygen from data as the energy of oxygen is considered to be zero
     interface_new = 1
     for _ in 1:nr_of_interfaces
-        if medium_of_interfaces[interface_new] == EnergySystems.m_c_g_o2
+        if medium_of_interfaces[interface_new] == :m_c_g_o2
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
             deleteat!(output_all_value_sum, interface_new)

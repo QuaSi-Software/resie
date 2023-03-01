@@ -12,7 +12,7 @@ mutable struct FixedSupply <: ControlledSystem
     uac::String
     controller::Controller
     sys_function::SystemFunction
-    medium::MediumCategory
+    medium::Symbol
 
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap

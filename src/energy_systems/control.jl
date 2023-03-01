@@ -1,5 +1,5 @@
 """Convenience type alias for requirements of energy systems."""
-const EnSysRequirements = Dict{String,Tuple{Type,Union{Nothing,MediumCategory}}}
+const EnSysRequirements = Dict{String,Tuple{Type,Union{Nothing,Symbol}}}
 
 """
 Prototype for Condition, from which instances of the latter are derived.

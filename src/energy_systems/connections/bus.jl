@@ -13,7 +13,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
     uac::String
     controller::Controller
     sys_function::SystemFunction
-    medium::MediumCategory
+    medium::Symbol
 
     input_interfaces::Vector{SystemInterface}
     output_interfaces::Vector{SystemInterface}

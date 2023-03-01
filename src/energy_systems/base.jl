@@ -19,9 +19,8 @@ to the simulation as a whole as well as provide functionality on groups of energ
 """
 module EnergySystems
 
-export MediumCategory, EnergySystem, ControlledSystem, each, Grouping,
-    link_production_with, check_balances, perform_steps, output_values, output_value,
-    StepInstruction, StepInstructions
+export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_production_with,
+    perform_steps, output_values, output_value, StepInstruction, StepInstructions
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -46,45 +45,34 @@ The names are structured in a composite of segments. For example, these are:
     3. ac: The physical medium, in this case AC current
     4. 230v: Additional attributes of nominal value or ranges numbered through
 """
-@enum(MediumCategory,
+medium_categories = Set{Symbol}([
     # electricity
-    m_e_ac_230v,
+    :m_e_ac_230v,
 
     # chemicals - gasses
-    m_c_g_natgas,
-    m_c_g_h2,
-    m_c_g_o2,
+    :m_c_g_natgas,
+    :m_c_g_h2,
+    :m_c_g_o2,
 
     # heat - low temperature water
-    m_h_w_lt1,
-    m_h_w_lt2,
-    m_h_w_lt3,
-    m_h_w_lt4,
-    m_h_w_lt5,
+    :m_h_w_lt1,
+    :m_h_w_lt2,
+    :m_h_w_lt3,
+    :m_h_w_lt4,
+    :m_h_w_lt5,
 
     # heat - high temperature water
-    m_h_w_ht1,
-    m_h_w_ht2,
-    m_h_w_ht3,
-    m_h_w_ht4,
-    m_h_w_ht5,
-
-    # user-defined medium_names, limited to 10 for now
-    m_user_01,
-    m_user_02,
-    m_user_03,
-    m_user_04,
-    m_user_05,
-    m_user_06,
-    m_user_07,
-    m_user_08,
-    m_user_09,
-    m_user_10,)
+    :m_h_w_ht1,
+    :m_h_w_ht2,
+    :m_h_w_ht3,
+    :m_h_w_ht4,
+    :m_h_w_ht5,
+])
 
 """
-Convenience type for mapping the medium names as string to the medium names as Type MediumCategory
+Convenience type for mapping the medium names as string to the medium names as Type Symbol
 """
-const MediumCategoryMap = Dict{String,MediumCategory}()
+const MediumCategoryMap = Dict{String,Symbol}()
 
 """
 Enumerations of the archetype of an energy system describing its general function.
@@ -144,7 +132,7 @@ need to parse the user-submitted config options for every time step.
 """
 Base.@kwdef struct OutputKey
     unit::EnergySystem
-    medium::Union{Nothing,MediumCategory}
+    medium::Union{Nothing,Symbol}
     value_key::String
 end
 
@@ -283,7 +271,7 @@ To simultaneously define what is required and then hold references to instances 
 whole system has been loaded, it maps a medium category to either nothing (before systems
 are linked) or a SystemInterface instance.
 """
-const InterfaceMap = Dict{MediumCategory,Union{Nothing,SystemInterface}}
+const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
 
 """
     balance_on(interface, unit)

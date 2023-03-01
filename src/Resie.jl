@@ -29,9 +29,6 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
-    _ = load_medien(("user_defined_media" in keys(project_config)
-                     ? project_config["user_defined_media"]
-                     : Array{Any}(undef, 0)))
     systems = load_systems(project_config["energy_systems"])
     step_order = order_of_operations(systems)
 
