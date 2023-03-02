@@ -70,9 +70,17 @@ medium_categories = Set{Symbol}([
 ])
 
 """
-Convenience type for mapping the medium names as string to the medium names as Type Symbol
+register_media(categories)
+
+Add the given medium categories to the set of all medium categories.
 """
-const MediumCategoryMap = Dict{String,Symbol}()
+function register_media(categories::Vector{Symbol})
+    for cat in categories
+        push!(medium_categories, cat)
+    end
+end
+
+register_media(category::Symbol) = register_media([category,])
 
 """
 Enumerations of the archetype of an energy system describing its general function.

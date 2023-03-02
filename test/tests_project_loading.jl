@@ -36,9 +36,43 @@ function test_load_from_dict()
     @test systems["TST_HP_01"].power == 20000
 end
 
+function test_load_custom_medium_categories()
+    systems_config = Dict{String,Any}(
+        "TST_ELY_01" => Dict{String,Any}(
+            "type" => "Electrolyser",
+            "control_refs" => [],
+            "production_refs" => [],
+            "power" => 1000,
+            "m_el_in" => "m_e_dc_1000v",
+            "m_heat_out" => "m_h_w_55c",
+            "m_h2_out" => "m_c_g_h2-pure",
+            "m_o2_out" => "m_c_g_o2-impure",
+            "strategy" => Dict{String,Any}(
+                "name" => "Default"
+            )
+        ),
+    )
+    systems = Resie.load_systems(systems_config)
+    electrolyser = systems["TST_ELY_01"]
+
+    @test electrolyser.m_el_in == Symbol("m_e_dc_1000v")
+    @test electrolyser.m_heat_out == Symbol("m_h_w_55c")
+    @test electrolyser.m_h2_out == Symbol("m_c_g_h2-pure")
+    @test electrolyser.m_o2_out == Symbol("m_c_g_o2-impure")
+
+    @test Symbol("m_e_dc_1000v") in EnergySystems.medium_categories
+    @test Symbol("m_h_w_55c") in EnergySystems.medium_categories
+    @test Symbol("m_c_g_h2-pure") in EnergySystems.medium_categories
+    @test Symbol("m_c_g_o2-impure") in EnergySystems.medium_categories
+end
+
 @testset "project_loading_tests" begin
     @testset "load_from_dict" begin
         test_load_from_dict()
+    end
+
+    @testset "load_custom_medium_categories" begin
+        test_load_custom_medium_categories()
     end
 
     include("order_of_operations/bus_output_priorities.jl")
