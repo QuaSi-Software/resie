@@ -7,22 +7,22 @@ might still have a maximum power intake in a single time step, but can consume a
 of this.
 """
 mutable struct DispatchableSink <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
-    medium :: MediumCategory
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
+    medium::Symbol
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    max_power_profile :: Profile
-    scaling_factor :: Float64
+    max_power_profile::Profile
+    scaling_factor::Float64
 
-    max_power :: Float64
+    max_power::Float64
 
-    function DispatchableSink(uac :: String, config :: Dict{String, Any})
+    function DispatchableSink(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+        medium = Symbol(config["medium"])
 
         return new(
             uac, # uac
@@ -44,11 +44,11 @@ mutable struct DispatchableSink <: ControlledSystem
     end
 end
 
-function output_values(unit :: DispatchableSink) :: Vector{String}
+function output_values(unit::DispatchableSink)::Vector{String}
     return ["IN", "Max_Power"]
 end
 
-function output_value(unit :: DispatchableSink, key :: OutputKey) :: Float64
+function output_value(unit::DispatchableSink, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Max_Power"
@@ -58,16 +58,16 @@ function output_value(unit :: DispatchableSink, key :: OutputKey) :: Float64
 end
 
 function control(
-    unit :: DispatchableSink,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::DispatchableSink,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
     unit.max_power = unit.scaling_factor * Profiles.power_at_time(unit.max_power_profile, parameters["time"])
     set_max_power!(unit.input_interfaces[unit.medium], unit.max_power)
 end
 
-function produce(unit :: DispatchableSink, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.medium]
     balance, _, _ = balance_on(inface, inface.source)
     if balance > 0.0

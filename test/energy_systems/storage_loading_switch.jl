@@ -4,27 +4,27 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts :: Float64)
+watt_to_wh = function (watts::Float64)
     watts * 900 / 3600.0
 end
 
 function test_primary_producer_can_load_storage()
-    systems_config = Dict{String, Any}(
-        "TST_GRI_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
-        "TST_GRI_02" => Dict{String, Any}(
+        "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
             "production_refs" => ["TST_GBO_02"],
             "is_source" => true,
         ),
-        "TST_GBO_01" => Dict{String, Any}(
+        "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
             "production_refs" => [
@@ -37,25 +37,25 @@ function test_primary_producer_can_load_storage()
             },
             "power" => 10000
         ),
-        "TST_GBO_02" => Dict{String, Any}(
+        "TST_GBO_02" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
             "production_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
             "power" => 40000
         ),
-        "TST_BUS_01" => Dict{String, Any}(
+        "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01", "TST_BFT_01"],
             "input_priorities" => ["TST_GBO_01", "TST_BFT_01", "TST_GBO_02"]
         ),
-        "TST_BFT_01" => Dict{String, Any}(
+        "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [
@@ -64,7 +64,7 @@ function test_primary_producer_can_load_storage()
             "capacity" => 40000,
             "load" => 0
         ),
-        "TST_DEM_01" => Dict{String, Any}(
+        "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
@@ -76,7 +76,6 @@ function test_primary_producer_can_load_storage()
             "static_temperature" => 60
         ),
     )
-    _ = Resie.load_medien( Array{Any}(undef,0) )
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid_1 = systems["TST_GRI_01"]
@@ -86,7 +85,7 @@ function test_primary_producer_can_load_storage()
     boiler_1 = systems["TST_GBO_01"]
     boiler_2 = systems["TST_GBO_02"]
 
-    simulation_parameters = Dict{String, Any}(
+    simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )
@@ -107,7 +106,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.control(grid_1, systems, simulation_parameters)
     EnergySystems.control(grid_2, systems, simulation_parameters)
 
-    demand.input_interfaces[EnergySystems.m_h_w_ht1].bala
+    demand.input_interfaces[:m_h_w_ht1].bala
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
@@ -130,14 +129,14 @@ function test_primary_producer_can_load_storage()
     # highest demand temperature on the bus". this behaviour is not wrong, but unintuitive
 
     balance, potential, temperature = EnergySystems.balance_on(
-        tank_2.output_interfaces[EnergySystems.m_h_w_ht1], bus_2
+        tank_2.output_interfaces[:m_h_w_ht1], bus_2
     )
     @test balance == 0.0
     @test potential == -10075.0
     @test temperature === nothing
 
     balance, potential, temperature = EnergySystems.balance_on(
-        tank_1.output_interfaces[EnergySystems.m_h_w_ht1], bus_1
+        tank_1.output_interfaces[:m_h_w_ht1], bus_1
     )
     @test balance == 0.0
     @test potential == -30075.0

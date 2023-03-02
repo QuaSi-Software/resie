@@ -1,51 +1,49 @@
-function strt_sm_use_surplus_in_cycle(parameters :: Dict{String, Any}) :: StateMachine
+function strt_sm_use_surplus_in_cycle(parameters::Dict{String,Any})::StateMachine
     StateMachine(
         UInt(1), # state
-        Dict{UInt, String}( # state_names
+        Dict{UInt,String}( # state_names
             1 => "Load",
             2 => "Produce",
         ),
-        Dict{UInt, TruthTable}( # transitions
+        Dict{UInt,TruthTable}( # transitions
             1 => TruthTable( # State: Load
                 conditions=[
                     Condition(
                         "Buffer >= X%",
-                        Dict{String, Any}(
+                        Dict{String,Any}(
                             "percentage" => parameters["percentage"]
                         )
                     ),
                     Condition(
                         "HP is running",
-                        Dict{String, Any}()
+                        Dict{String,Any}()
                     )
                 ],
-                table_data=Dict{Tuple, UInt}(
-                    (false,false) => 2,
-                    (false,true) => 2,
-                    (true,false) => 1,
-                    (true,true) => 2,
+                table_data=Dict{Tuple,UInt}(
+                    (false, false) => 2,
+                    (false, true) => 2,
+                    (true, false) => 1,
+                    (true, true) => 2,
                 )
-            ),
-
-            2 => TruthTable( # State: Produce
+            ), 2 => TruthTable( # State: Produce
                 conditions=[
                     Condition(
                         "Buffer >= X%",
-                        Dict{String, Any}(
+                        Dict{String,Any}(
                             "percentage" => parameters["percentage"]
                         )
                     ),
                     Condition(
                         "HP is running",
-                        Dict{String, Any}()
+                        Dict{String,Any}()
                     )
                 ],
-                table_data=Dict{Tuple, UInt}(
-                        (false,false) => 2,
-                        (false,true) => 2,
-                        (true,false) => 1,
-                        (true,true) => 2,
-                    )
+                table_data=Dict{Tuple,UInt}(
+                    (false, false) => 2,
+                    (false, true) => 2,
+                    (true, false) => 1,
+                    (true, true) => 2,
+                )
             ),
         )
     )
@@ -68,7 +66,7 @@ OP_STRATS["use_surplus_in_cycle"] = OperationalStrategyType(
         "HP is running",
         "Buffer >= X%",
     ],
-    strategy_parameters=Dict{String, Any}(
+    strategy_parameters=Dict{String,Any}(
         "percentage" => 0.95,
     ),
     required_systems=EnSysRequirements()

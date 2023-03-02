@@ -1,5 +1,5 @@
 """Convenience type alias for requirements of energy systems."""
-const EnSysRequirements = Dict{String, Tuple{Type, Union{Nothing, MediumCategory}}}
+const EnSysRequirements = Dict{String,Tuple{Type,Union{Nothing,Symbol}}}
 
 """
 Prototype for Condition, from which instances of the latter are derived.
@@ -12,22 +12,22 @@ required for operational strategies (and therefore conditions) to work.
 """
 struct ConditionPrototype
     """An identifiable name."""
-    name :: String
+    name::String
 
     """Parameters the condition requires."""
-    parameters :: Dict{String, Any}
+    parameters::Dict{String,Any}
 
     """Defines which systems the condition requires, indexed by an internal name.
 
     For some systems a medium is required as they can take varying values.
     """
-    required_systems :: EnSysRequirements
+    required_systems::EnSysRequirements
 
     """Implementation of the boolean expression the condition represents."""
-    check_function :: Function
+    check_function::Function
 end
 
-CONDITION_PROTOTYPES = Dict{String, ConditionPrototype}()
+CONDITION_PROTOTYPES = Dict{String,ConditionPrototype}()
 
 include("conditions/base.jl")
 
@@ -39,13 +39,13 @@ required parameters and energy systems.
 """
 struct Condition
     """From which prototype the condition is derived."""
-    prototype :: ConditionPrototype
+    prototype::ConditionPrototype
 
     """Hold parameters the condition requires."""
-    parameters :: Dict{String, Any}
+    parameters::Dict{String,Any}
 
     """The systems linked to the condition indexed by an internal name."""
-    linked_systems :: Grouping
+    linked_systems::Grouping
 end
 
 """
@@ -53,7 +53,7 @@ end
 
 Get the linked system of the given name for a condition.
 """
-function rel(condition :: Condition, name :: String) :: ControlledSystem
+function rel(condition::Condition, name::String)::ControlledSystem
     return condition.linked_systems[name]
 end
 
@@ -70,9 +70,9 @@ Constructor for Condition.
     energy systems are required, but systems have been linked yet
 """
 function Condition(
-    name :: String,
-    parameters :: Dict{String, Any}
-) :: Condition
+    name::String,
+    parameters::Dict{String,Any}
+)::Condition
     prototype = CONDITION_PROTOTYPES[name]
     return Condition(
         prototype,
@@ -89,7 +89,7 @@ Look for the condition's required systems in the given set and link the conditio
 For example, if a condition required a system "grid_out" of type GridConnection and medium
 m_e_ac_230v, it will look through the set of given systems and link to the first match.
 """
-function link(condition :: Condition, systems :: Grouping)
+function link(condition::Condition, systems::Grouping)
     for (name, req_unit) in pairs(condition.prototype.required_systems)
         found_link = false
         for unit in each(systems)
@@ -108,8 +108,10 @@ function link(condition :: Condition, systems :: Grouping)
         end
 
         if !found_link
-            throw(KeyError("Could not find match for required system $name "
-                * "for condition $(condition.prototype.name)"))
+            throw(KeyError(
+                    "Could not find match for required system $name "
+                    * "for condition $(condition.prototype.name)"
+            ))
         end
     end
 end
@@ -123,7 +125,7 @@ The systems are the same as the control_refs project config entry, meaning this 
 input, but correction configuration should have been checked beforehand by automated
 mechanisms. See also [`link`](@ref) for how linking conditions works.
 """
-function link_control_with(unit :: ControlledSystem, systems :: Grouping)
+function link_control_with(unit::ControlledSystem, systems::Grouping)
     for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
             link(condition, systems)
@@ -139,7 +141,8 @@ function link_control_with(unit :: ControlledSystem, systems :: Grouping)
             if typeof(other_unit) <: req_type
                 if medium === nothing || (
                     hasfield(typeof(other_unit), Symbol("medium"))
-                    && other_unit.medium == medium
+                    &&
+                    other_unit.medium == medium
                 )
                     unit.controller.linked_systems[other_unit.uac] = other_unit
                 end
@@ -179,8 +182,8 @@ This example defines a transitions for a state machine with two states. If the c
 second state, otherwise the first.
 """
 Base.@kwdef struct TruthTable
-    conditions :: Vector{Condition}
-    table_data :: Dict{Tuple, UInt}
+    conditions::Vector{Condition}
+    table_data::Dict{Tuple,UInt}
 end
 
 """
@@ -194,29 +197,29 @@ implementations that require the simulation state as input.
 """
 mutable struct StateMachine
     """The current state of the state machine."""
-    state :: UInt
+    state::UInt
 
     """A map of state names indexes by their ID."""
-    state_names :: Dict{UInt, String}
+    state_names::Dict{UInt,String}
 
     """Maps states to a TruthTable that define the transitions in that state."""
-    transitions :: Dict{UInt, TruthTable}
+    transitions::Dict{UInt,TruthTable}
 
     """
     The number of steps the state machine has been in the current state.
 
     Starts counting at 1.
     """
-    time_in_state :: UInt
+    time_in_state::UInt
 end
 
 """
 Constructor for non-default fields.
 """
 StateMachine(
-    state :: UInt,
-    state_names :: Dict{UInt, String},
-    transitions :: Dict{UInt, TruthTable}
+    state::UInt,
+    state_names::Dict{UInt,String},
+    transitions::Dict{UInt,TruthTable}
 ) = StateMachine(
     state,
     state_names,
@@ -229,8 +232,8 @@ Default constructor that creates a state machine with only one state called "Def
 """
 StateMachine() = StateMachine(
     UInt(1),
-    Dict(UInt(1)=>"Default"),
-    Dict(UInt(1)=>TruthTable(
+    Dict(UInt(1) => "Default"),
+    Dict(UInt(1) => TruthTable(
         conditions=Vector(),
         table_data=Dict()
     ))
@@ -240,9 +243,9 @@ StateMachine() = StateMachine(
 Wraps around the mechanism of control for the operation strategy of an EnergySystem.
 """
 Base.@kwdef mutable struct Controller
-    strategy :: String
-    state_machine :: StateMachine
-    linked_systems :: Grouping
+    strategy::String
+    state_machine::StateMachine
+    linked_systems::Grouping
 end
 
 """
@@ -251,9 +254,9 @@ end
 Checks the controller of the given unit and moves the state machine to its new state.
 """
 function move_state(
-    unit :: ControlledSystem,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::ControlledSystem,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     machine = unit.controller.state_machine
     old_state = machine.state
@@ -282,28 +285,28 @@ A type of operational strategy that defines which parameters and systems a strat
 """
 Base.@kwdef struct OperationalStrategyType
     """Machine-readable name of the strategy."""
-    name :: String
+    name::String
 
     """Human-readable description that explains how to use the strategy."""
-    description :: String
+    description::String
 
     """Constructor method for the state machine used by the strategy."""
-    sm_constructor :: Function
+    sm_constructor::Function
 
     """A list of condition names that the strategy uses."""
-    conditions :: Vector{String}
+    conditions::Vector{String}
 
     """Required parameters for the strategy including those for the conditions."""
-    strategy_parameters :: Dict{String, Any}
+    strategy_parameters::Dict{String,Any}
 
     """Energy systems that the strategy requires for the correct order of execution.
 
     This differs from the system the conditions of the strategy require.
     """
-    required_systems :: EnSysRequirements
+    required_systems::EnSysRequirements
 end
 
-OP_STRATS = Dict{String, OperationalStrategyType}()
+OP_STRATS = Dict{String,OperationalStrategyType}()
 
 include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
@@ -324,7 +327,7 @@ Construct the controller for the strategy of the given name using the given para
 # Returns
 - `Controller`: The constructed controller for the given strategy.
 """
-function controller_for_strategy(strategy :: String, parameters :: Dict{String, Any}) :: Controller
+function controller_for_strategy(strategy::String, parameters::Dict{String,Any})::Controller
     if lowercase(strategy) == "default"
         return Controller("default", StateMachine(), Grouping())
     end

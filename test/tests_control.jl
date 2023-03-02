@@ -4,22 +4,22 @@ using Resie
 using Resie.EnergySystems
 
 function setup_control_tests()
-    systems_config = Dict{String, Any}(
-        "TST_BT_01" => Dict{String, Any}(
+    systems_config = Dict{String,Any}(
+        "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
             "production_refs" => [],
             "capacity" => 40000,
             "load" => 20000,
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "Default"
             )
         ),
-        "TST_HP_01" => Dict{String, Any}(
+        "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_BT_01"],
             "production_refs" => [],
-            "strategy" => Dict{String, Any}(
+            "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.9,
                 "low_threshold" => 0.2
@@ -30,7 +30,7 @@ function setup_control_tests()
     )
     systems = Resie.load_systems(systems_config)
 
-    simulation_params = Dict{String, Any}(
+    simulation_params = Dict{String,Any}(
         "time" => 0,
         "time_step_seconds" => 900,
         "epsilon" => 1e-9

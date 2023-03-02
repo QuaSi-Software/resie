@@ -12,19 +12,19 @@ buffer tank and en-/disabling the CHPP when a threshold is reached, in addition 
 overfill shutoff condition.
 """
 mutable struct CHPP <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    power :: Float64
-    electricity_fraction :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
+    power::Float64
+    electricity_fraction::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
 
-    function CHPP(uac :: String, config :: Dict{String, Any})
+    function CHPP(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -32,27 +32,21 @@ mutable struct CHPP <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_c_g_natgas => nothing
+                :m_c_g_natgas => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing,
-                m_e_ac_230v => nothing
+                :m_h_w_ht1 => nothing,
+                :m_e_ac_230v => nothing
             ),
             config["power"], # power
-            "electricity_fraction" in keys(config) # electricity_fraction
-                ? config["electricity_fraction"]
-                : 0.4,
-            "min_power_fraction" in keys(config) # min_power_fraction
-                ? config["min_power_fraction"]
-                : 0.2,
-            "min_run_time" in keys(config) # min_run_time
-                ? config["min_run_time"]
-                : 1800,
+            default(config, "electricity_fraction", 0.4),
+            default(config, "min_power_fraction", 0.2),
+            default(config, "min_run_time", 1800),
         )
     end
 end
 
-function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     strategy = unit.controller.strategy
     if strategy == "storage_driven" && unit.controller.state_machine.state != 2
         return
@@ -62,8 +56,8 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
     max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
     balance, potential, _ = balance_on(
-        unit.output_interfaces[m_h_w_ht1],
-        unit.output_interfaces[m_h_w_ht1].target
+        unit.output_interfaces[:m_h_w_ht1],
+        unit.output_interfaces[:m_h_w_ht1].target
     )
 
     demand_to_meet = (
@@ -81,9 +75,9 @@ function produce(unit :: CHPP, parameters :: Dict{String, Any}, watt_to_wh :: Fu
         return
     end
 
-    add!(unit.output_interfaces[m_e_ac_230v], max_produce_e * usage_fraction)
-    add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-    sub!(unit.input_interfaces[m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    add!(unit.output_interfaces[:m_e_ac_230v], max_produce_e * usage_fraction)
+    add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[:m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
 end
 
 export CHPP

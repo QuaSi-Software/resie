@@ -11,20 +11,20 @@ buffer tank and en-/disabling the heat pump when a threshold is reached, in addi
 overfill shutoff condition.
 """
 mutable struct HeatPump <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    power :: Float64
-    min_power_fraction :: Float64
-    min_run_time :: UInt
-    fixed_cop :: Float64
-    cop :: Float64
+    power::Float64
+    min_power_fraction::Float64
+    min_run_time::UInt
+    fixed_cop::Float64
+    cop::Float64
 
-    function HeatPump(uac :: String, config :: Dict{String, Any})
+    function HeatPump(uac::String, config::Dict{String,Any})
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -32,32 +32,26 @@ mutable struct HeatPump <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_h_w_lt1 => nothing,
-                m_e_ac_230v => nothing
+                :m_h_w_lt1 => nothing,
+                :m_e_ac_230v => nothing
             ),
             InterfaceMap( # output_interfaces
-                m_h_w_ht1 => nothing
+                :m_h_w_ht1 => nothing
             ),
             config["power"], # power
-            "min_power_fraction" in keys(config) # min_power_fraction
-                ? config["min_power_fraction"]
-                : 0.2,
-            "min_run_time" in keys(config) # min_run_time
-                ? config["min_run_time"]
-                : 0,
-            "fixed_cop" in keys(config) # fixed_cop
-                ? config["fixed_cop"]
-                : 3.0,
+            default(config, "min_power_fraction", 0.2),
+            default(config, "min_run_time", 0),
+            default(config, "fixed_cop", 3.0),
             0.0, # cop
         )
     end
 end
 
-function output_values(unit :: HeatPump) :: Vector{String}
+function output_values(unit::HeatPump)::Vector{String}
     return ["OUT", "Max_Power", "Temperature"]
 end
 
-function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
+function output_value(unit::HeatPump, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "OUT"
@@ -68,7 +62,7 @@ function output_value(unit :: HeatPump, key :: OutputKey) :: Float64
     throw(KeyError(key.value_key))
 end
 
-function dynamic_cop(in_temp :: Temperature, out_temp :: Temperature) :: Union{Nothing, Float64}
+function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
     if (in_temp === nothing || out_temp === nothing)
         return nothing
     end
@@ -77,15 +71,15 @@ function dynamic_cop(in_temp :: Temperature, out_temp :: Temperature) :: Union{N
     return 8.0 * exp(-0.08 * delta_t) + 1
 end
 
-function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
     in_blnc, _, in_temp = balance_on(
-        unit.input_interfaces[m_h_w_lt1],
+        unit.input_interfaces[:m_h_w_lt1],
         unit
     )
 
     out_blnc, out_pot, out_temp = balance_on(
-        unit.output_interfaces[m_h_w_ht1],
-        unit.output_interfaces[m_h_w_ht1].target
+        unit.output_interfaces[:m_h_w_ht1],
+        unit.output_interfaces[:m_h_w_ht1].target
     )
 
     cop = dynamic_cop(in_temp, out_temp)
@@ -103,10 +97,10 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
             return
         end
 
-        add!(unit.output_interfaces[m_h_w_ht1], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
+        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[m_h_w_lt1],
+            unit.input_interfaces[:m_h_w_lt1],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
@@ -119,9 +113,9 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         consume_e = max_consume_h / (unit.cop - 1.0)
         produce_h = max_consume_h + consume_e
 
-        add!(unit.output_interfaces[m_h_w_ht1], produce_h)
-        sub!(unit.input_interfaces[m_h_w_lt1], max_consume_h)
-        sub!(unit.input_interfaces[m_e_ac_230v], consume_e)
+        add!(unit.output_interfaces[:m_h_w_ht1], produce_h)
+        sub!(unit.input_interfaces[:m_h_w_lt1], max_consume_h)
+        sub!(unit.input_interfaces[:m_e_ac_230v], consume_e)
 
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
@@ -136,13 +130,13 @@ function produce(unit :: HeatPump, parameters :: Dict{String, Any}, watt_to_wh :
         end
 
         add!(
-            unit.output_interfaces[m_h_w_ht1],
+            unit.output_interfaces[:m_h_w_ht1],
             max_produce_h * usage_fraction,
             out_temp
         )
-        sub!(unit.input_interfaces[m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[m_h_w_lt1],
+            unit.input_interfaces[:m_h_w_lt1],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
     end

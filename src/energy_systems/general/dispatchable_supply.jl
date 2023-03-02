@@ -7,27 +7,27 @@ might still have a maximum power draw in a single time step, but can provide any
 of this to connected systems.
 """
 mutable struct DispatchableSupply <: ControlledSystem
-    uac :: String
-    controller :: Controller
-    sys_function :: SystemFunction
-    medium :: MediumCategory
+    uac::String
+    controller::Controller
+    sys_function::SystemFunction
+    medium::Symbol
 
-    input_interfaces :: InterfaceMap
-    output_interfaces :: InterfaceMap
+    input_interfaces::InterfaceMap
+    output_interfaces::InterfaceMap
 
-    max_power_profile :: Profile
-    temperature_profile :: Union{Profile, Nothing}
-    scaling_factor :: Float64
+    max_power_profile::Profile
+    temperature_profile::Union{Profile,Nothing}
+    scaling_factor::Float64
 
-    max_power :: Float64
-    temperature :: Temperature
+    max_power::Float64
+    temperature::Temperature
 
-    function DispatchableSupply(uac :: String, config :: Dict{String, Any})
+    function DispatchableSupply(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
-            Profile(config["temperature_profile_file_path"]) :
-            nothing
-        medium = getproperty(EnergySystems, Symbol(config["medium"]))
+                              Profile(config["temperature_profile_file_path"]) :
+                              nothing
+        medium = Symbol(config["medium"])
 
         return new(
             uac, # uac
@@ -51,11 +51,11 @@ mutable struct DispatchableSupply <: ControlledSystem
     end
 end
 
-function output_values(unit :: DispatchableSupply) :: Vector{String}
+function output_values(unit::DispatchableSupply)::Vector{String}
     return ["OUT", "Max_Power", "Temperature"]
 end
 
-function output_value(unit :: DispatchableSupply, key :: OutputKey) :: Float64
+function output_value(unit::DispatchableSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
         return unit.output_interfaces[key.medium].sum_abs_change * 0.5
     elseif key.value_key == "Max_Power"
@@ -67,9 +67,9 @@ function output_value(unit :: DispatchableSupply, key :: OutputKey) :: Float64
 end
 
 function control(
-    unit :: DispatchableSupply,
-    systems :: Grouping,
-    parameters :: Dict{String, Any}
+    unit::DispatchableSupply,
+    systems::Grouping,
+    parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
     unit.max_power = unit.scaling_factor * Profiles.power_at_time(unit.max_power_profile, parameters["time"])
@@ -80,7 +80,7 @@ function control(
     end
 end
 
-function produce(unit :: DispatchableSupply, parameters :: Dict{String, Any}, watt_to_wh :: Function)
+function produce(unit::DispatchableSupply, parameters::Dict{String,Any}, watt_to_wh::Function)
     outface = unit.output_interfaces[unit.medium]
     # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
     # must be handled here instead of being ignored

@@ -11,16 +11,16 @@ values somewhat independant from it (the overall timespan still needs to be the 
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
-    time_step :: Int
+    time_step::Int
 
     """Indicates whether the profile values are power or work."""
-    is_power :: Bool
+    is_power::Bool
 
     """Holds the profile values indexed by the time step number"""
-    data :: Vector{Float64}
+    data::Vector{Float64}
 
     """Construct a profile from the file at the given path."""
-    function Profile(file_path :: String)
+    function Profile(file_path::String)
         parsed = Vector{Float64}()
         time_step = 900
         is_power = false
@@ -58,7 +58,7 @@ end
 
 Get the power value of the profile at the given time.
 """
-function power_at_time(profile :: Profile, time :: Int)
+function power_at_time(profile::Profile, time::Int)
     step_nr = Int(round(time / profile.time_step) + 1)
     if profile.is_power
         return profile.data[step_nr]
@@ -72,7 +72,7 @@ end
 
 Get the work value of the profile at the given time.
 """
-function work_at_time(profile :: Profile, time :: Int)
+function work_at_time(profile::Profile, time::Int)
     step_nr = Int(round(time / profile.time_step) + 1)
     if profile.is_power
         return profile.data[step_nr] * (profile.time_step / 3600)
@@ -87,7 +87,7 @@ end
 Get the value of the profile at the given time without any conversion.
 The flag is_power will be ignored.
 """
-function value_at_time(profile :: Profile, time :: Int)
+function value_at_time(profile::Profile, time::Int)
     step_nr = Int(round(time / profile.time_step) + 1)
     return profile.data[step_nr]
 end

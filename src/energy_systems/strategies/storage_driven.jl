@@ -1,44 +1,42 @@
-function strt_sm_storage_driven(parameters :: Dict{String, Any}) :: StateMachine
+function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
     return StateMachine(
         UInt(1), # state
-        Dict{UInt, String}( # state_names
+        Dict{UInt,String}( # state_names
             1 => "Off",
             2 => "Load",
         ),
-        Dict{UInt, TruthTable}( # transitions
+        Dict{UInt,TruthTable}( # transitions
             1 => TruthTable( # State: Off
                 conditions=[
                     Condition(
                         "Buffer < X%",
-                        Dict{String, Any}(
+                        Dict{String,Any}(
                             "percentage" => parameters["low_threshold"]
                         )
                     ),
                 ],
-                table_data=Dict{Tuple, UInt}(
+                table_data=Dict{Tuple,UInt}(
                     (false,) => 1,
                     (true,) => 2,
                 )
-            ),
-
-            2 => TruthTable( # State: Load
+            ), 2 => TruthTable( # State: Load
                 conditions=[
                     Condition(
                         "Buffer >= X%",
-                        Dict{String, Any}(
+                        Dict{String,Any}(
                             "percentage" => parameters["high_threshold"]
                         )
                     ),
                     Condition(
                         "Min run time",
-                        Dict{String, Any}()
+                        Dict{String,Any}()
                     ),
                     Condition(
                         "Would overfill thermal buffer",
-                        Dict{String, Any}()
+                        Dict{String,Any}()
                     ),
                 ],
-                table_data=Dict{Tuple, UInt}(
+                table_data=Dict{Tuple,UInt}(
                     (false, false, false) => 2,
                     (false, true, false) => 2,
                     (true, false, false) => 2,
@@ -70,7 +68,7 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
         "Min run time",
         "Would overfill thermal buffer"
     ],
-    strategy_parameters=Dict{String, Any}(
+    strategy_parameters=Dict{String,Any}(
         "low_threshold" => 0.2,
         "high_threshold" => 0.95,
     ),
