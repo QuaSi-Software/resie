@@ -20,7 +20,7 @@ function output_keys(
             splitted = split(String(entry))
             if length(splitted) > 1
                 medium_key = splitted[1]
-                medium = getproperty(EnergySystems, Symbol(String(medium_key)))
+                medium = Symbol(String(medium_key))
                 value_key = splitted[2]
             else
                 medium = nothing
