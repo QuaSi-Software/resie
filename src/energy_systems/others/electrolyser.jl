@@ -17,7 +17,11 @@ mutable struct Electrolyser <: ControlledSystem
 
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
-    medium_names::Dict{String,String}
+
+    m_el_in::Symbol
+    m_heat_out::Symbol
+    m_h2_out::Symbol
+    m_o2_out::Symbol
 
     power::Float64
     heat_fraction::Float64
@@ -26,6 +30,12 @@ mutable struct Electrolyser <: ControlledSystem
     output_temperature::Temperature
 
     function Electrolyser(uac::String, config::Dict{String,Any})
+        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
+        m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
+        m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
+        register_media([m_el_in, m_heat_out, m_h2_out, m_o2_out])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -33,26 +43,17 @@ mutable struct Electrolyser <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                MediumCategoryMap[default(config["medium_names"], "el_in", "m_e_ac_230v")] => nothing
+                m_el_in => nothing
             ),
             InterfaceMap( # output_interfaces
-                MediumCategoryMap[default(config["medium_names"], "heat_out", "m_h_w_lt1")] => nothing,
-                MediumCategoryMap[default(config["medium_names"], "h2_out", "m_c_g_h2")] => nothing,
-                MediumCategoryMap[default(config["medium_names"], "o2_out", "m_c_g_o2")] => nothing,
+                m_heat_out => nothing,
+                m_h2_out => nothing,
+                m_o2_out => nothing,
             ),
-            "medium_names" in keys(config) # medium_names for input and outputs
-                ? Dict{String,String}(
-                    "el_in" => default(config["medium_names"], "el_in", "m_e_ac_230v"),
-                    "heat_out" => default(config["medium_names"], "heat_out", "m_h_w_lt1"),
-                    "h2_out" => default(config["medium_names"], "h2_out", "m_c_g_h2"),
-                    "o2_out" => default(config["medium_names"], "o2_out", "m_c_g_o2"),
-                )
-                : Dict{String,String}(  # default medium_names if no "medium_names" dict is given in input file
-                    "el_in" => "m_e_ac_230v",
-                    "heat_out" => "m_h_w_lt1",
-                    "h2_out" => "m_c_g_h2",
-                    "o2_out" => "m_c_g_o2"
-                ),
+            m_el_in,
+            m_heat_out,
+            m_h2_out,
+            m_o2_out,
             config["power"], # power
             default(config, "heat_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
@@ -63,32 +64,26 @@ mutable struct Electrolyser <: ControlledSystem
 end
 
 function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
-    # abbreviations for media types of input and outputs
-    heat_out = MediumCategoryMap[unit.medium_names["heat_out"]]
-    h2_out = MediumCategoryMap[unit.medium_names["h2_out"]]
-    o2_out = MediumCategoryMap[unit.medium_names["h2_out"]]
-    el_in = MediumCategoryMap[unit.medium_names["el_in"]]
-
     max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
     max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
     max_available_e = unit.power
 
     # heat
     balance_h, potential_h, _ = balance_on(
-        unit.output_interfaces[heat_out],
-        unit.output_interfaces[heat_out].target
+        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_out].target
     )
 
     # hydrogen
     balance_g, potential_g, _ = balance_on(
-        unit.output_interfaces[h2_out],
-        unit.output_interfaces[h2_out].target
+        unit.output_interfaces[unit.m_h2_out],
+        unit.output_interfaces[unit.m_h2_out].target
     )
 
     # electricity 
     balance_e, potential_e, _ = balance_on(
-        unit.input_interfaces[el_in],
-        unit.input_interfaces[el_in].target
+        unit.input_interfaces[unit.m_el_in],
+        unit.input_interfaces[unit.m_el_in].target
     )
 
     if balance_h + potential_h >= 0.0
@@ -115,14 +110,14 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
     end
 
     # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
-    add!(unit.output_interfaces[h2_out], max_produce_g * usage_fraction)
-    add!(unit.output_interfaces[o2_out], max_produce_g * usage_fraction * 0.5)
+    add!(unit.output_interfaces[unit.m_h2_out], max_produce_g * usage_fraction)
+    add!(unit.output_interfaces[unit.m_o2_out], max_produce_g * usage_fraction * 0.5)
     add!(
-        unit.output_interfaces[heat_out],
+        unit.output_interfaces[unit.m_heat_out],
         max_produce_h * usage_fraction,
         unit.output_temperature
     )
-    sub!(unit.input_interfaces[el_in], watt_to_wh(unit.power * usage_fraction))
+    sub!(unit.input_interfaces[unit.m_el_in], watt_to_wh(unit.power * usage_fraction))
 
 end
 
