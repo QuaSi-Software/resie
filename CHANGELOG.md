@@ -14,6 +14,11 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.9
+* Apply auto-format to existing code files
+* Rework how medium categories are handled
+* Adapt example energy system implementation (electrolyser) to use new functionality for enabling custom-defined medium categories
+
 ### Version 0.2.8
 * Bugfix in calculation of energy flow between two interconnected busses
 * Added reordering of Load() functions for storages 
