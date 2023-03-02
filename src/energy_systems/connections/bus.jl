@@ -182,8 +182,11 @@ or how often it was called.
 function distribute!(unit::Bus)
     remainder = balance_direct(unit)
 
+    # reset all non-bus input interfaces
     for inface in unit.input_interfaces
-        set!(inface, 0.0, inface.temperature)
+        if inface.source.sys_function !== sf_bus
+            set!(inface, 0.0, inface.temperature)
+        end
     end
 
     for output_uac in unit.output_priorities # for every output UAC (to enshure the correct order)...
@@ -221,9 +224,11 @@ function distribute!(unit::Bus)
         end
     end
 
-    # reset all output interfaces
+    # reset all non-bus output interfaces
     for outface in unit.output_interfaces
-        set!(outface, 0.0, outface.temperature)
+        if outface.target.sys_function !== sf_bus
+            set!(outface, 0.0, outface.temperature)
+        end
     end
 
     unit.remainder = remainder
