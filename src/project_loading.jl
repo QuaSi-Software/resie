@@ -16,50 +16,6 @@ function read_JSON(filepath::String)::Dict{AbstractString,Any}
     end
 end
 
-
-
-"""
-load_medien(user_medium)
-
-Fills global mapping dict (EnergySystems.MediumCategoryMap) to map input media (user_medium) to media list of enums.
-
-The media from the config file must have the following structure but can also be 
-an empty array if no user-defined media are given:
-```
-{
-...    
-"user_defined_media": [
-    "medium_temperature_heating_grid",
-    "testmedium2",
-    ...
-],
-...
-}
-```
-
-All user-defined media used in energy systems in the input file must be listed in the "user-defined-media" entry.
-"""
-function load_medien(user_medium::Array{Any})
-
-    # fill dictionary to map the medium names as string to the medium names as Type MediumCategory from enum
-    n = 1
-    for medium in instances(MediumCategory)
-        if string(medium)[1:6] == "m_user" && length(user_medium) >= n # user defined media names
-            EnergySystems.MediumCategoryMap[user_medium[n]] = medium
-            n += 1
-            if n >= 11
-                println("Input Error: Max. number of user-defined media is 10!")
-                # @ToDo integrate in error handling
-            end
-        elseif string(medium)[1:6] == "m_user"  # no (more) user-defined media names given
-            continue
-        else   # general predefined media names
-            EnergySystems.MediumCategoryMap[string(medium)] = medium
-        end
-    end
-
-end
-
 """
 load_systems(config)
 

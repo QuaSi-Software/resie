@@ -41,7 +41,6 @@ function test_busses_communicate_demand()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_media(Array{String}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]
@@ -165,7 +164,6 @@ function test_demand_over_busses_supply_is_transformer()
             "scale" => 1
         ),
     )
-    _ = Resie.load_media(Array{String}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand_1 = systems["TST_DEM_01"]
     demand_2 = systems["TST_DEM_02"]
@@ -389,7 +387,6 @@ function test_busses_communicate_storage_potential()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_media(Array{String}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
     grid = systems["TST_GRI_01"]

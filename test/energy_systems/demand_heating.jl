@@ -27,7 +27,6 @@ function test_demand_heating_temperature_values()
             "scale" => 1000
         ),
     )
-    _ = Resie.load_media(Array{String}(undef, 0))
     systems = Resie.load_systems(systems_config)
     demand = systems["TST_DEM_01"]
 
