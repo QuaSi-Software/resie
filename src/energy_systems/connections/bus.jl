@@ -69,7 +69,7 @@ function balance_nr(unit::Bus, caller::Bus)
         end
 
         if isa(inface.source, Bus)
-            supply = balance_nr(inface.source, unit)
+            supply = max(balance_nr(inface.source, unit), inface.balance)
             if supply < 0.0
                 continue
             end
@@ -85,7 +85,7 @@ function balance_nr(unit::Bus, caller::Bus)
         end
 
         if isa(outface.target, Bus)
-            demand = balance_nr(outface.target, unit)
+            demand = min(balance_nr(outface.target, unit), outface.balance)
             if demand > 0.0
                 continue
             end
