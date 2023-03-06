@@ -321,15 +321,20 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[:m_h_w_ht1].balance == 0.0
     @test demand_1.input_interfaces[:m_h_w_ht1].temperature == 60.0
     @test demand_1.input_interfaces[:m_h_w_ht1].sum_abs_change == 2000.0
-    @test demand_2.input_interfaces[:m_h_w_ht1].balance == -500.0
+    @test demand_2.input_interfaces[:m_h_w_ht1].balance == 0.0
     @test demand_2.input_interfaces[:m_h_w_ht1].temperature == 60.0
-    @test demand_2.input_interfaces[:m_h_w_ht1].sum_abs_change == 1000.0
+    @test demand_2.input_interfaces[:m_h_w_ht1].sum_abs_change == 2000.0
 
     @test EnergySystems.balance(bus_1) == -500.0
     @test EnergySystems.balance(bus_2) == 0.0
-    @test EnergySystems.balance(bus_3) == -500.0
+    @test EnergySystems.balance(bus_3) == 0.0
+    @test bus_1.output_interfaces[1].balance == 0.0
     @test bus_1.output_interfaces[1].sum_abs_change == 2000.0
-    @test bus_1.output_interfaces[2].sum_abs_change == 1000.0
+    @test bus_1.output_interfaces[2].balance == -500.0
+    @test bus_1.output_interfaces[2].sum_abs_change == 1500.0
+    @test bus_1.remainder == 0.0
+    @test bus_2.remainder == 0.0
+    @test bus_3.remainder == 0.0
 end
 
 @testset "demand_over_busses_supply_is_transformer" begin
