@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.10
+* Refactor distribution of bus systems to better match expected behaviour
+
 ### Version 0.2.9
 * Apply auto-format to existing code files
 * Rework how medium categories are handled

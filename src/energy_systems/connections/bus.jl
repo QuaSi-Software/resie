@@ -1,3 +1,5 @@
+using ResumableFunctions
+
 """
 Imnplementation of a bus energy system for balancing multiple inputs and outputs.
 
@@ -67,7 +69,7 @@ function balance_nr(unit::Bus, caller::Bus)
         end
 
         if isa(inface.source, Bus)
-            supply = balance_nr(inface.source, unit)
+            supply = max(balance_nr(inface.source, unit), inface.balance)
             if supply < 0.0
                 continue
             end
@@ -83,7 +85,7 @@ function balance_nr(unit::Bus, caller::Bus)
         end
 
         if isa(outface.target, Bus)
-            demand = balance_nr(outface.target, unit)
+            demand = min(balance_nr(outface.target, unit), outface.balance)
             if demand > 0.0
                 continue
             end
@@ -168,59 +170,68 @@ function balance_on(
 end
 
 """
+    for x in bus_infaces(bus)
+
+Iterator over the input interfaces that connect the given bus to other busses.
+"""
+@resumable function bus_infaces(unit::Bus)
+    # for every input UAC (to ensure the correct order)...
+    for input_uac in unit.input_priorities
+        # ...seach corresponding input inferface by...
+        for inface in unit.input_interfaces
+            # ...making sure the input interface is of type bus...
+            if inface.source.sys_function === sf_bus
+                # ...and the source's UAC matches the one in the input_priority.
+                if inface.source.uac === input_uac
+                    @yield inface
+                    break # we found the match, so we can break out of the inner loop.
+                end
+            end
+        end
+    end
+end
+
+"""
+    for x in bus_outfaces(bus)
+
+Iterator over the output interfaces that connect the given bus to other busses.
+"""
+@resumable function bus_outfaces(unit::Bus)
+    # for every output UAC (to ensure the correct order)...
+    for output_uac in unit.output_priorities
+        # ...seach corresponding output inferface by...
+        for outface in unit.output_interfaces
+            # ...making sure the output interface is of type bus...
+            if outface.target.sys_function === sf_bus
+                # ...and the target's UAC matches the one in the output_priority.
+                if outface.target.uac === output_uac
+                    @yield outface
+                    break # we found the match, so we can break out of the inner loop.
+                end
+            end
+        end
+    end
+end
+
+"""
     distribute!(unit)
 
 Bus-specific implementation of distribute!.
 
-This implementation checks the balance of the bus (which includes the so-called remainder),
-then sets all interfaces back to zero and saves the balance as the current remainder. This
-has the intention that calling this method will distribute the energy without changing the
-energy balance of the bus. That way the method can be called at any point after the balance
-might have changed and should always consider the correct energy balance regardless of when
-or how often it was called.
+This moves the energy from connected energy system from supply to demand systems both
+on the bus directly as well as taking other bus systems into account. This allows busses
+to be connected in chains (but not loops) and "communicate" the energy across. The method
+implicitly requires that each bus on the chain is called with distribute!() in a specific
+order, which is explained in more detail in the documentation. Essentially it starts from
+the leaves of the chain and progresses to the roots.
 """
 function distribute!(unit::Bus)
-    remainder = balance_direct(unit)
+    balance = balance_direct(unit)
 
     # reset all non-bus input interfaces
     for inface in unit.input_interfaces
         if inface.source.sys_function !== sf_bus
             set!(inface, 0.0, inface.temperature)
-        end
-    end
-
-    for output_uac in unit.output_priorities # for every output UAC (to enshure the correct order)...
-        for outface in unit.output_interfaces  # ...seach corresponding output inferface by...
-            if outface.target.sys_function === outface.source.sys_function  # ...making sure the output interface is from type bus...
-                if outface.target.uac === output_uac # ...and is corresponding to the uac given in the output_priority
-                    # calculate energy balance on current bus (outface.source) in order to write
-                    # sum_abs_change into interface to following bus (outface.taget) 
-                    sum_abs_change = 0
-                    for input_interface in outface.source.input_interfaces
-                        sum_abs_change += input_interface.sum_abs_change
-                    end
-                    for output_interface in outface.source.output_interfaces
-                        sum_abs_change -= output_interface.sum_abs_change
-                    end
-                    # check if sum_abs_change is bigger than need in outface.target to handel multiple busses on unit
-                    if (sum_abs_change / 2) > abs(outface.target.remainder)
-                        # order of distribution into multiple busses is equal to order of simulations for now (last buss will get least energy)
-                        sum_abs_change = 2 * abs(outface.target.remainder)
-                    end
-
-                    # write energy flow from source to target into sum_abs_change
-                    outface.sum_abs_change = sum_abs_change
-
-                    # adjust remainder on outface target bus
-                    outface.target.remainder += outface.sum_abs_change / 2
-
-                    # update remainder of current bus
-                    remainder = balance_direct(unit)
-
-                    # reset output interfaces
-                    # set!(outface, 0.0, outface.temperature)
-                end
-            end
         end
     end
 
@@ -231,7 +242,35 @@ function distribute!(unit::Bus)
         end
     end
 
-    unit.remainder = remainder
+    # distribute to outgoing busses according to output priority
+    if balance > 0.0
+        for outface in bus_outfaces(unit)
+            if balance > abs(outface.balance)
+                balance += outface.balance
+                set!(outface, 0.0, outface.temperature)
+            else
+                add!(outface, balance, outface.temperature)
+                balance = 0.0
+            end
+        end
+    end
+
+    # write any remaining demand into input bus interfaces (if any) according to input
+    # priority, however as available supply is not considered (as this happens implicitly
+    # through output priorities of the input bus), this effectively writes all the
+    # remaining demand into the first input according to the priority.
+    if balance < 0.0
+        for inface in bus_infaces(unit)
+            add!(inface, balance)
+            balance = 0.0
+        end
+    end
+
+    # if there is a balance unequal zero remaining, this happens either because there is
+    # no input bus or the balance was positive and is thus not communicated "backwards" to
+    # the input bus. the balance is saved in the remainder so it is available for further
+    # balance calculations
+    unit.remainder = balance
 end
 
 function output_values(unit::Bus)::Vector{String}
