@@ -1,3 +1,5 @@
+using ResumableFunctions
+
 """
 Imnplementation of a bus energy system for balancing multiple inputs and outputs.
 
@@ -165,6 +167,50 @@ function balance_on(
         storage_space,
         highest_demand_temp <= -1e9 ? nothing : highest_demand_temp
     )
+end
+
+"""
+    for x in bus_infaces(bus)
+
+Iterator over the input interfaces that connect the given bus to other busses.
+"""
+@resumable function bus_infaces(unit::Bus)
+    # for every input UAC (to ensure the correct order)...
+    for input_uac in unit.input_priorities
+        # ...seach corresponding input inferface by...
+        for inface in unit.input_interfaces
+            # ...making sure the input interface is of type bus...
+            if inface.source.sys_function === sf_bus
+                # ...and the source's UAC matches the one in the input_priority.
+                if inface.source.uac === input_uac
+                    @yield inface
+                    break # we found the match, so we can break out of the inner loop.
+                end
+            end
+        end
+    end
+end
+
+"""
+    for x in bus_outfaces(bus)
+
+Iterator over the output interfaces that connect the given bus to other busses.
+"""
+@resumable function bus_outfaces(unit::Bus)
+    # for every output UAC (to ensure the correct order)...
+    for output_uac in unit.output_priorities
+        # ...seach corresponding output inferface by...
+        for outface in unit.output_interfaces
+            # ...making sure the output interface is of type bus...
+            if outface.target.sys_function === sf_bus
+                # ...and the target's UAC matches the one in the output_priority.
+                if outface.target.uac === output_uac
+                    @yield outface
+                    break # we found the match, so we can break out of the inner loop.
+                end
+            end
+        end
+    end
 end
 
 """
