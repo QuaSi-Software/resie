@@ -12,7 +12,8 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    medium::Symbol
+    m_heat_in::Symbol
+    m_heat_out::Symbol
 
     capacity::Float64
     load::Float64
@@ -23,8 +24,9 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     low_temperature::Float64
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any})
-        medium = Symbol(default(config, "medium", "m_h_w_ht1"))
-        register_media([medium])
+        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
+        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
+        register_media([m_heat_in, m_heat_out])
 
         return new(
             uac, # uac
@@ -33,12 +35,13 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
-                medium => nothing
+                m_heat_in => nothing
             ),
             InterfaceMap( # output_interfaces
-                medium=> nothing
+                m_heat_out => nothing
             ),
-            medium,
+            m_heat_in,
+            m_heat_out,
             config["capacity"], # capacity
             config["load"], # load
             default(config, "use_adaptive_temperature", false),
@@ -66,7 +69,7 @@ function balance_on(
 end
 
 function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
-    outface = unit.output_interfaces[uni.medium]
+    outface = unit.output_interfaces[unit.m_heat_out]
     balance, _, demand_temp = balance_on(outface, outface.target)
 
     if balance >= 0.0
@@ -89,7 +92,7 @@ function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, wat
 end
 
 function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
-    inface = unit.input_interfaces[uni.medium]
+    inface = unit.input_interfaces[unit.m_heat_in]
     balance, _, supply_temp = balance_on(inface, inface.source)
 
     if balance <= 0.0
