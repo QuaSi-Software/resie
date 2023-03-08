@@ -30,11 +30,11 @@ function test_primary_producer_can_load_storage()
             "production_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => {
+            "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
-            },
+            ),
             "power" => 10000
         ),
         "TST_GBO_02" => Dict{String,Any}(
@@ -106,7 +106,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.control(grid_1, systems, simulation_parameters)
     EnergySystems.control(grid_2, systems, simulation_parameters)
 
-    demand.input_interfaces[:m_h_w_ht1].bala
+    demand.input_interfaces[demand.medium].bala
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
@@ -129,14 +129,14 @@ function test_primary_producer_can_load_storage()
     # highest demand temperature on the bus". this behaviour is not wrong, but unintuitive
 
     balance, potential, temperature = EnergySystems.balance_on(
-        tank_2.output_interfaces[:m_h_w_ht1], bus_2
+        tank_2.output_interfaces[tank_2.medium], bus_2
     )
     @test balance == 0.0
     @test potential == -10075.0
     @test temperature === nothing
 
     balance, potential, temperature = EnergySystems.balance_on(
-        tank_1.output_interfaces[:m_h_w_ht1], bus_1
+        tank_1.output_interfaces[tank_1.medium], bus_1
     )
     @test balance == 0.0
     @test potential == -30075.0

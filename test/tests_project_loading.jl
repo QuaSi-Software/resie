@@ -41,7 +41,7 @@ function test_load_custom_medium_categories()
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
             "control_refs" => [],
-            "production_refs" => [],
+            "production_refs" => ["TST_HP_01"],
             "power" => 1000,
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_out" => "m_h_w_55c",
@@ -51,19 +51,41 @@ function test_load_custom_medium_categories()
                 "name" => "Default"
             )
         ),
+        "TST_HP_01" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "control_refs" => [],
+            "production_refs" => [],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven",
+            ),
+            "m_el_in" => "m_e_dc_1000v",
+            "m_heat_in" => "m_h_w_55c",
+            "m_heat_out" => "m_h_w_85c",
+            "power" => 12000,
+            "fixed_cop" => 3.0
+        )
     )
     systems = Resie.load_systems(systems_config)
     electrolyser = systems["TST_ELY_01"]
+    heat_pump = systems["TST_HP_01"]
 
     @test electrolyser.m_el_in == Symbol("m_e_dc_1000v")
     @test electrolyser.m_heat_out == Symbol("m_h_w_55c")
     @test electrolyser.m_h2_out == Symbol("m_c_g_h2-pure")
     @test electrolyser.m_o2_out == Symbol("m_c_g_o2-impure")
 
+    @test heat_pump.m_el_in == Symbol("m_e_dc_1000v")
+    @test heat_pump.m_heat_in == Symbol("m_h_w_55c")
+    @test heat_pump.m_heat_out == Symbol("m_h_w_85c")
+
     @test Symbol("m_e_dc_1000v") in EnergySystems.medium_categories
     @test Symbol("m_h_w_55c") in EnergySystems.medium_categories
+    @test Symbol("m_h_w_85c") in EnergySystems.medium_categories
     @test Symbol("m_c_g_h2-pure") in EnergySystems.medium_categories
     @test Symbol("m_c_g_o2-impure") in EnergySystems.medium_categories
+
+    # check if iterface of user-defined medium is built up correctly
+    @test electrolyser.output_interfaces[electrolyser.m_heat_out].target.uac == "TST_HP_01"
 end
 
 @testset "project_loading_tests" begin
