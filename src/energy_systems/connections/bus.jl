@@ -27,6 +27,8 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 
     function Bus(uac::String, config::Dict{String,Any})
         medium = Symbol(config["medium"])
+        register_media([medium])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller

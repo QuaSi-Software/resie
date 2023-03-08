@@ -18,6 +18,10 @@ mutable struct HeatPump <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    m_el_in::Symbol
+    m_heat_out::Symbol
+    m_heat_in::Symbol
+
     power::Float64
     min_power_fraction::Float64
     min_run_time::UInt
@@ -25,6 +29,11 @@ mutable struct HeatPump <: ControlledSystem
     cop::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any})
+        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
+        register_media([m_el_in, m_heat_out, m_heat_in])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -32,12 +41,15 @@ mutable struct HeatPump <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                :m_h_w_lt1 => nothing,
-                :m_e_ac_230v => nothing
+                m_heat_in => nothing,
+                m_el_in => nothing
             ),
             InterfaceMap( # output_interfaces
-                :m_h_w_ht1 => nothing
+                m_heat_out => nothing
             ),
+            m_el_in,
+            m_heat_out,
+            m_heat_in,
             config["power"], # power
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
@@ -73,13 +85,13 @@ end
 
 function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
     in_blnc, _, in_temp = balance_on(
-        unit.input_interfaces[:m_h_w_lt1],
+        unit.input_interfaces[unit.m_heat_in],
         unit
     )
 
     out_blnc, out_pot, out_temp = balance_on(
-        unit.output_interfaces[:m_h_w_ht1],
-        unit.output_interfaces[:m_h_w_ht1].target
+        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_out].target
     )
 
     cop = dynamic_cop(in_temp, out_temp)
@@ -97,10 +109,10 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
             return
         end
 
-        add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        add!(unit.output_interfaces[unit.m_heat_out], max_produce_h * usage_fraction)
+        sub!(unit.input_interfaces[unit.m_el_in], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[:m_h_w_lt1],
+            unit.input_interfaces[unit.m_heat_in],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
 
@@ -113,9 +125,9 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         consume_e = max_consume_h / (unit.cop - 1.0)
         produce_h = max_consume_h + consume_e
 
-        add!(unit.output_interfaces[:m_h_w_ht1], produce_h)
-        sub!(unit.input_interfaces[:m_h_w_lt1], max_consume_h)
-        sub!(unit.input_interfaces[:m_e_ac_230v], consume_e)
+        add!(unit.output_interfaces[unit.m_heat_out], produce_h)
+        sub!(unit.input_interfaces[unit.m_heat_in], max_consume_h)
+        sub!(unit.input_interfaces[unit.m_el_in], consume_e)
 
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
@@ -130,13 +142,13 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         end
 
         add!(
-            unit.output_interfaces[:m_h_w_ht1],
+            unit.output_interfaces[unit.m_heat_out],
             max_produce_h * usage_fraction,
             out_temp
         )
-        sub!(unit.input_interfaces[:m_e_ac_230v], max_produce_h * usage_fraction / unit.cop)
+        sub!(unit.input_interfaces[unit.m_el_in], max_produce_h * usage_fraction / unit.cop)
         sub!(
-            unit.input_interfaces[:m_h_w_lt1],
+            unit.input_interfaces[unit.m_heat_in],
             max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
         )
     end
