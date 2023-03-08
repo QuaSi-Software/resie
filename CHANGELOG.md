@@ -14,6 +14,11 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.2.11
+* Implemented user-definable media for all energy systems
+* Adaption of tests to the new user-definable media names
+* Small bug fixes
+
 ### Version 0.2.10
 * Refactor distribution of bus systems to better match expected behaviour
 
