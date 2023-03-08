@@ -169,11 +169,11 @@ function balance_on(
     )
 end
 
-"""
-    for x in bus_infaces(bus)
+# """
+#     for x in bus_infaces(bus)
 
-Iterator over the input interfaces that connect the given bus to other busses.
-"""
+# Iterator over the input interfaces that connect the given bus to other busses.
+# """
 @resumable function bus_infaces(unit::Bus)
     # for every input UAC (to ensure the correct order)...
     for input_uac in unit.input_priorities
@@ -191,11 +191,11 @@ Iterator over the input interfaces that connect the given bus to other busses.
     end
 end
 
-"""
-    for x in bus_outfaces(bus)
+# """
+#     for x in bus_outfaces(bus)
 
-Iterator over the output interfaces that connect the given bus to other busses.
-"""
+# Iterator over the output interfaces that connect the given bus to other busses.
+# """
 @resumable function bus_outfaces(unit::Bus)
     # for every output UAC (to ensure the correct order)...
     for output_uac in unit.output_priorities
