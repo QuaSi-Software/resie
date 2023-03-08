@@ -22,6 +22,8 @@ mutable struct GridConnection <: ControlledSystem
 
     function GridConnection(uac::String, config::Dict{String,Any})
         medium = Symbol(config["medium"])
+        register_media([medium])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller

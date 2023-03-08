@@ -62,10 +62,6 @@
         "end": 604800,
         "time_step_seconds": 900
     },
-    "user_defined_media": [
-        "medium_temperature_heating_grid",
-        "testmedium2"
-    ],
     "energy_systems": {
         "TST_DEM_TH_01": {
             "type": "Demand",
@@ -264,9 +260,8 @@
                 "name": "demand_driven"
             },
             "power": 400000,
-            "medium_names": {
-                "heat_out": "m_h_w_ht1"
-            }
+            "m_heat_out": "m_h_w_ht1"
+
         },
         "TST_CHP_01": {
             "type": "CHPP",

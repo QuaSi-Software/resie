@@ -15,12 +15,16 @@ mutable struct PVPlant <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    m_el_out::Symbol
+
     energy_profile::Profile
     scaling_factor::Float64
 
     supply::Float64
 
     function PVPlant(uac::String, config::Dict{String,Any})
+        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
+        register_media([m_el_out])
 
         # load energy profile from path
         energy_profile = Profile(config["energy_profile_file_path"])
@@ -33,8 +37,9 @@ mutable struct PVPlant <: ControlledSystem
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces
-                :m_e_ac_230v => nothing
+                m_el_out => nothing
             ),
+            m_el_out,
             energy_profile, # energy_profile
             config["scale"], # scaling_factor
             0.0 # supply
@@ -67,7 +72,7 @@ end
 
 
 function produce(unit::PVPlant, parameters::Dict{String,Any}, watt_to_wh::Function)
-    outface = unit.output_interfaces[:m_e_ac_230v]
+    outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
 end
 

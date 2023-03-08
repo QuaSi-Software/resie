@@ -13,11 +13,18 @@ mutable struct GasBoiler <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    m_gas_in::Symbol
+    m_heat_out::Symbol
+
     power::Float64
     min_power_fraction::Float64
     min_run_time::UInt
 
     function GasBoiler(uac::String, config::Dict{String,Any})
+        m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
+        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        register_media([m_gas_in, m_heat_out])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -25,11 +32,13 @@ mutable struct GasBoiler <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                :m_c_g_natgas => nothing
+                m_gas_in => nothing
             ),
             InterfaceMap( # output_interfaces
-                :m_h_w_ht1 => nothing
+                m_heat_out => nothing
             ),
+            m_gas_in,
+            m_heat_out,
             config["power"], # power
             default(config, "min_power_fraction", 0.1),
             default(config, "min_run_time", 0),
@@ -46,8 +55,8 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
     max_produce_h = watt_to_wh(unit.power)
 
     balance, potential, _ = balance_on(
-        unit.output_interfaces[:m_h_w_ht1],
-        unit.output_interfaces[:m_h_w_ht1].target
+        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_out].target
     )
 
     demand_to_meet = (
@@ -64,8 +73,8 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
         return
     end
 
-    add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
-    sub!(unit.input_interfaces[:m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    add!(unit.output_interfaces[unit.m_heat_out], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[unit.m_gas_in], watt_to_wh(unit.power * usage_fraction))
 end
 
 export GasBoiler

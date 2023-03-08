@@ -47,8 +47,8 @@ function test_demand_heating_temperature_values()
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
-    @test demand.input_interfaces[:m_h_w_ht1].balance == -75.0
-    @test demand.input_interfaces[:m_h_w_ht1].temperature == 55.0
+    @test demand.input_interfaces[demand.medium].balance == -75.0
+    @test demand.input_interfaces[demand.medium].temperature == 55.0
 end
 
 @testset "demand_heating_temperature_values" begin
