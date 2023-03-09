@@ -1,6 +1,46 @@
 using ResumableFunctions
 
 """
+Utility struct to contain the connections, input/output priorities and other related data
+for bus systems.
+"""
+Base.@kwdef mutable struct ConnectionMatrix
+    input_order::Union{Nothing,Vector{String}}
+    output_order::Vector{String}
+    storage_loading::Union{Nothing,Vector{Vector{Bool}}}
+
+    function ConnectionMatrix(config::Dict{String,Any})
+        input_order = nothing
+        output_order = [String(u) for u in config["production_refs"]]
+        storage_loading = nothing
+
+        if "connection_matrix" in keys(config)
+            if "input_order" in keys(config["connection_matrix"])
+                input_order = [String(u) for u in config["connection_matrix"]["input_order"]]
+            end
+
+            if "output_order" in keys(config["connection_matrix"])
+                output_order = [String(u) for u in config["connection_matrix"]["output_order"]]
+            end
+
+            if "storage_loading" in keys(config["connection_matrix"])
+                storage_loading = []
+                for row in config["connection_matrix"]["storage_loading"]
+                    vec = [Bool(v) for v in row]
+                    push!(storage_loading, vec)
+                end
+            end
+        end
+
+        return new(
+            input_order,
+            output_order,
+            storage_loading,
+        )
+    end
+end
+
+"""
 Imnplementation of a bus energy system for balancing multiple inputs and outputs.
 
 This energy system is both a possible real system (mostly for electricity) as well as a
@@ -19,9 +59,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
 
     input_interfaces::Vector{SystemInterface}
     output_interfaces::Vector{SystemInterface}
-
-    input_priorities::Vector{String}
-    output_priorities::Vector{String}
+    connectivity::ConnectionMatrix
 
     remainder::Float64
 
@@ -36,8 +74,7 @@ Base.@kwdef mutable struct Bus <: ControlledSystem
             medium, # medium
             [], # input_interfaces
             [], # output_interfaces,
-            config["input_priorities"],
-            config["production_refs"],
+            ConnectionMatrix(config),
             0.0 # remainder
         )
     end
@@ -176,7 +213,7 @@ Iterator over the input interfaces that connect the given bus to other busses.
 """
 @resumable function bus_infaces(unit::Bus)
     # for every input UAC (to ensure the correct order)...
-    for input_uac in unit.input_priorities
+    for input_uac in unit.connectivity.input_order
         # ...seach corresponding input inferface by...
         for inface in unit.input_interfaces
             # ...making sure the input interface is of type bus...
@@ -198,7 +235,7 @@ Iterator over the output interfaces that connect the given bus to other busses.
 """
 @resumable function bus_outfaces(unit::Bus)
     # for every output UAC (to ensure the correct order)...
-    for output_uac in unit.output_priorities
+    for output_uac in unit.connectivity.output_order
         # ...seach corresponding output inferface by...
         for outface in unit.output_interfaces
             # ...making sure the output interface is of type bus...
