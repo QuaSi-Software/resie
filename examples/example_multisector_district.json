@@ -233,7 +233,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 40000,
+            "m_heat_out": "m_h_w_ht1"
         },
         "TST_CHP_01": {
             "type": "CHPP",

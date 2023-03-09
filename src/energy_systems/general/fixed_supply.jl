@@ -30,6 +30,7 @@ mutable struct FixedSupply <: ControlledSystem
                               Profile(config["temperature_profile_file_path"]) :
                               nothing
         medium = Symbol(config["medium"])
+        register_media([medium])
 
         return new(
             uac, # uac

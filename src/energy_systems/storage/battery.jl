@@ -13,10 +13,15 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    medium::Symbol
+
     capacity::Float64
     load::Float64
 
     function Battery(uac::String, config::Dict{String,Any})
+        medium = Symbol(default(config, "medium", "m_e_ac_230v"))
+        register_media([medium])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -24,11 +29,12 @@ Base.@kwdef mutable struct Battery <: ControlledSystem
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
-                :m_e_ac_230v => nothing
+                medium => nothing
             ),
             InterfaceMap( # output_interfaces
-                :m_e_ac_230v => nothing
+                medium => nothing
             ),
+            medium,
             config["capacity"], # capacity
             config["load"] # load
         )
@@ -47,7 +53,7 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
         return
     end
 
-    outface = unit.output_interfaces[:m_e_ac_230v]
+    outface = unit.output_interfaces[unit.medium]
     balance, _, _ = balance_on(outface, outface.target)
 
     if balance >= 0.0
@@ -68,7 +74,7 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
         return
     end
 
-    inface = unit.input_interfaces[:m_e_ac_230v]
+    inface = unit.input_interfaces[unit.medium]
     balance, _, _ = balance_on(inface, inface.source)
 
     if balance <= 0.0

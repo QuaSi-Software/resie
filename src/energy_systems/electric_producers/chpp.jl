@@ -19,12 +19,21 @@ mutable struct CHPP <: ControlledSystem
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    m_gas_in::Symbol
+    m_heat_out::Symbol
+    m_el_out::Symbol
+
     power::Float64
     electricity_fraction::Float64
     min_power_fraction::Float64
     min_run_time::UInt
 
     function CHPP(uac::String, config::Dict{String,Any})
+        m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
+        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
+        register_media([m_gas_in, m_heat_out, m_el_out])
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -32,12 +41,15 @@ mutable struct CHPP <: ControlledSystem
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                :m_c_g_natgas => nothing
+                m_gas_in => nothing
             ),
             InterfaceMap( # output_interfaces
-                :m_h_w_ht1 => nothing,
-                :m_e_ac_230v => nothing
+                m_heat_out => nothing,
+                m_el_out => nothing
             ),
+            m_gas_in,
+            m_heat_out,
+            m_el_out,
             config["power"], # power
             default(config, "electricity_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
@@ -56,8 +68,8 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
     balance, potential, _ = balance_on(
-        unit.output_interfaces[:m_h_w_ht1],
-        unit.output_interfaces[:m_h_w_ht1].target
+        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_out].target
     )
 
     demand_to_meet = (
@@ -75,9 +87,9 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
         return
     end
 
-    add!(unit.output_interfaces[:m_e_ac_230v], max_produce_e * usage_fraction)
-    add!(unit.output_interfaces[:m_h_w_ht1], max_produce_h * usage_fraction)
-    sub!(unit.input_interfaces[:m_c_g_natgas], watt_to_wh(unit.power * usage_fraction))
+    add!(unit.output_interfaces[unit.m_el_out], max_produce_e * usage_fraction)
+    add!(unit.output_interfaces[unit.m_heat_out], max_produce_h * usage_fraction)
+    sub!(unit.input_interfaces[unit.m_gas_in], watt_to_wh(unit.power * usage_fraction))
 end
 
 export CHPP
