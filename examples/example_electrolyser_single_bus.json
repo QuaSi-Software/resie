@@ -74,12 +74,12 @@
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
-            "control_refs": ["TST_01_ELT_01_ELY"],
+            "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
-                "name": "supply_driven"
+                "name": "demand_driven"
             },
             "power": 20000,
             "fixed_cop": 3.0
@@ -122,7 +122,7 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "control_refs": ["TST_01_HZG_02_DEM"],
+            "control_refs": ["TST_01_HZG_01_HTP"],
             "production_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_DEM",
@@ -147,7 +147,8 @@
                 "percentage": 0.9
             },
             "capacity": 4000000,
-            "load": 2000000
+            "load": 2000000,
+            "high_temperature": 50
         },
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
