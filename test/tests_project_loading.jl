@@ -97,6 +97,8 @@ end
         test_load_custom_medium_categories()
     end
 
+    include("initialization/bus.jl")
+
     include("order_of_operations/bus_output_priorities.jl")
     include("order_of_operations/bus_to_bus.jl")
     include("order_of_operations/heat_pumps_wrong.jl")
