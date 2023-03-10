@@ -5,12 +5,12 @@ Utility struct to contain the connections, input/output priorities and other rel
 for bus systems.
 """
 Base.@kwdef mutable struct ConnectionMatrix
-    input_order::Union{Nothing,Vector{String}}
+    input_order::Vector{String}
     output_order::Vector{String}
     storage_loading::Union{Nothing,Vector{Vector{Bool}}}
 
     function ConnectionMatrix(config::Dict{String,Any})
-        input_order = nothing
+        input_order = []
         output_order = [String(u) for u in config["production_refs"]]
         storage_loading = nothing
 
