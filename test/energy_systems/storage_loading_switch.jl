@@ -53,7 +53,22 @@ function test_primary_producer_can_load_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01", "TST_BFT_01"],
-            "input_priorities" => ["TST_GBO_01", "TST_BFT_01", "TST_GBO_02"]
+            "connection_matrix" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_GBO_01",
+                    "TST_BFT_01",
+                    "TST_GBO_02"
+                ],
+                "output_order" => [
+                    "TST_DEM_01",
+                    "TST_BFT_01"
+                ],
+                "storage_loading" => [
+                    [1, 1],
+                    [1, 0],
+                    [1, 0]
+                ]
+            )
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",

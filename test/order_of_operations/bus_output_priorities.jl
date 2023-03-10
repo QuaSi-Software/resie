@@ -26,21 +26,43 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_BUS_02", "TST_BUS_03"],
-            "input_priorities" => ["TST_GBO_01"]
+            "connection_matrix" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_GBO_01",
+                ],
+                "output_order" => [
+                    "TST_BUS_02",
+                    "TST_BUS_03"
+                ],
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_01"],
-            "input_priorities" => ["TST_BUS_01"]
+            "connection_matrix" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                ],
+                "output_order" => [
+                    "TST_DEM_01",
+                ],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "production_refs" => ["TST_DEM_02"],
-            "input_priorities" => ["TST_BUS_01"]
+            "connection_matrix" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                ],
+                "output_order" => [
+                    "TST_DEM_02",
+                ],
+            )
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
