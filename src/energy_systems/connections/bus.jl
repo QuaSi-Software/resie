@@ -178,14 +178,32 @@ function balance_on(
 )::Tuple{Float64,Float64,Temperature}
     highest_demand_temp = -1e9
     storage_space = 0.0
+    input_index = nothing
 
-    for outface in unit.output_interfaces
+    # find the index of the input on the bus. if the method was called on an output,
+    # the input index will remain as nothing
+    for (idx, input_uac) in pairs(unit.connectivity.input_order)
+        if input_uac == interface.source.uac
+            input_index = idx
+            break
+        end
+    end
+
+    for (idx, outface) in pairs(unit.output_interfaces)
         if outface.target.sys_function === sf_bus
             balance, potential, temperature = balance_on(outface, outface.target)
         else
             balance = outface.balance
             temperature = outface.temperature
-            if outface.target.sys_function === sf_storage
+            if (
+                outface.target.sys_function === sf_storage
+                &&
+                (
+                    input_index === nothing
+                    || unit.connectivity.storage_loading === nothing
+                    || unit.connectivity.storage_loading[input_index][idx]
+                )
+            )
                 _, potential, _ = balance_on(outface, outface.target)
             else
                 potential = 0.0
