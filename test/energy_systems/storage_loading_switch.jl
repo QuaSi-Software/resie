@@ -86,8 +86,8 @@ function test_primary_producer_can_load_storage()
             "production_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
-            "scale" => 1000,
-            "static_load" => 1000,
+            "scale" => 1,
+            "static_load" => 5000,
             "static_temperature" => 60
         ),
     )
@@ -105,6 +105,10 @@ function test_primary_producer_can_load_storage()
         "time" => 0,
     )
 
+    # first timestep, demand is higher than primary producer can provide, so both should
+    # operate. however as the secondary should not load the storage, it only covers the
+    # remaining demand
+
     EnergySystems.reset(grid_1)
     EnergySystems.reset(grid_2)
     EnergySystems.reset(boiler_1)
@@ -121,41 +125,98 @@ function test_primary_producer_can_load_storage()
     EnergySystems.control(grid_1, systems, simulation_parameters)
     EnergySystems.control(grid_2, systems, simulation_parameters)
 
-    demand.input_interfaces[demand.medium].bala
+    @test boiler_1.controller.state_machine.state == 2
+    @test boiler_2.controller.state_machine.state == 1
+
+    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
+
+    EnergySystems.produce(boiler_1, simulation_parameters, watt_to_wh)
+    @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
+
+    EnergySystems.produce(tank, simulation_parameters, watt_to_wh)
+    @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
+
+    EnergySystems.produce(boiler_2, simulation_parameters, watt_to_wh)
+    @test boiler_2.output_interfaces[boiler_2.m_heat_out].balance == 2500.0
+
+    EnergySystems.load(tank, simulation_parameters, watt_to_wh)
+    @test tank.input_interfaces[tank.medium].sum_abs_change == 0.0
+
+    EnergySystems.produce(grid_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid_1, simulation_parameters, watt_to_wh)
+    EnergySystems.distribute!(bus)
+
+    balance, potential, _ = EnergySystems.balance_on(
+        boiler_1.output_interfaces[boiler_1.m_heat_out], bus
+    )
+    @test balance == 0.0
+    @test potential == -40000.0
+
+    balance, potential, _ = EnergySystems.balance_on(
+        boiler_2.output_interfaces[boiler_2.m_heat_out], bus
+    )
+    @test balance == 0.0
+    @test potential == 0.0
+
+    # in the second timestep, demand is lower than primary producer can provide, so the
+    # excess can go into storage. because the secondary should not load the storage, it
+    # should be inactive during this time step
+
+    EnergySystems.reset(grid_1)
+    EnergySystems.reset(grid_2)
+    EnergySystems.reset(boiler_1)
+    EnergySystems.reset(boiler_2)
+    EnergySystems.reset(bus)
+    EnergySystems.reset(tank)
+    EnergySystems.reset(demand)
+
+    demand.static_load = 1500
+
+    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(bus, systems, simulation_parameters)
+    EnergySystems.control(boiler_1, systems, simulation_parameters)
+    EnergySystems.control(tank, systems, simulation_parameters)
+    EnergySystems.control(boiler_2, systems, simulation_parameters)
+    EnergySystems.control(grid_1, systems, simulation_parameters)
+    EnergySystems.control(grid_2, systems, simulation_parameters)
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
 
-    EnergySystems.produce(demand, systems, simulation_parameters)
-    EnergySystems.produce(bus, systems, simulation_parameters)
-    EnergySystems.produce(boiler_1, systems, simulation_parameters)
-    EnergySystems.produce(tank, systems, simulation_parameters)
-    EnergySystems.produce(boiler_2, systems, simulation_parameters)
+    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
+
+    EnergySystems.produce(boiler_1, simulation_parameters, watt_to_wh)
+    @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
+
+    EnergySystems.produce(tank, simulation_parameters, watt_to_wh)
+    @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
+
+    EnergySystems.produce(boiler_2, simulation_parameters, watt_to_wh)
+    @test boiler_2.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 0.0
+
     EnergySystems.load(tank, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid_1, systems, simulation_parameters)
-    EnergySystems.produce(grid_2, systems, simulation_parameters)
+    @test tank.load == 1000.0
+
+    EnergySystems.produce(grid_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid_1, simulation_parameters, watt_to_wh)
     EnergySystems.distribute!(bus)
 
-    # a peculiar thing happens after distribute! has been called on a bus: when a system
-    # interface that previously held a demand at a not-nothing temperature has been matched
-    # by a corresponding supply, calling balance_on on the bus now returns a temperature of
-    # nothing, even if the system interface still has the same temperature. this happens
-    # because a balance of 0 is not considered a demand and is not considered for "the
-    # highest demand temperature on the bus". this behaviour is not wrong, but unintuitive
+    @test tank.input_interfaces[tank.medium].sum_abs_change == 2000.0
+    @test boiler_1.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 5000.0
 
-    balance, potential, temperature = EnergySystems.balance_on(
-        tank_2.output_interfaces[tank_2.medium], bus_2
+    balance, potential, _ = EnergySystems.balance_on(
+        boiler_1.output_interfaces[boiler_1.m_heat_out], bus
     )
     @test balance == 0.0
-    @test potential == -10075.0
-    @test temperature === nothing
+    @test potential == -39000.0
 
-    balance, potential, temperature = EnergySystems.balance_on(
-        tank_1.output_interfaces[tank_1.medium], bus_1
+    balance, potential, _ = EnergySystems.balance_on(
+        boiler_2.output_interfaces[boiler_2.m_heat_out], bus
     )
     @test balance == 0.0
-    @test potential == -30075.0
-    @test temperature === nothing
+    @test potential == 0.0
 end
 
 @testset "primary_producer_can_load_storage" begin
