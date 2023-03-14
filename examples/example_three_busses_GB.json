@@ -65,7 +65,12 @@
                 "ESS_BUS_TH_02",
                 "ESS_BUS_TH_03"
             ],
-            "input_priorities": [ ]
+            "connection_matrix": {
+                "output_order": [
+                    "ESS_BUS_TH_02",
+                    "ESS_BUS_TH_03"
+                ]
+            }
         },
         "ESS_BUS_TH_02": {
             "type": "Bus",
@@ -75,10 +80,16 @@
                 "TST_DEM_01",
                 "TST_BFT_TH_01"
             ],
-            "input_priorities": [
-                "ESS_BUS_TH_01",
-                "TST_BFT_TH_01"
-             ]
+            "connection_matrix": {
+                "input_order": [
+                    "ESS_BUS_TH_01",
+                    "TST_BFT_TH_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_BFT_TH_01"
+                ]
+            }
         },
         "ESS_BUS_TH_03": {
             "type": "Bus",
@@ -88,10 +99,16 @@
                 "TST_DEM_02",
                 "TST_BFT_TH_02"
             ],
-            "input_priorities": [
-                "ESS_BUS_TH_01",
-                "TST_BFT_TH_02"
-             ]
+            "connection_matrix": {
+                "input_order": [
+                    "ESS_BUS_TH_01",
+                    "TST_BFT_TH_02"
+                ],
+                "output_order": [
+                    "TST_DEM_02",
+                    "TST_BFT_TH_02"
+                ]
+            }
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",

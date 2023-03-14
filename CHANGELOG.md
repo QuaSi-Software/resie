@@ -14,6 +14,11 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.0
+* Implement connectivity matrix on bus systems for controlling which producer can load which storage on the same bus
+* Remove operational strategy "use_surplus_in_cycle" as it is no longer needed with this new feature
+* Move definitions of input and output priorities into connectivity matrix
+
 ### Version 0.2.11
 * Implemented user-definable media for all energy systems
 * Adaption of tests to the new user-definable media names

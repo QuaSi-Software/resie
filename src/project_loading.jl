@@ -170,14 +170,14 @@ function order_of_operations(systems::Grouping)::StepInstructions
     # reorder systems connected to a bus so they match the input priority:
     for bus in values(systems_by_function[3])
         # for each system in the bus' input priority...
-        for own_idx = 1:length(bus.input_priorities)
-            own_uac = bus.input_priorities[own_idx]
+        for own_idx = 1:length(bus.connectivity.input_order)
+            own_uac = bus.connectivity.input_order[own_idx]
             own_ctrl_idx = idx_of(simulation_order, own_uac, EnergySystems.s_control)
             own_prod_idx = idx_of(simulation_order, own_uac, EnergySystems.s_produce)
 
             # ...make sure every system following after...
-            for other_idx = own_idx:length(bus.input_priorities)
-                other_uac = bus.input_priorities[other_idx]
+            for other_idx = own_idx:length(bus.connectivity.input_order)
+                other_uac = bus.connectivity.input_order[other_idx]
                 other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
                 other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
 
@@ -235,8 +235,8 @@ function order_of_operations(systems::Grouping)::StepInstructions
         # also make sure that the order of the load() function of the storages connected to the following busses have the same order than the busses
         #
         # for bus in the first bus' production refs...
-        for own_idx = 1:length(bus.output_priorities)
-            own_uac = bus.output_priorities[own_idx]
+        for own_idx = 1:length(bus.connectivity.output_order)
+            own_uac = bus.connectivity.output_order[own_idx]
 
             # predefine indexes for storages, set to zero
             own_storage_idx = 0
@@ -258,8 +258,8 @@ function order_of_operations(systems::Grouping)::StepInstructions
                 end
 
                 # ...make sure every bus following after...
-                for other_idx = own_idx:length(bus.output_priorities)
-                    other_uac = bus.output_priorities[other_idx]
+                for other_idx = own_idx:length(bus.connectivity.output_order)
+                    other_uac = bus.connectivity.output_order[other_idx]
                     if uac_is_bus(bus, other_uac) # consider only busses
                         other_dist_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
 

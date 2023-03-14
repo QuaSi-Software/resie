@@ -49,9 +49,16 @@
                 "TST_01_HZG_02_HTP",
                 "TST_01_ELT_01_ELY"
             ],
-            "input_priorities": [
-                "TST_01_ELT_01_GRI"
-            ]
+            "connection_matrix": {
+                "input_order": [
+                    "TST_01_ELT_01_GRI"
+                ],
+                "output_order": [
+                    "TST_01_HZG_01_HTP",
+                    "TST_01_HZG_02_HTP",
+                    "TST_01_ELT_01_ELY"
+                ]
+            }
         },
         "TST_01_HZG_01_BUS": {
             "type": "Bus",
@@ -60,10 +67,15 @@
             "production_refs": [
                 "TST_01_HZG_01_DEM"
             ],
-            "input_priorities": [
-                "TST_01_HZG_02_HTP",
-                "TST_01_HZG_01_GBO"
-            ]
+            "connection_matrix": {
+                "input_order": [
+                    "TST_01_HZG_02_HTP",
+                    "TST_01_HZG_01_GBO"
+                ],
+                "output_order": [
+                    "TST_01_HZG_01_DEM"
+                ]
+            }
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",

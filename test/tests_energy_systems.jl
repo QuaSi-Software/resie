@@ -4,4 +4,5 @@ using Test
     include("energy_systems/heat_pump_demand_driven.jl")
     include("energy_systems/demand_heating.jl")
     include("energy_systems/bus_to_bus.jl")
+    include("energy_systems/storage_loading_switch.jl")
 end
