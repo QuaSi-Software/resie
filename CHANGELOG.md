@@ -14,6 +14,10 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.1
+* Added tests for demand_driven strategy with and without bus between transformer and demand
+* Adapted default control strategy of gasboiler and heatpump to enable storage-filling
+
 ### Version 0.3.0
 * Implement connectivity matrix on bus systems for controlling which producer can load which storage on the same bus
 * Remove operational strategy "use_surplus_in_cycle" as it is no longer needed with this new feature
