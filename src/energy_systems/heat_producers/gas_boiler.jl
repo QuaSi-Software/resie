@@ -62,7 +62,7 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
     demand_to_meet = (
         strategy == "storage_driven"
         ? balance + potential
-        : balance
+        : balance + potential
     )
     if demand_to_meet >= 0.0
         return
