@@ -132,11 +132,11 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
     elseif unit.controller.strategy == "demand_driven"
         max_produce_h = watt_to_wh(unit.power)
 
-        if out_blnc >= 0.0
+        if out_blnc + out_pot >= 0.0
             return # don't add to a surplus of energy
         end
 
-        usage_fraction = min(1.0, abs(out_blnc) / max_produce_h)
+        usage_fraction = min(1.0, abs(out_blnc + out_pot) / max_produce_h)
         if usage_fraction < unit.min_power_fraction
             return
         end
