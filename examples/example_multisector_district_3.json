@@ -239,14 +239,17 @@
         },
         "TST_ELY_01": {
             "type": "Electrolyser",
-            "control_refs": [],
+            "control_refs": ["TST_HP_01"],
             "production_refs": [
                 "TST_GRI_H2_01",
                 "TST_GRI_O2_01",
                 "TST_HP_01"
             ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "demand_driven",
+                "m_h2_out": false,
+                "m_o2_out": false,
+                "m_el_in": false
             },
             "power": 180000,
             "min_power_fraction": 0,
@@ -257,7 +260,9 @@
             "control_refs": [  ],
             "production_refs": ["TST_BUS_TH_01" ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "demand_driven",
+                "m_heat_in": false,
+                "m_el_in": false
             },
             "power": 60000,
             "fixed_cop": 3.0
