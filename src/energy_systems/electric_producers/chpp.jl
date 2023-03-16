@@ -75,14 +75,14 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     demand_to_meet = (
         strategy == "storage_driven"
         ? balance + potential
-        : balance
+        : (unit.controller.parameter["storages"] ? balance + potential : balance) 
     )
 
     if demand_to_meet >= 0.0
         return
     end
 
-    usage_fraction = min(1.0, abs(balance + potential) / max_produce_h)
+    usage_fraction = min(1.0, abs(demand_to_meet) / max_produce_h)
     if usage_fraction < unit.min_power_fraction
         return
     end
