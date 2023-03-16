@@ -19,6 +19,7 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
     conditions=[],
     strategy_parameters=Dict{String,Any}(
         "name" => "demand_driven",
+        "storages" => true,
         "m_el_in" => true,
         "m_el_out" => true,
         "m_gas_in" => true,
