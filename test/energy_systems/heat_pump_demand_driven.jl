@@ -55,6 +55,7 @@ function test_heat_pump_demand_driven_correct_order()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     @test heat_pump.controller.state_machine.state == 1
