@@ -228,6 +228,11 @@
                     "TST_BUS_TH_02",
                     "TST_BUS_TH_03",
                     "TST_BFT_TH_03"
+                ],
+                "storage_loading": [
+                    [1, 1, 1],
+                    [1, 1, 1],
+                    [1, 1, 0]
                 ]
             }
         },
@@ -293,11 +298,13 @@
                 "TST_BUS_TH_01"
             ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "demand_driven",
+                "m_el_in": false,
+                "m_h2_out": false,
+                "m_o2_out": false
             },
             "power": 400000,
             "m_heat_out": "m_h_w_ht1"
-
         },
         "TST_CHP_01": {
             "type": "CHPP",
@@ -318,7 +325,8 @@
                 "TST_BUS_TH_01"
             ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "demand_driven",
+                "storages": false
             },
             "power": 400000
         },
