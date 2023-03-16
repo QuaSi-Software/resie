@@ -17,7 +17,16 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
     description=strt_desc_supply_driven,
     sm_constructor=strt_sm_supply_driven,
     conditions=[],
-    strategy_parameters=Dict{String,Any}(),
+    strategy_parameters=Dict{String,Any}(
+        "name" => "supply_driven",
+        "m_el_in" => true,
+        "m_el_out" => true,
+        "m_gas_in" => true,
+        "m_h2_out" => true,
+        "m_o2_out" => true,
+        "m_heat_out" => true,
+        "m_heat_in" => true
+    ),
     required_systems=EnSysRequirements(
         "supplier" => (EnergySystem, nothing)
     )
