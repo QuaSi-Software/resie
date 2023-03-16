@@ -59,7 +59,7 @@
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 604800,
+        "end": 6048000,
         "time_step_seconds": 900
     },
     "energy_systems": {
@@ -222,6 +222,7 @@
                 "input_order": [
                     "TST_ELY_01",
                     "TST_CHP_01",
+                    "TST_BFT_TH_03",
                     "TST_GBO_01"
                 ],
                 "output_order": [
@@ -232,6 +233,7 @@
                 "storage_loading": [
                     [1, 1, 1],
                     [1, 1, 1],
+                    [1, 1, 0],
                     [1, 1, 0]
                 ]
             }
@@ -326,7 +328,7 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "storages": false
+                "load_storages": false
             },
             "power": 400000
         },
@@ -355,7 +357,7 @@
                 "TST_BUS_TH_01"
             ],
             "capacity": 4000000,
-            "load": 0
+            "load": 1000000
         }
     }
 }

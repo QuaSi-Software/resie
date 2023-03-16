@@ -75,7 +75,7 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     demand_to_meet = (
         strategy == "storage_driven"
         ? balance + potential
-        : (unit.controller.parameter["storages"] ? balance + potential : balance) 
+        : (unit.controller.parameter["load_storages"] ? balance + potential : balance) 
     )
 
     if demand_to_meet >= 0.0
