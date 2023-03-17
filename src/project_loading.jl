@@ -217,7 +217,23 @@ function order_of_operations(systems::Grouping)::StepInstructions
     systems_by_function = categorize_by_function(systems)
     simulation_order = base_order(systems_by_function)
 
-    # reorder systems connected to a bus so they match the input priority:
+    reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+    reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+    reorder_storage_loading(simulation_order, systems, systems_by_function)
+    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
+
+    fn_first = function (entry)
+        return entry[1]
+    end
+    return [(u[2][1].uac, u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+end
+
+"""
+    reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+
+Reorder systems connected to a bus so they match the input priority defined on that bus.
+"""
+function reorder_for_input_priorities(simulation_order, systems, systems_by_function)
     for bus in values(systems_by_function[3])
         # for each system in the bus' input priority...
         for own_idx = 1:length(bus.connectivity.input_order)
@@ -247,8 +263,30 @@ function order_of_operations(systems::Grouping)::StepInstructions
             end
         end
     end
+end
 
-    # reorder distribution of busses
+"""
+    reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+
+Reorder the distribution of busses so that any chain of busses connected to each other
+have the "sink" busses before the "source" busses while also considering the output
+priorities of two or more sink busses connected to the same source bus.
+
+In the following, assume energy flow from left to right:
+
+                ------------
+                 Sink Bus 1
+                ------------
+              /
+------------
+Source Bus 1
+------------
+              \
+                ------------
+                Sink Bus 2
+                ------------
+"""
+function reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
     for bus in values(systems_by_function[3])
         # make sure that every following bus connected to a fist bus is calculated earlier than the first bus (only distribute here)
         own_uac = bus.uac
@@ -293,9 +331,15 @@ function order_of_operations(systems::Grouping)::StepInstructions
             end
         end
     end
+end
 
+"""
+    reorder_storage_loading(simulation_order, systems, systems_by_function)
 
-    # reorder load and produce of storages
+Reorder systems such the loading (and unloading) of storages follows the priorities on
+busses, including communication across connected busses.
+"""
+function reorder_storage_loading(simulation_order, systems, systems_by_function)
     for bus in values(systems_by_function[3])
         # make sure that the order of the load() function of the storages connected to the following busses have the same order than the busses.
         # for every bus in the first bus' production refs...
@@ -360,9 +404,15 @@ function order_of_operations(systems::Grouping)::StepInstructions
             end
         end
     end
+end
 
-    # reorder systems such that their control dependencies are handled first, but only if
-    # these are not storage systems (which are handled differently)
+"""
+    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
+
+Reorder systems such that all of their control dependencies have their control and
+produce steps happen before the unit itself. Storage systems are excepted.
+"""
+function reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
     for unit in values(systems)
         for other_uac in keys(unit.controller.linked_systems)
             other_unit = systems[other_uac]
@@ -388,9 +438,4 @@ function order_of_operations(systems::Grouping)::StepInstructions
             end
         end
     end
-
-    fn_first = function (entry)
-        return entry[1]
-    end
-    return [(u[2][1].uac, u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
 end
