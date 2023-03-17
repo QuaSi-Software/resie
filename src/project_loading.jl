@@ -130,10 +130,13 @@ function base_order(systems_by_function)
         end
     end
 
-    # produce transformers
-    for unit in values(systems_by_function[4])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
-        initial_nr -= 1
+    # place steps potential and produce for transformers in order by "chains"
+    chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
+    for chain in chains
+        for unit in iterate_chain(chain, EnergySystems.sf_transformer, true)
+            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
     end
 
     # produce, then load storages
@@ -190,6 +193,104 @@ function uac_is_bus(energysystem, uac)
         end
     end
     return false
+end
+
+"""
+    add_non_recursive!(node_set, unit, caller_uac)
+
+Add connected units of the same system function to the node set in a non-recursive manner.
+"""
+function add_non_recursive!(node_set, unit, caller_uac)
+    push!(node_set, unit)
+
+    for inface in values(unit.input_interfaces)
+        if inface.source.uac == caller_uac
+            continue
+        elseif inface.source.sys_function === unit.sys_function
+            add_non_recursive!(node_set, inface.source, unit.uac)
+        end
+    end
+
+    for outface in values(unit.output_interfaces)
+        if outface.target.uac == caller_uac
+            continue
+        elseif outface.target.sys_function === unit.sys_function
+            add_non_recursive!(node_set, outface.target, unit.uac)
+        end
+    end
+end
+
+"""
+    find_chains(systems, sys_function)
+
+Find all chains of the given system function in the given set of systems.
+"""
+function find_chains(systems, sys_function)
+    chains = []
+
+    for unit in systems
+        if unit.sys_function !== sys_function
+            continue
+        end
+
+        already_recorded = false
+        for chain in chains
+            if unit in chain
+                already_recorded = true
+            end
+        end
+
+        if !already_recorded
+            chain = Set()
+            add_non_recursive!(chain, unit, "")
+            push!(chains, chain)
+        end
+    end
+
+    return chains
+end
+
+"""
+    distance_to_sink(node, sys_function)
+
+Calculate the distance of the given node to the leaves of the chain.
+"""
+function distance_to_sink(node, sys_function)
+    is_leaf = function(node)
+        for outface in values(node.output_interfaces)
+            if outface.target.sys_function === sys_function
+                return false
+            end
+        end
+        return true
+    end
+
+    if is_leaf(node)
+        return 0
+    else
+        max_distance = 0
+        for outface in values(unit.output_interfaces)
+            distance = distance_to_sink(outface.target, sys_function)
+            max_distance = distance > max_distance ? distance : max_distance
+        end
+        return max_distance + 1
+    end
+end
+
+"""
+    iterate_chain(chain, sys_function, reverse)
+
+Iteration order over a chain of units of the same system function.
+"""
+function iterate_chain(chain, sys_function, reverse)
+    distances = []
+    for node in chain
+        push!(distances, (distance_to_sink(node, sys_function), node))
+    end
+    fn_first = function (entry)
+        return entry[1]
+    end
+    return [u[2] for u in sort(distances, by=fn_first, rev=reverse)]
 end
 
 """
