@@ -47,6 +47,19 @@ mutable struct GridConnection <: ControlledSystem
     end
 end
 
+function control(
+    unit::GridConnection,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    if unit.sys_function === sf_dispatchable_source
+        set_max_energy!(unit.output_interfaces[unit.medium], Inf)
+    else
+        set_max_energy!(unit.input_interfaces[unit.medium], -Inf)
+    end
+end
+
 function produce(unit::GridConnection, parameters::Dict{String,Any}, watt_to_wh::Function)
     if unit.sys_function === sf_dispatchable_source
         outface = unit.output_interfaces[unit.medium]

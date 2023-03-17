@@ -76,6 +76,8 @@ function control(
 )
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
+    
     if unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.output_interfaces[unit.medium].temperature = unit.temperature
