@@ -69,6 +69,130 @@ function load_systems(config::Dict{String,Any})::Grouping
 end
 
 """
+    categorize_by_function(systems)
+
+Sort the given systems into buckets by their system functions.
+"""
+function categorize_by_function(systems)
+    return [
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_fixed_source],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_fixed_sink],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_bus],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_transformer],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_storage],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_dispatchable_source],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_dispatchable_sink],
+    ]
+end
+
+"""
+    base_order(systems_by_function)
+
+Calculate the base order for the simulation steps.
+
+This is determined by the system functions having a certain "natural" order as well as the
+simulation steps having a natural order as well.
+"""
+function base_order(systems_by_function)
+    simulation_order = []
+    initial_nr = sum([length(bucket) for bucket in systems_by_function]) * 100
+
+    # reset all systems, order doesn't matter
+    for sf_order = 1:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_reset)])
+            initial_nr -= 1
+        end
+    end
+
+
+    # calculate control of all systems. the order corresponds to the general order of
+    # system functions
+    for sf_order = 1:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
+            initial_nr -= 1
+        end
+    end
+
+    # produce fixed sources/sinks and busses.
+    for sf_order = 1:3
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
+    end
+
+    # produce transformers
+    for unit in values(systems_by_function[4])
+        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+        initial_nr -= 1
+    end
+
+    # produce, then load storages
+    for unit in values(systems_by_function[5])
+        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+        initial_nr -= 1
+    end
+    for unit in values(systems_by_function[5])
+        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_load)])
+        initial_nr -= 1
+    end
+
+    # produce dispatchable sources/sinks
+    for sf_order = 6:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
+    end
+
+    # distribute busses
+    for unit in values(systems_by_function[3])
+        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_distribute)])
+        initial_nr -= 1
+    end
+
+    return simulation_order
+end
+
+"""
+    idx_of(order, uac, step)
+
+Helper function to find the index of a given combination of step and unit (by its UAC).
+"""
+function idx_of(order, uac, step)
+    for idx in eachindex(order)
+        if order[idx][2][1].uac == uac && order[idx][2][2] == step
+            return idx
+        end
+    end
+    return 0
+end
+
+"""
+    uac_is_bus(energysystem, uac)
+
+Helper function to check if the given UAC corresponds to a bus in the outputs of the
+given energy system.
+"""
+function uac_is_bus(energysystem, uac)
+    for output_interface in energysystem.output_interfaces
+        if (output_interface.target.uac === uac && output_interface.target.sys_function === EnergySystems.sf_bus)
+            return true
+        end
+    end
+    return false
+end
+
+"""
 order_of_operations(systems)
 
 Calculate the order of steps that need to be performed to simulate the given systems.
@@ -90,82 +214,8 @@ not trivial and might not work for each possible grouping of systems.
 ```
 """
 function order_of_operations(systems::Grouping)::StepInstructions
-    systems_by_function = [
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_fixed_source],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_fixed_sink],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_bus],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_transformer],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_storage],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_source],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_sink],
-    ]
-
-    simulation_order = []
-    initial_nr = length(systems) * 100
-
-    # reset all systems, order doesn't matter
-    for sf_order = 1:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_reset)])
-            initial_nr -= 1
-        end
-    end
-
-
-    # calculate control of all systems. the order corresponds to the general order of
-    # system functions
-    for sf_order = 1:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
-            initial_nr -= 1
-        end
-    end
-
-    # produce all systems except dispatchable sources/sinks. the order corresponds
-    # to the general order of system functions
-    for sf_order = 1:5
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
-            initial_nr -= 1
-        end
-    end
-
-    # sandwich loading of storage systems between the other systems and dispatchable ones
-    for unit in values(systems_by_function[5])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_load)])
-        initial_nr -= 1
-    end
-
-    # handle dispatchable sources/sinks
-    for sf_order = 6:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
-            initial_nr -= 1
-        end
-    end
-
-    # finally, distribute bus systems
-    for unit in values(systems_by_function[3])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_distribute)])
-        initial_nr -= 1
-    end
-
-    # helper function to find certain steps in the simulation order
-    idx_of = function (order, uac, step)
-        for idx in eachindex(order)
-            if order[idx][2][1].uac == uac && order[idx][2][2] == step
-                return idx
-            end
-        end
-        return 0
-    end
+    systems_by_function = categorize_by_function(systems)
+    simulation_order = base_order(systems_by_function)
 
     # reorder systems connected to a bus so they match the input priority:
     for bus in values(systems_by_function[3])
@@ -196,19 +246,6 @@ function order_of_operations(systems::Grouping)::StepInstructions
                 end
             end
         end
-    end
-
-    # helper function to check if target system is bus
-    uac_is_bus = function (energysystem, uac)
-        bool = false
-        for output_interface in energysystem.output_interfaces
-            if output_interface.target.uac === uac
-                if output_interface.target.sys_function === EnergySystems.sf_bus
-                    bool = true
-                end
-            end
-        end
-        return bool
     end
 
     # reorder distribution of busses
