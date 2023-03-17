@@ -60,7 +60,7 @@ mutable struct HeatPump <: ControlledSystem
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return ["OUT", "Max_Power", "Temperature"]
+    return ["IN", "OUT", "COP"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -159,7 +159,7 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         other_limitations = 1.0
 
     elseif unit.controller.strategy == "storage_driven" 
-        return # do not start due to statemachine! ToDo: correct? (->EtOt)
+        return # do not start due to statemachine!
 
     elseif unit.controller.strategy == "supply_driven"
 

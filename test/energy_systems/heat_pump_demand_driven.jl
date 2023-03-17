@@ -76,7 +76,7 @@ function test_heat_pump_demand_driven_correct_order()
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
     EnergySystems.control(source, systems, simulation_parameters)
 
-    source.max_power = 5000
+    source.max_energy = 5000/4
     source.temperature = 35
     source.output_interfaces[source.medium].temperature = 35
 
@@ -122,7 +122,7 @@ function test_heat_pump_demand_driven_correct_order()
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
     EnergySystems.control(source, systems, simulation_parameters)
 
-    source.max_power = 2000
+    source.max_energy = 2000/4
     source.temperature = 35
     source.output_interfaces[source.medium].temperature = 35
 

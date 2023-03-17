@@ -18,7 +18,7 @@ mutable struct DispatchableSink <: ControlledSystem
     max_power_profile::Profile
     scaling_factor::Float64
 
-    max_power::Float64
+    max_energy::Float64
 
     function DispatchableSink(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
@@ -40,20 +40,20 @@ mutable struct DispatchableSink <: ControlledSystem
             ),
             max_power_profile, # max_power_profile
             config["scale"], # scaling_factor
-            0.0, # max_power
+            0.0, # max_energy
         )
     end
 end
 
 function output_values(unit::DispatchableSink)::Vector{String}
-    return ["IN", "Max_Power"]
+    return ["IN", "Max_Energy"]
 end
 
 function output_value(unit::DispatchableSink, key::OutputKey)::Float64
     if key.value_key == "IN"
         return unit.input_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.value_key == "Max_Power"
-        return unit.max_power
+    elseif key.value_key == "Max_Energy"
+        return unit.max_energy
     end
     throw(KeyError(key.value_key))
 end
@@ -64,8 +64,8 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
-    unit.max_power = unit.scaling_factor * Profiles.power_at_time(unit.max_power_profile, parameters["time"])
-    set_max_power!(unit.input_interfaces[unit.medium], unit.max_power)
+    unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
 end
 
 function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_wh::Function)
@@ -74,7 +74,7 @@ function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_w
     if balance > 0.0
         sub!(
             inface,
-            min(abs(balance), watt_to_wh(unit.max_power))
+            min(abs(balance), unit.max_energy)
         )
     end
 end

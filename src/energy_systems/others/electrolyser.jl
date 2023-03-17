@@ -133,10 +133,10 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
         usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) / max_produce_h2 
         usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) / max_produce_o2 
         usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) / max_produce_heat
-        other_limitations = 1
+        other_limitations = 1 
 
     elseif unit.controller.strategy == "storage_driven" 
-        return # do not start due to statemachine! ToDo: correct? (->EtOt)
+        return # do not start due to statemachine!
     
     elseif unit.controller.strategy == "supply_driven"
         usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el 
