@@ -96,7 +96,7 @@ Enumerations of a simulation step that can be performed on an energy system.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
-@enum Step s_reset s_control s_produce s_load s_distribute
+@enum Step s_reset s_control s_produce s_load s_distribute s_potential
 
 """
 Convenience type for holding the instruction for one system and one step.
