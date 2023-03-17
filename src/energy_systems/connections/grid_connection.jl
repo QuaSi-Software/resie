@@ -65,17 +65,17 @@ function produce(unit::GridConnection, parameters::Dict{String,Any}, watt_to_wh:
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
         # must be handled here instead of being ignored
-        balance, _, _ = balance_on(outface, outface.target)
-        if balance < 0.0
-            unit.draw_sum += balance
-            add!(outface, abs(balance))
+        InterfaceInfo = balance_on(outface, outface.target)
+        if InterfaceInfo.balance < 0.0
+            unit.draw_sum += InterfaceInfo.balance
+            add!(outface, abs(InterfaceInfo.balance))
         end
     else
         inface = unit.input_interfaces[unit.medium]
-        balance, _, _ = balance_on(inface, inface.source)
-        if balance > 0.0
-            unit.load_sum += balance
-            sub!(inface, balance)
+        InterfaceInfo = balance_on(inface, inface.source)
+        if InterfaceInfo.balance > 0.0
+            unit.load_sum += InterfaceInfo.balance
+            sub!(inface, InterfaceInfo.balance)
         end
     end
 end

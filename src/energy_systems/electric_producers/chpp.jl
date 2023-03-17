@@ -67,15 +67,15 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     max_produce_h = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
     max_produce_e = watt_to_wh(unit.power * unit.electricity_fraction)
 
-    balance, potential, _ = balance_on(
+    InterfaceInfo = balance_on(
         unit.output_interfaces[unit.m_heat_out],
         unit.output_interfaces[unit.m_heat_out].target
     )
 
     demand_to_meet = (
         strategy == "storage_driven"
-        ? balance + potential
-        : (unit.controller.parameter["load_storages"] ? balance + potential : balance) 
+        ? InterfaceInfo.balance + InterfaceInfo.storage_potential
+        : (unit.controller.parameter["load_storages"] ? InterfaceInfo.balance + InterfaceInfo.storage_potential : InterfaceInfo.balance) 
     )
 
     if demand_to_meet >= 0.0

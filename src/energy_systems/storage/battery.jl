@@ -44,8 +44,14 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::Battery
-)::Tuple{Float64,Float64,Temperature}
-    return interface.balance, -unit.capacity + unit.load, interface.temperature
+)::NamedTuple{}
+
+    return (
+            balance = interface.balance,
+            storage_potential = -unit.capacity + unit.load,
+            #energy_potential = 0.0,
+            temperature = interface.temperature
+            )
 end
 
 function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
@@ -54,15 +60,15 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     end
 
     outface = unit.output_interfaces[unit.medium]
-    balance, _, _ = balance_on(outface, outface.target)
+    InterfaceInfo = balance_on(outface, outface.target)
 
-    if balance >= 0.0
+    if InterfaceInfo.balance >= 0.0
         return # produce is only concerned with moving energy to the target
     end
 
-    if unit.load > abs(balance)
-        unit.load += balance
-        add!(outface, abs(balance))
+    if unit.load > abs(InterfaceInfo.balance)
+        unit.load += InterfaceInfo.balance
+        add!(outface, abs(InterfaceInfo.balance))
     else
         add!(outface, unit.load)
         unit.load = 0.0
@@ -75,16 +81,16 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     end
 
     inface = unit.input_interfaces[unit.medium]
-    balance, _, _ = balance_on(inface, inface.source)
+    InterfaceInfo = balance_on(inface, inface.source)
 
-    if balance <= 0.0
+    if InterfaceInfo.balance <= 0.0
         return # load is only concerned with receiving energy from the target
     end
 
     diff = unit.capacity - unit.load
-    if diff > balance
-        unit.load += balance
-        sub!(inface, balance)
+    if diff > InterfaceInfo.balance
+        unit.load += InterfaceInfo.balance
+        sub!(inface, InterfaceInfo.balance)
     else
         unit.load = unit.capacity
         sub!(inface, diff)

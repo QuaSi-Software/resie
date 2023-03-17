@@ -87,10 +87,12 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
     # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
     # electricity 
     if unit.controller.parameter["m_el_in"] == true 
-        balance_el, potential_el, _ = balance_on(
+        InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_el_in],
             unit
         )
+        balance_el = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_el = InterfaceInfo.storage_potential
         if (unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) <= parameters["epsilon"]
             return # do nothing if there is no electricity to consume
         end
@@ -101,10 +103,13 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
    
     # heat in 
     if unit.controller.parameter["m_heat_in"] == true 
-        balance_heat_in, potential_heat_in, in_temp = balance_on(
+        InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_heat_in],
             unit
         )
+        balance_heat_in = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_heat_in = InterfaceInfo.storage_potential
+        in_temp = InterfaceInfo.temperature
         if (unit.controller.parameter["unload_storages"] ? balance_heat_in + potential_heat_in : balance_heat_in) <= parameters["epsilon"]
             return # do nothing if there is no heat to consume
         end
@@ -115,10 +120,13 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
 
     # heat out
     if unit.controller.parameter["m_heat_out"] == true 
-        balance_heat_out, potential_heat_out, out_temp = balance_on(
+        InterfaceInfo = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
+        balance_heat_out = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_heat_out = InterfaceInfo.storage_potential
+        out_temp = InterfaceInfo.temperature
         if (unit.controller.parameter["load_storages"] ? balance_heat_out + potential_heat_out : balance_heat_out) >= -parameters["epsilon"]
             return # don't add to a surplus of heat
         end
@@ -129,17 +137,19 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
    
     # check if temperature has already been read from input and output interface
     if !(@isdefined in_temp)
-        _, _, in_temp = balance_on(
+        InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_heat_in],
             unit
         )
+        in_temp = InterfaceInfo.temperature
     end
 
     if !(@isdefined out_temp)
-        _, _, out_temp = balance_on(
+        InterfaceInfo = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
+        out_temp = InterfaceInfo.temperature
     end
 
     # calculate COP

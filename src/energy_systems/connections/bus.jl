@@ -99,42 +99,57 @@ Variant of [`balance`](@ref) that includes other connected bus systems and their
 balance, but does so in a non-recursive manner such that any bus in the chain of connected
 bus systems is only considered once.
 """
-function balance_nr(unit::Bus, caller::Bus)
+function balance_nr(unit::Bus, caller::Bus)::NamedTuple{}
     balance = 0.0
+    #energy_sum = 0.0
 
-    for inface in unit.input_interfaces
+    for inface in unit.input_interfaces   # supply
         if inface.source == caller
             continue
         end
 
-        if isa(inface.source, Bus)
-            supply = max(balance_nr(inface.source, unit), inface.balance)
-            if supply < 0.0
+        if isa(inface.source, Bus)  
+            InterfaceInfo = balance_nr(inface.source, unit)
+            #energy_supply = InterfaceInfo.energy_potential
+            balance_supply = max(InterfaceInfo.balance, inface.balance)
+            if balance_supply < 0.0
                 continue
             end
         else
-            supply, _, _ = balance_on(inface, inface.source)
+            InterfaceInfo = balance_on(inface, inface.source)
+            balance_supply = InterfaceInfo.balance
+            #energy_supply = InterfaceInfo.energy_potential
         end
-        balance += supply
+        balance += balance_supply
+        #energy_sum += energy_supply
     end
 
-    for outface in unit.output_interfaces
+    for outface in unit.output_interfaces  # demand
         if outface.target == caller
             continue
         end
 
         if isa(outface.target, Bus)
-            demand = min(balance_nr(outface.target, unit), outface.balance)
-            if demand > 0.0
+            InterfaceInfo = balance_nr(outface.target, unit)
+            #energy_demand = InterfaceInfo.energy_potential
+            balance_demand = min(InterfaceInfo.balance, outface.balance)
+            if balance_demand > 0.0
                 continue
             end
         else
-            demand, _, _ = balance_on(outface, outface.target)
+            InterfaceInfo = balance_on(outface, outface.target)
+            #energy_demand = InterfaceInfo.energy_potential
+            balance_demand = InterfaceInfo.balance
         end
-        balance += demand
+        balance += balance_demand
+        #energy_sum += energy_demand
+
     end
 
-    return balance + unit.remainder
+    return (
+        balance = balance + unit.remainder,
+        #energy_potential = energy_sum
+    )
 end
 
 """
@@ -145,28 +160,28 @@ Energy balance on a bus system without considering any other connected bus syste
 function balance_direct(unit::Bus)::Float64
     balance = 0.0
 
-    for inface in unit.input_interfaces
+    for inface in unit.input_interfaces  # supply
         if isa(inface.source, Bus)
             continue
         else
-            supply, _, _ = balance_on(inface, inface.source)
-            balance += supply
+            InterfaceInfo = balance_on(inface, inface.source)
+            balance += InterfaceInfo.balance
         end
     end
 
-    for outface in unit.output_interfaces
+    for outface in unit.output_interfaces  # demand
         if isa(outface.target, Bus)
             continue
         else
-            demand, _, _ = balance_on(outface, outface.target)
-            balance += demand
+            InterfaceInfo = balance_on(outface, outface.target)
+            balance += InterfaceInfo.balance
         end
     end
 
     return balance + unit.remainder
 end
 
-function balance(unit::Bus)::Float64
+function balance(unit::Bus)::NamedTuple{}
     # we can use the non-recursive version of the method as a bus will never
     # be connected to itself... right?
     return balance_nr(unit, unit)
@@ -175,9 +190,10 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::Bus
-)::Tuple{Float64,Float64,Temperature}
+)::NamedTuple{}
     highest_demand_temp = -1e9
     storage_space = 0.0
+    #energy_sum = 0.0
     input_index = nothing
 
     # find the index of the input on the bus. if the method was called on an output,
@@ -189,12 +205,17 @@ function balance_on(
         end
     end
 
+    # iterate through outfaces
     for (idx, outface) in pairs(unit.output_interfaces)
         if outface.target.sys_function === sf_bus
-            balance, potential, temperature = balance_on(outface, outface.target)
+            InterfaceInfo = balance_on(outface, outface.target)
+            balance = InterfaceInfo.balance
+            storage_potential = InterfaceInfo.storage_potential
+            temperature = InterfaceInfo.temperature
         else
             balance = outface.balance
             temperature = outface.temperature
+            #energy_sum += (outface.max_energy === nothing ? 0.0 : outface.max_energy)
             if (
                 outface.target.sys_function === sf_storage
                 &&
@@ -204,9 +225,10 @@ function balance_on(
                     || unit.connectivity.storage_loading[input_index][idx]
                 )
             )
-                _, potential, _ = balance_on(outface, outface.target)
+                InterfaceInfo = balance_on(outface, outface.target)
+                storage_potential = InterfaceInfo.storage_potential
             else
-                potential = 0.0
+                storage_potential = 0.0
             end
         end
 
@@ -216,14 +238,15 @@ function balance_on(
             )
         end
 
-        storage_space += potential
+        storage_space += storage_potential
     end
 
     return (
-        balance(unit),
-        storage_space,
-        highest_demand_temp <= -1e9 ? nothing : highest_demand_temp
-    )
+            balance = balance(unit).balance,
+            storage_potential = storage_space,
+            #energy_potential = energy_sum + balance(unit).energy_potential,
+            temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
+            )
 end
 
 # """
@@ -336,7 +359,7 @@ end
 
 function output_value(unit::Bus, key::OutputKey)::Float64
     if key.value_key == "Balance"
-        return balance(unit)
+        return balance(unit).balance
     end
     throw(KeyError(key.value_key))
 end

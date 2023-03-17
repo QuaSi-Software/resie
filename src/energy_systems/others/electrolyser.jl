@@ -73,10 +73,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
     # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
     # electricity 
     if unit.controller.parameter["m_el_in"] == true 
-        balance_el, potential_el, _ = balance_on(
+        InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_el_in],
             unit
         )
+        balance_el = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_el = InterfaceInfo.storage_potential
         if (unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) <= parameters["epsilon"]
             return # do nothing if there is no electricity to consume
         end
@@ -87,10 +89,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
 
     # hydrogen
     if unit.controller.parameter["m_h2_out"] == true   
-        balance_h2, potential_h2, _ = balance_on(
+        InterfaceInfo = balance_on(
             unit.output_interfaces[unit.m_h2_out],
             unit.output_interfaces[unit.m_h2_out].target
         )
+        balance_h2 = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_h2 = InterfaceInfo.storage_potential
         if (unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) >= -parameters["epsilon"]
             return  # don't add to a surplus of hydrogen
         end
@@ -101,10 +105,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
 
     # oxygen
     if unit.controller.parameter["m_o2_out"] == true 
-        balance_o2, potential_o2, _ = balance_on(
+        InterfaceInfo = balance_on(
             unit.output_interfaces[unit.m_o2_out],
             unit.output_interfaces[unit.m_o2_out].target
         )
+        balance_o2 = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_o2 = InterfaceInfo.storage_potential
         if (unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) >= -parameters["epsilon"]
             return  # don't add to a surplus of oxygen
         end
@@ -115,10 +121,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
 
     # heat
     if unit.controller.parameter["m_heat_out"] == true  
-        balance_heat, potential_heat, _ = balance_on(
+        InterfaceInfo = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
+        balance_heat = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
+        potential_heat = InterfaceInfo.storage_potential
         if (unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) >= 0
             return  # don't add to a surplus of heat
         end

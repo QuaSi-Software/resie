@@ -295,18 +295,25 @@ without having to check if its connected to a Bus or directly to a system.
     also defines which system is the source.
 - `unit::ControlledSystem`: The receiving system
 
-# Returns
-- `Float64`: The balance of the target system that can be considered a demand on the source
-    system
-- `Float64`: An additional demand that covers the free storage space connected to the
-    target system
-- `Float64`: The temperature of the interface
+# Returns NamedTuple with
+- "balance"::Float64:           The balance of the target system that can be considered a 
+                                demand on the source system
+- "storage_potential"::Float64: An additional demand that covers the free storage space 
+                                connected to the target system
+- "energy_potential"::Float64:  The maximum enery an interface can provide or consume
+- "temperature"::Temperature:   The temperature of the interface
 """
 function balance_on(
     interface::SystemInterface,
     unit::ControlledSystem
-)::Tuple{Float64,Float64,Temperature}
-    return interface.balance, 0.0, interface.temperature
+)::NamedTuple{}
+
+    return (
+            balance = interface.balance,
+            storage_potential = 0.0,
+            #energy_potential = (interface.max_energy === nothing ? 0.0 : interface.max_energy),
+            temperature = interface.temperature
+            )
 end
 
 """
@@ -319,7 +326,7 @@ the end of it. If it is not zero, either the simulation failed to correctly calc
 energy balance of the entire system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
-function balance(unit::ControlledSystem)::Float64
+function balance(unit::ControlledSystem)::NamedTuple{}
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
@@ -334,7 +341,10 @@ function balance(unit::ControlledSystem)::Float64
         end
     end
 
-    return balance
+    return (
+        balance = balance,
+        #energy_potential = nothing
+    )
 end
 
 """
@@ -566,8 +576,8 @@ function check_balances(
 
     for (key, unit) in pairs(systems)
         unit_balance = balance(unit)
-        if unit_balance > epsilon || unit_balance < -epsilon
-            push!(warnings, (key, unit_balance))
+        if unit_balance.balance > epsilon || unit_balance.balance < -epsilon
+            push!(warnings, (key, unit_balance.balance))
         end
     end
 
