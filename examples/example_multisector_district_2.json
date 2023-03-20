@@ -59,7 +59,7 @@
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 6048000,
+        "end": 604800,
         "time_step_seconds": 900
     },
     "energy_systems": {
@@ -300,10 +300,7 @@
                 "TST_BUS_TH_01"
             ],
             "strategy": {
-                "name": "demand_driven",
-                "m_el_in": false,
-                "m_h2_out": false,
-                "m_o2_out": false
+                "name": "demand_driven"
             },
             "power": 400000,
             "m_heat_out": "m_h_w_ht1"
