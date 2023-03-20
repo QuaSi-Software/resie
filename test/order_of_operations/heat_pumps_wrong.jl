@@ -3,6 +3,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function test_ooo_for_heat_pumps_wrong()
     systems_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
@@ -59,7 +61,7 @@ function test_ooo_for_heat_pumps_wrong()
 
     systems = Resie.load_systems(systems_config)
     ooo = Resie.order_of_operations(systems)
-    @test all(ooo .== expected)
+    @test pwc_steps_astr(expected, ooo) == ""
 end
 
 @testset "ooo_for_heat_pumps_wrong" begin
