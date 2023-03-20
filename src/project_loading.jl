@@ -133,7 +133,7 @@ function base_order(systems_by_function)
     # place steps potential and produce for transformers in order by "chains"
     chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
-        for unit in iterate_chain(chain, EnergySystems.sf_transformer, true)
+        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
             push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
             initial_nr -= 1
         end
@@ -223,7 +223,11 @@ end
 """
     find_chains(systems, sys_function)
 
-Find all chains of the given system function in the given set of systems.
+Find all chains of the given system function in the given collection of systems.
+
+A chain is a subgraph of the graph spanned by all connections of the given energy systems,
+which is a directed graph. The subgraph is defined by all connected systems of the given
+system function.
 """
 function find_chains(systems, sys_function)
     chains = []
@@ -253,7 +257,11 @@ end
 """
     distance_to_sink(node, sys_function)
 
-Calculate the distance of the given node to the leaves of the chain.
+Calculate the distance of the given node to the sinks of the chain.
+
+A sink is defined as a node with no successors of the same system function. For the sinks
+this distance is 0. For all other nodes it is the maximum over the distances of its
+successors plus one.
 """
 function distance_to_sink(node, sys_function)
     is_leaf = function(node)
@@ -281,8 +289,17 @@ end
     iterate_chain(chain, sys_function, reverse)
 
 Iteration order over a chain of units of the same system function.
+
+This order is determined by the distance of a node to the sinks of the subgraph (the chain),
+where the distance is maxed over the successors of a node. The order is then an ascending
+ordering over the distances of nodes.
+
+# Arguments
+-`chain::Set`: A chain as a set of energy systems
+-`sys_function`: The system function of the energy systems in the chain
+-`reverse::Bool`: If true, the ordering will be in descending order
 """
-function iterate_chain(chain, sys_function, reverse)
+function iterate_chain(chain, sys_function; reverse=false)
     distances = []
     for node in chain
         push!(distances, (distance_to_sink(node, sys_function), node))

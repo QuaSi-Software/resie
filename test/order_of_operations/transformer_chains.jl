@@ -113,7 +113,7 @@ function test_iteration_order()
         systems["TST_BUS_02"],
         systems["TST_BUS_01"],
     ]
-    calculated = Resie.iterate_chain(chain, EnergySystems.sf_bus, false)
+    calculated = Resie.iterate_chain(chain, EnergySystems.sf_bus, reverse=false)
     for i in 1:6
         @test "#$i: " * calculated[i].uac == "#$i: " * expected[i].uac
     end
