@@ -67,6 +67,7 @@ function control(
 )
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 
 end
 
