@@ -64,6 +64,7 @@ function test_busses_communicate_demand()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     EnergySystems.reset(demand)
@@ -78,16 +79,16 @@ function test_busses_communicate_demand()
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
     @test grid.output_interfaces[grid.medium].balance == 0.0
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
-    @test EnergySystems.balance(bus_1).balance == -75.0
-    @test EnergySystems.balance(bus_2).balance == -75.0
+    @test EnergySystems.balance(bus_1) == -75.0
+    @test EnergySystems.balance(bus_2) == -75.0
     @test grid.output_interfaces[grid.medium].balance == 0.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
@@ -96,8 +97,8 @@ function test_busses_communicate_demand()
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
     @test bus_1.remainder == 0.0
     @test bus_2.remainder == 0.0
     @test grid.output_interfaces[grid.medium].balance == 75.0
@@ -108,8 +109,8 @@ function test_busses_communicate_demand()
     @test demand.input_interfaces[demand.medium].balance == 0.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
     @test demand.input_interfaces[demand.medium].sum_abs_change == 150.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
     @test bus_1.remainder == 0.0
     @test bus_2.remainder == 0.0
     @test grid.output_interfaces[grid.medium].balance == 0.0
@@ -212,6 +213,7 @@ function test_demand_over_busses_supply_is_transformer()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # first timestep, all works as expected, all demands can be met
@@ -236,9 +238,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].balance == 0.0
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_3).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
 
     EnergySystems.produce(demand_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(demand_1, simulation_parameters, watt_to_wh)
@@ -247,18 +249,18 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].balance == -1000.0
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
-    @test EnergySystems.balance(bus_3).balance == -1000.0
-    @test EnergySystems.balance(bus_2).balance == -1000.0
-    @test EnergySystems.balance(bus_1).balance == -2000.0
+    @test EnergySystems.balance(bus_3) == -1000.0
+    @test EnergySystems.balance(bus_2) == -1000.0
+    @test EnergySystems.balance(bus_1) == -2000.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
     EnergySystems.produce(bus_3, simulation_parameters, watt_to_wh)
     EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
 
-    @test EnergySystems.balance(bus_3).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
     @test boiler.input_interfaces[boiler.m_gas_in].balance == -2000.0
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
@@ -267,9 +269,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].balance == -1000.0
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
-    @test EnergySystems.balance(bus_3).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
     @test grid.output_interfaces[boiler.m_gas_in].balance == 0.0
 
     EnergySystems.distribute!(bus_2)
@@ -283,9 +285,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].sum_abs_change == 2000.0
 
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_3).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
     @test bus_1.output_interfaces[1].sum_abs_change == 2000.0
     @test bus_1.output_interfaces[2].sum_abs_change == 2000.0
 
@@ -314,9 +316,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].balance == 0.0
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
-    @test EnergySystems.balance(bus_1).balance == 0.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_3).balance == 0.0
+    @test EnergySystems.balance(bus_1) == 0.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
 
     EnergySystems.produce(demand_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(demand_1, simulation_parameters, watt_to_wh)
@@ -325,9 +327,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].balance == -1000.0
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
-    @test EnergySystems.balance(bus_3).balance == -1000.0
-    @test EnergySystems.balance(bus_2).balance == -1000.0
-    @test EnergySystems.balance(bus_1).balance == -2000.0
+    @test EnergySystems.balance(bus_3) == -1000.0
+    @test EnergySystems.balance(bus_2) == -1000.0
+    @test EnergySystems.balance(bus_1) == -2000.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
@@ -337,9 +339,9 @@ function test_demand_over_busses_supply_is_transformer()
     # busses don't consider output priority in the balance() function, so bus_2 also
     # thinks it has a negative balance even though it will later, in distribute(), be
     # prefered over bus_3 due to the output priorities
-    @test EnergySystems.balance(bus_3).balance == -500.0
-    @test EnergySystems.balance(bus_2).balance == -500.0
-    @test EnergySystems.balance(bus_1).balance == -500.0
+    @test EnergySystems.balance(bus_3) == -500.0
+    @test EnergySystems.balance(bus_2) == -500.0
+    @test EnergySystems.balance(bus_1) == -500.0
     @test boiler.input_interfaces[boiler.m_gas_in].balance == -1500.0
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
@@ -361,9 +363,9 @@ function test_demand_over_busses_supply_is_transformer()
     @test demand_2.input_interfaces[demand_2.medium].temperature == 60.0
     @test demand_2.input_interfaces[demand_2.medium].sum_abs_change == 2000.0
 
-    @test EnergySystems.balance(bus_1).balance == -500.0
-    @test EnergySystems.balance(bus_2).balance == 0.0
-    @test EnergySystems.balance(bus_3).balance == 0.0
+    @test EnergySystems.balance(bus_1) == -500.0
+    @test EnergySystems.balance(bus_2) == 0.0
+    @test EnergySystems.balance(bus_3) == 0.0
     @test bus_1.output_interfaces[1].balance == 0.0
     @test bus_1.output_interfaces[1].sum_abs_change == 2000.0
     @test bus_1.output_interfaces[2].balance == -500.0
@@ -457,6 +459,7 @@ function test_busses_communicate_storage_potential()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     EnergySystems.reset(demand)

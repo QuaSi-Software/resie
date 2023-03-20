@@ -103,6 +103,7 @@ function test_primary_producer_can_load_storage()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # first timestep, demand is higher than primary producer can provide, so both should

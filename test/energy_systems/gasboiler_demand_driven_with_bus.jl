@@ -51,6 +51,7 @@ function test_gasboiler_demand_driven_with_bus()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # test if correct demand is produced by gasboiler to make sure that the information of
@@ -199,6 +200,7 @@ function test_gasboiler_demand_driven_without_bus()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # test if correct demand is produced by gasboiler to make sure that the information of
