@@ -89,33 +89,33 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
     if unit.controller.parameter["m_el_in"] == true 
         InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_el_in],
-            unit
+            unit.input_interfaces[unit.m_el_in].source
         )
-        balance_el = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_el = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) <= parameters["epsilon"]
+        potential_energy_el = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_el = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
             return # do nothing if there is no electricity to consume
         end
     else # unlimited demand in interface is assumed
-        balance_el = Inf
-        potential_el = Inf
+        potential_energy_el = Inf
+        potential_storage_el = Inf
     end
    
     # heat in 
     if unit.controller.parameter["m_heat_in"] == true 
         InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_heat_in],
-            unit
+            unit.input_interfaces[unit.m_heat_in].source
         )
-        balance_heat_in = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_heat_in = InterfaceInfo.storage_potential
+        potential_energy_heat_in = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat_in = InterfaceInfo.storage_potential
         in_temp = InterfaceInfo.temperature
-        if (unit.controller.parameter["unload_storages"] ? balance_heat_in + potential_heat_in : balance_heat_in) <= parameters["epsilon"]
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) <= parameters["epsilon"]
             return # do nothing if there is no heat to consume
         end
     else # unlimited demand in interface is assumed
-        balance_heat_in = Inf
-        potential_heat_in = Inf
+        potential_energy_heat_in = Inf
+        potential_storage_heat_in = Inf
     end
 
     # heat out
@@ -124,15 +124,15 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        balance_heat_out = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_heat_out = InterfaceInfo.storage_potential
+        potential_energy_heat_out = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat_out = InterfaceInfo.storage_potential
         out_temp = InterfaceInfo.temperature
-        if (unit.controller.parameter["load_storages"] ? balance_heat_out + potential_heat_out : balance_heat_out) >= -parameters["epsilon"]
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
             return # don't add to a surplus of heat
         end
     else # unlimited demand in interface is assumed
-        balance_heat_out = Inf
-        potential_heat_out = Inf
+        potential_energy_heat_out = Inf
+        potential_storage_heat_out = Inf
     end
    
     # check if temperature has already been read from input and output interface
@@ -163,9 +163,9 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
 
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
 
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? balance_heat_out + potential_heat_out : balance_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? balance_heat_in + potential_heat_in : balance_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
         other_limitations = 1.0
 
     elseif unit.controller.strategy == "storage_driven" 
@@ -173,16 +173,16 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
 
     elseif unit.controller.strategy == "supply_driven"
 
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? balance_heat_out + potential_heat_out : balance_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? balance_heat_in + potential_heat_in : balance_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
         other_limitations = 1.0
 
     elseif unit.controller.strategy == "demand_driven"
 
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? balance_heat_out + potential_heat_out : balance_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? balance_heat_in + potential_heat_in : balance_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
         other_limitations = 1.0
 
     end

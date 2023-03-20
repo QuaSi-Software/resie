@@ -75,16 +75,16 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
     if unit.controller.parameter["m_el_in"] == true 
         InterfaceInfo = balance_on(
             unit.input_interfaces[unit.m_el_in],
-            unit
+            unit.input_interfaces[unit.m_el_in].source
         )
-        balance_el = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_el = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) <= parameters["epsilon"]
+        potential_energy_el = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_el = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
             return # do nothing if there is no electricity to consume
         end
     else # unlimited demand in interface is assumed
-        balance_el = Inf
-        potential_el = Inf
+        potential_energy_el = Inf
+        potential_storage_el = Inf
     end
 
     # hydrogen
@@ -93,14 +93,14 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
             unit.output_interfaces[unit.m_h2_out],
             unit.output_interfaces[unit.m_h2_out].target
         )
-        balance_h2 = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_h2 = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) >= -parameters["epsilon"]
+        potential_energy_h2 = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_h2 = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) >= -parameters["epsilon"]
             return  # don't add to a surplus of hydrogen
         end
     else # unlimited demand in interface is assumed
-        balance_h2 = -Inf
-        potential_h2 = -Inf
+        potential_energy_h2 = -Inf
+        potential_storage_h2 = -Inf
     end
 
     # oxygen
@@ -109,14 +109,14 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
             unit.output_interfaces[unit.m_o2_out],
             unit.output_interfaces[unit.m_o2_out].target
         )
-        balance_o2 = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_o2 = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) >= -parameters["epsilon"]
+        potential_energy_o2 = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_o2 = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) >= -parameters["epsilon"]
             return  # don't add to a surplus of oxygen
         end
     else # unlimited demand in interface is assumed
-        balance_o2 = -Inf
-        potential_o2 = -Inf
+        potential_energy_o2 = -Inf
+        potential_storage_o2 = -Inf
     end
 
     # heat
@@ -125,39 +125,39 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        balance_heat = InterfaceInfo.balance #+ InterfaceInfo.energy_potential
-        potential_heat = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) >= 0
+        potential_energy_heat = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) >= 0
             return  # don't add to a surplus of heat
         end
     else # unlimited supply in interface is assumed
-        balance_heat = -Inf
-        potential_heat = -Inf
+        potential_energy_heat = -Inf
+        potential_storage_heat = -Inf
     end
 
     # get usage_factions depending on control strategy
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) / max_produce_heat
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
         other_limitations = 1 
 
     elseif unit.controller.strategy == "storage_driven" 
         return # do not start due to statemachine!
     
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) / max_produce_heat
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
         other_limitations = 1
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? balance_el + potential_el : balance_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? balance_h2 + potential_h2 : balance_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? balance_o2 + potential_o2 : balance_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? balance_heat + potential_heat : balance_heat) / max_produce_heat
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
         other_limitations = 1
 
     else
