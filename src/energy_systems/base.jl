@@ -311,7 +311,7 @@ function balance_on(
     return (
             balance = interface.balance,
             storage_potential = 0.0,
-            #energy_potential = (interface.max_energy === nothing ? 0.0 : interface.max_energy),
+            energy_potential = interface.max_energy === nothing ? 0.0 : interface.max_energy,
             temperature = interface.temperature
             )
 end
@@ -326,7 +326,7 @@ the end of it. If it is not zero, either the simulation failed to correctly calc
 energy balance of the entire system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
-function balance(unit::ControlledSystem)::NamedTuple{}
+function balance(unit::ControlledSystem)::Float64
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
@@ -341,10 +341,7 @@ function balance(unit::ControlledSystem)::NamedTuple{}
         end
     end
 
-    return (
-        balance = balance,
-        #energy_potential = nothing
-    )
+    return balance    
 end
 
 """
@@ -576,8 +573,8 @@ function check_balances(
 
     for (key, unit) in pairs(systems)
         unit_balance = balance(unit)
-        if unit_balance.balance > epsilon || unit_balance.balance < -epsilon
-            push!(warnings, (key, unit_balance.balance))
+        if unit_balance > epsilon || unit_balance < -epsilon
+            push!(warnings, (key, unit_balance))
         end
     end
 

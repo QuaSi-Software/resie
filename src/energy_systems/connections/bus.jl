@@ -99,9 +99,8 @@ Variant of [`balance`](@ref) that includes other connected bus systems and their
 balance, but does so in a non-recursive manner such that any bus in the chain of connected
 bus systems is only considered once.
 """
-function balance_nr(unit::Bus, caller::Bus)::NamedTuple{}
+function balance_nr(unit::Bus, caller::Bus)::Float64
     balance = 0.0
-    #energy_sum = 0.0
 
     for inface in unit.input_interfaces   # supply
         if inface.source == caller
@@ -110,18 +109,14 @@ function balance_nr(unit::Bus, caller::Bus)::NamedTuple{}
 
         if isa(inface.source, Bus)  
             InterfaceInfo = balance_nr(inface.source, unit)
-            #energy_supply = InterfaceInfo.energy_potential
-            balance_supply = max(InterfaceInfo.balance, inface.balance)
+            balance_supply = max(InterfaceInfo, inface.balance)
             if balance_supply < 0.0
                 continue
             end
         else
-            InterfaceInfo = balance_on(inface, inface.source)
-            balance_supply = InterfaceInfo.balance
-            #energy_supply = InterfaceInfo.energy_potential
+            balance_supply = balance_on(inface, inface.source).balance
         end
         balance += balance_supply
-        #energy_sum += energy_supply
     end
 
     for outface in unit.output_interfaces  # demand
@@ -131,25 +126,18 @@ function balance_nr(unit::Bus, caller::Bus)::NamedTuple{}
 
         if isa(outface.target, Bus)
             InterfaceInfo = balance_nr(outface.target, unit)
-            #energy_demand = InterfaceInfo.energy_potential
-            balance_demand = min(InterfaceInfo.balance, outface.balance)
+            balance_demand = min(InterfaceInfo, outface.balance)
             if balance_demand > 0.0
                 continue
             end
         else
-            InterfaceInfo = balance_on(outface, outface.target)
-            #energy_demand = InterfaceInfo.energy_potential
-            balance_demand = InterfaceInfo.balance
+            balance_demand = balance_on(outface, outface.target).balance
         end
         balance += balance_demand
-        #energy_sum += energy_demand
 
     end
 
-    return (
-        balance = balance + unit.remainder,
-        #energy_potential = energy_sum
-    )
+    return  balance + unit.remainder
 end
 
 """
@@ -164,8 +152,7 @@ function balance_direct(unit::Bus)::Float64
         if isa(inface.source, Bus)
             continue
         else
-            InterfaceInfo = balance_on(inface, inface.source)
-            balance += InterfaceInfo.balance
+            balance += balance_on(inface, inface.source).balance
         end
     end
 
@@ -173,15 +160,14 @@ function balance_direct(unit::Bus)::Float64
         if isa(outface.target, Bus)
             continue
         else
-            InterfaceInfo = balance_on(outface, outface.target)
-            balance += InterfaceInfo.balance
+            balance += balance_on(outface, outface.target).balance
         end
     end
 
     return balance + unit.remainder
 end
 
-function balance(unit::Bus)::NamedTuple{}
+function balance(unit::Bus)::Float64
     # we can use the non-recursive version of the method as a bus will never
     # be connected to itself... right?
     return balance_nr(unit, unit)
@@ -193,29 +179,34 @@ function balance_on(
 )::NamedTuple{}
     highest_demand_temp = -1e9
     storage_space = 0.0
-    #energy_sum = 0.0
     input_index = nothing
+    caller_is_input = false   # ==true if interface is input of unit (caller puts energy in unit); 
+                              # ==false if interface is output of unit (caller gets energy from unit)
+    energy_potential_outputs = 0.0
+    energy_potential_inputs = 0.0
 
     # find the index of the input on the bus. if the method was called on an output,
     # the input index will remain as nothing
     for (idx, input_uac) in pairs(unit.connectivity.input_order)
         if input_uac == interface.source.uac
             input_index = idx
+            caller_is_input = true
             break
         end
     end
 
-    # iterate through outfaces
+    # iterate through outfaces to get storage loading potential
     for (idx, outface) in pairs(unit.output_interfaces)
         if outface.target.sys_function === sf_bus
             InterfaceInfo = balance_on(outface, outface.target)
             balance = InterfaceInfo.balance
             storage_potential = InterfaceInfo.storage_potential
+            energy_potential = InterfaceInfo.energy_potential
             temperature = InterfaceInfo.temperature
         else
             balance = outface.balance
             temperature = outface.temperature
-            #energy_sum += (outface.max_energy === nothing ? 0.0 : outface.max_energy)
+            energy_potential = outface.max_energy === nothing ? 0.0 : outface.max_energy
             if (
                 outface.target.sys_function === sf_storage
                 &&
@@ -239,12 +230,32 @@ function balance_on(
         end
 
         storage_space += storage_potential
+        energy_potential_outputs += energy_potential
     end
 
+    if caller_is_input == false  # also need to check inputs of unit in order to sum up potential_energy_inputs
+        for (idx, inface) in pairs(unit.input_interfaces)
+            if inface.source.sys_function === sf_bus
+                InterfaceInfo = balance_on(inface, inface.source)
+                energy_potential = InterfaceInfo.energy_potential
+            else
+                energy_potential = inface.max_energy === nothing ? 0.0 : inface.max_energy
+            end
+            energy_potential_inputs += energy_potential
+        end
+    end
+    # ToDo: consider connectivity matrix? For now, only the load and produce of storages are regulated 
+    #       in the connectivity matrix. For storages, max_energy is set to 0.0 in their control step, so
+    #       this needs not to be considered here for energy_potential.
+    # Note: balance is used for actual balance while energy_potential and storage_potential are potential
+    #       energies that could be given or taken. For now, the potentials are only written in the control
+    #       step of grid_connection, dispatchable_sink, dispatchable_supply and fixed_supply and not for
+    #       transformers.
+    
     return (
-            balance = balance(unit).balance,
+            balance = balance(unit),
             storage_potential = storage_space,
-            #energy_potential = energy_sum + balance(unit).energy_potential,
+            energy_potential = caller_is_input ? energy_potential_outputs : energy_potential_inputs ,
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )
 end
@@ -359,7 +370,7 @@ end
 
 function output_value(unit::Bus, key::OutputKey)::Float64
     if key.value_key == "Balance"
-        return balance(unit).balance
+        return balance(unit)
     end
     throw(KeyError(key.value_key))
 end
