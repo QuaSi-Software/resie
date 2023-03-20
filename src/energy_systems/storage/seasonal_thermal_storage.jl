@@ -66,10 +66,25 @@ function balance_on(
     unit::SeasonalThermalStorage
 )::NamedTuple{}
 
+    caller_is_input = false   # ==true if interface is input of unit (caller puts energy in unit); 
+                              # ==false if interface is output of unit (caller gets energy from unit)
+    
+    # check if caller is input or output of unit
+    for (_, input_uac) in pairs(unit.input_interfaces)
+        if input_uac == interface.source.uac
+            caller_is_input = true
+            break
+        end
+        if input_uac.source.uac == interface.source.uac
+            caller_is_input = true
+            break
+        end
+    end
+
     return (
             balance = interface.balance,
-            storage_potential = -unit.capacity + unit.load,
-            #energy_potential = 0.0,
+            storage_potential = caller_is_input ? -(unit.capacity-unit.load) : unit.load,
+            energy_potential = 0.0,
             temperature = interface.temperature
             )
 end
