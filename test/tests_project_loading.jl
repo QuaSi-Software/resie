@@ -103,4 +103,5 @@ end
     include("order_of_operations/bus_to_bus.jl")
     include("order_of_operations/heat_pumps_wrong.jl")
     include("order_of_operations/storage_loading_switch.jl")
+    include("order_of_operations/transformer_chains.jl")
 end
