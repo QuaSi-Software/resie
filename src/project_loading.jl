@@ -269,7 +269,7 @@ function distance_to_sink(node, sys_function)
         return 0
     else
         max_distance = 0
-        for outface in values(unit.output_interfaces)
+        for outface in values(node.output_interfaces)
             distance = distance_to_sink(outface.target, sys_function)
             max_distance = distance > max_distance ? distance : max_distance
         end
