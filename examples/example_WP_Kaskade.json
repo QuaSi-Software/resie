@@ -12,8 +12,8 @@
         "output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
-			"TST_01_ELT_01_ELY": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],			
+			"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht2 OUT"],			
             "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"]
         }
     },
@@ -88,7 +88,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 40000,
+            "m_heat_out": "m_h_w_lt1"
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
@@ -100,7 +101,8 @@
                 "name": "supply_driven"
             },
             "power": 20000,
-            "fixed_cop": 3.0
+            "fixed_cop": 3.0,
+            "m_heat_out": "m_h_w_ht2"
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -112,7 +114,8 @@
                 "name": "demand_driven"
             },
             "power": 20000,
-            "fixed_cop": 3.0
+            "fixed_cop": 3.0,
+            "m_heat_in": "m_h_w_ht2"
         },
         "TST_01_HZG_01_GBO": {
             "type": "GasBoiler",
