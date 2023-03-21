@@ -194,3 +194,141 @@ end
 @testset "find_chains" begin
     test_find_chains()
 end
+
+function test_find_indexes()
+    # normal case
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    own_idx, target_idx = Resie.find_indexes(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control)
+    )
+    @test own_idx == 1
+    @test target_idx == 3
+
+    # can't find either step due to wrong UAC in one case and wrong step in the other
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    own_idx, target_idx = Resie.find_indexes(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_produce),
+        ("TST_BSS_01", EnergySystems.s_control)
+    )
+    @test own_idx === nothing
+    @test target_idx === nothing
+end
+
+@testset "find_indexes" begin
+    test_find_indexes()
+end
+
+function test_place_one_higher()
+    # normal test case
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_higher!(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control)
+    )
+    @test steps[1] == [2, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [4, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [3, ("TST_BUS_01", EnergySystems.s_control)]
+
+    # priority already is higher and force was not used => no change
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [4, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_higher!(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control)
+    )
+    @test steps[1] == [2, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [3, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [4, ("TST_BUS_01", EnergySystems.s_control)]
+
+    # priority already is higher and force was used => works as normal
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [4, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_higher!(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control),
+        force=true
+    )
+    @test steps[1] == [2, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [4, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [3, ("TST_BUS_01", EnergySystems.s_control)]
+end
+
+@testset "place_one_higher" begin
+    test_place_one_higher()
+end
+
+function test_place_one_lower()
+    # normal test case
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_lower!(
+        steps,
+        ("TST_BUS_02", EnergySystems.s_control),
+        ("TST_BUS_03", EnergySystems.s_control)
+    )
+    @test steps[1] == [2, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [1, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [0, ("TST_BUS_01", EnergySystems.s_control)]
+
+    # priority already is lower and force was not used => no change
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_lower!(
+        steps,
+        ("TST_BUS_03", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control)
+    )
+    @test steps[1] == [2, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [3, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [1, ("TST_BUS_01", EnergySystems.s_control)]
+
+    # priority already is lower and force was used => works as normal
+    steps = [
+        [2, ("TST_BUS_02", EnergySystems.s_control)],
+        [3, ("TST_BUS_03", EnergySystems.s_control)],
+        [1, ("TST_BUS_01", EnergySystems.s_control)],
+    ]
+    Resie.place_one_lower!(
+        steps,
+        ("TST_BUS_03", EnergySystems.s_control),
+        ("TST_BUS_01", EnergySystems.s_control),
+        force=true
+    )
+    @test steps[1] == [1, ("TST_BUS_02", EnergySystems.s_control)]
+    @test steps[2] == [3, ("TST_BUS_03", EnergySystems.s_control)]
+    @test steps[3] == [2, ("TST_BUS_01", EnergySystems.s_control)]
+end
+
+@testset "place_one_lower" begin
+    test_place_one_lower()
+end

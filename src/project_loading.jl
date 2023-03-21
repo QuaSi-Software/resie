@@ -347,6 +347,96 @@ function order_of_operations(systems::Grouping)::StepInstructions
 end
 
 """
+    find_indexes(steps, own, target)
+
+Find the indexes of the specified two step instructions in the given collection.
+
+# Arguments
+-`steps::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+-`own::Tuple{String,SystemFunction}`: The first step instruction to look for
+-`target::Tuple{String,SystemFunction}`: The second step instruction to look for
+# Returns
+-`Integer`: Index in the collection of the first instruction
+-`Integer`: Index in the collection of the second instruction
+"""
+function find_indexes(steps, own, target)
+    own_idx = nothing
+    target_idx = nothing
+
+    for i in eachindex(steps)
+        if steps[i][2][1] == own[1] && steps[i][2][2] == own[2]
+            own_idx = i
+        end
+        if steps[i][2][1] == target[1] && steps[i][2][2] == target[2]
+            target_idx = i
+        end
+    end
+
+    return (own_idx, target_idx)
+end
+
+"""
+    place_one!(steps, own, target, higher=true)
+
+Give the target step instruction a priority one higher/lower than the given one.
+
+# Arguments
+-`steps::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+-`own::Tuple{String,SystemFunction}`: The first step instruction to look for
+-`target::Tuple{String,SystemFunction}`: The second step instruction to look for
+-`higher::Bool`: If true places the target instruction one higher, otherwise one lower
+-`force::Bool`: If true, forces the placement even if the target priority already is
+    higher/lower than the first one. If false, no changes are performed if the priority
+    already is higher/lower
+"""
+function place_one!(steps, own, target; higher=true, force=false)
+    own_idx, target_idx = find_indexes(steps, own, target)
+    if own_idx === nothing || target_idx === nothing
+        return
+    end
+
+    # check if target priority already is higher/lower
+    own_priority = steps[own_idx][1]
+    target_priority = steps[target_idx][1]
+    if !force && ((higher && target_priority > own_priority)
+                  ||
+                  (!higher && target_priority < own_priority))
+        return
+    end
+
+    # shift other units with higher/lower priority up/down by one
+    for i in eachindex(steps)
+        if (higher && steps[i][1] > own_priority
+            ||
+            !higher && steps[i][1] < own_priority)
+
+            steps[i][1] += higher ? 1 : -1
+        end
+    end
+
+    # place target one step higher/lower than own
+    steps[target_idx][1] = own_priority + (higher ? 1 : -1)
+end
+
+"""
+    place_one_higher!(steps, own, target)
+
+Alias to place_one! with the `higher` argument set to true.
+"""
+function place_one_higher!(steps, own, target; force=false)
+    place_one!(steps, own, target, higher=true, force=force)
+end
+
+"""
+    place_one_lower!(steps, own, target)
+
+Alias to place_one! with the `higher` argument set to false.
+"""
+function place_one_lower!(steps, own, target; force=false)
+    place_one!(steps, own, target, higher=false, force=force)
+end
+
+"""
     reorder_for_input_priorities(simulation_order, systems, systems_by_function)
 
 Reorder systems connected to a bus so they match the input priority defined on that bus.
