@@ -444,32 +444,23 @@ end
 Reorder systems connected to a bus so they match the input priority defined on that bus.
 """
 function reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+    # for every bus...
     for bus in values(systems_by_function[3])
-        # for each system in the bus' input priority...
+        # ...for each system in the bus' input priority...
         for own_idx = 1:length(bus.connectivity.input_order)
-            own_uac = bus.connectivity.input_order[own_idx]
-            own_ctrl_idx = idx_of(simulation_order, own_uac, EnergySystems.s_control)
-            own_prod_idx = idx_of(simulation_order, own_uac, EnergySystems.s_produce)
-
             # ...make sure every system following after...
-            for other_idx = own_idx:length(bus.connectivity.input_order)
-                other_uac = bus.connectivity.input_order[other_idx]
-                other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
-                other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
-
-                # ...is of a lower priority. if not, swap the control steps...
-                if simulation_order[own_ctrl_idx][1] < simulation_order[other_ctrl_idx][1]
-                    tmp = simulation_order[own_ctrl_idx][1]
-                    simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
-                    simulation_order[other_ctrl_idx][1] = tmp
-                end
-
-                # ...and swap the production too.
-                if simulation_order[own_prod_idx][1] < simulation_order[other_prod_idx][1]
-                    tmp = simulation_order[own_prod_idx][1]
-                    simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
-                    simulation_order[other_prod_idx][1] = tmp
-                end
+            for other_idx = own_idx+1:length(bus.connectivity.input_order)
+                # ...is of a lower priority in control and produce
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_control),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_control)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_produce),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_produce)
+                )
             end
         end
     end
@@ -497,45 +488,36 @@ Source Bus 1
                 ------------
 """
 function reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+    # for every bus...
     for bus in values(systems_by_function[3])
-        # make sure that every following bus connected to a fist bus is calculated earlier than the first bus (only distribute here)
-        own_uac = bus.uac
-        own_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
-        # for every bus in the bus' output_interface...
-        for other_unit in bus.output_interfaces
-            if other_unit.target.sys_function == EnergySystems.sf_bus  # consider only busses
-                other_uac = other_unit.target.uac
-                other_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
-
-                # ...check if it is of a lower priority. If not, swap the distribute steps.
-                if simulation_order[own_idx][1] > simulation_order[other_idx][1]
-                    tmp = simulation_order[own_idx][1]
-                    simulation_order[own_idx][1] = simulation_order[other_idx][1]
-                    simulation_order[other_idx][1] = tmp
-                end
+        # ...make sure that every successor bus...
+        for outface in bus.output_interfaces
+            if outface.target.sys_function == EnergySystems.sf_bus
+                # ...has a higher priority
+                place_one_higher!(
+                    simulation_order,
+                    (bus.uac, EnergySystems.s_distribute),
+                    (outface.target.uac, EnergySystems.s_distribute)
+                )
             end
         end
 
-        # make sure the order of distribution match the order according to the production_refs of the first bus
-        # for bus in the first bus' production refs...
+        # ...for every successor bus in the output priorities...
         for own_idx = 1:length(bus.connectivity.output_order)
             own_uac = bus.connectivity.output_order[own_idx]
 
-            if uac_is_bus(bus, own_uac) # consider only busses
-                own_dist_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
-
+            if uac_is_bus(bus, own_uac)
                 # ...make sure every bus following after...
-                for other_idx = own_idx:length(bus.connectivity.output_order)
+                for other_idx = own_idx+1:length(bus.connectivity.output_order)
                     other_uac = bus.connectivity.output_order[other_idx]
-                    if uac_is_bus(bus, other_uac) # consider only busses
-                        other_dist_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
 
-                        # ...is of a lower priority. If not, swap the distribute steps.
-                        if simulation_order[own_dist_idx][1] < simulation_order[other_dist_idx][1]
-                            tmp = simulation_order[own_dist_idx][1]
-                            simulation_order[own_dist_idx][1] = simulation_order[other_dist_idx][1]
-                            simulation_order[other_dist_idx][1] = tmp
-                        end
+                    if uac_is_bus(bus, other_uac)
+                        # ...has a lower priority
+                        place_one_lower!(
+                            simulation_order,
+                            (own_uac, EnergySystems.s_distribute),
+                            (other_uac, EnergySystems.s_distribute)
+                        )
                     end
                 end
             end
@@ -623,29 +605,27 @@ Reorder systems such that all of their control dependencies have their control a
 produce steps happen before the unit itself. Storage systems are excepted.
 """
 function reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
+    # for every energy system unit...
     for unit in values(systems)
+        # ...make sure every system linked by its controller...
         for other_uac in keys(unit.controller.linked_systems)
             other_unit = systems[other_uac]
+            # ...excepting storages...
             if other_unit.sys_function == EnergySystems.sf_storage
                 continue
             end
 
-            own_ctrl_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_control)
-            own_prod_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_produce)
-            other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
-            other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
-
-            if simulation_order[own_ctrl_idx] > simulation_order[other_ctrl_idx]
-                tmp = simulation_order[own_ctrl_idx][1]
-                simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
-                simulation_order[other_ctrl_idx][1] = tmp
-            end
-
-            if simulation_order[own_prod_idx][1] > simulation_order[other_prod_idx][1]
-                tmp = simulation_order[own_prod_idx][1]
-                simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
-                simulation_order[other_prod_idx][1] = tmp
-            end
+            # ...has a higher priority in control and produce
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_control),
+                (other_uac, EnergySystems.s_control)
+            )
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_produce),
+                (other_uac, EnergySystems.s_produce)
+            )
         end
     end
 end
