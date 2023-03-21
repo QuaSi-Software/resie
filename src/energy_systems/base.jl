@@ -311,7 +311,7 @@ function balance_on(
     return (
             balance = interface.balance,
             storage_potential = 0.0,
-            energy_potential = interface.max_energy === nothing ? 0.0 : interface.max_energy,
+            energy_potential = (interface.max_energy === nothing || interface.sum_abs_change > 0.0 ) ? 0.0 : interface.max_energy,
             temperature = interface.temperature
             )
 end

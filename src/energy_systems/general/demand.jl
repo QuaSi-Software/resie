@@ -96,6 +96,9 @@ function control(
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
+
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
+
 end
 
 function produce(unit::Demand, parameters::Dict{String,Any}, watt_to_wh::Function)

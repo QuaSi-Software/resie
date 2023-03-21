@@ -201,12 +201,12 @@ function balance_on(
             InterfaceInfo = balance_on(outface, outface.target)
             balance = InterfaceInfo.balance
             storage_potential = InterfaceInfo.storage_potential
-            energy_potential = InterfaceInfo.energy_potential
+            energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : InterfaceInfo.energy_potential
             temperature = InterfaceInfo.temperature
         else
             balance = outface.balance
             temperature = outface.temperature
-            energy_potential = outface.max_energy === nothing ? 0.0 : outface.max_energy
+            energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 ) ? 0.0 : outface.max_energy
             if (
                 outface.target.sys_function === sf_storage
                 &&
@@ -233,13 +233,13 @@ function balance_on(
         energy_potential_outputs += energy_potential
     end
 
-    if caller_is_input == false  # also need to check inputs of unit in order to sum up potential_energy_inputs
+    if caller_is_input == false && interface.sum_abs_change == 0.0 # also need to check inputs of unit in order to sum up potential_energy_inputs, but only if necessary
         for (idx, inface) in pairs(unit.input_interfaces)
             if inface.source.sys_function === sf_bus
                 InterfaceInfo = balance_on(inface, inface.source)
-                energy_potential = InterfaceInfo.energy_potential
+                energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : InterfaceInfo.energy_potential
             else
-                energy_potential = inface.max_energy === nothing ? 0.0 : inface.max_energy
+                energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
             end
             energy_potential_inputs += energy_potential
         end
@@ -249,13 +249,14 @@ function balance_on(
     #       this needs not to be considered here for energy_potential.
     # Note: balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken. For now, the potentials are only written in the control
-    #       step of grid_connection, dispatchable_sink, dispatchable_supply and fixed_supply and not for
-    #       transformers.
+    #       step of fixed or dispatchable sinkds and sources and not for transformers. If an energy system 
+    #       connected to the interface of balane_on() has already been produces, the max_energy is ignored 
+    #       and set to zero. Then, only the balance can be used in the calling energy system.
     
     return (
             balance = balance(unit),
             storage_potential = storage_space,
-            energy_potential = caller_is_input ? energy_potential_outputs : energy_potential_inputs ,
+            energy_potential = interface.sum_abs_change > 0.0 ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )
 end

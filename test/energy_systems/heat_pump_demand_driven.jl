@@ -107,8 +107,7 @@ function test_heat_pump_demand_driven_correct_order()
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 391.7615409590889
     @test grid.output_interfaces[grid.medium].temperature === nothing
 
-    # second step: demand is above max power of source (adjusted for additional input
-    # of electricity), big delta T leads to low COP = 1.326097
+    # second step: demand is above max power of source, big delta T leads to low COP = 1.326097
 
     for unit in values(systems)
         EnergySystems.reset(unit)
