@@ -180,13 +180,16 @@ function balance_on(
     highest_demand_temp = -1e9
     storage_space = 0.0
     input_index = nothing
-    caller_is_input = false   # ==true if interface is input of unit (caller puts energy in unit); 
-                              # ==false if interface is output of unit (caller gets energy from unit)
+    caller_is_input = false   # == true if interface is input of unit (caller puts energy in unit); 
+                              # == false if interface is output of unit (caller gets energy from unit)
     energy_potential_outputs = 0.0
     energy_potential_inputs = 0.0
 
     # find the index of the input on the bus. if the method was called on an output,
     # the input index will remain as nothing
+    # Attention: unit.connectivity.input_order is mandatory to have a list of all inputs! 
+    #            Maybe change to unit.output_interfaces in future versions or set any order in 
+    #            connectivity.input_order if nothing is given in the input file?
     for (idx, input_uac) in pairs(unit.connectivity.input_order)
         if input_uac == interface.source.uac
             input_index = idx
@@ -247,11 +250,12 @@ function balance_on(
     # ToDo: consider connectivity matrix? For now, only the load and produce of storages are regulated 
     #       in the connectivity matrix. For storages, max_energy is set to 0.0 in their control step, so
     #       this needs not to be considered here for energy_potential.
-    # Note: balance is used for actual balance while energy_potential and storage_potential are potential
+    # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken. For now, the potentials are only written in the control
-    #       step of fixed or dispatchable sinkds and sources and not for transformers. If an energy system 
-    #       connected to the interface of balane_on() has already been produces, the max_energy is ignored 
-    #       and set to zero. Then, only the balance can be used in the calling energy system.
+    #       step of fixed or dispatchable sinks and sources (including grid and PV) but not for transformers. 
+    #       If an energy system connected to the interface of balane_on() has already been produces, the 
+    #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
+    #       calling energy system to avoid double counting.
     
     return (
             balance = balance(unit),

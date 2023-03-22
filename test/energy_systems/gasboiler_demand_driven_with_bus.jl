@@ -23,7 +23,11 @@ function test_gasboiler_demand_driven_with_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01"]
+            "production_refs" => ["TST_DEM_01"],
+            "connection_matrix" => Dict{String,Any}(
+                "input_order" => ["TST_GB_01"],
+                "output_order" => ["TST_DEM_01"]
+            )
         ),
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
@@ -64,17 +68,39 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 12000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(bus, systems, simulation_parameters)
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 12000/4
+    
+    # no production so far, balance is zero, energy_potential is zero
+    InterfaceInfo = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000/4
-    @test demand.input_interfaces[demand.medium].temperature == 85
+    @test demand.input_interfaces[demand.medium].temperature ≈ 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ -12000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
@@ -99,17 +125,39 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 15000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(bus, systems, simulation_parameters)
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 15000/4
+    
+    # no production so far, balance is zero, energy_potential is zero
+    InterfaceInfo = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4
-    @test demand.input_interfaces[demand.medium].temperature == 85
+    @test demand.input_interfaces[demand.medium].temperature ≈ 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ -15000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
@@ -134,17 +182,39 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 10000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(bus, systems, simulation_parameters)
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 10000/4
+    
+    # no production so far, balance is zero, energy_potential is zero
+    InterfaceInfo = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000/4
-    @test demand.input_interfaces[demand.medium].temperature == 85
+    @test demand.input_interfaces[demand.medium].temperature ≈ 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
+    @test InterfaceInfo.balance ≈ -10000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
@@ -213,16 +283,38 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 12000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 12000/4
+    
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ==  Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ -12000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
@@ -230,6 +322,12 @@ function test_gasboiler_demand_driven_without_bus()
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
     @test demand.input_interfaces[demand.medium].balance ≈ 0
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 2*12000/4
+
+    # demand and gasboiler were produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ -12000/4
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
@@ -242,16 +340,38 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 15000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 15000/4
+    
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ==  Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ -15000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ -15000/4 + 12000/4
@@ -259,6 +379,12 @@ function test_gasboiler_demand_driven_without_bus()
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4 + 12000/4   
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 15000/4 + 12000/4
+
+    # demand and gasboiler were produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ -12000/4
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
@@ -271,16 +397,38 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, systems, simulation_parameters)
+    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 10000/4
     demand.temperature = 85
+    demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
     EnergySystems.control(gasboiler, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
+    @test grid.output_interfaces[grid.medium].max_energy == Inf
+
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 10000/4
+    
+    # no production so far, balance is zero, energy_potential is non-zero
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ 0.0
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ==  Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
+
+    # demand was produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
+    @test InterfaceInfo.balance ≈ -10000/4  
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
@@ -288,6 +436,12 @@ function test_gasboiler_demand_driven_without_bus()
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -10000/4
     @test demand.input_interfaces[demand.medium].balance ≈ 0
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 2*10000/4 
+
+    # demand and gasboiler were produced --> energy_potential should be zero, but not the balance
+    InterfaceInfo = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
+    @test InterfaceInfo.balance ≈ -10000/4
+    @test InterfaceInfo.storage_potential ≈ 0.0
+    @test InterfaceInfo.energy_potential ≈ 0.0
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
