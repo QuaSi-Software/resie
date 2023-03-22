@@ -143,9 +143,9 @@ end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Load"
         return unit.load
     elseif key.value_key == "Capacity"
