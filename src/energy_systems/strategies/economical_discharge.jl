@@ -68,6 +68,7 @@ OP_STRATS["economical_discharge"] = OperationalStrategyType(
         "Sufficient charge"
     ],
     strategy_parameters=Dict{String,Any}(
+        "name" => "economical_discharge",
         "pv_threshold" => 0.15,
         "min_charge" => 0.2,
         "discharge_limit" => 0.05,

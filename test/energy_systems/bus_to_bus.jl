@@ -64,6 +64,7 @@ function test_busses_communicate_demand()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     EnergySystems.reset(demand)
@@ -212,6 +213,7 @@ function test_demand_over_busses_supply_is_transformer()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # first timestep, all works as expected, all demands can be met
@@ -457,6 +459,7 @@ function test_busses_communicate_storage_potential()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     EnergySystems.reset(demand)
@@ -475,19 +478,19 @@ function test_busses_communicate_storage_potential()
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
-    balance, potential, temperature = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
-    @test balance == -75.0
-    @test potential == -10000.0
-    @test temperature == 55.0
+    @test InterfaceInfo.balance == -75.0
+    @test InterfaceInfo.storage_potential == -10000.0
+    @test InterfaceInfo.temperature == 55.0
 
-    balance, potential, temperature = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
-    @test balance == -75.0
-    @test potential == -30000.0
-    @test temperature == 55.0
+    @test InterfaceInfo.balance == -75.0
+    @test InterfaceInfo.storage_potential == -30000.0
+    @test InterfaceInfo.temperature == 55.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(tank_2, simulation_parameters, watt_to_wh)
@@ -506,19 +509,19 @@ function test_busses_communicate_storage_potential()
     # because a balance of 0 is not considered a demand and is not considered for "the
     # highest demand temperature on the bus". this behaviour is not wrong, but unintuitive
 
-    balance, potential, temperature = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
-    @test balance == 0.0
-    @test potential == -10075.0
-    @test temperature === nothing
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == -10075.0
+    @test InterfaceInfo.temperature === nothing
 
-    balance, potential, temperature = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
-    @test balance == 0.0
-    @test potential == -30075.0
-    @test temperature === nothing
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == -30075.0
+    @test InterfaceInfo.temperature === nothing
 end
 
 @testset "busses_communicate_storage_potential" begin

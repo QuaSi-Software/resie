@@ -45,14 +45,12 @@
         },
         "ESS_GBO_01": {
             "type": "GasBoiler",
-            "control_refs": ["TST_BFT_TH_01"],
+            "control_refs": ["ESS_BUS_TH_01"],
             "production_refs": [
                 "ESS_BUS_TH_01"
             ],
             "strategy": {
-                "name": "storage_driven",
-                "high_threshold": 1,
-                "low_threshold": 1
+                "name": "demand_driven"
             },
             "min_power_fraction": 0,
             "power": 2000

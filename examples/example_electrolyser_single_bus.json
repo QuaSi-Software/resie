@@ -195,7 +195,8 @@
                 "TST_01_ELT_01_GRO"
             ],
             "strategy": {
-                "name": "demand_driven"
+                "name": "demand_driven",
+                "m_heat_out": false
             },
             "power": 40000
         },

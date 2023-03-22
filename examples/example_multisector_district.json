@@ -70,7 +70,7 @@
             "production_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_01_energy.prf",
             "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_01_temp.prf",
-            "scale": 1
+            "scale": 0.1
         },
         "TST_DEM_TH_02": {
             "type": "Demand",
@@ -79,7 +79,7 @@
             "production_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_02_energy.prf",
             "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_02_temp.prf",
-            "scale": 1
+            "scale": 0.1
         },
         "TST_DEM_EL_01": {
             "type": "Demand",
@@ -183,9 +183,14 @@
                 "TST_DEM_EL_01"
             ],
             "connection_matrix": {
+                "input_order": [
+                    "TST_PVP_EL_01",
+                    "TST_CHP_01",
+                    "TST_GRI_EL_01"
+                ],
                 "output_order": [
-                    "TST_GRI_EL_01_out",
-                    "TST_DEM_EL_01"
+                    "TST_DEM_EL_01",
+                    "TST_GRI_EL_01_out"
                 ]
             }
         },
@@ -240,6 +245,9 @@
                 "TST_GBO_01"
             ],
             "connection_matrix": {
+                "input_order": [
+                    "TST_GRI_EG_01"
+                ],
                 "output_order": [
                     "TST_CHP_01",
                     "TST_GBO_01"
@@ -289,8 +297,8 @@
             "production_refs": [
                 "TST_DEM_TH_01"
             ],
-            "capacity": 40000,
-            "load": 0
+            "capacity": 80000,
+            "load": 40000
         },
         "TST_BFT_TH_02": {
             "type": "BufferTank",

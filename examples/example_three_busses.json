@@ -51,6 +51,9 @@
                 "ESS_BUS_TH_03"
             ],
             "connection_matrix": {
+                "input_order": [
+                    "TST_GRI_01"
+                ],
                 "output_order": [
                     "ESS_BUS_TH_02",
                     "ESS_BUS_TH_03"
@@ -65,6 +68,9 @@
                 "TST_DEM_01"
             ],
             "connection_matrix": {
+                "input_order": [
+                    "ESS_BUS_TH_01"
+                ],
                 "output_order": [
                     "TST_DEM_01"
                 ]
@@ -79,6 +85,9 @@
                 "TST_DEM_02"
             ],
             "connection_matrix": {
+                "input_order": [
+                    "ESS_BUS_TH_01"
+                ],
                 "output_order": [
                     "TST_DEM_02"
                 ]

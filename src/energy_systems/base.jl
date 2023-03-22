@@ -183,8 +183,8 @@ Base.@kwdef mutable struct SystemInterface
     """Current temperature of the medium on this interface"""
     temperature::Temperature = nothing
 
-    """Maximum power the source can provide in the current timestep"""
-    max_power::Union{Nothing,Float64} = nothing
+    """Maximum energy the source can provide in the current timestep"""
+    max_energy::Union{Nothing,Float64} = nothing
 end
 
 """
@@ -249,15 +249,15 @@ function set!(
 end
 
 """
-    set_max_power!(interface, value)
+    set_max_energy!(interface, value)
 
 Set the maximum power that can be delivered to the given value.
 """
-function set_max_power!(
+function set_max_energy!(
     interface::SystemInterface,
     value::Union{Nothing,Float64}
 )
-    interface.max_power = value
+    interface.max_energy = value
 end
 
 """
@@ -269,7 +269,7 @@ function reset!(interface::SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
     interface.temperature = nothing
-    interface.max_power = nothing
+    interface.max_energy = nothing
 end
 
 """
@@ -295,18 +295,25 @@ without having to check if its connected to a Bus or directly to a system.
     also defines which system is the source.
 - `unit::ControlledSystem`: The receiving system
 
-# Returns
-- `Float64`: The balance of the target system that can be considered a demand on the source
-    system
-- `Float64`: An additional demand that covers the free storage space connected to the
-    target system
-- `Float64`: The temperature of the interface
+# Returns NamedTuple with
+- "balance"::Float64:           The balance of the target system that can be considered a 
+                                demand on the source system
+- "storage_potential"::Float64: An additional demand that covers the free storage space 
+                                connected to the target system
+- "energy_potential"::Float64:  The maximum enery an interface can provide or consume
+- "temperature"::Temperature:   The temperature of the interface
 """
 function balance_on(
     interface::SystemInterface,
     unit::ControlledSystem
-)::Tuple{Float64,Float64,Temperature}
-    return interface.balance, 0.0, interface.temperature
+)::NamedTuple{}
+
+    return (
+            balance = interface.balance,
+            storage_potential = 0.0,
+            energy_potential = (interface.max_energy === nothing || interface.sum_abs_change > 0.0 ) ? 0.0 : interface.max_energy,
+            temperature = interface.temperature
+            )
 end
 
 """
@@ -334,7 +341,7 @@ function balance(unit::ControlledSystem)::Float64
         end
     end
 
-    return balance
+    return balance    
 end
 
 """
