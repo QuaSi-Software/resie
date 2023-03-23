@@ -526,73 +526,56 @@ function reorder_distribution_of_busses(simulation_order, systems, systems_by_fu
 end
 
 """
+    find_storages_ordered(bus, systems)
+
+Finds storage systems in the given bus and all successor busses ordered by the output priorities.
+
+# Arguments
+-`bus::EnergySystem`: The bus from which to start the search
+-`systems::Grouping`: All energy systems in the system topology
+-`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
+"""
+function find_storages_ordered(bus, systems; reverse=false)
+    storages = []
+    pushing = reverse ? pushfirst! : push!
+
+    for unit_uac in bus.connectivity.output_order
+        unit = systems[unit_uac]
+        if unit.sys_function == EnergySystems.sf_storage
+            pushing(storages, unit)
+        elseif unit.sys_function == EnergySystems.sf_bus
+            for storage in find_storages_ordered(unit, systems)
+                pushing(storages, storage)
+            end
+        end
+    end
+
+    return storages
+end
+
+"""
     reorder_storage_loading(simulation_order, systems, systems_by_function)
 
 Reorder systems such the loading (and unloading) of storages follows the priorities on
 busses, including communication across connected busses.
 """
 function reorder_storage_loading(simulation_order, systems, systems_by_function)
-    for bus in values(systems_by_function[3])
-        # make sure that the order of the load() function of the storages connected to the following busses have the same order than the busses.
-        # for every bus in the first bus' production refs...
-        for own_idx = 1:length(bus.connectivity.output_order)
-            own_uac = bus.connectivity.output_order[own_idx]
+    for bus_chain in find_chains(systems_by_function[3], EnergySystems.sf_bus)
+        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus)
+            storages = find_storages_ordered(bus, systems, reverse=true)
+            if length(storages) < 2
+                continue
+            end
 
-            # predefine indexes for storages, set to zero
-            own_storage_load_idx = 0
-            own_storage_produce_idx = 0
-            other_storage_load_idx = 0
-            other_storage_produce_idx = 0
-
-            if uac_is_bus(bus, own_uac) # consider only busses
-                # check if a storage is connected to own bus
-                for bus_output_interface in bus.output_interfaces # seach interfaces of original bus to find own bus
-                    if bus_output_interface.target.uac == own_uac  # found correct interface
-                        for own_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach in interface.targets for interconnected storage
-                            if own_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
-                                own_storage_uac = own_bus_output_interfaces.target.uac
-                                own_storage_produce_idx = idx_of(simulation_order, own_storage_uac, EnergySystems.s_produce)
-                                own_storage_load_idx = idx_of(simulation_order, own_storage_uac, EnergySystems.s_load)
-                            end
-                        end
-                    end
-                end
-
-                # ...make sure every storage connected to a bus following own_bus in the output priorities of the original bus...
-                for other_idx = own_idx:length(bus.connectivity.output_order)
-                    other_uac = bus.connectivity.output_order[other_idx]
-                    if uac_is_bus(bus, other_uac) # consider only busses
-                        # check if a storage is connected to other bus
-                        for bus_output_interface in bus.output_interfaces # seach interfaces for other bus
-                            if bus_output_interface.target.uac == other_uac  # found correct interface
-                                for other_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach interface.targets for storage
-                                    if other_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
-                                        other_storage_uac = other_bus_output_interfaces.target.uac
-                                        other_storage_produce_idx = idx_of(simulation_order, other_storage_uac, EnergySystems.s_produce)
-                                        other_storage_load_idx = idx_of(simulation_order, other_storage_uac, EnergySystems.s_load)
-                                    end
-                                end
-                            end
-                        end
-
-                        #... is on lower index. So check if load() of storage of other bus is on lower index than own storage. If not, swap the load steps
-                        if own_storage_load_idx > 0 && other_storage_load_idx > 0
-                            if simulation_order[own_storage_load_idx][1] < simulation_order[other_storage_load_idx][1]
-                                tmp = simulation_order[own_storage_load_idx][1]
-                                simulation_order[own_storage_load_idx][1] = simulation_order[other_storage_load_idx][1]
-                                simulation_order[other_storage_load_idx][1] = tmp
-                            end
-                        end
-                        #... and also check if produce() of storage of other bus is on lower index than own storage. If not, swap the load steps
-                        if own_storage_produce_idx > 0 && other_storage_produce_idx > 0
-                            if simulation_order[own_storage_produce_idx][1] < simulation_order[other_storage_produce_idx][1]
-                                tmp = simulation_order[own_storage_produce_idx][1]
-                                simulation_order[own_storage_produce_idx][1] = simulation_order[other_storage_produce_idx][1]
-                                simulation_order[other_storage_produce_idx][1] = tmp
-                            end
-                        end
-                    end
-                end
+            # by continuosly placing lower than the last element, which has highest priority
+            # due to the reverse ordering, the correct order is preserved
+            last_element = last(storages)
+            for idx in 1:length(storages)-1
+                place_one_lower!(
+                    simulation_order,
+                    (last_element.uac, EnergySystems.produce),
+                    (storages[idx].uac, EnergySystems.produce)
+                )
             end
         end
     end
