@@ -473,53 +473,38 @@ Reorder the distribution of busses so that any chain of busses connected to each
 have the "sink" busses before the "source" busses while also considering the output
 priorities of two or more sink busses connected to the same source bus.
 
-In the following, assume energy flow from left to right:
+In the following, assume energy flows from left to right:
 
-                ------------
-                 Sink Bus 1
-                ------------
-              /
-------------
-Source Bus 1
-------------
-              \
-                ------------
-                Sink Bus 2
-                ------------
+               ------------
+               |   Bus 2  |   ------------
+               ------------   |   Bus 5  |
+             /              / ------------
+------------   ------------
+|   Bus 1  |---|   Bus 3  |
+------------   -----------`
+             `              ` ------------
+               `-----------   |   Bus 6  |
+               |   Bus 4  |   ------------
+               ------------
+With input priorities (4,3,2) on bus 1 and (6,5) on bus 3 this would result in an order
+of: 4,6,5,3,2,1
 """
 function reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
-    # for every bus...
-    for bus in values(systems_by_function[3])
-        # ...make sure that every successor bus...
-        for outface in bus.output_interfaces
-            if outface.target.sys_function == EnergySystems.sf_bus
-                # ...has a higher priority
+    # for every bus chain...
+    for bus_chain in find_chains(systems_by_function[3], EnergySystems.sf_bus)
+        # ...by sources-first ordering...
+        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus, reverse=true)
+            output_order = length(bus.connectivity.output_order) > 0 ?
+                           bus.connectivity.output_order :
+                           [u.target.uac for u in bus.output_interfaces]
+            # ...make sure every successor bus...
+            for successor_uac in output_order
+                # ...has a higher priority in the order they are appear in the list
                 place_one_higher!(
                     simulation_order,
                     (bus.uac, EnergySystems.s_distribute),
-                    (outface.target.uac, EnergySystems.s_distribute)
+                    (successor_uac, EnergySystems.s_distribute)
                 )
-            end
-        end
-
-        # ...for every successor bus in the output priorities...
-        for own_idx = 1:length(bus.connectivity.output_order)
-            own_uac = bus.connectivity.output_order[own_idx]
-
-            if uac_is_bus(bus, own_uac)
-                # ...make sure every bus following after...
-                for other_idx = own_idx+1:length(bus.connectivity.output_order)
-                    other_uac = bus.connectivity.output_order[other_idx]
-
-                    if uac_is_bus(bus, other_uac)
-                        # ...has a lower priority
-                        place_one_lower!(
-                            simulation_order,
-                            (own_uac, EnergySystems.s_distribute),
-                            (other_uac, EnergySystems.s_distribute)
-                        )
-                    end
-                end
             end
         end
     end

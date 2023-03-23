@@ -209,9 +209,9 @@ function test_busses_distribution_reorder_steps()
         [100, ("TST_BUS_01", EnergySystems.s_distribute)],
         [101, ("TST_BUS_02", EnergySystems.s_distribute)],
         [102, ("TST_BUS_03", EnergySystems.s_distribute)],
-        [103, ("TST_BUS_04", EnergySystems.s_distribute)],
-        [104, ("TST_BUS_05", EnergySystems.s_distribute)],
-        [105, ("TST_BUS_06", EnergySystems.s_distribute)],
+        [105, ("TST_BUS_04", EnergySystems.s_distribute)],
+        [103, ("TST_BUS_05", EnergySystems.s_distribute)],
+        [104, ("TST_BUS_06", EnergySystems.s_distribute)],
     ]
     Resie.reorder_distribution_of_busses(steps, systems, by_function)
     @test pwc_steps_astr(expected, steps) == ""
