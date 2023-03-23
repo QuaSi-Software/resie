@@ -20,7 +20,7 @@ to the simulation as a whole as well as provide functionality on groups of energ
 module EnergySystems
 
 export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_production_with,
-    perform_steps, output_values, output_value, StepInstruction, StepInstructions
+    perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -445,6 +445,23 @@ function output_values(unit::EnergySystem)::Vector{String}
 end
 
 """
+    calculate_energy_flow(interface)
+
+Calculates the energy flow in an interface and returns the energy.
+If the balance in an interface was not zero, the requested amount of energy and not
+the acutal energy that has been provided is returned! 
+This is conformily of the output interfaces of busses to non-busses which are set
+to the requested energy, not regarding the energy that has been delivered!
+
+Replacing the - below by a +, this can be changed, then the delivered energy and not
+the requested energy is returned. Comparing this to the bahaviour of busses, this can 
+be non-intuitive.
+"""
+function calculate_energy_flow(interface::SystemInterface)::Float64
+    return (interface.sum_abs_change - interface.balance) / 2
+end
+
+"""
     output_value(unit, key)
 
 Return the value for the output with the given output key.
@@ -464,9 +481,9 @@ Throws:
 """
 function output_value(unit::EnergySystem, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     end
     throw(KeyError(key.value_key))
 end

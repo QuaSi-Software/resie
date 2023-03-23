@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.3
+* bugfix in calculation of IN and OUT energy in output_value() for chases with balance /= 0. 
+
 ### Version 0.3.2
 * adapted control strategies for all transformers: All in- and outputs need to be sattisfied by default
 * added optional user-defined input in control strategie of each transformer to ignore certain in- or outputs within control strategy
