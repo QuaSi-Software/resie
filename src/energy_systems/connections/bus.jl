@@ -198,6 +198,18 @@ function balance_on(
         end
     end
 
+    # helper function to get corresponding output index in connectivity matrix from index of output interface
+    # ToDo: Maybe avoid this function and make shure that the order of output_interfaces in unit is the 
+    #       same as specified in the connectivity matrix at the beginning of the simulation?
+    function get_connectivity_output_index(unit, output_interface_index)::Int
+        output_interface_uac = unit.output_interfaces[output_interface_index].target.uac
+        for  (idx,connectivity_output_uac) in pairs(unit.connectivity.output_order)
+            if connectivity_output_uac == output_interface_uac
+                return idx
+            end
+        end
+    end
+
     # iterate through outfaces to get storage loading potential
     for (idx, outface) in pairs(unit.output_interfaces)
         if outface.target.sys_function === sf_bus
@@ -216,7 +228,7 @@ function balance_on(
                 (
                     input_index === nothing
                     || unit.connectivity.storage_loading === nothing
-                    || unit.connectivity.storage_loading[input_index][idx]
+                    || unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
                 )
             )
                 InterfaceInfo = balance_on(outface, outface.target)
