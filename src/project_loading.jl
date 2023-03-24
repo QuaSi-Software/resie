@@ -133,6 +133,10 @@ function base_order(systems_by_function)
     # place steps potential and produce for transformers in order by "chains"
     chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
+        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+            initial_nr -= 1
+        end
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
@@ -450,11 +454,16 @@ function reorder_for_input_priorities(simulation_order, systems, systems_by_func
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every system following after...
             for other_idx = own_idx+1:length(bus.connectivity.input_order)
-                # ...is of a lower priority in control and produce
+                # ...is of a lower priority in control, potential and produce
                 place_one_lower!(
                     simulation_order,
                     (bus.connectivity.input_order[own_idx], EnergySystems.s_control),
                     (bus.connectivity.input_order[other_idx], EnergySystems.s_control)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_potential),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_potential)
                 )
                 place_one_lower!(
                     simulation_order,
@@ -588,11 +597,16 @@ function reorder_for_control_dependencies(simulation_order, systems, systems_by_
                 continue
             end
 
-            # ...has a higher priority in control and produce
+            # ...has a higher priority in control, potential and produce
             place_one_higher!(
                 simulation_order,
                 (unit.uac, EnergySystems.s_control),
                 (other_uac, EnergySystems.s_control)
+            )
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_potential),
+                (other_uac, EnergySystems.s_potential)
             )
             place_one_higher!(
                 simulation_order,
