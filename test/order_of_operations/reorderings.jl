@@ -220,3 +220,144 @@ end
 @testset "busses_distribution_reorder_steps" begin
     test_busses_distribution_reorder_steps()
 end
+
+function test_data_storage_loading()
+    systems_config = Dict{String,Any}(
+        "TST_BUS_01" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "production_refs" => [
+                "TST_BUS_02",
+                "TST_BFT_01",
+                "TST_BUS_03",
+            ],
+            "connection_matrix" => Dict{String, Any}(
+                "input_order" => [],
+                "output_order" => [
+                    "TST_BUS_02",
+                    "TST_BFT_01",
+                    "TST_BUS_03",
+                ],
+            )
+        ),
+        "TST_BUS_02" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "production_refs" => ["TST_BFT_02"],
+        ),
+        "TST_BUS_03" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "production_refs" => ["TST_BFT_03"],
+        ),
+        "TST_BFT_01" => Dict{String,Any}(
+            "type" => "BufferTank",
+            "control_refs" => [],
+            "production_refs" => [
+                "TST_BUS_01"
+            ],
+            "capacity" => 40000,
+            "load" => 0
+        ),
+        "TST_BFT_02" => Dict{String,Any}(
+            "type" => "BufferTank",
+            "control_refs" => [],
+            "production_refs" => [
+                "TST_BUS_02"
+            ],
+            "capacity" => 40000,
+            "load" => 0
+        ),
+        "TST_BFT_03" => Dict{String,Any}(
+            "type" => "BufferTank",
+            "control_refs" => [],
+            "production_refs" => [
+                "TST_BUS_03"
+            ],
+            "capacity" => 40000,
+            "load" => 0
+        ),
+    )
+    systems = Resie.load_systems(systems_config)
+    by_function = Resie.categorize_by_function(systems)
+    return systems, by_function
+end
+
+function test_find_storages_ordered()
+    systems, _ = test_data_storage_loading()
+
+    expected = [
+        systems["TST_BFT_02"],
+        systems["TST_BFT_01"],
+        systems["TST_BFT_03"],
+    ]
+    result = Resie.find_storages_ordered(systems["TST_BUS_01"], systems)
+    @test pwc_units_astr(expected, result) == ""
+
+    expected = [
+        systems["TST_BFT_03"],
+        systems["TST_BFT_01"],
+        systems["TST_BFT_02"],
+    ]
+    result = Resie.find_storages_ordered(systems["TST_BUS_01"], systems, reverse=true)
+    @test pwc_units_astr(expected, result) == ""
+end
+
+@testset "find_storages_ordered" begin
+    test_find_storages_ordered()
+end
+
+function test_storage_loading_no_change()
+    systems, by_function = test_data_storage_loading()
+    steps = [
+        [100, ("TST_BFT_02", EnergySystems.s_produce)],
+        [99, ("TST_BFT_01", EnergySystems.s_produce)],
+        [98, ("TST_BFT_03", EnergySystems.s_produce)],
+        [97, ("TST_BFT_02", EnergySystems.s_load)],
+        [96, ("TST_BFT_01", EnergySystems.s_load)],
+        [95, ("TST_BFT_03", EnergySystems.s_load)],
+    ]
+    expected = [
+        [100, ("TST_BFT_02", EnergySystems.s_produce)],
+        [99, ("TST_BFT_01", EnergySystems.s_produce)],
+        [98, ("TST_BFT_03", EnergySystems.s_produce)],
+        [97, ("TST_BFT_02", EnergySystems.s_load)],
+        [96, ("TST_BFT_01", EnergySystems.s_load)],
+        [95, ("TST_BFT_03", EnergySystems.s_load)],
+    ]
+    Resie.reorder_storage_loading(steps, systems, by_function)
+    @test pwc_steps_astr(expected, steps) == ""
+end
+
+@testset "storage_loading_no_change" begin
+    test_storage_loading_no_change()
+end
+
+function test_storage_loading_reorder_steps()
+    systems, by_function = test_data_storage_loading()
+    steps = [
+        [100, ("TST_BFT_01", EnergySystems.s_produce)],
+        [99, ("TST_BFT_02", EnergySystems.s_produce)],
+        [98, ("TST_BFT_03", EnergySystems.s_produce)],
+        [97, ("TST_BFT_01", EnergySystems.s_load)],
+        [96, ("TST_BFT_02", EnergySystems.s_load)],
+        [95, ("TST_BFT_03", EnergySystems.s_load)],
+    ]
+    expected = [
+        [98, ("TST_BFT_01", EnergySystems.s_produce)],
+        [99, ("TST_BFT_02", EnergySystems.s_produce)],
+        [97, ("TST_BFT_03", EnergySystems.s_produce)],
+        [94, ("TST_BFT_01", EnergySystems.s_load)],
+        [95, ("TST_BFT_02", EnergySystems.s_load)],
+        [93, ("TST_BFT_03", EnergySystems.s_load)],
+    ]
+    Resie.reorder_storage_loading(steps, systems, by_function)
+    @test pwc_steps_astr(expected, steps) == ""
+end
+
+@testset "storage_loading_reorder_steps" begin
+    test_storage_loading_reorder_steps()
+end
