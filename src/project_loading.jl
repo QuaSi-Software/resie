@@ -558,8 +558,8 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
             for idx in 1:length(storages)-1
                 place_one_lower!(
                     simulation_order,
-                    (last_element.uac, EnergySystems.produce),
-                    (storages[idx].uac, EnergySystems.produce)
+                    (last_element.uac, EnergySystems.s_produce),
+                    (storages[idx].uac, EnergySystems.s_produce)
                 )
             end
         end
