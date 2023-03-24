@@ -107,7 +107,7 @@ function base_order(systems_by_function)
     # reset all systems, order doesn't matter
     for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_reset)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_reset)])
             initial_nr -= 1
         end
     end
@@ -117,7 +117,7 @@ function base_order(systems_by_function)
     # system functions
     for sf_order = 1:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_control)])
             initial_nr -= 1
         end
     end
@@ -125,7 +125,7 @@ function base_order(systems_by_function)
     # produce fixed sources/sinks and busses.
     for sf_order = 1:3
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
         end
     end
@@ -134,32 +134,32 @@ function base_order(systems_by_function)
     chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
         end
     end
 
     # produce, then load storages
     for unit in values(systems_by_function[5])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
         initial_nr -= 1
     end
     for unit in values(systems_by_function[5])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_load)])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_load)])
         initial_nr -= 1
     end
 
     # produce dispatchable sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
             initial_nr -= 1
         end
     end
 
     # distribute busses
     for unit in values(systems_by_function[3])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_distribute)])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_distribute)])
         initial_nr -= 1
     end
 
@@ -345,7 +345,7 @@ function order_of_operations(systems::Grouping)::StepInstructions
     fn_first = function (entry)
         return entry[1]
     end
-    return [(u[2][1].uac, u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+    return [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
 end
 
 """
