@@ -135,13 +135,18 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
         potential_storage_heat = -Inf
     end
 
+    # get usage fraction of external profile (normalized from 0 to 1)
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    if usage_fraction_operation_profile <= 0.0
+        return # no operation allowed from external profile
+    end
+
     # get usage_factions depending on control strategy
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
         usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
         usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
         usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
-        other_limitations = 1 
 
     elseif unit.controller.strategy == "storage_driven" 
         return # do not start due to statemachine!
@@ -151,14 +156,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
         usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
         usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
         usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
-        other_limitations = 1
 
     elseif unit.controller.strategy == "demand_driven"
         usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
         usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
         usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
         usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
-        other_limitations = 1
 
     else
         throw(ArgumentError("Error: No valid control strategy chosen for electrolyser. Must be one of storage_driven, supply_driven, demand_driven."))
@@ -171,7 +174,7 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
         usage_fraction_h2, 
         usage_fraction_o2,
         usage_fraction_heat,
-        other_limitations
+        usage_fraction_operation_profile
         )
 
     # exit if usage_fraction is below min_power_fraciton 

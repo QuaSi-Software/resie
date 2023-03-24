@@ -53,7 +53,7 @@ mutable struct HeatPump <: ControlledSystem
             config["power"], # power
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
-            default(config, "fixed_cop", 3.0),
+            default(config, "fixed_cop", nothing),
             0.0, # cop
         )
     end
@@ -152,9 +152,19 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         out_temp = InterfaceInfo.temperature
     end
 
+    # get usage fraction of external profile (normalized from 0 to 1)
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    if usage_fraction_operation_profile <= 0.0
+        return # no operation allowed from external profile
+    end
+
     # calculate COP
-    cop = dynamic_cop(in_temp, out_temp)
-    unit.cop = cop === nothing ? unit.fixed_cop : cop
+    # cop = dynamic_cop(in_temp, out_temp)
+    # unit.cop = cop === nothing ? unit.fixed_cop : cop
+    unit.cop = unit.fixed_cop === nothing ? dynamic_cop(in_temp, out_temp) : unit.fixed_cop
+    if unit.cop === nothing
+        throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
+    end
 
     # maximum possible in and outputs of heat pump, not regarding any external limits!
     max_produce_heat = watt_to_wh(unit.power)
@@ -166,7 +176,6 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
-        other_limitations = 1.0
 
     elseif unit.controller.strategy == "storage_driven" 
         return # do not start due to statemachine!
@@ -176,14 +185,12 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
-        other_limitations = 1.0
 
     elseif unit.controller.strategy == "demand_driven"
 
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
-        other_limitations = 1.0
 
     end
 
@@ -193,7 +200,7 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         usage_fraction_heat_out,
         usage_fraction_heat_in, 
         usage_fraction_el,
-        other_limitations
+        usage_fraction_operation_profile
         )
 
     # exit if usage_fraction is below min_power_fraciton 
