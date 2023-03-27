@@ -344,6 +344,14 @@ function controller_for_strategy(strategy::String, parameters::Dict{String,Any})
     end
 
     params = merge(OP_STRATS[strategy].strategy_parameters, parameters)
+
+    # load operation profile if path is given in input file
+    if haskey(params, "operation_profile_path")
+        if params["operation_profile_path"]  !== nothing
+            params["operation_profile"] = Profile(params["operation_profile_path"])
+        end
+    end
+    
     machine = OP_STRATS[strategy].sm_constructor(params)
     return Controller(strategy, params, machine, Grouping())
 end

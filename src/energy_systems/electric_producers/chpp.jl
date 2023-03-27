@@ -116,12 +116,17 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
         potential_energy_heat_out = Inf
         potential_storage_heat_out = Inf
     end
+
+    # get usage fraction of external profile (normalized from 0 to 1)
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    if usage_fraction_operation_profile <= 0.0
+        return # no operation allowed from external profile
+    end
    
     # calculate usage fractions
     usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
     usage_fraction_el_out = -((unit.controller.parameter["unload_storages"] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
     usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-    other_limitations = 1.0
 
     # get smallest usage fraction
     usage_fraction = min(
@@ -129,7 +134,7 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
         usage_fraction_heat_out,
         usage_fraction_el_out, 
         usage_fraction_gas_in,
-        other_limitations
+        usage_fraction_operation_profile
         )
 
     # exit if usage_fraction is below min_power_fraciton 

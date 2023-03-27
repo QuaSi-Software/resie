@@ -14,6 +14,11 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.4
+* added feature to control transformers from user-given control profile with values within [0,1]. This adds to the already existing limitations in the control strategy of demand_driven, supply_driven and storage_driven strategy.
+* bugfix in index assignement of connectivity matrix to output_interfaces in balance_on() of bus
+* changed calculation of COP of heatpump: If fixed_cop is given in the input file, it will be used and not the temperature-dependend COP. Corrected tests to meet this definition.
+
 ### Version 0.3.3
 * bugfix in calculation of IN and OUT energy in output_value() for chases with balance /= 0. 
 

@@ -21,6 +21,7 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
         "name" => "supply_driven",
         "load_storages" => true,
         "unload_storages" => true,
+        "operation_profile_path" => nothing,
         "m_el_in" => true,
         "m_el_out" => true,
         "m_gas_in" => true,
