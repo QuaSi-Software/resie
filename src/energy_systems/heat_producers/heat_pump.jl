@@ -25,7 +25,7 @@ mutable struct HeatPump <: ControlledSystem
     power::Float64
     min_power_fraction::Float64
     min_run_time::UInt
-    fixed_cop::Float64
+    fixed_cop::Any
     cop::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any})

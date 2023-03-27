@@ -42,8 +42,7 @@ function test_heat_pump_demand_driven_correct_order()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000,
-            "fixed_cop" => 3.0
+            "power" => 12000
         ),
     )
     systems = Resie.load_systems(systems_config)
