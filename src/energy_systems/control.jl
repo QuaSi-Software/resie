@@ -313,6 +313,7 @@ include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 include("strategies/demand_driven.jl")
 include("strategies/supply_driven.jl")
+include("strategies/extended_storage_control.jl")
 
 """
     controller_for_strategy(strategy, parameters)
