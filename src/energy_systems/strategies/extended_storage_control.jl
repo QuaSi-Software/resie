@@ -8,6 +8,10 @@ This strategy offers the possibility to decide if a storage is allowed to either
 storage in the system framework or if a storage can be filled by any connected storage in the system framework.
 While the connection matrix of each bus only defines the loading/unloading of directly connected
 storages, the funcionality provided within this strategy is valid system-wide.
+NOTE: If the properties of load_any_storage and unload_any_storage of different storages in a system don't 
+      fit together, unexpected results can be retrieved. If a storage is allowed to load all other storages, 
+      the restrictions of the other storages are ignored. If one of them is set to "unload_any_storage=false", 
+      this can not be garanteed as is highly depends on the order of operation.
 """
 
 OP_STRATS["extended_storage_control"] = OperationalStrategyType(
