@@ -82,6 +82,8 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
             energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_demand = InterfaceInfo.balance
         end
     else
         energy_demand = InterfaceInfo.balance
@@ -113,6 +115,8 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["unload_any_storage"]
             energy_available = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_available = InterfaceInfo.balance
         end
     else
         energy_available = InterfaceInfo.balance

@@ -99,6 +99,8 @@ function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, wat
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
             energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_demand = InterfaceInfo.balance
         end
     else
         energy_demand = InterfaceInfo.balance
@@ -133,6 +135,8 @@ function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_t
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["unload_any_storage"]
             energy_available = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_available = InterfaceInfo.balance
         end
     else
         energy_available = InterfaceInfo.balance
