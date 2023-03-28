@@ -77,13 +77,23 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     outface = unit.output_interfaces[unit.medium]
     InterfaceInfo = balance_on(outface, outface.target)
 
-    if InterfaceInfo.balance >= 0.0
+    if unit.controller.parameter["name"] == "default"
+        energy_demand = InterfaceInfo.balance
+    elseif unit.controller.parameter["name"] == "extended_storage_control"
+        if unit.controller.parameter["load_any_storage"]
+            energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        end
+    else
+        energy_demand = InterfaceInfo.balance
+    end
+
+    if energy_demand >= 0.0
         return # produce is only concerned with moving energy to the target
     end
 
-    if unit.load > abs(InterfaceInfo.balance)
-        unit.load += InterfaceInfo.balance
-        add!(outface, abs(InterfaceInfo.balance))
+    if unit.load > abs(energy_demand)
+        unit.load += energy_demand
+        add!(outface, abs(energy_demand))
     else
         add!(outface, unit.load)
         unit.load = 0.0
@@ -98,14 +108,24 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.medium]
     InterfaceInfo = balance_on(inface, inface.source)
 
-    if InterfaceInfo.balance <= 0.0
+    if unit.controller.parameter["name"] == "default"
+        energy_available = InterfaceInfo.balance
+    elseif unit.controller.parameter["name"] == "extended_storage_control"
+        if unit.controller.parameter["unload_any_storage"]
+            energy_available = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        end
+    else
+        energy_available = InterfaceInfo.balance
+    end
+
+    if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
     end
 
     diff = unit.capacity - unit.load
-    if diff > InterfaceInfo.balance
-        unit.load += InterfaceInfo.balance
-        sub!(inface, InterfaceInfo.balance)
+    if diff > energy_available
+        unit.load += energy_available
+        sub!(inface, energy_available)
     else
         unit.load = unit.capacity
         sub!(inface, diff)
