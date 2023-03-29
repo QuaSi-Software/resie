@@ -14,6 +14,12 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.5
+* added extended_storage_control strategy for all storages to allow users to decide whether a storage can load ANY other interconnected storage of the system framework or not (default = storages are not allowed to load other storages). This only works if the OoO of produce() and load() is correct which will be implemented in upcoming versions.
+* changed definition in balance_on() of busses: Storages are never allowed to load themselves!
+* adjusted testcases to meet new definition above
+* added testcases to test extended_storage_control
+
 ### Version 0.3.4
 * added feature to control transformers from user-given control profile with values within [0,1]. This adds to the already existing limitations in the control strategy of demand_driven, supply_driven and storage_driven strategy.
 * bugfix in index assignement of connectivity matrix to output_interfaces in balance_on() of bus
