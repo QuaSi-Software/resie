@@ -225,7 +225,7 @@ function balance_on(
             if (
                 outface.target.sys_function === sf_storage
                 &&
-                outface.target.uac !== interface.target.uac  # never allow unloading of own storage load
+                outface.target.uac !== interface.source.uac  # never allow unloading of own storage load
                 &&
                 (
                     input_index === nothing
