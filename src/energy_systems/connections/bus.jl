@@ -179,9 +179,7 @@ function balance_on(
 )::NamedTuple{}
     highest_demand_temp = -1e9
     storage_potential_outputs = 0.0
-    storage_potential_inputs = 0.0
     input_index = nothing
-    output_index = nothing
     caller_is_input = false   # == true if interface is input of unit (caller puts energy in unit); 
                               # == false if interface is output of unit (caller gets energy from unit)
     energy_potential_outputs = 0.0
@@ -200,14 +198,6 @@ function balance_on(
         end
     end
 
-    for (idx, output_uac) in pairs(unit.connectivity.output_order)
-        if output_uac == interface.target.uac
-            output_index = idx
-            caller_is_input = false
-            break
-        end
-    end
-
     # helper function to get corresponding output index in connectivity matrix from index of output interface
     # ToDo: Maybe avoid this function and make shure that the order of output_interfaces in unit is the 
     #       same as specified in the connectivity matrix at the beginning of the simulation?
@@ -215,15 +205,6 @@ function balance_on(
         output_interface_uac = unit.output_interfaces[output_interface_index].target.uac
         for  (idx,connectivity_output_uac) in pairs(unit.connectivity.output_order)
             if connectivity_output_uac == output_interface_uac
-                return idx
-            end
-        end
-    end
-
-    function get_connectivity_input_index(unit, input_interface_index)::Int
-        input_interface_uac = unit.input_interfaces[input_interface_index].source.uac
-        for  (idx,connectivity_input_uac) in pairs(unit.connectivity.input_order)
-            if connectivity_input_uac == input_interface_uac
                 return idx
             end
         end
@@ -244,7 +225,7 @@ function balance_on(
             if (
                 outface.target.sys_function === sf_storage
                 &&
-                outface.target.uac !== interface.target.uac
+                outface.target.uac !== interface.target.uac  # never allow unloading of own storage load
                 &&
                 (
                     input_index === nothing
@@ -269,33 +250,15 @@ function balance_on(
         energy_potential_outputs += energy_potential
     end
 
-    if caller_is_input == false # && interface.sum_abs_change == 0.0 # also need to check inputs of unit in order to sum up potential_energy_inputs, but only if necessary
+    if caller_is_input == false && interface.sum_abs_change == 0.0 # also need to check inputs of unit in order to sum up potential_energy_inputs, but only if necessary
         for (idx, inface) in pairs(unit.input_interfaces)
             if inface.source.sys_function === sf_bus
                 InterfaceInfo = balance_on(inface, inface.source)
                 energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : InterfaceInfo.energy_potential
-                storage_potential = InterfaceInfo.storage_potential
             else
                 energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
-                if (
-                    inface.source.sys_function === sf_storage
-                    &&
-                    inface.source.uac !== interface.target.uac # do not allow loading of own storage
-                    &&
-                    (
-                        output_index === nothing
-                        || unit.connectivity.storage_loading === nothing
-                        || unit.connectivity.storage_loading[get_connectivity_input_index(unit, idx)][output_index]
-                    )
-                )
-                    InterfaceInfo = balance_on(inface, inface.source)
-                    storage_potential = InterfaceInfo.storage_potential
-                else
-                    storage_potential = 0.0
-                end
             end
             energy_potential_inputs += energy_potential
-            storage_potential_inputs += storage_potential
         end
     end
     # ToDo: consider connectivity matrix? For now, only the load and produce of storages are regulated 
@@ -310,7 +273,7 @@ function balance_on(
     
     return (
             balance = balance(unit),
-            storage_potential = caller_is_input ? storage_potential_outputs : storage_potential_inputs,
+            storage_potential = caller_is_input ? storage_potential_outputs : 0.0,
             energy_potential = interface.sum_abs_change > 0.0 ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )

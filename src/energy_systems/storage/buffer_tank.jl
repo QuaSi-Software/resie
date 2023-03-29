@@ -126,18 +126,7 @@ function load(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Functi
     inface = unit.input_interfaces[unit.medium]
     InterfaceInfo = balance_on(inface, inface.source)
     supply_temp = InterfaceInfo.temperature
-
-    if unit.controller.parameter["name"] == "default"
-        energy_available = InterfaceInfo.balance
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["unload_any_storage"]
-            energy_available = InterfaceInfo.balance + InterfaceInfo.storage_potential
-        else
-            energy_available = InterfaceInfo.balance
-        end
-    else
-        energy_available = InterfaceInfo.balance
-    end
+    energy_available = InterfaceInfo.balance
 
     if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
