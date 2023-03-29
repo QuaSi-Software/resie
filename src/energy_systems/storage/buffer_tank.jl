@@ -91,7 +91,19 @@ function produce(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Fun
     InterfaceInfo = balance_on(outface, outface.target)
     demand_temp = InterfaceInfo.temperature
 
-    if InterfaceInfo.balance >= 0.0
+    if unit.controller.parameter["name"] == "default"
+        energy_demand = InterfaceInfo.balance
+    elseif unit.controller.parameter["name"] == "extended_storage_control"
+        if unit.controller.parameter["load_any_storage"]
+            energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_demand = InterfaceInfo.balance
+        end
+    else
+        energy_demand = InterfaceInfo.balance
+    end
+
+    if energy_demand >= 0.0
         return # produce is only concerned with moving energy to the target
     end
 
@@ -101,9 +113,9 @@ function produce(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Fun
         # a temperature higher than the lower limit of the tank
     end
 
-    if unit.load > abs(InterfaceInfo.balance)
-        unit.load += InterfaceInfo.balance
-        add!(outface, abs(InterfaceInfo.balance), demand_temp)
+    if unit.load > abs(energy_demand)
+        unit.load += energy_demand
+        add!(outface, abs(energy_demand), demand_temp)
     else
         add!(outface, unit.load, demand_temp)
         unit.load = 0.0
@@ -114,8 +126,9 @@ function load(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Functi
     inface = unit.input_interfaces[unit.medium]
     InterfaceInfo = balance_on(inface, inface.source)
     supply_temp = InterfaceInfo.temperature
+    energy_available = InterfaceInfo.balance
 
-    if InterfaceInfo.balance <= 0.0
+    if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
     end
 
@@ -125,9 +138,9 @@ function load(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Functi
     end
 
     diff = unit.capacity - unit.load
-    if diff > InterfaceInfo.balance
-        unit.load += InterfaceInfo.balance
-        sub!(inface, InterfaceInfo.balance, supply_temp)
+    if diff > energy_available
+        unit.load += energy_available
+        sub!(inface, energy_available, supply_temp)
     else
         unit.load = unit.capacity
         sub!(inface, diff, supply_temp)

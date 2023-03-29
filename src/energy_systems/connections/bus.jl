@@ -178,7 +178,7 @@ function balance_on(
     unit::Bus
 )::NamedTuple{}
     highest_demand_temp = -1e9
-    storage_space = 0.0
+    storage_potential_outputs = 0.0
     input_index = nothing
     caller_is_input = false   # == true if interface is input of unit (caller puts energy in unit); 
                               # == false if interface is output of unit (caller gets energy from unit)
@@ -225,6 +225,8 @@ function balance_on(
             if (
                 outface.target.sys_function === sf_storage
                 &&
+                outface.target.uac !== interface.source.uac  # never allow unloading of own storage load
+                &&
                 (
                     input_index === nothing
                     || unit.connectivity.storage_loading === nothing
@@ -244,7 +246,7 @@ function balance_on(
             )
         end
 
-        storage_space += storage_potential
+        storage_potential_outputs += storage_potential
         energy_potential_outputs += energy_potential
     end
 
@@ -271,7 +273,7 @@ function balance_on(
     
     return (
             balance = balance(unit),
-            storage_potential = storage_space,
+            storage_potential = caller_is_input ? storage_potential_outputs : 0.0,
             energy_potential = interface.sum_abs_change > 0.0 ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )

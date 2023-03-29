@@ -482,14 +482,14 @@ function test_busses_communicate_storage_potential()
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
     @test InterfaceInfo.balance == -75.0
-    @test InterfaceInfo.storage_potential == -10000.0
+    @test InterfaceInfo.storage_potential == 0.0
     @test InterfaceInfo.temperature == 55.0
 
     InterfaceInfo = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
     @test InterfaceInfo.balance == -75.0
-    @test InterfaceInfo.storage_potential == -30000.0
+    @test InterfaceInfo.storage_potential == -10000.0
     @test InterfaceInfo.temperature == 55.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
@@ -513,14 +513,14 @@ function test_busses_communicate_storage_potential()
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
     @test InterfaceInfo.balance == 0.0
-    @test InterfaceInfo.storage_potential == -10075.0
+    @test InterfaceInfo.storage_potential == 0.0
     @test InterfaceInfo.temperature === nothing
 
     InterfaceInfo = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
     @test InterfaceInfo.balance == 0.0
-    @test InterfaceInfo.storage_potential == -30075.0
+    @test InterfaceInfo.storage_potential == -10075.0
     @test InterfaceInfo.temperature === nothing
 end
 
