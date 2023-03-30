@@ -3,6 +3,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function test_ooo_bus_output_priorities()
     systems_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -104,6 +106,7 @@ function test_ooo_bus_output_priorities()
         ("TST_BUS_02", EnergySystems.s_produce),
         ("TST_BUS_01", EnergySystems.s_produce),
         ("TST_BUS_03", EnergySystems.s_produce),
+        ("TST_GBO_01", EnergySystems.s_potential),
         ("TST_GBO_01", EnergySystems.s_produce),
         ("TST_GRI_01", EnergySystems.s_produce),
         ("TST_BUS_02", EnergySystems.s_distribute),
@@ -113,7 +116,7 @@ function test_ooo_bus_output_priorities()
 
     systems = Resie.load_systems(systems_config)
     ooo = Resie.order_of_operations(systems)
-    @test all(ooo .== expected)
+    @test pwc_steps_astr(expected, ooo) == ""
 end
 
 

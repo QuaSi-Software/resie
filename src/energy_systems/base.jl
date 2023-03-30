@@ -96,7 +96,7 @@ Enumerations of a simulation step that can be performed on an energy system.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
-@enum Step s_reset s_control s_produce s_load s_distribute
+@enum Step s_reset s_control s_produce s_load s_distribute s_potential
 
 """
 Convenience type for holding the instruction for one system and one step.
@@ -384,6 +384,24 @@ function control(
 end
 
 """
+    potential(unit, parameters, watt_to_wh)
+
+Calculate potential energy consumption/production for the given energy system.
+
+# Arguments
+- `unit::ControlledSystem`: The system for which potentials are calculated
+- `parameters::Dict{String, Any}`: Project-wide parameters
+- `watt_to_wh::Function`: Utility function to calculate work from a given power
+"""
+function potential(
+    unit::ControlledSystem,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function
+)
+    # default implementation is to do nothing
+end
+
+"""
     produce(unit, parameters, watt_to_wh)
 
 Perform the production calculations for the given energy system.
@@ -647,6 +665,8 @@ function perform_steps(
             reset(unit)
         elseif step == s_control
             control(unit, systems, parameters)
+        elseif step == s_potential
+            potential(unit, parameters, watt_to_wh)
         elseif step == s_produce
             produce(unit, parameters, watt_to_wh)
         elseif step == s_load

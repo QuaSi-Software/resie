@@ -14,6 +14,14 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.6
+* Refactor algorithm for determining order of operations for a more modular approach with reusable helper functions and add tests for new modular functions.
+* Add helper functions for improving output of tests checking the order of operations
+* Add simulation step for calculating energy potentials. The default method does nothing and transformer implementations ought to calculate their potentials in the step and write the information to the interfaces.
+* Add handling of chains of transformers to order of operations algorithm. The algorithm iterates over each chain in one pass sink-to-source, adding potential steps along the way, then another pass source-to-sink adding the produce steps.
+* Add deactivated tests highlighting problems with transformer chains - the tests fail until transformer implementations for potentials are added
+* Add handling of storage loading to order of operations algorithm. The algorithm considers the output priorities on chains of busses for the loading of storages connected to all busses of a chain.
+
 ### Version 0.3.5
 * added extended_storage_control strategy for all storages to allow users to decide whether a storage can load ANY other interconnected storage of the system framework or not (default = storages are not allowed to load other storages). This only works if the OoO of produce() and load() is correct which will be implemented in upcoming versions.
 * changed definition in balance_on() of busses: Storages are never allowed to load themselves!

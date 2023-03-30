@@ -69,6 +69,254 @@ function load_systems(config::Dict{String,Any})::Grouping
 end
 
 """
+    categorize_by_function(systems)
+
+Sort the given systems into buckets by their system functions.
+"""
+function categorize_by_function(systems)
+    return [
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_fixed_source],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_fixed_sink],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_bus],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_transformer],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_storage],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_dispatchable_source],
+        [unit for unit in each(systems)
+         if unit.sys_function == EnergySystems.sf_dispatchable_sink],
+    ]
+end
+
+"""
+    base_order(systems_by_function)
+
+Calculate the base order for the simulation steps.
+
+This is determined by the system functions having a certain "natural" order as well as the
+simulation steps having a natural order as well.
+"""
+function base_order(systems_by_function)
+    simulation_order = []
+    initial_nr = sum([length(bucket) for bucket in systems_by_function]) * 100
+
+    # reset all systems, order doesn't matter
+    for sf_order = 1:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_reset)])
+            initial_nr -= 1
+        end
+    end
+
+
+    # calculate control of all systems. the order corresponds to the general order of
+    # system functions
+    for sf_order = 1:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_control)])
+            initial_nr -= 1
+        end
+    end
+
+    # produce fixed sources/sinks and busses.
+    for sf_order = 1:3
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
+    end
+
+    # place steps potential and produce for transformers in order by "chains"
+    chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
+    for chain in chains
+        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+            initial_nr -= 1
+        end
+        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
+    end
+
+    # produce, then load storages
+    for unit in values(systems_by_function[5])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+        initial_nr -= 1
+    end
+    for unit in values(systems_by_function[5])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_load)])
+        initial_nr -= 1
+    end
+
+    # produce dispatchable sources/sinks
+    for sf_order = 6:7
+        for unit in values(systems_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            initial_nr -= 1
+        end
+    end
+
+    # distribute busses
+    for unit in values(systems_by_function[3])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_distribute)])
+        initial_nr -= 1
+    end
+
+    return simulation_order
+end
+
+"""
+    idx_of(order, uac, step)
+
+Helper function to find the index of a given combination of step and unit (by its UAC).
+"""
+function idx_of(order, uac, step)
+    for idx in eachindex(order)
+        if order[idx][2][1].uac == uac && order[idx][2][2] == step
+            return idx
+        end
+    end
+    return 0
+end
+
+"""
+    uac_is_bus(energysystem, uac)
+
+Helper function to check if the given UAC corresponds to a bus in the outputs of the
+given energy system.
+"""
+function uac_is_bus(energysystem, uac)
+    for output_interface in energysystem.output_interfaces
+        if (output_interface.target.uac === uac && output_interface.target.sys_function === EnergySystems.sf_bus)
+            return true
+        end
+    end
+    return false
+end
+
+"""
+    add_non_recursive!(node_set, unit, caller_uac)
+
+Add connected units of the same system function to the node set in a non-recursive manner.
+"""
+function add_non_recursive!(node_set, unit, caller_uac)
+    push!(node_set, unit)
+
+    for inface in values(unit.input_interfaces)
+        if inface.source.uac == caller_uac
+            continue
+        elseif inface.source.sys_function === unit.sys_function
+            add_non_recursive!(node_set, inface.source, unit.uac)
+        end
+    end
+
+    for outface in values(unit.output_interfaces)
+        if outface.target.uac == caller_uac
+            continue
+        elseif outface.target.sys_function === unit.sys_function
+            add_non_recursive!(node_set, outface.target, unit.uac)
+        end
+    end
+end
+
+"""
+    find_chains(systems, sys_function)
+
+Find all chains of the given system function in the given collection of systems.
+
+A chain is a subgraph of the graph spanned by all connections of the given energy systems,
+which is a directed graph. The subgraph is defined by all connected systems of the given
+system function.
+"""
+function find_chains(systems, sys_function)
+    chains = []
+
+    for unit in systems
+        if unit.sys_function !== sys_function
+            continue
+        end
+
+        already_recorded = false
+        for chain in chains
+            if unit in chain
+                already_recorded = true
+            end
+        end
+
+        if !already_recorded
+            chain = Set()
+            add_non_recursive!(chain, unit, "")
+            push!(chains, chain)
+        end
+    end
+
+    return chains
+end
+
+"""
+    distance_to_sink(node, sys_function)
+
+Calculate the distance of the given node to the sinks of the chain.
+
+A sink is defined as a node with no successors of the same system function. For the sinks
+this distance is 0. For all other nodes it is the maximum over the distances of its
+successors plus one.
+"""
+function distance_to_sink(node, sys_function)
+    is_leaf = function(node)
+        for outface in values(node.output_interfaces)
+            if outface.target.sys_function === sys_function
+                return false
+            end
+        end
+        return true
+    end
+
+    if is_leaf(node)
+        return 0
+    else
+        max_distance = 0
+        for outface in values(node.output_interfaces)
+            if outface.target.sys_function == sys_function
+                distance = distance_to_sink(outface.target, sys_function)
+                max_distance = distance > max_distance ? distance : max_distance
+            end
+        end
+        return max_distance + 1
+    end
+end
+
+"""
+    iterate_chain(chain, sys_function, reverse)
+
+Iteration order over a chain of units of the same system function.
+
+This order is determined by the distance of a node to the sinks of the subgraph (the chain),
+where the distance is maxed over the successors of a node. The order is then an ascending
+ordering over the distances of nodes.
+
+# Arguments
+-`chain::Set`: A chain as a set of energy systems
+-`sys_function`: The system function of the energy systems in the chain
+-`reverse::Bool`: If true, the ordering will be in descending order
+"""
+function iterate_chain(chain, sys_function; reverse=false)
+    distances = []
+    for node in chain
+        push!(distances, (distance_to_sink(node, sys_function), node))
+    end
+    fn_first = function (entry)
+        return entry[1]
+    end
+    return [u[2] for u in sort(distances, by=fn_first, rev=reverse)]
+end
+
+"""
 order_of_operations(systems)
 
 Calculate the order of steps that need to be performed to simulate the given systems.
@@ -90,242 +338,281 @@ not trivial and might not work for each possible grouping of systems.
 ```
 """
 function order_of_operations(systems::Grouping)::StepInstructions
-    systems_by_function = [
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_fixed_source],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_fixed_sink],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_bus],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_transformer],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_storage],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_source],
-        [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_sink],
-    ]
+    systems_by_function = categorize_by_function(systems)
+    simulation_order = base_order(systems_by_function)
 
-    simulation_order = []
-    initial_nr = length(systems) * 100
-
-    # reset all systems, order doesn't matter
-    for sf_order = 1:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_reset)])
-            initial_nr -= 1
-        end
-    end
-
-
-    # calculate control of all systems. the order corresponds to the general order of
-    # system functions
-    for sf_order = 1:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_control)])
-            initial_nr -= 1
-        end
-    end
-
-    # produce all systems except dispatchable sources/sinks. the order corresponds
-    # to the general order of system functions
-    for sf_order = 1:5
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
-            initial_nr -= 1
-        end
-    end
-
-    # sandwich loading of storage systems between the other systems and dispatchable ones
-    for unit in values(systems_by_function[5])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_load)])
-        initial_nr -= 1
-    end
-
-    # handle dispatchable sources/sinks
-    for sf_order = 6:7
-        for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit, EnergySystems.s_produce)])
-            initial_nr -= 1
-        end
-    end
-
-    # finally, distribute bus systems
-    for unit in values(systems_by_function[3])
-        push!(simulation_order, [initial_nr, (unit, EnergySystems.s_distribute)])
-        initial_nr -= 1
-    end
-
-    # helper function to find certain steps in the simulation order
-    idx_of = function (order, uac, step)
-        for idx in eachindex(order)
-            if order[idx][2][1].uac == uac && order[idx][2][2] == step
-                return idx
-            end
-        end
-        return 0
-    end
-
-    # reorder systems connected to a bus so they match the input priority:
-    for bus in values(systems_by_function[3])
-        # for each system in the bus' input priority...
-        for own_idx = 1:length(bus.connectivity.input_order)
-            own_uac = bus.connectivity.input_order[own_idx]
-            own_ctrl_idx = idx_of(simulation_order, own_uac, EnergySystems.s_control)
-            own_prod_idx = idx_of(simulation_order, own_uac, EnergySystems.s_produce)
-
-            # ...make sure every system following after...
-            for other_idx = own_idx:length(bus.connectivity.input_order)
-                other_uac = bus.connectivity.input_order[other_idx]
-                other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
-                other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
-
-                # ...is of a lower priority. if not, swap the control steps...
-                if simulation_order[own_ctrl_idx][1] < simulation_order[other_ctrl_idx][1]
-                    tmp = simulation_order[own_ctrl_idx][1]
-                    simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
-                    simulation_order[other_ctrl_idx][1] = tmp
-                end
-
-                # ...and swap the production too.
-                if simulation_order[own_prod_idx][1] < simulation_order[other_prod_idx][1]
-                    tmp = simulation_order[own_prod_idx][1]
-                    simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
-                    simulation_order[other_prod_idx][1] = tmp
-                end
-            end
-        end
-    end
-
-    # helper function to check if target system is bus
-    uac_is_bus = function (energysystem, uac)
-        bool = false
-        for output_interface in energysystem.output_interfaces
-            if output_interface.target.uac === uac
-                if output_interface.target.sys_function === EnergySystems.sf_bus
-                    bool = true
-                end
-            end
-        end
-        return bool
-    end
-
-    # reorder distribution of busses and load of storages
-    for bus in values(systems_by_function[3])
-        # make sure that every following bus connected to a fist bus is calculated earlier than the first bus (only distribute here)
-        own_uac = bus.uac
-        own_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
-        # for every bus in the bus' output_interface...
-        for other_unit in bus.output_interfaces
-            if other_unit.target.sys_function == EnergySystems.sf_bus  # consider only busses
-                other_uac = other_unit.target.uac
-                other_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
-
-                # ...check if it is of a lower priority. If not, swap the distribute steps.
-                if simulation_order[own_idx][1] > simulation_order[other_idx][1]
-                    tmp = simulation_order[own_idx][1]
-                    simulation_order[own_idx][1] = simulation_order[other_idx][1]
-                    simulation_order[other_idx][1] = tmp
-                end
-            end
-        end
-
-        # make sure the order of distribution match the order according to the production_refs of the first bus
-        # also make sure that the order of the load() function of the storages connected to the following busses have the same order than the busses
-        #
-        # for bus in the first bus' production refs...
-        for own_idx = 1:length(bus.connectivity.output_order)
-            own_uac = bus.connectivity.output_order[own_idx]
-
-            # predefine indexes for storages, set to zero
-            own_storage_idx = 0
-            other_storage_idx = 0
-
-            if uac_is_bus(bus, own_uac) # consider only busses
-                own_dist_idx = idx_of(simulation_order, own_uac, EnergySystems.s_distribute)
-
-                # check if a storage is connected to own bus
-                for bus_output_interface in bus.output_interfaces # seach interfaces for own bus
-                    if bus_output_interface.target.uac == own_uac  # found correct interface
-                        for own_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach interface.targets for storage
-                            if own_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
-                                own_storage_uac = own_bus_output_interfaces.target.uac
-                                own_storage_idx = idx_of(simulation_order, own_storage_uac, EnergySystems.s_load)
-                            end
-                        end
-                    end
-                end
-
-                # ...make sure every bus following after...
-                for other_idx = own_idx:length(bus.connectivity.output_order)
-                    other_uac = bus.connectivity.output_order[other_idx]
-                    if uac_is_bus(bus, other_uac) # consider only busses
-                        other_dist_idx = idx_of(simulation_order, other_uac, EnergySystems.s_distribute)
-
-                        # ...is of a lower priority. If not, swap the distribute steps.
-                        if simulation_order[own_dist_idx][1] < simulation_order[other_dist_idx][1]
-                            tmp = simulation_order[own_dist_idx][1]
-                            simulation_order[own_dist_idx][1] = simulation_order[other_dist_idx][1]
-                            simulation_order[other_dist_idx][1] = tmp
-                        end
-
-                        # check if a storage is connected to other bus
-                        for bus_output_interface in bus.output_interfaces # seach interfaces for other bus
-                            if bus_output_interface.target.uac == other_uac  # found correct interface
-                                for other_bus_output_interfaces in bus_output_interface.target.output_interfaces # seach interface.targets for storage
-                                    if other_bus_output_interfaces.target.sys_function == EnergySystems.sf_storage
-                                        other_storage_uac = other_bus_output_interfaces.target.uac
-                                        other_storage_idx = idx_of(simulation_order, other_storage_uac, EnergySystems.s_load)
-                                    end
-                                end
-                            end
-                        end
-
-                        #... and check if load() of storage of other bus is on lower index than own storage. If not, swap the load steps
-                        if own_storage_idx > 0 && other_storage_idx > 0
-                            if simulation_order[own_storage_idx][1] < simulation_order[other_storage_idx][1]
-                                tmp = simulation_order[own_storage_idx][1]
-                                simulation_order[own_storage_idx][1] = simulation_order[other_storage_idx][1]
-                                simulation_order[other_storage_idx][1] = tmp
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    # reorder systems such that their control dependencies are handled first, but only if
-    # these are not storage systems (which are handled differently)
-    for unit in values(systems)
-        for other_uac in keys(unit.controller.linked_systems)
-            other_unit = systems[other_uac]
-            if other_unit.sys_function == EnergySystems.sf_storage
-                continue
-            end
-
-            own_ctrl_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_control)
-            own_prod_idx = idx_of(simulation_order, unit.uac, EnergySystems.s_produce)
-            other_ctrl_idx = idx_of(simulation_order, other_uac, EnergySystems.s_control)
-            other_prod_idx = idx_of(simulation_order, other_uac, EnergySystems.s_produce)
-
-            if simulation_order[own_ctrl_idx] > simulation_order[other_ctrl_idx]
-                tmp = simulation_order[own_ctrl_idx][1]
-                simulation_order[own_ctrl_idx][1] = simulation_order[other_ctrl_idx][1]
-                simulation_order[other_ctrl_idx][1] = tmp
-            end
-
-            if simulation_order[own_prod_idx][1] > simulation_order[other_prod_idx][1]
-                tmp = simulation_order[own_prod_idx][1]
-                simulation_order[own_prod_idx][1] = simulation_order[other_prod_idx][1]
-                simulation_order[other_prod_idx][1] = tmp
-            end
-        end
-    end
+    reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+    reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+    reorder_storage_loading(simulation_order, systems, systems_by_function)
+    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
 
     fn_first = function (entry)
         return entry[1]
     end
-    return [(u[2][1].uac, u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+    return [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+end
+
+"""
+    find_indexes(steps, own, target)
+
+Find the indexes of the specified two step instructions in the given collection.
+
+# Arguments
+-`steps::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+-`own::Tuple{String,SystemFunction}`: The first step instruction to look for
+-`target::Tuple{String,SystemFunction}`: The second step instruction to look for
+# Returns
+-`Integer`: Index in the collection of the first instruction
+-`Integer`: Index in the collection of the second instruction
+"""
+function find_indexes(steps, own, target)
+    own_idx = nothing
+    target_idx = nothing
+
+    for i in eachindex(steps)
+        if steps[i][2][1] == own[1] && steps[i][2][2] == own[2]
+            own_idx = i
+        end
+        if steps[i][2][1] == target[1] && steps[i][2][2] == target[2]
+            target_idx = i
+        end
+    end
+
+    return (own_idx, target_idx)
+end
+
+"""
+    place_one!(steps, own, target, higher=true)
+
+Give the target step instruction a priority one higher/lower than the given one.
+
+# Arguments
+-`steps::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+-`own::Tuple{String,SystemFunction}`: The first step instruction to look for
+-`target::Tuple{String,SystemFunction}`: The second step instruction to look for
+-`higher::Bool`: If true places the target instruction one higher, otherwise one lower
+-`force::Bool`: If true, forces the placement even if the target priority already is
+    higher/lower than the first one. If false, no changes are performed if the priority
+    already is higher/lower
+"""
+function place_one!(steps, own, target; higher=true, force=false)
+    own_idx, target_idx = find_indexes(steps, own, target)
+    if own_idx === nothing || target_idx === nothing
+        return
+    end
+
+    # check if target priority already is higher/lower
+    own_priority = steps[own_idx][1]
+    target_priority = steps[target_idx][1]
+    if !force && ((higher && target_priority > own_priority)
+                  ||
+                  (!higher && target_priority < own_priority))
+        return
+    end
+
+    # shift other units with higher/lower priority up/down by one
+    for i in eachindex(steps)
+        if (higher && steps[i][1] > own_priority
+            ||
+            !higher && steps[i][1] < own_priority)
+
+            steps[i][1] += higher ? 1 : -1
+        end
+    end
+
+    # place target one step higher/lower than own
+    steps[target_idx][1] = own_priority + (higher ? 1 : -1)
+end
+
+"""
+    place_one_higher!(steps, own, target)
+
+Alias to place_one! with the `higher` argument set to true.
+"""
+function place_one_higher!(steps, own, target; force=false)
+    place_one!(steps, own, target, higher=true, force=force)
+end
+
+"""
+    place_one_lower!(steps, own, target)
+
+Alias to place_one! with the `higher` argument set to false.
+"""
+function place_one_lower!(steps, own, target; force=false)
+    place_one!(steps, own, target, higher=false, force=force)
+end
+
+"""
+    reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+
+Reorder systems connected to a bus so they match the input priority defined on that bus.
+"""
+function reorder_for_input_priorities(simulation_order, systems, systems_by_function)
+    # for every bus...
+    for bus in values(systems_by_function[3])
+        # ...for each system in the bus' input priority...
+        for own_idx = 1:length(bus.connectivity.input_order)
+            # ...make sure every system following after...
+            for other_idx = own_idx+1:length(bus.connectivity.input_order)
+                # ...is of a lower priority in control, potential and produce
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_control),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_control)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_potential),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_potential)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_produce),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_produce)
+                )
+            end
+        end
+    end
+end
+
+"""
+    reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+
+Reorder the distribution of busses so that any chain of busses connected to each other
+have the "sink" busses before the "source" busses while also considering the output
+priorities of two or more sink busses connected to the same source bus.
+
+In the following, assume energy flows from left to right:
+
+               ------------
+               |   Bus 2  |   ------------
+               ------------   |   Bus 5  |
+             /              / ------------
+------------   ------------
+|   Bus 1  |---|   Bus 3  |
+------------   -----------`
+             `              ` ------------
+               `-----------   |   Bus 6  |
+               |   Bus 4  |   ------------
+               ------------
+With input priorities (4,3,2) on bus 1 and (6,5) on bus 3 this would result in an order
+of: 4,6,5,3,2,1
+"""
+function reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
+    # for every bus chain...
+    for bus_chain in find_chains(systems_by_function[3], EnergySystems.sf_bus)
+        # ...by sources-first ordering...
+        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus, reverse=true)
+            output_order = length(bus.connectivity.output_order) > 0 ?
+                           bus.connectivity.output_order :
+                           [u.target.uac for u in bus.output_interfaces]
+            # ...make sure every successor bus...
+            for successor_uac in output_order
+                # ...has a higher priority in the order they are appear in the list
+                place_one_higher!(
+                    simulation_order,
+                    (bus.uac, EnergySystems.s_distribute),
+                    (successor_uac, EnergySystems.s_distribute)
+                )
+            end
+        end
+    end
+end
+
+"""
+    find_storages_ordered(bus, systems)
+
+Finds storage systems in the given bus and all successor busses ordered by the output priorities.
+
+# Arguments
+-`bus::EnergySystem`: The bus from which to start the search
+-`systems::Grouping`: All energy systems in the system topology
+-`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
+"""
+function find_storages_ordered(bus, systems; reverse=false)
+    storages = []
+    pushing = reverse ? pushfirst! : push!
+
+    for unit_uac in bus.connectivity.output_order
+        unit = systems[unit_uac]
+        if unit.sys_function == EnergySystems.sf_storage
+            pushing(storages, unit)
+        elseif unit.sys_function == EnergySystems.sf_bus
+            for storage in find_storages_ordered(unit, systems)
+                pushing(storages, storage)
+            end
+        end
+    end
+
+    return storages
+end
+
+"""
+    reorder_storage_loading(simulation_order, systems, systems_by_function)
+
+Reorder systems such the loading (and unloading) of storages follows the priorities on
+busses, including communication across connected busses.
+"""
+function reorder_storage_loading(simulation_order, systems, systems_by_function)
+    for bus_chain in find_chains(systems_by_function[3], EnergySystems.sf_bus)
+        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus)
+            storages = find_storages_ordered(bus, systems, reverse=true)
+            if length(storages) < 2
+                continue
+            end
+
+            # by continuosly placing lower than the last element, which has highest priority
+            # due to the reverse ordering, the correct order is preserved
+            last_element = last(storages)
+            for idx in 1:length(storages)-1
+                place_one_lower!(
+                    simulation_order,
+                    (last_element.uac, EnergySystems.s_produce),
+                    (storages[idx].uac, EnergySystems.s_produce)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (last_element.uac, EnergySystems.s_load),
+                    (storages[idx].uac, EnergySystems.s_load)
+                )
+            end
+        end
+    end
+end
+
+"""
+    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
+
+Reorder systems such that all of their control dependencies have their control and
+produce steps happen before the unit itself. Storage systems are excepted.
+"""
+function reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
+    # for every energy system unit...
+    for unit in values(systems)
+        # ...make sure every system linked by its controller...
+        for other_uac in keys(unit.controller.linked_systems)
+            other_unit = systems[other_uac]
+            # ...excepting storages...
+            if other_unit.sys_function == EnergySystems.sf_storage
+                continue
+            end
+
+            # ...has a higher priority in control, potential and produce
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_control),
+                (other_uac, EnergySystems.s_control)
+            )
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_potential),
+                (other_uac, EnergySystems.s_potential)
+            )
+            place_one_higher!(
+                simulation_order,
+                (unit.uac, EnergySystems.s_produce),
+                (other_uac, EnergySystems.s_produce)
+            )
+        end
+    end
 end

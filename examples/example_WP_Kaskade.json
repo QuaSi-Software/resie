@@ -79,7 +79,7 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "control_refs": ["TST_01_HZG_02_DEM"],
+            "control_refs": ["TST_01_HZG_01_HTP", "TST_01_HZG_02_HTP"],
             "production_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_DEM",
@@ -93,7 +93,7 @@
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
-            "control_refs": ["TST_01_ELT_01_ELY"],
+            "control_refs": ["TST_01_HZG_02_HTP"],
             "production_refs": [
                 "TST_01_HZG_02_HTP"
             ],
