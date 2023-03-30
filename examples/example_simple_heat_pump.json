@@ -11,7 +11,7 @@
                 "COP"
             ],
             "TST_DEM_01": ["Temperature"],
-            "TST_SRC_01": ["Temperature", "Max_Power"]
+            "TST_SRC_01": ["Temperature", "Max_Energy"]
         },
         "output_plot": {
             "1": {
@@ -51,7 +51,7 @@
                 "scale_factor": 1
             },
             "7": {
-                "key": {"TST_SRC_01": ["Max_Power"]},
+                "key": {"TST_SRC_01": ["Max_Energy"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001

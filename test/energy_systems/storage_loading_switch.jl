@@ -103,6 +103,7 @@ function test_primary_producer_can_load_storage()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     # first timestep, demand is higher than primary producer can provide, so both should
@@ -147,17 +148,17 @@ function test_primary_producer_can_load_storage()
     EnergySystems.produce(grid_1, simulation_parameters, watt_to_wh)
     EnergySystems.distribute!(bus)
 
-    balance, potential, _ = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         boiler_1.output_interfaces[boiler_1.m_heat_out], bus
     )
-    @test balance == 0.0
-    @test potential == -40000.0
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == -40000.0
 
-    balance, potential, _ = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         boiler_2.output_interfaces[boiler_2.m_heat_out], bus
     )
-    @test balance == 0.0
-    @test potential == 0.0
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == 0.0
 
     # in the second timestep, demand is lower than primary producer can provide, so the
     # excess can go into storage. because the secondary should not load the storage, it
@@ -206,17 +207,17 @@ function test_primary_producer_can_load_storage()
     @test tank.input_interfaces[tank.medium].sum_abs_change == 2000.0
     @test boiler_1.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 5000.0
 
-    balance, potential, _ = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         boiler_1.output_interfaces[boiler_1.m_heat_out], bus
     )
-    @test balance == 0.0
-    @test potential == -39000.0
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == -39000.0
 
-    balance, potential, _ = EnergySystems.balance_on(
+    InterfaceInfo = EnergySystems.balance_on(
         boiler_2.output_interfaces[boiler_2.m_heat_out], bus
     )
-    @test balance == 0.0
-    @test potential == 0.0
+    @test InterfaceInfo.balance == 0.0
+    @test InterfaceInfo.storage_potential == 0.0
 end
 
 @testset "primary_producer_can_load_storage" begin

@@ -244,6 +244,7 @@ Wraps around the mechanism of control for the operation strategy of an EnergySys
 """
 Base.@kwdef mutable struct Controller
     strategy::String
+    parameter::Dict{String,Any}
     state_machine::StateMachine
     linked_systems::Grouping
 end
@@ -312,6 +313,7 @@ include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 include("strategies/demand_driven.jl")
 include("strategies/supply_driven.jl")
+include("strategies/extended_storage_control.jl")
 
 """
     controller_for_strategy(strategy, parameters)
@@ -328,16 +330,31 @@ Construct the controller for the strategy of the given name using the given para
 """
 function controller_for_strategy(strategy::String, parameters::Dict{String,Any})::Controller
     if lowercase(strategy) == "default"
-        return Controller("default", StateMachine(), Grouping())
+        return Controller("default", parameters, StateMachine(), Grouping())
     end
 
     if !(strategy in keys(OP_STRATS))
         throw(ArgumentError("Unknown strategy $strategy"))
     end
 
+    # check if parameters given in input file for strategy are valid parameters:
+    for key in keys(parameters)
+        if !(key in keys(OP_STRATS[strategy].strategy_parameters)) && !(startswith(key, "_"))
+            throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
+        end
+    end
+
     params = merge(OP_STRATS[strategy].strategy_parameters, parameters)
+
+    # load operation profile if path is given in input file
+    if haskey(params, "operation_profile_path")
+        if params["operation_profile_path"]  !== nothing
+            params["operation_profile"] = Profile(params["operation_profile_path"])
+        end
+    end
+    
     machine = OP_STRATS[strategy].sm_constructor(params)
-    return Controller(strategy, machine, Grouping())
+    return Controller(strategy, params, machine, Grouping())
 end
 
 export Condition, TruthTable, StateMachine, link_control_with, controller_for_strategy

@@ -44,8 +44,29 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::Battery
-)::Tuple{Float64,Float64,Temperature}
-    return interface.balance, -unit.capacity + unit.load, interface.temperature
+)::NamedTuple{}
+
+    caller_is_input = false   # ==true if interface is input of unit (caller puts energy in unit); 
+                              # ==false if interface is output of unit (caller gets energy from unit)
+
+    # check if caller is input or output of unit
+    for (_, input_uac) in pairs(unit.input_interfaces)
+        if input_uac == interface.source.uac
+            caller_is_input = true
+            break
+        end
+        if input_uac.source.uac == interface.source.uac
+            caller_is_input = true
+            break
+        end
+    end
+
+    return (
+            balance = interface.balance,
+            storage_potential = caller_is_input ? -(unit.capacity-unit.load) : unit.load,
+            energy_potential = 0.0,
+            temperature = interface.temperature
+            )
 end
 
 function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
@@ -54,15 +75,27 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     end
 
     outface = unit.output_interfaces[unit.medium]
-    balance, _, _ = balance_on(outface, outface.target)
+    InterfaceInfo = balance_on(outface, outface.target)
 
-    if balance >= 0.0
+    if unit.controller.parameter["name"] == "default"
+        energy_demand = InterfaceInfo.balance
+    elseif unit.controller.parameter["name"] == "extended_storage_control"
+        if unit.controller.parameter["load_any_storage"]
+            energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+        else
+            energy_demand = InterfaceInfo.balance
+        end
+    else
+        energy_demand = InterfaceInfo.balance
+    end
+
+    if energy_demand >= 0.0
         return # produce is only concerned with moving energy to the target
     end
 
-    if unit.load > abs(balance)
-        unit.load += balance
-        add!(outface, abs(balance))
+    if unit.load > abs(energy_demand)
+        unit.load += energy_demand
+        add!(outface, abs(energy_demand))
     else
         add!(outface, unit.load)
         unit.load = 0.0
@@ -75,16 +108,17 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     end
 
     inface = unit.input_interfaces[unit.medium]
-    balance, _, _ = balance_on(inface, inface.source)
+    InterfaceInfo = balance_on(inface, inface.source)
+    energy_available = InterfaceInfo.balance
 
-    if balance <= 0.0
+    if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
     end
 
     diff = unit.capacity - unit.load
-    if diff > balance
-        unit.load += balance
-        sub!(inface, balance)
+    if diff > energy_available
+        unit.load += energy_available
+        sub!(inface, energy_available)
     else
         unit.load = unit.capacity
         sub!(inface, diff)
@@ -97,9 +131,9 @@ end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Load"
         return unit.load
     elseif key.value_key == "Capacity"

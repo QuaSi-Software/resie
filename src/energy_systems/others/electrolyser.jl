@@ -64,60 +64,133 @@ mutable struct Electrolyser <: ControlledSystem
 end
 
 function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
-    max_produce_h = watt_to_wh(unit.power * unit.heat_fraction)
-    max_produce_g = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
-    max_available_e = unit.power
+    # get maximum energy demand and supply of electrolyser, not regarding external bounds:
+    max_produce_heat = watt_to_wh(unit.power * unit.heat_fraction)
+    max_produce_h2 = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
+    max_produce_o2 = 0.5 * max_produce_h2  # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
+    max_consume_el = watt_to_wh(unit.power)
 
-    # heat
-    balance_h, potential_h, _ = balance_on(
-        unit.output_interfaces[unit.m_heat_out],
-        unit.output_interfaces[unit.m_heat_out].target
-    )
-
-    # hydrogen
-    balance_g, potential_g, _ = balance_on(
-        unit.output_interfaces[unit.m_h2_out],
-        unit.output_interfaces[unit.m_h2_out].target
-    )
-
+    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
     # electricity 
-    balance_e, potential_e, _ = balance_on(
-        unit.input_interfaces[unit.m_el_in],
-        unit.input_interfaces[unit.m_el_in].target
-    )
-
-    if balance_h + potential_h >= 0.0
-        return # don't add to a surplus of h2 
+    if unit.controller.parameter["m_el_in"] == true 
+        InterfaceInfo = balance_on(
+            unit.input_interfaces[unit.m_el_in],
+            unit.input_interfaces[unit.m_el_in].source
+        )
+        potential_energy_el = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_el = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
+            return # do nothing if there is no electricity to consume
+        end
+    else # unlimited demand in interface is assumed
+        potential_energy_el = Inf
+        potential_storage_el = Inf
     end
 
-    # --> currently not working as potential of unlimited sinks are not written into interface  @ToDo
-    # if  balance_g + potential_g >= 0.0 
-    #     return # don't add to a surplus of heat
-    # end
+    # hydrogen
+    if unit.controller.parameter["m_h2_out"] == true   
+        InterfaceInfo = balance_on(
+            unit.output_interfaces[unit.m_h2_out],
+            unit.output_interfaces[unit.m_h2_out].target
+        )
+        potential_energy_h2 = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_h2 = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) >= -parameters["epsilon"]
+            return  # don't add to a surplus of hydrogen
+        end
+    else # unlimited demand in interface is assumed
+        potential_energy_h2 = -Inf
+        potential_storage_h2 = -Inf
+    end
 
-    # --> currently not working as potential of unlimited sources are not written into interface @ToDo
-    # if balance_e + potential_e <= 0.0
-    #     return  # no elecricity available
-    # end   
+    # oxygen
+    if unit.controller.parameter["m_o2_out"] == true 
+        InterfaceInfo = balance_on(
+            unit.output_interfaces[unit.m_o2_out],
+            unit.output_interfaces[unit.m_o2_out].target
+        )
+        potential_energy_o2 = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_o2 = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) >= -parameters["epsilon"]
+            return  # don't add to a surplus of oxygen
+        end
+    else # unlimited demand in interface is assumed
+        potential_energy_o2 = -Inf
+        potential_storage_o2 = -Inf
+    end
 
-    # --> currently not working as balances are not calculated correctly for unlimited gas and electricity @ToDo
-    #usage_fraction = min(1.0, abs(balance_h + potential_h) / max_produce_h, abs(balance_g + potential_g) / max_produce_g, abs(balance_e + potential_e) / max_available_e)
-    # for now, use only heat balance and potential:
-    usage_fraction = min(1.0, abs(balance_h + potential_h) / max_produce_h)
+    # heat
+    if unit.controller.parameter["m_heat_out"] == true  
+        InterfaceInfo = balance_on(
+            unit.output_interfaces[unit.m_heat_out],
+            unit.output_interfaces[unit.m_heat_out].target
+        )
+        potential_energy_heat = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) >= 0
+            return  # don't add to a surplus of heat
+        end
+    else # unlimited supply in interface is assumed
+        potential_energy_heat = -Inf
+        potential_storage_heat = -Inf
+    end
 
+    # get usage fraction of external profile (normalized from 0 to 1)
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    if usage_fraction_operation_profile <= 0.0
+        return # no operation allowed from external profile
+    end
+
+    # get usage_factions depending on control strategy
+    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
+
+    elseif unit.controller.strategy == "storage_driven" 
+        return # do not start due to statemachine!
+    
+    elseif unit.controller.strategy == "supply_driven"
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
+
+    elseif unit.controller.strategy == "demand_driven"
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
+
+    else
+        throw(ArgumentError("Error: No valid control strategy chosen for electrolyser. Must be one of storage_driven, supply_driven, demand_driven."))
+    end
+
+    # get smallest usage fraction
+    usage_fraction = min(
+        1.0, 
+        usage_fraction_el,
+        usage_fraction_h2, 
+        usage_fraction_o2,
+        usage_fraction_heat,
+        usage_fraction_operation_profile
+        )
+
+    # exit if usage_fraction is below min_power_fraciton 
     if usage_fraction < unit.min_power_fraction
         return
     end
 
-    # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
-    add!(unit.output_interfaces[unit.m_h2_out], max_produce_g * usage_fraction)
-    add!(unit.output_interfaces[unit.m_o2_out], max_produce_g * usage_fraction * 0.5)
+    # write production and demand in interfaces
+    add!(unit.output_interfaces[unit.m_h2_out], max_produce_h2 * usage_fraction)
+    add!(unit.output_interfaces[unit.m_o2_out], max_produce_o2 * usage_fraction)
     add!(
         unit.output_interfaces[unit.m_heat_out],
-        max_produce_h * usage_fraction,
+        max_produce_heat * usage_fraction,
         unit.output_temperature
     )
-    sub!(unit.input_interfaces[unit.m_el_in], watt_to_wh(unit.power * usage_fraction))
+    sub!(unit.input_interfaces[unit.m_el_in], max_consume_el * usage_fraction)
 
 end
 

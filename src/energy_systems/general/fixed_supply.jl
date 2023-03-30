@@ -60,7 +60,7 @@ end
 
 function output_value(unit::FixedSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Supply"
         return unit.supply
     elseif key.value_key == "Temperature"
@@ -76,6 +76,8 @@ function control(
 )
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
+    
     if unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.output_interfaces[unit.medium].temperature = unit.temperature

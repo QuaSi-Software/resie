@@ -14,6 +14,34 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.5
+* added extended_storage_control strategy for all storages to allow users to decide whether a storage can load ANY other interconnected storage of the system framework or not (default = storages are not allowed to load other storages). This only works if the OoO of produce() and load() is correct which will be implemented in upcoming versions.
+* changed definition in balance_on() of busses: Storages are never allowed to load themselves!
+* adjusted testcases to meet new definition above
+* added testcases to test extended_storage_control
+
+### Version 0.3.4
+* added feature to control transformers from user-given control profile with values within [0,1]. This adds to the already existing limitations in the control strategy of demand_driven, supply_driven and storage_driven strategy.
+* bugfix in index assignement of connectivity matrix to output_interfaces in balance_on() of bus
+* changed calculation of COP of heatpump: If fixed_cop is given in the input file, it will be used and not the temperature-dependend COP. Corrected tests to meet this definition.
+
+### Version 0.3.3
+* bugfix in calculation of IN and OUT energy in output_value() for chases with balance /= 0. 
+
+### Version 0.3.2
+* adapted control strategies for all transformers: All in- and outputs need to be sattisfied by default
+* added optional user-defined input in control strategie of each transformer to ignore certain in- or outputs within control strategy
+* added optional user-defined input in control strategie of each transformer to allow or deny system-wide storage loading or unloading
+* changed max_power to max_energy for all energy systems in outputs and unit structs
+* added max_energy to interfaces and control() of grids, sources and sinks in order to provide information on how many energy is available or can be taken, calculated in balance_on(), to meet new control strategies of transformers
+* adapted balance_on() to also return energy_potential (if sum_abs_change /= 0) that represents the potential maximum energy in- or output at unit (former potential is now named storage_potential, balance_on() returns now a named tuple instead of tuples)
+* added and corrected tests to meet new control strategies and test new functionalities 
+* adapted examples to meet new functionalities
+
+### Version 0.3.1
+* Added tests for demand_driven strategy with and without bus between transformer and demand
+* Adapted default control strategy of gasboiler and heatpump to enable storage-filling
+
 ### Version 0.3.0
 * Implement connectivity matrix on bus systems for controlling which producer can load which storage on the same bus
 * Remove operational strategy "use_surplus_in_cycle" as it is no longer needed with this new feature

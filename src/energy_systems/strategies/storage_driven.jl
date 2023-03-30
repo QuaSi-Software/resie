@@ -71,6 +71,17 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
     strategy_parameters=Dict{String,Any}(
         "low_threshold" => 0.2,
         "high_threshold" => 0.95,
+        "name" => "storage_driven",
+        "load_storages" => true,
+        "unload_storages" => true,
+        "operation_profile_path" => nothing,
+        "m_el_in" => true,
+        "m_el_out" => true,
+        "m_gas_in" => true,
+        "m_h2_out" => true,
+        "m_o2_out" => true,
+        "m_heat_out" => true,
+        "m_heat_in" => true,
     ),
     required_systems=EnSysRequirements()
 )

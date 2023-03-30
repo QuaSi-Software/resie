@@ -65,7 +65,7 @@ end
 
 function output_value(unit::Demand, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Load"
         return unit.load
     elseif key.value_key == "Temperature"
@@ -96,6 +96,9 @@ function control(
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
+
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
+
 end
 
 function produce(unit::Demand, parameters::Dict{String,Any}, watt_to_wh::Function)

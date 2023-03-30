@@ -53,7 +53,7 @@ end
 
 function output_value(unit::PVPlant, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Supply"
         return unit.supply
     end
@@ -67,6 +67,7 @@ function control(
 )
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 
 end
 

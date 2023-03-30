@@ -19,7 +19,7 @@ mutable struct DispatchableSupply <: ControlledSystem
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
 
-    max_power::Float64
+    max_energy::Float64
     temperature::Temperature
 
     function DispatchableSupply(uac::String, config::Dict{String,Any})
@@ -46,21 +46,21 @@ mutable struct DispatchableSupply <: ControlledSystem
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
-            0.0, # max_power
+            0.0, # max_energy
             nothing, # temperature
         )
     end
 end
 
 function output_values(unit::DispatchableSupply)::Vector{String}
-    return ["OUT", "Max_Power", "Temperature"]
+    return ["OUT", "Max_Energy", "Temperature"]
 end
 
 function output_value(unit::DispatchableSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
-    elseif key.value_key == "Max_Power"
-        return unit.max_power
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Max_Energy"
+        return unit.max_energy
     elseif key.value_key == "Temperature"
         return unit.temperature
     end
@@ -73,8 +73,8 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
-    unit.max_power = unit.scaling_factor * Profiles.power_at_time(unit.max_power_profile, parameters["time"])
-    set_max_power!(unit.output_interfaces[unit.medium], unit.max_power)
+    unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
     if unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
         unit.output_interfaces[unit.medium].temperature = unit.temperature
@@ -86,11 +86,11 @@ function produce(unit::DispatchableSupply, parameters::Dict{String,Any}, watt_to
     # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
     # must be handled here instead of being ignored
     # 2. we also ignore the temperature of the interface as the source defines that itself
-    balance, _, _ = balance_on(outface, outface.target)
-    if balance < 0.0
+    InterfaceInfo = balance_on(outface, outface.target)
+    if InterfaceInfo.balance < 0.0
         add!(
             outface,
-            min(abs(balance), watt_to_wh(unit.max_power)),
+            min(abs(InterfaceInfo.balance), unit.max_energy),
             unit.temperature
         )
     end

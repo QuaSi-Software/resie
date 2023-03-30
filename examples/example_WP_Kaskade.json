@@ -88,7 +88,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 40000,
+            "m_heat_out": "m_h_w_lt1"
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",

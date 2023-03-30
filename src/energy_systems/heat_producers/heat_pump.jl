@@ -25,7 +25,7 @@ mutable struct HeatPump <: ControlledSystem
     power::Float64
     min_power_fraction::Float64
     min_run_time::UInt
-    fixed_cop::Float64
+    fixed_cop::Any
     cop::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any})
@@ -53,21 +53,21 @@ mutable struct HeatPump <: ControlledSystem
             config["power"], # power
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
-            default(config, "fixed_cop", 3.0),
+            default(config, "fixed_cop", nothing),
             0.0, # cop
         )
     end
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return ["OUT", "Max_Power", "Temperature"]
+    return ["IN", "OUT", "COP"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"
         return unit.cop
     end
@@ -84,74 +84,141 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
 end
 
 function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
-    in_blnc, _, in_temp = balance_on(
-        unit.input_interfaces[unit.m_heat_in],
-        unit
-    )
-
-    out_blnc, out_pot, out_temp = balance_on(
-        unit.output_interfaces[unit.m_heat_out],
-        unit.output_interfaces[unit.m_heat_out].target
-    )
-
-    cop = dynamic_cop(in_temp, out_temp)
-    unit.cop = cop === nothing ? unit.fixed_cop : cop
-
-    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        max_produce_h = watt_to_wh(unit.power)
-
-        if out_blnc + out_pot >= 0.0
-            return # don't add to a surplus of energy
-        end
-
-        usage_fraction = min(1.0, abs(out_blnc + out_pot) / max_produce_h)
-        if usage_fraction < unit.min_power_fraction
-            return
-        end
-
-        add!(unit.output_interfaces[unit.m_heat_out], max_produce_h * usage_fraction)
-        sub!(unit.input_interfaces[unit.m_el_in], max_produce_h * usage_fraction / unit.cop)
-        sub!(
-            unit.input_interfaces[unit.m_heat_in],
-            max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
+    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
+    # electricity 
+    if unit.controller.parameter["m_el_in"] == true 
+        InterfaceInfo = balance_on(
+            unit.input_interfaces[unit.m_el_in],
+            unit.input_interfaces[unit.m_el_in].source
         )
-
-    elseif unit.controller.strategy == "supply_driven"
-        if in_blnc < parameters["epsilon"]
+        potential_energy_el = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_el = InterfaceInfo.storage_potential
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
+            return # do nothing if there is no electricity to consume
+        end
+    else # unlimited demand in interface is assumed
+        potential_energy_el = Inf
+        potential_storage_el = Inf
+    end
+   
+    # heat in 
+    if unit.controller.parameter["m_heat_in"] == true 
+        InterfaceInfo = balance_on(
+            unit.input_interfaces[unit.m_heat_in],
+            unit.input_interfaces[unit.m_heat_in].source
+        )
+        potential_energy_heat_in = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat_in = InterfaceInfo.storage_potential
+        in_temp = InterfaceInfo.temperature
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) <= parameters["epsilon"]
             return # do nothing if there is no heat to consume
         end
+    else # unlimited demand in interface is assumed
+        potential_energy_heat_in = Inf
+        potential_storage_heat_in = Inf
+    end
 
-        max_consume_h = min(unit.power * (1.0 - 1.0 / unit.cop), in_blnc)
-        consume_e = max_consume_h / (unit.cop - 1.0)
-        produce_h = max_consume_h + consume_e
+    # heat out
+    if unit.controller.parameter["m_heat_out"] == true 
+        InterfaceInfo = balance_on(
+            unit.output_interfaces[unit.m_heat_out],
+            unit.output_interfaces[unit.m_heat_out].target
+        )
+        potential_energy_heat_out = InterfaceInfo.balance + InterfaceInfo.energy_potential
+        potential_storage_heat_out = InterfaceInfo.storage_potential
+        out_temp = InterfaceInfo.temperature
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+            return # don't add to a surplus of heat
+        end
+    else # unlimited demand in interface is assumed
+        potential_energy_heat_out = Inf
+        potential_storage_heat_out = Inf
+    end
+   
+    # check if temperature has already been read from input and output interface
+    if !(@isdefined in_temp)
+        InterfaceInfo = balance_on(
+            unit.input_interfaces[unit.m_heat_in],
+            unit
+        )
+        in_temp = InterfaceInfo.temperature
+    end
 
-        add!(unit.output_interfaces[unit.m_heat_out], produce_h)
-        sub!(unit.input_interfaces[unit.m_heat_in], max_consume_h)
-        sub!(unit.input_interfaces[unit.m_el_in], consume_e)
+    if !(@isdefined out_temp)
+        InterfaceInfo = balance_on(
+            unit.output_interfaces[unit.m_heat_out],
+            unit.output_interfaces[unit.m_heat_out].target
+        )
+        out_temp = InterfaceInfo.temperature
+    end
+
+    # get usage fraction of external profile (normalized from 0 to 1)
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    if usage_fraction_operation_profile <= 0.0
+        return # no operation allowed from external profile
+    end
+
+    # calculate COP
+    # cop = dynamic_cop(in_temp, out_temp)
+    # unit.cop = cop === nothing ? unit.fixed_cop : cop
+    unit.cop = unit.fixed_cop === nothing ? dynamic_cop(in_temp, out_temp) : unit.fixed_cop
+    if unit.cop === nothing
+        throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
+    end
+
+    # maximum possible in and outputs of heat pump, not regarding any external limits!
+    max_produce_heat = watt_to_wh(unit.power)
+    max_consume_heat = max_produce_heat * (1.0 - 1.0 / unit.cop)
+    max_consume_el = max_produce_heat - max_consume_heat
+
+    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
+
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
+
+    elseif unit.controller.strategy == "storage_driven" 
+        return # do not start due to statemachine!
+
+    elseif unit.controller.strategy == "supply_driven"
+
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
 
     elseif unit.controller.strategy == "demand_driven"
-        max_produce_h = watt_to_wh(unit.power)
 
-        if out_blnc >= 0.0
-            return # don't add to a surplus of energy
-        end
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
 
-        usage_fraction = min(1.0, abs(out_blnc) / max_produce_h)
-        if usage_fraction < unit.min_power_fraction
-            return
-        end
-
-        add!(
-            unit.output_interfaces[unit.m_heat_out],
-            max_produce_h * usage_fraction,
-            out_temp
-        )
-        sub!(unit.input_interfaces[unit.m_el_in], max_produce_h * usage_fraction / unit.cop)
-        sub!(
-            unit.input_interfaces[unit.m_heat_in],
-            max_produce_h * usage_fraction * (1.0 - 1.0 / unit.cop)
-        )
     end
+
+    # get smallest usage fraction
+    usage_fraction = min(
+        1.0, 
+        usage_fraction_heat_out,
+        usage_fraction_heat_in, 
+        usage_fraction_el,
+        usage_fraction_operation_profile
+        )
+
+    # exit if usage_fraction is below min_power_fraciton 
+    if usage_fraction < unit.min_power_fraction
+        return
+    end
+
+    # write consumed and produced energy in interfaces
+    add!(
+        unit.output_interfaces[unit.m_heat_out],
+        max_produce_heat * usage_fraction,
+        out_temp
+    )
+    sub!(unit.input_interfaces[unit.m_el_in], max_produce_heat * usage_fraction / unit.cop)
+    sub!(
+        unit.input_interfaces[unit.m_heat_in],
+        max_produce_heat * usage_fraction * (1.0 - 1.0 / unit.cop)
+    )
 end
 
 export HeatPump

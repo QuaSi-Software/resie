@@ -47,22 +47,35 @@ mutable struct GridConnection <: ControlledSystem
     end
 end
 
+function control(
+    unit::GridConnection,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    if unit.sys_function === sf_dispatchable_source
+        set_max_energy!(unit.output_interfaces[unit.medium], Inf)
+    else
+        set_max_energy!(unit.input_interfaces[unit.medium], -Inf)
+    end
+end
+
 function produce(unit::GridConnection, parameters::Dict{String,Any}, watt_to_wh::Function)
     if unit.sys_function === sf_dispatchable_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
         # must be handled here instead of being ignored
-        balance, _, _ = balance_on(outface, outface.target)
-        if balance < 0.0
-            unit.draw_sum += balance
-            add!(outface, abs(balance))
+        InterfaceInfo = balance_on(outface, outface.target)
+        if InterfaceInfo.balance < 0.0
+            unit.draw_sum += InterfaceInfo.balance
+            add!(outface, abs(InterfaceInfo.balance))
         end
     else
         inface = unit.input_interfaces[unit.medium]
-        balance, _, _ = balance_on(inface, inface.source)
-        if balance > 0.0
-            unit.load_sum += balance
-            sub!(inface, balance)
+        InterfaceInfo = balance_on(inface, inface.source)
+        if InterfaceInfo.balance > 0.0
+            unit.load_sum += InterfaceInfo.balance
+            sub!(inface, InterfaceInfo.balance)
         end
     end
 end
@@ -73,9 +86,9 @@ end
 
 function output_value(unit::GridConnection, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return unit.input_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return unit.output_interfaces[key.medium].sum_abs_change * 0.5
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Draw sum"
         return unit.draw_sum
     elseif key.value_key == "Load sum"
