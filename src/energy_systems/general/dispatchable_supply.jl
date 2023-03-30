@@ -86,11 +86,11 @@ function produce(unit::DispatchableSupply, parameters::Dict{String,Any}, watt_to
     # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
     # must be handled here instead of being ignored
     # 2. we also ignore the temperature of the interface as the source defines that itself
-    InterfaceInfo = balance_on(outface, outface.target)
-    if InterfaceInfo.balance < 0.0
+    exchange = balance_on(outface, outface.target)
+    if exchange.balance < 0.0
         add!(
             outface,
-            min(abs(InterfaceInfo.balance), unit.max_energy),
+            min(abs(exchange.balance), unit.max_energy),
             unit.temperature
         )
     end

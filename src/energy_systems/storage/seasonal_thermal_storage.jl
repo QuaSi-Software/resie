@@ -91,19 +91,19 @@ end
 
 function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
     outface = unit.output_interfaces[unit.m_heat_out]
-    InterfaceInfo = balance_on(outface, outface.target)
-    demand_temp = InterfaceInfo.temperature
+    exchange = balance_on(outface, outface.target)
+    demand_temp = exchange.temperature
 
     if unit.controller.parameter["name"] == "default"
-        energy_demand = InterfaceInfo.balance
+        energy_demand = exchange.balance
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
-            energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+            energy_demand = exchange.balance + exchange.storage_potential
         else
-            energy_demand = InterfaceInfo.balance
+            energy_demand = exchange.balance
         end
     else
-        energy_demand = InterfaceInfo.balance
+        energy_demand = exchange.balance
     end
 
     if energy_demand >= 0.0
@@ -127,9 +127,9 @@ end
 
 function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.m_heat_in]
-    InterfaceInfo = balance_on(inface, inface.source)
-    supply_temp = InterfaceInfo.temperature
-    energy_available = InterfaceInfo.balance
+    exchange = balance_on(inface, inface.source)
+    supply_temp = exchange.temperature
+    energy_available = exchange.balance
 
     if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target

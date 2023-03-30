@@ -70,11 +70,11 @@ end
 
 function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.medium]
-    InterfaceInfo = balance_on(inface, inface.source)
-    if InterfaceInfo.balance > 0.0
+    exchange = balance_on(inface, inface.source)
+    if exchange.balance > 0.0
         sub!(
             inface,
-            min(abs(InterfaceInfo.balance), unit.max_energy)
+            min(abs(exchange.balance), unit.max_energy)
         )
     end
 end

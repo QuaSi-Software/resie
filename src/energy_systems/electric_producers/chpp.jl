@@ -71,12 +71,12 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
     # Gas input 
     if unit.controller.parameter["m_gas_in"] == true 
-        InterfaceInfo = balance_on(
+        exchange = balance_on(
             unit.input_interfaces[unit.m_gas_in],
             unit.input_interfaces[unit.m_gas_in].source
         )
-        potential_energy_gas_in = InterfaceInfo.balance + InterfaceInfo.energy_potential
-        potential_storage_gas_in = InterfaceInfo.storage_potential
+        potential_energy_gas_in = exchange.balance + exchange.energy_potential
+        potential_storage_gas_in = exchange.storage_potential
         if (unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) <= parameters["epsilon"]
             return # do nothing if there is no gas to consume
         end
@@ -87,12 +87,12 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
    
     # electricity output 
     if unit.controller.parameter["m_el_out"] == true 
-        InterfaceInfo = balance_on(
+        exchange = balance_on(
             unit.output_interfaces[unit.m_el_out],
             unit.output_interfaces[unit.m_el_out].target
         )
-        potential_energy_el_out = InterfaceInfo.balance + InterfaceInfo.energy_potential
-        potential_storage_el_out = InterfaceInfo.storage_potential
+        potential_energy_el_out = exchange.balance + exchange.energy_potential
+        potential_storage_el_out = exchange.storage_potential
         if (unit.controller.parameter["load_storages"] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) >= -parameters["epsilon"]
             return # don't add to a surplus of electricity
         end
@@ -103,12 +103,12 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
 
     # heat output
     if unit.controller.parameter["m_heat_out"] == true 
-        InterfaceInfo = balance_on(
+        exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = InterfaceInfo.balance + InterfaceInfo.energy_potential
-        potential_storage_heat_out = InterfaceInfo.storage_potential
+        potential_energy_heat_out = exchange.balance + exchange.energy_potential
+        potential_storage_heat_out = exchange.storage_potential
         if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
             return # don't add to a surplus of heat
         end

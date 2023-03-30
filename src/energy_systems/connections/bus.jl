@@ -108,8 +108,8 @@ function balance_nr(unit::Bus, caller::Bus)::Float64
         end
 
         if isa(inface.source, Bus)  
-            InterfaceInfo = balance_nr(inface.source, unit)
-            balance_supply = max(InterfaceInfo, inface.balance)
+            exchange = balance_nr(inface.source, unit)
+            balance_supply = max(exchange, inface.balance)
             if balance_supply < 0.0
                 continue
             end
@@ -125,8 +125,8 @@ function balance_nr(unit::Bus, caller::Bus)::Float64
         end
 
         if isa(outface.target, Bus)
-            InterfaceInfo = balance_nr(outface.target, unit)
-            balance_demand = min(InterfaceInfo, outface.balance)
+            exchange = balance_nr(outface.target, unit)
+            balance_demand = min(exchange, outface.balance)
             if balance_demand > 0.0
                 continue
             end
@@ -213,11 +213,11 @@ function balance_on(
     # iterate through outfaces to get storage loading potential
     for (idx, outface) in pairs(unit.output_interfaces)
         if outface.target.sys_function === sf_bus
-            InterfaceInfo = balance_on(outface, outface.target)
-            balance = InterfaceInfo.balance
-            storage_potential = InterfaceInfo.storage_potential
-            energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : InterfaceInfo.energy_potential
-            temperature = InterfaceInfo.temperature
+            exchange = balance_on(outface, outface.target)
+            balance = exchange.balance
+            storage_potential = exchange.storage_potential
+            energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
+            temperature = exchange.temperature
         else
             balance = outface.balance
             temperature = outface.temperature
@@ -233,8 +233,8 @@ function balance_on(
                     || unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
                 )
             )
-                InterfaceInfo = balance_on(outface, outface.target)
-                storage_potential = InterfaceInfo.storage_potential
+                exchange = balance_on(outface, outface.target)
+                storage_potential = exchange.storage_potential
             else
                 storage_potential = 0.0
             end
@@ -253,8 +253,8 @@ function balance_on(
     if caller_is_input == false && interface.sum_abs_change == 0.0 # also need to check inputs of unit in order to sum up potential_energy_inputs, but only if necessary
         for (idx, inface) in pairs(unit.input_interfaces)
             if inface.source.sys_function === sf_bus
-                InterfaceInfo = balance_on(inface, inface.source)
-                energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : InterfaceInfo.energy_potential
+                exchange = balance_on(inface, inface.source)
+                energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
             else
                 energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
             end
