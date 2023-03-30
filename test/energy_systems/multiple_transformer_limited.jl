@@ -84,6 +84,7 @@ function test_multiple_transformer_with_limitations()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9,
     )
 
     for unit in values(systems)
