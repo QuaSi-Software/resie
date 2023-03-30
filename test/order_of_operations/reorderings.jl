@@ -294,7 +294,7 @@ function test_find_storages_ordered()
         systems["TST_BFT_01"],
         systems["TST_BFT_03"],
     ]
-    result = Resie.find_storages_ordered(systems["TST_BUS_01"], systems)
+    result, limits = Resie.find_storages_ordered(systems["TST_BUS_01"], systems, nothing)
     @test pwc_units_astr(expected, result) == ""
 
     expected = [
@@ -302,7 +302,7 @@ function test_find_storages_ordered()
         systems["TST_BFT_01"],
         systems["TST_BFT_02"],
     ]
-    result = Resie.find_storages_ordered(systems["TST_BUS_01"], systems, reverse=true)
+    result, limits = Resie.find_storages_ordered(systems["TST_BUS_01"], systems, nothing, reverse=true)
     @test pwc_units_astr(expected, result) == ""
 end
 
