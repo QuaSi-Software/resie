@@ -562,7 +562,7 @@ function get_storage_loading_entry(bus, storage, source)
 end
 
 """
-    find_storages_ordered(bus, systems)
+    find_storages_ordered(bus, systems, source)
 
 Finds storage systems in the given bus and all successor busses ordered by the output priorities.
 
