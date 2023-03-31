@@ -214,10 +214,10 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         max_produce_heat * usage_fraction,
         out_temp
     )
-    sub!(unit.input_interfaces[unit.m_el_in], max_produce_heat * usage_fraction / unit.cop)
+    sub!(unit.input_interfaces[unit.m_el_in], max_consume_el * usage_fraction)
     sub!(
         unit.input_interfaces[unit.m_heat_in],
-        max_produce_heat * usage_fraction * (1.0 - 1.0 / unit.cop)
+        max_consume_heat * usage_fraction
     )
 end
 
