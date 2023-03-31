@@ -519,32 +519,85 @@ function reorder_distribution_of_busses(simulation_order, systems, systems_by_fu
     end
 end
 
+
 """
-    find_storages_ordered(bus, systems)
+    get_storage_loading_entry(bus, storage)
+
+checks if the storage has a limitation in the bus' storage_loading matrix coming from source and
+returns true (1 in storage_loading matrix) if not and false (0) if a limitation is present.
+
+# Arguments
+-`bus::EnergySystem`: The bus that is in the middle of source and storage
+-`storage::EnergySystem`: The storage connected to the bus
+-`source::EnergySystem`: The source of the bus from where the search has startet. 
+                         Can be nothing, then true will be returned.
+"""
+function get_storage_loading_entry(bus, storage, source)
+    storage_loading_matrix = bus.connectivity.storage_loading
+    if storage_loading_matrix === nothing || source === nothing
+        return true   # if no storage loading matrix is given, storage loading is assumed to be allowed
+    else
+        output_uac = storage.uac
+        connectivity_output_idx = []
+        for (idx,connectivity_output_uac) in pairs(bus.connectivity.output_order)
+            if connectivity_output_uac == output_uac
+                connectivity_output_idx = idx
+            end
+        end
+
+        input_uac = source.uac
+        connectivity_input_idx = []
+        for (idx,connectivity_input_uac) in pairs(bus.connectivity.input_order)
+            if connectivity_input_uac == input_uac
+                connectivity_input_idx = idx
+            end
+        end
+
+        if storage_loading_matrix[connectivity_input_idx][connectivity_output_idx] == 1
+            return true
+        else
+            return false
+        end        
+    end
+end
+
+"""
+    find_storages_ordered(bus, systems, source)
 
 Finds storage systems in the given bus and all successor busses ordered by the output priorities.
 
 # Arguments
 -`bus::EnergySystem`: The bus from which to start the search
 -`systems::Grouping`: All energy systems in the system topology
+-`source::EnergySystem`: The source from which bus was reached out. Can be nothing if bus is first bus.
 -`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
 """
-function find_storages_ordered(bus, systems; reverse=false)
+function find_storages_ordered(bus, systems, source; reverse=false)
     storages = []
+    limited = []
     pushing = reverse ? pushfirst! : push!
 
     for unit_uac in bus.connectivity.output_order
         unit = systems[unit_uac]
         if unit.sys_function == EnergySystems.sf_storage
             pushing(storages, unit)
+            if get_storage_loading_entry(bus, unit, source)
+                pushing(limited, true)
+            else
+                pushing(limited, false)
+            end
         elseif unit.sys_function == EnergySystems.sf_bus
-            for storage in find_storages_ordered(unit, systems)
+            storages_returned, limits = find_storages_ordered(unit, systems, bus)
+            for storage in storages_returned
                 pushing(storages, storage)
+            end
+            for limit in limits
+                pushing(limited, limit)
             end
         end
     end
 
-    return storages
+    return storages, limited
 end
 
 """
@@ -556,25 +609,54 @@ busses, including communication across connected busses.
 function reorder_storage_loading(simulation_order, systems, systems_by_function)
     for bus_chain in find_chains(systems_by_function[3], EnergySystems.sf_bus)
         for bus in iterate_chain(bus_chain, EnergySystems.sf_bus)
-            storages = find_storages_ordered(bus, systems, reverse=true)
+            storages, limitations = find_storages_ordered(bus, systems, nothing, reverse=true)
             if length(storages) < 2
                 continue
             end
 
             # by continuosly placing lower than the last element, which has highest priority
             # due to the reverse ordering, the correct order is preserved
-            last_element = last(storages)
-            for idx in 1:length(storages)-1
-                place_one_lower!(
-                    simulation_order,
-                    (last_element.uac, EnergySystems.s_produce),
-                    (storages[idx].uac, EnergySystems.s_produce)
-                )
-                place_one_lower!(
-                    simulation_order,
-                    (last_element.uac, EnergySystems.s_load),
-                    (storages[idx].uac, EnergySystems.s_load)
-                )
+            for last_index in 1:length(storages)
+                last_element = storages[length(storages)+1-last_index]
+                for idx in 1:(length(storages)-last_index)
+                    place_one_lower!(
+                        simulation_order,
+                        (last_element.uac, EnergySystems.s_produce),
+                        (storages[idx].uac, EnergySystems.s_produce)
+                    )
+                    place_one_lower!(
+                        simulation_order,
+                        (last_element.uac, EnergySystems.s_load),
+                        (storages[idx].uac, EnergySystems.s_load)
+                    )
+                end
+            end
+
+            # sort storages into two list (storages with limited and unlimited loading)
+            unimited_storages = []
+            limited_storages = []
+            for (idx, storage) in pairs(storages)
+                if limitations[idx]
+                    push!(unimited_storages, storage)
+                else
+                    push!(limited_storages, storage)
+                end
+            end 
+
+            # make sure all limited storages are placed behind the unlimited ones
+            for limited_storage in limited_storages
+                for unimited_storage in unimited_storages
+                    place_one_lower!(
+                        simulation_order,
+                        (unimited_storage.uac, EnergySystems.s_produce),
+                        (limited_storage.uac, EnergySystems.s_produce)
+                    )
+                    place_one_lower!(
+                        simulation_order,
+                        (unimited_storage.uac, EnergySystems.s_load),
+                        (limited_storage.uac, EnergySystems.s_load)
+                    )
+                end
             end
         end
     end
