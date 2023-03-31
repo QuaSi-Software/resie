@@ -54,7 +54,6 @@ function test_ooo_for_heat_pumps_wrong()
         ("TST_SRC_01", EnergySystems.s_control),
         ("TST_GRI_01", EnergySystems.s_control),
         ("TST_DEM_01", EnergySystems.s_produce),
-        ("TST_HP_01", EnergySystems.s_potential),
         ("TST_HP_01", EnergySystems.s_produce),
         ("TST_SRC_01", EnergySystems.s_produce),
         ("TST_GRI_01", EnergySystems.s_produce),
