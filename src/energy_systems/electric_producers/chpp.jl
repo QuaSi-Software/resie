@@ -104,7 +104,7 @@ function check_el_out(
             )
             potential_energy_el = exchange.balance + exchange.energy_potential
             potential_storage_el = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) >= -parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el, potential_storage_el)
