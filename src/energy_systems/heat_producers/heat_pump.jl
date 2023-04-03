@@ -164,6 +164,7 @@ function calculate_energies(
     unit::HeatPump,
     parameters::Dict{String,Any},
     watt_to_wh::Function,
+    temperatures::Tuple{Temperature, Temperature},
     potentials::Vector{Float64}
 )
     potential_energy_el = potentials[1]
@@ -179,10 +180,8 @@ function calculate_energies(
         return (false, nothing, nothing, nothing)
     end
 
-    # calculate COP
-    # cop = dynamic_cop(in_temp, out_temp)
-    # unit.cop = cop === nothing ? unit.fixed_cop : cop
-    unit.cop = unit.fixed_cop === nothing ? dynamic_cop(in_temp, out_temp) : unit.fixed_cop
+    # a fixed COP has priority. if it's not given the dynamic cop requires temperatures
+    unit.cop = unit.fixed_cop === nothing ? dynamic_cop(temperatures[1], temperatures[2]) : unit.fixed_cop
     if unit.cop === nothing
         throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
     end
@@ -283,6 +282,7 @@ function potential(
 
     energies = calculate_energies(
         unit, parameters, watt_to_wh,
+        (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,
             potential_energy_heat_in, potential_storage_heat_in,
@@ -337,6 +337,7 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
 
     energies = calculate_energies(
         unit, parameters, watt_to_wh,
+        (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,
             potential_energy_heat_in, potential_storage_heat_in,
