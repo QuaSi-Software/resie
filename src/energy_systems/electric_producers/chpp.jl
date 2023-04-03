@@ -81,7 +81,7 @@ function check_gas_in(
             end
             return (potential_energy_gas, potential_storage_gas, exchange.temperature)
         end
-    else # unlimited demand in interface is assumed
+    else
         return (Inf, Inf)
     end
 end
@@ -91,25 +91,17 @@ function check_el_out(
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_el_out"] == true
-        if (
-            unit.output_interfaces[unit.m_el_out].source.sys_function == sf_transformer
-            &&
-            unit.output_interfaces[unit.m_el_out].max_energy === nothing
+        exchange = balance_on(
+            unit.output_interfaces[unit.m_el_out],
+            unit.output_interfaces[unit.m_el_out].target
         )
-            return (Inf, Inf)
-        else
-            exchange = balance_on(
-                unit.output_interfaces[unit.m_el_out],
-                unit.output_interfaces[unit.m_el_out].target
-            )
-            potential_energy_el = exchange.balance + exchange.energy_potential
-            potential_storage_el = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) >= -parameters["epsilon"]
-                return (nothing, nothing)
-            end
-            return (potential_energy_el, potential_storage_el)
+        potential_energy_el = exchange.balance + exchange.energy_potential
+        potential_storage_el = exchange.storage_potential
+        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) >= -parameters["epsilon"]
+            return (nothing, nothing)
         end
-    else # unlimited demand in interface is assumed
+        return (potential_energy_el, potential_storage_el)
+    else
         return (Inf, Inf)
     end
 end
@@ -118,7 +110,6 @@ function check_heat_out(
     unit::CHPP,
     parameters::Dict{String,Any}
 )
-    # heat out
     if unit.controller.parameter["m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
@@ -127,11 +118,11 @@ function check_heat_out(
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         potential_storage_heat_out = exchange.storage_potential
         if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
-            return (nothing, nothing, exchange.temperature)
+            return (nothing, nothing)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
-    else # unlimited demand in interface is assumed
-        return (Inf, Inf, nothing)
+        return (potential_energy_heat_out, potential_storage_heat_out)
+    else
+        return (Inf, Inf)
     end
 end
 
@@ -277,7 +268,7 @@ function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
 
     if energies[1]
         sub!(unit.input_interfaces[unit.m_gas_in], energies[2])
-        add!(unit.input_interfaces[unit.m_el_out], energies[3])
+        add!(unit.output_interfaces[unit.m_el_out], energies[3])
         add!(unit.output_interfaces[unit.m_heat_out], energies[4])
     end
 end
