@@ -87,8 +87,6 @@ function check_el_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
-    # electricity 
     if unit.controller.parameter["m_el_in"] == true
         if (
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
@@ -108,7 +106,7 @@ function check_el_in(
             end
             return (potential_energy_el, potential_storage_el)
         end
-    else # unlimited demand in interface is assumed
+    else
         return (Inf, Inf)
     end
 end
@@ -117,7 +115,6 @@ function check_heat_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    # heat in 
     if unit.controller.parameter["m_heat_in"] == true
         if (
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
@@ -137,7 +134,7 @@ function check_heat_in(
             end
             return (potential_energy_heat_in, potential_storage_heat_in, exchange.temperature)
         end
-    else # unlimited demand in interface is assumed
+    else
         return (Inf, Inf, nothing)
     end
 
@@ -147,7 +144,6 @@ function check_heat_out(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    # heat out
     if unit.controller.parameter["m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
@@ -159,7 +155,7 @@ function check_heat_out(
             return (nothing, nothing, exchange.temperature)
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
-    else # unlimited demand in interface is assumed
+    else
         return (Inf, Inf, nothing)
     end
 end
@@ -196,8 +192,9 @@ function calculate_energies(
     max_consume_heat = max_produce_heat * (1.0 - 1.0 / unit.cop)
     max_consume_el = max_produce_heat - max_consume_heat
 
+    # all three standard operating strategies behave the same, but it is better to be
+    # explicit about the behaviour rather than grouping all together
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
@@ -206,20 +203,17 @@ function calculate_energies(
         return (false, nothing, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
 
     elseif unit.controller.strategy == "demand_driven"
-
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
         usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
         usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
-
     end
 
-    # get smallest usage fraction
+    # limit actual usage by limits of inputs, outputs and profile
     usage_fraction = min(
         1.0,
         usage_fraction_heat_out,
@@ -228,7 +222,6 @@ function calculate_energies(
         usage_fraction_operation_profile
     )
 
-    # exit if usage_fraction is below min_power_fraciton 
     if usage_fraction < unit.min_power_fraction
         return (false, nothing, nothing, nothing)
     end
@@ -246,8 +239,6 @@ function potential(
     parameters::Dict{String,Any},
     watt_to_wh::Function
 )
-    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
-    # electricity 
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
@@ -256,7 +247,6 @@ function potential(
         return
     end
 
-    # heat in 
     potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
         set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
@@ -265,7 +255,6 @@ function potential(
         return
     end
 
-    # heat out
     potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
@@ -274,7 +263,8 @@ function potential(
         return
     end
 
-    # check if temperature has already been read from input and output interface
+    # check if temperature has already been read from input and output interface, if not
+    # check by balance_on
     if in_temp === nothing
         exchange = balance_on(
             unit.input_interfaces[unit.m_heat_in],
@@ -312,38 +302,24 @@ function potential(
 end
 
 function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
-    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
-    # electricity 
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
         return
     end
 
-    # heat in
     potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
         return
     end
 
-    # heat out
-    if unit.controller.parameter["m_heat_out"] == true
-        exchange = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        potential_energy_heat_out = exchange.balance + exchange.energy_potential
-        potential_storage_heat_out = exchange.storage_potential
-        out_temp = exchange.temperature
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
-            return # don't add to a surplus of heat
-        end
-    else # unlimited demand in interface is assumed
-        potential_energy_heat_out = Inf
-        potential_storage_heat_out = Inf
+    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
+    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        return
     end
 
-    # check if temperature has already been read from input and output interface
-    if !(@isdefined in_temp)
+    # check if temperature has already been read from input and output interface, if not
+    # check by balance_on
+    if in_temp === nothing
         exchange = balance_on(
             unit.input_interfaces[unit.m_heat_in],
             unit
@@ -351,7 +327,7 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
         in_temp = exchange.temperature
     end
 
-    if !(@isdefined out_temp)
+    if out_temp === nothing
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
