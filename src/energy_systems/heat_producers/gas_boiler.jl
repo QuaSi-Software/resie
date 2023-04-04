@@ -46,72 +46,173 @@ mutable struct GasBoiler <: ControlledSystem
     end
 end
 
-function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Function)
-    strategy = unit.controller.strategy
-    if strategy == "storage_driven" && unit.controller.state_machine.state != 2
-        return
-    end
-    
-    max_produce_heat = watt_to_wh(unit.power)
-    max_consume_gas = max_produce_heat 
+function set_max_energies!(unit::GasBoiler, gas_in::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+end
 
-    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
-    # Gas input 
-    if unit.controller.parameter["m_gas_in"] == true 
-        InterfaceInfo = balance_on(
-            unit.input_interfaces[unit.m_gas_in],
-            unit.input_interfaces[unit.m_gas_in].source
+function check_gas_in(
+    unit::GasBoiler,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_gas_in"] == true
+        if (
+            unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
+            &&
+            unit.input_interfaces[unit.m_gas_in].max_energy === nothing
         )
-        potential_energy_gas_in = InterfaceInfo.balance + InterfaceInfo.energy_potential
-        potential_storage_gas_in = InterfaceInfo.storage_potential
-        if (unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) <= parameters["epsilon"]
-            return # do nothing if there is no gas to consume
+            return (Inf, Inf)
+        else
+            exchange = balance_on(
+                unit.input_interfaces[unit.m_gas_in],
+                unit.input_interfaces[unit.m_gas_in].source
+            )
+            potential_energy_gas = exchange.balance + exchange.energy_potential
+            potential_storage_gas = exchange.storage_potential
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_gas + potential_storage_gas : potential_energy_gas) <= parameters["epsilon"]
+                return (nothing, nothing)
+            end
+            return (potential_energy_gas, potential_storage_gas, exchange.temperature)
         end
-    else # unlimited demand in interface is assumed
-        potential_energy_gas_in = -Inf
-        potential_storage_gas_in = -Inf
+    else
+        return (Inf, Inf)
     end
+end
 
-    # heat output
-    if unit.controller.parameter["m_heat_out"] == true 
-        InterfaceInfo = balance_on(
+function check_heat_out(
+    unit::GasBoiler,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_heat_out"] == true
+        exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = InterfaceInfo.balance + InterfaceInfo.energy_potential
-        potential_storage_heat_out = InterfaceInfo.storage_potential
+        potential_energy_heat_out = exchange.balance + exchange.energy_potential
+        potential_storage_heat_out = exchange.storage_potential
         if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
-            return # don't add to a surplus of heat
+            return (nothing, nothing)
         end
-    else # unlimited demand in interface is assumed
-        potential_energy_heat_out = Inf
-        potential_storage_heat_out = Inf
+        return (potential_energy_heat_out, potential_storage_heat_out)
+    else
+        return (-Inf, -Inf)
     end
-   
+end
+
+function calculate_energies(
+    unit::GasBoiler,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function,
+    potentials::Vector{Float64}
+)
+    potential_energy_gas_in = potentials[1]
+    potential_storage_gas_in = potentials[2]
+    potential_energy_heat_out = potentials[3]
+    potential_storage_heat_out = potentials[4]
+
+    max_produce_heat = watt_to_wh(unit.power)
+    max_consume_gas = max_produce_heat 
+
     # get usage fraction of external profile (normalized from 0 to 1)
     usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
     if usage_fraction_operation_profile <= 0.0
         return # no operation allowed from external profile
     end
-    
-    # calculate usage fractions
-    usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-    usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
 
-    # get smallest usage fraction
+    # all three standard operating strategies behave the same, but it is better to be
+    # explicit about the behaviour rather than grouping all together
+    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+
+    elseif unit.controller.strategy == "storage_driven"
+        return (false, nothing, nothing, nothing)
+
+    elseif unit.controller.strategy == "supply_driven"
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+
+    elseif unit.controller.strategy == "demand_driven"
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+    end
+
+    # limit actual usage by limits of inputs, outputs and profile
     usage_fraction = min(
-        1.0, 
+        1.0,
         usage_fraction_heat_out,
         usage_fraction_gas_in,
         usage_fraction_operation_profile
-        )
+    )
 
     if usage_fraction < unit.min_power_fraction
+        return (false, nothing, nothing)
+    end
+
+    return (
+        true,
+        max_consume_gas * usage_fraction,
+        max_produce_heat * usage_fraction
+    )
+end
+
+function potential(
+    unit::GasBoiler,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function
+)
+    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
+    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+        set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
-    add!(unit.output_interfaces[unit.m_heat_out], max_produce_heat * usage_fraction)
-    sub!(unit.input_interfaces[unit.m_gas_in], max_consume_gas * usage_fraction)
+    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0)
+        return
+    end
+
+    energies = calculate_energies(
+        unit, parameters, watt_to_wh,
+        [
+            potential_energy_gas_in, potential_storage_gas_in,
+            potential_energy_heat_out, potential_storage_heat_out
+        ]
+    )
+
+    if !energies[1]
+        set_max_energies!(unit, 0.0, 0.0)
+    else
+        set_max_energies!(unit, energies[2], energies[3])
+    end
+end
+
+function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Function)
+    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
+    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+        set_max_energies!(unit, 0.0, 0.0)
+        return
+    end
+
+    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0)
+        return
+    end
+
+    energies = calculate_energies(
+        unit, parameters, watt_to_wh,
+        [
+            potential_energy_gas_in, potential_storage_gas_in,
+            potential_energy_heat_out, potential_storage_heat_out
+        ]
+    )
+
+    if energies[1]
+        sub!(unit.input_interfaces[unit.m_gas_in], energies[2])
+        add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+    end
 end
 
 export GasBoiler

@@ -478,19 +478,19 @@ function test_busses_communicate_storage_potential()
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
-    InterfaceInfo = EnergySystems.balance_on(
+    exchange = EnergySystems.balance_on(
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
-    @test InterfaceInfo.balance == -75.0
-    @test InterfaceInfo.storage_potential == 0.0
-    @test InterfaceInfo.temperature == 55.0
+    @test exchange.balance == -75.0
+    @test exchange.storage_potential == 0.0
+    @test exchange.temperature == 55.0
 
-    InterfaceInfo = EnergySystems.balance_on(
+    exchange = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
-    @test InterfaceInfo.balance == -75.0
-    @test InterfaceInfo.storage_potential == -10000.0
-    @test InterfaceInfo.temperature == 55.0
+    @test exchange.balance == -75.0
+    @test exchange.storage_potential == -10000.0
+    @test exchange.temperature == 55.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(tank_2, simulation_parameters, watt_to_wh)
@@ -509,19 +509,19 @@ function test_busses_communicate_storage_potential()
     # because a balance of 0 is not considered a demand and is not considered for "the
     # highest demand temperature on the bus". this behaviour is not wrong, but unintuitive
 
-    InterfaceInfo = EnergySystems.balance_on(
+    exchange = EnergySystems.balance_on(
         tank_2.output_interfaces[tank_2.medium], bus_2
     )
-    @test InterfaceInfo.balance == 0.0
-    @test InterfaceInfo.storage_potential == 0.0
-    @test InterfaceInfo.temperature === nothing
+    @test exchange.balance == 0.0
+    @test exchange.storage_potential == 0.0
+    @test exchange.temperature === nothing
 
-    InterfaceInfo = EnergySystems.balance_on(
+    exchange = EnergySystems.balance_on(
         tank_1.output_interfaces[tank_1.medium], bus_1
     )
-    @test InterfaceInfo.balance == 0.0
-    @test InterfaceInfo.storage_potential == -10075.0
-    @test InterfaceInfo.temperature === nothing
+    @test exchange.balance == 0.0
+    @test exchange.storage_potential == -10075.0
+    @test exchange.temperature === nothing
 end
 
 @testset "busses_communicate_storage_potential" begin

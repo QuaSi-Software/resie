@@ -14,6 +14,13 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.8
+* Fix issue with the signs of field max_energy being set for interfaces by energy systems. It is now always positive and method balance_on returns the energy potential with the correct sign depending on whether the caller is input or output in respect to the interface.
+* Rework the implementations of energy systems GasBoiler, HeatPump and CHPP to use the new simulation step potential so that their potential and production calculations work correctly for any chain of transformers
+* Minor readability improvements
+* Remove potential calculations for transformer chains of length 1, as these calculations are superfluous by definition
+* Remove reordering of order of operations for control dependencies, as these reorderings have become superfluous with the other reorderings covering the same cases
+
 ### Version 0.3.7
 * adapted OoO for storages according the following rules:
   1. produce() and load() from leaves to trunk

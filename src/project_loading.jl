@@ -133,9 +133,11 @@ function base_order(systems_by_function)
     # place steps potential and produce for transformers in order by "chains"
     chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
-        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
-            initial_nr -= 1
+        if length(chain) > 1
+            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                initial_nr -= 1
+            end
         end
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
@@ -344,7 +346,6 @@ function order_of_operations(systems::Grouping)::StepInstructions
     reorder_for_input_priorities(simulation_order, systems, systems_by_function)
     reorder_distribution_of_busses(simulation_order, systems, systems_by_function)
     reorder_storage_loading(simulation_order, systems, systems_by_function)
-    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
 
     fn_first = function (entry)
         return entry[1]
@@ -658,43 +659,6 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                     )
                 end
             end
-        end
-    end
-end
-
-"""
-    reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
-
-Reorder systems such that all of their control dependencies have their control and
-produce steps happen before the unit itself. Storage systems are excepted.
-"""
-function reorder_for_control_dependencies(simulation_order, systems, systems_by_function)
-    # for every energy system unit...
-    for unit in values(systems)
-        # ...make sure every system linked by its controller...
-        for other_uac in keys(unit.controller.linked_systems)
-            other_unit = systems[other_uac]
-            # ...excepting storages...
-            if other_unit.sys_function == EnergySystems.sf_storage
-                continue
-            end
-
-            # ...has a higher priority in control, potential and produce
-            place_one_higher!(
-                simulation_order,
-                (unit.uac, EnergySystems.s_control),
-                (other_uac, EnergySystems.s_control)
-            )
-            place_one_higher!(
-                simulation_order,
-                (unit.uac, EnergySystems.s_potential),
-                (other_uac, EnergySystems.s_potential)
-            )
-            place_one_higher!(
-                simulation_order,
-                (unit.uac, EnergySystems.s_produce),
-                (other_uac, EnergySystems.s_produce)
-            )
         end
     end
 end

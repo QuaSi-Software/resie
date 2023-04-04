@@ -75,18 +75,18 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     end
 
     outface = unit.output_interfaces[unit.medium]
-    InterfaceInfo = balance_on(outface, outface.target)
+    exchange = balance_on(outface, outface.target)
 
     if unit.controller.parameter["name"] == "default"
-        energy_demand = InterfaceInfo.balance
+        energy_demand = exchange.balance
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
-            energy_demand = InterfaceInfo.balance + InterfaceInfo.storage_potential
+            energy_demand = exchange.balance + exchange.storage_potential
         else
-            energy_demand = InterfaceInfo.balance
+            energy_demand = exchange.balance
         end
     else
-        energy_demand = InterfaceInfo.balance
+        energy_demand = exchange.balance
     end
 
     if energy_demand >= 0.0
@@ -108,8 +108,8 @@ function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
     end
 
     inface = unit.input_interfaces[unit.medium]
-    InterfaceInfo = balance_on(inface, inface.source)
-    energy_available = InterfaceInfo.balance
+    exchange = balance_on(inface, inface.source)
+    energy_available = exchange.balance
 
     if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
