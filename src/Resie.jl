@@ -30,7 +30,13 @@ nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
     systems = load_systems(project_config["energy_systems"])
-    step_order = order_of_operations(systems)
+
+    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
+        step_order = load_order_of_operations(project_config["order_of_operation"], systems)
+        println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
+    else
+        step_order = calculate_order_of_operations(systems)
+    end
 
     time_step = 900
     if "time_step_seconds" in keys(project_config["simulation_parameters"])
@@ -132,6 +138,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     # preallocate for speed: Matrix with data of interfaces in every timestep
     output_all_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
 
+    # export order or operatin (OoO)
     if project_config["io_settings"]["dump_info"]
         dump_info(
             project_config["io_settings"]["dump_info_file"],
