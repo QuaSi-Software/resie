@@ -270,11 +270,11 @@ function balance_on(
     #       If an energy system connected to the interface of balane_on() has already been produces, the 
     #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
     #       calling energy system to avoid double counting.
-    
+    balance_written = interface.sum_abs_change > 0.0
     return (
             balance = balance(unit),
             storage_potential = caller_is_input ? storage_potential_outputs : 0.0,
-            energy_potential = interface.sum_abs_change > 0.0 ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
+            energy_potential = balance_written ? 0.0 : (caller_is_input ? -abs(energy_potential_outputs) : abs(energy_potential_inputs)),
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )
 end

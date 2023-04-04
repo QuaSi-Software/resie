@@ -58,6 +58,12 @@ mutable struct CHPP <: ControlledSystem
     end
 end
 
+function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
+    set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+end
+
 function check_gas_in(
     unit::CHPP,
     parameters::Dict{String,Any}
@@ -102,7 +108,7 @@ function check_el_out(
         end
         return (potential_energy_el, potential_storage_el)
     else
-        return (Inf, Inf)
+        return (-Inf, -Inf)
     end
 end
 
@@ -122,7 +128,7 @@ function check_heat_out(
         end
         return (potential_energy_heat_out, potential_storage_heat_out)
     else
-        return (Inf, Inf)
+        return (-Inf, -Inf)
     end
 end
 
@@ -199,25 +205,19 @@ function potential(
 )
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_gas_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_el_out], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_el_out, potential_storage_el_out = check_el_out(unit, parameters)
     if potential_energy_el_out === nothing && potential_storage_el_out === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_gas_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_el_out], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_gas_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_el_out], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
@@ -231,29 +231,28 @@ function potential(
     )
 
     if !energies[1]
-        set_max_energy!(unit.input_interfaces[unit.m_gas_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_el_out], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
-        set_max_energy!(unit.input_interfaces[unit.m_gas_in], -energies[2])
-        set_max_energy!(unit.input_interfaces[unit.m_el_out], energies[3])
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], energies[4])
+        set_max_energies!(unit, energies[2], energies[3], energies[4])
     end
 end
 
 function produce(unit::CHPP, parameters::Dict{String,Any}, watt_to_wh::Function)
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_el_out, potential_storage_el_out = check_el_out(unit, parameters)
     if potential_energy_el_out === nothing && potential_storage_el_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 

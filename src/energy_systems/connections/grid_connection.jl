@@ -56,7 +56,7 @@ function control(
     if unit.sys_function === sf_dispatchable_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else
-        set_max_energy!(unit.input_interfaces[unit.medium], -Inf)
+        set_max_energy!(unit.input_interfaces[unit.medium], Inf)
     end
 end
 

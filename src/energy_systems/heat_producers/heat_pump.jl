@@ -74,6 +74,15 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
+function set_max_energies!(
+    unit::HeatPump, el_in::Float64,
+    heat_in::Float64, heat_out::Float64
+)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+end
+
 function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
     if (in_temp === nothing || out_temp === nothing)
         return nothing
@@ -156,7 +165,7 @@ function check_heat_out(
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
     else
-        return (Inf, Inf, nothing)
+        return (-Inf, -Inf, nothing)
     end
 end
 
@@ -240,25 +249,19 @@ function potential(
 )
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
@@ -291,29 +294,28 @@ function potential(
     )
 
     if !energies[1]
-        set_max_energy!(unit.input_interfaces[unit.m_el_in], 0.0)
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
-        set_max_energy!(unit.input_interfaces[unit.m_el_in], -energies[2])
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], -energies[3])
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], energies[4])
+        set_max_energies!(unit, energies[2], energies[3], energies[4])
     end
 end
 
 function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
