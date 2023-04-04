@@ -14,6 +14,13 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.7
+* adapted OoO for storages according the following rules:
+  1. produce() and load() from leaves to trunk
+  2. produce() and load() of leaves are in order of output interfaces of trunk busses
+  3. produce() and load() of loading-limited storages are calculated after loading-unlimited storages with respect to the loading_matrix in busses
+* adapted and added test for new calculation order of storages
+
 ### Version 0.3.6
 * Refactor algorithm for determining order of operations for a more modular approach with reusable helper functions and add tests for new modular functions.
 * Add helper functions for improving output of tests checking the order of operations
