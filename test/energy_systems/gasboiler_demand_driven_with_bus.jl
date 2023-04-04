@@ -84,7 +84,7 @@ function test_gasboiler_demand_driven_with_bus()
     exchange = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ 12000/4
+    @test exchange.energy_potential ≈ -12000/4
     
     # no production so far, balance is zero, energy_potential is zero
     exchange = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
@@ -141,7 +141,7 @@ function test_gasboiler_demand_driven_with_bus()
     exchange = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ 15000/4
+    @test exchange.energy_potential ≈ -15000/4
     
     # no production so far, balance is zero, energy_potential is zero
     exchange = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
@@ -198,7 +198,7 @@ function test_gasboiler_demand_driven_with_bus()
     exchange = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ 10000/4
+    @test exchange.energy_potential ≈ -10000/4
     
     # no production so far, balance is zero, energy_potential is zero
     exchange = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
@@ -304,7 +304,7 @@ function test_gasboiler_demand_driven_without_bus()
     exchange = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ==  Inf
+    @test exchange.energy_potential == -Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000/4
@@ -361,7 +361,7 @@ function test_gasboiler_demand_driven_without_bus()
     exchange = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ==  Inf
+    @test exchange.energy_potential == -Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4
@@ -418,7 +418,7 @@ function test_gasboiler_demand_driven_without_bus()
     exchange = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_gas_in], gasboiler)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ==  Inf
+    @test exchange.energy_potential == -Inf
 
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000/4
