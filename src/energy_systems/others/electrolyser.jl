@@ -63,135 +63,265 @@ mutable struct Electrolyser <: ControlledSystem
     end
 end
 
-function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
-    # get maximum energy demand and supply of electrolyser, not regarding external bounds:
-    max_produce_heat = watt_to_wh(unit.power * unit.heat_fraction)
-    max_produce_h2 = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
-    max_produce_o2 = 0.5 * max_produce_h2  # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
-    max_consume_el = watt_to_wh(unit.power)
+function set_max_energies!(
+    unit::Electrolyser, el_in::Float64, heat_out::Float64,
+    h2_out::Float64, o2_out::Float64
+)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
+    set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
+end
 
-    # get balance on in- and outputs, but only if they act as limitations (default: all are limiting, equals true)
-    # electricity 
-    if unit.controller.parameter["m_el_in"] == true 
-        exchange = balance_on(
-            unit.input_interfaces[unit.m_el_in],
-            unit.input_interfaces[unit.m_el_in].source
+function check_el_in(
+    unit::Electrolyser,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_el_in"] == true
+        if (
+            unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
+            &&
+            unit.input_interfaces[unit.m_el_in].max_energy === nothing
         )
-        potential_energy_el = exchange.balance + exchange.energy_potential
-        potential_storage_el = exchange.storage_potential
-        if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
-            return # do nothing if there is no electricity to consume
+            return (Inf, Inf)
+        else
+            exchange = balance_on(
+                unit.input_interfaces[unit.m_el_in],
+                unit.input_interfaces[unit.m_el_in].source
+            )
+            potential_energy_el_in = exchange.balance + exchange.energy_potential
+            potential_storage_el_in = exchange.storage_potential
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) <= parameters["epsilon"]
+                return (nothing, nothing)
+            end
+            return (potential_energy_el_in, potential_storage_el_in)
         end
-    else # unlimited demand in interface is assumed
-        potential_energy_el = Inf
-        potential_storage_el = Inf
+    else
+        return (Inf, Inf)
     end
+end
 
-    # hydrogen
-    if unit.controller.parameter["m_h2_out"] == true   
-        exchange = balance_on(
-            unit.output_interfaces[unit.m_h2_out],
-            unit.output_interfaces[unit.m_h2_out].target
-        )
-        potential_energy_h2 = exchange.balance + exchange.energy_potential
-        potential_storage_h2 = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) >= -parameters["epsilon"]
-            return  # don't add to a surplus of hydrogen
-        end
-    else # unlimited demand in interface is assumed
-        potential_energy_h2 = -Inf
-        potential_storage_h2 = -Inf
-    end
-
-    # oxygen
-    if unit.controller.parameter["m_o2_out"] == true 
-        exchange = balance_on(
-            unit.output_interfaces[unit.m_o2_out],
-            unit.output_interfaces[unit.m_o2_out].target
-        )
-        potential_energy_o2 = exchange.balance + exchange.energy_potential
-        potential_storage_o2 = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) >= -parameters["epsilon"]
-            return  # don't add to a surplus of oxygen
-        end
-    else # unlimited demand in interface is assumed
-        potential_energy_o2 = -Inf
-        potential_storage_o2 = -Inf
-    end
-
-    # heat
-    if unit.controller.parameter["m_heat_out"] == true  
+function check_heat_out(
+    unit::Electrolyser,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat = exchange.balance + exchange.energy_potential
-        potential_storage_heat = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) >= 0
-            return  # don't add to a surplus of heat
+        potential_energy_heat_out = exchange.balance + exchange.energy_potential
+        potential_storage_heat_out = exchange.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+            return (nothing, nothing)
         end
-    else # unlimited supply in interface is assumed
-        potential_energy_heat = -Inf
-        potential_storage_heat = -Inf
+        return (potential_energy_heat_out, potential_storage_heat_out)
+    else
+        return (-Inf, -Inf)
     end
+end
+
+function check_h2_out(
+    unit::Electrolyser,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_h2_out"] == true
+        exchange = balance_on(
+            unit.output_interfaces[unit.m_h2_out],
+            unit.output_interfaces[unit.m_h2_out].target
+        )
+        potential_energy_h2_out = exchange.balance + exchange.energy_potential
+        potential_storage_h2_out = exchange.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) >= -parameters["epsilon"]
+            return (nothing, nothing)
+        end
+        return (potential_energy_h2_out, potential_storage_h2_out)
+    else
+        return (-Inf, -Inf)
+    end
+end
+
+function check_o2_out(
+    unit::Electrolyser,
+    parameters::Dict{String,Any}
+)
+    if unit.controller.parameter["m_o2_out"] == true
+        exchange = balance_on(
+            unit.output_interfaces[unit.m_o2_out],
+            unit.output_interfaces[unit.m_o2_out].target
+        )
+        potential_energy_o2_out = exchange.balance + exchange.energy_potential
+        potential_storage_o2_out = exchange.storage_potential
+        if (unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) >= -parameters["epsilon"]
+            return (nothing, nothing)
+        end
+        return (potential_energy_o2_out, potential_storage_o2_out)
+    else
+        return (-Inf, -Inf)
+    end
+end
+
+function calculate_energies(
+    unit::Electrolyser,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function,
+    potentials::Vector{Float64}
+)
+    potential_energy_el_in = potentials[1]
+    potential_storage_el_in = potentials[2]
+    potential_energy_heat_out = potentials[3]
+    potential_storage_heat_out = potentials[4]
+    potential_energy_h2_out = potentials[5]
+    potential_storage_h2_out = potentials[6]
+    potential_energy_o2_out = potentials[7]
+    potential_storage_o2_out = potentials[8]
+
+    max_produce_heat = watt_to_wh(unit.power * unit.heat_fraction)
+    max_produce_h2 = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
+    # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
+    max_produce_o2 = 0.5 * max_produce_h2
+    max_consume_el = watt_to_wh(unit.power)
 
     # get usage fraction of external profile (normalized from 0 to 1)
     usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
     if usage_fraction_operation_profile <= 0.0
-        return # no operation allowed from external profile
+        return (false, nothing, nothing, nothing, nothing)
     end
 
-    # get usage_factions depending on control strategy
+    # all three standard operating strategies behave the same, but it is better to be
+    # explicit about the behaviour rather than grouping all together
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) / max_consume_el
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) / max_produce_h2
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) / max_produce_o2
 
-    elseif unit.controller.strategy == "storage_driven" 
-        return # do not start due to statemachine!
-    
+    elseif unit.controller.strategy == "storage_driven"
+        return (false, nothing, nothing, nothing, nothing)
+
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) / max_consume_el
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) / max_produce_h2
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) / max_produce_o2
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el 
-        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2 + potential_storage_h2 : potential_energy_h2) / max_produce_h2 
-        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2 + potential_storage_o2 : potential_energy_o2) / max_produce_o2 
-        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat + potential_storage_heat : potential_energy_heat) / max_produce_heat
-
-    else
-        throw(ArgumentError("Error: No valid control strategy chosen for electrolyser. Must be one of storage_driven, supply_driven, demand_driven."))
+        usage_fraction_el = +(unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) / max_consume_el
+        usage_fraction_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat
+        usage_fraction_h2 = -(unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) / max_produce_h2
+        usage_fraction_o2 = -(unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) / max_produce_o2
     end
 
-    # get smallest usage fraction
+    # limit actual usage by limits of inputs, outputs and profile
     usage_fraction = min(
-        1.0, 
+        1.0,
         usage_fraction_el,
-        usage_fraction_h2, 
-        usage_fraction_o2,
         usage_fraction_heat,
+        usage_fraction_h2,
+        usage_fraction_o2,
         usage_fraction_operation_profile
-        )
+    )
 
-    # exit if usage_fraction is below min_power_fraciton 
     if usage_fraction < unit.min_power_fraction
+        return (false, nothing, nothing, nothing, nothing)
+    end
+
+    return (
+        true,
+        max_consume_el * usage_fraction,
+        max_produce_heat * usage_fraction,
+        max_produce_h2 * usage_fraction,
+        max_produce_o2 * usage_fraction,
+    )
+end
+
+function potential(
+    unit::Electrolyser,
+    parameters::Dict{String,Any},
+    watt_to_wh::Function
+)
+    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
+    if potential_energy_el_in === nothing && potential_storage_el_in === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    # write production and demand in interfaces
-    add!(unit.output_interfaces[unit.m_h2_out], max_produce_h2 * usage_fraction)
-    add!(unit.output_interfaces[unit.m_o2_out], max_produce_o2 * usage_fraction)
-    add!(
-        unit.output_interfaces[unit.m_heat_out],
-        max_produce_heat * usage_fraction,
-        unit.output_temperature
-    )
-    sub!(unit.input_interfaces[unit.m_el_in], max_consume_el * usage_fraction)
+    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
 
+    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, parameters)
+    if potential_energy_h2_out === nothing && potential_storage_h2_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, parameters)
+    if potential_energy_o2_out === nothing && potential_storage_o2_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    energies = calculate_energies(
+        unit, parameters, watt_to_wh,
+        [
+            potential_energy_el_in, potential_storage_el_in,
+            potential_energy_heat_out, potential_storage_heat_out,
+            potential_energy_h2_out, potential_storage_h2_out,
+            potential_energy_o2_out, potential_storage_o2_out
+        ]
+    )
+
+    if !energies[1]
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+    else
+        set_max_energies!(unit, energies[2],energies[3], energies[4], energies[5])
+    end
+end
+
+function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
+    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
+    if potential_energy_el_in === nothing && potential_storage_el_in === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, parameters)
+    if potential_energy_h2_out === nothing && potential_storage_h2_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, parameters)
+    if potential_energy_o2_out === nothing && potential_storage_o2_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+
+    energies = calculate_energies(
+        unit, parameters, watt_to_wh,
+        [
+            potential_energy_el_in, potential_storage_el_in,
+            potential_energy_heat_out, potential_storage_heat_out,
+            potential_energy_h2_out, potential_storage_h2_out,
+            potential_energy_o2_out, potential_storage_o2_out
+        ]
+    )
+
+    if energies[1]
+        sub!(unit.input_interfaces[unit.m_el_in], energies[2])
+        add!(unit.output_interfaces[unit.m_heat_out], energies[3], unit.output_temperature)
+        add!(unit.output_interfaces[unit.m_h2_out], energies[4])
+        add!(unit.output_interfaces[unit.m_o2_out], energies[5])
+    end
 end
 
 export Electrolyser
