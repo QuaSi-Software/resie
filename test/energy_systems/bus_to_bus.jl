@@ -83,6 +83,28 @@ function test_busses_communicate_demand()
     @test EnergySystems.balance(bus_2) == 0.0
     @test grid.output_interfaces[grid.medium].balance == 0.0
 
+    # demand not produced yet --> balance is zero, but energy_potential not
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ -75.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ -75.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ Inf
+    # @test exchange.temperature === nothing
+    exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ Inf
+    # @test exchange.temperature ≈ 55 # is not nothing as temperature is given in interface from demand
+
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
@@ -91,9 +113,53 @@ function test_busses_communicate_demand()
     @test EnergySystems.balance(bus_2) == -75.0
     @test grid.output_interfaces[grid.medium].balance == 0.0
 
+    # demand already produced --> balance is not zero, but energy_potential
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ -75.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ -75.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
+    @test exchange.balance ≈ -75.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ Inf
+    # @test exchange.temperature === nothing
+    exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+    @test exchange.balance ≈ -75.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0 # balance in current interface already written!
+    # @test exchange.temperature ≈ 55  # is not nothing as temperature is given in interface from demand
+
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+
+    # everything produced --> energy_potential should be zero!
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 55
+    exchange = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature === nothing
+    exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 55 # is not nothing as temperature is given in interface from demand
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
@@ -242,8 +308,88 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_2) == 0.0
     @test EnergySystems.balance(bus_3) == 0.0
 
+    # demand not produced yet --> balance is zero, but energy_potential not
+    # input interfaces
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ -2000.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ -1000.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ -1000.0
+    # @test exchange.temperature ≈ 60.0
+
+    # output interfaces
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0 # gasboiler is not doing potential() step, therefore max_energy is not written
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0 # gasboiler is not doing potential() step, therefore max_energy is not written
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0 # gasboiler is not doing potential() step, therefore max_energy is not written
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_3.output_interfaces[1], bus_3)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0 # gasboiler is not doing potential() step, therefore max_energy is not written
+    # @test exchange.temperature ≈ 60.0
+
     EnergySystems.produce(demand_2, simulation_parameters, watt_to_wh)
     EnergySystems.produce(demand_1, simulation_parameters, watt_to_wh)
+
+    # demand already produced --> balance is not zero anymore, but energy_potential
+    # input interfaces
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ -2000.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ -1000.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
+    @test exchange.balance ≈ -1000.0
+    @test exchange.storage_potential ≈ 0.0 
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+
+     # output interfaces
+     exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_1)
+     @test exchange.balance ≈ -2000.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0 
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_1)
+     @test exchange.balance ≈ -2000.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+     @test exchange.balance ≈ -1000.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_3.output_interfaces[1], bus_3)
+     @test exchange.balance ≈ -1000.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0
+     # @test exchange.temperature ≈ 60.0 
 
     @test demand_1.input_interfaces[demand_1.medium].balance == -1000.0
     @test demand_1.input_interfaces[demand_1.medium].temperature == 60.0
@@ -257,6 +403,46 @@ function test_demand_over_busses_supply_is_transformer()
     EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
     EnergySystems.produce(bus_3, simulation_parameters, watt_to_wh)
     EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+
+    # gasboiler already produced --> balance and energy_potential is zero
+    # input interfaces
+    exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+    exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 0.0 
+    @test exchange.energy_potential ≈ 0.0
+    # @test exchange.temperature ≈ 60.0
+
+     # output interfaces
+     exchange = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_1)
+     @test exchange.balance ≈ 0.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0 
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_1)
+     @test exchange.balance ≈ 0.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0 
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
+     @test exchange.balance ≈ 0.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0 
+     # @test exchange.temperature ≈ 60.0
+     exchange = EnergySystems.balance_on(bus_3.output_interfaces[1], bus_3)
+     @test exchange.balance ≈ 0.0
+     @test exchange.storage_potential ≈ 0.0
+     @test exchange.energy_potential ≈ 0.0 
+     # @test exchange.temperature ≈ 60.0 
 
     @test EnergySystems.balance(bus_3) == 0.0
     @test EnergySystems.balance(bus_2) == 0.0
@@ -293,6 +479,8 @@ function test_demand_over_busses_supply_is_transformer()
 
     # second timestep, there's not enough supply to meet demand, bus 2 has priority
     # over bus 3
+    # not tests for balance_on() of busses here as for this function the missmatch of 
+    # demand and supply is not important
 
     boiler.power = 6000
 
@@ -476,6 +664,32 @@ function test_busses_communicate_storage_potential()
     EnergySystems.control(tank_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
+    # demand not produced yet --> balance is zero, but energy_potential not
+    # input interfaces
+    exchange = EnergySystems.balance_on(grid.output_interfaces[grid.medium], bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ -30000
+    @test exchange.energy_potential ≈ -75.0
+    # @test exchange.temperature ≈ 55.0
+    interface_between_bus1_bus2 = bus_2.input_interfaces[1].source.uac == "TST_BUS_01" ? bus_2.input_interfaces[1] : bus_2.input_interfaces[2]
+    exchange = EnergySystems.balance_on(interface_between_bus1_bus2, bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ -10000
+    @test exchange.energy_potential ≈ -75.0
+    # @test exchange.temperature ≈ 55.0
+
+    # output interfaces
+    exchange = EnergySystems.balance_on(interface_between_bus1_bus2, bus_1)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 20000
+    @test exchange.energy_potential ≈ Inf
+    # @test exchange.temperature ≈ 55.0
+    exchange = EnergySystems.balance_on(demand.input_interfaces[demand.medium], bus_2)
+    @test exchange.balance ≈ 0.0
+    @test exchange.storage_potential ≈ 30000
+    @test exchange.energy_potential ≈ Inf
+    # @test exchange.temperature ≈ 55.0
+
     EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
 
     exchange = EnergySystems.balance_on(
@@ -483,6 +697,7 @@ function test_busses_communicate_storage_potential()
     )
     @test exchange.balance == -75.0
     @test exchange.storage_potential == 0.0
+    @test exchange.energy_potential == 0.0
     @test exchange.temperature == 55.0
 
     exchange = EnergySystems.balance_on(
@@ -490,6 +705,7 @@ function test_busses_communicate_storage_potential()
     )
     @test exchange.balance == -75.0
     @test exchange.storage_potential == -10000.0
+    @test exchange.energy_potential == 0.0
     @test exchange.temperature == 55.0
 
     EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
@@ -514,6 +730,7 @@ function test_busses_communicate_storage_potential()
     )
     @test exchange.balance == 0.0
     @test exchange.storage_potential == 0.0
+    @test exchange.energy_potential == 0.0
     @test exchange.temperature === nothing
 
     exchange = EnergySystems.balance_on(
@@ -521,6 +738,7 @@ function test_busses_communicate_storage_potential()
     )
     @test exchange.balance == 0.0
     @test exchange.storage_potential == -10075.0
+    @test exchange.energy_potential == 0.0
     @test exchange.temperature === nothing
 end
 
