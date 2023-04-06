@@ -86,9 +86,9 @@ function categorize_by_function(systems)
         [unit for unit in each(systems)
          if unit.sys_function == EnergySystems.sf_storage],
         [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_source],
+         if unit.sys_function == EnergySystems.sf_bounded_source],
         [unit for unit in each(systems)
-         if unit.sys_function == EnergySystems.sf_dispatchable_sink],
+         if unit.sys_function == EnergySystems.sf_bounded_sink],
     ]
 end
 
@@ -155,7 +155,7 @@ function base_order(systems_by_function)
         initial_nr -= 1
     end
 
-    # produce dispatchable sources/sinks
+    # produce bounded sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])

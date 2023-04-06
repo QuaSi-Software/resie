@@ -217,7 +217,7 @@
             "is_source": true
         },
         "TST_01_HZG_02_SRC": {
-            "type": "DispatchableSupply",
+            "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "production_refs": [

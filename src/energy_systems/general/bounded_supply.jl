@@ -1,12 +1,12 @@
 """
-Implementation of an energy system modeling an abstract dispatchable supply of some medium.
+Implementation of an energy system modeling an abstract bounded supply of some medium.
 
-This is particularly useful for testing, but can also be used to model any dispatchable
+This is particularly useful for testing, but can also be used to model any bounded
 energy system or other equipment unit that produces energy in a given medium. The system
 might still have a maximum power draw in a single time step, but can provide any fraction
 of this to connected systems.
 """
-mutable struct DispatchableSupply <: ControlledSystem
+mutable struct BoundedSupply <: ControlledSystem
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -22,7 +22,7 @@ mutable struct DispatchableSupply <: ControlledSystem
     max_energy::Float64
     temperature::Temperature
 
-    function DispatchableSupply(uac::String, config::Dict{String,Any})
+    function BoundedSupply(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
                               Profile(config["temperature_profile_file_path"]) :
@@ -35,7 +35,7 @@ mutable struct DispatchableSupply <: ControlledSystem
             controller_for_strategy( # controller
                 config["strategy"]["name"], config["strategy"]
             ),
-            sf_dispatchable_source, # sys_function
+            sf_bounded_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing
@@ -52,11 +52,11 @@ mutable struct DispatchableSupply <: ControlledSystem
     end
 end
 
-function output_values(unit::DispatchableSupply)::Vector{String}
+function output_values(unit::BoundedSupply)::Vector{String}
     return ["OUT", "Max_Energy", "Temperature"]
 end
 
-function output_value(unit::DispatchableSupply, key::OutputKey)::Float64
+function output_value(unit::BoundedSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
@@ -68,7 +68,7 @@ function output_value(unit::DispatchableSupply, key::OutputKey)::Float64
 end
 
 function control(
-    unit::DispatchableSupply,
+    unit::BoundedSupply,
     systems::Grouping,
     parameters::Dict{String,Any}
 )
@@ -81,7 +81,7 @@ function control(
     end
 end
 
-function produce(unit::DispatchableSupply, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::BoundedSupply, parameters::Dict{String,Any}, watt_to_wh::Function)
     outface = unit.output_interfaces[unit.medium]
     # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
     # must be handled here instead of being ignored
@@ -96,4 +96,4 @@ function produce(unit::DispatchableSupply, parameters::Dict{String,Any}, watt_to
     end
 end
 
-export DispatchableSupply
+export BoundedSupply

@@ -30,9 +30,9 @@ mutable struct GridConnection <: ControlledSystem
                 config["strategy"]["name"], config["strategy"]
             ),
             if Bool(config["is_source"])
-                sf_dispatchable_source
+                sf_bounded_source
             else
-                sf_dispatchable_sink
+                sf_bounded_sink
             end, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -53,7 +53,7 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, systems, parameters)
-    if unit.sys_function === sf_dispatchable_source
+    if unit.sys_function === sf_bounded_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else
         set_max_energy!(unit.input_interfaces[unit.medium], Inf)
@@ -61,7 +61,7 @@ function control(
 end
 
 function produce(unit::GridConnection, parameters::Dict{String,Any}, watt_to_wh::Function)
-    if unit.sys_function === sf_dispatchable_source
+    if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential
         # must be handled here instead of being ignored
