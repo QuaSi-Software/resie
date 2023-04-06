@@ -105,7 +105,11 @@ function dump_info(
 
         for entry in order_of_operations
             for step in entry[2:lastindex(entry)]
-                write(file_handle, "1. `$(entry[1]) $(entry[2])`\n")
+                if entry == last(order_of_operations)
+                    write(file_handle, "\"$(entry[1]) $(entry[2])\"\n")
+                else
+                    write(file_handle, "\"$(entry[1]) $(entry[2])\",\n")
+                end
             end
         end
     end

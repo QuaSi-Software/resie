@@ -30,7 +30,7 @@
             "production_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
-            "scale": 10000.0
+            "scale": 2000.0
         },
         "TST_01_HZG_02_DEM": {
             "type": "Demand",
@@ -38,7 +38,7 @@
             "control_refs": [],
             "production_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
-            "scale": 10000.0
+            "scale": 2000.0
         },
         "TST_01_ELT_01_BUS": {
             "type": "Bus",
@@ -88,45 +88,49 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000,
-            "m_heat_out": "m_h_w_lt1"
+            "power": 20000,
+            "m_heat_out": "m_h_w_lt1",
+            "min_power_fraction": 0.0
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
-            "control_refs": ["TST_01_HZG_02_HTP"],
+            "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_02_HTP"
             ],
             "strategy": {
                 "name": "supply_driven"
             },
-            "power": 20000,
+            "power": 10000,
             "fixed_cop": 3.0,
-            "m_heat_out": "m_h_w_ht2"
+            "m_heat_out": "m_h_w_ht2",
+            "min_power_fraction" : 0.0
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
-            "control_refs": ["TST_01_HZG_01_BUS"],
+            "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
+            "power": 10000,
             "fixed_cop": 3.0,
-            "m_heat_in": "m_h_w_ht2"
+            "m_heat_in": "m_h_w_ht2",
+            "min_power_fraction" : 0.0
         },
         "TST_01_HZG_01_GBO": {
             "type": "GasBoiler",
-            "control_refs": ["TST_01_HZG_01_BUS"],
+            "control_refs": [],
             "production_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000
+            "power": 40000,
+            "min_power_fraction": 0.0
         },
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
@@ -153,5 +157,45 @@
             "production_refs": [],
             "is_source": false
         }
-    }
+    },
+    "order_of_operation": [
+        "TST_01_HZG_02_DEM s_reset",
+        "TST_01_HZG_01_DEM s_reset",
+        "TST_01_ELT_01_BUS s_reset",
+        "TST_01_HZG_01_BUS s_reset",
+        "TST_01_HZG_01_GBO s_reset",
+        "TST_01_ELT_01_ELY s_reset",
+        "TST_01_HZG_02_HTP s_reset",
+        "TST_01_HZG_01_HTP s_reset",
+        "TST_01_ELT_01_GRI s_reset",
+        "TST_01_HZG_01_GRI s_reset",
+        "TST_01_ELT_01_GRO s_reset",
+        "TST_01_HZG_02_DEM s_control",
+        "TST_01_HZG_01_DEM s_control",
+        "TST_01_ELT_01_BUS s_control",
+        "TST_01_HZG_01_BUS s_control",
+        "TST_01_ELT_01_ELY s_control",
+        "TST_01_HZG_02_HTP s_control",
+        "TST_01_HZG_01_GBO s_control",
+        "TST_01_HZG_01_HTP s_control",
+        "TST_01_ELT_01_GRI s_control",
+        "TST_01_HZG_01_GRI s_control",
+        "TST_01_ELT_01_GRO s_control",
+        "TST_01_HZG_02_DEM s_produce",
+        "TST_01_HZG_01_DEM s_produce",
+        "TST_01_ELT_01_BUS s_produce",
+        "TST_01_HZG_01_BUS s_produce",
+        "TST_01_HZG_02_HTP s_potential",
+        "TST_01_HZG_01_HTP s_potential",
+        "TST_01_ELT_01_ELY s_potential",
+        "TST_01_ELT_01_ELY s_produce",
+        "TST_01_HZG_01_HTP s_produce",
+        "TST_01_HZG_02_HTP s_produce",
+        "TST_01_HZG_01_GBO s_produce",
+        "TST_01_ELT_01_GRI s_produce",
+        "TST_01_HZG_01_GRI s_produce",
+        "TST_01_ELT_01_GRO s_produce",
+        "TST_01_ELT_01_BUS s_distribute",
+        "TST_01_HZG_01_BUS s_distribute"
+    ]
 }

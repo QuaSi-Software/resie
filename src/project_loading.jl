@@ -319,7 +319,7 @@ function iterate_chain(chain, sys_function; reverse=false)
 end
 
 """
-order_of_operations(systems)
+calculate_order_of_operations(systems)
 
 Calculate the order of steps that need to be performed to simulate the given systems.
 
@@ -339,7 +339,7 @@ not trivial and might not work for each possible grouping of systems.
 ]
 ```
 """
-function order_of_operations(systems::Grouping)::StepInstructions
+function calculate_order_of_operations(systems::Grouping)::StepInstructions
     systems_by_function = categorize_by_function(systems)
     simulation_order = base_order(systems_by_function)
 
@@ -352,6 +352,65 @@ function order_of_operations(systems::Grouping)::StepInstructions
     end
     return [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
 end
+
+"""
+load_order_of_operations(order_of_operation_input, systems)
+
+Reads in the order of operation given in the input file.
+The Vektor that is passed has to have one entry for each operation. All operations have to 
+be in the following syntax:
+[
+    "UAC_Key s_step",
+    ...
+]
+"UAC_Key s_step" can be "TST_01_HZG_02_DEM s_reset" for example.
+
+# Args
+- `order_of_operation_input::Vector{String}`: A Vektor of strings containing the operations 
+                                              given in the input file 
+- `system::Grouping`: All systems of the input file                                             
+# Returns
+- `step_instructions`: The order of opertaions given in the input file in the structure:
+```
+[
+    ["UAC Key", s_step],
+    ...
+]
+```
+"""
+function load_order_of_operations(order_of_operation_input, systems::Grouping)::StepInstructions
+    step_instructions = []
+    all_system_uac = collect(keys(systems)) # [unit.uac for unit in keys(systems)]
+
+    for entry in order_of_operation_input 
+        uac = string(split(entry)[1])
+        s_step = split(entry)[2]
+
+        if s_step == "s_reset"
+           s_step_system = EnergySystems.s_reset
+        elseif s_step == "s_control"
+            s_step_system = EnergySystems.s_control
+        elseif s_step == "s_produce"
+            s_step_system = EnergySystems.s_produce
+        elseif s_step == "s_potential"
+            s_step_system = EnergySystems.s_potential
+        elseif s_step == "s_load"
+            s_step_system = EnergySystems.s_load
+        elseif s_step == "s_distribute"
+            s_step_system = EnergySystems.s_distribute
+        else 
+            throw(ArgumentError("Unknown operation step \"$s_step\" in \"order_of_operation\" in input file. Must be one of: s_reset, s_control, s_produce, s_potential, s_load, s_distribute"))
+        end
+
+        if !(uac in all_system_uac)
+            throw(ArgumentError("Unknown system UAC \"$uac\" in \"order_of_operation\" given in input file. Each UAC must match the name of an energy system given in the input file."))
+        end
+
+        push!(step_instructions, [uac, s_step_system] )
+    end
+    return [(u[1], u[2]) for u in step_instructions]
+end
+
 
 """
     find_indexes(steps, own, target)

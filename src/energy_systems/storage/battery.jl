@@ -46,20 +46,9 @@ function balance_on(
     unit::Battery
 )::NamedTuple{}
 
-    caller_is_input = false   # ==true if interface is input of unit (caller puts energy in unit); 
-                              # ==false if interface is output of unit (caller gets energy from unit)
-
-    # check if caller is input or output of unit
-    for (_, input_uac) in pairs(unit.input_interfaces)
-        if input_uac == interface.source.uac
-            caller_is_input = true
-            break
-        end
-        if input_uac.source.uac == interface.source.uac
-            caller_is_input = true
-            break
-        end
-    end
+    caller_is_input = unit.uac == interface.target.uac ? true : false
+    # ==true if interface is input of unit (caller puts energy in unit); 
+    # ==false if interface is output of unit (caller gets energy from unit)
 
     return (
             balance = interface.balance,
