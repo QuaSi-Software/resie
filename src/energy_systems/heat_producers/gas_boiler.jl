@@ -19,6 +19,7 @@ mutable struct GasBoiler <: ControlledSystem
     power::Float64
     min_power_fraction::Float64
     min_run_time::UInt
+    output_temperature::Temperature
 
     function GasBoiler(uac::String, config::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
@@ -42,8 +43,18 @@ mutable struct GasBoiler <: ControlledSystem
             config["power"], # power
             default(config, "min_power_fraction", 0.1),
             default(config, "min_run_time", 0),
+            default(config, "output_temperature", nothing)
         )
     end
+end
+
+function control(
+    unit::GasBoiler,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
 function set_max_energies!(unit::GasBoiler, gas_in::Float64, heat_out::Float64)

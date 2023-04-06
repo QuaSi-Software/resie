@@ -27,6 +27,7 @@ mutable struct CHPP <: ControlledSystem
     electricity_fraction::Float64
     min_power_fraction::Float64
     min_run_time::UInt
+    output_temperature::Temperature
 
     function CHPP(uac::String, config::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
@@ -54,8 +55,19 @@ mutable struct CHPP <: ControlledSystem
             default(config, "electricity_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 1800),
+            default(config, "output_temperature", nothing),
+
         )
     end
+end
+
+function control(
+    unit::CHPP,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
 function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)

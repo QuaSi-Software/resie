@@ -53,8 +53,8 @@ mutable struct Demand <: ControlledSystem
             config["scale"], # scaling_factor
             0.0, # load
             nothing, # temperature
-            default(config, "static_load", nothing),
-            default(config, "static_temperature", nothing),
+            default(config, "static_load", nothing), # static_load
+            default(config, "static_temperature", nothing), # static_temperature
         )
     end
 end
@@ -91,11 +91,10 @@ function control(
 
     if unit.static_temperature !== nothing
         unit.temperature = unit.static_temperature
-        unit.input_interfaces[unit.medium].temperature = unit.static_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
-        unit.input_interfaces[unit.medium].temperature = unit.temperature
     end
+    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.input_interfaces[unit.medium].temperature)
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
 

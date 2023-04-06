@@ -90,6 +90,7 @@
             },
             "power": 20000,
             "m_heat_out": "m_h_w_lt1",
+            "output_temperature": 25.0,
             "min_power_fraction": 0.0
         },
         "TST_01_HZG_01_HTP": {
@@ -102,7 +103,7 @@
                 "name": "supply_driven"
             },
             "power": 10000,
-            "fixed_cop": 3.0,
+            "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
             "min_power_fraction" : 0.0
         },
@@ -116,7 +117,6 @@
                 "name": "demand_driven"
             },
             "power": 10000,
-            "fixed_cop": 3.0,
             "m_heat_in": "m_h_w_ht2",
             "min_power_fraction" : 0.0
         },
