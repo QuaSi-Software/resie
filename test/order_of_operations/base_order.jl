@@ -140,7 +140,7 @@ function test_base_order()
             "is_source" => true
         ),
         "TST_01_HZG_02_SRC" => Dict{String,Any}(
-            "type" => "DispatchableSupply",
+            "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
             "production_refs" => [

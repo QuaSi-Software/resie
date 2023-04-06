@@ -20,7 +20,7 @@ function test_heat_pump_demand_driven_correct_order()
             "scale" => 1500
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "DispatchableSupply",
+            "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
             "production_refs" => ["TST_HP_01"],

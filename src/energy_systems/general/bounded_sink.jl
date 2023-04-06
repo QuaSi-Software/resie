@@ -1,12 +1,12 @@
 """
-Implementation of an energy system modeling a generic dispatchable sink of a chosen medium.
+Implementation of an energy system modeling a generic bounded sink of a chosen medium.
 
-This is particularly useful for testing, but can also be used to model any dispatchable
+This is particularly useful for testing, but can also be used to model any bounded
 energy system or other equipment unit that consumes energy of a given medium. The system
 might still have a maximum power intake in a single time step, but can consume any fraction
 of this.
 """
-mutable struct DispatchableSink <: ControlledSystem
+mutable struct BoundedSink <: ControlledSystem
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -20,7 +20,7 @@ mutable struct DispatchableSink <: ControlledSystem
 
     max_energy::Float64
 
-    function DispatchableSink(uac::String, config::Dict{String,Any})
+    function BoundedSink(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -45,11 +45,11 @@ mutable struct DispatchableSink <: ControlledSystem
     end
 end
 
-function output_values(unit::DispatchableSink)::Vector{String}
+function output_values(unit::BoundedSink)::Vector{String}
     return ["IN", "Max_Energy"]
 end
 
-function output_value(unit::DispatchableSink, key::OutputKey)::Float64
+function output_value(unit::BoundedSink, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
@@ -59,7 +59,7 @@ function output_value(unit::DispatchableSink, key::OutputKey)::Float64
 end
 
 function control(
-    unit::DispatchableSink,
+    unit::BoundedSink,
     systems::Grouping,
     parameters::Dict{String,Any}
 )
@@ -68,7 +68,7 @@ function control(
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
 end
 
-function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::BoundedSink, parameters::Dict{String,Any}, watt_to_wh::Function)
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     if exchange.balance > 0.0
@@ -79,4 +79,4 @@ function produce(unit::DispatchableSink, parameters::Dict{String,Any}, watt_to_w
     end
 end
 
-export DispatchableSink
+export BoundedSink
