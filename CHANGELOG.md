@@ -14,6 +14,14 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.4.1
+* balance_on() now always returns the temperature if it is given
+* added control() on all energy systems with temperatures to write the required temperatures to the interfaces
+* control() of sinks and sources reworked to do the same thing
+* adapted tests and added new tests to check the temperatures returned by balance_on()
+* added optional input and output temperatures of transformers as user input
+* changed example_WP_Kascade to dynamic COP calculation depending on dynamic demand temperatures
+
 ### Version 0.4.0
 * Rename dispatchable sinks and sources to bounded sinks and sources
 
