@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.4.0
+* Rename dispatchable sinks and sources to bounded sinks and sources
+
 ### Version 0.3.9
 * added optional input of custom OoO to the input file using the "order_of_operation" section and changed the format of the output of "dump_info" to allow copy and paste of OoO to the input file
 * added tests for loading user-defined OoOs
