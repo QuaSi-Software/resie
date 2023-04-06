@@ -266,7 +266,7 @@ function balance_on(
     #       this needs not to be considered here for energy_potential.
     # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken. For now, the potentials are only written in the control
-    #       step of fixed or dispatchable sinks and sources (including grid and PV) but not for transformers. 
+    #       step of fixed or bounded sinks and sources (including grid and PV) but not for transformers.
     #       If an energy system connected to the interface of balane_on() has already been produces, the 
     #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
     #       calling energy system to avoid double counting.

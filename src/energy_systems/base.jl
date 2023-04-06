@@ -88,7 +88,7 @@ Enumerations of the archetype of an energy system describing its general functio
 These are described in more detail in the accompanying documentation of the simulation
 model.
 """
-@enum(SystemFunction, sf_dispatchable_sink, sf_dispatchable_source, sf_fixed_sink,
+@enum(SystemFunction, sf_bounded_sink, sf_bounded_source, sf_fixed_sink,
     sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """

@@ -35,7 +35,7 @@ mutable struct DispatchableSupply <: ControlledSystem
             controller_for_strategy( # controller
                 config["strategy"]["name"], config["strategy"]
             ),
-            sf_dispatchable_source, # sys_function
+            sf_bounded_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing

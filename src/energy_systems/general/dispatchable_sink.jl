@@ -30,7 +30,7 @@ mutable struct DispatchableSink <: ControlledSystem
             controller_for_strategy( # controller
                 config["strategy"]["name"], config["strategy"]
             ),
-            sf_dispatchable_sink, # sys_function
+            sf_bounded_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
                 medium => nothing
