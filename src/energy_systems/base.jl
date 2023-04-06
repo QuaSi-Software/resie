@@ -89,7 +89,7 @@ Enumerations of the archetype of an energy system describing its general functio
 These are described in more detail in the accompanying documentation of the simulation
 model.
 """
-@enum(SystemFunction, sf_dispatchable_sink, sf_dispatchable_source, sf_fixed_sink,
+@enum(SystemFunction, sf_bounded_sink, sf_bounded_source, sf_fixed_sink,
     sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """
@@ -541,8 +541,8 @@ using ..Profiles
 # require the definition of certain basic systems such as a bus or a grid connection
 include("general/demand.jl")
 include("general/fixed_supply.jl")
-include("general/dispatchable_supply.jl")
-include("general/dispatchable_sink.jl")
+include("general/bounded_supply.jl")
+include("general/bounded_sink.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
