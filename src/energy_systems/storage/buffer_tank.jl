@@ -49,6 +49,17 @@ mutable struct BufferTank <: ControlledSystem
     end
 end
 
+function control(
+    unit::BufferTank,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
+    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
+
+end
+
 function temperature_at_load(unit::BufferTank)::Temperature
     if unit.use_adaptive_temperature
         partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))

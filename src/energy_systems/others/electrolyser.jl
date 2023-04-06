@@ -63,6 +63,15 @@ mutable struct Electrolyser <: ControlledSystem
     end
 end
 
+function control(
+    unit::Electrolyser,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
+end
+
 function set_max_energies!(
     unit::Electrolyser, el_in::Float64, heat_out::Float64,
     h2_out::Float64, o2_out::Float64
@@ -113,11 +122,11 @@ function check_heat_out(
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         potential_storage_heat_out = exchange.storage_potential
         if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
-            return (nothing, nothing)
+            return (nothing, nothing, exchange.temperature)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out)
+        return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
     else
-        return (-Inf, -Inf)
+        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
     end
 end
 
@@ -246,8 +255,12 @@ function potential(
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+    if temp_out !== nothing && temp_out > unit.output_temperature  # interface temperature has to be lower or the same for electorlyser
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
@@ -288,8 +301,12 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, parameters)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        return
+    end
+    if temp_out !== nothing && temp_out > unit.output_temperature  # interface temperature has to be lower or the same for electorlyser
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end

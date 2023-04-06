@@ -21,6 +21,7 @@ mutable struct BoundedSupply <: ControlledSystem
 
     max_energy::Float64
     temperature::Temperature
+    static_temperature::Temperature
 
     function BoundedSupply(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
@@ -48,6 +49,7 @@ mutable struct BoundedSupply <: ControlledSystem
             config["scale"], # scaling_factor
             0.0, # max_energy
             nothing, # temperature
+            default(config, "static_temperature", nothing) # static_temperature
         )
     end
 end
@@ -75,10 +77,14 @@ function control(
     move_state(unit, systems, parameters)
     unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
-    if unit.temperature_profile !== nothing
+
+    if unit.static_temperature !== nothing
+        unit.temperature = unit.static_temperature
+    elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
-        unit.output_interfaces[unit.medium].temperature = unit.temperature
     end
+    unit.output_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.output_interfaces[unit.medium].temperature)
+
 end
 
 function produce(unit::BoundedSupply, parameters::Dict{String,Any}, watt_to_wh::Function)

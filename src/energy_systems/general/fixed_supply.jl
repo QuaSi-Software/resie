@@ -23,6 +23,7 @@ mutable struct FixedSupply <: ControlledSystem
 
     supply::Float64
     temperature::Temperature
+    static_temperature::Temperature
 
     function FixedSupply(uac::String, config::Dict{String,Any})
         energy_profile = Profile(config["energy_profile_file_path"])
@@ -49,7 +50,8 @@ mutable struct FixedSupply <: ControlledSystem
             temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
             0.0, # supply
-            nothing # temperature
+            nothing, # temperature
+            default(config, "static_temperature", nothing) # static_temperature
         )
     end
 end
@@ -77,11 +79,14 @@ function control(
     move_state(unit, systems, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
-    
-    if unit.temperature_profile !== nothing
+
+    if unit.static_temperature !== nothing
+        unit.temperature = unit.static_temperature
+    elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
-        unit.output_interfaces[unit.medium].temperature = unit.temperature
     end
+    unit.output_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.output_interfaces[unit.medium].temperature)
+
 end
 
 function produce(unit::FixedSupply, parameters::Dict{String,Any}, watt_to_wh::Function)

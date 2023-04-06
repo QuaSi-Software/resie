@@ -52,6 +52,17 @@ mutable struct SeasonalThermalStorage <: ControlledSystem
     end
 end
 
+function control(
+    unit::SeasonalThermalStorage,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.m_heat_out].temperature)
+    unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
+
+end
+
 function temperature_at_load(unit::SeasonalThermalStorage)::Temperature
     if unit.use_adaptive_temperature
         partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))

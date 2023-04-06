@@ -26,6 +26,8 @@ mutable struct HeatPump <: ControlledSystem
     min_power_fraction::Float64
     min_run_time::UInt
     fixed_cop::Any
+    output_temperature::Temperature
+    input_temperature::Temperature
     cop::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any})
@@ -54,9 +56,22 @@ mutable struct HeatPump <: ControlledSystem
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
             default(config, "fixed_cop", nothing),
+            default(config, "output_temperature", nothing),
+            default(config, "input_temperature", nothing),
             0.0, # cop
         )
     end
+end
+
+function control(
+    unit::HeatPump,
+    systems::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, systems, parameters)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
+    unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
+
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -130,7 +145,7 @@ function check_heat_in(
             &&
             unit.input_interfaces[unit.m_heat_in].max_energy === nothing
         )
-            return (Inf, Inf, nothing)
+            return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)
         else
             exchange = balance_on(
                 unit.input_interfaces[unit.m_heat_in],
@@ -144,7 +159,7 @@ function check_heat_in(
             return (potential_energy_heat_in, potential_storage_heat_in, exchange.temperature)
         end
     else
-        return (Inf, Inf, nothing)
+        return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)
     end
 
 end
@@ -165,7 +180,7 @@ function check_heat_out(
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
     else
-        return (-Inf, -Inf, nothing)
+        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
     end
 end
 
@@ -283,6 +298,24 @@ function potential(
         out_temp = exchange.temperature
     end
 
+    # quit if requested temperature is higher than optionally given output_temperature
+    if unit.output_temperature !== nothing && out_temp > unit.output_temperature
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        return
+    end
+        
+    # quit if available temperature is higher than optionally given input_temperature
+    if unit.input_temperature !== nothing && in_temp < unit.input_temperature
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        return
+    end
+
+    if out_temp === nothing && unit.fixed_cop === nothing
+        throw(ArgumentError("Heat pump $(unit.uac) has no requested output temperature. Please provide a temperature."))
+    elseif in_temp === nothing && unit.fixed_cop === nothing
+        throw(ArgumentError("Heat pump $(unit.uac) has no requested input temperature. Please provide a temperature."))
+    end
+
     energies = calculate_energies(
         unit, parameters, watt_to_wh,
         (in_temp, out_temp),
@@ -335,6 +368,24 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
             unit.output_interfaces[unit.m_heat_out].target
         )
         out_temp = exchange.temperature
+    end
+
+    # quit if requested temperature is higher than optionally given output_temperature
+    if unit.output_temperature !== nothing && out_temp > unit.output_temperature
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        return
+    end
+        
+    # quit if available temperature is higher than optionally given input_temperature
+    if unit.input_temperature !== nothing && in_temp < unit.input_temperature
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        return
+    end
+
+    if out_temp === nothing && unit.fixed_cop === nothing
+        throw(ArgumentError("Heat pump $(unit.uac) has no requested output temperature. Please provide a temperature."))
+    elseif in_temp === nothing && unit.fixed_cop === nothing
+        throw(ArgumentError("Heat pump $(unit.uac) has no requested input temperature. Please provide a temperature."))
     end
 
     energies = calculate_energies(

@@ -239,7 +239,6 @@ function balance_on(
                 energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
                 temperature = exchange.temperature
             else
-                balance = outface.balance
                 temperature = outface.temperature
                 energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 ) ? 0.0 : -outface.max_energy 
                 if (
@@ -260,12 +259,7 @@ function balance_on(
                 end
             end
 
-            if temperature !== nothing && balance < 0
-                highest_demand_temp = (
-                    temperature > highest_demand_temp ? temperature : highest_demand_temp
-                )
-            end
-
+            highest_demand_temp = highest_temperature(temperature, highest_demand_temp)
             storage_potential_outputs += storage_potential  # is negative to be consistent with requested demand
             energy_potential_outputs += energy_potential # is negative to be consistent with requested demand
         end
@@ -280,7 +274,6 @@ function balance_on(
                 energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
                 temperature = exchange.temperature
             else
-                balance = inface.balance
                 temperature = inface.temperature
                 energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
                 if (
@@ -301,16 +294,17 @@ function balance_on(
                 end
             end
 
-            if temperature !== nothing && balance < 0
-                highest_demand_temp = (
-                    temperature > highest_demand_temp ? temperature : highest_demand_temp
-                )
-            end
-
+            highest_demand_temp = highest_temperature(temperature, highest_demand_temp)
             storage_potential_inputs += storage_potential # is positive to be consistent with supplied supply
             energy_potential_inputs += energy_potential # is positive to be consistent with supplied supply
         end
     end
+
+    # if temperature is still nothing, check if temperature is given in current interface
+    if highest_demand_temp <= -1e9 && interface.temperature !== nothing
+        highest_demand_temp = interface.temperature
+    end
+
     # Note: For now, only the load and produce of storages are regulated in the connectivity matrix.
     #       For storages, max_energy is set to 0.0 in their control step, so this doesn't need to be 
     #       considered here for energy_potential.

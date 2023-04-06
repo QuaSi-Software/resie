@@ -20,7 +20,8 @@ to the simulation as a whole as well as provide functionality on groups of energ
 module EnergySystems
 
 export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_production_with,
-    perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow
+    perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
+    highest_temperature
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -201,10 +202,12 @@ function add!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature != temperature
-            println("Warning: Mixing temperatures on interface $(interface.source.uac)"
-                    *
-                    "->$(interface.target.uac)")
+        if interface.temperature !== nothing && interface.temperature < temperature
+            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
+            * " -> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
+        elseif interface.temperature !== nothing && interface.temperature > temperature
+            println("Warning: Temperature in interface is higher than delivered temperature on interface $(interface.source.uac)"
+            * " -> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -224,10 +227,12 @@ function sub!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature != temperature
-            println("Warning: Mixing temperatures on interface $(interface.source.uac)"
-                    *
-                    "->$(interface.target.uac)")
+        if interface.temperature !== nothing && interface.temperature < temperature
+            println("Warning: Temperature in interface is lower than requested temperature on interface $(interface.source.uac)"
+                    * " -> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
+        elseif interface.temperature !== nothing && interface.temperature > temperature
+            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
+            * " -> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -270,6 +275,25 @@ function reset!(interface::SystemInterface)
     interface.sum_abs_change = 0.0
     interface.temperature = nothing
     interface.max_energy = nothing
+end
+
+
+"""
+    highest_temperature(rature_1, temperature_2)::Temperature
+
+Returns the smallest temperature::Temperature and handles nothing-values:
+- If both of the inputs are floats, the minimum will be returned.
+- If one of the inputs is nothing and one a float, the float will be returned.
+- If both of the inputs are nothing, nothing will be returned.
+"""
+function highest_temperature(temperature_1, temperature_2)::Temperature
+    if temperature_1 !== nothing && temperature_2 !== nothing
+        return max(temperature_1, temperature_2)
+    elseif temperature_1 === nothing && temperature_2 !== nothing
+        return temperature_2
+    elseif temperature_1 !== nothing && temperature_2 === nothing
+        return temperature_1
+    end
 end
 
 """

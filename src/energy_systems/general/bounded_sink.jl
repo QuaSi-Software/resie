@@ -16,12 +16,18 @@ mutable struct BoundedSink <: ControlledSystem
     output_interfaces::InterfaceMap
 
     max_power_profile::Profile
+    temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
 
     max_energy::Float64
+    temperature::Temperature
+    static_temperature::Temperature
 
     function BoundedSink(uac::String, config::Dict{String,Any})
         max_power_profile = Profile(config["max_power_profile_file_path"])
+        temperature_profile = "temperature_profile_file_path" in keys(config) ?
+                               Profile(config["temperature_profile_file_path"]) :
+                               nothing
         medium = Symbol(config["medium"])
         register_media([medium])
 
@@ -39,8 +45,11 @@ mutable struct BoundedSink <: ControlledSystem
                 medium => nothing
             ),
             max_power_profile, # max_power_profile
+            temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
             0.0, # max_energy
+            nothing, # temperature
+            default(config, "static_temperature", nothing) # static_temperature
         )
     end
 end
@@ -66,6 +75,14 @@ function control(
     move_state(unit, systems, parameters)
     unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
+
+    if unit.static_temperature !== nothing
+        unit.temperature = unit.static_temperature
+    elseif unit.temperature_profile !== nothing
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
+    end
+    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.input_interfaces[unit.medium].temperature)
+
 end
 
 function produce(unit::BoundedSink, parameters::Dict{String,Any}, watt_to_wh::Function)
