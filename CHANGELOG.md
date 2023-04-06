@@ -14,6 +14,13 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.3.9
+* added optional input of custom OoO to the input file using the "order_of_operation" section and changed the format of the output of "dump_info" to allow copy and paste of OoO to the input file
+* added tests for loading user-defined OoOs
+* activated tests for transformers-in-a-row
+* reworked balance_on() of the bus to allow transformers to differ between storage_potential and energy_potential in their input_interfaces
+* added tests to check the new balance_on() of the bus and the functionality of the "unload_storages" flag in the demand-driven control strategy
+
 ### Version 0.3.8
 * Fix issue with the signs of field max_energy being set for interfaces by energy systems. It is now always positive and method balance_on returns the energy potential with the correct sign depending on whether the caller is input or output in respect to the interface.
 * Rework the implementations of energy systems GasBoiler, HeatPump and CHPP to use the new simulation step potential so that their potential and production calculations work correctly for any chain of transformers

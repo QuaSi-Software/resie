@@ -179,14 +179,16 @@ function balance_on(
 )::NamedTuple{}
     highest_demand_temp = -1e9
     storage_potential_outputs = 0.0
+    storage_potential_inputs = 0.0
     input_index = nothing
-    caller_is_input = false   # == true if interface is input of unit (caller puts energy in unit); 
+    output_index = nothing
+    caller_is_input = nothing # == true if interface is input of unit (caller puts energy in unit); 
                               # == false if interface is output of unit (caller gets energy from unit)
     energy_potential_outputs = 0.0
     energy_potential_inputs = 0.0
 
-    # find the index of the input on the bus. if the method was called on an output,
-    # the input index will remain as nothing
+    # find the index of the input/output on the bus. if the method was called on an output,
+    # the input index will remain as nothing and vice versa.
     # Attention: unit.connectivity.input_order is mandatory to have a list of all inputs! 
     #            Maybe change to unit.output_interfaces in future versions or set any order in 
     #            connectivity.input_order if nothing is given in the input file?
@@ -198,7 +200,15 @@ function balance_on(
         end
     end
 
-    # helper function to get corresponding output index in connectivity matrix from index of output interface
+    for (idx, output_uac) in pairs(unit.connectivity.output_order)
+        if output_uac == interface.target.uac
+            output_index = idx
+            caller_is_input = false
+            break
+        end
+    end
+
+    # helper functions to get corresponding input/output index in connectivity matrix from index of output interface
     # ToDo: Maybe avoid this function and make shure that the order of output_interfaces in unit is the 
     #       same as specified in the connectivity matrix at the beginning of the simulation?
     function get_connectivity_output_index(unit, output_interface_index)::Int
@@ -210,71 +220,110 @@ function balance_on(
         end
     end
 
-    # iterate through outfaces to get storage loading potential
-    for (idx, outface) in pairs(unit.output_interfaces)
-        if outface.target.sys_function === sf_bus
-            exchange = balance_on(outface, outface.target)
-            balance = exchange.balance
-            storage_potential = exchange.storage_potential
-            energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
-            temperature = exchange.temperature
-        else
-            balance = outface.balance
-            temperature = outface.temperature
-            energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 ) ? 0.0 : outface.max_energy
-            if (
-                outface.target.sys_function === sf_storage
-                &&
-                outface.target.uac !== interface.source.uac  # never allow unloading of own storage load
-                &&
-                (
-                    input_index === nothing
-                    || unit.connectivity.storage_loading === nothing
-                    || unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
-                )
-            )
-                exchange = balance_on(outface, outface.target)
-                storage_potential = exchange.storage_potential
-            else
-                storage_potential = 0.0
+    function get_connectivity_input_index(unit, input_interface_index)::Int
+        input_interface_uac = unit.input_interfaces[input_interface_index].source.uac
+        for  (idx,connectivity_input_uac) in pairs(unit.connectivity.input_order)
+            if connectivity_input_uac == input_interface_uac
+                return idx
             end
         end
-
-        if temperature !== nothing && balance < 0
-            highest_demand_temp = (
-                temperature > highest_demand_temp ? temperature : highest_demand_temp
-            )
-        end
-
-        storage_potential_outputs += storage_potential
-        energy_potential_outputs += energy_potential
     end
+    
+    # iterate through outfaces to get storage loading and energy output potential, only if caller is input
+    if caller_is_input == true
+        for (idx, outface) in pairs(unit.output_interfaces)
+            if outface.target.sys_function === sf_bus
+                exchange = balance_on(outface, outface.target)
+                balance = exchange.balance
+                storage_potential = exchange.storage_potential
+                energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
+                temperature = exchange.temperature
+            else
+                balance = outface.balance
+                temperature = outface.temperature
+                energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 ) ? 0.0 : -outface.max_energy 
+                if (
+                    outface.target.sys_function === sf_storage
+                    &&
+                    outface.target.uac !== interface.source.uac  # never allow unloading of own storage load
+                    &&
+                    (
+                        input_index === nothing
+                        || unit.connectivity.storage_loading === nothing
+                        || unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
+                    )
+                )
+                    exchange = balance_on(outface, outface.target)
+                    storage_potential = exchange.storage_potential
+                else
+                    storage_potential = 0.0
+                end
+            end
 
-    if caller_is_input == false && interface.sum_abs_change == 0.0 # also need to check inputs of unit in order to sum up potential_energy_inputs, but only if necessary
+            if temperature !== nothing && balance < 0
+                highest_demand_temp = (
+                    temperature > highest_demand_temp ? temperature : highest_demand_temp
+                )
+            end
+
+            storage_potential_outputs += storage_potential  # is negative to be consistent with requested demand
+            energy_potential_outputs += energy_potential # is negative to be consistent with requested demand
+        end
+    end 
+
+    # iterate through infaces to get storage loading and energy input potential, only if caller is output
+    if caller_is_input == false
         for (idx, inface) in pairs(unit.input_interfaces)
             if inface.source.sys_function === sf_bus
                 exchange = balance_on(inface, inface.source)
+                storage_potential = exchange.storage_potential
                 energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
+                temperature = exchange.temperature
             else
+                balance = inface.balance
+                temperature = inface.temperature
                 energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
+                if (
+                    inface.source.sys_function === sf_storage
+                    &&
+                    inface.source.uac !== interface.target.uac # do not allow loading of own storage
+                    &&
+                    (
+                        output_index === nothing
+                        || unit.connectivity.storage_loading === nothing
+                        || unit.connectivity.storage_loading[get_connectivity_input_index(unit, idx)][output_index]
+                    )
+                )
+                    exchange = balance_on(inface, inface.source)
+                    storage_potential = exchange.storage_potential
+                else
+                    storage_potential = 0.0
+                end
             end
-            energy_potential_inputs += energy_potential
+
+            if temperature !== nothing && balance < 0
+                highest_demand_temp = (
+                    temperature > highest_demand_temp ? temperature : highest_demand_temp
+                )
+            end
+
+            storage_potential_inputs += storage_potential # is positive to be consistent with supplied supply
+            energy_potential_inputs += energy_potential # is positive to be consistent with supplied supply
         end
     end
-    # ToDo: consider connectivity matrix? For now, only the load and produce of storages are regulated 
-    #       in the connectivity matrix. For storages, max_energy is set to 0.0 in their control step, so
-    #       this needs not to be considered here for energy_potential.
+    # Note: For now, only the load and produce of storages are regulated in the connectivity matrix.
+    #       For storages, max_energy is set to 0.0 in their control step, so this doesn't need to be 
+    #       considered here for energy_potential.
     # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
-    #       energies that could be given or taken. For now, the potentials are only written in the control
-    #       step of fixed or bounded sinks and sources (including grid and PV) but not for transformers.
-    #       If an energy system connected to the interface of balane_on() has already been produces, the 
+    #       energies that could be given or taken.
+    #       If an energy system connected to the interface of balane_on() has already been produced, the 
     #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
-    #       calling energy system to avoid double counting.
+    #       calling energy system to avoid double counting of energies.
     balance_written = interface.sum_abs_change > 0.0
     return (
             balance = balance(unit),
-            storage_potential = caller_is_input ? storage_potential_outputs : 0.0,
-            energy_potential = balance_written ? 0.0 : (caller_is_input ? -abs(energy_potential_outputs) : abs(energy_potential_inputs)),
+            storage_potential = caller_is_input ? storage_potential_outputs : storage_potential_inputs,
+            energy_potential = balance_written ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
             temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
             )
 end

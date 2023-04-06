@@ -112,7 +112,7 @@ function test_ooo_storage_loading_switch()
     ]
 
     systems = Resie.load_systems(systems_config)
-    ooo = Resie.order_of_operations(systems)
+    ooo = Resie.calculate_order_of_operations(systems)
     @test pwc_steps_astr(expected, ooo) == ""
 end
 
