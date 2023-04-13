@@ -14,14 +14,15 @@ Use of Resie is described in more detail in the accompanying documentation. You 
 1. Switch into project directory: `cd /path/to/repo`
 1. Start the julia REPL with `julia`
 1. Switch to the package REPL with `]` (no enter necessary)
-1. Activate the environment and precompile Resie with `activate .`
+1. Activate the project environment: `activate .`
+1. Add required packages: `add ColorSchemes Debugger Infiltrator JSON PlotlyJS ResumableFunctions Test`
 1. Exit out of the package REPL with shortcut `Ctrl+c`
 1. Exit out of the julia REPL with `exit()`
 
 ## Usage
 
 1. Switch into project directory: `cd /path/to/resie`
-1. Run the simulation with `julia --project=. src/Resie.jl examples/example_two_sector.json`
+1. Run the simulation with `julia --project=. src/resie-cli.jl examples/example_two_sector.json`
 1. Outputs of the example projects can be found in `output/out.csv` and `output/info_dump.md`
 
 ## Testing
@@ -35,14 +36,10 @@ There are two ways to run tests, one using just the command line and one using t
 1. Switch into project directory: `cd /path/to/resie`
 1. Run the tests with `julia --project=. test/runtests.jl`
 
-**Note: At the moment this produces an erroneous output of "No project config file given", but as this does not affect test results, this can be ignored.**
-
 ### Using the REPL
 
 1. Switch into project directory: `cd /path/to/resie`
-1. Start the julia REPL with `julia`
-1. Switch to the package REPL with `]` (no enter necessary)
-1. Activate the environment and precompile Resie with `activate .`
+1. Start the julia REPL with `julia --project=.`
 1. Run the test suite with `test Resie`
 
 ### Enable testing in the VS Code debugger
