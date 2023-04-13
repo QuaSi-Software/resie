@@ -692,10 +692,10 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                 end
             end
 
-            # make sure that storages on the leave-busses are loaded right after the produce of transformers on leave-busses 
+            # make sure that storages on the leaf-busses are loaded right after the produce of transformers on leaf-busses 
             # (only if storage-loading is allowed by the connectivity matrix of the bus)
             # to avoid that other storages in the system uses the not requested energy that was indented to load the storage, 
-            # which can otherwise happen in the trunk bus or in other leave busses as well. 
+            # which can otherwise happen in the trunk bus or in other leaf busses as well. 
             for (_, storage) in pairs(storages)                                                         # iterate through all storages in the current bus_chain
                 for (_, storage_input_interface) in pairs(storage.input_interfaces)                     # and get input interface of storage. Usually ony one interface is present in storage, but for-loop is used here to identify the interface without the need of the medium name
                     if storage_input_interface.source.sys_function == EnergySystems.sf_bus              # check if source of storage is a bus
