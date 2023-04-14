@@ -209,41 +209,31 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 end
 
 """
-    main()
+    load_and_run(filepath)
 
-Entry point into the simulation engine. The simulation is controlled and configured by a
-config file.
+Load a project from the given file and run the simulation with it.
 
-# Command line arguments
-## Positional arguments
-- `String`: Filepath to the project config file (see documentation on file format). Can be
-a path relative to the CWD of the caller.
+# Arguments
+- `filepath::String`: Filepath to the project config file.
 """
-function main()
-    if length(ARGS) > 0
-        filepath = ARGS[1]
-        if filepath !== nothing && filepath != ""
-            project_config = nothing
+function load_and_run(filepath::String)
+    project_config = nothing
 
-            try
-                project_config = read_JSON(abspath(filepath))
-            catch exc
-                if isa(exc, MethodError)
-                    println("Could not parse project config file")
-                    return
-                end
-            end
-
-            run_simulation(project_config)
+    try
+        project_config = read_JSON(abspath(filepath))
+    catch exc
+        if isa(exc, MethodError)
+            println("Could not parse project config file")
             return
         end
+    end
 
-        println("Could not find or access project config file")
+    if project_config === nothing
+        println("Could not find or parse project config file")
         return
     end
 
-    println("No project config file argument given")
+    run_simulation(project_config)
 end
-main()
 
 end # module
