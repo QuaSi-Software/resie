@@ -581,7 +581,7 @@ end
 
 
 """
-    get_storage_loading_entry(bus, storage)
+    get_storage_loading_entry(bus, storage, source)
 
 checks if the storage has a limitation in the bus' storage_loading matrix coming from source and
 returns true (1 in storage_loading matrix) if not and false (0) if a limitation is present.
@@ -689,6 +689,33 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                         (last_element.uac, EnergySystems.s_load),
                         (storages[idx].uac, EnergySystems.s_load)
                     )
+                end
+            end
+
+            # make sure that storages on the leaf-busses are loaded right after the produce of transformers on leaf-busses 
+            # (only if storage-loading is allowed by the connectivity matrix of the bus)
+            # to avoid that other storages in the system uses the not requested energy that was indented to load the storage, 
+            # which can otherwise happen in the trunk bus or in other leaf busses as well. 
+            for (_, storage) in pairs(storages)                                                         # iterate through all storages in the current bus_chain
+                for (_, storage_input_interface) in pairs(storage.input_interfaces)                     # and get input interface of storage. Usually ony one interface is present in storage, but for-loop is used here to identify the interface without the need of the medium name
+                    if storage_input_interface.source.sys_function == EnergySystems.sf_bus              # check if source of storage is a bus
+                        for bus_input_interface in storage_input_interface.source.input_interfaces      # iterate through input interfaces of this bus
+                            if bus_input_interface.source.sys_function == EnergySystems.sf_transformer  # and check if they are fed by transformers. 
+                                if (                                                                    # if yes, check if the transfomer is allowed to load the storage
+                                    get_storage_loading_entry(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
+                                    &&                                                                  # and
+                                    storage_input_interface.source !== bus                              # do not consider the trunk bus
+                                )
+                                    place_one_lower!(                                                   # and then make sure that the load step of the storage is right after the produce step of the transformer
+                                        simulation_order,
+                                        (bus_input_interface.source.uac, EnergySystems.s_produce),
+                                        (storage.uac, EnergySystems.s_load),
+                                        force=true
+                                    )
+                                end
+                            end
+                        end
+                    end
                 end
             end
 

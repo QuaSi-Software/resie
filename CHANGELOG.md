@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.5.1
+* Added additional rule to the calculation of OoO that handles multiple buses with storages and transformers that feed energy into leaf busses. The added function adjusts the position of the load() step of the storages in the OoO to ensure that the energy from the leaf transformer is not fed into the wrong storage.
+
 ### Version 0.5.0
 * Split library and CLI part of Resie into two files. This allows including Resie as a library without immediately executing anything, which is especially useful for tests. At the moment the CLI does nothing but pipe arguments to the library part, but can be extended in the future, for example for additional commands other than running a simulation.
 
