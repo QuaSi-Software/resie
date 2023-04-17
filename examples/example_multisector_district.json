@@ -284,7 +284,7 @@
                 "name": "demand_driven",
                 "operation_profile_path": "profiles/district/4000hours_with_least_CO2_2022.prf"
             },
-            "power": 750000,
+            "power": 600000,
             "output_temperature": 50.0
         },
         "TST_CHP_01": {
@@ -296,11 +296,11 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "load_storages": false
+                "load_storages": true
             },
-            "power": 300000,
+            "power": 150000,
             "output_temperature": 60,
-            "min_power_fraction": 0.0
+            "min_power_fraction": 1.0
         },
         "TST_GBO_01": {
             "type": "GasBoiler",
@@ -322,7 +322,7 @@
             "production_refs": [
                 "TST_BUS_TH_01"
             ],
-            "capacity": 800000,
+            "capacity": 500000,
             "load": 0,
             "high_temperature": 60.0
         },
@@ -332,7 +332,7 @@
             "production_refs": [
                 "TST_BUS_TH_02"
             ],
-            "capacity": 800000,
+            "capacity": 500000,
             "load": 150000,
             "high_temperature": 60.0
         },
@@ -343,7 +343,7 @@
                 "TST_HTP_01"
             ],
             "capacity": 400000000,
-            "load": 200000000,
+            "load": 190000000,
             "high_temperature": 60.0
         },
         "TST_HTP_01": {
@@ -369,7 +369,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 330000,
+            "power": 300000,
             "fixed_cop": 3.5
         }
     }
