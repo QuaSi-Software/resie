@@ -208,7 +208,7 @@
             ],
             "capacity": 4000000,
             "load": 2000000,
-            "high_temperature": 50
+            "high_temperature": 75
         },
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
