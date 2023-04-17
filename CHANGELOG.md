@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.5.2
+* updated example input files and their profile data (now given in specific values related to the net floor area or net PV area)
+
 ### Version 0.5.1
 * Added additional rule to the calculation of OoO that handles multiple buses with storages and transformers that feed energy into leaf busses. The added function adjusts the position of the load() step of the storages in the OoO to ensure that the energy from the leaf transformer is not fed into the wrong storage.
 
