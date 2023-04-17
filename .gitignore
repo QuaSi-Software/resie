@@ -12,3 +12,4 @@ info_dump.md
 
 # input files (test data and templates are added separately)
 *.json
+profiles/district/230413_profiles_management.xlsx
