@@ -1,6 +1,8 @@
 # Resie - simulation engine for district-scale networks of energy systems
 
-Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [TBD](http://example.com). This document describes installation and basic instructions, particularly for developers.
+Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi.readthedocs.io). This document describes installation and basic instructions, particularly for developers.
+
+Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. For information on how you can contribute please check the documentation.
 
 ## Installation
 
