@@ -14,6 +14,10 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.5.3
+* Choose license: MIT
+* Update link to documentation
+
 ### Version 0.5.2
 * updated example input files and their profile data (now given in specific values related to the net floor area or net PV area)
 
