@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.5.4
+* Fix link to documentation
+
 ### Version 0.5.3
 * Choose license: MIT
 * Update link to documentation
