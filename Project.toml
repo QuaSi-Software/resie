@@ -1,7 +1,7 @@
 name = "Resie"
 uuid = "2e0f99b1-0d8f-4296-8d0c-1c50a50d04c8"
 authors = ["Etienne Ott <etienne.ott@siz-energieplus.de>", "Heiner Steinacker <heiner.steinacker@siz-energieplus.de>"]
-version = "0.5.4"
+version = "0.5.5"
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
