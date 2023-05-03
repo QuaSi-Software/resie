@@ -174,7 +174,7 @@ function create_profile_line_plots(
     y = outputs_plot_data[:, 2:end]
     traces = GenericTrace[]
     for i in axes(y, 2)
-        trace = scatter(x=x / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+        trace = scatter(x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
         if axis[i] == "right"
             trace.yaxis = "y2"
         else  # default is left axis
@@ -184,7 +184,7 @@ function create_profile_line_plots(
     end
 
     layout = Layout(title_text="Plot of outputs as defined in the input-file",
-        xaxis_title_text="Time [min]",
+        xaxis_title_text="Time [hour]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))
 
