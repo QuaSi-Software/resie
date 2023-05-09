@@ -279,10 +279,10 @@ end
 
 
 """
-    highest_temperature(rature_1, temperature_2)::Temperature
+    highest_temperature(temperature_1, temperature_2)::Temperature
 
-Returns the smallest temperature::Temperature and handles nothing-values:
-- If both of the inputs are floats, the minimum will be returned.
+Returns the highest temperature::Temperature and handles nothing-values:
+- If both of the inputs are floats, the maximum will be returned.
 - If one of the inputs is nothing and one a float, the float will be returned.
 - If both of the inputs are nothing, nothing will be returned.
 """
@@ -548,6 +548,8 @@ include("connections/bus.jl")
 include("storage/battery.jl")
 include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
+include("heat_sources/geothermal_probes.jl")
+include("heat_sources/geothermal_heat_collectors.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
 include("heat_producers/gas_boiler.jl")
