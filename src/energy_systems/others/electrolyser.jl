@@ -173,7 +173,6 @@ end
 function calculate_energies(
     unit::Electrolyser,
     parameters::Dict{String,Any},
-    watt_to_wh::Function,
     potentials::Vector{Float64}
 )
     potential_energy_el_in = potentials[1]
@@ -246,8 +245,7 @@ end
 
 function potential(
     unit::Electrolyser,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
@@ -278,7 +276,7 @@ function potential(
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         [
             potential_energy_el_in, potential_storage_el_in,
             potential_energy_heat_out, potential_storage_heat_out,
@@ -294,7 +292,7 @@ function potential(
     end
 end
 
-function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::Electrolyser, parameters::Dict{String,Any})
     potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
@@ -324,7 +322,7 @@ function produce(unit::Electrolyser, parameters::Dict{String,Any}, watt_to_wh::F
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         [
             potential_energy_el_in, potential_storage_el_in,
             potential_energy_heat_out, potential_storage_heat_out,

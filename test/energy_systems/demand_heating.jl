@@ -4,9 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts::Float64)
-    watts * 900 / 3600.0
-end
+EnergySystems.set_timestep(900)
 
 function test_demand_heating_temperature_values()
     systems_config = Dict{String,Any}(
@@ -45,7 +43,7 @@ function test_demand_heating_temperature_values()
     @test demand.load == 75.0
     @test demand.temperature == 55.0
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0

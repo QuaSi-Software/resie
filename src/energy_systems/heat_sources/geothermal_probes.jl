@@ -189,7 +189,7 @@ end
 
 # produce function that provides energy from the geothermal probes and calculates new temperatures 
 # according to actual delivered or received energy
-function produce(unit::GeothermalProbes, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::GeothermalProbes, parameters::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]  # output interface
     exchange = balance_on(outface, outface.target)     # gather information of output interface
@@ -228,7 +228,7 @@ function produce(unit::GeothermalProbes, parameters::Dict{String,Any}, watt_to_w
 
 end
 
-function load(unit::GeothermalProbes, parameters::Dict{String,Any}, watt_to_wh::Function)
+function load(unit::GeothermalProbes, parameters::Dict{String,Any})
     # we can assume that energy will be either be taken from or fed into the geothermal probe field within one time step,
     # but not both within one time step - right? Therefore we can call calculate_new_probe_field_temperatures!() from produce
     # and from load, but it will never be calculated twice as only one call will be performed with energy>0. If both load

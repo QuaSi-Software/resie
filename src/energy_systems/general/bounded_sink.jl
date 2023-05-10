@@ -85,7 +85,7 @@ function control(
 
 end
 
-function produce(unit::BoundedSink, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::BoundedSink, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     if exchange.balance > 0.0

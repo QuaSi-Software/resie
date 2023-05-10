@@ -4,9 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts::Float64)
-    watts * 900 / 3600.0
-end
+EnergySystems.set_timestep(900)
 
 function test_multiple_transformer_with_limitations()
     systems_config = Dict{String,Any}(
@@ -102,12 +100,12 @@ function test_multiple_transformer_with_limitations()
     EnergySystems.control(grid_el2, systems, simulation_parameters)
     EnergySystems.control(grid_o2, systems, simulation_parameters)
 
-    EnergySystems.produce(demand_heat, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(demand_h2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand_heat, simulation_parameters)
+    EnergySystems.produce(demand_h2, simulation_parameters)
     @test demand_heat.input_interfaces[demand_heat.medium].balance ≈ -2240/4
     @test demand_h2.input_interfaces[demand_h2.medium].balance ≈ -2400/4
 
-    EnergySystems.potential(heat_pump, simulation_parameters, watt_to_wh)
+    EnergySystems.potential(heat_pump, simulation_parameters)
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy ≈ 2240/4 * ((3.5-1)/3.5)
     @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy ≈ 2240/4 / 3.5
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy ≈ 2240/4
@@ -117,7 +115,7 @@ function test_multiple_transformer_with_limitations()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ -2400/4/0.6*0.4
 
-    EnergySystems.potential(electrolyser, simulation_parameters, watt_to_wh)
+    EnergySystems.potential(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].max_energy ≈ 2400/4/0.6*0.4
     @test electrolyser.output_interfaces[electrolyser.m_h2_out].max_energy ≈ 2400/4
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy ≈ 2400/4/2
@@ -133,7 +131,7 @@ function test_multiple_transformer_with_limitations()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 2400/4/0.6*0.4
 
-    EnergySystems.produce(electrolyser, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].balance ≈ 1600/4
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].sum_abs_change ≈ 1600/4
     @test electrolyser.output_interfaces[electrolyser.m_h2_out].balance ≈ 0
@@ -141,15 +139,15 @@ function test_multiple_transformer_with_limitations()
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].balance ≈ 0.5*2400/4
     @test electrolyser.input_interfaces[electrolyser.m_el_in].balance ≈ -4000/4
 
-    EnergySystems.produce(heat_pump, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 2*2240/4
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -640/4
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0
 
-    EnergySystems.produce(grid_el1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid_el2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid_o2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid_el1, simulation_parameters)
+    EnergySystems.produce(grid_el2, simulation_parameters)
+    EnergySystems.produce(grid_o2, simulation_parameters)
     @test grid_o2.input_interfaces[grid_o2.medium].balance ≈ 0
     @test grid_o2.input_interfaces[grid_o2.medium].sum_abs_change ≈ 2*0.5*2400/4
     @test grid_el1.output_interfaces[grid_el1.medium].balance ≈ 0
@@ -183,12 +181,12 @@ function test_multiple_transformer_with_limitations()
     EnergySystems.control(grid_el2, systems, simulation_parameters)
     EnergySystems.control(grid_o2, systems, simulation_parameters)
 
-    EnergySystems.produce(demand_heat, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(demand_h2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand_heat, simulation_parameters)
+    EnergySystems.produce(demand_h2, simulation_parameters)
     @test demand_heat.input_interfaces[demand_heat.medium].balance ≈ -2240/4
     @test demand_h2.input_interfaces[demand_h2.medium].balance ≈ -0.5*2400/4
 
-    EnergySystems.potential(heat_pump, simulation_parameters, watt_to_wh)
+    EnergySystems.potential(heat_pump, simulation_parameters)
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy ≈ 2240/4 * ((3.5-1)/3.5)
     @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy ≈ 2240/4 / 3.5
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy ≈ 2240/4
@@ -198,7 +196,7 @@ function test_multiple_transformer_with_limitations()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ -2400/4/0.6*0.4
 
-    EnergySystems.potential(electrolyser, simulation_parameters, watt_to_wh)
+    EnergySystems.potential(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].max_energy ≈ 0.5*2400/4/0.6*0.4
     @test electrolyser.output_interfaces[electrolyser.m_h2_out].max_energy ≈ 0.5*2400/4
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy ≈ 0.5*2400/4/2
@@ -214,8 +212,8 @@ function test_multiple_transformer_with_limitations()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.5*2400/4/0.6*0.4
 
-    EnergySystems.produce(electrolyser, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(heat_pump, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(electrolyser, simulation_parameters)
+    EnergySystems.produce(heat_pump, simulation_parameters)
     
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -0.5*2240/4
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 560+560/2
@@ -231,9 +229,9 @@ function test_multiple_transformer_with_limitations()
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].balance ≈ 0.5*0.5*2400/4
     @test electrolyser.input_interfaces[electrolyser.m_el_in].balance ≈ -0.5*4000/4
 
-    EnergySystems.produce(grid_el1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid_el2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid_o2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid_el1, simulation_parameters)
+    EnergySystems.produce(grid_el2, simulation_parameters)
+    EnergySystems.produce(grid_o2, simulation_parameters)
     @test grid_o2.input_interfaces[grid_o2.medium].balance ≈ 0
     @test grid_o2.input_interfaces[grid_o2.medium].sum_abs_change ≈ 2*0.5*0.5*2400/4
     @test grid_el1.output_interfaces[grid_el1.medium].balance ≈ 0

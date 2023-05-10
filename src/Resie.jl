@@ -60,6 +60,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         "time_step_seconds" => time_step,
         "epsilon" => 1e-9
     )
+    EnergySystems.set_timestep(parameters["time_step_seconds"])
 
     outputs = output_keys(systems, project_config["io_settings"]["output_keys"])
     reset_file(project_config["io_settings"]["output_file"], outputs)

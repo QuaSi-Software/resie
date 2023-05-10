@@ -4,9 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts::Float64)
-    watts * 900 / 3600.0
-end
+EnergySystems.set_timestep(900)
 
 function test_extended_storage_control_strategy_allow_loading_by_storage()
     systems_config = Dict{String,Any}(
@@ -130,30 +128,30 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
     EnergySystems.control(storage_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
 
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(boiler, simulation_parameters)
     @test boiler.output_interfaces[boiler.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_2, simulation_parameters)
     @test storage_2.output_interfaces[storage_2.medium].balance == 2500.0
     @test storage_2.load == 20000.0 - 2500.0
 
-    EnergySystems.produce(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_1, simulation_parameters)
     @test storage_1.output_interfaces[storage_1.medium].balance == 20000.0
     @test storage_1.load == 0
 
-    EnergySystems.load(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_2, simulation_parameters)
     @test storage_2.input_interfaces[storage_2.medium].balance == -20000.0
     @test storage_2.load == 40000.0 - 2500.0
 
-    EnergySystems.load(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_1, simulation_parameters)
     @test storage_1.input_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_1)
     @test storage_2.input_interfaces[storage_2.medium].balance == 0.0
@@ -282,30 +280,30 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
     EnergySystems.control(storage_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
 
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(boiler, simulation_parameters)
     @test boiler.output_interfaces[boiler.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_2, simulation_parameters)
     @test storage_2.output_interfaces[storage_2.medium].balance == 2500.0
     @test storage_2.load == 20000.0 - 2500.0
 
-    EnergySystems.produce(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_1, simulation_parameters)
     @test storage_1.output_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 20000.0
 
-    EnergySystems.load(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_2, simulation_parameters)
     @test storage_2.input_interfaces[storage_2.medium].balance == 0.0
     @test storage_2.load == 20000.0 - 2500.0
 
-    EnergySystems.load(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_1, simulation_parameters)
     @test storage_1.input_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 20000.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_1)
   
@@ -441,30 +439,30 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.control(storage_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
 
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(boiler, simulation_parameters)
     @test boiler.output_interfaces[boiler.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_2, simulation_parameters)
     @test storage_2.output_interfaces[storage_2.medium].balance == 2500.0
     @test storage_2.load == 20000.0 - 2500.0
 
-    EnergySystems.produce(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_1, simulation_parameters)
     @test storage_1.output_interfaces[storage_1.medium].balance == 20000.0
     @test storage_1.load == 0
 
-    EnergySystems.load(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_2, simulation_parameters)
     @test storage_2.input_interfaces[storage_2.medium].balance == -20000.0
     @test storage_2.load == 40000.0 - 2500.0
 
-    EnergySystems.load(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_1, simulation_parameters)
     @test storage_1.input_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_1)
     @test storage_2.input_interfaces[storage_2.medium].balance == 0.0
@@ -493,30 +491,30 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.control(storage_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
 
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(boiler, simulation_parameters)
     @test boiler.output_interfaces[boiler.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_2, simulation_parameters)
     @test storage_2.output_interfaces[storage_2.medium].balance == 0.0
     @test storage_2.load == 40000.0 - 2500.0
 
-    EnergySystems.produce(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(storage_1, simulation_parameters)
     @test storage_1.output_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 0
 
-    EnergySystems.load(storage_2, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_2, simulation_parameters)
     @test storage_2.input_interfaces[storage_2.medium].balance == -500.0
     @test storage_2.load == 40000.0 - 2500.0 + 500.0
 
-    EnergySystems.load(storage_1, simulation_parameters, watt_to_wh)
+    EnergySystems.load(storage_1, simulation_parameters)
     @test storage_1.input_interfaces[storage_1.medium].balance == 0.0
     @test storage_1.load == 0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_1)
     @test storage_2.input_interfaces[storage_2.medium].balance == 0.0
