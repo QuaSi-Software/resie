@@ -115,7 +115,6 @@ function control(
         # sets max_energy to zero if requested/available temperature does not fit to temperature of geothermal probe field.
         # This works as the control step of transformers is always calculated earlier than the one of storages. If temperatures
         # are written to the connected interface by a transformer, this is already done at this point.
-        # ToDo: what if GTP is connected to Bus?!
     if unit.output_interfaces[unit.m_heat_out].temperature > unit.current_output_temperature
         unit.max_output_energy = 0.0  # no energy can be provided if requested temperature is higher than max. temperature of probe field
     else
