@@ -60,7 +60,7 @@ function test_heat_pump_demand_driven_correct_order()
     @test heat_pump.controller.state_machine.state == 1
 
     # first time step: demand is below max power of source (adjusted for additional input
-    # of electricity), small delta T leads to high COP = 4.594631
+    # of electricity), small delta T leads to high COP = 12.725999999999999
 
     for unit in values(systems)
         EnergySystems.reset(unit)
@@ -91,22 +91,22 @@ function test_heat_pump_demand_driven_correct_order()
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 1800
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature == 45
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -195.88077047954445
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -70.7213578500708
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -704.1192295204555
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -829.2786421499292
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature == 35
 
     EnergySystems.produce(source, simulation_parameters, watt_to_wh)
     @test source.output_interfaces[source.medium].balance ≈ 0
-    @test source.output_interfaces[source.medium].sum_abs_change ≈ 1408.238459040911
+    @test source.output_interfaces[source.medium].sum_abs_change ≈ 1658.5572842998583
     @test source.output_interfaces[source.medium].temperature == 35
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
-    @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 391.7615409590889
+    @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 141.4427157001416 
     @test grid.output_interfaces[grid.medium].temperature === nothing
 
-    # second step: demand is above max power of source, big delta T leads to low COP = 1.326097
+    # second step: demand is above max power of source, big delta T leads to low COP = 3.4814999999999996
 
     for unit in values(systems)
         EnergySystems.reset(unit)
@@ -134,10 +134,10 @@ function test_heat_pump_demand_driven_correct_order()
     @test demand.input_interfaces[demand.medium].temperature == 75
 
     EnergySystems.produce(heat_pump, simulation_parameters, watt_to_wh)
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -2100 + 500*(1.3260976318269297/(1.3260976318269297-1))
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 2100 + 500*(1.3260976318269297/(1.3260976318269297-1))
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -2100 + 500*(3.4814999999999996/(3.4814999999999996-1))
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 2100 + 500*(3.4814999999999996/(3.4814999999999996-1))
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature == 75
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(500*(1.3260976318269297/(1.3260976318269297-1)) - 500)
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(500*(3.4814999999999996/(3.4814999999999996-1)) - 500)
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -500
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature == 35
@@ -149,7 +149,7 @@ function test_heat_pump_demand_driven_correct_order()
 
     EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
-    @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*(500*(1.3260976318269297/(1.3260976318269297-1)) - 500)
+    @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*(500*(3.4814999999999996/(3.4814999999999996-1)) - 500)
     @test grid.output_interfaces[grid.medium].temperature === nothing
 end
 
