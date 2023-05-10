@@ -514,12 +514,7 @@ function reorder_for_input_priorities(simulation_order, systems, systems_by_func
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every system following after...
             for other_idx = own_idx+1:length(bus.connectivity.input_order)
-                # ...is of a lower priority in control, potential and produce
-                place_one_lower!(
-                    simulation_order,
-                    (bus.connectivity.input_order[own_idx], EnergySystems.s_control),
-                    (bus.connectivity.input_order[other_idx], EnergySystems.s_control)
-                )
+                # ...is of a lower priority in potential and produce
                 place_one_lower!(
                     simulation_order,
                     (bus.connectivity.input_order[own_idx], EnergySystems.s_potential),

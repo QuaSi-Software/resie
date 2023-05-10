@@ -14,6 +14,11 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+### Version 0.5.6
+* Calculation of COP of heat pump changed from dummy implementation to Carnot COP with 40% efficiency and adjusted tests accordingly.
+* OoO for control steps changed: The OoO of the controls now corresponds to the base order without any rearrangement! This was necessary to ensure that the transformers are controlled before the storages. Tests were adapted accordingly.
+* Added dummy implementation and example file for geothermal probes and geothermal heat collectors.
+  
 ### Version 0.5.5
 * minor changes in the output line plot and exemplary input files
 

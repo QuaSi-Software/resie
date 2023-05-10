@@ -102,9 +102,8 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     if (in_temp === nothing || out_temp === nothing)
         return nothing
     end
-
-    delta_t = out_temp - in_temp
-    return 8.0 * exp(-0.08 * delta_t) + 1
+    
+    return 0.4 * (273.15 + out_temp) / (out_temp - in_temp) # Carnot-COP with 40 % efficiency
 end
 
 function check_el_in(
@@ -304,7 +303,7 @@ function potential(
         return
     end
         
-    # quit if available temperature is higher than optionally given input_temperature
+    # quit if available temperature is lower than optionally given input_temperature
     if unit.input_temperature !== nothing && in_temp < unit.input_temperature
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return

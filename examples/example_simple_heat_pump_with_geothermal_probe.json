@@ -1,0 +1,130 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+        },
+        "output_plot": {
+            "1": {
+                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_HP_01": ["m_e_ac_230v IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_HP_01": ["COP"]},
+                "axis": "left",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "5": {
+                "key": {"TST_DEM_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_GTP_01": ["Temperature_1"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "7": {
+                "key": {"TST_GTP_01": ["Temperature_10"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "8": {
+                "key": {"TST_GTP_01": ["Temperature_99"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "9": {
+                "key": {"TST_GTP_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "10": {
+                "key": {"TST_STH_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 86400,
+        "time_step_seconds": 900
+    },
+    "energy_systems": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "production_refs": [],
+            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "static_temperature": 45,
+            "scale": 100
+        },
+        "TST_STH_01": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "m_el_out": "m_h_w_ht1",
+            "production_refs": [
+                "TST_GTP_01"
+            ],
+            "energy_profile_file_path": "./profiles/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
+            "scale": 50
+        },
+        "TST_GTP_01": {
+            "type": "GeothermalProbes",
+            "m_heat_out": "m_h_w_lt1",
+            "control_refs": [],
+            "production_refs": [
+                "TST_HP_01"
+            ],
+            "ambient_temperature_profile_path": "./profiles/district/ambient_temperature_TRY2015_Stuttgart.prf",
+            "max_output_power": 600,
+            "max_input_power": 300,
+            "regeneration": true      
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "production_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "control_refs": [ ],
+            "production_refs": [
+                "TST_DEM_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 9000,
+            "min_power_fraction": 0.0
+        }
+    }
+}

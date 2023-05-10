@@ -50,11 +50,11 @@ function test_input_priorities_reordered_inputs()
     ]
     expected = [
         [100, ("TST_BUS_03", EnergySystems.s_control)],
-        [97, ("TST_BUS_01", EnergySystems.s_control)],
+        [99, ("TST_BUS_01", EnergySystems.s_control)],
         [98, ("TST_BUS_02", EnergySystems.s_control)],
-        [96, ("TST_BUS_03", EnergySystems.s_produce)],
-        [93, ("TST_BUS_01", EnergySystems.s_produce)],
-        [94, ("TST_BUS_02", EnergySystems.s_produce)],
+        [97, ("TST_BUS_03", EnergySystems.s_produce)],
+        [94, ("TST_BUS_01", EnergySystems.s_produce)],
+        [95, ("TST_BUS_02", EnergySystems.s_produce)],
     ]
     Resie.reorder_for_input_priorities(steps, systems, by_function)
     @test pwc_steps_astr(expected, steps) == ""
