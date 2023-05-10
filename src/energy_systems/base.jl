@@ -29,6 +29,29 @@ Convenience function to get the value of a key from a config dict using a defaul
 default(config::Dict{String,Any}, name::String, default_val::Any)::Any =
     return name in keys(config) ? config[name] : default_val
 
+
+"""
+The number of hours per time step, used by various utility functions.
+"""
+HOURS_PER_TIME_STEP::Float64 = 0.25
+
+"""
+Update the time step, in seconds.
+"""
+function set_timestep(step_seconds::Integer)
+    global HOURS_PER_TIME_STEP = Float64(step_seconds) / 3600.0
+end
+
+"""
+Calculate energy from power by using the simulation time step.
+
+This function must be assigned a method after simulation parameters (such as the timestep)
+have been loaded.
+"""
+function watt_to_wh(watts::Float64)
+    return watts * HOURS_PER_TIME_STEP
+end
+
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
@@ -409,43 +432,39 @@ function control(
 end
 
 """
-    potential(unit, parameters, watt_to_wh)
+    potential(unit, parameters)
 
 Calculate potential energy consumption/production for the given energy system.
 
 # Arguments
 - `unit::ControlledSystem`: The system for which potentials are calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
-- `watt_to_wh::Function`: Utility function to calculate work from a given power
 """
 function potential(
     unit::ControlledSystem,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    produce(unit, parameters, watt_to_wh)
+    produce(unit, parameters)
 
 Perform the production calculations for the given energy system.
 
 # Arguments
 - `unit::ControlledSystem`: The system for which production is calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
-- `watt_to_wh::Function`: Utility function to calculate work from a given power
 """
 function produce(
     unit::ControlledSystem,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    load(unit, parameters, watt_to_wh)
+    load(unit, parameters)
 
 Load excess energy into storage energy systems.
 
@@ -454,12 +473,10 @@ For non-storage systems this function does nothing.
 # Arguments
 - `unit::ControlledSystem`: The system for which production is calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
-- `watt_to_wh::Function`: Utility function to calculate work from a given power
 """
 function load(
     unit::ControlledSystem,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
@@ -680,10 +697,6 @@ function perform_steps(
     order_of_operations::StepInstructions,
     parameters::Dict{String,Any}
 )
-    watt_to_wh = function (watts::Float64)
-        watts * Float64(parameters["time_step_seconds"]) / 3600.0
-    end
-
     for entry in order_of_operations
         unit = systems[entry[1]]
         step = entry[2]
@@ -693,11 +706,11 @@ function perform_steps(
         elseif step == s_control
             control(unit, systems, parameters)
         elseif step == s_potential
-            potential(unit, parameters, watt_to_wh)
+            potential(unit, parameters)
         elseif step == s_produce
-            produce(unit, parameters, watt_to_wh)
+            produce(unit, parameters)
         elseif step == s_load
-            load(unit, parameters, watt_to_wh)
+            load(unit, parameters)
         elseif step == s_distribute
             distribute!(unit)
         end

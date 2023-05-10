@@ -4,9 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts::Float64)
-    watts * 900 / 3600.0
-end
+EnergySystems.set_timestep(900)
 
 function test_busses_communicate_demand()
     systems_config = Dict{String,Any}(
@@ -105,7 +103,7 @@ function test_busses_communicate_demand()
     @test exchange.energy_potential ≈ Inf
     @test exchange.temperature === 55.0 # is not nothing as temperature is given in interface from demand
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance ≈ -75.0
     @test demand.input_interfaces[demand.medium].temperature === 55.0
@@ -135,9 +133,9 @@ function test_busses_communicate_demand()
     @test exchange.energy_potential ≈ 0.0 # balance in current interface already written!
     @test exchange.temperature === 55.0 # is not nothing as temperature is given in interface from demand
 
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
+    EnergySystems.produce(grid, simulation_parameters)
 
     # everything produced --> energy_potential should be zero!
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
@@ -348,8 +346,8 @@ function test_demand_over_busses_supply_is_transformer()
     @test exchange.energy_potential ≈ 0.0 # gasboiler is not doing potential() step, therefore max_energy is not written
     @test exchange.temperature === 60.0
 
-    EnergySystems.produce(demand_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(demand_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand_2, simulation_parameters)
+    EnergySystems.produce(demand_1, simulation_parameters)
 
     # demand already produced --> balance is not zero anymore, but energy_potential
     # input interfaces
@@ -399,10 +397,10 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_2) ≈ -1000.0
     @test EnergySystems.balance(bus_1) ≈ -2000.0
 
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_3, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
+    EnergySystems.produce(bus_3, simulation_parameters)
+    EnergySystems.produce(boiler, simulation_parameters)
 
     # gasboiler already produced --> balance and energy_potential is zero
     # input interfaces
@@ -449,7 +447,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_1) ≈ 0.0
     @test boiler.input_interfaces[boiler.m_gas_in].balance ≈ -2000.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance ≈ -1000.0
     @test demand_1.input_interfaces[demand_1.medium].temperature === 60.0
@@ -508,8 +506,8 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test EnergySystems.balance(bus_3) ≈ 0.0
 
-    EnergySystems.produce(demand_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(demand_1, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand_2, simulation_parameters)
+    EnergySystems.produce(demand_1, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance ≈ -1000.0
     @test demand_1.input_interfaces[demand_1.medium].temperature === 60.0
@@ -519,10 +517,10 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_2) ≈ -1000.0
     @test EnergySystems.balance(bus_1) ≈ -2000.0
 
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_3, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(boiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
+    EnergySystems.produce(bus_3, simulation_parameters)
+    EnergySystems.produce(boiler, simulation_parameters)
 
     # busses don't consider output priority in the balance() function, so bus_2 also
     # thinks it has a negative balance even though it will later, in distribute(), be
@@ -532,7 +530,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_1) ≈ -500.0
     @test boiler.input_interfaces[boiler.m_gas_in].balance ≈ -1500.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance ≈ -1000.0
     @test demand_1.input_interfaces[demand_1.medium].temperature === 60.0
@@ -692,7 +690,7 @@ function test_busses_communicate_storage_potential()
     @test exchange.energy_potential ≈ Inf
     @test exchange.temperature === 55.0
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
 
     exchange = EnergySystems.balance_on(
         tank_2.output_interfaces[tank_2.medium], bus_2
@@ -710,13 +708,13 @@ function test_busses_communicate_storage_potential()
     @test exchange.energy_potential ≈ 0.0
     @test exchange.temperature === 55.0
 
-    EnergySystems.produce(bus_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(tank_2, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(bus_1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(tank_1, simulation_parameters, watt_to_wh)
-    EnergySystems.load(tank_2, simulation_parameters, watt_to_wh)
-    EnergySystems.load(tank_1, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus_2, simulation_parameters)
+    EnergySystems.produce(tank_2, simulation_parameters)
+    EnergySystems.produce(bus_1, simulation_parameters)
+    EnergySystems.produce(tank_1, simulation_parameters)
+    EnergySystems.load(tank_2, simulation_parameters)
+    EnergySystems.load(tank_1, simulation_parameters)
+    EnergySystems.produce(grid, simulation_parameters)
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_1)
 

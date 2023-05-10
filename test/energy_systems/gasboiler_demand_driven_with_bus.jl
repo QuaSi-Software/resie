@@ -4,9 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-watt_to_wh = function (watts::Float64)
-    watts * 900 / 3600.0
-end
+EnergySystems.set_timestep(900)
 
 function test_gasboiler_demand_driven_with_bus()
     systems_config = Dict{String,Any}(
@@ -92,7 +90,7 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000/4
     @test demand.input_interfaces[demand.medium].temperature ≈ 85
 
@@ -102,12 +100,12 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 12000/4
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*12000/4
 
@@ -149,7 +147,7 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4
     @test demand.input_interfaces[demand.medium].temperature ≈ 85
 
@@ -159,12 +157,12 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 12000/4
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*12000/4
 
@@ -206,7 +204,7 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000/4
     @test demand.input_interfaces[demand.medium].temperature ≈ 85
 
@@ -216,12 +214,12 @@ function test_gasboiler_demand_driven_with_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(bus, simulation_parameters, watt_to_wh)
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 10000/4
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -10000/4
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*10000/4
 
@@ -306,7 +304,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential == -Inf
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
 
@@ -316,7 +314,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 2*12000/4
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
@@ -329,7 +327,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*12000/4
 
@@ -363,7 +361,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential == -Inf
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
 
@@ -373,7 +371,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ -15000/4 + 12000/4
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 12000/4 + 15000/4
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -12000/4
@@ -386,7 +384,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*12000/4
 
@@ -420,7 +418,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential == -Inf
 
-    EnergySystems.produce(demand, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000/4
     @test demand.input_interfaces[demand.medium].temperature == 85
 
@@ -430,7 +428,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(gasboiler, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 2*10000/4 
     @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -10000/4
@@ -443,7 +441,7 @@ function test_gasboiler_demand_driven_without_bus()
     @test exchange.storage_potential ≈ 0.0
     @test exchange.energy_potential ≈ 0.0
 
-    EnergySystems.produce(grid, simulation_parameters, watt_to_wh)
+    EnergySystems.produce(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 2*10000/4
 

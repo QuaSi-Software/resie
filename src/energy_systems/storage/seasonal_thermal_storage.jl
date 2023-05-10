@@ -89,7 +89,7 @@ function balance_on(
             )
 end
 
-function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
@@ -125,7 +125,7 @@ function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, wat
     end
 end
 
-function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any}, watt_to_wh::Function)
+function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchange = balance_on(inface, inface.source)
     supply_temp = exchange.temperature

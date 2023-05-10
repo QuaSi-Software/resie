@@ -58,7 +58,7 @@ function balance_on(
             )
 end
 
-function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::Battery, parameters::Dict{String,Any})
     if unit.controller.state_machine.state != 2
         return
     end
@@ -91,7 +91,7 @@ function produce(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Functi
     end
 end
 
-function load(unit::Battery, parameters::Dict{String,Any}, watt_to_wh::Function)
+function load(unit::Battery, parameters::Dict{String,Any})
     if unit.controller.state_machine.state != 1
         return
     end

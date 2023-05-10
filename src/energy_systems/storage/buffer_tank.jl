@@ -86,7 +86,7 @@ function balance_on(
             )
 end
 
-function produce(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::BufferTank, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
@@ -122,7 +122,7 @@ function produce(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Fun
     end
 end
 
-function load(unit::BufferTank, parameters::Dict{String,Any}, watt_to_wh::Function)
+function load(unit::BufferTank, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     supply_temp = exchange.temperature

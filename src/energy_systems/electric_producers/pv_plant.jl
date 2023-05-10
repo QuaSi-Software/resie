@@ -72,7 +72,7 @@ function control(
 end
 
 
-function produce(unit::PVPlant, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::PVPlant, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
 end

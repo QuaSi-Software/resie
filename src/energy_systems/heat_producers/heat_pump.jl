@@ -186,7 +186,6 @@ end
 function calculate_energies(
     unit::HeatPump,
     parameters::Dict{String,Any},
-    watt_to_wh::Function,
     temperatures::Tuple{Temperature, Temperature},
     potentials::Vector{Float64}
 )
@@ -258,8 +257,7 @@ end
 
 function potential(
     unit::HeatPump,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
@@ -316,7 +314,7 @@ function potential(
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,
@@ -332,7 +330,7 @@ function potential(
     end
 end
 
-function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::HeatPump, parameters::Dict{String,Any})
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
@@ -388,7 +386,7 @@ function produce(unit::HeatPump, parameters::Dict{String,Any}, watt_to_wh::Funct
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,

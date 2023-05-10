@@ -113,7 +113,6 @@ end
 function calculate_energies(
     unit::GasBoiler,
     parameters::Dict{String,Any},
-    watt_to_wh::Function,
     potentials::Vector{Float64}
 )
     potential_energy_gas_in = potentials[1]
@@ -169,8 +168,7 @@ end
 
 function potential(
     unit::GasBoiler,
-    parameters::Dict{String,Any},
-    watt_to_wh::Function
+    parameters::Dict{String,Any}
 )
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
@@ -185,7 +183,7 @@ function potential(
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         [
             potential_energy_gas_in, potential_storage_gas_in,
             potential_energy_heat_out, potential_storage_heat_out
@@ -199,7 +197,7 @@ function potential(
     end
 end
 
-function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Function)
+function produce(unit::GasBoiler, parameters::Dict{String,Any})
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0)
@@ -213,7 +211,7 @@ function produce(unit::GasBoiler, parameters::Dict{String,Any}, watt_to_wh::Func
     end
 
     energies = calculate_energies(
-        unit, parameters, watt_to_wh,
+        unit, parameters,
         [
             potential_energy_gas_in, potential_storage_gas_in,
             potential_energy_heat_out, potential_storage_heat_out
