@@ -21,7 +21,7 @@
             "type": "Demand",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 1500
@@ -30,14 +30,14 @@
             "type": "GridConnection",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": ["ESS_BUS_TH_01"],
+            "output_refs": ["ESS_BUS_TH_01"],
             "is_source": true
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "ESS_BUS_TH_02"
             ],
             "connection_matrix": {
@@ -53,7 +53,7 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_01"
             ],
             "connection_matrix": {

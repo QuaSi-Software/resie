@@ -12,14 +12,14 @@ function test_busses_communicate_demand()
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02"],
+            "output_refs" => ["TST_BUS_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GRI_01",
@@ -33,7 +33,7 @@ function test_busses_communicate_demand()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -47,7 +47,7 @@ function test_busses_communicate_demand()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000
@@ -191,13 +191,13 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BUS_01"],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
@@ -207,7 +207,7 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BUS_03"],
+            "output_refs" => ["TST_BUS_02", "TST_BUS_03"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -222,7 +222,7 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -236,7 +236,7 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_02"],
+            "output_refs" => ["TST_DEM_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -250,7 +250,7 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "static_load" => 1000,
             "static_temperature" => 60,
             "scale" => 1
@@ -259,7 +259,7 @@ function test_demand_over_busses_supply_is_transformer()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "static_load" => 1000,
             "static_temperature" => 60,
             "scale" => 1
@@ -571,14 +571,14 @@ function test_busses_communicate_storage_potential()
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
+            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
@@ -593,7 +593,7 @@ function test_busses_communicate_storage_potential()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -604,7 +604,7 @@ function test_busses_communicate_storage_potential()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
@@ -619,7 +619,7 @@ function test_busses_communicate_storage_potential()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 20000,
@@ -630,7 +630,7 @@ function test_busses_communicate_storage_potential()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000

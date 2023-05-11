@@ -8,7 +8,7 @@ function test_load_from_dict()
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "capacity" => 40000,
             "load" => 20000,
             "strategy" => Dict{String,Any}(
@@ -18,7 +18,7 @@ function test_load_from_dict()
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_BT_01"],
-            "production_refs" => [],
+            "output_refs" => [],
             "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.5,
@@ -41,7 +41,7 @@ function test_load_custom_medium_categories()
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
             "control_refs" => [],
-            "production_refs" => ["TST_HP_01"],
+            "output_refs" => ["TST_HP_01"],
             "power" => 1000,
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_out" => "m_h_w_55c",
@@ -54,7 +54,7 @@ function test_load_custom_medium_categories()
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),

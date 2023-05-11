@@ -11,7 +11,7 @@ function load_order_of_operation()
             "type"=> "Demand",
             "medium"=> "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs"=> [],
+            "output_refs"=> [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -20,7 +20,7 @@ function load_order_of_operation()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_HP_01"
             ],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
@@ -31,7 +31,7 @@ function load_order_of_operation()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_HP_01"
             ],
             "is_source" => true
@@ -41,7 +41,7 @@ function load_order_of_operation()
             "control_refs" => [
                 "TST_DEM_01"
             ],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_DEM_01"
             ],
             "strategy" => Dict{String,Any}(

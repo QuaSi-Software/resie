@@ -12,7 +12,7 @@ function test_run_energy_system_from_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -21,7 +21,7 @@ function test_run_energy_system_from_storage()
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => ["TST_HP_01", "TST_BFT_01"],
+            "output_refs" => ["TST_HP_01", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
@@ -36,7 +36,7 @@ function test_run_energy_system_from_storage()
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -47,13 +47,13 @@ function test_run_energy_system_from_storage()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => ["TST_HP_01"],
+            "output_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
                 "unload_storages" => true
@@ -188,7 +188,7 @@ function test_run_energy_system_from_storage_denied()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -197,7 +197,7 @@ function test_run_energy_system_from_storage_denied()
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => ["TST_HP_01", "TST_BFT_01"],
+            "output_refs" => ["TST_HP_01", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
@@ -212,7 +212,7 @@ function test_run_energy_system_from_storage_denied()
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -223,13 +223,13 @@ function test_run_energy_system_from_storage_denied()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => ["TST_HP_01"],
+            "output_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
                 "unload_storages" => false

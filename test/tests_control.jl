@@ -8,7 +8,7 @@ function setup_control_tests()
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "capacity" => 40000,
             "load" => 20000,
             "strategy" => Dict{String,Any}(
@@ -18,7 +18,7 @@ function setup_control_tests()
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_BT_01"],
-            "production_refs" => [],
+            "output_refs" => [],
             "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.9,

@@ -12,7 +12,7 @@ function test_gasboiler_demand_driven_with_bus()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -21,7 +21,7 @@ function test_gasboiler_demand_driven_with_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "connection_matrix" => Dict{String,Any}(
                 "input_order" => ["TST_GB_01"],
                 "output_order" => ["TST_DEM_01"]
@@ -31,13 +31,13 @@ function test_gasboiler_demand_driven_with_bus()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GB_01"],
+            "output_refs" => ["TST_GB_01"],
             "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BUS_01"],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
@@ -238,7 +238,7 @@ function test_gasboiler_demand_driven_without_bus()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -247,13 +247,13 @@ function test_gasboiler_demand_driven_without_bus()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GB_01"],
+            "output_refs" => ["TST_GB_01"],
             "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_DEM_01"],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),

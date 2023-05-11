@@ -11,19 +11,19 @@ function test_data_input_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_03"],
+            "output_refs" => ["TST_BUS_03"],
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_03"],
+            "output_refs" => ["TST_BUS_03"],
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
@@ -107,7 +107,7 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_04",
                 "TST_BUS_03",
                 "TST_BUS_02",
@@ -125,13 +125,13 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_06",
                 "TST_BUS_05",
             ],
@@ -149,19 +149,19 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
         ),
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
         ),
     )
     systems = Resie.load_systems(systems_config)
@@ -227,7 +227,7 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02",
                 "TST_BFT_01",
                 "TST_BUS_03",
@@ -245,18 +245,18 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BFT_02"],
+            "output_refs" => ["TST_BFT_02"],
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BFT_03"],
+            "output_refs" => ["TST_BFT_03"],
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -265,7 +265,7 @@ function test_data_storage_loading()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 40000,
@@ -274,7 +274,7 @@ function test_data_storage_loading()
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_03"
             ],
             "capacity" => 40000,
@@ -414,14 +414,14 @@ function test_data_storage_loading_with_matrix()
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),   
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02",
                 "TST_BFT_01",
                 "TST_BUS_03",
@@ -446,7 +446,7 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BFT_02"],
+            "output_refs" => ["TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
@@ -465,7 +465,7 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BFT_03"],
+            "output_refs" => ["TST_BFT_03"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_03",
@@ -483,7 +483,7 @@ function test_data_storage_loading_with_matrix()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -492,7 +492,7 @@ function test_data_storage_loading_with_matrix()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 40000,
@@ -501,7 +501,7 @@ function test_data_storage_loading_with_matrix()
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_03"
             ],
             "capacity" => 40000,

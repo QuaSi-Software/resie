@@ -59,8 +59,8 @@ function load_systems(config::Dict{String,Any})::Grouping
             link_control_with(systems[unit_key], others)
         end
 
-        if length(entry["production_refs"]) > 0
-            others = Grouping(key => systems[key] for key in entry["production_refs"])
+        if length(entry["output_refs"]) > 0
+            others = Grouping(key => systems[key] for key in entry["output_refs"])
             link_production_with(systems[unit_key], others)
         end
     end

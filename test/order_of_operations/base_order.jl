@@ -10,7 +10,7 @@ function test_base_order()
         "TST_01_ELT_01_PVP" => Dict{String,Any}(
             "type" => "PVPlant",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "energy_profile_file_path" => "./profiles/tests/source_power_pv.prf",
@@ -20,7 +20,7 @@ function test_base_order()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 10000.0
@@ -29,7 +29,7 @@ function test_base_order()
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 15000
         ),
@@ -37,7 +37,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT"
             ],
@@ -57,7 +57,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_DEM",
                 "TST_01_HZG_01_HTP",
                 "TST_01_ELT_01_BAT",
@@ -81,7 +81,7 @@ function test_base_order()
         "TST_01_HZG_01_CHP" => Dict{String,Any}(
             "type" => "CHPP",
             "control_refs" => ["TST_01_HZG_01_BFT"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS",
                 "TST_01_ELT_01_BUS"
             ],
@@ -95,7 +95,7 @@ function test_base_order()
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_01_HZG_01_BFT"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy" => Dict{String,Any}(
@@ -109,7 +109,7 @@ function test_base_order()
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
             "capacity" => 40000,
@@ -118,7 +118,7 @@ function test_base_order()
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
             "control_refs" => ["TST_01_ELT_01_PVP"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "strategy" => Dict{String,Any}(
@@ -134,7 +134,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_CHP"
             ],
             "is_source" => true
@@ -143,7 +143,7 @@ function test_base_order()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_HTP"
             ],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
@@ -154,7 +154,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "is_source" => true
@@ -163,7 +163,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "is_source" => false
         )
     )

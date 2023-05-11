@@ -11,7 +11,7 @@ Base.@kwdef mutable struct ConnectionMatrix
 
     function ConnectionMatrix(config::Dict{String,Any})
         input_order = []
-        output_order = [String(u) for u in config["production_refs"]]
+        output_order = [String(u) for u in config["output_refs"]]
         storage_loading = nothing
 
         if "connection_matrix" in keys(config)

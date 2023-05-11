@@ -12,20 +12,20 @@ function test_primary_producer_can_load_storage()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_02"],
+            "output_refs" => ["TST_GBO_02"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -38,7 +38,7 @@ function test_primary_producer_can_load_storage()
         "TST_GBO_02" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -50,7 +50,7 @@ function test_primary_producer_can_load_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_01"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -71,7 +71,7 @@ function test_primary_producer_can_load_storage()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -81,7 +81,7 @@ function test_primary_producer_can_load_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,

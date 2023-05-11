@@ -74,7 +74,7 @@
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 10000.0
@@ -83,7 +83,7 @@
             "type": "Demand",
             "medium": "m_c_g_h2",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
             "scale": 10000.0
         },
@@ -91,7 +91,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT",
                 "TST_01_HZG_01_STS"
@@ -120,7 +120,7 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_HTP",
                 "TST_01_ELT_01_ELY"
@@ -139,7 +139,7 @@
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
@@ -153,7 +153,7 @@
             "control_refs": [
                 "TST_01_HZG_01_BUS"
             ],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
@@ -165,7 +165,7 @@
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "capacity": 40000,
@@ -174,7 +174,7 @@
         "TST_01_HZG_01_GBO": {
             "type": "GasBoiler",
             "control_refs": ["TST_01_HZG_01_BFT"],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
@@ -189,7 +189,7 @@
             "control_refs": [
                 "TST_01_HZG_02_DEM"
             ],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_DEM",
                 "TST_01_ELT_01_GRO"
@@ -203,7 +203,7 @@
         "TST_01_HZG_01_STS": {
             "type": "SeasonalThermalStorage",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_02_HTP"
             ],
             "capacity": 4000000,
@@ -214,7 +214,7 @@
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_GBO"
             ],
             "is_source": true
@@ -223,7 +223,7 @@
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
             "is_source": true
@@ -232,7 +232,7 @@
             "type": "GridConnection",
             "medium": "m_c_g_o2",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         }
     }

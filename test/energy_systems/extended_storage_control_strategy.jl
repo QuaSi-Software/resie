@@ -12,13 +12,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -31,7 +31,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
+            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -47,7 +47,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -62,7 +62,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -75,7 +75,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 40000,
@@ -85,7 +85,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
@@ -164,13 +164,13 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -183,7 +183,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
+            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -199,7 +199,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -214,7 +214,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -226,7 +226,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 40000,
@@ -236,7 +236,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
@@ -315,13 +315,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -333,7 +333,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
+            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -349,7 +349,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -364,7 +364,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -377,7 +377,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "strategy" => Dict{String,Any}(
@@ -391,7 +391,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,

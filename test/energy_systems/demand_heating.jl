@@ -12,14 +12,14 @@ function test_demand_heating_temperature_values()
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01"],
+            "output_refs" => ["TST_DEM_01"],
             "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000

@@ -12,14 +12,14 @@ function test_ooo_bus_to_bus()
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_01"],
+            "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_BUS_02", "TST_BFT_01"],
+            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
@@ -34,7 +34,7 @@ function test_ooo_bus_to_bus()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -44,7 +44,7 @@ function test_ooo_bus_to_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_02"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
@@ -59,7 +59,7 @@ function test_ooo_bus_to_bus()
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_02"
             ],
             "capacity" => 20000,
@@ -69,7 +69,7 @@ function test_ooo_bus_to_bus()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000
