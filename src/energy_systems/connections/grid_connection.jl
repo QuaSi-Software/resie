@@ -60,7 +60,7 @@ function control(
     end
 end
 
-function produce(unit::GridConnection, parameters::Dict{String,Any})
+function process(unit::GridConnection, parameters::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage systems, then the potential

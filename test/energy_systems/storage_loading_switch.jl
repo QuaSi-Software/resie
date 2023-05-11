@@ -127,23 +127,23 @@ function test_primary_producer_can_load_storage()
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
 
-    EnergySystems.produce(demand, simulation_parameters)
-    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(bus, simulation_parameters)
 
-    EnergySystems.produce(boiler_1, simulation_parameters)
+    EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(tank, simulation_parameters)
+    EnergySystems.process(tank, simulation_parameters)
     @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(boiler_2, simulation_parameters)
+    EnergySystems.process(boiler_2, simulation_parameters)
     @test boiler_2.output_interfaces[boiler_2.m_heat_out].balance == 2500.0
 
     EnergySystems.load(tank, simulation_parameters)
     @test tank.input_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(grid_2, simulation_parameters)
-    EnergySystems.produce(grid_1, simulation_parameters)
+    EnergySystems.process(grid_2, simulation_parameters)
+    EnergySystems.process(grid_1, simulation_parameters)
     EnergySystems.distribute!(bus)
 
     exchange = EnergySystems.balance_on(
@@ -183,23 +183,23 @@ function test_primary_producer_can_load_storage()
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
 
-    EnergySystems.produce(demand, simulation_parameters)
-    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(bus, simulation_parameters)
 
-    EnergySystems.produce(boiler_1, simulation_parameters)
+    EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(tank, simulation_parameters)
+    EnergySystems.process(tank, simulation_parameters)
     @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(boiler_2, simulation_parameters)
+    EnergySystems.process(boiler_2, simulation_parameters)
     @test boiler_2.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 0.0
 
     EnergySystems.load(tank, simulation_parameters)
     @test tank.load == 1000.0
 
-    EnergySystems.produce(grid_2, simulation_parameters)
-    EnergySystems.produce(grid_1, simulation_parameters)
+    EnergySystems.process(grid_2, simulation_parameters)
+    EnergySystems.process(grid_1, simulation_parameters)
     EnergySystems.distribute!(bus)
 
     @test tank.input_interfaces[tank.medium].sum_abs_change == 2000.0

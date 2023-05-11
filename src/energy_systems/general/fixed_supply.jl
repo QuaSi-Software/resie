@@ -89,7 +89,7 @@ function control(
 
 end
 
-function produce(unit::FixedSupply, parameters::Dict{String,Any})
+function process(unit::FixedSupply, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     add!(outface, unit.supply, unit.temperature)
 end

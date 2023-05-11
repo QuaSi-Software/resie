@@ -330,7 +330,7 @@ function potential(
     end
 end
 
-function produce(unit::HeatPump, parameters::Dict{String,Any})
+function process(unit::HeatPump, parameters::Dict{String,Any})
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)

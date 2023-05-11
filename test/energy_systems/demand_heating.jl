@@ -43,7 +43,7 @@ function test_demand_heating_temperature_values()
     @test demand.load == 75.0
     @test demand.temperature == 55.0
 
-    EnergySystems.produce(demand, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -75.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0

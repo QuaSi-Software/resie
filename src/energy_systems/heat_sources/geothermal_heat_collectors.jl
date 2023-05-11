@@ -187,9 +187,9 @@ function calculate_new_heat_collector_temperatures(unit::GeothermalHeatCollector
 
 end
 
-# produce function that provides energy from the geothermal heat collector and calculates new temperatures 
+# process function that provides energy from the geothermal heat collector and calculates new temperatures 
 # according to actual delivered or received energy
-function produce(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
+function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]  # output interface
     exchange = balance_on(outface, outface.target)     # gather information of output interface

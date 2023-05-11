@@ -94,7 +94,7 @@ function test_run_energy_system_from_storage()
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
-    EnergySystems.produce(hheat_demand, simulation_parameters)
+    EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
@@ -106,7 +106,7 @@ function test_run_energy_system_from_storage()
     @test exchange.energy_potential ≈ 0.0
     @test exchange.temperature === 35.0
 
-    EnergySystems.produce(heat_pump, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 1600
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature === 45.0
@@ -115,15 +115,15 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800*2/3
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
 
-    EnergySystems.produce(lheat_bus, simulation_parameters)
-    EnergySystems.produce(lheat_storage, simulation_parameters)
+    EnergySystems.process(lheat_bus, simulation_parameters)
+    EnergySystems.process(lheat_storage, simulation_parameters)
     EnergySystems.load(lheat_storage, simulation_parameters)
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 800*2/3
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 800*2/3
     @test lheat_storage.output_interfaces[lheat_storage.medium].temperature === 35.0
 
-    EnergySystems.produce(power_grid, simulation_parameters)
+    EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2*800/3
     @test power_grid.output_interfaces[power_grid.medium].temperature === nothing
@@ -146,7 +146,7 @@ function test_run_energy_system_from_storage()
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
-    EnergySystems.produce(hheat_demand, simulation_parameters)
+    EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
@@ -158,7 +158,7 @@ function test_run_energy_system_from_storage()
     @test exchange.energy_potential ≈ 0.0
     @test exchange.temperature === 35.0
 
-    EnergySystems.produce(heat_pump, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100*3/2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800+100*3/2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature === 45.0
@@ -167,15 +167,15 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -100
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
 
-    EnergySystems.produce(lheat_bus, simulation_parameters)
-    EnergySystems.produce(lheat_storage, simulation_parameters)
+    EnergySystems.process(lheat_bus, simulation_parameters)
+    EnergySystems.process(lheat_storage, simulation_parameters)
     EnergySystems.load(lheat_storage, simulation_parameters)
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 100
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 100
     @test lheat_storage.output_interfaces[lheat_storage.medium].temperature === 35.0
 
-    EnergySystems.produce(power_grid, simulation_parameters)
+    EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2*(100*3/2)/3
     @test power_grid.output_interfaces[power_grid.medium].temperature === nothing
@@ -271,7 +271,7 @@ function test_run_energy_system_from_storage_denied()
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
-    EnergySystems.produce(hheat_demand, simulation_parameters)
+    EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
@@ -283,7 +283,7 @@ function test_run_energy_system_from_storage_denied()
     @test exchange.energy_potential ≈ 0.0
     @test exchange.temperature === 35.0
 
-    EnergySystems.produce(heat_pump, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature === 45.0
@@ -292,15 +292,15 @@ function test_run_energy_system_from_storage_denied()
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0.0
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
 
-    EnergySystems.produce(lheat_bus, simulation_parameters)
-    EnergySystems.produce(lheat_storage, simulation_parameters)
+    EnergySystems.process(lheat_bus, simulation_parameters)
+    EnergySystems.process(lheat_storage, simulation_parameters)
     EnergySystems.load(lheat_storage, simulation_parameters)
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 0.0
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 0.0
     @test lheat_storage.output_interfaces[lheat_storage.medium].temperature === 35.0
 
-    EnergySystems.produce(power_grid, simulation_parameters)
+    EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 0.0
     @test power_grid.output_interfaces[power_grid.medium].temperature === nothing

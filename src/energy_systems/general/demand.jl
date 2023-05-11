@@ -100,7 +100,7 @@ function control(
 
 end
 
-function produce(unit::Demand, parameters::Dict{String,Any})
+function process(unit::Demand, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.load, unit.temperature)
 end

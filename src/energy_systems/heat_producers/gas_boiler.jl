@@ -197,7 +197,7 @@ function potential(
     end
 end
 
-function produce(unit::GasBoiler, parameters::Dict{String,Any})
+function process(unit::GasBoiler, parameters::Dict{String,Any})
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0)

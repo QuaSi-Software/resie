@@ -87,7 +87,7 @@ function control(
 
 end
 
-function produce(unit::BoundedSupply, parameters::Dict{String,Any})
+function process(unit::BoundedSupply, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
     # must be handled here instead of being ignored

@@ -448,7 +448,7 @@ function potential(
 end
 
 """
-    produce(unit, parameters)
+    process(unit, parameters)
 
 Perform the production calculations for the given energy system.
 
@@ -456,7 +456,7 @@ Perform the production calculations for the given energy system.
 - `unit::ControlledSystem`: The system for which production is calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
-function produce(
+function process(
     unit::ControlledSystem,
     parameters::Dict{String,Any}
 )
@@ -708,7 +708,7 @@ function perform_steps(
         elseif step == s_potential
             potential(unit, parameters)
         elseif step == s_process
-            produce(unit, parameters)
+            process(unit, parameters)
         elseif step == s_load
             load(unit, parameters)
         elseif step == s_distribute

@@ -292,7 +292,7 @@ function potential(
     end
 end
 
-function produce(unit::Electrolyser, parameters::Dict{String,Any})
+function process(unit::Electrolyser, parameters::Dict{String,Any})
     potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)

@@ -86,7 +86,7 @@ function balance_on(
             )
 end
 
-function produce(unit::BufferTank, parameters::Dict{String,Any})
+function process(unit::BufferTank, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature

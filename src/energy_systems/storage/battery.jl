@@ -58,7 +58,7 @@ function balance_on(
             )
 end
 
-function produce(unit::Battery, parameters::Dict{String,Any})
+function process(unit::Battery, parameters::Dict{String,Any})
     if unit.controller.state_machine.state != 2
         return
     end

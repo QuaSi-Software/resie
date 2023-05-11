@@ -89,7 +89,7 @@ function balance_on(
             )
 end
 
-function produce(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
+function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
