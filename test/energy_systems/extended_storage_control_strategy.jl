@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_extended_storage_control_strategy_allow_loading_by_storage()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -93,14 +93,14 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "static_temperature" => 60
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
-    storage_1 = systems["TST_BFT_01"]
-    storage_2 = systems["TST_BFT_02"]
-    boiler = systems["TST_GBO_01"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    storage_1 = components["TST_BFT_01"]
+    storage_2 = components["TST_BFT_02"]
+    boiler = components["TST_GBO_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -120,13 +120,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
     EnergySystems.reset(boiler)
     EnergySystems.reset(demand)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(storage_2, systems, simulation_parameters)
-    EnergySystems.control(storage_1, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(storage_2, components, simulation_parameters)
+    EnergySystems.control(storage_1, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus_2, simulation_parameters)
@@ -159,7 +159,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
 end
 
 function test_extended_storage_control_strategy_deny_loading_by_storage()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -244,14 +244,14 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "static_temperature" => 60
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
-    storage_1 = systems["TST_BFT_01"]
-    storage_2 = systems["TST_BFT_02"]
-    boiler = systems["TST_GBO_01"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    storage_1 = components["TST_BFT_01"]
+    storage_2 = components["TST_BFT_02"]
+    boiler = components["TST_GBO_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -272,13 +272,13 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
     EnergySystems.reset(boiler)
     EnergySystems.reset(demand)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(storage_2, systems, simulation_parameters)
-    EnergySystems.control(storage_1, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(storage_2, components, simulation_parameters)
+    EnergySystems.control(storage_1, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus_2, simulation_parameters)
@@ -310,7 +310,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
 end
 
 function test_extended_storage_control_strategy_allow_loading_by_storage_and_gasboiler()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -399,14 +399,14 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "static_temperature" => 60
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
-    storage_1 = systems["TST_BFT_01"]
-    storage_2 = systems["TST_BFT_02"]
-    boiler = systems["TST_GBO_01"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    storage_1 = components["TST_BFT_01"]
+    storage_2 = components["TST_BFT_02"]
+    boiler = components["TST_GBO_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -431,13 +431,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.reset(boiler)
     EnergySystems.reset(demand)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(storage_2, systems, simulation_parameters)
-    EnergySystems.control(storage_1, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(storage_2, components, simulation_parameters)
+    EnergySystems.control(storage_1, components, simulation_parameters)
+    EnergySystems.control(grid,componentss, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus_2, simulation_parameters)
@@ -483,13 +483,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
 
     demand.static_load = 2000
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(storage_2, systems, simulation_parameters)
-    EnergySystems.control(storage_1, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(storage_2, components, simulation_parameters)
+    EnergySystems.control(storage_1, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus_2, simulation_parameters)

@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 
 function test_load_from_dict()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
@@ -29,15 +29,15 @@ function test_load_from_dict()
         ),
     )
 
-    systems = Resie.load_systems(systems_config)
-    @test length(keys(systems)) == 2
-    @test typeof(systems["TST_BT_01"]) == Resie.EnergySystems.BufferTank
-    @test systems["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
-    @test systems["TST_HP_01"].power == 20000
+    components = Resie.load_components(components_config)
+    @test length(keys(components)) == 2
+    @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
+    @test components["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
+    @test components["TST_HP_01"].power == 20000
 end
 
 function test_load_custom_medium_categories()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
             "control_refs" => [],
@@ -65,9 +65,9 @@ function test_load_custom_medium_categories()
             "fixed_cop" => 3.0
         )
     )
-    systems = Resie.load_systems(systems_config)
-    electrolyser = systems["TST_ELY_01"]
-    heat_pump = systems["TST_HP_01"]
+    components = Resie.load_components(components_config)
+    electrolyser = components["TST_ELY_01"]
+    heat_pump = components["TST_HP_01"]
 
     @test electrolyser.m_el_in == Symbol("m_e_dc_1000v")
     @test electrolyser.m_heat_out == Symbol("m_h_w_55c")

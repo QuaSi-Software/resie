@@ -1,13 +1,13 @@
-"""Convenience type alias for requirements of energy systems."""
+"""Convenience type alias for requirements of components."""
 const EnSysRequirements = Dict{String,Tuple{Type,Union{Nothing,Symbol}}}
 
 """
 Prototype for Condition, from which instances of the latter are derived.
 
-See Condition for how they are used. The prototype defines which energy systems a
+See Condition for how they are used. The prototype defines which components a
 condition requires to calculate its truth value, as well parameters for this calculation.
-The selection of energy system for the condition is considered an input to the simulation
-as it cannot be derived from other inputs. It is up to the user to decide which systems are
+The selection of component for the condition is considered an input to the simulation
+as it cannot be derived from other inputs. It is up to the user to decide which components are
 required for operational strategies (and therefore conditions) to work.
 """
 struct ConditionPrototype
@@ -17,11 +17,11 @@ struct ConditionPrototype
     """Parameters the condition requires."""
     parameters::Dict{String,Any}
 
-    """Defines which systems the condition requires, indexed by an internal name.
+    """Defines which components the condition requires, indexed by an internal name.
 
-    For some systems a medium is required as they can take varying values.
+    For some components a medium is required as they can take varying values.
     """
-    required_systems::EnSysRequirements
+    required_components::EnSysRequirements
 
     """Implementation of the boolean expression the condition represents."""
     check_function::Function
@@ -35,7 +35,7 @@ include("conditions/base.jl")
 A boolean decision variable for a transition in a state machine.
 
 A Condition instance is constructed from its corresponding prototype, which invokes certain
-required parameters and energy systems.
+required parameters and components.
 """
 struct Condition
     """From which prototype the condition is derived."""
@@ -44,17 +44,17 @@ struct Condition
     """Hold parameters the condition requires."""
     parameters::Dict{String,Any}
 
-    """The systems linked to the condition indexed by an internal name."""
-    linked_systems::Grouping
+    """The components linked to the condition indexed by an internal name."""
+    linked_components::Grouping
 end
 
 """
     rel(condition, name)
 
-Get the linked system of the given name for a condition.
+Get the linked component of the given name for a condition.
 """
 function rel(condition::Condition, name::String)::ControlledComponent
-    return condition.linked_systems[name]
+    return condition.linked_components[name]
 end
 
 """
@@ -67,7 +67,7 @@ Constructor for Condition.
 
 # Returns
 - `Condition`: A Condition instance with default parameter values and information on which
-    energy systems are required, but systems have been linked yet
+    components are required, but components have not been linked yet
 """
 function Condition(
     name::String,
@@ -82,26 +82,26 @@ function Condition(
 end
 
 """
-    link(condition, systems)
+    link(condition, components)
 
-Look for the condition's required systems in the given set and link the condition to them.
+Look for the condition's required components in the given set and link the condition to them.
 
-For example, if a condition required a system "grid_out" of type GridConnection and medium
-m_e_ac_230v, it will look through the set of given systems and link to the first match.
+For example, if a condition required a component "grid_out" of type GridConnection and medium
+m_e_ac_230v, it will look through the set of given components and link to the first match.
 """
-function link(condition::Condition, systems::Grouping)
-    for (name, req_unit) in pairs(condition.prototype.required_systems)
+function link(condition::Condition, components::Grouping)
+    for (name, req_unit) in pairs(condition.prototype.required_components)
         found_link = false
-        for unit in each(systems)
+        for unit in each(components)
             if isa(unit, req_unit[1])
                 if (req_unit[2] !== nothing
                     && hasfield(typeof(unit), Symbol("medium"))
                     && unit.medium == req_unit[2]
                 )
-                    condition.linked_systems[name] = unit
+                    condition.linked_components[name] = unit
                     found_link = true
                 elseif req_unit[2] === nothing
-                    condition.linked_systems[name] = unit
+                    condition.linked_components[name] = unit
                     found_link = true
                 end
             end
@@ -109,7 +109,7 @@ function link(condition::Condition, systems::Grouping)
 
         if !found_link
             throw(KeyError(
-                    "Could not find match for required system $name "
+                    "Could not find match for required component $name "
                     * "for condition $(condition.prototype.name)"
             ))
         end
@@ -117,34 +117,34 @@ function link(condition::Condition, systems::Grouping)
 end
 
 """
-    link_control_with(unit, systems)
+    link_control_with(unit, components)
 
-Link the given systems with the control mechanisms of the given unit.
+Link the given components with the control mechanisms of the given unit.
 
-The systems are the same as the control_refs project config entry, meaning this is user
+The components are the same as the control_refs project config entry, meaning this is user
 input, but correction configuration should have been checked beforehand by automated
 mechanisms. See also [`link`](@ref) for how linking conditions works.
 """
-function link_control_with(unit::ControlledComponent, systems::Grouping)
+function link_control_with(unit::ControlledComponent, components::Grouping)
     for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
-            link(condition, systems)
+            link(condition, components)
         end
     end
 
-    # @TODO: if a strategy requires multiple systems of general description, the first
-    # system in the grouping will be matched multiple times, instead of each being matched
+    # @TODO: if a strategy requires multiple components of general description, the first
+    # component in the grouping will be matched multiple times, instead of each being matched
     # only once
     strategy_type = OP_STRATS[unit.controller.strategy]
-    for (req_type, medium) in values(strategy_type.required_systems)
-        for other_unit in values(systems)
+    for (req_type, medium) in values(strategy_type.required_components)
+        for other_unit in values(components)
             if typeof(other_unit) <: req_type
                 if medium === nothing || (
                     hasfield(typeof(other_unit), Symbol("medium"))
                     &&
                     other_unit.medium == medium
                 )
-                    unit.controller.linked_systems[other_unit.uac] = other_unit
+                    unit.controller.linked_components[other_unit.uac] = other_unit
                 end
             end
         end
@@ -152,8 +152,8 @@ function link_control_with(unit::ControlledComponent, systems::Grouping)
 
     for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
-            for other_unit in values(condition.linked_systems)
-                unit.controller.linked_systems[other_unit.uac] = other_unit
+            for other_unit in values(condition.linked_components)
+                unit.controller.linked_components[other_unit.uac] = other_unit
             end
         end
     end
@@ -246,17 +246,17 @@ Base.@kwdef mutable struct Controller
     strategy::String
     parameter::Dict{String,Any}
     state_machine::StateMachine
-    linked_systems::Grouping
+    linked_components::Grouping
 end
 
 """
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
 
 Checks the controller of the given unit and moves the state machine to its new state.
 """
 function move_state(
     unit::ControlledComponent,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
     machine = unit.controller.state_machine
@@ -282,7 +282,7 @@ function move_state(
 end
 
 """
-A type of operational strategy that defines which parameters and systems a strategy requires.
+A type of operational strategy that defines which parameters and components a strategy requires.
 """
 Base.@kwdef struct OperationalStrategyType
     """Machine-readable name of the strategy."""
@@ -300,11 +300,11 @@ Base.@kwdef struct OperationalStrategyType
     """Required parameters for the strategy including those for the conditions."""
     strategy_parameters::Dict{String,Any}
 
-    """Energy systems that the strategy requires for the correct order of execution.
+    """Components that the strategy requires for the correct order of execution.
 
-    This differs from the system the conditions of the strategy require.
+    This differs from the component the conditions of the strategy require.
     """
-    required_systems::EnSysRequirements
+    required_components::EnSysRequirements
 end
 
 OP_STRATS = Dict{String,OperationalStrategyType}()

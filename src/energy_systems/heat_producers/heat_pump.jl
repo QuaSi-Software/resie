@@ -1,5 +1,5 @@
 """
-Implementation of a heat pump energy system.
+Implementation of a heat pump component.
 
 For the moment this remains a simple implementation that requires a low temperature heat
 and electricity input and produces high temperature heat. Has a fixed coefficient of
@@ -65,10 +65,10 @@ end
 
 function control(
     unit::HeatPump,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 

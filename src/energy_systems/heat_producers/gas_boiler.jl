@@ -50,10 +50,10 @@ end
 
 function control(
     unit::GasBoiler,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 

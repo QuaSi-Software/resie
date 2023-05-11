@@ -6,7 +6,7 @@ using Resie.EnergySystems
 include("../test_util.jl")
 
 function load_order_of_operation()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type"=> "Demand",
             "medium"=> "m_h_w_ht1",
@@ -97,14 +97,14 @@ function load_order_of_operation()
         ("TST_GRI_01", EnergySystems.s_process)
     ]
 
-    systems = Resie.load_systems(systems_config)
+    components = Resie.load_components(components_config)
 
     # from input file
-    order_from_input_file = Resie.load_order_of_operations(order_of_operation, systems)
+    order_from_input_file = Resie.load_order_of_operations(order_of_operation, components)
     @test pwc_steps_astr(expected_order_from_input_file, order_from_input_file) == ""
 
     # from ooo calculation
-    order_calculated = Resie.calculate_order_of_operations(systems)
+    order_calculated = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected_order_calculated, order_calculated) == ""
 
 end

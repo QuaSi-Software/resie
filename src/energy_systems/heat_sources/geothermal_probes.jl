@@ -78,11 +78,11 @@ end
 
 function control(
     unit::GeothermalProbes,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
     # in case there is a state machine for geothermal probes
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
 
     # get ambient temperature from profile for current time step if needed (probably only for geothermal collectors)
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, parameters["time"])
@@ -129,7 +129,7 @@ function control(
         end
     end
 
-    # set max_energy to interfaces to provide information for connected systems
+    # set max_energy to interfaces to provide information for connected components
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_output_energy)
     if unit.regeneration
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)

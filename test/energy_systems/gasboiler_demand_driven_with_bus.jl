@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_gasboiler_demand_driven_with_bus()
-    systems_config = Dict{String,Any}(
+   components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -44,11 +44,11 @@ function test_gasboiler_demand_driven_with_bus()
             "power" => 12000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    gasboiler = systems["TST_GB_01"]
-    grid = systems["TST_GRI_01"]
-    demand = systems["TST_DEM_01"]
-    bus = systems["TST_BUS_01"]
+    components = Resie.load_components(components_config)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
+    bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -61,11 +61,11 @@ function test_gasboiler_demand_driven_with_bus()
 
     # first time step: demand is exactly the max power of GasBoiler  
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 12000/4
@@ -73,9 +73,9 @@ function test_gasboiler_demand_driven_with_bus()
     demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero
@@ -118,11 +118,11 @@ function test_gasboiler_demand_driven_with_bus()
 
     # second step: demand is above max power of GasBoiler 
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 15000/4
@@ -130,9 +130,9 @@ function test_gasboiler_demand_driven_with_bus()
     demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero
@@ -175,11 +175,11 @@ function test_gasboiler_demand_driven_with_bus()
 
     # third step: demand is below max power of GasBoiler 
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 10000/4
@@ -187,9 +187,9 @@ function test_gasboiler_demand_driven_with_bus()
     demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero
@@ -233,7 +233,7 @@ function test_gasboiler_demand_driven_with_bus()
 end
 
 function test_gasboiler_demand_driven_without_bus()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -260,10 +260,10 @@ function test_gasboiler_demand_driven_without_bus()
             "power" => 12000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    gasboiler = systems["TST_GB_01"]
-    grid = systems["TST_GRI_01"]
-    demand = systems["TST_DEM_01"]
+    components = Resie.load_components(components_config)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -276,11 +276,11 @@ function test_gasboiler_demand_driven_without_bus()
 
     # first time step: demand is exactly the max power of GasBoiler  
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 12000/4
@@ -288,8 +288,8 @@ function test_gasboiler_demand_driven_without_bus()
     demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero
@@ -333,11 +333,11 @@ function test_gasboiler_demand_driven_without_bus()
 
     # second step: demand is above max power of GasBoiler 
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 15000/4
@@ -345,8 +345,8 @@ function test_gasboiler_demand_driven_without_bus()
     demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero
@@ -390,11 +390,11 @@ function test_gasboiler_demand_driven_without_bus()
 
     # third step: demand is below max power of GasBoiler 
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
     @test demand.load == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
     demand.load = 10000/4
@@ -402,8 +402,8 @@ function test_gasboiler_demand_driven_without_bus()
     demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85
 
-    EnergySystems.control(gasboiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(gasboiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
     @test grid.output_interfaces[grid.medium].max_energy == Inf
 
     # no processing so far, balance is zero, energy_potential is non-zero

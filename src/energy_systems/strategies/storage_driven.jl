@@ -53,7 +53,7 @@ end
 
 strt_desc_storage_driven = """Storage-driven
 ------------------------
-Run an energy system depending on the state of a linked thermal buffer tank. In particular
+Run a component depending on the state of a linked thermal buffer tank. In particular
 this strategy enables processing when the tank has fallen below a certain threshold and
 disables it when the tank has reached another threshold.
 """
@@ -83,5 +83,5 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
         "m_heat_out" => true,
         "m_heat_in" => true,
     ),
-    required_systems=EnSysRequirements()
+    required_components=EnSysRequirements()
 )

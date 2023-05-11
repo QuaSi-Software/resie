@@ -51,10 +51,10 @@ end
 
 function control(
     unit::BufferTank,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
     unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
 

@@ -62,10 +62,10 @@ end
 
 function control(
     unit::PVPlant,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 

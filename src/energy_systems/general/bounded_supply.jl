@@ -1,10 +1,10 @@
 """
-Implementation of an energy system modeling an abstract bounded supply of some medium.
+Implementation of a component modeling an abstract bounded supply of some medium.
 
 This is particularly useful for testing, but can also be used to model any bounded
-energy system or other equipment unit that processes energy in a given medium. The system
+component or other equipment unit that processes energy in a given medium. The component
 might still have a maximum power draw in a single time step, but can provide any fraction
-of this to connected systems.
+of this to connected components.
 """
 mutable struct BoundedSupply <: ControlledComponent
     uac::String
@@ -71,10 +71,10 @@ end
 
 function control(
     unit::BoundedSupply,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
@@ -89,7 +89,7 @@ end
 
 function process(unit::BoundedSupply, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    # 1. @TODO: if disp. sources should be allowed to load storage systems, then the potential
+    # 1. @TODO: if disp. sources should be allowed to load storage components, then the potential
     # must be handled here instead of being ignored
     # 2. we also ignore the temperature of the interface as the source defines that itself
     exchange = balance_on(outface, outface.target)

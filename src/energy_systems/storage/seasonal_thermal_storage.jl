@@ -1,5 +1,5 @@
 """
-Implementation of a seasonal thermal storage system.
+Implementation of a seasonal thermal storage component.
 
 This is a simplified model, which mostly deals with amounts of energy and considers
 temperatures only for the available temperature as the tank is depleted.
@@ -54,10 +54,10 @@ end
 
 function control(
     unit::SeasonalThermalStorage,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 

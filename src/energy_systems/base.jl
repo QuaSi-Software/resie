@@ -1,21 +1,22 @@
 """
-Implementations of energy systems and required functions to construct a network of systems.
+Implementations of energy system components and required functions to construct a network
+of components.
 
 Code in this module attempts to match the model description as close as possible as well as
 adds utility features and makes abstract descriptions work with actual code.
 
 # Notes on this file in particular
 
-Functionality that is common to all energy systems should go here, while code handling
-specific features should be placed in the corresponding file for the energy system. These
+Functionality that is common to all components should go here, while code handling
+specific features should be placed in the corresponding file for the component. These
 individual files are included in the middle of the module. This has been proven necessary
 as the implementations do require the fundamental types, definitions and functions in this
 module while also extending the module. To avoid circular dependencies, they cannot be put
 into a module block of the same module in a different file.
 
 Utility and interface functions should be placed after the part that includes the
-individual energy systems. These interact with the previous parts to provide an interface
-to the simulation as a whole as well as provide functionality on groups of energy systems.
+individual components. These interact with the previous parts to provide an interface
+to the simulation as a whole as well as provide functionality on groups of components.
 """
 module EnergySystems
 
@@ -55,9 +56,9 @@ end
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
-considered the nominal range. For example, a heating system might circulate water anywhere
+considered the nominal range. For example, a heating component might circulate water anywhere
 from 30°C to 60°C, but the nominal temperature is considered to be 60°C. This is intended
-so it becomes possible to prevent linking systems that do not work together because they
+so it becomes possible to prevent linking components that do not work together because they
 work on different nominal temperatures, while both work with the same physical medium,
 for example water.
 
@@ -107,7 +108,7 @@ end
 register_media(category::Symbol) = register_media([category,])
 
 """
-Enumerations of the archetype of an energy system describing its general function.
+Enumerations of the archetype of a component describing its general function.
 
 These are described in more detail in the accompanying documentation of the simulation
 model.
@@ -116,14 +117,14 @@ model.
     sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """
-Enumerations of a simulation step that can be performed on an energy system.
+Enumerations of a simulation step that can be performed on a component.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
 @enum Step s_reset s_control s_process s_load s_distribute s_potential
 
 """
-Convenience type for holding the instruction for one system and one step.
+Convenience type for holding the instruction for one component and one step.
 """
 const StepInstruction = Tuple{String,Step}
 
@@ -138,16 +139,16 @@ The basic type of all energy system components.
 abstract type Component end
 
 """
-A type describing an energy system that has control functionality.
+A type describing a component that has control functionality.
 
 Because Julia does not have interface->implementation like OOP languages such as Java,
 types implementing this abstract type are further to be assumed to have the fields required
-by all energy systems, in particular the field `controller` of type `Controller`.
+by all components, in particular the field `controller` of type `Controller`.
 """
 abstract type ControlledComponent <: Component end
 
 """
-Convenience alias to a dict mapping UAC keys to an energy system.
+Convenience alias to a dict mapping UAC keys to a component.
 """
 const Grouping = Dict{String,ControlledComponent}
 
@@ -169,19 +170,19 @@ Base.@kwdef struct OutputKey
 end
 
 """
-    each(systems :: Grouping)
+    each(components :: Grouping)
 
-Generator over each of the energy systems in the given grouping.
+Generator over each of the components in the given grouping.
 """
-function each(systems::Grouping)::Base.ValueIterator
-    return values(systems)
+function each(components::Grouping)::Base.ValueIterator
+    return values(components)
 end
 
 """
-Handles the tracking of energy being transfered from one energy system to another.
+Handles the tracking of energy being transfered from one component to another.
 
-This abstraction is useful to avoid energy system having to "know" other types. Instead of
-calling functions to transfer energy, a system can draw from or load into a SystemInterface
+This abstraction is useful to avoid components having to "know" other types. Instead of
+calling functions to transfer energy, a component can draw from or load into a SystemInterface
 instance instead.
 
 Energy is considered to always flow from the source to the target. A negative balance is a
@@ -192,10 +193,10 @@ via the interface. Assuming the energy balance holds, at the end of a time step 
 interface's field "sum_abs_change" will have a value of twice the total energy transfered.
 """
 Base.@kwdef mutable struct SystemInterface
-    """The source system providing energy"""
+    """The source component providing energy"""
     source::Union{Nothing,ControlledComponent} = nothing
 
-    """The target system receiving energy"""
+    """The target component receiving energy"""
     target::Union{Nothing,ControlledComponent} = nothing
 
     """The current balance of the interface"""
@@ -320,11 +321,11 @@ function highest_temperature(temperature_1, temperature_2)::Temperature
 end
 
 """
-Convenience type used define the required system interfaces of an energy system.
+Convenience type used define the required system interfaces of a component.
 
 To simultaneously define what is required and then hold references to instances after the
-whole system has been loaded, it maps a medium category to either nothing (before systems
-are linked) or a SystemInterface instance.
+whole energy system has been loaded, it maps a medium category to either nothing (before
+components are linked) or a SystemInterface instance.
 """
 const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
 
@@ -333,20 +334,20 @@ const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
 
 Return the balance of a unit in respect to the given interface.
 
-For most energy systems this is simply the balance of the interface itself, but for Bus
-instances this is handled differently. This function helps to implement an energy system
-without having to check if its connected to a Bus or directly to a system.
+For most components this is simply the balance of the interface itself, but for Bus
+instances this is handled differently. This function helps to implement a component
+without having to check if its connected to a Bus or directly to a component.
 
 # Arguments
 - `interface::SystemInterface`: The interface "on which" the balance is calculated. This
-    also defines which system is the source.
-- `unit::ControlledComponent`: The receiving system
+    also defines which component is the source.
+- `unit::ControlledComponent`: The receiving component
 
 # Returns NamedTuple with
-- "balance"::Float64:           The balance of the target system that can be considered a 
-                                demand on the source system
+- "balance"::Float64:           The balance of the target component that can be considered a 
+                                demand on the source component
 - "storage_potential"::Float64: An additional demand that covers the free storage space 
-                                connected to the target system
+                                connected to the target component
 - "energy_potential"::Float64:  The maximum enery an interface can provide or consume
 - "temperature"::Temperature:   The temperature of the interface
 """
@@ -371,7 +372,7 @@ Calculate the energy balance of the given unit as a whole.
 
 This is expected to start at zero at the beginning of a time step and return to zero at
 the end of it. If it is not zero, either the simulation failed to correctly calculate the
-energy balance of the entire system or the simulated network was not able to ensure the
+energy balance of the energy system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
 function balance(unit::ControlledComponent)::Float64
@@ -395,10 +396,10 @@ end
 """
     reset(unit)
 
-Reset the given energy system back to zero.
+Reset the given component back to zero.
 
-For most energy systems this only resets the balances on the system interfaces but some
-systems might require more complex reset handling.
+For most components this only resets the balances on the system interfaces but some
+components might require more complex reset handling.
 """
 function reset(unit::ControlledComponent)
     for inface in values(unit.input_interfaces)
@@ -414,30 +415,30 @@ function reset(unit::ControlledComponent)
 end
 
 """
-    control(unit, systems, parameters)
+    control(unit, components, parameters)
 
-Perform the control calculations for the given energy system.
+Perform the control calculations for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The system for which control is handled
-- `systems::Grouping`: A reference dict to all energy systems in the project
+- `unit::ControlledComponent`: The component for which control is handled
+- `components::Grouping`: A reference dict to all components in the project
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function control(
     unit::ControlledComponent,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
 end
 
 """
     potential(unit, parameters)
 
-Calculate potential energy processing for the given energy system.
+Calculate potential energy processing for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The system for which potentials are calculated
+- `unit::ControlledComponent`: The component for which potentials are calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function potential(
@@ -450,10 +451,10 @@ end
 """
     process(unit, parameters)
 
-Perform the processing calculations for the given energy system.
+Perform the processing calculations for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The system that is processed
+- `unit::ControlledComponent`: The component that is processed
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function process(
@@ -466,9 +467,9 @@ end
 """
     load(unit, parameters)
 
-Load excess energy into storage energy systems.
+Load excess energy into storage components.
 
-For non-storage systems this function does nothing.
+For non-storage components this function does nothing.
 
 # Arguments
 - `unit::ControlledComponent`: The storage loading excess energy
@@ -486,7 +487,7 @@ end
 
 Distribute the energy inputs and outputs of a bus.
 
-For non-bus systems this function does nothing.
+For non-bus components this function does nothing.
 """
 function distribute!(unit::ControlledComponent)
     # default implementation is to do nothing
@@ -495,7 +496,7 @@ end
 """
     output_values(unit)
 
-Specify which outputs an energy system can provide.
+Specify which outputs a component can provide.
 
 For the special values "IN" and "OUT" a medium category is required for fetching the actual
 value, while this method only specifies that there is an input or output.
@@ -531,13 +532,13 @@ absolute changes of the system interfaces and divided by 2. This behaviour is pa
 expected use of the method.
 
 Args:
-- `unit::Component`: The energy system for which to fetch the output
+- `unit::Component`: The component for which to fetch the output
 - `key::OutputKey`: An OutputKey specifying which output to return. This should be one of
     the options provided by `output_values()` as well as "IN" or "OUT"
 Returns:
 - `Float64`: The value of the desired output
 Throws:
-- `KeyError`: The key value requested must be one the energy system can provide
+- `KeyError`: The key value requested must be one the component can provide
 """
 function output_value(unit::Component, key::OutputKey)::Float64
     if key.value_key == "IN"
@@ -554,8 +555,8 @@ include("control.jl")
 
 using ..Profiles
 
-# the order of includes of the individual systems matters here as some energy systems
-# require the definition of certain basic systems such as a bus or a grid connection
+# the order of includes of the individual components matters here as some components
+# require the definition of certain basic components such as a bus or a grid connection
 include("general/demand.jl")
 include("general/fixed_supply.jl")
 include("general/bounded_supply.jl")
@@ -576,32 +577,32 @@ include("electric_producers/pv_plant.jl")
 load_condition_prototypes()
 
 """
-    link_output_with(unit, systems)
+    link_output_with(unit, components)
 
-Set the output targets of the given unit to the given energy systems.
+Set the output targets of the given unit to the given components.
 
-This function is used to construct the network of energy system from a graph input that
-determines which systems provide energy to which other systems.
+This function is used to construct the network of components from a graph input that
+determines which components provide energy to which other components.
 
 # Arguments
 - `unit::ControlledComponent`: The unit providing energy
-- `systems::Grouping`: A set of systems receiving energy. As systems might have multiple
+- `components::Grouping`: A set of components receiving energy. As components might have multiple
     outputs, this is used to set them all at once.
 """
-function link_output_with(unit::ControlledComponent, systems::Grouping)
+function link_output_with(unit::ControlledComponent, components::Grouping)
     if isa(unit, Bus)
-        for system in each(systems)
-            if isa(system, Bus)
-                if unit.medium == system.medium
-                    connection = SystemInterface(source=unit, target=system)
-                    push!(system.input_interfaces, connection)
+        for component in each(components)
+            if isa(component, Bus)
+                if unit.medium == component.medium
+                    connection = SystemInterface(source=unit, target=component)
+                    push!(component.input_interfaces, connection)
                     push!(unit.output_interfaces, connection)
                 end
             else
-                for in_medium in keys(system.input_interfaces)
+                for in_medium in keys(component.input_interfaces)
                     if in_medium == unit.medium
-                        connection = SystemInterface(source=unit, target=system)
-                        system.input_interfaces[in_medium] = connection
+                        connection = SystemInterface(source=unit, target=component)
+                        component.input_interfaces[in_medium] = connection
                         push!(unit.output_interfaces, connection)
                     end
                 end
@@ -609,19 +610,19 @@ function link_output_with(unit::ControlledComponent, systems::Grouping)
         end
     else
         for out_medium in keys(unit.output_interfaces)
-            for system in each(systems)
-                if isa(system, Bus)
-                    if out_medium == system.medium
-                        connection = SystemInterface(source=unit, target=system)
-                        push!(system.input_interfaces, connection)
+            for component in each(components)
+                if isa(component, Bus)
+                    if out_medium == component.medium
+                        connection = SystemInterface(source=unit, target=component)
+                        push!(component.input_interfaces, connection)
                         unit.output_interfaces[out_medium] = connection
                     end
                 else
-                    for in_medium in keys(system.input_interfaces)
+                    for in_medium in keys(component.input_interfaces)
                         if out_medium == in_medium
-                            connection = SystemInterface(source=unit, target=system)
+                            connection = SystemInterface(source=unit, target=component)
                             unit.output_interfaces[out_medium] = connection
-                            system.input_interfaces[in_medium] = connection
+                            component.input_interfaces[in_medium] = connection
                         end
                     end
                 end
@@ -631,26 +632,26 @@ function link_output_with(unit::ControlledComponent, systems::Grouping)
 end
 
 """
-    check_balances(systems, epsilon)
+    check_balances(components, epsilon)
 
-Check the energy balance of the given systems and return warnings of any violations.
+Check the energy balance of the given components and return warnings of any violations.
 
 # Arguments
-- `system::Grouping`: The systems to check
+- `component::Grouping`: The components to check
 - `epsilon::Float64`: A balance is only considered violated if the absolute value of the
     sum is larger than this value. This helps with spurious floating point issues
 
 # Returns
 - `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the key of the
-    system that has a non-zero energy balance and the value of that balance.
+    component that has a non-zero energy balance and the value of that balance.
 """
 function check_balances(
-    systems::Grouping,
+    components::Grouping,
     epsilon::Float64
 )::Vector{Tuple{String,Float64}}
     warnings = []
 
-    for (key, unit) in pairs(systems)
+    for (key, unit) in pairs(components)
         unit_balance = balance(unit)
         if unit_balance > epsilon || unit_balance < -epsilon
             push!(warnings, (key, unit_balance))
@@ -661,50 +662,50 @@ function check_balances(
 end
 
 """
-    perform_steps(systems, order_of_operations, parameters)
+    perform_steps(components, order_of_operations, parameters)
 
-Perform the simulation steps of one time step for the given systems in the given order.
+Perform the simulation steps of one time step for the given components in the given order.
 
 # Arguments
-- `systems::Grouping`: The entirety of the energy systems
+- `components::Grouping`: The entirety of the components
 - `order_of_operations::Vector{Vector{Any}}`: Defines which steps are performed in which order.
-    Each system must go through the simulation steps defined in EnergySystems.Step, but the
+    Each component must go through the simulation steps defined in EnergySystems.Step, but the
     order is not the same for all simulations. Determining the order must be handled
     elsewhere, as this function only goes through and calls the appropriate functions. The
-    first item of each entry must be the key of the system for which the following steps
+    first item of each entry must be the key of the component for which the following steps
     are performed.
 - `parameters::Dict{String, Any}`: Project-wide parameters
 
 # Examples
 ```
-    systems = Grouping(
-        "system_a" => Component(),
-        "system_b" => Component(),
+    components = Grouping(
+        "component_a" => Component(),
+        "component_b" => Component(),
     )
     order = [
-        ["system_a", EnergySystems.s_control]
-        ["system_b", EnergySystems.s_control, EnergySystems.s_process]
-        ["system_a", EnergySystems.s_process]
+        ["component_a", EnergySystems.s_control]
+        ["component_b", EnergySystems.s_control, EnergySystems.s_process]
+        ["component_a", EnergySystems.s_process]
     ]
     parameters = Dict{String, Any}("time" => 0)
-    perform_steps(systems, order, parameters)
+    perform_steps(components, order, parameters)
 ```
-In this example the control of system A is performed first, then control and processing of
-system B and finally processing of system A.
+In this example the control of component A is performed first, then control and processing of
+component B and finally processing of component A.
 """
 function perform_steps(
-    systems::Grouping,
+    components::Grouping,
     order_of_operations::StepInstructions,
     parameters::Dict{String,Any}
 )
     for entry in order_of_operations
-        unit = systems[entry[1]]
+        unit = components[entry[1]]
         step = entry[2]
 
         if step == s_reset
             reset(unit)
         elseif step == s_control
-            control(unit, systems, parameters)
+            control(unit, components, parameters)
         elseif step == s_potential
             potential(unit, parameters)
         elseif step == s_process

@@ -1,5 +1,5 @@
 """
-Implementation of a battery energy system holding electric charge.
+Implementation of a battery component holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
 parameters (its capacity). However the default operation strategy is more complex and

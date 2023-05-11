@@ -8,13 +8,13 @@ items. This is done to speed up selection of values for the output in each time 
 as this transformation has to be done only once at the beginning.
 """
 function output_keys(
-    systems::Grouping,
+    components::Grouping,
     from_config::Dict{String,Any}
 )::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
     for unit_key in keys(from_config)
-        unit = systems[unit_key]
+        unit = components[unit_key]
 
         for entry in from_config[unit_key]
             splitted = split(String(entry))
@@ -87,16 +87,16 @@ function write_to_file(
 end
 
 """
-dump_info(file_path, systems, order_of_operations, parameters)
+dump_info(file_path, components, order_of_operations, parameters)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
-general to find out why the systems behave in the simulation as they do.
+general to find out why the energy system behaves in the simulation as it does.
 """
 function dump_info(
     file_path::String,
-    systems::Grouping,
+    components::Grouping,
     order_of_operations::StepInstructions,
     parameters::Dict{String,Any}
 )
@@ -202,7 +202,7 @@ Inputs:
 output_all_sourcenames and *sinknames are vectors with names of the source and sink of each interface
 output_all_values are logs with data from each timestep in the shape [timestep,interface].
 medium_of_interface is a vector of the medium corresponding to each interface
-nr_of_interfaces is the total number of iterfaces in the current system topology
+nr_of_interfaces is the total number of iterfaces in the current energy system
 """
 function create_sankey(
     output_all_sourcenames::Vector{Any},
@@ -249,7 +249,7 @@ function create_sankey(
         colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
         color_map = Dict(zip(unique_medium_labels, colors))
         colors_for_medium_labels = map(x -> color_map[x], medium_labels)
-    else # account for cases with only one medium in the system topology
+    else # account for cases with only one medium in the energy system
         colors_for_medium_labels = get(ColorSchemes.roma, 0.5)
     end
 
@@ -269,7 +269,7 @@ function create_sankey(
                 label=medium_labels,
                 color=colors_for_medium_labels
             )),
-        Layout(title_text="Sankey diagram of system topology and energy flows", font_size=14)
+        Layout(title_text="Sankey diagram of the energy system and energy flows", font_size=14)
     )
 
     # save plot

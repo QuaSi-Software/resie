@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_heat_pump_demand_driven_correct_order()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -43,11 +43,11 @@ function test_heat_pump_demand_driven_correct_order()
             "power" => 12000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    heat_pump = systems["TST_HP_01"]
-    source = systems["TST_SRC_01"]
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
+    components = Resie.load_components(components_config)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -60,26 +60,26 @@ function test_heat_pump_demand_driven_correct_order()
     # first time step: demand is below max power of source (adjusted for additional input
     # of electricity), small delta T leads to high COP = 12.725999999999999
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
 
     demand.load = 900
     demand.temperature = 45
     demand.input_interfaces[demand.medium].temperature = 45
 
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
-    EnergySystems.control(source, systems, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
 
     source.max_energy = 5000/4
     source.temperature = 35
     source.output_interfaces[source.medium].temperature = 35
     source.output_interfaces[source.medium].max_energy = 5000/4
 
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -900
@@ -106,26 +106,26 @@ function test_heat_pump_demand_driven_correct_order()
 
     # second step: demand is above max power of source, big delta T leads to low COP = 3.4814999999999996
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
 
     demand.load = 2100
     demand.temperature = 75
     demand.input_interfaces[demand.medium].temperature = 75
 
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
-    EnergySystems.control(source, systems, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
 
     source.max_energy = 500
     source.temperature = 35
     source.output_interfaces[source.medium].temperature = 35
     source.output_interfaces[source.medium].max_energy = 500
 
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -2100

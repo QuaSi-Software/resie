@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_busses_communicate_demand()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
@@ -53,11 +53,11 @@ function test_busses_communicate_demand()
             "scale" => 1000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -70,10 +70,10 @@ function test_busses_communicate_demand()
     EnergySystems.reset(bus_1)
     EnergySystems.reset(bus_2)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance ≈ 0.0
     @test demand.input_interfaces[demand.medium].temperature === 55.0
@@ -186,7 +186,7 @@ end
 end
 
 function test_demand_over_busses_supply_is_transformer()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -265,14 +265,14 @@ function test_demand_over_busses_supply_is_transformer()
             "scale" => 1
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand_1 = systems["TST_DEM_01"]
-    demand_2 = systems["TST_DEM_02"]
-    grid = systems["TST_GRI_01"]
-    boiler = systems["TST_GBO_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
-    bus_3 = systems["TST_BUS_03"]
+    components = Resie.load_components(components_config)
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    boiler = components["TST_GBO_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    bus_3 = components["TST_BUS_03"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -290,13 +290,13 @@ function test_demand_over_busses_supply_is_transformer()
     EnergySystems.reset(boiler)
     EnergySystems.reset(grid)
 
-    EnergySystems.control(demand_2, systems, simulation_parameters)
-    EnergySystems.control(demand_1, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(bus_3, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand_2, components, simulation_parameters)
+    EnergySystems.control(demand_1, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(bus_3, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance ≈ 0.0
     @test demand_1.input_interfaces[demand_1.medium].temperature === 60.0
@@ -490,13 +490,13 @@ function test_demand_over_busses_supply_is_transformer()
     EnergySystems.reset(boiler)
     EnergySystems.reset(grid)
 
-    EnergySystems.control(demand_2, systems, simulation_parameters)
-    EnergySystems.control(demand_1, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(bus_3, systems, simulation_parameters)
-    EnergySystems.control(boiler, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand_2, components, simulation_parameters)
+    EnergySystems.control(demand_1, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(bus_3, components, simulation_parameters)
+    EnergySystems.control(boiler, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance ≈ 0.0
     @test demand_1.input_interfaces[demand_1.medium].temperature === 60.0
@@ -566,7 +566,7 @@ end
 end
 
 function test_busses_communicate_storage_potential()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
@@ -636,13 +636,13 @@ function test_busses_communicate_storage_potential()
             "scale" => 1000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid = systems["TST_GRI_01"]
-    bus_1 = systems["TST_BUS_01"]
-    bus_2 = systems["TST_BUS_02"]
-    tank_1 = systems["TST_BFT_01"]
-    tank_2 = systems["TST_BFT_02"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    tank_1 = components["TST_BFT_01"]
+    tank_2 = components["TST_BFT_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -657,12 +657,12 @@ function test_busses_communicate_storage_potential()
     EnergySystems.reset(tank_1)
     EnergySystems.reset(grid)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus_2, systems, simulation_parameters)
-    EnergySystems.control(tank_2, systems, simulation_parameters)
-    EnergySystems.control(bus_1, systems, simulation_parameters)
-    EnergySystems.control(tank_1, systems, simulation_parameters)
-    EnergySystems.control(grid, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus_2, components, simulation_parameters)
+    EnergySystems.control(tank_2, components, simulation_parameters)
+    EnergySystems.control(bus_1, components, simulation_parameters)
+    EnergySystems.control(tank_1, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces

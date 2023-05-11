@@ -1,9 +1,9 @@
 """
-Implementation of an energy system modeling an abstract fixed supply of some medium.
+Implementation of a component modeling an abstract fixed supply of some medium.
 
-This is particularly useful for testing, but can also be used to model any energy system
+This is particularly useful for testing, but can also be used to model any component
 or other equipment unit that processes energy in a medium, all of which has to be consumed
-as the energy system cannot be dispatched like a grid connection can.
+as the component cannot be dispatched like a grid connection can.
 Note that "fixed" in this context means that the amount of energy the unit processes is
 fixed within a timestep, but can vary over multiple timesteps. No calculation other than
 scaling of profile values is performed in each timestep.
@@ -73,10 +73,10 @@ end
 
 function control(
     unit::FixedSupply,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
 

@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_run_energy_system_from_storage()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -63,12 +63,12 @@ function test_run_energy_system_from_storage()
             "min_power_fraction" => 0.0
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    heat_pump = systems["TST_HP_01"]
-    hheat_demand = systems["TST_DEM_01"]
-    power_grid = systems["TST_GRI_01"]
-    lheat_storage = systems["TST_BFT_01"]
-    lheat_bus = systems["TST_BUS_01"]
+    components = Resie.load_components(components_config)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -80,15 +80,15 @@ function test_run_energy_system_from_storage()
 
     # first time step: storage is full to power heatpump
     
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(hheat_demand, systems, simulation_parameters)
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(power_grid, systems, simulation_parameters)
-    EnergySystems.control(lheat_storage, systems, simulation_parameters)
-    EnergySystems.control(lheat_bus, systems, simulation_parameters)
+    EnergySystems.control(hheat_demand, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(power_grid, components, simulation_parameters)
+    EnergySystems.control(lheat_storage, components, simulation_parameters)
+    EnergySystems.control(lheat_bus, components, simulation_parameters)
 
     hheat_demand.load = 800
     hheat_demand.temperature = 45.0
@@ -130,15 +130,15 @@ function test_run_energy_system_from_storage()
 
     # second step: storage is nearly empty, operation of heatpump is limited
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(hheat_demand, systems, simulation_parameters)
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(power_grid, systems, simulation_parameters)
-    EnergySystems.control(lheat_storage, systems, simulation_parameters)
-    EnergySystems.control(lheat_bus, systems, simulation_parameters)
+    EnergySystems.control(hheat_demand, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(power_grid, components, simulation_parameters)
+    EnergySystems.control(lheat_storage, components, simulation_parameters)
+    EnergySystems.control(lheat_bus, components, simulation_parameters)
 
     lheat_storage.load = 100.0
 
@@ -183,7 +183,7 @@ function test_run_energy_system_from_storage()
 end
 
 function test_run_energy_system_from_storage_denied()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -239,12 +239,12 @@ function test_run_energy_system_from_storage_denied()
             "min_power_fraction" => 0.0
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    heat_pump = systems["TST_HP_01"]
-    hheat_demand = systems["TST_DEM_01"]
-    power_grid = systems["TST_GRI_01"]
-    lheat_storage = systems["TST_BFT_01"]
-    lheat_bus = systems["TST_BUS_01"]
+    components = Resie.load_components(components_config)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -257,15 +257,15 @@ function test_run_energy_system_from_storage_denied()
     # first time step: storage is full to power heatpump, but heatpump unloading storages is test_run_energy_system_from_storage_denied
     # not energy should be transferred at all.
     
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(hheat_demand, systems, simulation_parameters)
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(power_grid, systems, simulation_parameters)
-    EnergySystems.control(lheat_storage, systems, simulation_parameters)
-    EnergySystems.control(lheat_bus, systems, simulation_parameters)
+    EnergySystems.control(hheat_demand, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(power_grid, components, simulation_parameters)
+    EnergySystems.control(lheat_storage, components, simulation_parameters)
+    EnergySystems.control(lheat_bus, components, simulation_parameters)
 
     hheat_demand.load = 800
     hheat_demand.temperature = 45.0

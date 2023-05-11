@@ -2,7 +2,7 @@ using ResumableFunctions
 
 """
 Utility struct to contain the connections, input/output priorities and other related data
-for bus systems.
+for bus components.
 """
 Base.@kwdef mutable struct ConnectionMatrix
     input_order::Vector{String}
@@ -41,13 +41,13 @@ Base.@kwdef mutable struct ConnectionMatrix
 end
 
 """
-Imnplementation of a bus energy system for balancing multiple inputs and outputs.
+Imnplementation of a bus component for balancing multiple inputs and outputs.
 
-This energy system is both a possible real system (mostly for electricity) as well as a
-necessary abstraction of the model. The basic idea is that one or more energy systems feed
-energy of the same medium into a bus and one or more energy systems draw that energy from
+This component is both a possible real energy system component (mostly for electricity) as well as a
+necessary abstraction of the model. The basic idea is that one or more components feed
+energy of the same medium into a bus and one or more components draw that energy from
 the bus. A bus with only one input and only one output can be replaced with a direct
-connection between both systems.
+connection between both components.
 
 The function and purpose is described in more detail in the accompanying documentation.
 """
@@ -95,9 +95,9 @@ end
 """
     balance_nr(unit, caller)
 
-Variant of [`balance`](@ref) that includes other connected bus systems and their energy
+Variant of [`balance`](@ref) that includes other connected bus components and their energy
 balance, but does so in a non-recursive manner such that any bus in the chain of connected
-bus systems is only considered once.
+bus components is only considered once.
 """
 function balance_nr(unit::Bus, caller::Bus)::Float64
     balance = 0.0
@@ -143,7 +143,7 @@ end
 """
     balance_direct(unit)
 
-Energy balance on a bus system without considering any other connected bus systems.
+Energy balance on a bus component without considering any other connected bus components.
 """
 function balance_direct(unit::Bus)::Float64
     balance = 0.0
@@ -310,9 +310,9 @@ function balance_on(
     #       considered here for energy_potential.
     # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken.
-    #       If an energy system connected to the interface of balance_on() has already been processed, the 
+    #       If a component connected to the interface of balance_on() has already been processed, the 
     #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
-    #       calling energy system to avoid double counting of energies.
+    #       calling component to avoid double counting of energies.
     balance_written = interface.sum_abs_change > 0.0
     return (
             balance = balance(unit),
@@ -371,8 +371,8 @@ end
 
 Bus-specific implementation of distribute!.
 
-This moves the energy from connected energy system from supply to demand systems both
-on the bus directly as well as taking other bus systems into account. This allows busses
+This moves the energy from connected component from supply to demand components both
+on the bus directly as well as taking other bus components into account. This allows busses
 to be connected in chains (but not loops) and "communicate" the energy across. The method
 implicitly requires that each bus on the chain is called with distribute!() in a specific
 order, which is explained in more detail in the documentation. Essentially it starts from

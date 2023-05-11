@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_primary_producer_can_load_storage()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -89,14 +89,14 @@ function test_primary_producer_can_load_storage()
             "static_temperature" => 60
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid_1 = systems["TST_GRI_01"]
-    grid_2 = systems["TST_GRI_02"]
-    bus = systems["TST_BUS_01"]
-    tank = systems["TST_BFT_01"]
-    boiler_1 = systems["TST_GBO_01"]
-    boiler_2 = systems["TST_GBO_02"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid_1 = components["TST_GRI_01"]
+    grid_2 = components["TST_GRI_02"]
+    bus = components["TST_BUS_01"]
+    tank = components["TST_BFT_01"]
+    boiler_1 = components["TST_GBO_01"]
+    boiler_2 = components["TST_GBO_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -116,13 +116,13 @@ function test_primary_producer_can_load_storage()
     EnergySystems.reset(tank)
     EnergySystems.reset(demand)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(boiler_1, systems, simulation_parameters)
-    EnergySystems.control(tank, systems, simulation_parameters)
-    EnergySystems.control(boiler_2, systems, simulation_parameters)
-    EnergySystems.control(grid_1, systems, simulation_parameters)
-    EnergySystems.control(grid_2, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(boiler_1, components, simulation_parameters)
+    EnergySystems.control(tank, components, simulation_parameters)
+    EnergySystems.control(boiler_2, components, simulation_parameters)
+    EnergySystems.control(grid_1, components, simulation_parameters)
+    EnergySystems.control(grid_2, components, simulation_parameters)
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
@@ -172,13 +172,13 @@ function test_primary_producer_can_load_storage()
 
     demand.static_load = 1500
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(boiler_1, systems, simulation_parameters)
-    EnergySystems.control(tank, systems, simulation_parameters)
-    EnergySystems.control(boiler_2, systems, simulation_parameters)
-    EnergySystems.control(grid_1, systems, simulation_parameters)
-    EnergySystems.control(grid_2, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(boiler_1, components, simulation_parameters)
+    EnergySystems.control(tank, components, simulation_parameters)
+    EnergySystems.control(boiler_2, components, simulation_parameters)
+    EnergySystems.control(grid_1, components, simulation_parameters)
+    EnergySystems.control(grid_2, components, simulation_parameters)
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1

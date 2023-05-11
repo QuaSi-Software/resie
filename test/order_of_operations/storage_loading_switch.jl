@@ -6,7 +6,7 @@ using Resie.EnergySystems
 include("../test_util.jl")
 
 function test_ooo_storage_loading_switch()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
@@ -111,8 +111,8 @@ function test_ooo_storage_loading_switch()
         ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
-    systems = Resie.load_systems(systems_config)
-    ooo = Resie.calculate_order_of_operations(systems)
+    components = Resie.load_components(components_config)
+    ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end
 

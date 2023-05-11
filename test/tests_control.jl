@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 
 function setup_control_tests()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
@@ -28,7 +28,7 @@ function setup_control_tests()
             "fixed_cop" => 3.0
         ),
     )
-    systems = Resie.load_systems(systems_config)
+    components = Resie.load_components(components_config)
 
     simulation_params = Dict{String,Any}(
         "time" => 0,
@@ -36,29 +36,29 @@ function setup_control_tests()
         "epsilon" => 1e-9
     )
 
-    return systems, simulation_params
+    return components, simulation_params
 end
 
 function test_move_state_default_strategy()
-    systems, simulation_params = setup_control_tests()
-    buffer_tank = systems["TST_BT_01"]
+    components, simulation_params = setup_control_tests()
+    buffer_tank = components["TST_BT_01"]
 
     @test buffer_tank.controller.state_machine.state == 1
-    EnergySystems.move_state(buffer_tank, systems, simulation_params)
+    EnergySystems.move_state(buffer_tank, components, simulation_params)
     @test buffer_tank.controller.state_machine.state == 1
 end
 
 function test_move_state_storage_driven_hp()
-    systems, simulation_params = setup_control_tests()
-    buffer_tank = systems["TST_BT_01"]
-    heat_pump = systems["TST_HP_01"]
+    components, simulation_params = setup_control_tests()
+    buffer_tank = components["TST_BT_01"]
+    heat_pump = components["TST_HP_01"]
 
     buffer_tank.load = 20000
     heat_pump.controller.state_machine.state = 1
-    EnergySystems.move_state(heat_pump, systems, simulation_params)
+    EnergySystems.move_state(heat_pump, components, simulation_params)
     @test heat_pump.controller.state_machine.state == 1
     buffer_tank.load = 0
-    EnergySystems.move_state(heat_pump, systems, simulation_params)
+    EnergySystems.move_state(heat_pump, components, simulation_params)
     @test heat_pump.controller.state_machine.state == 2
 end
 

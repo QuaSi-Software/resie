@@ -1,5 +1,5 @@
 """
-Implementation of an energy system modeling the connection to a public grid of a certain medium.
+Implementation of a component modeling the connection to a public grid of a certain medium.
 
 Public grids are considered to have an unlimited amount of energy they can provide, but
 might be limited in the power they can provide, although this behaviour is not yet
@@ -49,10 +49,10 @@ end
 
 function control(
     unit::GridConnection,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     if unit.sys_function === sf_bounded_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else
@@ -63,7 +63,7 @@ end
 function process(unit::GridConnection, parameters::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
-        # @TODO: if grids should be allowed to load storage systems, then the potential
+        # @TODO: if grids should be allowed to load storage components, then the potential
         # must be handled here instead of being ignored
         exchange = balance_on(outface, outface.target)
         if exchange.balance < 0.0

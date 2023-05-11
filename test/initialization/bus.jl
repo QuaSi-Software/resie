@@ -3,7 +3,7 @@ using Test
 using Resie
 using Resie.EnergySystems
 
-function system_topology()::Dict{String,Any}
+function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
@@ -51,9 +51,9 @@ function system_topology()::Dict{String,Any}
 end
 
 function test_load_no_connection_matrix()
-    systems_config = system_topology()
-    systems = Resie.load_systems(systems_config)
-    bus = systems["TST_BUS_01"]
+    components_config = energy_system()
+    components = Resie.load_components(components_config)
+    bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 2
     @test bus.connectivity.output_order[1] == "TST_DEM_01"
@@ -66,13 +66,13 @@ end
 end
 
 function test_load_given_lists_empty()
-    systems_config = system_topology()
-    systems_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
+    components_config = energy_system()
+    components_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
         "input_order" => [],
         "output_order" => [],
     )
-    systems = Resie.load_systems(systems_config)
-    bus = systems["TST_BUS_01"]
+    components = Resie.load_components(components_config)
+    bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 0
     @test bus.connectivity.storage_loading === nothing
@@ -83,8 +83,8 @@ end
 end
 
 function test_fully_specified()
-    systems_config = system_topology()
-    systems_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
+    components_config = energy_system()
+    components_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
         "input_order" => [
             "TST_PVP_01",
             "TST_GRI_01",
@@ -99,8 +99,8 @@ function test_fully_specified()
             [1, 0]
         ]
     )
-    systems = Resie.load_systems(systems_config)
-    bus = systems["TST_BUS_01"]
+    components = Resie.load_components(components_config)
+    bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 2
     bus.connectivity.input_order[1] == "TST_PVP_01"
     bus.connectivity.input_order[2] == "TST_GRI_01"

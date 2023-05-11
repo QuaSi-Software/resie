@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 
 function test_distance_from_sink()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
@@ -42,14 +42,14 @@ function test_distance_from_sink()
             "output_refs" => [],
         ),
     )
-    systems = Resie.load_systems(systems_config)
+    components = Resie.load_components(components_config)
 
-    @test Resie.distance_to_sink(systems["TST_BUS_01"], EnergySystems.sf_bus) == 3
-    @test Resie.distance_to_sink(systems["TST_BUS_02"], EnergySystems.sf_bus) == 2
-    @test Resie.distance_to_sink(systems["TST_BUS_03"], EnergySystems.sf_bus) == 0
-    @test Resie.distance_to_sink(systems["TST_BUS_04"], EnergySystems.sf_bus) == 0
-    @test Resie.distance_to_sink(systems["TST_BUS_05"], EnergySystems.sf_bus) == 1
-    @test Resie.distance_to_sink(systems["TST_BUS_06"], EnergySystems.sf_bus) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus) == 3
+    @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus) == 2
+    @test Resie.distance_to_sink(components["TST_BUS_03"], EnergySystems.sf_bus) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_04"], EnergySystems.sf_bus) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_05"], EnergySystems.sf_bus) == 1
+    @test Resie.distance_to_sink(components["TST_BUS_06"], EnergySystems.sf_bus) == 0
 end
 
 @testset "distance_from_sink" begin
@@ -57,7 +57,7 @@ end
 end
 
 function test_iteration_order()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
@@ -95,23 +95,23 @@ function test_iteration_order()
             "output_refs" => [],
         ),
     )
-    systems = Resie.load_systems(systems_config)
+    components = Resie.load_components(components_config)
 
     chain = [
-        systems["TST_BUS_01"],
-        systems["TST_BUS_02"],
-        systems["TST_BUS_03"],
-        systems["TST_BUS_04"],
-        systems["TST_BUS_05"],
-        systems["TST_BUS_06"],
+        components["TST_BUS_01"],
+        components["TST_BUS_02"],
+        components["TST_BUS_03"],
+        components["TST_BUS_04"],
+        components["TST_BUS_05"],
+        components["TST_BUS_06"],
     ]
     expected = [
-        systems["TST_BUS_03"],
-        systems["TST_BUS_04"],
-        systems["TST_BUS_06"],
-        systems["TST_BUS_05"],
-        systems["TST_BUS_02"],
-        systems["TST_BUS_01"],
+        components["TST_BUS_03"],
+        components["TST_BUS_04"],
+        components["TST_BUS_06"],
+        components["TST_BUS_05"],
+        components["TST_BUS_02"],
+        components["TST_BUS_01"],
     ]
     calculated = Resie.iterate_chain(chain, EnergySystems.sf_bus, reverse=false)
     for i in 1:6
@@ -124,7 +124,7 @@ end
 end
 
 function test_find_chains()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
@@ -172,19 +172,19 @@ function test_find_chains()
             "scale" => 1000
         ),
     )
-    systems = Resie.load_systems(systems_config)
+    components = Resie.load_components(components_config)
 
     expected_1 = Set([
-        systems["TST_BUS_01"],
-        systems["TST_BUS_02"],
+        components["TST_BUS_01"],
+        components["TST_BUS_02"],
     ])
     expected_2 = Set([
-        systems["TST_BUS_03"],
-        systems["TST_BUS_04"],
-        systems["TST_BUS_05"],
+        components["TST_BUS_03"],
+        components["TST_BUS_04"],
+        components["TST_BUS_05"],
     ])
 
-    chains = Resie.find_chains([u for u in values(systems)], EnergySystems.sf_bus)
+    chains = Resie.find_chains([u for u in values(components)], EnergySystems.sf_bus)
 
     @test length(chains) == 2
     @test chains[1] == expected_1

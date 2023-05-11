@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_demand_heating_temperature_values()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
@@ -25,8 +25,8 @@ function test_demand_heating_temperature_values()
             "scale" => 1000
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -38,7 +38,7 @@ function test_demand_heating_temperature_values()
     @test demand.load == 0.0
     @test demand.temperature === nothing
 
-    EnergySystems.control(demand, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
 
     @test demand.load == 75.0
     @test demand.temperature == 55.0

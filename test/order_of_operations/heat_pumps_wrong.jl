@@ -6,7 +6,7 @@ using Resie.EnergySystems
 include("../test_util.jl")
 
 function test_ooo_for_heat_pumps_wrong()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -59,8 +59,8 @@ function test_ooo_for_heat_pumps_wrong()
         ("TST_GRI_01", EnergySystems.s_process),
     ]
 
-    systems = Resie.load_systems(systems_config)
-    ooo = Resie.calculate_order_of_operations(systems)
+    components = Resie.load_components(components_config)
+    ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end
 

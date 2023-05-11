@@ -4,10 +4,10 @@ end
 
 strt_desc_demand_driven = """Demand-driven
 ------------------------
-Ensures that the processing of a system is done after the demand from systems that receive
-energy from the controlled system has been calculated. This also works if a bus acts as
-intermediary between systems. As this strategy does not implement any actual control, it is
-mostly used for ensuring the systems are calculated in the right order as well as
+Ensures that the processing of a component is done after the demand from components that receive
+energy from the controlled component has been calculated. This also works if a bus acts as
+intermediary between components. As this strategy does not implement any actual control, it is
+mostly used for ensuring the components are calculated in the right order as well as
 indicating to the process implementation that a given demand must be met (as opposed to
 strategy "supply_driven").
 """
@@ -30,7 +30,7 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
         "m_heat_out" => true,
         "m_heat_in" => true
     ),
-    required_systems=EnSysRequirements(
+    required_components=EnSysRequirements(
         "receiver" => (Component, nothing)
     )
 )

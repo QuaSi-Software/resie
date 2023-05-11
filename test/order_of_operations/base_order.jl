@@ -6,7 +6,7 @@ using Resie.EnergySystems
 include("../test_util.jl")
 
 function test_base_order()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_01_ELT_01_PVP" => Dict{String,Any}(
             "type" => "PVPlant",
             "control_refs" => [],
@@ -214,8 +214,8 @@ function test_base_order()
         [1258, ("TST_01_HZG_01_BUS", EnergySystems.s_distribute)],
     ]
 
-    systems = Resie.load_systems(systems_config)
-    by_function = Resie.categorize_by_function(systems)
+    components = Resie.load_components(components_config)
+    by_function = Resie.categorize_by_function(components)
     steps = Resie.base_order(by_function)
     @test pwc_steps_astr(expected, steps) == ""
 end

@@ -73,5 +73,5 @@ OP_STRATS["economical_discharge"] = OperationalStrategyType(
         "min_charge" => 0.2,
         "discharge_limit" => 0.05,
     ),
-    required_systems=EnSysRequirements()
+    required_components=EnSysRequirements()
 )

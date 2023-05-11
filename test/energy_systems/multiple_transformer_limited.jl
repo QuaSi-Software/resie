@@ -7,7 +7,7 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_multiple_transformer_with_limitations()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_DEM_heat_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -70,14 +70,14 @@ function test_multiple_transformer_with_limitations()
             "min_power_fraction" => 0.0
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    heat_pump = systems["TST_HP_01"]
-    electrolyser = systems["TST_ELY_01"]
-    grid_el1 = systems["TST_GRI_el_01"]
-    grid_el2 = systems["TST_GRI_el_02"]
-    demand_h2 = systems["TST_DEM_H2_01"]
-    demand_heat = systems["TST_DEM_heat_01"]
-    grid_o2 = systems["TST_GRI_O2_01"]
+    components = Resie.load_components(components_config)
+    heat_pump = components["TST_HP_01"]
+    electrolyser = components["TST_ELY_01"]
+    grid_el1 = components["TST_GRI_el_01"]
+    grid_el2 = components["TST_GRI_el_02"]
+    demand_h2 = components["TST_DEM_H2_01"]
+    demand_heat = components["TST_DEM_heat_01"]
+    grid_o2 = components["TST_GRI_O2_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -85,20 +85,20 @@ function test_multiple_transformer_with_limitations()
         "epsilon" => 1e-9,
     )
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
     # first time step: demand is met perfectly 
-    EnergySystems.control(demand_heat, systems, simulation_parameters)
-    EnergySystems.control(demand_h2, systems, simulation_parameters)
+    EnergySystems.control(demand_heat, components, simulation_parameters)
+    EnergySystems.control(demand_h2, components, simulation_parameters)
     demand_h2.load = 2400/4
     demand_heat.load = 2240/4
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(electrolyser, systems, simulation_parameters)
-    EnergySystems.control(grid_el1, systems, simulation_parameters)
-    EnergySystems.control(grid_el2, systems, simulation_parameters)
-    EnergySystems.control(grid_o2, systems, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(electrolyser, components, simulation_parameters)
+    EnergySystems.control(grid_el1, components, simulation_parameters)
+    EnergySystems.control(grid_el2, components, simulation_parameters)
+    EnergySystems.control(grid_o2, components, simulation_parameters)
 
     EnergySystems.process(demand_heat, simulation_parameters)
     EnergySystems.process(demand_h2, simulation_parameters)
@@ -167,19 +167,19 @@ function test_multiple_transformer_with_limitations()
     #  --> if that is fixed, the heat pump is running on 100% instead of 50% due to lack of information that electrolyser 
     #      can only run 50% due to a limitation in hydrogen demand
 
-    for unit in values(systems)
+    for unit in values(components)
         EnergySystems.reset(unit)
     end
 
-    EnergySystems.control(demand_heat, systems, simulation_parameters)
-    EnergySystems.control(demand_h2, systems, simulation_parameters)
+    EnergySystems.control(demand_heat, components, simulation_parameters)
+    EnergySystems.control(demand_h2, components, simulation_parameters)
     demand_h2.load = 0.5*2400/4  # reducing h2 demand by half
     demand_heat.load = 2240/4  # same heat demand as bevore
-    EnergySystems.control(heat_pump, systems, simulation_parameters)
-    EnergySystems.control(electrolyser, systems, simulation_parameters)
-    EnergySystems.control(grid_el1, systems, simulation_parameters)
-    EnergySystems.control(grid_el2, systems, simulation_parameters)
-    EnergySystems.control(grid_o2, systems, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(electrolyser, components, simulation_parameters)
+    EnergySystems.control(grid_el1, components, simulation_parameters)
+    EnergySystems.control(grid_el2, components, simulation_parameters)
+    EnergySystems.control(grid_o2, components, simulation_parameters)
 
     EnergySystems.process(demand_heat, simulation_parameters)
     EnergySystems.process(demand_h2, simulation_parameters)
