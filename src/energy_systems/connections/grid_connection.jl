@@ -8,7 +8,7 @@ remaining demand of energy or take in any excess of energy. To make it possible 
 one-way connection they are split into two instances for providing or receiving energy and
 must be handled as such in the input for constructing a project.
 """
-mutable struct GridConnection <: ControlledSystem
+mutable struct GridConnection <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

@@ -6,7 +6,7 @@ energy system or other equipment unit that processes energy in a given medium. T
 might still have a maximum power draw in a single time step, but can provide any fraction
 of this to connected systems.
 """
-mutable struct BoundedSupply <: ControlledSystem
+mutable struct BoundedSupply <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

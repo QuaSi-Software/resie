@@ -6,7 +6,7 @@ energy system or other equipment unit that consumes energy of a given medium. Th
 might still have a maximum power intake in a single time step, but can consume any fraction
 of this.
 """
-mutable struct BoundedSink <: ControlledSystem
+mutable struct BoundedSink <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

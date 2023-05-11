@@ -4,7 +4,7 @@ Implementation of a seasonal thermal storage system.
 This is a simplified model, which mostly deals with amounts of energy and considers
 temperatures only for the available temperature as the tank is depleted.
 """
-mutable struct SeasonalThermalStorage <: ControlledSystem
+mutable struct SeasonalThermalStorage <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

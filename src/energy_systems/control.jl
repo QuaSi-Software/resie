@@ -53,7 +53,7 @@ end
 
 Get the linked system of the given name for a condition.
 """
-function rel(condition::Condition, name::String)::ControlledSystem
+function rel(condition::Condition, name::String)::ControlledComponent
     return condition.linked_systems[name]
 end
 
@@ -125,7 +125,7 @@ The systems are the same as the control_refs project config entry, meaning this 
 input, but correction configuration should have been checked beforehand by automated
 mechanisms. See also [`link`](@ref) for how linking conditions works.
 """
-function link_control_with(unit::ControlledSystem, systems::Grouping)
+function link_control_with(unit::ControlledComponent, systems::Grouping)
     for table in values(unit.controller.state_machine.transitions)
         for condition in table.conditions
             link(condition, systems)
@@ -255,7 +255,7 @@ end
 Checks the controller of the given unit and moves the state machine to its new state.
 """
 function move_state(
-    unit::ControlledSystem,
+    unit::ControlledComponent,
     systems::Grouping,
     parameters::Dict{String,Any}
 )

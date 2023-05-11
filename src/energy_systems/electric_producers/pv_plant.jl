@@ -7,7 +7,7 @@ seperate tool, a proper implemention would mostly just load a profile and consid
 some system losses. The amplitude parameter is a scaling factor, but is not an average
 power value.
 """
-mutable struct PVPlant <: ControlledSystem
+mutable struct PVPlant <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

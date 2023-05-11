@@ -19,7 +19,7 @@ to the simulation as a whole as well as provide functionality on groups of energ
 """
 module EnergySystems
 
-export check_balances, ControlledSystem, each, Component, Grouping, link_output_with,
+export check_balances, ControlledComponent, each, Component, Grouping, link_output_with,
     perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
     highest_temperature
 
@@ -144,12 +144,12 @@ Because Julia does not have interface->implementation like OOP languages such as
 types implementing this abstract type are further to be assumed to have the fields required
 by all energy systems, in particular the field `controller` of type `Controller`.
 """
-abstract type ControlledSystem <: Component end
+abstract type ControlledComponent <: Component end
 
 """
 Convenience alias to a dict mapping UAC keys to an energy system.
 """
-const Grouping = Dict{String,ControlledSystem}
+const Grouping = Dict{String,ControlledComponent}
 
 """
 Convenience alias for temperatures which can be a number or "nothing".
@@ -193,10 +193,10 @@ interface's field "sum_abs_change" will have a value of twice the total energy t
 """
 Base.@kwdef mutable struct SystemInterface
     """The source system providing energy"""
-    source::Union{Nothing,ControlledSystem} = nothing
+    source::Union{Nothing,ControlledComponent} = nothing
 
     """The target system receiving energy"""
-    target::Union{Nothing,ControlledSystem} = nothing
+    target::Union{Nothing,ControlledComponent} = nothing
 
     """The current balance of the interface"""
     balance::Float64 = 0.0
@@ -340,7 +340,7 @@ without having to check if its connected to a Bus or directly to a system.
 # Arguments
 - `interface::SystemInterface`: The interface "on which" the balance is calculated. This
     also defines which system is the source.
-- `unit::ControlledSystem`: The receiving system
+- `unit::ControlledComponent`: The receiving system
 
 # Returns NamedTuple with
 - "balance"::Float64:           The balance of the target system that can be considered a 
@@ -352,7 +352,7 @@ without having to check if its connected to a Bus or directly to a system.
 """
 function balance_on(
     interface::SystemInterface,
-    unit::ControlledSystem
+    unit::ControlledComponent
 )::NamedTuple{}
     input_sign = unit.uac == interface.target.uac ? -1 : +1
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
@@ -374,7 +374,7 @@ the end of it. If it is not zero, either the simulation failed to correctly calc
 energy balance of the entire system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
-function balance(unit::ControlledSystem)::Float64
+function balance(unit::ControlledComponent)::Float64
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
@@ -400,7 +400,7 @@ Reset the given energy system back to zero.
 For most energy systems this only resets the balances on the system interfaces but some
 systems might require more complex reset handling.
 """
-function reset(unit::ControlledSystem)
+function reset(unit::ControlledComponent)
     for inface in values(unit.input_interfaces)
         if inface !== nothing
             reset!(inface)
@@ -419,12 +419,12 @@ end
 Perform the control calculations for the given energy system.
 
 # Arguments
-- `unit::ControlledSystem`: The system for which control is handled
+- `unit::ControlledComponent`: The system for which control is handled
 - `systems::Grouping`: A reference dict to all energy systems in the project
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function control(
-    unit::ControlledSystem,
+    unit::ControlledComponent,
     systems::Grouping,
     parameters::Dict{String,Any}
 )
@@ -437,11 +437,11 @@ end
 Calculate potential energy processing for the given energy system.
 
 # Arguments
-- `unit::ControlledSystem`: The system for which potentials are calculated
+- `unit::ControlledComponent`: The system for which potentials are calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function potential(
-    unit::ControlledSystem,
+    unit::ControlledComponent,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -453,11 +453,11 @@ end
 Perform the processing calculations for the given energy system.
 
 # Arguments
-- `unit::ControlledSystem`: The system that is processed
+- `unit::ControlledComponent`: The system that is processed
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function process(
-    unit::ControlledSystem,
+    unit::ControlledComponent,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -471,11 +471,11 @@ Load excess energy into storage energy systems.
 For non-storage systems this function does nothing.
 
 # Arguments
-- `unit::ControlledSystem`: The storage loading excess energy
+- `unit::ControlledComponent`: The storage loading excess energy
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function load(
-    unit::ControlledSystem,
+    unit::ControlledComponent,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -488,7 +488,7 @@ Distribute the energy inputs and outputs of a bus.
 
 For non-bus systems this function does nothing.
 """
-function distribute!(unit::ControlledSystem)
+function distribute!(unit::ControlledComponent)
     # default implementation is to do nothing
 end
 
@@ -584,11 +584,11 @@ This function is used to construct the network of energy system from a graph inp
 determines which systems provide energy to which other systems.
 
 # Arguments
-- `unit::ControlledSystem`: The unit providing energy
+- `unit::ControlledComponent`: The unit providing energy
 - `systems::Grouping`: A set of systems receiving energy. As systems might have multiple
     outputs, this is used to set them all at once.
 """
-function link_output_with(unit::ControlledSystem, systems::Grouping)
+function link_output_with(unit::ControlledComponent, systems::Grouping)
     if isa(unit, Bus)
         for system in each(systems)
             if isa(system, Bus)

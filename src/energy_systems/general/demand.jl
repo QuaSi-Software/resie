@@ -6,7 +6,7 @@ tools that calculate the demand before a simulation of the energy systems is don
 profiles usually are normalized to some degree, therefore Demand instances require a scaling
 factor to turn the relative values to absolute values of required energy.
 """
-mutable struct Demand <: ControlledSystem
+mutable struct Demand <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

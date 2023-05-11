@@ -5,7 +5,7 @@ For the moment the implementation remains simple with only one state (its charge
 parameters (its capacity). However the default operation strategy is more complex and
 toggles the processing of the battery dependant on available PV power and its own charge.
 """
-Base.@kwdef mutable struct Battery <: ControlledSystem
+Base.@kwdef mutable struct Battery <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

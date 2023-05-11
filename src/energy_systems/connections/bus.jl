@@ -51,7 +51,7 @@ connection between both systems.
 
 The function and purpose is described in more detail in the accompanying documentation.
 """
-Base.@kwdef mutable struct Bus <: ControlledSystem
+Base.@kwdef mutable struct Bus <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction

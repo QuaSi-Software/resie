@@ -5,7 +5,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the boiler when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct GasBoiler <: ControlledSystem
+mutable struct GasBoiler <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
