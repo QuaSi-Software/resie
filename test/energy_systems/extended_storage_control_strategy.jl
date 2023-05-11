@@ -437,7 +437,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.control(boiler, components, simulation_parameters)
     EnergySystems.control(storage_2, components, simulation_parameters)
     EnergySystems.control(storage_1, components, simulation_parameters)
-    EnergySystems.control(grid,componentss, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus_2, simulation_parameters)

@@ -164,7 +164,7 @@ This is a specific data structure intended to speed up recording output by avoid
 need to parse the user-submitted config options for every time step.
 """
 Base.@kwdef struct OutputKey
-    unit::EnergySystem
+    unit::Component
     medium::Union{Nothing,Symbol}
     value_key::String
 end

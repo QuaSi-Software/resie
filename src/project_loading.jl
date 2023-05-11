@@ -47,7 +47,7 @@ function load_components(config::Dict{String,Any})::Grouping
 
         symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
-        if unit_class <: EnergySystems.EnergySystem
+        if unit_class <: EnergySystems.Component
             instance = unit_class(unit_key, unit_config)
             components[unit_key] = instance
         end
