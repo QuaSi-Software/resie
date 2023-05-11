@@ -218,7 +218,7 @@ function test_find_indexes()
     ]
     own_idx, target_idx = Resie.find_indexes(
         steps,
-        ("TST_BUS_02", EnergySystems.s_produce),
+        ("TST_BUS_02", EnergySystems.s_process),
         ("TST_BSS_01", EnergySystems.s_control)
     )
     @test own_idx === nothing

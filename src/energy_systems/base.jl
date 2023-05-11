@@ -120,7 +120,7 @@ Enumerations of a simulation step that can be performed on an energy system.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
-@enum Step s_reset s_control s_produce s_load s_distribute s_potential
+@enum Step s_reset s_control s_process s_load s_distribute s_potential
 
 """
 Convenience type for holding the instruction for one system and one step.
@@ -683,8 +683,8 @@ Perform the simulation steps of one time step for the given systems in the given
     )
     order = [
         ["system_a", EnergySystems.s_control]
-        ["system_b", EnergySystems.s_control, EnergySystems.s_produce]
-        ["system_a", EnergySystems.s_produce]
+        ["system_b", EnergySystems.s_control, EnergySystems.s_process]
+        ["system_a", EnergySystems.s_process]
     ]
     parameters = Dict{String, Any}("time" => 0)
     perform_steps(systems, order, parameters)
@@ -707,7 +707,7 @@ function perform_steps(
             control(unit, systems, parameters)
         elseif step == s_potential
             potential(unit, parameters)
-        elseif step == s_produce
+        elseif step == s_process
             produce(unit, parameters)
         elseif step == s_load
             load(unit, parameters)

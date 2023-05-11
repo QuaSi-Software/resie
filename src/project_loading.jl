@@ -125,7 +125,7 @@ function base_order(systems_by_function)
     # produce fixed sources/sinks and busses.
     for sf_order = 1:3
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
             initial_nr -= 1
         end
     end
@@ -140,14 +140,14 @@ function base_order(systems_by_function)
             end
         end
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
             initial_nr -= 1
         end
     end
 
     # produce, then load storages
     for unit in values(systems_by_function[5])
-        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
         initial_nr -= 1
     end
     for unit in values(systems_by_function[5])
@@ -158,7 +158,7 @@ function base_order(systems_by_function)
     # produce bounded sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_produce)])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
             initial_nr -= 1
         end
     end
@@ -390,8 +390,8 @@ function load_order_of_operations(order_of_operation_input, systems::Grouping)::
            s_step_system = EnergySystems.s_reset
         elseif s_step == "s_control"
             s_step_system = EnergySystems.s_control
-        elseif s_step == "s_produce"
-            s_step_system = EnergySystems.s_produce
+        elseif s_step == "s_process"
+            s_step_system = EnergySystems.s_process
         elseif s_step == "s_potential"
             s_step_system = EnergySystems.s_potential
         elseif s_step == "s_load"
@@ -399,7 +399,7 @@ function load_order_of_operations(order_of_operation_input, systems::Grouping)::
         elseif s_step == "s_distribute"
             s_step_system = EnergySystems.s_distribute
         else 
-            throw(ArgumentError("Unknown operation step \"$s_step\" in \"order_of_operation\" in input file. Must be one of: s_reset, s_control, s_produce, s_potential, s_load, s_distribute"))
+            throw(ArgumentError("Unknown operation step \"$s_step\" in \"order_of_operation\" in input file. Must be one of: s_reset, s_control, s_process, s_potential, s_load, s_distribute"))
         end
 
         if !(uac in all_system_uac)
@@ -522,8 +522,8 @@ function reorder_for_input_priorities(simulation_order, systems, systems_by_func
                 )
                 place_one_lower!(
                     simulation_order,
-                    (bus.connectivity.input_order[own_idx], EnergySystems.s_produce),
-                    (bus.connectivity.input_order[other_idx], EnergySystems.s_produce)
+                    (bus.connectivity.input_order[own_idx], EnergySystems.s_process),
+                    (bus.connectivity.input_order[other_idx], EnergySystems.s_process)
                 )
             end
         end
@@ -676,8 +676,8 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                 for idx in 1:(length(storages)-last_index)
                     place_one_lower!(
                         simulation_order,
-                        (last_element.uac, EnergySystems.s_produce),
-                        (storages[idx].uac, EnergySystems.s_produce)
+                        (last_element.uac, EnergySystems.s_process),
+                        (storages[idx].uac, EnergySystems.s_process)
                     )
                     place_one_lower!(
                         simulation_order,
@@ -703,7 +703,7 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                                 )
                                     place_one_lower!(                                                   # and then make sure that the load step of the storage is right after the produce step of the transformer
                                         simulation_order,
-                                        (bus_input_interface.source.uac, EnergySystems.s_produce),
+                                        (bus_input_interface.source.uac, EnergySystems.s_process),
                                         (storage.uac, EnergySystems.s_load),
                                         force=true
                                     )
@@ -730,8 +730,8 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                 for unimited_storage in unimited_storages
                     place_one_lower!(
                         simulation_order,
-                        (unimited_storage.uac, EnergySystems.s_produce),
-                        (limited_storage.uac, EnergySystems.s_produce)
+                        (unimited_storage.uac, EnergySystems.s_process),
+                        (limited_storage.uac, EnergySystems.s_process)
                     )
                     place_one_lower!(
                         simulation_order,
