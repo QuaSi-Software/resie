@@ -1,12 +1,12 @@
 """
-Implementation of an energy system modeling a generic bounded sink of a chosen medium.
+Implementation of a component modeling a generic bounded sink of a chosen medium.
 
 This is particularly useful for testing, but can also be used to model any bounded
-energy system or other equipment unit that consumes energy of a given medium. The system
+component or other equipment unit that consumes energy of a given medium. The component
 might still have a maximum power intake in a single time step, but can consume any fraction
 of this.
 """
-mutable struct BoundedSink <: ControlledSystem
+mutable struct BoundedSink <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -69,10 +69,10 @@ end
 
 function control(
     unit::BoundedSink,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, parameters["time"])
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
 
@@ -85,7 +85,7 @@ function control(
 
 end
 
-function produce(unit::BoundedSink, parameters::Dict{String,Any})
+function process(unit::BoundedSink, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     if exchange.balance > 0.0

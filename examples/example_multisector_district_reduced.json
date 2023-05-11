@@ -4,22 +4,17 @@
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "output_keys": {
-			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"],
-            "TST_BFT_TH_01": ["Load"],
-            "TST_DEM_TH_02": ["m_h_w_ht1 IN"],
-            "TST_BFT_TH_02": ["Load"],
-            "TST_STES_TH_01": ["Load"],
-            "TST_ELY_01": ["m_h_w_lt1 OUT"],
-            "TST_CHP_01": ["m_h_w_ht1 OUT"],
-            "TST_GBO_01": ["m_h_w_ht1 OUT"],
-            "TST_HTP_01": ["m_h_w_ht1 OUT"],
-            "TST_HTP_02": ["m_h_w_ht1 OUT"],
-            "TST_BUS_TH_00": ["Balance"],
-            "TST_PVP_EL_01": ["m_e_ac_230v OUT"]
+			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"]
         },
         "output_plot": {
             "1": {
                 "key": {"TST_DEM_TH_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kW",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_DEM_TH_02": ["m_h_w_ht1 IN"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
@@ -30,26 +25,20 @@
                 "unit": "kW",
                 "scale_factor": 0.001
             },
-            "2": {
-                "key": {"TST_DEM_TH_02": ["m_h_w_ht1 IN"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": 0.001
-            },
             "4": {
                 "key": {"TST_BFT_TH_02": ["Load"]},
                 "axis": "right",
-                "unit": "kWh",
+                "unit": "kW",
                 "scale_factor": 0.001
             },
             "5": {
                 "key": {"TST_STES_TH_01": ["Load"]},
                 "axis": "right",
-                "unit": "kWh",
+                "unit": "kW",
                 "scale_factor": 0.001
             },
             "6": {
-                "key": {"TST_ELY_01": ["m_h_w_lt1 OUT"]},
+                "key": {"TST_ELY_01": ["m_c_g_h2 OUT"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
@@ -77,30 +66,6 @@
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
-            },
-            "11": {
-                "key": {"TST_BUS_TH_00": ["Balance"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": 0.001
-            },
-            "12": {
-                "key": {"TST_PVP_EL_01": ["m_e_ac_230v OUT"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": 0.001
-            },
-            "13": {
-                "key": {"TST_STES_TH_01": ["m_h_w_ht1 IN"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": -0.001
-            },
-            "14": {
-                "key": {"TST_STES_TH_01": ["m_h_w_lt1 OUT"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": 0.001
             }
         }    
     },
@@ -116,17 +81,17 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
-            "static_temperature": 60,
-            "scale": 16000
+            "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_temp_60_const.prf",
+            "scale": 13000
         },
         "TST_DEM_TH_02": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
-            "static_temperature": 60,
-            "scale": 19000
+            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_temp_60_const.prf",
+            "scale": 15000
         },
         "TST_DEM_EL_01": {
             "type": "Demand",
@@ -319,7 +284,7 @@
                 "name": "demand_driven",
                 "operation_profile_path": "profiles/district/4000hours_with_least_CO2_2022.prf"
             },
-            "power": 600000,
+            "power": 750000,
             "output_temperature": 50.0
         },
         "TST_CHP_01": {
@@ -331,11 +296,11 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "load_storages": true
+                "load_storages": false
             },
-            "power": 150000,
+            "power": 300000,
             "output_temperature": 60,
-            "min_power_fraction": 1.0
+            "min_power_fraction": 0.0
         },
         "TST_GBO_01": {
             "type": "GasBoiler",
@@ -349,8 +314,7 @@
                 "low_threshold": 0.5          
             },
             "power": 400000,
-            "output_temperature": 60,
-            "min_power_fraction": 0.0
+            "output_temperature": 60
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",
@@ -358,7 +322,7 @@
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
-            "capacity": 500000,
+            "capacity": 800000,
             "load": 0,
             "high_temperature": 60.0
         },
@@ -368,7 +332,7 @@
             "output_refs": [
                 "TST_BUS_TH_02"
             ],
-            "capacity": 500000,
+            "capacity": 800000,
             "load": 150000,
             "high_temperature": 60.0
         },
@@ -379,7 +343,7 @@
                 "TST_HTP_01"
             ],
             "capacity": 400000000,
-            "load": 190000000,
+            "load": 200000000,
             "high_temperature": 60.0
         },
         "TST_HTP_01": {
@@ -405,10 +369,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 300000,
+            "power": 330000,
             "fixed_cop": 3.5
         }
-    },
-    "order_of_operation": [
-    ]
+    }
 }

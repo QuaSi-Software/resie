@@ -1,5 +1,5 @@
 """
-Implementation of a heat pump energy system.
+Implementation of a heat pump component.
 
 For the moment this remains a simple implementation that requires a low temperature heat
 and electricity input and produces high temperature heat. Has a fixed coefficient of
@@ -10,7 +10,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct HeatPump <: ControlledSystem
+mutable struct HeatPump <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -65,10 +65,10 @@ end
 
 function control(
     unit::HeatPump,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
@@ -330,7 +330,7 @@ function potential(
     end
 end
 
-function produce(unit::HeatPump, parameters::Dict{String,Any})
+function process(unit::HeatPump, parameters::Dict{String,Any})
     potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)

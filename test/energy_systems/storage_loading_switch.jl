@@ -7,25 +7,25 @@ using Resie.Profiles
 EnergySystems.set_timestep(900)
 
 function test_primary_producer_can_load_storage()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_01"],
+            "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => ["TST_GBO_02"],
+            "output_refs" => ["TST_GBO_02"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -38,7 +38,7 @@ function test_primary_producer_can_load_storage()
         "TST_GBO_02" => Dict{String,Any}(
             "type" => "GasBoiler",
             "control_refs" => ["TST_BFT_01"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "strategy" => Dict{String,Any}(
@@ -50,7 +50,7 @@ function test_primary_producer_can_load_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => ["TST_DEM_01", "TST_BFT_01"],
+            "output_refs" => ["TST_DEM_01", "TST_BFT_01"],
             "connection_matrix" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -71,7 +71,7 @@ function test_primary_producer_can_load_storage()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_BUS_01"
             ],
             "capacity" => 40000,
@@ -81,7 +81,7 @@ function test_primary_producer_can_load_storage()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
@@ -89,14 +89,14 @@ function test_primary_producer_can_load_storage()
             "static_temperature" => 60
         ),
     )
-    systems = Resie.load_systems(systems_config)
-    demand = systems["TST_DEM_01"]
-    grid_1 = systems["TST_GRI_01"]
-    grid_2 = systems["TST_GRI_02"]
-    bus = systems["TST_BUS_01"]
-    tank = systems["TST_BFT_01"]
-    boiler_1 = systems["TST_GBO_01"]
-    boiler_2 = systems["TST_GBO_02"]
+    components = Resie.load_components(components_config)
+    demand = components["TST_DEM_01"]
+    grid_1 = components["TST_GRI_01"]
+    grid_2 = components["TST_GRI_02"]
+    bus = components["TST_BUS_01"]
+    tank = components["TST_BFT_01"]
+    boiler_1 = components["TST_GBO_01"]
+    boiler_2 = components["TST_GBO_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -116,34 +116,34 @@ function test_primary_producer_can_load_storage()
     EnergySystems.reset(tank)
     EnergySystems.reset(demand)
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(boiler_1, systems, simulation_parameters)
-    EnergySystems.control(tank, systems, simulation_parameters)
-    EnergySystems.control(boiler_2, systems, simulation_parameters)
-    EnergySystems.control(grid_1, systems, simulation_parameters)
-    EnergySystems.control(grid_2, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(boiler_1, components, simulation_parameters)
+    EnergySystems.control(tank, components, simulation_parameters)
+    EnergySystems.control(boiler_2, components, simulation_parameters)
+    EnergySystems.control(grid_1, components, simulation_parameters)
+    EnergySystems.control(grid_2, components, simulation_parameters)
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
 
-    EnergySystems.produce(demand, simulation_parameters)
-    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(bus, simulation_parameters)
 
-    EnergySystems.produce(boiler_1, simulation_parameters)
+    EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(tank, simulation_parameters)
+    EnergySystems.process(tank, simulation_parameters)
     @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(boiler_2, simulation_parameters)
+    EnergySystems.process(boiler_2, simulation_parameters)
     @test boiler_2.output_interfaces[boiler_2.m_heat_out].balance == 2500.0
 
     EnergySystems.load(tank, simulation_parameters)
     @test tank.input_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(grid_2, simulation_parameters)
-    EnergySystems.produce(grid_1, simulation_parameters)
+    EnergySystems.process(grid_2, simulation_parameters)
+    EnergySystems.process(grid_1, simulation_parameters)
     EnergySystems.distribute!(bus)
 
     exchange = EnergySystems.balance_on(
@@ -172,34 +172,34 @@ function test_primary_producer_can_load_storage()
 
     demand.static_load = 1500
 
-    EnergySystems.control(demand, systems, simulation_parameters)
-    EnergySystems.control(bus, systems, simulation_parameters)
-    EnergySystems.control(boiler_1, systems, simulation_parameters)
-    EnergySystems.control(tank, systems, simulation_parameters)
-    EnergySystems.control(boiler_2, systems, simulation_parameters)
-    EnergySystems.control(grid_1, systems, simulation_parameters)
-    EnergySystems.control(grid_2, systems, simulation_parameters)
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+    EnergySystems.control(boiler_1, components, simulation_parameters)
+    EnergySystems.control(tank, components, simulation_parameters)
+    EnergySystems.control(boiler_2, components, simulation_parameters)
+    EnergySystems.control(grid_1, components, simulation_parameters)
+    EnergySystems.control(grid_2, components, simulation_parameters)
 
     @test boiler_1.controller.state_machine.state == 2
     @test boiler_2.controller.state_machine.state == 1
 
-    EnergySystems.produce(demand, simulation_parameters)
-    EnergySystems.produce(bus, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(bus, simulation_parameters)
 
-    EnergySystems.produce(boiler_1, simulation_parameters)
+    EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
-    EnergySystems.produce(tank, simulation_parameters)
+    EnergySystems.process(tank, simulation_parameters)
     @test tank.output_interfaces[tank.medium].sum_abs_change == 0.0
 
-    EnergySystems.produce(boiler_2, simulation_parameters)
+    EnergySystems.process(boiler_2, simulation_parameters)
     @test boiler_2.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 0.0
 
     EnergySystems.load(tank, simulation_parameters)
     @test tank.load == 1000.0
 
-    EnergySystems.produce(grid_2, simulation_parameters)
-    EnergySystems.produce(grid_1, simulation_parameters)
+    EnergySystems.process(grid_2, simulation_parameters)
+    EnergySystems.process(grid_1, simulation_parameters)
     EnergySystems.distribute!(bus)
 
     @test tank.input_interfaces[tank.medium].sum_abs_change == 2000.0

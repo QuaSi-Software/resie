@@ -29,13 +29,13 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
-    systems = load_systems(project_config["energy_systems"])
+    components = load_components(project_config["components"])
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        step_order = load_order_of_operations(project_config["order_of_operation"], systems)
+        step_order = load_order_of_operations(project_config["order_of_operation"], components)
         println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
     else
-        step_order = calculate_order_of_operations(systems)
+        step_order = calculate_order_of_operations(components)
     end
 
     time_step = 900
@@ -62,7 +62,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     )
     EnergySystems.set_timestep(parameters["time_step_seconds"])
 
-    outputs = output_keys(systems, project_config["io_settings"]["output_keys"])
+    outputs = output_keys(components, project_config["io_settings"]["output_keys"])
     reset_file(project_config["io_settings"]["output_file"], outputs)
 
     ### set data for profile line plot
@@ -78,7 +78,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # set keys for output plots    
         outputs_plot_keys = Vector{EnergySystems.OutputKey}()
         for plot in project_config["io_settings"]["output_plot"]
-            append!(outputs_plot_keys, output_keys(systems, plot[2]["key"]))
+            append!(outputs_plot_keys, output_keys(components, plot[2]["key"]))
         end
 
         # prepare array for output plots
@@ -92,8 +92,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     medium_of_interfaces = []
     output_all_sourcenames = []
     output_all_targetnames = []
-    for each_system in systems
-        for each_outputinterface in each_system[2].output_interfaces
+    for each_component in components
+        for each_outputinterface in each_component[2].output_interfaces
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                 if isdefined(each_outputinterface[2], :target)
                     # count interface
@@ -143,20 +143,20 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     if project_config["io_settings"]["dump_info"]
         dump_info(
             project_config["io_settings"]["dump_info_file"],
-            systems, step_order, parameters
+            components, step_order, parameters
         )
     end
 
     for steps = 1:nr_of_steps
         # perform the simulation
-        perform_steps(systems, step_order, parameters)
+        perform_steps(components, step_order, parameters)
 
-        # check if any energy system was not balanced
-        warnings = check_balances(systems, parameters["epsilon"])
+        # check if any component was not balanced
+        warnings = check_balances(components, parameters["epsilon"])
         if length(warnings) > 0
             print("Time is $(parameters["time"])\n")
             for (key, balance) in warnings
-                print("Warning: Balance for system $key was not zero: $balance\n")
+                print("Warning: Balance for component $key was not zero: $balance\n")
             end
         end
 
@@ -173,8 +173,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # Attention: This can lead to overfilling of demands which is currenlty not visible
         # in the sankey diagram!
         n = 1
-        for each_system in systems
-            for each_outputinterface in each_system[2].output_interfaces
+        for each_component in components
+            for each_outputinterface in each_component[2].output_interfaces
                 if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                     if isdefined(each_outputinterface[2], :target)
                         output_all_values[steps, n] = calculate_energy_flow(each_outputinterface[2])  

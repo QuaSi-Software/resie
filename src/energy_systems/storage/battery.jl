@@ -1,11 +1,11 @@
 """
-Implementation of a battery energy system holding electric charge.
+Implementation of a battery component holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
 parameters (its capacity). However the default operation strategy is more complex and
-toggles the production of the battery dependant on available PV power and its own charge.
+toggles the processing of the battery dependant on available PV power and its own charge.
 """
-Base.@kwdef mutable struct Battery <: ControlledSystem
+Base.@kwdef mutable struct Battery <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -58,7 +58,7 @@ function balance_on(
             )
 end
 
-function produce(unit::Battery, parameters::Dict{String,Any})
+function process(unit::Battery, parameters::Dict{String,Any})
     if unit.controller.state_machine.state != 2
         return
     end
@@ -79,7 +79,7 @@ function produce(unit::Battery, parameters::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
-        return # produce is only concerned with moving energy to the target
+        return # process is only concerned with moving energy to the target
     end
 
     if unit.load > abs(energy_demand)

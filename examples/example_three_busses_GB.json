@@ -16,12 +16,12 @@
         "end": 86400,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 1500
@@ -30,7 +30,7 @@
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 1500
@@ -39,14 +39,14 @@
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "ESS_GBO_01"],
             "is_source": true
         },
         "ESS_GBO_01": {
             "type": "GasBoiler",
             "control_refs": ["ESS_BUS_TH_01"],
-            "production_refs": [
+            "output_refs": [
                 "ESS_BUS_TH_01"
             ],
             "strategy": {
@@ -59,7 +59,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "ESS_BUS_TH_02",
                 "ESS_BUS_TH_03"
             ],
@@ -77,7 +77,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_01",
                 "TST_BFT_TH_01"
             ],
@@ -96,7 +96,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_02",
                 "TST_BFT_TH_02"
             ],
@@ -114,7 +114,7 @@
         "TST_BFT_TH_01": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "ESS_BUS_TH_02"
             ],
             "capacity": 4000,
@@ -123,7 +123,7 @@
         "TST_BFT_TH_02": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "ESS_BUS_TH_03"
             ],
             "capacity": 4000,

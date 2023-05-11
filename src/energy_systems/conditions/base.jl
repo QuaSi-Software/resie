@@ -4,7 +4,7 @@ function load_condition_prototypes()
         Dict{String,Any}( # parameters
             "percentage" => 0.5
         ),
-        EnSysRequirements( # required_systems
+        EnSysRequirements( # required_components
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
@@ -18,7 +18,7 @@ function load_condition_prototypes()
         Dict{String,Any}( # parameters
             "percentage" => 0.5
         ),
-        EnSysRequirements( # required_systems
+        EnSysRequirements( # required_components
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
@@ -30,7 +30,7 @@ function load_condition_prototypes()
     CONDITION_PROTOTYPES["Min run time"] = ConditionPrototype(
         "Min run time", # name
         Dict{String,Any}(), # parameters
-        EnSysRequirements(), # required_systems
+        EnSysRequirements(), # required_components
         function (condition, unit, simulation_parameters) # check_function
             return unit.controller.state_machine.time_in_state *
                    simulation_parameters["time_step_seconds"] >=
@@ -41,7 +41,7 @@ function load_condition_prototypes()
     CONDITION_PROTOTYPES["Would overfill thermal buffer"] = ConditionPrototype(
         "Would overfill thermal buffer", # name
         Dict{String,Any}(), # parameters
-        EnSysRequirements( # required_systems
+        EnSysRequirements( # required_components
             "buffer" => (BufferTank, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
@@ -55,7 +55,7 @@ function load_condition_prototypes()
         Dict{String,Any}( # parameters
             "threshold" => 1000
         ),
-        EnSysRequirements( # required_systems
+        EnSysRequirements( # required_components
             "pv_plant" => (PVPlant, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
@@ -73,7 +73,7 @@ function load_condition_prototypes()
         Dict{String,Any}( # parameters
             "threshold" => 0.2
         ),
-        EnSysRequirements(), # required_systems
+        EnSysRequirements(), # required_components
         function (condition, unit, simulation_parameters) # check_function
             return unit.load >= condition.parameters["threshold"] * unit.capacity
         end
@@ -82,7 +82,7 @@ function load_condition_prototypes()
     CONDITION_PROTOTYPES["HP is running"] = ConditionPrototype(
         "HP is running", # name
         Dict{String,Any}(), # parameters
-        EnSysRequirements( # required_systems
+        EnSysRequirements( # required_components
             "heat_pump" => (HeatPump, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function

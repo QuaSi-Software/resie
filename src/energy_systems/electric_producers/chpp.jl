@@ -1,5 +1,5 @@
 """
-Implementation of a combined-heat-power-plant (CHPP) energy system.
+Implementation of a combined-heat-power-plant (CHPP) component.
 
 For the moment this remains a simple implementation that converts natural gas into
 electricity and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.4:0.6. Has a minimum
@@ -11,7 +11,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the CHPP when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct CHPP <: ControlledSystem
+mutable struct CHPP <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -63,10 +63,10 @@ end
 
 function control(
     unit::CHPP,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
@@ -247,7 +247,7 @@ function potential(
     end
 end
 
-function produce(unit::CHPP, parameters::Dict{String,Any})
+function process(unit::CHPP, parameters::Dict{String,Any})
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)

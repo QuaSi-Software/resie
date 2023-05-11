@@ -4,11 +4,11 @@ end
 
 strt_desc_supply_driven = """Supply-driven
 ------------------------
-Ensures that the production of a system is done after the production from systems that
-provide energy to the controlled system has been calculated. This also works if a bus acts as
-intermediary between systems. As this strategy does not implement any actual control, it is
-mostly used for ensuring the systems are calculated in the right order as well as
-indicating to the production implementation that a given supply must be used (as opposed to
+Ensures that the processing of a component is done after the processing from components that
+provide energy to the controlled component has been calculated. This also works if a bus acts as
+intermediary between components. As this strategy does not implement any actual control, it is
+mostly used for ensuring the components are calculated in the right order as well as
+indicating to the process implementation that a given supply must be used (as opposed to
 strategy "demand_driven").
 """
 
@@ -30,7 +30,7 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
         "m_heat_out" => true,
         "m_heat_in" => true
     ),
-    required_systems=EnSysRequirements(
-        "supplier" => (EnergySystem, nothing)
+    required_components=EnSysRequirements(
+        "supplier" => (Component, nothing)
     )
 )

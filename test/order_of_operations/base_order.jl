@@ -6,11 +6,11 @@ using Resie.EnergySystems
 include("../test_util.jl")
 
 function test_base_order()
-    systems_config = Dict{String,Any}(
+    components_config = Dict{String,Any}(
         "TST_01_ELT_01_PVP" => Dict{String,Any}(
             "type" => "PVPlant",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "energy_profile_file_path" => "./profiles/tests/source_power_pv.prf",
@@ -20,7 +20,7 @@ function test_base_order()
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 10000.0
@@ -29,7 +29,7 @@ function test_base_order()
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 15000
         ),
@@ -37,7 +37,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT"
             ],
@@ -57,7 +57,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_DEM",
                 "TST_01_HZG_01_HTP",
                 "TST_01_ELT_01_BAT",
@@ -81,7 +81,7 @@ function test_base_order()
         "TST_01_HZG_01_CHP" => Dict{String,Any}(
             "type" => "CHPP",
             "control_refs" => ["TST_01_HZG_01_BFT"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS",
                 "TST_01_ELT_01_BUS"
             ],
@@ -95,7 +95,7 @@ function test_base_order()
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_01_HZG_01_BFT"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy" => Dict{String,Any}(
@@ -109,7 +109,7 @@ function test_base_order()
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
             "capacity" => 40000,
@@ -118,7 +118,7 @@ function test_base_order()
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
             "control_refs" => ["TST_01_ELT_01_PVP"],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "strategy" => Dict{String,Any}(
@@ -134,7 +134,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_CHP"
             ],
             "is_source" => true
@@ -143,7 +143,7 @@ function test_base_order()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_HZG_01_HTP"
             ],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
@@ -154,7 +154,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [
+            "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
             "is_source" => true
@@ -163,7 +163,7 @@ function test_base_order()
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "production_refs" => [],
+            "output_refs" => [],
             "is_source" => false
         )
     )
@@ -195,27 +195,27 @@ function test_base_order()
         [1277, ("TST_01_HZG_01_GRI", EnergySystems.s_control)],
         [1276, ("TST_01_HZG_02_SRC", EnergySystems.s_control)],
         [1275, ("TST_01_ELT_01_GRO", EnergySystems.s_control)],
-        [1274, ("TST_01_ELT_01_PVP", EnergySystems.s_produce)],
-        [1273, ("TST_01_ELT_01_DEM", EnergySystems.s_produce)],
-        [1272, ("TST_01_HZG_01_DEM", EnergySystems.s_produce)],
-        [1271, ("TST_01_ELT_01_BUS", EnergySystems.s_produce)],
-        [1270, ("TST_01_HZG_01_BUS", EnergySystems.s_produce)],
-        [1269, ("TST_01_HZG_01_CHP", EnergySystems.s_produce)],
-        [1268, ("TST_01_HZG_01_HTP", EnergySystems.s_produce)],
-        [1267, ("TST_01_HZG_01_BFT", EnergySystems.s_produce)],
-        [1266, ("TST_01_ELT_01_BAT", EnergySystems.s_produce)],
+        [1274, ("TST_01_ELT_01_PVP", EnergySystems.s_process)],
+        [1273, ("TST_01_ELT_01_DEM", EnergySystems.s_process)],
+        [1272, ("TST_01_HZG_01_DEM", EnergySystems.s_process)],
+        [1271, ("TST_01_ELT_01_BUS", EnergySystems.s_process)],
+        [1270, ("TST_01_HZG_01_BUS", EnergySystems.s_process)],
+        [1269, ("TST_01_HZG_01_CHP", EnergySystems.s_process)],
+        [1268, ("TST_01_HZG_01_HTP", EnergySystems.s_process)],
+        [1267, ("TST_01_HZG_01_BFT", EnergySystems.s_process)],
+        [1266, ("TST_01_ELT_01_BAT", EnergySystems.s_process)],
         [1265, ("TST_01_HZG_01_BFT", EnergySystems.s_load)],
         [1264, ("TST_01_ELT_01_BAT", EnergySystems.s_load)],
-        [1263, ("TST_01_ELT_01_GRI", EnergySystems.s_produce)],
-        [1262, ("TST_01_HZG_01_GRI", EnergySystems.s_produce)],
-        [1261, ("TST_01_HZG_02_SRC", EnergySystems.s_produce)],
-        [1260, ("TST_01_ELT_01_GRO", EnergySystems.s_produce)],
+        [1263, ("TST_01_ELT_01_GRI", EnergySystems.s_process)],
+        [1262, ("TST_01_HZG_01_GRI", EnergySystems.s_process)],
+        [1261, ("TST_01_HZG_02_SRC", EnergySystems.s_process)],
+        [1260, ("TST_01_ELT_01_GRO", EnergySystems.s_process)],
         [1259, ("TST_01_ELT_01_BUS", EnergySystems.s_distribute)],
         [1258, ("TST_01_HZG_01_BUS", EnergySystems.s_distribute)],
     ]
 
-    systems = Resie.load_systems(systems_config)
-    by_function = Resie.categorize_by_function(systems)
+    components = Resie.load_components(components_config)
+    by_function = Resie.categorize_by_function(components)
     steps = Resie.base_order(by_function)
     @test pwc_steps_astr(expected, steps) == ""
 end

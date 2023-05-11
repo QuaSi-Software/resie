@@ -1,7 +1,7 @@
 """
     pwc_units_astr(expected, actual)
 
-Piece-wise comparison of energy system units noting differences in the return string.
+Piece-wise comparison of components noting differences in the return string.
 """
 function pwc_units_astr(expected::Vector, actual::Vector)
     max_length = max(length(expected), length(actual))

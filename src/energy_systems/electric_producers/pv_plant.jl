@@ -7,7 +7,7 @@ seperate tool, a proper implemention would mostly just load a profile and consid
 some system losses. The amplitude parameter is a scaling factor, but is not an average
 power value.
 """
-mutable struct PVPlant <: ControlledSystem
+mutable struct PVPlant <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -62,17 +62,17 @@ end
 
 function control(
     unit::PVPlant,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 
 end
 
 
-function produce(unit::PVPlant, parameters::Dict{String,Any})
+function process(unit::PVPlant, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
 end

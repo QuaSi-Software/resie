@@ -4,7 +4,7 @@ Implementation of a buffer tank holding hot water for heating or DHW purposes.
 This is a simplified model, which mostly deals with amounts of energy and considers
 temperatures only for the available temperature as the tank is depleted.
 """
-mutable struct BufferTank <: ControlledSystem
+mutable struct BufferTank <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -51,10 +51,10 @@ end
 
 function control(
     unit::BufferTank,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
     unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
 
@@ -86,7 +86,7 @@ function balance_on(
             )
 end
 
-function produce(unit::BufferTank, parameters::Dict{String,Any})
+function process(unit::BufferTank, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
@@ -104,7 +104,7 @@ function produce(unit::BufferTank, parameters::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
-        return # produce is only concerned with moving energy to the target
+        return # process is only concerned with moving energy to the target
     end
 
     if demand_temp !== nothing && demand_temp > temperature_at_load(unit)

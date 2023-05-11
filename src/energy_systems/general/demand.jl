@@ -1,12 +1,12 @@
 """
-Implementation of an energy system that models the demand consumers in a building require.
+Implementation of a component that models the demand consumers in a building require.
 
 As the simulation does not encompass demand calculations, this is usually taken from other
-tools that calculate the demand before a simulation of the energy systems is done. These
+tools that calculate the demand before a simulation of the components is done. These
 profiles usually are normalized to some degree, therefore Demand instances require a scaling
 factor to turn the relative values to absolute values of required energy.
 """
-mutable struct Demand <: ControlledSystem
+mutable struct Demand <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -76,10 +76,10 @@ end
 
 function control(
     unit::Demand,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
 
     if unit.static_load !== nothing
         unit.load = unit.static_load
@@ -100,7 +100,7 @@ function control(
 
 end
 
-function produce(unit::Demand, parameters::Dict{String,Any})
+function process(unit::Demand, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.load, unit.temperature)
 end

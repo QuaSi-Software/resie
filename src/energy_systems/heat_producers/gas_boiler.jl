@@ -5,7 +5,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the boiler when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct GasBoiler <: ControlledSystem
+mutable struct GasBoiler <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -50,10 +50,10 @@ end
 
 function control(
     unit::GasBoiler,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
@@ -197,7 +197,7 @@ function potential(
     end
 end
 
-function produce(unit::GasBoiler, parameters::Dict{String,Any})
+function process(unit::GasBoiler, parameters::Dict{String,Any})
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0)

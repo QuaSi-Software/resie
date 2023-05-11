@@ -7,10 +7,10 @@ run time of 3600s taken into consideration in its control behaviour and a minimu
 fraction of 20%. The power is considered the maximum amount of electricity that the
 electrolyser can consume.
 
-At the moment there is no operation strategy is implemented and the production of the
+At the moment there is no operation strategy is implemented and the processing of the
 electrolyser is controlled by the demand it is linked to requires.
 """
-mutable struct Electrolyser <: ControlledSystem
+mutable struct Electrolyser <: ControlledComponent
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -65,10 +65,10 @@ end
 
 function control(
     unit::Electrolyser,
-    systems::Grouping,
+    components::Grouping,
     parameters::Dict{String,Any}
 )
-    move_state(unit, systems, parameters)
+    move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
@@ -292,7 +292,7 @@ function potential(
     end
 end
 
-function produce(unit::Electrolyser, parameters::Dict{String,Any})
+function process(unit::Electrolyser, parameters::Dict{String,Any})
     potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)

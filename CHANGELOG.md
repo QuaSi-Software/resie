@@ -14,6 +14,14 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+## Version 0.6.0
+* Refactor terms and names used to refer to various concepts in the simulation model:
+  * energy system => component
+  * energy network / system topology => energy system
+  * production => processing, and variations thereof, including the simulation step produce => process
+  * Module EnergySystems remains named the same as the functionality still concerns the modelling of energy systems. In this regard the old name was too limited on the components of an energy system
+* Change keys "energy_systems" and "production_refs" in project file to "components" and "output_refs" 
+
 ### Version 0.5.7
 * Refactor function watt_to_wh as a global function in module EnergySystems
 

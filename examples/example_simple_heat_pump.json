@@ -63,12 +63,12 @@
         "end": 86400,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 1500
@@ -77,7 +77,7 @@
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_HP_01"
             ],
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
@@ -88,7 +88,7 @@
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_HP_01"
             ],
             "is_source": true
@@ -98,7 +98,7 @@
             "control_refs": [
                 "TST_DEM_01"
             ],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_01"
             ],
             "strategy": {

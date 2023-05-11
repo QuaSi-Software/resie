@@ -74,12 +74,12 @@
         "end": 31535100,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_DEM_TH_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_temp_60_const.prf",
             "scale": 13000
@@ -88,7 +88,7 @@
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "temperature_profile_file_path": "./profiles/district/demand_heating_and_water_temp_60_const.prf",
             "scale": 15000
@@ -97,7 +97,7 @@
             "type": "Demand",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
             "scale": 13000
         },   
@@ -105,7 +105,7 @@
             "type": "Demand",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
             "scale": 15000
         }, 
@@ -113,56 +113,56 @@
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": ["TST_BUS_EL_01"],
+            "output_refs": ["TST_BUS_EL_01"],
             "is_source": true
         },
         "TST_GRI_EL_01_out": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         },
         "TST_GRI_EL_02": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": ["TST_BUS_EL_02"],
+            "output_refs": ["TST_BUS_EL_02"],
             "is_source": true
         },
         "TST_GRI_EL_02_out": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         },
         "TST_GRI_H2_01": {
             "type": "GridConnection",
             "medium": "m_c_g_h2",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         },
         "TST_GRI_O2_01": {
             "type": "GridConnection",
             "medium": "m_c_g_o2",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         },
         "TST_GRI_EG_01": {
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_GAS_01"],
             "is_source": true
         },
         "TST_PVP_EL_01": {
             "type": "PVPlant",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_EL_01"
             ],
             "energy_profile_file_path": "./profiles/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
@@ -171,7 +171,7 @@
         "TST_PVP_EL_02": {
             "type": "PVPlant",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_EL_02"
             ],
             "energy_profile_file_path": "./profiles/district/PV_Stuttgart_10_west_Wh_per_square_meter.prf",
@@ -180,7 +180,7 @@
         "TST_PVP_EL_03": {
             "type": "PVPlant",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_EL_02"
             ],
             "energy_profile_file_path": "./profiles/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
@@ -189,7 +189,7 @@
         "TST_BAT_01": {
             "type": "Battery",
             "control_refs": ["TST_PVP_EL_02"],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_EL_02"
             ],
             "strategy": {
@@ -205,7 +205,7 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_GRI_EL_01_out",
                 "TST_HTP_01",
                 "TST_DEM_EL_01"
@@ -227,7 +227,7 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_EL_02",
                 "TST_ELY_01",
                 "TST_HTP_02",
@@ -260,7 +260,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_02",
                 "TST_BUS_TH_01",
                 "TST_STES_TH_01"
@@ -287,7 +287,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_TH_01",
                 "TST_BFT_TH_01"
             ],
@@ -312,7 +312,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_DEM_TH_02",
                 "TST_BFT_TH_02"
             ],
@@ -331,7 +331,7 @@
             "type": "Bus",
             "medium": "m_c_g_natgas",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_CHP_01",
                 "TST_GBO_01"
             ],
@@ -348,7 +348,7 @@
         "TST_ELY_01": {
             "type": "Electrolyser",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_GRI_H2_01",
                 "TST_GRI_O2_01",
                 "TST_HTP_02"
@@ -363,7 +363,7 @@
         "TST_CHP_01": {
             "type": "CHPP",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_00",
                 "TST_BUS_EL_01"
             ],
@@ -378,7 +378,7 @@
         "TST_GBO_01": {
             "type": "GasBoiler",
             "control_refs": ["TST_BFT_TH_01"],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_01"
             ],
             "strategy": {
@@ -392,7 +392,7 @@
         "TST_BFT_TH_01": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_01"
             ],
             "capacity": 150000,
@@ -402,7 +402,7 @@
         "TST_BFT_TH_02": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_02"
             ],
             "capacity": 150000,
@@ -412,7 +412,7 @@
         "TST_STES_TH_01": {
             "type": "SeasonalThermalStorage",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_HTP_01"
             ],
             "capacity": 350000000,
@@ -422,7 +422,7 @@
         "TST_HTP_01": {
             "type": "HeatPump",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_00"
             ],
             "strategy": {
@@ -436,7 +436,7 @@
         "TST_HTP_02": {
             "type": "HeatPump",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_BUS_TH_00"
             ],
             "strategy": {

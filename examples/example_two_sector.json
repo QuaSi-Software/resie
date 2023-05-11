@@ -83,11 +83,11 @@
         "end": 604800,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_01_ELT_01_PVP": {
             "type": "PVPlant",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
             "energy_profile_file_path": "./profiles/tests/source_power_pv.prf",
@@ -97,7 +97,7 @@
             "type": "Demand",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_electricity.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 10000.0
@@ -106,7 +106,7 @@
             "type": "Demand",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "scale": 15000
         },
@@ -114,7 +114,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT"
             ],
@@ -134,7 +134,7 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_ELT_01_DEM",
                 "TST_01_HZG_01_HTP",
                 "TST_01_ELT_01_BAT",
@@ -158,7 +158,7 @@
         "TST_01_HZG_01_CHP": {
             "type": "CHPP",
             "control_refs": ["TST_01_HZG_01_BFT"],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS",
                 "TST_01_ELT_01_BUS"
             ],
@@ -172,7 +172,7 @@
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
             "control_refs": ["TST_01_HZG_01_BFT"],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "strategy": {
@@ -186,7 +186,7 @@
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
             "capacity": 40000,
@@ -195,7 +195,7 @@
         "TST_01_ELT_01_BAT": {
             "type": "Battery",
             "control_refs": ["TST_01_ELT_01_PVP"],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
             "strategy": {
@@ -211,7 +211,7 @@
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_CHP"
             ],
             "is_source": true
@@ -220,7 +220,7 @@
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_HZG_01_HTP"
             ],
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
@@ -231,7 +231,7 @@
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [
+            "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
             "is_source": true
@@ -240,7 +240,7 @@
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "production_refs": [],
+            "output_refs": [],
             "is_source": false
         }
     }
