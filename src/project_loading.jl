@@ -61,7 +61,7 @@ function load_systems(config::Dict{String,Any})::Grouping
 
         if length(entry["output_refs"]) > 0
             others = Grouping(key => systems[key] for key in entry["output_refs"])
-            link_production_with(systems[unit_key], others)
+            link_output_with(systems[unit_key], others)
         end
     end
 

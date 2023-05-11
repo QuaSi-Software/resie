@@ -19,7 +19,7 @@ to the simulation as a whole as well as provide functionality on groups of energ
 """
 module EnergySystems
 
-export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_production_with,
+export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_output_with,
     perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
     highest_temperature
 
@@ -576,9 +576,9 @@ include("electric_producers/pv_plant.jl")
 load_condition_prototypes()
 
 """
-    link_production_with(unit, systems)
+    link_output_with(unit, systems)
 
-Set the production targets of the given unit to the given energy systems.
+Set the output targets of the given unit to the given energy systems.
 
 This function is used to construct the network of energy system from a graph input that
 determines which systems provide energy to which other systems.
@@ -588,7 +588,7 @@ determines which systems provide energy to which other systems.
 - `systems::Grouping`: A set of systems receiving energy. As systems might have multiple
     outputs, this is used to set them all at once.
 """
-function link_production_with(unit::ControlledSystem, systems::Grouping)
+function link_output_with(unit::ControlledSystem, systems::Grouping)
     if isa(unit, Bus)
         for system in each(systems)
             if isa(system, Bus)
