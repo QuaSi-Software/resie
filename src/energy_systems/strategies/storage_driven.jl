@@ -54,7 +54,7 @@ end
 strt_desc_storage_driven = """Storage-driven
 ------------------------
 Run an energy system depending on the state of a linked thermal buffer tank. In particular
-this strategy enables production when the tank has fallen below a certain threshold and
+this strategy enables processing when the tank has fallen below a certain threshold and
 disables it when the tank has reached another threshold.
 """
 

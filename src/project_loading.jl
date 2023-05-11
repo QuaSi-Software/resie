@@ -122,7 +122,7 @@ function base_order(systems_by_function)
         end
     end
 
-    # produce fixed sources/sinks and busses.
+    # process fixed sources/sinks and busses.
     for sf_order = 1:3
         for unit in values(systems_by_function[sf_order])
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -130,7 +130,7 @@ function base_order(systems_by_function)
         end
     end
 
-    # place steps potential and produce for transformers in order by "chains"
+    # place steps potential and process for transformers in order by "chains"
     chains = find_chains(systems_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
         if length(chain) > 1
@@ -145,7 +145,7 @@ function base_order(systems_by_function)
         end
     end
 
-    # produce, then load storages
+    # process, then load storages
     for unit in values(systems_by_function[5])
         push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
         initial_nr -= 1
@@ -155,7 +155,7 @@ function base_order(systems_by_function)
         initial_nr -= 1
     end
 
-    # produce bounded sources/sinks
+    # process bounded sources/sinks
     for sf_order = 6:7
         for unit in values(systems_by_function[sf_order])
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -514,7 +514,7 @@ function reorder_for_input_priorities(simulation_order, systems, systems_by_func
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every system following after...
             for other_idx = own_idx+1:length(bus.connectivity.input_order)
-                # ...is of a lower priority in potential and produce
+                # ...is of a lower priority in potential and process
                 place_one_lower!(
                     simulation_order,
                     (bus.connectivity.input_order[own_idx], EnergySystems.s_potential),
@@ -687,7 +687,7 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                 end
             end
 
-            # make sure that storages on the leaf-busses are loaded right after the produce of transformers on leaf-busses 
+            # make sure that storages on the leaf-busses are loaded right after the processing of transformers on leaf-busses 
             # (only if storage-loading is allowed by the connectivity matrix of the bus)
             # to avoid that other storages in the system uses the not requested energy that was indented to load the storage, 
             # which can otherwise happen in the trunk bus or in other leaf busses as well. 
@@ -701,7 +701,7 @@ function reorder_storage_loading(simulation_order, systems, systems_by_function)
                                     &&                                                                  # and
                                     storage_input_interface.source !== bus                              # do not consider the trunk bus
                                 )
-                                    place_one_lower!(                                                   # and then make sure that the load step of the storage is right after the produce step of the transformer
+                                    place_one_lower!(                                                   # and then make sure that the load step of the storage is right after the process step of the transformer
                                         simulation_order,
                                         (bus_input_interface.source.uac, EnergySystems.s_process),
                                         (storage.uac, EnergySystems.s_load),

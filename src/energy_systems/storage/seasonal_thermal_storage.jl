@@ -107,7 +107,7 @@ function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
-        return # produce is only concerned with moving energy to the target
+        return # process is only concerned with moving energy to the target
     end
 
     if demand_temp !== nothing && demand_temp > temperature_at_load(unit)

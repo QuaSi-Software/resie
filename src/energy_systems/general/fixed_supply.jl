@@ -2,9 +2,9 @@
 Implementation of an energy system modeling an abstract fixed supply of some medium.
 
 This is particularly useful for testing, but can also be used to model any energy system
-or other equipment unit that produces energy in a medium, all of which has to be consumed
+or other equipment unit that processes energy in a medium, all of which has to be consumed
 as the energy system cannot be dispatched like a grid connection can.
-Note that "fixed" in this context means that the amount of energy the unit produces is
+Note that "fixed" in this context means that the amount of energy the unit processes is
 fixed within a timestep, but can vary over multiple timesteps. No calculation other than
 scaling of profile values is performed in each timestep.
 """

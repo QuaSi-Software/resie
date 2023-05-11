@@ -434,7 +434,7 @@ end
 """
     potential(unit, parameters)
 
-Calculate potential energy consumption/production for the given energy system.
+Calculate potential energy processing for the given energy system.
 
 # Arguments
 - `unit::ControlledSystem`: The system for which potentials are calculated
@@ -450,10 +450,10 @@ end
 """
     process(unit, parameters)
 
-Perform the production calculations for the given energy system.
+Perform the processing calculations for the given energy system.
 
 # Arguments
-- `unit::ControlledSystem`: The system for which production is calculated
+- `unit::ControlledSystem`: The system that is processed
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function process(
@@ -471,7 +471,7 @@ Load excess energy into storage energy systems.
 For non-storage systems this function does nothing.
 
 # Arguments
-- `unit::ControlledSystem`: The system for which production is calculated
+- `unit::ControlledSystem`: The storage loading excess energy
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function load(
@@ -689,8 +689,8 @@ Perform the simulation steps of one time step for the given systems in the given
     parameters = Dict{String, Any}("time" => 0)
     perform_steps(systems, order, parameters)
 ```
-In this example the control of system A is performed first, then control and production of
-system B and finally production of system A.
+In this example the control of system A is performed first, then control and processing of
+system B and finally processing of system A.
 """
 function perform_steps(
     systems::Grouping,

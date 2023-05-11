@@ -218,7 +218,7 @@ function test_multiple_transformer_with_limitations()
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -0.5*2240/4
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 560+560/2
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -0.5*640/4
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0  # produce of electrolyser already done
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0  # process of electrolyser already done
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 0.5*2*1600/4 # 200 are transferred between ely and hp
 
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].balance ≈ 0 #actually the same as two test above

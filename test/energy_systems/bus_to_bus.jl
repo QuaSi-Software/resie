@@ -81,7 +81,7 @@ function test_busses_communicate_demand()
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
@@ -111,7 +111,7 @@ function test_busses_communicate_demand()
     @test EnergySystems.balance(bus_2) ≈ -75.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
 
-    # demand already produced --> balance is not zero, but energy_potential
+    # demand already processed --> balance is not zero, but energy_potential
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ -75.0
     @test exchange.storage_potential ≈ 0.0
@@ -137,7 +137,7 @@ function test_busses_communicate_demand()
     EnergySystems.process(bus_1, simulation_parameters)
     EnergySystems.process(grid, simulation_parameters)
 
-    # everything produced --> energy_potential should be zero!
+    # everything processed --> energy_potential should be zero!
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ 0.0
     @test exchange.storage_potential ≈ 0.0
@@ -306,7 +306,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test EnergySystems.balance(bus_3) ≈ 0.0
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ 0.0
@@ -349,7 +349,7 @@ function test_demand_over_busses_supply_is_transformer()
     EnergySystems.process(demand_2, simulation_parameters)
     EnergySystems.process(demand_1, simulation_parameters)
 
-    # demand already produced --> balance is not zero anymore, but energy_potential
+    # demand already processed --> balance is not zero anymore, but energy_potential
     # input interfaces
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ -2000.0
@@ -402,7 +402,7 @@ function test_demand_over_busses_supply_is_transformer()
     EnergySystems.process(bus_3, simulation_parameters)
     EnergySystems.process(boiler, simulation_parameters)
 
-    # gasboiler already produced --> balance and energy_potential is zero
+    # gasboiler already processed --> balance and energy_potential is zero
     # input interfaces
     exchange = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test exchange.balance ≈ 0.0
@@ -664,7 +664,7 @@ function test_busses_communicate_storage_potential()
     EnergySystems.control(tank_1, systems, simulation_parameters)
     EnergySystems.control(grid, systems, simulation_parameters)
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchange = EnergySystems.balance_on(grid.output_interfaces[grid.medium], bus_1)
     @test exchange.balance ≈ 0.0

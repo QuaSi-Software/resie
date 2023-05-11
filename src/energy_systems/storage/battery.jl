@@ -3,7 +3,7 @@ Implementation of a battery energy system holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
 parameters (its capacity). However the default operation strategy is more complex and
-toggles the production of the battery dependant on available PV power and its own charge.
+toggles the processing of the battery dependant on available PV power and its own charge.
 """
 Base.@kwdef mutable struct Battery <: ControlledSystem
     uac::String
@@ -79,7 +79,7 @@ function process(unit::Battery, parameters::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
-        return # produce is only concerned with moving energy to the target
+        return # process is only concerned with moving energy to the target
     end
 
     if unit.load > abs(energy_demand)

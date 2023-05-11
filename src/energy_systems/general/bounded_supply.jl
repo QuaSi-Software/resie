@@ -2,7 +2,7 @@
 Implementation of an energy system modeling an abstract bounded supply of some medium.
 
 This is particularly useful for testing, but can also be used to model any bounded
-energy system or other equipment unit that produces energy in a given medium. The system
+energy system or other equipment unit that processes energy in a given medium. The system
 might still have a maximum power draw in a single time step, but can provide any fraction
 of this to connected systems.
 """

@@ -98,7 +98,7 @@ function test_run_energy_system_from_storage()
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test exchange.balance ≈ 0.0
@@ -150,7 +150,7 @@ function test_run_energy_system_from_storage()
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test exchange.balance ≈ 0.0
@@ -275,7 +275,7 @@ function test_run_energy_system_from_storage_denied()
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
     @test hheat_demand.input_interfaces[hheat_demand.medium].temperature === 45.0
 
-    # demand not produced yet --> balance is zero, but energy_potential not
+    # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test exchange.balance ≈ 0.0

@@ -305,12 +305,12 @@ function balance_on(
         highest_demand_temp = interface.temperature
     end
 
-    # Note: For now, only the load and produce of storages are regulated in the connectivity matrix.
+    # Note: For now, only the load and processing of storages are regulated in the connectivity matrix.
     #       For storages, max_energy is set to 0.0 in their control step, so this doesn't need to be 
     #       considered here for energy_potential.
     # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken.
-    #       If an energy system connected to the interface of balane_on() has already been produced, the 
+    #       If an energy system connected to the interface of balance_on() has already been processed, the 
     #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
     #       calling energy system to avoid double counting of energies.
     balance_written = interface.sum_abs_change > 0.0

@@ -7,7 +7,7 @@ run time of 3600s taken into consideration in its control behaviour and a minimu
 fraction of 20%. The power is considered the maximum amount of electricity that the
 electrolyser can consume.
 
-At the moment there is no operation strategy is implemented and the production of the
+At the moment there is no operation strategy is implemented and the processing of the
 electrolyser is controlled by the demand it is linked to requires.
 """
 mutable struct Electrolyser <: ControlledSystem

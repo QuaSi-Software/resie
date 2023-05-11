@@ -217,7 +217,7 @@ function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
 
     if energy_demand >= 0.0
         # no calculate_new_heat_collector_temperatures() as this will be done in load() step to avoid double calling!
-        return # produce is only concerned with moving energy to the target
+        return # process is only concerned with moving energy to the target
     end
 
     # calcute energy that acutally can be delivered and set it to the output interface 
@@ -230,9 +230,9 @@ end
 
 function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # we can assume that energy will be either be taken from or fed into the geothermal heat collector field within one time step,
-    # but not both within one time step - right? Therefore we can call calculate_new_heat_collector_temperatures() from produce
+    # but not both within one time step - right? Therefore we can call calculate_new_heat_collector_temperatures() from process
     # and from load, but it will never be calculated twice as only one call will be performed with energy>0. If both load
-    # and produce happens at the same time step with an energy flow>0, the temperatures of the GTP field will be calculated twice 
+    # and process happens at the same time step with an energy flow>0, the temperatures of the GTP field will be calculated twice 
     # in each timestep with the current implementation. This should work, but is not computationally effiecient.
     if !unit.regeneration
         # recalculate heat collector temperatures for next timestep (function checks if is has already been calculated in the current timestep)
@@ -274,7 +274,7 @@ function balance_on(
 )::NamedTuple{}
     # check if interface is input or output on unit
     input_sign = unit.uac == interface.target.uac ? -1 : +1
-    # check if a balance was already written --> if yes, storage potential will be set to zero as storage was already produced/loaded
+    # check if a balance was already written --> if yes, storage potential will be set to zero as storage was already processed/loaded
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
 
     return (
