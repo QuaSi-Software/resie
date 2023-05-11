@@ -23,6 +23,6 @@ OP_STRATS["extended_storage_control"] = OperationalStrategyType(
         "load_any_storage" => false
     ),
     required_systems=EnSysRequirements(
-        "receiver" => (EnergySystem, nothing)
+        "receiver" => (Component, nothing)
     )
 )

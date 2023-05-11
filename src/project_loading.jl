@@ -582,9 +582,9 @@ checks if the storage has a limitation in the bus' storage_loading matrix coming
 returns true (1 in storage_loading matrix) if not and false (0) if a limitation is present.
 
 # Arguments
--`bus::EnergySystem`: The bus that is in the middle of source and storage
--`storage::EnergySystem`: The storage connected to the bus
--`source::EnergySystem`: The source of the bus from where the search has startet. 
+-`bus::Component`: The bus that is in the middle of source and storage
+-`storage::Component`: The storage connected to the bus
+-`source::Component`: The source of the bus from where the search has startet. 
                          Can be nothing, then true will be returned.
 """
 function get_storage_loading_entry(bus, storage, source)
@@ -622,9 +622,9 @@ end
 Finds storage systems in the given bus and all successor busses ordered by the output priorities.
 
 # Arguments
--`bus::EnergySystem`: The bus from which to start the search
+-`bus::Component`: The bus from which to start the search
 -`systems::Grouping`: All energy systems in the system topology
--`source::EnergySystem`: The source from which bus was reached out. Can be nothing if bus is first bus.
+-`source::Component`: The source from which bus was reached out. Can be nothing if bus is first bus.
 -`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
 """
 function find_storages_ordered(bus, systems, source; reverse=false)

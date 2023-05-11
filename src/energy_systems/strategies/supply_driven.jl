@@ -31,6 +31,6 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
         "m_heat_in" => true
     ),
     required_systems=EnSysRequirements(
-        "supplier" => (EnergySystem, nothing)
+        "supplier" => (Component, nothing)
     )
 )

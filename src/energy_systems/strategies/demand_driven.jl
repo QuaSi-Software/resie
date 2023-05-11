@@ -31,6 +31,6 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
         "m_heat_in" => true
     ),
     required_systems=EnSysRequirements(
-        "receiver" => (EnergySystem, nothing)
+        "receiver" => (Component, nothing)
     )
 )

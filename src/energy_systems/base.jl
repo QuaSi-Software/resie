@@ -19,7 +19,7 @@ to the simulation as a whole as well as provide functionality on groups of energ
 """
 module EnergySystems
 
-export check_balances, ControlledSystem, each, EnergySystem, Grouping, link_output_with,
+export check_balances, ControlledSystem, each, Component, Grouping, link_output_with,
     perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
     highest_temperature
 
@@ -133,9 +133,9 @@ Holds the order of steps as instructions for how to perform the simulation.
 const StepInstructions = Vector{StepInstruction}
 
 """
-The basic type of all energy systems.
+The basic type of all energy system components.
 """
-abstract type EnergySystem end
+abstract type Component end
 
 """
 A type describing an energy system that has control functionality.
@@ -144,7 +144,7 @@ Because Julia does not have interface->implementation like OOP languages such as
 types implementing this abstract type are further to be assumed to have the fields required
 by all energy systems, in particular the field `controller` of type `Controller`.
 """
-abstract type ControlledSystem <: EnergySystem end
+abstract type ControlledSystem <: Component end
 
 """
 Convenience alias to a dict mapping UAC keys to an energy system.
@@ -500,7 +500,7 @@ Specify which outputs an energy system can provide.
 For the special values "IN" and "OUT" a medium category is required for fetching the actual
 value, while this method only specifies that there is an input or output.
 """
-function output_values(unit::EnergySystem)::Vector{String}
+function output_values(unit::Component)::Vector{String}
     return ["IN", "OUT"]
 end
 
@@ -531,7 +531,7 @@ absolute changes of the system interfaces and divided by 2. This behaviour is pa
 expected use of the method.
 
 Args:
-- `unit::EnergySystem`: The energy system for which to fetch the output
+- `unit::Component`: The energy system for which to fetch the output
 - `key::OutputKey`: An OutputKey specifying which output to return. This should be one of
     the options provided by `output_values()` as well as "IN" or "OUT"
 Returns:
@@ -539,7 +539,7 @@ Returns:
 Throws:
 - `KeyError`: The key value requested must be one the energy system can provide
 """
-function output_value(unit::EnergySystem, key::OutputKey)::Float64
+function output_value(unit::Component, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
@@ -678,8 +678,8 @@ Perform the simulation steps of one time step for the given systems in the given
 # Examples
 ```
     systems = Grouping(
-        "system_a" => EnergySystem(),
-        "system_b" => EnergySystem(),
+        "system_a" => Component(),
+        "system_b" => Component(),
     )
     order = [
         ["system_a", EnergySystems.s_control]

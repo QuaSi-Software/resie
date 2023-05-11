@@ -240,7 +240,7 @@ StateMachine() = StateMachine(
 )
 
 """
-Wraps around the mechanism of control for the operation strategy of an EnergySystem.
+Wraps around the mechanism of control for the operation strategy of a Component.
 """
 Base.@kwdef mutable struct Controller
     strategy::String
