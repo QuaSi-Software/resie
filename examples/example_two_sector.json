@@ -83,7 +83,7 @@
         "end": 604800,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_01_ELT_01_PVP": {
             "type": "PVPlant",
             "control_refs": [],

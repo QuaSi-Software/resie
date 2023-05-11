@@ -29,7 +29,7 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
-    systems = load_systems(project_config["energy_systems"])
+    systems = load_systems(project_config["components"])
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
         step_order = load_order_of_operations(project_config["order_of_operation"], systems)

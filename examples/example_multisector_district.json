@@ -109,7 +109,7 @@
         "end": 31535100,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_DEM_TH_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",

@@ -69,7 +69,7 @@
         "end": 604800,
         "time_step_seconds": 900
     },
-    "energy_systems": {
+    "components": {
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
