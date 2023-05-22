@@ -13,31 +13,31 @@
             "1": {
                 "key": {"TST_DEM_ht_01": ["m_h_w_ht1 Load"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
                 "key": {"TST_DEM_H2_01": ["m_c_g_h2 Load"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
                 "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
                 "key": {"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "5": {
                 "key": {"TST_01_ELT_01_ELY": ["m_c_g_h2 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             }
           }    

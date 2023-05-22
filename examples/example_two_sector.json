@@ -31,49 +31,49 @@
             "1": {
                 "key": {"TST_01_HZG_01_BFT": ["Load"]},
                 "axis": "right",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
                 "key": {"TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
                 "key": {"TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
                 "key": {"TST_01_HZG_01_BUS": ["Balance"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "5": {
                 "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "6": {
                 "key": {"TST_01_ELT_01_PVP": ["m_e_ac_230v OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "7": {
                 "key": {"TST_01_ELT_01_BUS": ["Balance"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "8": {
                 "key": {"TST_01_ELT_01_BAT": ["Load"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             }
         }
