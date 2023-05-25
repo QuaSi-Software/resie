@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+## Version 0.6.1
+* corrected wrong units given for output_plot in example files
+
 ## Version 0.6.0
 * Refactor terms and names used to refer to various concepts in the simulation model:
   * energy system => component
