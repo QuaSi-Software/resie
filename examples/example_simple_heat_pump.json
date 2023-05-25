@@ -17,19 +17,19 @@
             "1": {
                 "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
                 "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
                 "key": {"TST_HP_01": ["m_e_ac_230v IN"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
@@ -53,7 +53,7 @@
             "7": {
                 "key": {"TST_SRC_01": ["Max_Energy"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             }
         }    
