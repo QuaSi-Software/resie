@@ -59,3 +59,5 @@ Open `launch.json` (via the gear wheel in the run config dropdown in the debug t
     "args": []
 }
 ```
+
+The "args" should contain the path to the .json input file 
