@@ -125,10 +125,12 @@ end
 
 function calculate_thermal_efficiency(
     part_load_ratio::Float64,
-    linear_coeff = 0.05
+    a::Float64 = 0.3822,
+    b::Float64 = 2.2013,
+    c::Float64 = -2.8237,
+    d::Float64 = 1.3021
 )
-    thermal_efficiency = part_load_ratio > 0.9 ? sqrt(part_load_ratio) - linear_coeff * sqrt(part_load_ratio) : sqrt(part_load_ratio)
-    return thermal_efficiency
+    return  d * part_load_ratio^3 + c * part_load_ratio^2 + b * part_load_ratio + a
 end
 
 function calculate_inverse_expended_energy(
