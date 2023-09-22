@@ -18,6 +18,8 @@ mutable struct GasBoiler <: ControlledComponent
 
     power::Float64
     load::String
+    #max_thermal_efficiency::Float64
+    max_consumable_gas::Float64
     min_power_fraction::Float64 # Minimum amount of power needed for the component to run (?)
     min_run_time::UInt # von state machine genutzt; min run time of component, e.g. several time steps
     output_temperature::Temperature # Desired temperatue of the heated medium
@@ -27,7 +29,8 @@ mutable struct GasBoiler <: ControlledComponent
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas")) # Get value of key
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1")) # Get value of key
         register_media([m_gas_in, m_heat_out])
-
+        max_consumable_gas = watt_to_wh(float(config["power"])) / config["max_thermal_efficiency"]
+    
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -43,7 +46,8 @@ mutable struct GasBoiler <: ControlledComponent
             m_gas_in,
             m_heat_out,
             config["power"], # power
-            config["load"], # full or part load ratio
+            config["load"], # "full" or "plr" (part load ratio)
+            max_consumable_gas,
             default(config, "min_power_fraction", 0.1),
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing)
@@ -69,7 +73,6 @@ function check_gas_in(
     unit::GasBoiler,
     parameters::Dict{String,Any}
 )
-    println("gas in")
     if unit.controller.parameter["m_gas_in"] == true # soll Steuerparameter das Medium für die Berechnung berücksichtigen
         if ( # If unit's system function is to transform energy of one medium to energy in another medium
             unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
@@ -102,13 +105,11 @@ function check_heat_out(
     unit::GasBoiler,
     parameters::Dict{String,Any}
 )
-    println("heat out")
     if unit.controller.parameter["m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        println(exchange)
         # potential_energy: how much energy needs to be provided directly
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         # potential_storage: how much energy can be delivered to storage
@@ -130,15 +131,27 @@ function calculate_thermal_efficiency(
     c::Float64 = -2.8237,
     d::Float64 = 1.3021
 )
-    return  d * part_load_ratio^3 + c * part_load_ratio^2 + b * part_load_ratio + a
+    return  a + b * part_load_ratio + c * part_load_ratio^2 + d * part_load_ratio^3
 end
 
 function calculate_inverse_expended_energy(
-    intake_energy::Float64
+    intake_gas::Float64,
+    max_consumable_gas::Float64
 )
-    #if intake energy
-    part_load_ratio = 1
-    return part_load_ratio
+    # expended energy function: power = plr1*a in [0,0.1] / plr1[0.1]*a + plr2*b in [0,0.8] / plr1[0.1]*a + plr2[0.8]*b + plr3*c in [0,0.1]
+    if intake_gas > max_consumable_gas
+        intake_gas = max_consumable_gas
+    end
+    # normalize
+    intake_gas_norm = intake_gas / max_consumable_gas
+    
+    if intake_gas_norm <= 0.05  # Inversion for the first segment
+        return intake_gas_norm / 2.5
+    elseif intake_gas_norm > 0.05 && intake_gas_norm <= 0.9 # Inversion for the second segment
+        return (intake_gas_norm - 31/880) / (65/88)
+    else  # Inversion for the third segment
+        return (intake_gas_norm + 2) / 3
+    end
 end
 
 function calculate_energies(
@@ -146,19 +159,18 @@ function calculate_energies(
     parameters::Dict{String,Any},
     potentials::Vector{Float64}
 )
-    println("potentials: ", potentials)
     potential_energy_gas_in = potentials[1]
     potential_storage_gas_in = potentials[2]
     potential_energy_heat_out = potentials[3]
     potential_storage_heat_out = potentials[4]
-    
-    if unit.load == "full load"
+
+    if unit.load == "full"
         max_produce_heat = watt_to_wh(unit.power)
         max_consume_gas = max_produce_heat
-    elseif unit.load == "prt" # part load ratio
+    elseif unit.load == "plr" # part load ratio
         if unit.controller.strategy == "demand_driven"
             max_produce_heat = watt_to_wh(unit.power) # max_produce_heat should equal rated power, else when using demand heat which can be inf a non-physical state occurs
-            demand_heat = unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out # given
+            demand_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) # given
             if demand_heat >= max_produce_heat # limit demand_heat to get a physical value for max_consume_gas, else possible intake can be inf
                 demand_heat = max_produce_heat
             elseif demand_heat < 0 # ensure that part-load-ratio is greater equal 0
@@ -166,21 +178,15 @@ function calculate_energies(
             end
             part_load_ratio = demand_heat / watt_to_wh(unit.power) # since demand_heat is bounded, max part-load-ratio is 1, which corresponds to the defintion
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
-            # if max_produce_heat is used, then max_consume_gas would be greater than needed, what is not correct because we have a set demand 
-            # and every extra energy would be a loss. demand_heat can be max_produce_heat if the demand is higher or equal to max_produce_heat
-            max_consume_gas = demand_heat / thermal_efficiency 
+            max_consume_gas = max_produce_heat / thermal_efficiency      
         elseif unit.controller.strategy == "supply_driven"
-            # if it is inf then 
-            max_consume_gas = unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in
-            part_load_ratio = calculate_inverse_expended_energy(max_consume_gas) # über inverse da Kurve bekannt # given curve of expended energy
+            intake_gas = unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in
+            max_consume_gas = unit.max_consumable_gas
+            part_load_ratio = calculate_inverse_expended_energy(intake_gas, max_consume_gas) # über inverse da Kurve bekannt # given curve of expended energy
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
             max_produce_heat = thermal_efficiency * max_consume_gas
             if max_produce_heat > watt_to_wh(unit.power) # check if computed max_produce_heat exceeds the limit of GB
                 max_produce_heat = watt_to_wh(unit.power)
-                # adjust needed max_consume_gas since not everything of the supply might be needed / can be used
-                # max_consume_gas = max_produce_heat / thermal_efficiency
-                # no need to adjust because usage_fraction will be 1 since max_consume_gas / max_consume_gas and by that other usage_fractions (if smaller than 1) 
-                # will regulate the usage and by that determine the max_consume_gas when returning the values
             end
         end
     end
@@ -223,11 +229,11 @@ function calculate_energies(
     if usage_fraction < unit.min_power_fraction # Komponente wird nicht genutzt, wenn der Nutzungsanteil geringer ist als minimal zu aufwendende Leistung, um das Gerät zubenutzen
         return (false, nothing, nothing)
     end
-
+               
     return (
         true,
-        max_consume_gas * usage_fraction, # Ist dies der best mögliche Ertrag (?) Hier müsste Wirkungsgrad rein, da gerade nur der Fall, dass eine Umwandlung von 100 % stattfindet (kein Verlust) (?)
-        max_produce_heat * usage_fraction # Muss angepasst werden, da bei geringerem Wirkungsgrad der maximale Gasverbrauch höher sein wird, um auf die geforderte Wärme zukommenfs
+        max_consume_gas * usage_fraction, 
+        max_produce_heat * usage_fraction
     )
 end
 
