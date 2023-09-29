@@ -9,4 +9,5 @@ using Test
     include("energy_systems/multiple_transformer_limited.jl")
     include("energy_systems/gasboiler_demand_driven_with_bus.jl")
     include("energy_systems/extended_storage_control_strategy.jl")
+    include("energy_systems/gas_boiler_plr_efficiency.jl")
 end
