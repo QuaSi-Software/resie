@@ -4,84 +4,100 @@
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "output_keys": {
+            "TST_STH_01": ["m_h_w_ht1 OUT"],
+            "TST_DEM_01": ["m_h_w_lt1 IN"],
+            "TST_GTP_01": ["borehole_temperature","thermal_resistance","average_fluid_temperature","Re","T_out","Q_out","Q_in"]
+
         },
         "output_plot": {
+            
             "1": {
-                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "key": {"TST_DEM_01": ["m_h_w_lt1 IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
+            
             "2": {
-                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "3": {
-                "key": {"TST_HP_01": ["m_e_ac_230v IN"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "4": {
-                "key": {"TST_HP_01": ["COP"]},
-                "axis": "left",
-                "unit": "-",
-                "scale_factor": 1
-            },
-            "5": {
-                "key": {"TST_DEM_01": ["m_h_w_ht1 IN"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "6": {
-                "key": {"TST_GTP_01": ["Temperature_1"]},
-                "axis": "right",
-                "unit": "°C",
-                "scale_factor": 1
-            },
-            "7": {
-                "key": {"TST_GTP_01": ["Temperature_10"]},
-                "axis": "right",
-                "unit": "°C",
-                "scale_factor": 1
-            },
-            "8": {
-                "key": {"TST_GTP_01": ["Temperature_99"]},
-                "axis": "right",
-                "unit": "°C",
-                "scale_factor": 1
-            },
-            "9": {
                 "key": {"TST_GTP_01": ["m_h_w_lt1 OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "10": {
+            "3": {
                 "key": {"TST_STH_01": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_GTP_01": ["borehole_temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "5": {
+                "key": {"TST_GTP_01": ["average_fluid_temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+
+            "6": {
+                "key": {"TST_GTP_01": ["thermal_resistance"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1
+            },
+
+            "7": {
+                "key": {"TST_GTP_01": ["Re"]},
+                "axis": "left",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "8": {
+                "key": {"TST_GTP_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "9": {
+                "key": {"TST_GTP_01": ["T_out"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "10": {
+                "key": {"TST_GTP_01": ["Q_out"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "11": {
+                "key": {"TST_GTP_01": ["Q_in"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
             }
+           
+            
         }    
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 86400,
-        "time_step_seconds": 900
+        "end": 31536000,
+        "time_step_seconds": 3600
     },
     "components": {
         "TST_DEM_01": {
             "type": "Demand",
-            "medium": "m_h_w_ht1",
+            "medium": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
-            "static_temperature": 45,
-            "scale": 100
+            "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
+            "static_temperature": -5,
+            "scale": 1
         },
         "TST_STH_01": {
             "type": "PVPlant",
@@ -90,41 +106,35 @@
             "output_refs": [
                 "TST_GTP_01"
             ],
-            "energy_profile_file_path": "./profiles/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
-            "scale": 50
+            "energy_profile_file_path": "./profiles/district/Regeneration_GEW_25years.prf",
+            "scale": 1
         },
         "TST_GTP_01": {
             "type": "GeothermalProbes",
             "m_heat_out": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [
-                "TST_HP_01"
-            ],
-            "ambient_temperature_profile_path": "./profiles/district/ambient_temperature_TRY2015_Stuttgart.prf",
-            "max_output_power": 600,
-            "max_input_power": 300,
-            "regeneration": true      
-        },
-        "TST_GRI_01": {
-            "type": "GridConnection",
-            "medium": "m_e_ac_230v",
-            "control_refs": [],
-            "output_refs": [
-                "TST_HP_01"
-            ],
-            "is_source": true
-        },
-        "TST_HP_01": {
-            "type": "HeatPump",
-            "control_refs": [ ],
-            "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
-            "power": 9000,
-            "min_power_fraction": 0.0
+            "ambient_temperature_profile_path": "./profiles/district/Regeneration_GEW_25years.prf",
+            "max_output_power": 600,
+            "max_input_power": 300,
+            "regeneration": true,
+            "undisturbed_ground_temperature": 12.0,
+            "soil_heat_conductivity": 1.6 ,
+            "thermal_resistance": 0.1, 
+            "probe_depth": 150,
+            "diameter_pipe_outer": 0.032,
+            "diameter_pipe_inner": 0.026,
+            "fluid_heat_capacity":3780,
+            "fluid_density":1045,
+            "fluid_viscosity":3.9e-6,
+            "fluid_lambda":0.494,
+            "fluid_prandtl": 31.3,
+            "grout_lambda": 2,
+            "pipe_lambda": 0.42,
+            "diameter_borehole": 0.15
         }
+                
     }
 }
