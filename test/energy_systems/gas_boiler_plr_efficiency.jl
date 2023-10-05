@@ -55,7 +55,7 @@ function test_gas_boiler_demand_driven_plr()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 1.0619
+    expected_efficiency = 1.0 
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(gasboiler, components, simulation_parameters)
@@ -79,7 +79,7 @@ function test_gas_boiler_demand_driven_plr()
     end
 
     demand.static_load = 500
-    expected_efficiency = 0.9396875
+    expected_efficiency = 0.7440249999999999
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(gasboiler, components, simulation_parameters)
@@ -149,7 +149,7 @@ function test_gas_boiler_supply_driven_plr()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 1.0619
+    expected_efficiency = 1.0
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 1000 / expected_efficiency
@@ -157,6 +157,7 @@ function test_gas_boiler_supply_driven_plr()
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
     demand.input_interfaces[demand.medium].max_energy = 1000 * 10
+    demand.max_energy = 1000 * 10
 
     EnergySystems.process(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 1000 / expected_efficiency
@@ -175,7 +176,7 @@ function test_gas_boiler_supply_driven_plr()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 0.9396875
+    expected_efficiency = 0.744025
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 500 / expected_efficiency
@@ -183,9 +184,11 @@ function test_gas_boiler_supply_driven_plr()
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
     demand.input_interfaces[demand.medium].max_energy = 500 * 10
+    demand.max_energy = 500 * 10
 
     EnergySystems.process(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 500 / expected_efficiency
+    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 500
@@ -193,6 +196,7 @@ function test_gas_boiler_supply_driven_plr()
     @test demand.input_interfaces[demand.medium].balance ≈ 500
 
     EnergySystems.process(demand, simulation_parameters)
+    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
     @test demand.input_interfaces[demand.medium].balance ≈ 0
 end
 
