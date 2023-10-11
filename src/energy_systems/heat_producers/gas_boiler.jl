@@ -131,6 +131,10 @@ end
 function calculate_thermal_efficiency(
     plr::Float64, # part load ratio
 )
+    #=
+    This function, with set magic-numbers, serves as a temporary implementation of an 
+    efficiency/PLR curve until a more generalised framework for such calculations is implemented.
+    =#
     return -0.9117*plr^2 + 1.8795*plr + 0.0322
 end
 
