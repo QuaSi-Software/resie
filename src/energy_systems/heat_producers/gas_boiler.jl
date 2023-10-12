@@ -17,7 +17,7 @@ mutable struct GasBoiler <: ControlledComponent
     m_heat_out::Symbol
 
     power::Float64
-    is_plr_dependant::String
+    is_plr_dependant::Bool
     max_consumable_gas::Float64
     plr_to_expended_energy::Vector{Tuple{Float64, Float64}} 
     min_power_fraction::Float64 # Minimum amount of power so that the component can be operated
@@ -36,7 +36,7 @@ mutable struct GasBoiler <: ControlledComponent
         end_value = 1.0
         step_size = 0.1 # set the discretization
         for plr in collect(start_value:step_size:end_value)
-            # Create a tuple: (plr value, expended energy); hard coded function for expended energy
+            # Create a tuple: (part load ratio value, expended energy); hard coded function for expended energy = useful_energy / thermal_efficiency
             plr_expended_energy_pair = (plr, (plr / (-0.9117*plr^2 + 1.8795*plr + 0.0322)) * 1000)
             push!(plr_to_expended_energy, plr_expended_energy_pair) # Append the tuple to the lookup table
         end
@@ -140,13 +140,9 @@ end
 
 function calculate_plr_through_inversed_expended_energy(
     intake_gas::Float64,
-    max_consumable_gas::Float64,
     unit::GasBoiler
 )
-    if intake_gas > max_consumable_gas # obsolete?
-        intake_gas = max_consumable_gas
-    end
-
+    
     # Variables to define interval where provided value falls in
     lower_x = nothing
     lower_y = nothing
@@ -190,10 +186,10 @@ function calculate_energies(
     potential_energy_heat_out = potentials[3]
     potential_storage_heat_out = potentials[4]
 
-    if unit.is_plr_dependant == "false"
+    if unit.is_plr_dependant == false
         max_produce_heat = watt_to_wh(unit.power)
         max_consume_gas = max_produce_heat
-    elseif unit.is_plr_dependant == "true" # part load ratio
+    elseif unit.is_plr_dependant == true # part load ratio
         if unit.controller.strategy == "demand_driven"
             max_produce_heat = watt_to_wh(unit.power) # max_produce_heat should equal rated power, else when using demand heat, which can be inf, a non-physical state might occur
             demand_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out)
@@ -208,7 +204,7 @@ function calculate_energies(
         elseif unit.controller.strategy == "supply_driven"
             intake_gas = unit.input_interfaces[unit.m_gas_in].max_energy
             max_consume_gas = unit.max_consumable_gas
-            part_load_ratio = calculate_plr_through_inversed_expended_energy(intake_gas, max_consume_gas, unit)
+            part_load_ratio = calculate_plr_through_inversed_expended_energy(intake_gas, unit)
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
             max_produce_heat = thermal_efficiency * max_consume_gas
         end

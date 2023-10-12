@@ -31,7 +31,7 @@ function test_gas_boiler_demand_driven_plr()
                 "name" => "demand_driven",
             ),
             "power" => 4000,
-            "is_plr_dependant" => "true",
+            "is_plr_dependant" => true,
             "max_thermal_efficiency" => 1.0,
         ),
     )
@@ -125,7 +125,7 @@ function test_gas_boiler_supply_driven_plr()
                 "name" => "supply_driven",
             ),
             "power" => 4000,
-            "is_plr_dependant" => "true",
+            "is_plr_dependant" => true,
             "max_thermal_efficiency" => 1.0,
         ),
     )
