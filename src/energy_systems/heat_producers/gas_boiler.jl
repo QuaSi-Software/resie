@@ -19,28 +19,33 @@ mutable struct GasBoiler <: ControlledComponent
     power::Float64
     is_plr_dependant::Bool
     max_consumable_gas::Float64
-    plr_to_expended_energy::Vector{Tuple{Float64, Float64}} 
-    min_power_fraction::Float64 # Minimum amount of power so that the component can be operated
-    min_run_time::UInt
+    plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
+    min_power_fraction::Float64 # Minimum amount of power so that the component can be
+    min_run_time::UInt          # operated
     output_temperature::Temperature
 
     function GasBoiler(uac::String, config::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_gas_in, m_heat_out])
-        max_consumable_gas = watt_to_wh(float(config["power"])) / default(config, "max_thermal_efficiency", 1.0)
-        plr_to_expended_energy = [] # lookup table for conversion of part load ratio to expended energy
-        
+
+        max_consumable_gas = watt_to_wh(float(config["power"])) /
+                             default(config, "max_thermal_efficiency", 1.0)
+        # lookup table for conversion of part load ratio to expended energy
+        plr_to_expended_energy = []
         # fill up plr_to_expended_energy lookup table
         start_value = 0.0
         end_value = 1.0
         step_size = 0.1 # set the discretization
         for plr in collect(start_value:step_size:end_value)
-            # Create a tuple: (part load ratio value, expended energy); hard coded function for expended energy = useful_energy / thermal_efficiency
-            plr_expended_energy_pair = (plr, (plr / (-0.9117*plr^2 + 1.8795*plr + 0.0322)) * 1000)
-            push!(plr_to_expended_energy, plr_expended_energy_pair) # Append the tuple to the lookup table
+            # Create a tuple: (part load ratio value, expended energy); hard coded function
+            # for expended energy = useful_energy / thermal_efficiency
+            plr_expended_energy_pair = (plr,
+                (plr / (-0.9117 * plr^2 + 1.8795 * plr + 0.0322)) * 1000)
+            # Append the tuple to the lookup table
+            push!(plr_to_expended_energy, plr_expended_energy_pair)
         end
-    
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -72,10 +77,16 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
+        unit.output_temperature,
+        unit.output_interfaces[unit.m_heat_out].temperature
+    )
 end
 
-function set_max_energies!(unit::GasBoiler, gas_in::Float64, heat_out::Float64) # Set maximum energies that can be taken in and outputed by the unit
+"""
+Set maximum energies that can be taken in and put out by the unit
+"""
+function set_max_energies!(unit::GasBoiler, gas_in::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
@@ -98,12 +109,16 @@ function check_gas_in(
             )
             potential_energy_gas = exchange.balance + exchange.energy_potential
             potential_storage_gas = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_gas + potential_storage_gas : potential_energy_gas) <= parameters["epsilon"]
+            if (
+                unit.controller.parameter["unload_storages"] ?
+                potential_energy_gas + potential_storage_gas :
+                potential_energy_gas
+            ) <= parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_gas, potential_storage_gas, exchange.temperature)
         end
-    else 
+    else
         return (Inf, Inf)
     end
 end
@@ -119,7 +134,11 @@ function check_heat_out(
         )
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         potential_storage_heat_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+        if (
+            unit.controller.parameter["load_storages"] ?
+            potential_energy_heat_out + potential_storage_heat_out :
+            potential_energy_heat_out
+        ) >= -parameters["epsilon"]
             return (nothing, nothing)
         end
         return (potential_energy_heat_out, potential_storage_heat_out)
@@ -128,21 +147,21 @@ function check_heat_out(
     end
 end
 
+"""
+This function, with set magic-numbers, serves as a temporary implementation of an
+efficiency/PLR curve until a more generalised framework for such calculations is
+implemented.
+"""
 function calculate_thermal_efficiency(
     plr::Float64, # part load ratio
 )
-    #=
-    This function, with set magic-numbers, serves as a temporary implementation of an 
-    efficiency/PLR curve until a more generalised framework for such calculations is implemented.
-    =#
-    return -0.9117*plr^2 + 1.8795*plr + 0.0322
+    return -0.9117 * plr^2 + 1.8795 * plr + 0.0322
 end
 
 function calculate_plr_through_inversed_expended_energy(
     intake_gas::Float64,
     unit::GasBoiler
 )
-    
     # Variables to define interval where provided value falls in
     lower_x = nothing
     lower_y = nothing
@@ -168,12 +187,13 @@ function calculate_plr_through_inversed_expended_energy(
 
     try  # Check if intake_gas is within the range of the lookup table
         if lower_x !== nothing && upper_x !== nothing
-            return lower_x + (intake_gas - lower_y) * (upper_x - lower_x) / (upper_y - lower_y) # perform linear interpolation
+            # perform linear interpolation
+            return lower_x + (intake_gas - lower_y) *
+                             (upper_x - lower_x) / (upper_y - lower_y)
         end
     catch
         println("The intake_gas value is not within the range of the lookup table.")
     end
-
 end
 
 function calculate_energies(
@@ -191,48 +211,74 @@ function calculate_energies(
         max_consume_gas = max_produce_heat
     elseif unit.is_plr_dependant == true # part load ratio
         if unit.controller.strategy == "demand_driven"
-            max_produce_heat = watt_to_wh(unit.power) # max_produce_heat should equal rated power, else when using demand heat, which can be inf, a non-physical state might occur
-            demand_heat = -(unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out)
-            if demand_heat >= max_produce_heat # set demand_heat to rated power -> prevent max_consume_gas to equal inf
+            # max_produce_heat should equal rated power, else when using demand heat, which
+            # can be inf, a non-physical state might occur
+            max_produce_heat = watt_to_wh(unit.power)
+            demand_heat = -(unit.controller.parameter["load_storages"] ?
+                            potential_energy_heat_out + potential_storage_heat_out :
+                            potential_energy_heat_out)
+            if demand_heat >= max_produce_heat
+                # set demand_heat to rated power -> prevent max_consume_gas to equal inf
                 demand_heat = max_produce_heat
-            elseif demand_heat < 0 # ensure that part-load-ratio is greater equal 0
+            elseif demand_heat < 0
+                # ensure that part-load-ratio is greater equal 0
                 demand_heat = 0
             end
             part_load_ratio = demand_heat / watt_to_wh(unit.power)
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
-            max_consume_gas = max_produce_heat / thermal_efficiency      
+            max_consume_gas = max_produce_heat / thermal_efficiency
         elseif unit.controller.strategy == "supply_driven"
             intake_gas = unit.input_interfaces[unit.m_gas_in].max_energy
             max_consume_gas = unit.max_consumable_gas
-            part_load_ratio = calculate_plr_through_inversed_expended_energy(intake_gas, unit)
+            part_load_ratio = calculate_plr_through_inversed_expended_energy(
+                intake_gas, unit
+            )
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
             max_produce_heat = thermal_efficiency * max_consume_gas
         end
     end
-    
+
     # get usage fraction of external profile (normalized from 0 to 1)
     # when no profile is provided, then 100 % of unit is used
-    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    usage_fraction_operation_profile =
+        unit.controller.parameter["operation_profile_path"] === nothing ?
+        1.0 :
+        value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
     if usage_fraction_operation_profile <= 0.0
         return # no operation allowed from external profile
     end
-    
+
     # all three standard operating strategies behave the same, but it is better to be
     # explicit about the behaviour rather than grouping all together
-    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2 
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-    
+    if (
+        unit.controller.strategy == "storage_driven" &&
+        unit.controller.state_machine.state == 2
+    )
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+                                     potential_energy_heat_out + potential_storage_heat_out :
+                                     potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ?
+                                   potential_energy_gas_in + potential_storage_gas_in :
+                                   potential_energy_gas_in) / max_consume_gas)
+
     elseif unit.controller.strategy == "storage_driven"
         return (false, nothing, nothing, nothing)
-    
+
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+                                     potential_energy_heat_out + potential_storage_heat_out :
+                                     potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ?
+                                   potential_energy_gas_in + potential_storage_gas_in :
+                                   potential_energy_gas_in) / max_consume_gas)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+                                     potential_energy_heat_out + potential_storage_heat_out :
+                                     potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ?
+                                   potential_energy_gas_in + potential_storage_gas_in :
+                                   potential_energy_gas_in) / max_consume_gas)
     end
 
     # limit actual usage by limits of inputs, outputs and profile
@@ -243,14 +289,15 @@ function calculate_energies(
         usage_fraction_operation_profile
     )
 
-    if usage_fraction < unit.min_power_fraction # Component is not used if usage_fraction is less than min_power_fraction that is required to use the component
-        
+    # Component is not used if usage_fraction is less than min_power_fraction that is
+    # required to use the component
+    if usage_fraction < unit.min_power_fraction
         return (false, nothing, nothing)
     end
 
     return (
         true,
-        max_consume_gas * usage_fraction, 
+        max_consume_gas * usage_fraction,
         max_produce_heat * usage_fraction
     )
 end
