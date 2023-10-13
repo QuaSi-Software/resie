@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2023 Authors: Etienne Ott, Heiner Steinacker
+Copyright (c) 2023 Authors: Maksim Helmann, Etienne Ott, Heiner Steinacker
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
