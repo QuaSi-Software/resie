@@ -28,7 +28,7 @@ mutable struct GasBoiler <: ControlledComponent
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_gas_in, m_heat_out])
-        max_consumable_gas = watt_to_wh(float(config["power"])) / config["max_thermal_efficiency"]
+        max_consumable_gas = watt_to_wh(float(config["power"])) / default(config, "max_thermal_efficiency", 1.0)
         plr_to_expended_energy = [] # lookup table for conversion of part load ratio to expended energy
         
         # fill up plr_to_expended_energy lookup table
@@ -56,7 +56,7 @@ mutable struct GasBoiler <: ControlledComponent
             m_gas_in,
             m_heat_out,
             config["power"], # power
-            config["is_plr_dependant"], # true: plr (part load ratio)
+            default(config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
             max_consumable_gas,
             plr_to_expended_energy,
             default(config, "min_power_fraction", 0.1),
