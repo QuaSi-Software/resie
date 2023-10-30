@@ -355,13 +355,13 @@ function balance_on(
     interface::SystemInterface,
     unit::ControlledComponent
 )::NamedTuple{}
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
+    input_sign = unit.uac == interface.target.uac ? -1 : +1
+
     return (
             balance = interface.balance,
-            storage_potential = 0.0,
-            energy_potential = balance_written ? 0.0 : input_sign * interface.max_energy,
-            temperature = interface.temperature
+            storage_potential = (uac=unit.uac, energy=0.0, temperature=interface.temperature),
+            energy_potential = (uac=unit.uac, energy=(balance_written ? 0.0 : input_sign * interface.max_energy), temperature=interface.temperature),
             )
 end
 
