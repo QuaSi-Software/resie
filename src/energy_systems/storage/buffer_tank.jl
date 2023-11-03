@@ -80,9 +80,8 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = caller_is_input ? -(unit.capacity-unit.load) : unit.load,
-            energy_potential = 0.0,
-            temperature = interface.temperature
+            storage_potential = (uac=unit.uac, energy=(caller_is_input ? -(unit.capacity-unit.load) : unit.load), temperature=interface.temperature),
+            energy_potential = (uac=unit.uac, energy=0.0, temperature=interface.temperature),
             )
 end
 

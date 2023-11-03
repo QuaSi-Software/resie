@@ -106,6 +106,22 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     return 0.4 * (273.15 + out_temp) / (out_temp - in_temp) # Carnot-COP with 40 % efficiency
 end
 
+
+function collect_all_energies_of_interface_balance(input::Any)
+    # make sure that input is an array of touples
+    energy_tuples = isa(input, NamedTuple) ? [input] : input
+    # return all energies in the touple array as vecor
+    return [t.energy for t in energy_tuples]
+end
+
+function collect_all_temperatures_of_interface_balance(input::Any)
+    # make sure that input is an array of touples
+    energy_tuples = isa(input, NamedTuple) ? [input] : input
+    # return all energies in the touple array as vecor
+    return [t.temperature for t in energy_tuples]
+end
+
+
 function check_el_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
@@ -122,9 +138,9 @@ function check_el_in(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
-            potential_energy_el = exchange.balance + exchange.energy_potential
-            potential_storage_el = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
+            potential_energy_el = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
+            potential_storage_el = collect_all_energies_of_interface_balance(exchange.storage_potential)
+            if (unit.controller.parameter["unload_storages"] ? np.sum(potential_energy_el) + np.sum(potential_storage_el) : np.sum(potential_energy_el)) <= parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el, potential_storage_el)
@@ -150,9 +166,9 @@ function check_heat_in(
                 unit.input_interfaces[unit.m_heat_in],
                 unit.input_interfaces[unit.m_heat_in].source
             )
-            potential_energy_heat_in = exchange.balance + exchange.energy_potential
-            potential_storage_heat_in = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) <= parameters["epsilon"]
+            potential_energy_heat_in = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
+            potential_storage_heat_in = collect_all_energies_of_interface_balance(exchange.storage_potential)
+            if (unit.controller.parameter["unload_storages"] ? np.sum(potential_energy_heat_in) + np.sum(potential_storage_heat_in) : np.sum(potential_energy_heat_in)) <= parameters["epsilon"]
                 return (nothing, nothing, exchange.temperature)
             end
             return (potential_energy_heat_in, potential_storage_heat_in, exchange.temperature)
@@ -172,9 +188,9 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = exchange.balance + exchange.energy_potential
-        potential_storage_heat_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+        potential_energy_heat_out = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
+        potential_storage_heat_out = collect_all_energies_of_interface_balance(exchange.storage_potential)
+        if (unit.controller.parameter["load_storages"] ? np.sum(potential_energy_heat_out) + np.sum(potential_storage_heat_out) : np.sum(potential_energy_heat_out)) >= -parameters["epsilon"]
             return (nothing, nothing, exchange.temperature)
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
