@@ -557,7 +557,7 @@ using ..Profiles
 
 # the order of includes of the individual components matters here as some components
 # require the definition of certain basic components such as a bus or a grid connection
-include("general/demand.jl")
+include("general/fixed_sink.jl")
 include("general/fixed_supply.jl")
 include("general/bounded_supply.jl")
 include("general/bounded_sink.jl")
