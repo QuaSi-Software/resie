@@ -17,16 +17,20 @@ mutable struct FixedSupply <: ControlledComponent
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    energy_profile::Profile
+    energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
 
     supply::Float64
     temperature::Temperature
+
+    static_supply::Union{Nothing,Float64}
     static_temperature::Temperature
 
     function FixedSupply(uac::String, config::Dict{String,Any})
-        energy_profile = Profile(config["energy_profile_file_path"])
+        energy_profile = "energy_profile_file_path" in keys(config) ?
+                         Profile(config["energy_profile_file_path"]) :
+                         nothing
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
                               Profile(config["temperature_profile_file_path"]) :
                               nothing
@@ -51,7 +55,8 @@ mutable struct FixedSupply <: ControlledComponent
             config["scale"], # scaling_factor
             0.0, # supply
             nothing, # temperature
-            default(config, "static_temperature", nothing) # static_temperature
+            default(config, "static_supply", nothing), # static_supply
+            default(config, "static_temperature", nothing), # static_temperature
         )
     end
 end
@@ -77,7 +82,14 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
-    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+
+    if unit.static_supply !== nothing
+        unit.supply = unit.static_supply
+    elseif unit.energy_profile !== nothing
+        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    else
+        unit.supply = 0.0
+    end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
 
     if unit.static_temperature !== nothing
@@ -86,7 +98,6 @@ function control(
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
     end
     unit.output_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.output_interfaces[unit.medium].temperature)
-
 end
 
 function process(unit::FixedSupply, parameters::Dict{String,Any})

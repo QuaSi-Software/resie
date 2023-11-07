@@ -88,6 +88,7 @@ function control(
     else
         unit.load = 0.0
     end
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
 
     if unit.static_temperature !== nothing
         unit.temperature = unit.static_temperature
@@ -95,9 +96,6 @@ function control(
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
     end
     unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.input_interfaces[unit.medium].temperature)
-
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
-
 end
 
 function process(unit::Demand, parameters::Dict{String,Any})
