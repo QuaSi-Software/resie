@@ -174,13 +174,31 @@ function balance(unit::Bus)::Float64
 end
 
 
-function fill_interface_touple(uac, energy; temperature=nothing, pressure=nothing, voltage=nothing)
-    return (uac=uac, energy=energy, temperature=temperature, pressure=pressure, voltage=voltage)
+# helper function to create a balance touple with values while filling optional values with nothing
+function fill_interface_touple(uac, energy_potential, storage_potential; temperature=nothing, pressure=nothing, voltage=nothing)
+    return (uac=uac,
+            energy_potential=energy_potential,
+            storage_potential=storage_potential,
+            temperature=temperature,
+            pressure=pressure,
+            voltage=voltage)
 end
 
-
+# helper function to create the structure of an array holding balance touples. Returnes only the empty structure.
 function create_interface_touple()
-    return NamedTuple{(:uac, :energy, :temperature, :pressure, :voltage), Tuple{String, Float64, Union{Temperature, Nothing}, Union{Float64, Nothing}, Union{Float64, Nothing}}}[]
+    return NamedTuple{( :uac,
+                        :energy_potential,
+                        :storage_potential,
+                        :temperature,
+                        :pressure,
+                        :voltage),
+                        Tuple{
+                            String,
+                            Float64,
+                            Float64,
+                            Union{Temperature, Nothing},
+                            Union{Float64, Nothing},
+                            Union{Float64, Nothing}}}[]
 end
 
 
@@ -192,8 +210,7 @@ function balance_on(
     output_index = nothing
     caller_is_input = nothing # == true if interface is input of unit (caller puts energy in unit); 
                               # == false if interface is output of unit (caller gets energy from unit)
-    results_energy_potential = create_interface_touple()
-    results_storage_potential = create_interface_touple()
+    energy_touple_result = create_interface_touple()
 
     # find the index of the input/output on the bus. if the method was called on an output,
     # the input index will remain as nothing and vice versa.
@@ -239,7 +256,7 @@ function balance_on(
     
     # iterate through outfaces to get storage loading and energy output potential, only if caller is input
     if caller_is_input == true
-        for (idx, outface) in pairs(unit.output_interfaces)
+        for (idx, outface) in pairs(unit.output_interfaces) # ToDo: adjust order so it matches the priority of the outputs of the bus
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
@@ -248,14 +265,13 @@ function balance_on(
                 if isa(outface.target, Bus)
                     exchange = balance_on(outface, outface.target)
                     if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
-                        for i = 1:length(exchange.energy_potential)
-                            exchange.energy_potential[i].energy = 0.0
-                            exchange.storage_potential[i].energy = 0.0
+                        for i = 1:length(exchange.energy)
+                            exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+                            exchange.energy[i].storage_potential = 0.0
                         end
                     end
                     # append exchange to current output
-                    push!(results_energy_potential, exchange)
-                    push!(results_storage_potential, exchange)
+                    push!(energy_touple_result, exchange)
                 else
                     temperature = outface.temperature
                     energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : -outface.max_energy
@@ -264,19 +280,18 @@ function balance_on(
                         outface.target.uac !== interface.source.uac && # never allow unloading of own storage load
                         outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0    # do not consider storage_potential if energy has already been transferred through interface
                         )
-                        storage_potential = balance_on(outface, outface.target).storage_potential.energy  # only one return will be given from storages!
+                        storage_potential = balance_on(outface, outface.target).energy.storage_potential  # only one return will be given from storages!
                     else
                         storage_potential = 0.0
                     end
                     # append exchange to current output
-                    push!(results_energy_potential, fill_interface_touple(outface.target.uac, energy_potential, temperature=temperature))
-                    push!(results_storage_potential, fill_interface_touple(outface.target.uac, storage_potential, temperature=temperature))
+                    push!(energy_touple_result, fill_interface_touple(outface.target.uac, energy_potential, storage_potential, temperature=temperature))
                 end
             end
         end
     elseif caller_is_input == false
         # iterate through infaces to get storage loading and energy input potential, only if caller is output
-        for (idx, inface) in pairs(unit.input_interfaces)
+        for (idx, inface) in pairs(unit.input_interfaces)  # ToDo: adjust order so it matches the priority of the inputs of the bus
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
@@ -285,14 +300,13 @@ function balance_on(
                 if isa(inface.source, Bus)
                     exchange = balance_on(inface, inface.source)
                     if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
-                        for i = 1:length(exchange.energy_potential)
-                            exchange.energy_potential[i].energy = 0.0
-                            exchange.storage_potential[i].energy = 0.0
+                        for i = 1:length(exchange.energy)
+                            exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+                            exchange.energy[i].storage_potential = 0.0
                         end
                     end
                     # append exchange to current output
-                    push!(results_energy_potential, exchange)
-                    push!(results_storage_potential, exchange)
+                    push!(energy_touple_result, exchange)
                 else
                     temperature = inface.temperature
                     energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : inface.max_energy
@@ -301,13 +315,12 @@ function balance_on(
                         inface.source.uac !== interface.target.uac &&   # do not allow loading of own storage
                         inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0    # do not consider storage_potential if energy has already been transferred through interface
                         )
-                        storage_potential = balance_on(inface, inface.source).storage_potential.energy  # only one return will be given from storages!
+                        storage_potential = balance_on(inface, inface.source).energy.storage_potential  # only one return will be given from storages!
                     else
                         storage_potential = 0.0
                     end
                     # append exchange to current output
-                    push!(results_energy_potential, fill_interface_touple(inface.source.uac, energy_potential, temperature=temperature))
-                    push!(results_storage_potential, fill_interface_touple(inface.source.uac, storage_potential, temperature=temperature))
+                    push!(energy_touple_result, fill_interface_touple(inface.source.uac, energy_potential, storage_potential, temperature=temperature))
                 end
             end
         end
@@ -323,8 +336,7 @@ function balance_on(
 
     return (
             balance = balance(unit),
-            storage_potential = results_storage_potential,
-            energy_potential = results_energy_potential
+            energy = energy_touple_result
             )
 end
 

@@ -279,8 +279,12 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = (uac=unit.uac, energy=(balance_written ? 0.0 : input_sign * interface.max_energy), temperature=interface.temperature),  # geothermal heat collector are handled as storages currently!
-            energy_potential = (uac=unit.uac, energy=0.0, temperature=interface.temperature),
+            energy = (  uac=unit.uac, 
+                        energy_potential=0.0,
+                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
+                        temperature=interface.temperature,
+                        pressure=nothing,
+                        voltage=nothing),   # geothermal heat collector are handled as storages currently!
             )
 end
 

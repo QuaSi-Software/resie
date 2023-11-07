@@ -55,6 +55,8 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
+
+    # revise! This is not correct anymore!
     unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
     unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
 
@@ -80,8 +82,12 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = (uac=unit.uac, energy=(caller_is_input ? -(unit.capacity-unit.load) : unit.load), temperature=interface.temperature),
-            energy_potential = (uac=unit.uac, energy=0.0, temperature=interface.temperature),
+            energy = (  uac=unit.uac,
+                        energy_potential=0.0,
+                        storage_potential=caller_is_input ? -(unit.capacity-unit.load) : unit.load,
+                        temperature=interface.temperature, 
+                        pressure=nothing,
+                        voltage=nothing),   
             )
 end
 

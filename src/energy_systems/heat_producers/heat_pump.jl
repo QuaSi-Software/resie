@@ -107,17 +107,19 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
 end
 
 
-function collect_all_energies_of_interface_balance(input::Any)
-    # make sure that input is an array of touples
+# helper functions to collect values from array of touples or single touples
+function collect_all_energy_potentials_of_interface_balance(input::Any)
     energy_tuples = isa(input, NamedTuple) ? [input] : input
-    # return all energies in the touple array as vecor
-    return [t.energy for t in energy_tuples]
+    return [t.energy_potential for t in energy_tuples]
+end
+
+function collect_all_storage_potentials_of_interface_balance(input::Any)
+    energy_tuples = isa(input, NamedTuple) ? [input] : input
+    return [t.storage_potential for t in energy_tuples]
 end
 
 function collect_all_temperatures_of_interface_balance(input::Any)
-    # make sure that input is an array of touples
     energy_tuples = isa(input, NamedTuple) ? [input] : input
-    # return all energies in the touple array as vecor
     return [t.temperature for t in energy_tuples]
 end
 
@@ -138,9 +140,9 @@ function check_el_in(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
-            potential_energy_el = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
-            potential_storage_el = collect_all_energies_of_interface_balance(exchange.storage_potential)
-            if (unit.controller.parameter["unload_storages"] ? np.sum(potential_energy_el) + np.sum(potential_storage_el) : np.sum(potential_energy_el)) <= parameters["epsilon"]
+            potential_energy_el = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
+            potential_storage_el = collect_all_storage_potentials_of_interface_balance(exchange.energy)
+            if (unit.controller.parameter["unload_storages"] ? sum(potential_energy_el) + sum(potential_storage_el) : sum(potential_energy_el)) <= parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el, potential_storage_el)
@@ -166,15 +168,16 @@ function check_heat_in(
                 unit.input_interfaces[unit.m_heat_in],
                 unit.input_interfaces[unit.m_heat_in].source
             )
-            potential_energy_heat_in = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
-            potential_storage_heat_in = collect_all_energies_of_interface_balance(exchange.storage_potential)
-            if (unit.controller.parameter["unload_storages"] ? np.sum(potential_energy_heat_in) + np.sum(potential_storage_heat_in) : np.sum(potential_energy_heat_in)) <= parameters["epsilon"]
-                return (nothing, nothing, exchange.temperature)
+            potential_energy_heat_in = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
+            potential_storage_heat_in = collect_all_storage_potentials_of_interface_balance(exchange.energy)
+            temperatures = collect_all_temperatures_of_interface_balance(exchange.energy)
+            if (unit.controller.parameter["unload_storages"] ? sum(potential_energy_heat_in) + sum(potential_storage_heat_in) : sum(potential_energy_heat_in)) <= parameters["epsilon"]
+                return (nothing, nothing, temperatures)
             end
-            return (potential_energy_heat_in, potential_storage_heat_in, exchange.temperature)
+            return (potential_energy_heat_in, potential_storage_heat_in, temperatures)
         end
     else
-        return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)
+        return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)  #ToDo not sure if that is correct here. Where is this written to the interface?
     end
 
 end
@@ -188,29 +191,36 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = exchange.balance + collect_all_energies_of_interface_balance(exchange.energy_potential)
-        potential_storage_heat_out = collect_all_energies_of_interface_balance(exchange.storage_potential)
-        if (unit.controller.parameter["load_storages"] ? np.sum(potential_energy_heat_out) + np.sum(potential_storage_heat_out) : np.sum(potential_energy_heat_out)) >= -parameters["epsilon"]
-            return (nothing, nothing, exchange.temperature)
+        potential_energy_heat_out = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
+        potential_storage_heat_out = collect_all_storage_potentials_of_interface_balance(exchange.energy)
+        temperatures = collect_all_temperatures_of_interface_balance(exchange.energy)
+        if (unit.controller.parameter["load_storages"] ? sum(potential_energy_heat_out) + sum(potential_storage_heat_out) : sum(potential_energy_heat_out)) >= -parameters["epsilon"]
+            return (nothing, nothing, temperatures)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
+        return (potential_energy_heat_out, potential_storage_heat_out, temperatures)
     else
-        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
+        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature) #ToDo not sure if that is correct here. Where is this written to the interface?
     end
 end
 
 function calculate_energies(
     unit::HeatPump,
     parameters::Dict{String,Any},
-    temperatures::Tuple{Temperature, Temperature},
-    potentials::Vector{Float64}
+    temperatures::Tuple{Vector{Float64}, Vector{Float64}},
+    potentials::Vector{Vector{Float64}}
 )
-    potential_energy_el = potentials[1]
-    potential_storage_el = potentials[2]
+    # rename variable for better readability
+    potential_energy_el = sum(potentials[1])        # no differenciation of power sources for now
+    potential_storage_el = sum(potentials[2])       # no differenciation of power sources for now
     potential_energy_heat_in = potentials[3]
     potential_storage_heat_in = potentials[4]
-    potential_energy_heat_out = potentials[5]
-    potential_storage_heat_out = potentials[6]
+    potential_energy_heat_out = sum(potentials[5])  # no differenciation of heat output layers for now
+    potential_storage_heat_out = sum(potentials[6]) # no differenciation of heat output layers for now
+
+    temperatures_in = temperatures[1]
+    temperatures_out = maximum(temperatures[2])         # no differenciation of heat output layers for now, maximum temperature is assumed
+
+    n_heat_in = length(potential_energy_heat_in)    # number of heat layers in input
 
     # get usage fraction of external profile (normalized from 0 to 1)
     usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
@@ -219,45 +229,51 @@ function calculate_energies(
     end
 
     # a fixed COP has priority. if it's not given the dynamic cop requires temperatures
-    unit.cop = unit.fixed_cop === nothing ? dynamic_cop(temperatures[1], temperatures[2]) : unit.fixed_cop
-    if unit.cop === nothing
-        throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
+    cop = zeros(n_heat_in)
+    for n=1:n_heat_in
+        cop[n] = unit.fixed_cop === nothing ? dynamic_cop(temperatures_in[n], temperatures_out) : unit.fixed_cop
+        if cop[n] === nothing
+            throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
+        end
     end
 
     # maximum possible in and outputs of heat pump, not regarding any external limits!
     max_produce_heat = watt_to_wh(unit.power)
-    max_consume_heat = max_produce_heat * (1.0 - 1.0 / unit.cop)
-    max_consume_el = max_produce_heat - max_consume_heat
+    max_consume_heat = max_produce_heat .* (1.0 .- 1.0 ./ cop)
+    max_consume_el = max_produce_heat .- max_consume_heat
 
     # all three standard operating strategies behave the same, but it is better to be
     # explicit about the behaviour rather than grouping all together
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
 
     elseif unit.controller.strategy == "storage_driven"
         return (false, nothing, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) / max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) / max_consume_el)
+        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
+        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
+        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
     end
 
     # limit actual usage by limits of inputs, outputs and profile
     usage_fraction = min(
         1.0,
-        usage_fraction_heat_out,
-        usage_fraction_heat_in,
-        usage_fraction_el,
-        usage_fraction_operation_profile
+        sum(usage_fraction_heat_out),
+        sum(usage_fraction_heat_in),
+        sum(usage_fraction_el),
+        sum(usage_fraction_operation_profile)
     )
+
+    # calculate average cop ToDo
+    unit.cop = cop
 
     if usage_fraction < unit.min_power_fraction
         return (false, nothing, nothing, nothing)
