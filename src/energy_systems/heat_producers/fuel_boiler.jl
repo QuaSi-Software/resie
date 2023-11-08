@@ -1,11 +1,11 @@
 """
-Implementation of a gas boiler producing heat from chemical energy in gaseous form.
+Implementation of a boiler producing heat (as hot water) from the chemical energy in a fuel.
 
-The only currently implemented operation strategy involves checking the load of a linked
-buffer tank and en-/disabling the boiler when a threshold is reached, in addition to an
-overfill shutoff condition.
+While not technically correct, this implementation can also be used to model an electric
+boiler, as the input medium can be freely chosen and therefore can be chosen to be
+electricity instead of a chemical fuel.
 """
-mutable struct GasBoiler <: Component
+mutable struct FuelBoiler <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -24,7 +24,7 @@ mutable struct GasBoiler <: Component
     min_run_time::UInt          # operated
     output_temperature::Temperature
 
-    function GasBoiler(uac::String, config::Dict{String,Any})
+    function FuelBoiler(uac::String, config::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_gas_in, m_heat_out])
@@ -72,7 +72,7 @@ mutable struct GasBoiler <: Component
 end
 
 function control(
-    unit::GasBoiler,
+    unit::FuelBoiler,
     components::Grouping,
     parameters::Dict{String,Any}
 )
@@ -86,13 +86,13 @@ end
 """
 Set maximum energies that can be taken in and put out by the unit
 """
-function set_max_energies!(unit::GasBoiler, gas_in::Float64, heat_out::Float64)
+function set_max_energies!(unit::FuelBoiler, gas_in::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
 
 function check_gas_in(
-    unit::GasBoiler,
+    unit::FuelBoiler,
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_gas_in"] == true
@@ -124,7 +124,7 @@ function check_gas_in(
 end
 
 function check_heat_out(
-    unit::GasBoiler,
+    unit::FuelBoiler,
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_heat_out"] == true
@@ -160,7 +160,7 @@ end
 
 function calculate_plr_through_inversed_expended_energy(
     intake_gas::Float64,
-    unit::GasBoiler
+    unit::FuelBoiler
 )
     # Variables to define interval where provided value falls in
     lower_x = nothing
@@ -197,7 +197,7 @@ function calculate_plr_through_inversed_expended_energy(
 end
 
 function calculate_energies(
-    unit::GasBoiler,
+    unit::FuelBoiler,
     parameters::Dict{String,Any},
     potentials::Vector{Float64}
 )
@@ -303,7 +303,7 @@ function calculate_energies(
 end
 
 function potential(
-    unit::GasBoiler,
+    unit::FuelBoiler,
     parameters::Dict{String,Any}
 )
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
@@ -333,7 +333,7 @@ function potential(
     end
 end
 
-function process(unit::GasBoiler, parameters::Dict{String,Any})
+function process(unit::FuelBoiler, parameters::Dict{String,Any})
     potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, parameters)
     if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0)
@@ -359,4 +359,4 @@ function process(unit::GasBoiler, parameters::Dict{String,Any})
     end
 end
 
-export GasBoiler
+export FuelBoiler
