@@ -4,7 +4,7 @@ Implementation of a component modeling a generic storage of a chosen medium.
 This is particularly useful for testing, but can also be used to model any storage or other
 equipment unit that stores energy in a given medium.
 """
-mutable struct Storage <: ControlledComponent
+mutable struct Storage <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

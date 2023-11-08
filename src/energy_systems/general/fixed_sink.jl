@@ -8,7 +8,7 @@ Note that "fixed" in this context means that the amount of energy the unit consu
 fixed within a timestep, but can vary over multiple timesteps. No calculation other than
 scaling of profile values is performed in each timestep.
 """
-mutable struct FixedSink <: ControlledComponent
+mutable struct FixedSink <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

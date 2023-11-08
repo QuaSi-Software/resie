@@ -6,7 +6,7 @@ component or other equipment unit that consumes energy of a given medium. The co
 might still have a maximum power intake in a single time step, but can consume any fraction
 of this.
 """
-mutable struct BoundedSink <: ControlledComponent
+mutable struct BoundedSink <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

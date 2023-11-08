@@ -6,7 +6,7 @@ component or other equipment unit that processes energy in a given medium. The c
 might still have a maximum power draw in a single time step, but can provide any fraction
 of this to connected components.
 """
-mutable struct BoundedSupply <: ControlledComponent
+mutable struct BoundedSupply <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

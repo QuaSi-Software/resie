@@ -20,8 +20,8 @@ to the simulation as a whole as well as provide functionality on groups of compo
 """
 module EnergySystems
 
-export check_balances, ControlledComponent, each, Component, Grouping, link_output_with,
-    perform_steps, output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
+export check_balances, Component, each, Grouping, link_output_with, perform_steps,
+    output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
     highest_temperature
 
 """
@@ -135,22 +135,26 @@ const StepInstructions = Vector{StepInstruction}
 
 """
 The basic type of all energy system components.
+
+Because Julia does not have field inheritance as OOP languages such as Java do, types
+implementing this abstract type are further to be assumed to have the fields required by all
+components:
+* uac::String: The user address code (UAC) of the component
+* controller::Controller: Handles control functionality
+* sys_function::SystemFunction: The system function the component has within the energy
+    system (storage, transformer, etc.)
+
+Some fields are expected, but behave differently for Bus components. For components of other
+system function these are:
+* input_interfaces::InterfaceMap: The input interfaces to the component indexed by medium
+* output_interfaces::InterfaceMap: The output interfaces to the component indexed by medium
 """
 abstract type Component end
 
 """
-A type describing a component that has control functionality.
-
-Because Julia does not have interface->implementation like OOP languages such as Java,
-types implementing this abstract type are further to be assumed to have the fields required
-by all components, in particular the field `controller` of type `Controller`.
-"""
-abstract type ControlledComponent <: Component end
-
-"""
 Convenience alias to a dict mapping UAC keys to a component.
 """
-const Grouping = Dict{String,ControlledComponent}
+const Grouping = Dict{String,Component}
 
 """
 Convenience alias for temperatures which can be a number or "nothing".
@@ -194,10 +198,10 @@ interface's field "sum_abs_change" will have a value of twice the total energy t
 """
 Base.@kwdef mutable struct SystemInterface
     """The source component providing energy"""
-    source::Union{Nothing,ControlledComponent} = nothing
+    source::Union{Nothing,Component} = nothing
 
     """The target component receiving energy"""
-    target::Union{Nothing,ControlledComponent} = nothing
+    target::Union{Nothing,Component} = nothing
 
     """The current balance of the interface"""
     balance::Float64 = 0.0
@@ -341,7 +345,7 @@ without having to check if its connected to a Bus or directly to a component.
 # Arguments
 - `interface::SystemInterface`: The interface "on which" the balance is calculated. This
     also defines which component is the source.
-- `unit::ControlledComponent`: The receiving component
+- `unit::Component`: The receiving component
 
 # Returns NamedTuple with
 - "balance"::Float64:           The balance of the target component that can be considered a 
@@ -353,7 +357,7 @@ without having to check if its connected to a Bus or directly to a component.
 """
 function balance_on(
     interface::SystemInterface,
-    unit::ControlledComponent
+    unit::Component
 )::NamedTuple{}
     input_sign = unit.uac == interface.target.uac ? -1 : +1
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
@@ -375,7 +379,7 @@ the end of it. If it is not zero, either the simulation failed to correctly calc
 energy balance of the energy system or the simulated network was not able to ensure the
 balance on the current time step. In either case, something went wrong.
 """
-function balance(unit::ControlledComponent)::Float64
+function balance(unit::Component)::Float64
     balance = 0.0
 
     for inface in values(unit.input_interfaces)
@@ -401,7 +405,7 @@ Reset the given component back to zero.
 For most components this only resets the balances on the system interfaces but some
 components might require more complex reset handling.
 """
-function reset(unit::ControlledComponent)
+function reset(unit::Component)
     for inface in values(unit.input_interfaces)
         if inface !== nothing
             reset!(inface)
@@ -420,12 +424,12 @@ end
 Perform the control calculations for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The component for which control is handled
+- `unit::Component`: The component for which control is handled
 - `components::Grouping`: A reference dict to all components in the project
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function control(
-    unit::ControlledComponent,
+    unit::Component,
     components::Grouping,
     parameters::Dict{String,Any}
 )
@@ -438,11 +442,11 @@ end
 Calculate potential energy processing for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The component for which potentials are calculated
+- `unit::Component`: The component for which potentials are calculated
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function potential(
-    unit::ControlledComponent,
+    unit::Component,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -454,11 +458,11 @@ end
 Perform the processing calculations for the given component.
 
 # Arguments
-- `unit::ControlledComponent`: The component that is processed
+- `unit::Component`: The component that is processed
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function process(
-    unit::ControlledComponent,
+    unit::Component,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -472,11 +476,11 @@ Load excess energy into storage components.
 For non-storage components this function does nothing.
 
 # Arguments
-- `unit::ControlledComponent`: The storage loading excess energy
+- `unit::Component`: The storage loading excess energy
 - `parameters::Dict{String, Any}`: Project-wide parameters
 """
 function load(
-    unit::ControlledComponent,
+    unit::Component,
     parameters::Dict{String,Any}
 )
     # default implementation is to do nothing
@@ -489,7 +493,7 @@ Distribute the energy inputs and outputs of a bus.
 
 For non-bus components this function does nothing.
 """
-function distribute!(unit::ControlledComponent)
+function distribute!(unit::Component)
     # default implementation is to do nothing
 end
 
@@ -585,11 +589,11 @@ This function is used to construct the network of components from a graph input 
 determines which components provide energy to which other components.
 
 # Arguments
-- `unit::ControlledComponent`: The unit providing energy
+- `unit::Component`: The unit providing energy
 - `components::Grouping`: A set of components receiving energy. As components might have multiple
     outputs, this is used to set them all at once.
 """
-function link_output_with(unit::ControlledComponent, components::Grouping)
+function link_output_with(unit::Component, components::Grouping)
     if isa(unit, Bus)
         for component in each(components)
             if isa(component, Bus)

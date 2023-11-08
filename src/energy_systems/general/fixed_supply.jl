@@ -8,7 +8,7 @@ Note that "fixed" in this context means that the amount of energy the unit proce
 fixed within a timestep, but can vary over multiple timesteps. No calculation other than
 scaling of profile values is performed in each timestep.
 """
-mutable struct FixedSupply <: ControlledComponent
+mutable struct FixedSupply <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

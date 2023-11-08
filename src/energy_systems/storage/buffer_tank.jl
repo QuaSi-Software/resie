@@ -4,7 +4,7 @@ Implementation of a buffer tank holding hot water for heating or DHW purposes.
 This is a simplified model, which mostly deals with amounts of energy and considers
 temperatures only for the available temperature as the tank is depleted.
 """
-mutable struct BufferTank <: ControlledComponent
+mutable struct BufferTank <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

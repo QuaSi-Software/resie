@@ -10,7 +10,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct HeatPump <: ControlledComponent
+mutable struct HeatPump <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
