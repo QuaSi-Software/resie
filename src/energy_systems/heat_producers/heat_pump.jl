@@ -218,7 +218,7 @@ function calculate_energies(
     potential_storage_heat_out = sum(potentials[6]) # no differenciation of heat output layers for now
 
     temperatures_in = temperatures[1]
-    temperatures_out = maximum(temperatures[2])         # no differenciation of heat output layers for now, maximum temperature is assumed
+    temperatures_out = maximum(temperatures[2])     # no differenciation of heat output layers for now, maximum temperature is assumed
 
     n_heat_in = length(potential_energy_heat_in)    # number of heat layers in input
 
@@ -237,53 +237,74 @@ function calculate_energies(
         end
     end
 
-    # maximum possible in and outputs of heat pump, not regarding any external limits!
-    max_produce_heat = watt_to_wh(unit.power)
-    max_consume_heat = max_produce_heat .* (1.0 .- 1.0 ./ cop)
-    max_consume_el = max_produce_heat .- max_consume_heat
+    # extermal limits in possible in- and outputs of heat pump, not regarding the design power
+    # Note: el_in and heat_out are scalars while heat_in is a vector representing the different sources
+    el_in_potential = potential_energy_el + (unit.controller.parameter["unload_storages"] ? potential_storage_el : 0)
+    heat_in_potential = potential_energy_heat_in + (unit.controller.parameter["unload_storages"] ? potential_storage_heat_in : 0)
+    heat_out_potential = -(potential_energy_heat_out + (unit.controller.parameter["load_storages"] ? potential_storage_heat_out : 0))
+    
+    # limit heat_out by design power of heat pump and extermal usage_factor from profile
+    heat_out_potential = min(heat_out_potential, usage_fraction_operation_profile * watt_to_wh(unit.power) )
 
-    # all three standard operating strategies behave the same, but it is better to be
-    # explicit about the behaviour rather than grouping all together
-    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
+    # calculate heat_out and el_in for given heat_in_potential vector while respecting the limits by heat_in_potential 
+    heat_out_max = cop ./ (cop .- 1) .* heat_in_potential
 
-    elseif unit.controller.strategy == "storage_driven"
-        return (false, nothing, nothing, nothing)
+    # check for limits by heat_out_potential 
+    for i in 1:n_heat_in
+        if heat_out_potential >= heat_out_max[i]
+            heat_out_potential -= heat_out_max[i]
+        else
+            heat_out_max[i] = heat_out_potential
+            heat_out_potential = 0.0
+        end
+    end
+    # # faster but harder to read
+    # for i in 1:n_heat_in
+    #     available_heat_out = min(heat_out_potential, heat_out_max[i])
+    #     heat_out_potential -= available_heat_out
+    #     heat_out_max[i] = available_heat_out
+    # end
 
-    elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
+    # calculate el_in_max
+    heat_in_max = heat_out_max .* (cop .- 1) ./ cop
+    el_in_max = heat_out_max .- heat_in_max
 
-    elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) ./ max_produce_heat)
-        usage_fraction_heat_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) ./ max_consume_heat)
-        usage_fraction_el = +((unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) ./ max_consume_el)
+    # check for limits by el_in_potential
+    for i in 1:n_heat_in
+        if el_in_potential >= el_in_max[i]
+            el_in_potential -= el_in_max[i]
+        else
+            el_in_max[i] = el_in_potential
+            el_in_potential = 0.0
+        end
     end
 
-    # limit actual usage by limits of inputs, outputs and profile
-    usage_fraction = min(
-        1.0,
-        sum(usage_fraction_heat_out),
-        sum(usage_fraction_heat_in),
-        sum(usage_fraction_el),
-        sum(usage_fraction_operation_profile)
-    )
+    # recalculate energies to match all limits
+    heat_out_max = el_in_max .* cop
+    heat_in_max = heat_out_max .- el_in_max
 
-    # calculate average cop ToDo
-    unit.cop = cop
+    # calculate sum_abs_change
+    heat_out = sum(heat_out_max)
+    heat_in = sum(heat_in_max)
+    el_in = sum(el_in_max)
 
+    # calculate overall cop
+    unit.cop = heat_out / (heat_out-heat_in)
+
+    # calculate overall input temperature
+    input_temperature = sum(heat_in_max .* temperatures_in) / heat_in
+
+    # calculate usage fraction related to he heat output and check for limits
+    usage_fraction = heat_out / watt_to_wh(unit.power)
     if usage_fraction < unit.min_power_fraction
         return (false, nothing, nothing, nothing)
     end
 
     return (
         true,
-        max_consume_el * usage_fraction,
-        max_consume_heat * usage_fraction,
-        max_produce_heat * usage_fraction
+        el_in,
+        heat_in,
+        heat_out
     )
 end
 
@@ -430,7 +451,7 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
     if energies[1]
         sub!(unit.input_interfaces[unit.m_el_in], energies[2])
         sub!(unit.input_interfaces[unit.m_heat_in], energies[3])
-        add!(unit.output_interfaces[unit.m_heat_out], energies[4], out_temp)
+        add!(unit.output_interfaces[unit.m_heat_out], energies[4], out_temp[1])
     end
 end
 
