@@ -68,6 +68,35 @@ function load_components(config::Dict{String,Any})::Grouping
     return components
 end
 
+
+"""
+reorder_interfaces_of_busses(components)
+
+Reorder the input and output interfaces of busses according to their input and output priorities given in the connectivity matrix
+"""
+function reorder_interfaces_of_busses(components::Grouping)::Grouping
+    for unit in each(components)
+        if unit.sys_function == EnergySystems.sf_bus
+            # get correct order according to connectivity matrix
+            output_order = unit.connectivity.output_order
+            input_order = unit.connectivity.input_order
+
+            # Create a dictionary to map 'uac' to its correct position
+            output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
+            input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
+
+            # Get the permutation indices that would sort the 'source'/'target' field by 'uac' order
+            output_perm_indices = sortperm([output_order_dict[unit.output_interfaces[i].target.uac] for i in 1:length(unit.output_interfaces)])
+            input_perm_indices = sortperm([input_order_dict[unit.input_interfaces[i].source.uac] for i in 1:length(unit.input_interfaces)])
+
+            # Reorder the input and output interfaces using the permutation indices
+            unit.output_interfaces = unit.output_interfaces[output_perm_indices]
+            unit.input_interfaces = unit.input_interfaces[input_perm_indices]
+        end
+    end
+    return components
+end
+
 """
     categorize_by_function(components)
 

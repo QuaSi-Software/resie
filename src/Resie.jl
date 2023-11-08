@@ -38,6 +38,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         step_order = calculate_order_of_operations(components)
     end
 
+    components = reorder_interfaces_of_busses(components)
+
     time_step = 900
     if "time_step_seconds" in keys(project_config["simulation_parameters"])
         time_step = UInt(project_config["simulation_parameters"]["time_step_seconds"])
