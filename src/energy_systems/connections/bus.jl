@@ -233,34 +233,14 @@ function balance_on(
         end
     end
 
-    # helper functions to get corresponding input/output index in connectivity matrix from index of output interface
-    # ToDo: Maybe avoid this function and make shure that the order of output_interfaces in unit is the 
-    #       same as specified in the connectivity matrix at the beginning of the simulation?
-    function get_connectivity_output_index(unit, output_interface_index)::Int
-        output_interface_uac = unit.output_interfaces[output_interface_index].target.uac
-        for  (idx,connectivity_output_uac) in pairs(unit.connectivity.output_order)
-            if connectivity_output_uac == output_interface_uac
-                return idx
-            end
-        end
-    end
-
-    function get_connectivity_input_index(unit, input_interface_index)::Int
-        input_interface_uac = unit.input_interfaces[input_interface_index].source.uac
-        for  (idx,connectivity_input_uac) in pairs(unit.connectivity.input_order)
-            if connectivity_input_uac == input_interface_uac
-                return idx
-            end
-        end
-    end
     
     # iterate through outfaces to get storage loading and energy output potential, only if caller is input
     if caller_is_input == true
-        for (idx, outface) in pairs(unit.output_interfaces) # ToDo: adjust order so it matches the priority of the outputs of the bus
+        for (idx, outface) in pairs(unit.output_interfaces)
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
-                unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
+                unit.connectivity.storage_loading[input_index][idx] 
                 )
                 if isa(outface.target, Bus)
                     exchange = balance_on(outface, outface.target)
@@ -295,7 +275,7 @@ function balance_on(
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
-                unit.connectivity.storage_loading[get_connectivity_input_index(unit, idx)][output_index]
+                unit.connectivity.storage_loading[idx][output_index]
                 )
                 if isa(inface.source, Bus)
                     exchange = balance_on(inface, inface.source)
