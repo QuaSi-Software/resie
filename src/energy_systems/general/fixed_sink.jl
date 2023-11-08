@@ -1,12 +1,14 @@
 """
-Implementation of a component that models the demand consumers in a building require.
+Implementation of a component modeling a generic fixed sink of a chosen medium.
 
-As the simulation does not encompass demand calculations, this is usually taken from other
-tools that calculate the demand before a simulation of the components is done. These
-profiles usually are normalized to some degree, therefore Demand instances require a scaling
-factor to turn the relative values to absolute values of required energy.
+This is particularly useful for testing, but can also be used to model any fixed
+component or other equipment unit that consumes energy of a given medium. This amount of
+energy ought to be provided by other components in the energy system.
+Note that "fixed" in this context means that the amount of energy the unit consumes is
+fixed within a timestep, but can vary over multiple timesteps. No calculation other than
+scaling of profile values is performed in each timestep.
 """
-mutable struct Demand <: ControlledComponent
+mutable struct FixedSink <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -25,7 +27,7 @@ mutable struct Demand <: ControlledComponent
     static_load::Union{Nothing,Float64}
     static_temperature::Temperature
 
-    function Demand(uac::String, config::Dict{String,Any})
+    function FixedSink(uac::String, config::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
                          Profile(config["energy_profile_file_path"]) :
                          nothing
@@ -59,11 +61,11 @@ mutable struct Demand <: ControlledComponent
     end
 end
 
-function output_values(unit::Demand)::Vector{String}
+function output_values(unit::FixedSink)::Vector{String}
     return ["IN", "Load", "Temperature"]
 end
 
-function output_value(unit::Demand, key::OutputKey)::Float64
+function output_value(unit::FixedSink, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Load"
@@ -75,7 +77,7 @@ function output_value(unit::Demand, key::OutputKey)::Float64
 end
 
 function control(
-    unit::Demand,
+    unit::FixedSink,
     components::Grouping,
     parameters::Dict{String,Any}
 )
@@ -84,25 +86,42 @@ function control(
     if unit.static_load !== nothing
         unit.load = unit.static_load
     elseif unit.energy_profile !== nothing
-        unit.load = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+        unit.load = unit.scaling_factor * Profiles.work_at_time(
+            unit.energy_profile, parameters["time"]
+        )
     else
         unit.load = 0.0
     end
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
 
     if unit.static_temperature !== nothing
         unit.temperature = unit.static_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
+        unit.temperature = Profiles.value_at_time(
+            unit.temperature_profile, parameters["time"]
+        )
     end
-    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.input_interfaces[unit.medium].temperature)
-
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
-
+    unit.input_interfaces[unit.medium].temperature = highest_temperature(
+        unit.temperature,
+        unit.input_interfaces[unit.medium].temperature
+    )
 end
 
-function process(unit::Demand, parameters::Dict{String,Any})
+function process(unit::FixedSink, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     sub!(inface, unit.load, unit.temperature)
 end
 
-export Demand
+"""
+A component that models the demand consumers in a building require.
+
+As the simulation does not encompass demand calculations, this is usually taken from other
+tools that calculate the demand before an energy system simulation is performed. These
+profiles usually are normalized to some degree, therefore Demand instances require a scaling
+factor to turn the relative values to absolute values of required energy.
+
+This is an alias to the generic implementation of a fixed sink.
+"""
+const Demand = FixedSink
+
+export FixedSink, Demand

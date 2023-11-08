@@ -11,7 +11,7 @@ The only currently implemented operation strategy involves checking the load of 
 buffer tank and en-/disabling the CHPP when a threshold is reached, in addition to an
 overfill shutoff condition.
 """
-mutable struct CHPP <: ControlledComponent
+mutable struct CHPP <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

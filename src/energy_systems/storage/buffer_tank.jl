@@ -4,7 +4,7 @@ Implementation of a buffer tank holding hot water for heating or DHW purposes.
 This is a simplified model, which mostly deals with amounts of energy and considers
 temperatures only for the available temperature as the tank is depleted.
 """
-mutable struct BufferTank <: ControlledComponent
+mutable struct BufferTank <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -148,7 +148,7 @@ function load(unit::BufferTank, parameters::Dict{String,Any})
 end
 
 function output_values(unit::BufferTank)::Vector{String}
-    return ["IN", "OUT", "Load", "Capacity"]
+    return ["IN", "OUT", "Load", "Load%", "Capacity"]
 end
 
 function output_value(unit::BufferTank, key::OutputKey)::Float64
@@ -158,6 +158,8 @@ function output_value(unit::BufferTank, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Load"
         return unit.load
+    elseif key.value_key == "Load%"
+        return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
     end

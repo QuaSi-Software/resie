@@ -10,7 +10,7 @@ electrolyser can consume.
 At the moment there is no operation strategy is implemented and the processing of the
 electrolyser is controlled by the demand it is linked to requires.
 """
-mutable struct Electrolyser <: ControlledComponent
+mutable struct Electrolyser <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
