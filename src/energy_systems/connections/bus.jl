@@ -214,22 +214,21 @@ function balance_on(
 
     # find the index of the input/output on the bus. if the method was called on an output,
     # the input index will remain as nothing and vice versa.
-    # Attention: unit.connectivity.input_order is mandatory to have a list of all inputs! 
-    #            Maybe change to unit.output_interfaces in future versions or set any order in 
-    #            connectivity.input_order if nothing is given in the input file?
-    for (idx, input_uac) in pairs(unit.connectivity.input_order)
-        if input_uac == interface.source.uac
+    for (idx, input_interface) in pairs(unit.input_interfaces)
+        if input_interface.source.uac == interface.source.uac
             input_index = idx
             caller_is_input = true
             break
         end
     end
 
-    for (idx, output_uac) in pairs(unit.connectivity.output_order)
-        if output_uac == interface.target.uac
-            output_index = idx
-            caller_is_input = false
-            break
+    if caller_is_input === nothing   # only check for outputs if no input was found
+        for (idx, output_interface) in pairs(unit.output_interfaces)
+            if output_interface.target.uac == interface.target.uac
+                output_index = idx
+                caller_is_input = false
+                break
+            end
         end
     end
 
