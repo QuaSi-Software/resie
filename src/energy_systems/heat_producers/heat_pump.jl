@@ -107,23 +107,6 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
 end
 
 
-# helper functions to collect values from array of touples or single touples
-function collect_all_energy_potentials_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.energy_potential for t in energy_tuples]
-end
-
-function collect_all_storage_potentials_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.storage_potential for t in energy_tuples]
-end
-
-function collect_all_temperatures_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.temperature for t in energy_tuples]
-end
-
-
 function check_el_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
@@ -450,8 +433,8 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
 
     if energies[1]
         sub!(unit.input_interfaces[unit.m_el_in], energies[2])
-        sub!(unit.input_interfaces[unit.m_heat_in], energies[3])
-        add!(unit.output_interfaces[unit.m_heat_out], energies[4], out_temp[1])
+        sub!(unit.input_interfaces[unit.m_heat_in], energies[3]) # revise! Should here the temperature (vector) be returned? ToDo 
+        add!(unit.output_interfaces[unit.m_heat_out], energies[4], maximum(out_temp))  # revise! This is not valid for cooling? ToDo
     end
 end
 

@@ -232,7 +232,6 @@ function balance_on(
         end
     end
 
-    
     # iterate through outfaces to get storage loading and energy output potential, only if caller is input
     if caller_is_input == true
         for (idx, outface) in pairs(unit.output_interfaces)
@@ -270,7 +269,7 @@ function balance_on(
         end
     elseif caller_is_input == false
         # iterate through infaces to get storage loading and energy input potential, only if caller is output
-        for (idx, inface) in pairs(unit.input_interfaces)  # ToDo: adjust order so it matches the priority of the inputs of the bus
+        for (idx, inface) in pairs(unit.input_interfaces)  
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
