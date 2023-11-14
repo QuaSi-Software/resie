@@ -1,0 +1,160 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+			"TST_HP_01": [
+                "m_h_w_lt1 IN",
+                "m_h_w_ht1 OUT",
+                "m_e_ac_230v IN",
+                "COP"
+            ],
+            "TST_DEM_01": ["Temperature"],
+            "TST_SRC_01": ["Temperature", "Max_Energy"]
+        },
+        "output_plot": {
+            "1": {
+                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_HP_01": ["m_e_ac_230v IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_HP_01": ["COP"]},
+                "axis": "left",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "5": {
+                "key": {"TST_DEM_01": ["Temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "6": {
+                "key": {"TST_SRC_01": ["Temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "7": {
+                "key": {"TST_SRC_01": ["Max_Energy"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 86400,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "static_temperature": 85,
+            "scale": 1500
+        },
+        "TST_SRC_01": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "static_temperature": 25,
+            "scale": 1000
+        },
+        "TST_SRC_02": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "static_temperature": 60,
+            "scale": 2000
+        },
+        "TST_BFT_TH_01": {
+            "type": "BufferTank",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "capacity": 150000,
+            "load": 70000,
+            "high_temperature": 65.0,
+            "low_temperature": 10.0,
+            "use_adaptive_temperature": false
+        },
+        "TST_BUS_TH_01": {
+            "type": "Bus",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HP_01",
+                "TST_BFT_TH_01"
+            ],
+            "connection_matrix": {
+                "input_order": [
+                    "TST_SRC_02",
+                    "TST_SRC_01",
+                    "TST_BFT_TH_01"
+                ],
+                "output_order": [
+                    "TST_HP_01",
+                    "TST_BFT_TH_01"
+                ],
+                "storage_loading": [
+                    [1, 1],
+                    [1, 1],
+                    [1, 0]
+                ]
+            }
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "control_refs": [
+                "TST_DEM_01"
+            ],
+            "output_refs": [
+                "TST_DEM_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power": 9000,
+            "min_power_fraction": 0.0
+        }
+    }
+}
