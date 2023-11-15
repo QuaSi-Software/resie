@@ -574,7 +574,7 @@ include("heat_sources/geothermal_probes.jl")
 include("heat_sources/geothermal_heat_collectors.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
-include("heat_producers/gas_boiler.jl")
+include("heat_producers/fuel_boiler.jl")
 include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 

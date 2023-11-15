@@ -22,7 +22,8 @@ function test_ooo_storage_loading_switch()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"
@@ -33,7 +34,8 @@ function test_ooo_storage_loading_switch()
             "power" => 40000
         ),
         "TST_GBO_02" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"

@@ -338,7 +338,8 @@
             "min_power_fraction": 1.0
         },
         "TST_GBO_01": {
-            "type": "GasBoiler",
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
             "control_refs": ["TST_BFT_TH_01"],
             "output_refs": [
                 "TST_BUS_TH_01"
