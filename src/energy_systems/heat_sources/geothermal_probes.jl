@@ -5,7 +5,7 @@ This implementations acts as storage as is can produce and load energy.
 ## ATTENTION: Geothermal probes are currently work in progress and not completed!!
 ## ATTENTION: The physical implementation is party nonsense!!
 """
-mutable struct GeothermalProbes <: ControlledComponent
+mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction

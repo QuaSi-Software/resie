@@ -1,11 +1,10 @@
 """
-Implementation of a battery component holding electric charge.
+Implementation of a component modeling a generic storage of a chosen medium.
 
-For the moment the implementation remains simple with only one state (its charge) and one
-parameters (its capacity). However the default operation strategy is more complex and
-toggles the processing of the battery dependant on available PV power and its own charge.
+This is particularly useful for testing, but can also be used to model any storage or other
+equipment unit that stores energy in a given medium.
 """
-Base.@kwdef mutable struct Battery <: Component
+mutable struct Storage <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -18,8 +17,8 @@ Base.@kwdef mutable struct Battery <: Component
     capacity::Float64
     load::Float64
 
-    function Battery(uac::String, config::Dict{String,Any})
-        medium = Symbol(default(config, "medium", "m_e_ac_230v"))
+    function Storage(uac::String, config::Dict{String,Any})
+        medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
@@ -36,47 +35,43 @@ Base.@kwdef mutable struct Battery <: Component
             ),
             medium,
             config["capacity"], # capacity
-            config["load"] # load
+            config["load"], # load
         )
     end
 end
 
-function balance_on(
-    interface::SystemInterface,
-    unit::Battery
-)::NamedTuple{}
-
-    caller_is_input = unit.uac == interface.target.uac ? true : false
-    # ==true if interface is input of unit (caller puts energy in unit); 
-    # ==false if interface is output of unit (caller gets energy from unit)
-
-    return (
-            balance = interface.balance,
-            energy = (  uac=unit.uac,
-                        energy_potential=0.0,
-                        storage_potential=caller_is_input ? -(unit.capacity-unit.load) : unit.load,
-                        temperature=interface.temperature,
-                        pressure=nothing,
-                        voltage=nothing),
-            )
+function control(
+    unit::Storage,
+    components::Grouping,
+    parameters::Dict{String,Any}
+)
+    move_state(unit, components, parameters)
 end
 
-function process(unit::Battery, parameters::Dict{String,Any})
-    if unit.controller.state_machine.state != 2
-        return
-    end
+function balance_on(
+    interface::SystemInterface,
+    unit::Storage
+)::NamedTuple{}
+    # true: interface is input of unit (caller puts energy in unit)
+    # false: interface is output of unit (caller gets energy from unit)
+    caller_is_input = unit.uac == interface.target.uac ? true : false
+    return (
+        balance=interface.balance,
+        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        energy_potential=0.0,
+        temperature=interface.temperature
+    )
+end
 
+function process(unit::Storage, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
 
-    if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
-        else
-            energy_demand = exchange.balance
-        end
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demand = exchange.balance + exchange.storage_potential
     else
         energy_demand = exchange.balance
     end
@@ -94,17 +89,13 @@ function process(unit::Battery, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::Battery, parameters::Dict{String,Any})
-    if unit.controller.state_machine.state != 1
-        return
-    end
-
+function load(unit::Storage, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     energy_available = exchange.balance
 
     if energy_available <= 0.0
-        return # load is only concerned with receiving energy from the target
+        return # load is only concerned with receiving energy from the source
     end
 
     diff = unit.capacity - unit.load
@@ -117,11 +108,11 @@ function load(unit::Battery, parameters::Dict{String,Any})
     end
 end
 
-function output_values(unit::Battery)::Vector{String}
+function output_values(unit::Storage)::Vector{String}
     return ["IN", "OUT", "Load", "Load%", "Capacity"]
 end
 
-function output_value(unit::Battery, key::OutputKey)::Float64
+function output_value(unit::Storage, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
@@ -136,4 +127,4 @@ function output_value(unit::Battery, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export Battery
+export Storage

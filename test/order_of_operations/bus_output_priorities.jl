@@ -15,7 +15,8 @@ function test_ooo_bus_output_priorities()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BUS_01"],
             "output_refs" => ["TST_BUS_01"],
             "strategy" => Dict{String,Any}(

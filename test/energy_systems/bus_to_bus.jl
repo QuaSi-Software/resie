@@ -195,7 +195,8 @@ function test_demand_over_busses_supply_is_transformer()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BUS_01"],
             "output_refs" => ["TST_BUS_01"],
             "strategy" => Dict{String,Any}(
@@ -445,7 +446,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_3) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test EnergySystems.balance(bus_1) ≈ 0.0
-    @test boiler.input_interfaces[boiler.m_gas_in].balance ≈ -2000.0
+    @test boiler.input_interfaces[boiler.m_fuel_in].balance ≈ -2000.0
 
     EnergySystems.process(grid, simulation_parameters)
 
@@ -456,7 +457,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_3) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test EnergySystems.balance(bus_1) ≈ 0.0
-    @test grid.output_interfaces[boiler.m_gas_in].balance ≈ 0.0
+    @test grid.output_interfaces[boiler.m_fuel_in].balance ≈ 0.0
 
     EnergySystems.distribute!(bus_2)
     EnergySystems.distribute!(bus_3)
@@ -528,7 +529,7 @@ function test_demand_over_busses_supply_is_transformer()
     @test EnergySystems.balance(bus_3) ≈ -500.0
     @test EnergySystems.balance(bus_2) ≈ -500.0
     @test EnergySystems.balance(bus_1) ≈ -500.0
-    @test boiler.input_interfaces[boiler.m_gas_in].balance ≈ -1500.0
+    @test boiler.input_interfaces[boiler.m_fuel_in].balance ≈ -1500.0
 
     EnergySystems.process(grid, simulation_parameters)
 

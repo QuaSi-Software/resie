@@ -123,7 +123,8 @@
             "is_source": true
         },
         "ESS_GBO_01": {
-            "type": "GasBoiler",
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
             "control_refs": ["ESS_BUS_TH_01"],
             "output_refs": [
                 "ESS_BUS_TH_01"

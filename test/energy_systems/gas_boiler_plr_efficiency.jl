@@ -24,7 +24,8 @@ function test_gas_boiler_demand_driven_plr()
             "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
@@ -66,7 +67,7 @@ function test_gas_boiler_demand_driven_plr()
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
-    @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -1000 / expected_efficiency
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -1000 / expected_efficiency
     @test demand.input_interfaces[demand.medium].balance ≈ 0
 
     EnergySystems.process(grid, simulation_parameters)
@@ -90,7 +91,7 @@ function test_gas_boiler_demand_driven_plr()
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
-    @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ -500 / expected_efficiency
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -500 / expected_efficiency
     @test demand.input_interfaces[demand.medium].balance ≈ 0
 
     EnergySystems.process(grid, simulation_parameters)
@@ -118,7 +119,8 @@ function test_gas_boiler_supply_driven_plr()
             "scale" => 1.0,
         ),
         "TST_GB_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
@@ -164,7 +166,7 @@ function test_gas_boiler_supply_driven_plr()
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 1000
-    @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ 0
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ 0
     @test demand.input_interfaces[demand.medium].balance ≈ 1000
 
     EnergySystems.process(demand, simulation_parameters)
@@ -192,7 +194,7 @@ function test_gas_boiler_supply_driven_plr()
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 500
-    @test gasboiler.input_interfaces[gasboiler.m_gas_in].balance ≈ 0
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ 0
     @test demand.input_interfaces[demand.medium].balance ≈ 500
 
     EnergySystems.process(demand, simulation_parameters)

@@ -5,7 +5,7 @@ This implementations acts as storage as is can produce and load energy.
 ## ATTENTION: Geothermal heat collector is currently work in progress and not completed!!
 ## ATTENTION: The physical implementation is party nonsense!!
 """
-mutable struct GeothermalHeatCollector <: ControlledComponent
+mutable struct GeothermalHeatCollector <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
