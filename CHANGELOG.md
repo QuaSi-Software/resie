@@ -14,6 +14,10 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+## Version 0.6.4
+* Generalise implementation of gas boiler to that of a fuel boiler
+  * Although this implicates the use of a chemical fuel to generate heat, the current implementation works with any kind of input including electricity
+
 ## Version 0.6.3
 * Remove abstract subtype ControlledComponent and use abstract top-level type Component in its stead
 * Add a generic implementation for storage components
