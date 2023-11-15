@@ -174,8 +174,8 @@ function balance(unit::Bus)::Float64
 end
 
 
-# helper function to create a balance touple with values while filling optional values with nothing
-function fill_interface_touple(uac, energy_potential, storage_potential; temperature=nothing, pressure=nothing, voltage=nothing)
+# helper function to create a balance tuple with values while filling optional values with nothing
+function fill_interface_tuple(uac, energy_potential, storage_potential; temperature=nothing, pressure=nothing, voltage=nothing)
     return (uac=uac,
             energy_potential=energy_potential,
             storage_potential=storage_potential,
@@ -184,8 +184,8 @@ function fill_interface_touple(uac, energy_potential, storage_potential; tempera
             voltage=voltage)
 end
 
-# helper function to create the structure of an array holding balance touples. Returnes only the empty structure.
-function create_interface_touple()
+# helper function to create the structure of an array holding balance tuples. Returnes only the empty structure.
+function create_interface_tuple()
     return NamedTuple{( :uac,
                         :energy_potential,
                         :storage_potential,
@@ -210,7 +210,7 @@ function balance_on(
     output_index = nothing
     caller_is_input = nothing # == true if interface is input of unit (caller puts energy in unit); 
                               # == false if interface is output of unit (caller gets energy from unit)
-    energy_touple_result = create_interface_touple()
+    energy_tuple_result = create_interface_tuple()
 
     # find the index of the input/output on the bus. if the method was called on an output,
     # the input index will remain as nothing and vice versa.
@@ -249,7 +249,7 @@ function balance_on(
                         end
                     end
                     # append exchange to current output
-                    push!(energy_touple_result, exchange)
+                    push!(energy_tuple_result, exchange)
                 else
                     temperature = outface.temperature
                     energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : -outface.max_energy
@@ -263,7 +263,7 @@ function balance_on(
                         storage_potential = 0.0
                     end
                     # append exchange to current output
-                    push!(energy_touple_result, fill_interface_touple(outface.target.uac, energy_potential, storage_potential, temperature=temperature))
+                    push!(energy_tuple_result, fill_interface_tuple(outface.target.uac, energy_potential, storage_potential, temperature=temperature))
                 end
             end
         end
@@ -284,7 +284,7 @@ function balance_on(
                         end
                     end
                     # append exchange to current output
-                    push!(energy_touple_result, exchange)
+                    push!(energy_tuple_result, exchange)
                 else
                     temperature = inface.temperature
                     energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : inface.max_energy
@@ -298,7 +298,7 @@ function balance_on(
                         storage_potential = 0.0
                     end
                     # append exchange to current output
-                    push!(energy_touple_result, fill_interface_touple(inface.source.uac, energy_potential, storage_potential, temperature=temperature))
+                    push!(energy_tuple_result, fill_interface_tuple(inface.source.uac, energy_potential, storage_potential, temperature=temperature))
                 end
             end
         end
@@ -314,7 +314,7 @@ function balance_on(
 
     return (
             balance = balance(unit),
-            energy = energy_touple_result
+            energy = energy_tuple_result
             )
 end
 

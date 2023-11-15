@@ -96,7 +96,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     output_all_targetnames = []
     for each_component in components
         for each_outputinterface in each_component[2].output_interfaces
-            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
+            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
                 if isdefined(each_outputinterface[2], :target)
                     # count interface
                     nr_of_interfaces += 1
@@ -177,7 +177,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         n = 1
         for each_component in components
             for each_outputinterface in each_component[2].output_interfaces
-                if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
+                if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
                     if isdefined(each_outputinterface[2], :target)
                         output_all_values[steps, n] = calculate_energy_flow(each_outputinterface[2])  
                         n += 1

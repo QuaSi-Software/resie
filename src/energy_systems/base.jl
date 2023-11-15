@@ -330,10 +330,10 @@ end
 """
     collect_all_energy_potentials_of_interface_balance(input::Any)
 
-Input is exchange.energy, an array of touples or a single touple as
+Input is exchange.energy, an array of tuples or a single tuple as
 return value of the balance_on().
 
-Returns a vector containing all energy_potentials listed in the touples.
+Returns a vector containing all energy_potentials listed in the tuples.
 """
 function collect_all_energy_potentials_of_interface_balance(input::Any)
     energy_tuples = isa(input, NamedTuple) ? [input] : input
@@ -344,10 +344,10 @@ end
 """
     collect_all_storage_potentials_of_interface_balance(input::Any)
 
-Input is exchange.energy, an array of touples or a single touple as
+Input is exchange.energy, an array of tuples or a single tuple as
 return value of the balance_on().
 
-Returns a vector containing all storage_potentials listed in the touples.
+Returns a vector containing all storage_potentials listed in the tuples.
 """
 function collect_all_storage_potentials_of_interface_balance(input::Any)
     energy_tuples = isa(input, NamedTuple) ? [input] : input
@@ -358,10 +358,10 @@ end
 """
 collect_all_temperatures_of_interface_balance(input::Any)
 
-Input is exchange.energy, an array of touples or a single touple as
+Input is exchange.energy, an array of tuples or a single tuple as
 return value of the balance_on().
 
-Returns a vector containing all temperatures listed in the touples.
+Returns a vector containing all temperatures listed in the tuples.
 """
 function collect_all_temperatures_of_interface_balance(input::Any)
     energy_tuples = isa(input, NamedTuple) ? [input] : input
