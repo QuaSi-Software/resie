@@ -65,6 +65,10 @@ function load_components(config::Dict{String,Any})::Grouping
         end
     end
 
+    # busses are likely linked out-of-order in the config, so we need to fix the order of
+    # interfaces after all components have been loaded
+    components = reorder_interfaces_of_busses(components)
+
     return components
 end
 
