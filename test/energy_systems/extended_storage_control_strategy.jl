@@ -16,7 +16,8 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
@@ -168,7 +169,8 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
@@ -319,7 +321,8 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
