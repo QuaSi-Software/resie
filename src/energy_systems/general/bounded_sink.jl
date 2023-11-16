@@ -49,7 +49,7 @@ mutable struct BoundedSink <: Component
             ),
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # max_energy
             nothing, # temperature
             default(config, "static_power", nothing), # static_power

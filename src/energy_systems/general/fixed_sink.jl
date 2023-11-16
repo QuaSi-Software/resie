@@ -52,7 +52,7 @@ mutable struct FixedSink <: Component
             ),
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # load
             nothing, # temperature
             default(config, "static_load", nothing), # static_load
