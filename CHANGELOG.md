@@ -16,6 +16,7 @@ breaking changes may slip beneath notice.
 
 ## Version 0.7.0
 * Change the inputs and outputs of busses such that the order matches the input and output priorities
+* Fix generic storage implementation not being available due to the module not being included
 
 ## Version 0.6.4
 * Generalise implementation of gas boiler to that of a fuel boiler
