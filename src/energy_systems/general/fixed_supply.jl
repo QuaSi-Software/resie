@@ -97,7 +97,7 @@ function control(
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
     end
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.output_interfaces[unit.medium].temperature)
+    unit.output_interfaces[unit.medium].temperature = highest(unit.temperature, unit.output_interfaces[unit.medium].temperature)
 end
 
 function process(unit::FixedSupply, parameters::Dict{String,Any})

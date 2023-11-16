@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest_temperature, collect_all_energy_potentials_of_interface_balance, 
+    highest, collect_all_energy_potentials_of_interface_balance,
     collect_all_storage_potentials_of_interface_balance,
     collect_all_temperatures_of_interface_balance
 
@@ -309,14 +309,17 @@ end
 
 
 """
-    highest_temperature(temperature_1, temperature_2)::Temperature
+    highest(temperature_1, temperature_2)::Temperature
 
-Returns the highest temperature::Temperature and handles nothing-values:
+Returns the highest temperature of the two inputs and handles nothing-values:
 - If both of the inputs are floats, the maximum will be returned.
 - If one of the inputs is nothing and one a float, the float will be returned.
 - If both of the inputs are nothing, nothing will be returned.
 """
-function highest_temperature(temperature_1, temperature_2)::Temperature
+function highest(
+    temperature_1::Temperature,
+    temperature_2::Temperature
+)::Temperature
     if temperature_1 !== nothing && temperature_2 !== nothing
         return max(temperature_1, temperature_2)
     elseif temperature_1 === nothing && temperature_2 !== nothing

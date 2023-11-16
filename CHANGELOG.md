@@ -18,6 +18,7 @@ breaking changes may slip beneath notice.
 * Change the inputs and outputs of busses such that the order matches the input and output priorities
 * Fix generic storage implementation not being available due to the module not being included
 * Fix the profile scaling factor of some components being required despite profiles being optional
+* Rename helper function highest_temperature to highest and add types to inputs
 
 ## Version 0.6.4
 * Generalise implementation of gas boiler to that of a fuel boiler

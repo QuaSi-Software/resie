@@ -98,7 +98,7 @@ function control(
             unit.temperature_profile, parameters["time"]
         )
     end
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(
+    unit.output_interfaces[unit.medium].temperature = highest(
         unit.temperature,
         unit.output_interfaces[unit.medium].temperature
     )

@@ -69,8 +69,8 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
-    unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
+    unit.input_interfaces[unit.m_heat_in].temperature = highest(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
 end
 

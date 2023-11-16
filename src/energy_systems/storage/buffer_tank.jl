@@ -57,8 +57,8 @@ function control(
     move_state(unit, components, parameters)
 
     # revise! This is not correct anymore!
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
-    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
+    unit.output_interfaces[unit.medium].temperature = highest(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
+    unit.input_interfaces[unit.medium].temperature = highest(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
 
 end
 
