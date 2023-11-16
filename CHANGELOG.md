@@ -14,6 +14,9 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+## Version 0.7.0
+* Change the inputs and outputs of busses such that the order matches the input and output priorities
+
 ## Version 0.6.4
 * Generalise implementation of gas boiler to that of a fuel boiler
   * Although this implicates the use of a chemical fuel to generate heat, the current implementation works with any kind of input including electricity
