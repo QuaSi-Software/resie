@@ -1,5 +1,3 @@
-using ResumableFunctions
-
 """
 Utility struct to contain the connections, input/output priorities and other related data
 for bus components.
@@ -318,48 +316,18 @@ function balance_on(
             )
 end
 
-# """
-#     for x in bus_infaces(bus)
-
-# Iterator over the input interfaces that connect the given bus to other busses.
-# """
-@resumable function bus_infaces(unit::Bus)
-    # for every input UAC (to ensure the correct order)...
-    for input_uac in unit.connectivity.input_order
-        # ...seach corresponding input inferface by...
-        for inface in unit.input_interfaces
-            # ...making sure the input interface is of type bus...
-            if inface.source.sys_function === sf_bus
-                # ...and the source's UAC matches the one in the input_priority.
-                if inface.source.uac === input_uac
-                    @yield inface
-                    break # we found the match, so we can break out of the inner loop.
-                end
-            end
-        end
-    end
+function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
+    return [f for f in unit.input_interfaces
+        if (inclusive && f.source.sys_function == condition)
+            || (!inclusive && f.source.sys_function != condition)
+    ]
 end
 
-# """
-#     for x in bus_outfaces(bus)
-
-# Iterator over the output interfaces that connect the given bus to other busses.
-# """
-@resumable function bus_outfaces(unit::Bus)
-    # for every output UAC (to ensure the correct order)...
-    for output_uac in unit.connectivity.output_order
-        # ...seach corresponding output inferface by...
-        for outface in unit.output_interfaces
-            # ...making sure the output interface is of type bus...
-            if outface.target.sys_function === sf_bus
-                # ...and the target's UAC matches the one in the output_priority.
-                if outface.target.uac === output_uac
-                    @yield outface
-                    break # we found the match, so we can break out of the inner loop.
-                end
-            end
-        end
-    end
+function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
+    return [f for f in unit.output_interfaces
+        if (inclusive && f.target.sys_function == condition)
+            || (!inclusive && f.target.sys_function != condition)
+    ]
 end
 
 """
@@ -378,22 +346,18 @@ function distribute!(unit::Bus)
     balance = balance_direct(unit)
 
     # reset all non-bus input interfaces
-    for inface in unit.input_interfaces
-        if inface.source.sys_function !== sf_bus
-            set!(inface, 0.0, inface.temperature)
-        end
+    for inface in filter_inputs(unit, sf_bus, false)
+        set!(inface, 0.0, inface.temperature)
     end
 
     # reset all non-bus output interfaces
-    for outface in unit.output_interfaces
-        if outface.target.sys_function !== sf_bus
-            set!(outface, 0.0, outface.temperature)
-        end
+    for outface in filter_outputs(unit, sf_bus, false)
+        set!(outface, 0.0, outface.temperature)
     end
 
     # distribute to outgoing busses according to output priority
     if balance > 0.0
-        for outface in bus_outfaces(unit)
+        for outface in filter_outputs(unit, sf_bus, true)
             if balance > abs(outface.balance)
                 balance += outface.balance
                 set!(outface, 0.0, outface.temperature)
@@ -409,7 +373,7 @@ function distribute!(unit::Bus)
     # through output priorities of the input bus), this effectively writes all the
     # remaining demand into the first input according to the priority.
     if balance < 0.0
-        for inface in bus_infaces(unit)
+        for inface in filter_inputs(unit, sf_bus, true)
             add!(inface, balance)
             balance = 0.0
         end
