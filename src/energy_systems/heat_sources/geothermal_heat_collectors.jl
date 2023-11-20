@@ -2,41 +2,6 @@
 Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
 """
-
-# read in heat flux profile from measurement data (only for validation purposes)
-file = open("C:/Users/vollmer/Documents/GitHub/resie_FA_AdVo/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r")
-heat_flux_profile = Vector{Float64}()
-for line in eachline(file)
-    push!(heat_flux_profile, parse(Float64, line))
-end
-close(file)
-
-# read in discretitaion vector (only for validation purposes)
-file = open("C:/Users/vollmer/Documents/GitHub/resie_FA_AdVo/src/energy_systems/heat_sources/dy_trnsys.txt", "r")
-dy_type710 = Vector{Float64}()
-
-for line in eachline(file)
-    push!(dy_type710, parse(Float64, line))
-end
-close(file)
-
-# read in inlet temperature profile from measurement data (only for validation purposes)
-file = open("C:/Users/vollmer/Documents/GitHub/resie_FA_AdVo/src/energy_systems/heat_sources/t_in_validation.txt", "r")
-file_t_in_validation = Vector{Float64}()
-for line in eachline(file)
-    push!(file_t_in_validation, parse(Float64, line))
-end
-close(file)
-
-# read in massflow profile from measurement data (only for validation purposes)
-file = open("C:/Users/vollmer/Documents/GitHub/resie_FA_AdVo/src/energy_systems/heat_sources/m_in_validation.txt", "r")
-file_m_in_validation = Vector{Float64}()
-for line in eachline(file)
-    push!(file_m_in_validation, parse(Float64, line))
-end
-close(file)
-
-
 mutable struct GeothermalHeatCollector <: ControlledComponent
     uac::String
     controller::Controller
@@ -104,13 +69,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     specific_heat_flux_in_out::Float64
     wh_to_w_timestep::Float64
     Re::Float64
-    q_in_out_nov::Vector
     discretization_mode::Int
-    validation_mode::Int
-    t_in_validation::Vector
-    t_out_validation::Vector
-    m_in_validation::Vector
-    p_out_validation::Vector
     t_avg_rand::Float64
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
@@ -172,11 +131,11 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             zeros(31,7),            # array to define specific heat capacity on next timestep (for apparent heat capacity method)
             zeros(31,7),            # Fluid 
             zeros(31,7),            # pipe_surrounding
-            default(config, "pipe_radius_outer", 0.016),                   # pipe outer radius
-            default(config, "pipe_thickness", 0.003),                 # thickness of pipe in m
-            default(config, "pipe_laying_depth", 1.5),                      # deepth of pipe system below the ground in m
-            default(config, "pipe_length", 100),                   # pipe length of one collector in m
-            default(config, "pipe_spacing", 0.5),                   # distance between pipes of collector in m.
+            default(config, "pipe_radius_outer", 0.016),        # pipe outer radius
+            default(config, "pipe_thickness", 0.003),           # thickness of pipe in m
+            default(config, "pipe_laying_depth", 1.5),          # deepth of pipe system below the ground in m
+            default(config, "pipe_length", 100),                # pipe length of one collector in m
+            default(config, "pipe_spacing", 0.5),               # distance between pipes of collector in m.
             0,                      # global radiation on surface. to be read in by weather-profile
             5.67e-8,                # Boltzmann-Constant
             0.9,                    # Emissivity on ground surface
@@ -189,22 +148,16 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             0,                      # pipe temperature. 
             0,                      # total heat flux in or out of collector. set by ReSiE Interface.
             0.5,                    # pipe heat conductivity.               
-            default(config, "fluid_specific_heat_capacity", 3800),  # fluid_specific_heat_capacity in J/(kg K)
-            default(config, "fluid_prantl_number", 30),             # prandtl number at 30 % glycol, 0 °C 
-            default(config, "fluid_density", 1045),                 # fluid density at 30 % glycol, 0 °C
-            default(config, "fluid_kinematic_viscosity", 3.9e-6),     # fluid_kinematic_viscosity at 30 % glycol, 0 °C
-            default(config, "fluid_heat_conductivity",0.5),      # fluid_heat_conductivity at 30 % glycol, 0 °C
-            default(config, "specific_heat_flux_in_out",20),          # max. specific heat flux extractable out of soil in W/m^2. Depending on ground and climate localization. [VDI 4640-2.]
-            1,           # time step of simulation in h to calculate power (W) out of energy (Wh) (wh_to_w_timestep), depending on simulation time step.
-            0,           # Re-Number, to be calculated 
-            heat_flux_profile,    # for validation purpose
-            0,      # discretization-mode. 0: Default. 1: read in dy-vector from Type 710 for validation purpose
-            0,      # 1: Validation-Mode (Input: t_in, m_in, output: p_out, t_out), 0: Resi-Mode (input: p_out, output: t_avg)
-            file_t_in_validation,   # inlet temperature vector. only for validation purpose
-            zeros(721),     # outlet temperature vector. only for validation purpose
-            file_m_in_validation, # massflow vector. only for validation purpose
-            zeros(721), # heat extraction vector. only for validation purpose
-            16.0    # starting temperature of pipe. set for validation purpose.
+            default(config, "fluid_specific_heat_capacity", 3800),      # fluid_specific_heat_capacity in J/(kg K)
+            default(config, "fluid_prantl_number", 30),                 # prandtl number at 30 % glycol, 0 °C 
+            default(config, "fluid_density", 1045),                     # fluid density at 30 % glycol, 0 °C
+            default(config, "fluid_kinematic_viscosity", 3.9e-6),       # fluid_kinematic_viscosity at 30 % glycol, 0 °C
+            default(config, "fluid_heat_conductivity",0.5),             # fluid_heat_conductivity at 30 % glycol, 0 °C
+            default(config, "specific_heat_flux_in_out",20),            # max. specific heat flux extractable out of soil in W/m^2. Depending on ground and climate localization. [VDI 4640-2.]
+            1,          # time step of simulation in h to calculate power (W) out of energy (Wh) (wh_to_w_timestep), depending on simulation time step.
+            0,          # Re-Number, to be calculated 
+            0,          # discretization-mode. 0: Default. 1: read in dy-vector from Type 710 for validation purpose
+            16.0        # starting temperature of pipe. set for validation purpose.
             )
     end
 end
@@ -217,10 +170,10 @@ function control(
 
     unit.timestep_index += 1
 
-    # Discretization and starting Temperature-Field.
+    # Discretization and starting Temperature-Field. --> ADD PREPROCESSING!
     if unit.timestep_index == 1
         if unit.discretization_mode ==0
-        # Discretization
+        # Discretization. 
         dx_R = [unit.pipe_radius_outer]
         dx_RM = [unit.pipe_radius_outer, unit.pipe_radius_outer, 2*unit.pipe_radius_outer, 4*unit.pipe_radius_outer]
         dx_End = unit.pipe_spacing/2 - sum(dx_R) - sum(dx_RM)
@@ -231,7 +184,7 @@ function control(
         dy_M = [(unit.pipe_laying_depth - (sum(dy_O)+sum(dy_MR)) - unit.pipe_radius_outer)]                       # dy is wide in the middle    
         dy_R = [unit.pipe_radius_outer, unit.pipe_radius_outer]                                                   # distance between nodes adjacent to fluid
         dy_RU = [unit.pipe_radius_outer/2, 1*unit.pipe_radius_outer, 1*unit.pipe_radius_outer, 3/2*unit.pipe_radius_outer, 2*unit.pipe_radius_outer,2*unit.pipe_radius_outer, 4*unit.pipe_radius_outer,16*unit.pipe_radius_outer,32*unit.pipe_radius_outer, 64*unit.pipe_radius_outer, 64*unit.pipe_radius_outer, 64*unit.pipe_radius_outer, 128*unit.pipe_radius_outer, 64*unit.pipe_radius_outer, 32*unit.pipe_radius_outer, 16*unit.pipe_radius_outer, 8*unit.pipe_radius_outer]  # mesh below the fluid-node until lower simulation boundary   
-        unit.dy = [dy_O..., dy_M..., dy_MR..., dy_R..., dy_RU...]   #s ize:27                         # build dy-vector
+        unit.dy = [dy_O..., dy_M..., dy_MR..., dy_R..., dy_RU...]   #size:27                         # build dy-vector
         
         unit.dz = copy(unit.pipe_length)
            
@@ -336,58 +289,6 @@ function control(
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
     end
 
-    # for Validation purposes: Input t_in, m_in; Output: t_out, p_out.
-    if unit.validation_mode == 1
-        R_rohr = 0  # initatisation of variable.
-
-        alpha_fluid = calculate_alpha_pipe(unit::GeothermalHeatCollector)   # To DO: Calculate out of mass-flow 
-        # Ramming längenbezogener Wärmedurchgangswiderstand
-        R_rohr = 1 / (2* pi) * (2 / (alpha_fluid * (2 * (unit.pipe_radius_outer - unit.pipe_thickness))) + 1 / unit.pipe_heat_conductivity * log(unit.pipe_radius_outer/(unit.pipe_radius_outer - unit.pipe_thickness)))
-        
-        # calculate fluid output temperature segment-wise 
-        n_segments = 94
-        t_in_neu = unit.t_in_validation[unit.timestep_index]
-        t_out = unit.t_in_validation[unit.timestep_index]
-        factor = unit.pipe_length/(n_segments * R_rohr*unit.m_in_validation[unit.timestep_index]*unit.fluid_specific_heat_capacity)
-        
-            for s=1:n_segments
-
-                if s == n_segments
-                    unit.t_out_validation[unit.timestep_index] = (factor * (unit.t_avg_rand-t_in_neu/2)+t_in_neu) * 1/(1+factor/2)
-                    #unit.t_out_validation[unit.timestep_index] = unit.pipe_length/(n_segments*R_rohr*unit.m_in_validation[unit.timestep_index]*unit.fluid_specific_heat_capacity)*(unit.t_avg_rand-t_in_neu) + t_in_neu
-                end
-                t_out = (factor * (unit.t_avg_rand-t_in_neu/2)+t_in_neu) * 1/(1+factor/2)
-                #t_out = unit.pipe_length/(n_segments*R_rohr*unit.m_in_validation[unit.timestep_index]*unit.fluid_specific_heat_capacity)*(unit.t_avg_rand-t_in_neu) + t_in_neu
-                t_in_neu = copy(t_out)
-
-            end
-        
-        n_rohr = 47 # number of pipes  
-        # p_out (only heat extraction)
-        if unit.t_in_validation[unit.timestep_index] >= unit.t_out_validation[unit.timestep_index]
-            unit.p_out_validation[unit.timestep_index] = 0
-            
-        elseif unit.m_in_validation[unit.timestep_index] <= 0
-            unit.p_out_validation[unit.timestep_index] = 0
-        else
-            unit.p_out_validation[unit.timestep_index] = unit.m_in_validation[unit.timestep_index]*unit.fluid_specific_heat_capacity*(unit.t_out_validation[unit.timestep_index]-unit.t_in_validation[unit.timestep_index])*n_rohr
-
-        end
-
-        for h = 1: (length(unit.dy)) 
-            for i =1:2  
-                if unit.Fluid[h,i] == 1 
-                    n_rohr = 47 
-                    unit.fluid_temperature = (unit.t_in_validation[unit.timestep_index]+unit.t_out_validation[unit.timestep_index])/2         # "+", because specific_heat_flux_pipe is negative during heat extraction.        
-                    unit.T2[h,i] = unit.fluid_temperature    
-            
-                end    
-            end
-        end
-    end
-
-
-
 end
 
 # function that calculates current (highest possible) output temperature of heat collector that can be provided. (lower temp. is always possible!)
@@ -400,7 +301,7 @@ end
 # function that calculates current (minimum possible) input temperature of heat collector that should be provided for regeneration 
 # (higher temperature is always possible, here the minimum should be calculated!)
 function current_input_temperature(unit::GeothermalHeatCollector)::Temperature
-    input_temperature = unit.pipe_temperature + unit.loading_temperature_spread/2
+    input_temperature = unit.pipe_temperature - unit.loading_temperature_spread/2
     # could be the lowest outer borewhole temperature plot the given temperature spread or a user-specified loading_temperature if given
     return input_temperature
 end
@@ -424,18 +325,13 @@ function get_max_input_power(unit::GeothermalHeatCollector)::Float64
 end
 
 function calculate_new_temperature_field(unit::GeothermalHeatCollector)
-    if unit.validation_mode == 0
-        # random output to avoid misunderstandings while reading output file.
-        unit.p_out_validation[unit.timestep_index]=99 
-    end
     
     # calculate heat transfer coefficient and thermal resistance
     alpha_fluid = calculate_alpha_pipe(unit::GeothermalHeatCollector)   
     R_rohr = 1 / (2* pi) * (2 / (alpha_fluid * (2 * (unit.pipe_radius_outer - unit.pipe_thickness))) + 1 / unit.pipe_heat_conductivity * log(unit.pipe_radius_outer/(unit.pipe_radius_outer - unit.pipe_thickness)))    
     
     # calculate fluid temperature
-    if  unit.validation_mode == 0
-        for h = 1: (length(unit.dy)) 
+    for h = 1: (length(unit.dy)) 
          
             for i =1:2  
                 if unit.Fluid[h,i] == 1 
@@ -443,20 +339,22 @@ function calculate_new_temperature_field(unit::GeothermalHeatCollector)
                     
                     # calculate specific heat extraction for 1 pipe per length
                     specific_heat_flux_pipe = (-1* unit.q_in_out_nov[unit.timestep_index]*1000/ (unit.pipe_length*n_rohr))
-                    unit.t_avg_rand = (unit.T1[h-1,i] + unit.T1[h+1,i] + unit.T1[h,i+1]) / 3 #deactivated during validation
-                    unit.fluid_temperature = unit.t_avg_rand + R_rohr * specific_heat_flux_pipe          # "+", because specific_heat_flux_pipe is negative during heat extraction.        
+                    unit.t_avg_rand = (unit.T1[h-1,i] + unit.T1[h+1,i] + unit.T1[h,i+1]) / 3        # deactivated during validation
+                    unit.fluid_temperature = unit.t_avg_rand + R_rohr * specific_heat_flux_pipe     # "+", because specific_heat_flux_pipe is negative during heat extraction.        
                         
                     unit.T2[h,i] = unit.fluid_temperature    
                 
                         
                 end    
             end
-        end 
-    end
+         
+    
  
     # calculate number of internal timesteps depending on internal time dt
     n_it = unit.wh_to_w_timestep/unit.dt   * 3600      
+
 for it=1:n_it
+
 n_rohr = 47
 
 # Loop - vertical direction
@@ -473,14 +371,14 @@ for i = 1 : (length(unit.dx)+1)
         (unit.dz * 0.5 * (unit.dy[h-1]+unit.dy[h-2]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+2] - unit.T1[h-1,i+1])/unit.dx[i] +    # WL in positve x-Richtung
         unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-2, i]-unit.T1[h-1,i])/(unit.dy[h-2]) +                       # WL in negatove y-Richtung
         1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h-1,i]))  * 
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                               # Quellterm
+        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h-1]))                                                               # Quellterm
         
         # lower node
         unit.T2[h+1,i] = unit.T1[h+1,i] +    
         (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1, i+2] - unit.T1[h+1,i+1])/unit.dx[i] +     # WL in positve x-Richtung
         unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+2,i]-unit.T1[h+1,i])/(unit.dy[h]) +                         # WL in positive y-Richtung
         1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h+1,i]))*
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                        # Quellterm
+        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]))                                                        # Quellterm
             
         # right node
         dq_x_p = unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+2] - unit.T1[h,i+1])/unit.dx[i]
@@ -492,7 +390,7 @@ for i = 1 : (length(unit.dx)+1)
         dq_y_n +    # WL in negative y-Richtung
         dq_y_p +    # WL in positive y-Richtung
         1/(R_rohr*unit.dz)* unit.dz * unit.dy[i] * (unit.fluid_temperature - unit.T1[h,i+1]))* 
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                   # Quellterm
+        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 *unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                   # Quellterm
 
     # adjacent nodes to fluid node have uniform temperature
     unit.t_avg_rand = (unit.T2[h-1,i] + unit.T2[h+1,i] + unit.T2[h,i+1])/3
@@ -589,7 +487,6 @@ for i = 1 : (length(unit.dx)+1)
         end 
     end
 
-
 end 
 end
 unit.T1 = copy(unit.T2)
@@ -662,11 +559,8 @@ unit.collector_total_heat_flux_in_out = unit.q_in_out_nov[unit.timestep_index]*1
 unit.Re = (unit.collector_total_heat_flux_in_out/n_rohr)/
         (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * d_i_pipe * unit.fluid_kinematic_viscosity * unit.fluid_density)
 end
-    
 
 Re = copy(unit.Re)
-
-
     # check for laminar flow
     if Re <= 2300
         Nu = calculate_Nu_laminar(unit::GeothermalHeatCollector, d_i_pipe, Re)
@@ -687,25 +581,20 @@ Re = copy(unit.Re)
 
 end
 
-
 function calculate_Nu_laminar(unit::GeothermalHeatCollector, d_i_pipe, Re)
     # Stephan
     Pr_water = 13.44                # Pr Number Water 0 °C
     Nu = 3.66 + (0.0677 * (Re * unit.fluid_prantl_number * d_i_pipe/unit.pipe_length)^1.33) /
         (1+0.1* unit.fluid_prantl_number * (Re * d_i_pipe/unit.pipe_length)^0.83) *
         (unit.fluid_prantl_number/Pr_water)^ 0.1
-
     return Nu
 end 
 
-
 function calculate_Nu_turbulent(unit::GeothermalHeatCollector, d_i_pipe, Re)
     zeta = (1.8*log(Re)-1.5)^-2
-
     # Gielinski
     Nu = (zeta/8 * Re * unit.fluid_prantl_number)/
         (1 + 12.7 * sqrt(zeta/8) * (unit.fluid_prantl_number^(2/3)-1))
-
     return Nu
 end
 
@@ -819,13 +708,8 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         end
     elseif key.value_key =="fluid_temperature"
         return unit.fluid_temperature
-    elseif key.value_key =="t_out"
-        return unit.t_out_validation[unit.timestep_index]
-    elseif key.value_key =="p_out"
-        return unit.p_out_validation[unit.timestep_index]
     elseif key.value_key =="Re"
         return unit.Re
-
     elseif key.value_key =="ambient_temperature"
     return unit.ambient_temperature
 
