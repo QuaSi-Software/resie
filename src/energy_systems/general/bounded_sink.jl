@@ -59,7 +59,14 @@ mutable struct BoundedSink <: Component
 end
 
 function output_values(unit::BoundedSink)::Vector{String}
-    return ["IN", "Max_Energy"]
+    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+        return [string(unit.medium)*" IN",
+                "Max_Energy"]
+    else
+        return [string(unit.medium)*" IN",
+                "Max_Energy",
+                "Temperature"]
+    end
 end
 
 function output_value(unit::BoundedSink, key::OutputKey)::Float64
@@ -67,6 +74,8 @@ function output_value(unit::BoundedSink, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
+    elseif key.value_key == "Temperature"
+        return unit.temperature
     end
     throw(KeyError(key.value_key))
 end

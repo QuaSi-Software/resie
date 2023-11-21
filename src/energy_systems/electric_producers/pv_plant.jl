@@ -48,7 +48,8 @@ mutable struct PVPlant <: Component
 end
 
 function output_values(unit::PVPlant)::Vector{String}
-    return ["OUT", "Supply"]
+    return [string(unit.m_el_out)*" OUT",
+            "Supply"]
 end
 
 function output_value(unit::PVPlant, key::OutputKey)::Float64

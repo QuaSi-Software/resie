@@ -62,7 +62,14 @@ mutable struct FixedSink <: Component
 end
 
 function output_values(unit::FixedSink)::Vector{String}
-    return ["IN", "Load", "Temperature"]
+    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+        return [string(unit.medium)*" IN",
+                "Load"]
+    else
+        return [string(unit.medium)*" IN",
+                "Load",
+                "Temperature"]
+    end
 end
 
 function output_value(unit::FixedSink, key::OutputKey)::Float64

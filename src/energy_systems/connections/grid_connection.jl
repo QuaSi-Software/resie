@@ -81,7 +81,15 @@ function process(unit::GridConnection, parameters::Dict{String,Any})
 end
 
 function output_values(unit::GridConnection)::Vector{String}
-    return ["IN", "OUT", "Draw sum", "Load sum"]
+    if unit.sys_function == sf_bounded_source
+        return [string(unit.medium)*" OUT",
+                "Draw_sum",
+                "Load_sum"]
+    elseif unit.sys_function == sf_bounded_sink
+        return [string(unit.medium)*" IN",
+                "Draw_sum",
+                "Load_sum"]
+    end
 end
 
 function output_value(unit::GridConnection, key::OutputKey)::Float64
@@ -89,9 +97,9 @@ function output_value(unit::GridConnection, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Draw sum"
+    elseif key.value_key == "Draw_sum"
         return unit.draw_sum
-    elseif key.value_key == "Load sum"
+    elseif key.value_key == "Load_sum"
         return unit.load_sum
     end
     throw(KeyError(key.value_key))

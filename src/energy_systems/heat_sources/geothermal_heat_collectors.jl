@@ -286,7 +286,13 @@ function balance_on(
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
-    return ["IN", "OUT", "TEMPERATURE_#NodeNum"]
+    temp_vect = []
+    append!(temp_vect, string(unit.m_heat_in)*" IN")
+    append!(temp_vect, string(unit.m_heat_out)*" OUT")
+    for n in range(length(unit.temperature_field))
+        append!(temp_vect, "TEMPERATURE_"*string(n))
+    end
+    return temp_vect
 end
 
 function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64

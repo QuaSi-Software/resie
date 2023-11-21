@@ -148,7 +148,11 @@ function load(unit::BufferTank, parameters::Dict{String,Any})
 end
 
 function output_values(unit::BufferTank)::Vector{String}
-    return ["IN", "OUT", "Load", "Load%", "Capacity"]
+    return [string(unit.medium)*" IN",
+            string(unit.medium)*" OUT",
+            "Load",
+            "Load%",
+            "Capacity"]
 end
 
 function output_value(unit::BufferTank, key::OutputKey)::Float64

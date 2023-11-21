@@ -62,7 +62,14 @@ mutable struct FixedSupply <: Component
 end
 
 function output_values(unit::FixedSupply)::Vector{String}
-    return ["OUT", "Supply", "Temperature"]
+    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+        return [string(unit.medium)*" OUT",
+                "Supply"]
+    else
+        return [string(unit.medium)*" OUT",
+                "Supply",
+                "Temperature"]
+    end
 end
 
 function output_value(unit::FixedSupply, key::OutputKey)::Float64

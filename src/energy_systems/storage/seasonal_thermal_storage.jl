@@ -151,7 +151,11 @@ function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
-    return ["IN", "OUT", "Load", "Load%", "Capacity"]
+    return [string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_out)*" OUT",
+            "Load",
+            "Load%",
+            "Capacity"]
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64

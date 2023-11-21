@@ -75,7 +75,10 @@ function control(
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return ["IN", "OUT", "COP"]
+    return [string(unit.m_el_in)*" IN", 
+            string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_out)*" OUT",
+            "COP"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64

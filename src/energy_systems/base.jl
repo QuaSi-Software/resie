@@ -500,13 +500,16 @@ end
 """
     output_values(unit)
 
-Specify which outputs a component can provide.
+Specify which data outputs a component can provide, including the medium of each output.
+Output at this point means data output in every timestep. This can include the energy on 
+the input- and output interfaces of a unit or its current state (like "LOAD").
 
-For the special values "IN" and "OUT" a medium category is required for fetching the actual
-value, while this method only specifies that there is an input or output.
+This methods provides the actual output type (like "IN" or "OUT") and the corresponding
+media of the data outputs. A medium is only needed for inputs and outputs, not for states.
 """
 function output_values(unit::Component)::Vector{String}
-    return ["IN", "OUT"]
+    return []  # base implementation returns an empty output vector as the output values 
+               # have to be specified in every component.
 end
 
 """
