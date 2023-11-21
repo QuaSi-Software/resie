@@ -62,69 +62,91 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     )
     EnergySystems.set_timestep(parameters["time_step_seconds"])
 
-    outputs = output_keys(components, project_config["io_settings"]["output_keys"])
-    reset_file(project_config["io_settings"]["output_file"], outputs)
-
-    ### set data for profile line plot
-    # check if profile line plot should be created (checks if output_plot is present or if
-    # it is "nothing")
-    plot_bool = !(
-        !(haskey(project_config["io_settings"], "output_plot"))
-        ||
-        project_config["io_settings"]["output_plot"] === "nothing"
-    )
-
-    if plot_bool
-        # set keys for output plots    
-        outputs_plot_keys = Vector{EnergySystems.OutputKey}()
-        for plot in project_config["io_settings"]["output_plot"]
-            append!(outputs_plot_keys, output_keys(components, plot[2]["key"]))
+    # read in flags, if all outputs should be printed and/or plotted
+    plot_all_outputs_bool = false
+    plot_bool = false
+    if haskey(project_config["io_settings"], "output_plot")
+        plot_bool = true  # if the key exists, set plot_bool to true by default
+        if project_config["io_settings"]["output_plot"] == "all"
+            plot_all_outputs_bool = true
+        elseif project_config["io_settings"]["output_plot"] == "nothing"
+            plot_bool = false
         end
-
-        # prepare array for output plots
-        outputs_plot_data = zeros(Float64, nr_of_steps, 1 + length(outputs_plot_keys))
     end
 
-    ### prepare array for output of all energy flow of all system interfaces
+    writeCSV_all_outputs_bool = false
+    writeCSV_bool = false
+    if haskey(project_config["io_settings"], "output_keys")
+        writeCSV_bool = true  # if the key exists, set plot_bool to true by default
+        if project_config["io_settings"]["output_keys"] == "all"
+            writeCSV_all_outputs_bool = true
+        elseif project_config["io_settings"]["output_keys"] == "nothing"
+            writeCSV_bool = false
+        end
+    end
+
+    # collect all possible outputs of all units if needed
+    if plot_all_outputs_bool || writeCSV_all_outputs_bool
+        all_output_keys = Vector{EnergySystems.OutputKey}()
+        for unit in components
+            temp_dict = Dict{String, Any}(unit[2].uac => output_values(unit[2]))
+            append!(all_output_keys, output_keys(components, temp_dict))
+        end
+    end
+
+    # collect output keys for lineplot and csv output
+    if plot_bool  # line plot
+        output_keys_lineplot = plot_all_outputs_bool ? all_output_keys : Vector{EnergySystems.OutputKey}()
+        # Collect output keys if not plotting all outputs
+        if !plot_all_outputs_bool
+            for plot in project_config["io_settings"]["output_plot"]
+                key = plot[2]["key"]
+                append!(output_keys_lineplot, output_keys(components, key))
+            end
+        end
+        # Initialize the array for output plots
+        output_data_lineplot = zeros(Float64, nr_of_steps, 1 + length(output_keys_lineplot))
+    end
+
+    if writeCSV_bool  # csv export
+        if writeCSV_all_outputs_bool # gather all outputs
+            output_keys_to_csv = all_output_keys
+        else  # get only requested output keys from input file for CSV-export
+            output_keys_to_csv = output_keys(components, project_config["io_settings"]["output_keys"])
+        end
+        reset_file(project_config["io_settings"]["output_file"], output_keys_to_csv)
+    end
+
+    ### prepare array for output of all energy flow of all system interfaces for Sankey
     # get number of system interfaces for preallocation and medium, source and target of
     # each interface for sankey diagram
     nr_of_interfaces = 0
     medium_of_interfaces = []
-    output_all_sourcenames = []
-    output_all_targetnames = []
+    output_sourcenames_sankey = []
+    output_targetnames_sankey = []
     for each_component in components
         for each_outputinterface in each_component[2].output_interfaces
+            medium = nothing  # reset medium
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
-                if isdefined(each_outputinterface[2], :target)
-                    # count interface
-                    nr_of_interfaces += 1
+                medium = each_outputinterface[1] # then, the medium is stored separately
+                each_outputinterface = each_outputinterface[2]
+            end
 
-                    #get name of source and sink
-                    push!(output_all_sourcenames, each_outputinterface[2].source.uac)
-                    push!(output_all_targetnames, each_outputinterface[2].target.uac)
-
-                    # get name of medium
-                    if isdefined(each_outputinterface[2].target, :medium)
-                        push!(medium_of_interfaces, each_outputinterface[2].target.medium)
-                    elseif isdefined(each_outputinterface[2].source, :medium)
-                        push!(medium_of_interfaces, each_outputinterface[2].source.medium)
-                    else
-                        push!(medium_of_interfaces, each_outputinterface[1])
-                    end
-                end
-            elseif isdefined(each_outputinterface, :target)
+            if isdefined(each_outputinterface, :target)
                 # count interface
                 nr_of_interfaces += 1
 
                 #get name of source and sink
-                push!(output_all_sourcenames, each_outputinterface.source.uac)
-                push!(output_all_targetnames, each_outputinterface.target.uac)
+                push!(output_sourcenames_sankey, each_outputinterface.source.uac)
+                push!(output_targetnames_sankey, each_outputinterface.target.uac)
 
                 # get name of medium
                 if isdefined(each_outputinterface.target, :medium)
                     push!(medium_of_interfaces, each_outputinterface.target.medium)
                 elseif isdefined(each_outputinterface.source, :medium)
                     push!(medium_of_interfaces, each_outputinterface.source.medium)
+                elseif !(medium === nothing)
+                    push!(medium_of_interfaces, medium)
                 else
                     println("Warning: The name of the medium was not detected. This may lead to wrong colouring in Sankey plot.")
                 end
@@ -137,7 +159,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         : ""
     )
     # preallocate for speed: Matrix with data of interfaces in every timestep
-    output_all_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
+    output_interface_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
 
     # export order or operatin (OoO)
     if project_config["io_settings"]["dump_info"]
@@ -160,14 +182,18 @@ function run_simulation(project_config::Dict{AbstractString,Any})
             end
         end
 
-        # output to file
-        write_to_file(
-            project_config["io_settings"]["output_file"],
-            outputs,
-            parameters["time"]
-        )
+        # write requested output data of the components to CSV-file
+        # This is currently done in every time step to keep data even if 
+        # an error occurs.
+        if writeCSV_bool
+            write_to_file(
+                            project_config["io_settings"]["output_file"],
+                            output_keys_to_csv,
+                            parameters["time"]
+                          )
+        end
 
-        # get all data of all interfaces in every timestep for Sankey
+        # get the energy transported through each interface in every timestep for Sankey
         # if the balance of an interface was not zero, the actual energy that was flowing
         # is written to the outputs.
         # Attention: This can lead to overfilling of demands which is currenlty not visible
@@ -177,22 +203,19 @@ function run_simulation(project_config::Dict{AbstractString,Any})
             for each_outputinterface in each_component[2].output_interfaces
                 if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                     if isdefined(each_outputinterface[2], :target)
-                        output_all_values[steps, n] = calculate_energy_flow(each_outputinterface[2])  
+                        output_interface_values[steps, n] = calculate_energy_flow(each_outputinterface[2])  
                         n += 1
                     end
                 elseif isdefined(each_outputinterface, :target)
-                    output_all_values[steps, n] = calculate_energy_flow(each_outputinterface) 
+                    output_interface_values[steps, n] = calculate_energy_flow(each_outputinterface) 
                     n += 1
                 end
             end
         end
 
-        # gather data for profile line plot (@ToDo: may extract from all data in post processing)
+        # gather output data of each component for line plot
         if plot_bool
-            outputs_plot_data[steps, :] = geather_output_data(
-                outputs_plot_keys,
-                parameters["time"]
-            )
+            output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, parameters["time"])
         end
 
         # simulation update
@@ -201,11 +224,15 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 
     ### create profile line plot
     if plot_bool
-        create_profile_line_plots(outputs_plot_data, outputs_plot_keys, project_config["io_settings"]["output_plot"])
+        create_profile_line_plots(  output_data_lineplot,
+                                    output_keys_lineplot,
+                                    plot_all_outputs_bool,
+                                    plot_all_outputs_bool ? nothing : project_config["io_settings"]["output_plot"]
+                                 )
     end
 
     ### create Sankey diagram
-    create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
+    create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces)
 
 end
 

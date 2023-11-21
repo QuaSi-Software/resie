@@ -144,29 +144,44 @@ create a line plot with data and label. user_input is dict from input file
 function create_profile_line_plots(
     outputs_plot_data::Matrix{Float64},
     outputs_plot_keys::Vector{EnergySystems.OutputKey},
-    user_input::Dict{String,Any}
+    plot_all::Bool,
+    user_input::Union{Nothing,Dict{String,Any}}
 )
 
-    # set Axis, unit and scale factor
-    axis = String[]
-    unit = String[]
-    scale_fact = Float64[]
-    for plot in user_input
-        push!(axis, string(plot[2]["axis"]))
-        push!(unit, string(plot[2]["unit"]))
-        push!(scale_fact, plot[2]["scale_factor"])
-    end
-
-    # create legend entries
-    labels = String[]
-    n = 1
-    for outkey in outputs_plot_keys
-        if outkey.medium === nothing
-            push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
-        else
-            push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+    # set Axis, unit and scale factor if given
+    if !plot_all  # plot only defined outputs
+        axis = String[]
+        unit = String[]
+        scale_fact = Float64[]
+        for plot in user_input
+            push!(axis, string(plot[2]["axis"]))
+            push!(unit, string(plot[2]["unit"]))
+            push!(scale_fact, plot[2]["scale_factor"])
         end
-        n += 1
+   
+        # create legend entries
+        labels = String[]
+        n = 1
+        for outkey in outputs_plot_keys
+            if outkey.medium === nothing
+                push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+            else
+                push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+            end
+            n += 1
+        end
+    else # plot all outputs. Here no units or scaling factors are available.
+         # create legend entries if no information is given
+         labels = String[]
+         n = 1
+         for outkey in outputs_plot_keys
+             if outkey.medium === nothing
+                 push!(labels, string("$(outkey.unit.uac) $(outkey.value_key)"))
+             else
+                 push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"))
+             end
+             n += 1
+         end
     end
 
     # create plot
@@ -174,11 +189,15 @@ function create_profile_line_plots(
     y = outputs_plot_data[:, 2:end]
     traces = GenericTrace[]
     for i in axes(y, 2)
-        trace = scatter(x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
-        if axis[i] == "right"
-            trace.yaxis = "y2"
-        else  # default is left axis
-            trace.yaxis = "y1"
+        if !plot_all
+            trace = scatter(x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+            if axis[i] == "right"
+                trace.yaxis = "y2"
+            else  # default is left axis
+                trace.yaxis = "y1"
+            end
+        else
+            trace = scatter(x=x / 60 / 60, y=y[:, i], mode="lines", name=labels[i])
         end
         push!(traces, trace)
     end
