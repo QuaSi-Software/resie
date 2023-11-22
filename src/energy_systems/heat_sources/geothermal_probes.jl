@@ -3,6 +3,7 @@ Implementation of geothermal probes.
 This implementations acts as storage as it can produce and load energy.
 """
 
+
 # Current solution to get g-function values
 # read g-function .txt file
 file = open("/Path/To/G_Function.txt", "r")
