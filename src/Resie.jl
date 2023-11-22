@@ -63,30 +63,30 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     EnergySystems.set_timestep(parameters["time_step_seconds"])
 
     # read in flags, if all outputs should be printed and/or plotted
-    plot_all_outputs_bool = false
-    plot_bool = false
+    do_plot_all_outputs = false
+    do_create_plot = false
     if haskey(project_config["io_settings"], "output_plot")
-        plot_bool = true  # if the key exists, set plot_bool to true by default
+        do_create_plot = true  # if the key exists, set do_create_plot to true by default
         if project_config["io_settings"]["output_plot"] == "all"
-            plot_all_outputs_bool = true
+            do_plot_all_outputs = true
         elseif project_config["io_settings"]["output_plot"] == "nothing"
-            plot_bool = false
+            do_create_plot = false
         end
     end
 
-    writeCSV_all_outputs_bool = false
-    writeCSV_bool = false
+    do_write_all_CSV_outputs = false
+    do_write_CSV = false
     if haskey(project_config["io_settings"], "output_keys")
-        writeCSV_bool = true  # if the key exists, set plot_bool to true by default
+        do_write_CSV = true  # if the key exists, set do_create_plot to true by default
         if project_config["io_settings"]["output_keys"] == "all"
-            writeCSV_all_outputs_bool = true
+            do_write_all_CSV_outputs = true
         elseif project_config["io_settings"]["output_keys"] == "nothing"
-            writeCSV_bool = false
+            do_write_CSV = false
         end
     end
 
     # collect all possible outputs of all units if needed
-    if plot_all_outputs_bool || writeCSV_all_outputs_bool
+    if do_plot_all_outputs || do_write_all_CSV_outputs
         all_output_keys = Vector{EnergySystems.OutputKey}()
         for unit in components
             temp_dict = Dict{String, Any}(unit[2].uac => output_values(unit[2]))
@@ -95,10 +95,10 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     end
 
     # collect output keys for lineplot and csv output
-    if plot_bool  # line plot
-        output_keys_lineplot = plot_all_outputs_bool ? all_output_keys : Vector{EnergySystems.OutputKey}()
+    if do_create_plot  # line plot
+        output_keys_lineplot = do_plot_all_outputs ? all_output_keys : Vector{EnergySystems.OutputKey}()
         # Collect output keys if not plotting all outputs
-        if !plot_all_outputs_bool
+        if !do_plot_all_outputs
             for plot in project_config["io_settings"]["output_plot"]
                 key = plot[2]["key"]
                 append!(output_keys_lineplot, output_keys(components, key))
@@ -108,8 +108,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         output_data_lineplot = zeros(Float64, nr_of_steps, 1 + length(output_keys_lineplot))
     end
 
-    if writeCSV_bool  # csv export
-        if writeCSV_all_outputs_bool # gather all outputs
+    if do_write_CSV  # csv export
+        if do_write_all_CSV_outputs # gather all outputs
             output_keys_to_csv = all_output_keys
         else  # get only requested output keys from input file for CSV-export
             output_keys_to_csv = output_keys(components, project_config["io_settings"]["output_keys"])
@@ -185,7 +185,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # write requested output data of the components to CSV-file
         # This is currently done in every time step to keep data even if 
         # an error occurs.
-        if writeCSV_bool
+        if do_write_CSV
             write_to_file(
                             project_config["io_settings"]["output_file"],
                             output_keys_to_csv,
@@ -214,7 +214,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         end
 
         # gather output data of each component for line plot
-        if plot_bool
+        if do_create_plot
             output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, parameters["time"])
         end
 
@@ -223,11 +223,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     end
 
     ### create profile line plot
-    if plot_bool
+    if do_create_plot
         create_profile_line_plots(  output_data_lineplot,
                                     output_keys_lineplot,
-                                    plot_all_outputs_bool,
-                                    plot_all_outputs_bool ? nothing : project_config["io_settings"]["output_plot"]
+                                    do_plot_all_outputs,
+                                    do_plot_all_outputs ? nothing : project_config["io_settings"]["output_plot"]
                                  )
     end
 
