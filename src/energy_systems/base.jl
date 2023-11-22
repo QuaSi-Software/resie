@@ -382,6 +382,39 @@ components are linked) or a SystemInterface instance.
 const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
 
 """
+Contains the data on the energy exchance (and related information) on an interface.
+"""
+Base.@kwdef mutable struct EnergyExchange
+    balance::Float64
+    uac::String
+    energy_potential::Float64
+    storage_potential::Float64
+    temperature::Temperature
+    pressure::Union{Nothing,Float64}
+    voltage::Union{Nothing,Float64}
+end
+
+"""
+Convenience alias to EnergyExchange.
+"""
+const EnEx = EnergyExchange
+
+"""
+Sum of balances over the given list of energy exchanges.
+"""
+function balance(entries::Vector{EnergyExchange})::Float64
+    return sum(e.balance for e in entries)
+end
+
+function energy_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.energy_potential for e in entries)
+end
+
+function storage_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.storage_potential for e in entries)
+end
+
+"""
     balance_on(interface, unit)
 
 Return the balance of a unit in respect to the given interface.
@@ -403,22 +436,19 @@ without having to check if its connected to a Bus or directly to a component.
 - "energy_potential"::Float64:  The maximum enery an interface can provide or consume
 - "temperature"::Temperature:   The temperature of the interface
 """
-function balance_on(
-    interface::SystemInterface,
-    unit::Component
-)::NamedTuple{}
+function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
     input_sign = unit.uac == interface.target.uac ? -1 : +1
 
-    return (
-            balance = interface.balance,
-            energy = (  uac=unit.uac,
-                        energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
-                        storage_potential=0.0,
-                        temperature=interface.temperature,
-                        pressure=nothing,
-                        voltage=nothing),
-            )
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
+        storage_potential=0.0,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 """
