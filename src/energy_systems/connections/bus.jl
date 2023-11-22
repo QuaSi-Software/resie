@@ -98,44 +98,43 @@ balance, but does so in a non-recursive manner such that any bus in the chain of
 bus components is only considered once.
 """
 function balance_nr(unit::Bus, caller::Bus)::Float64
-    balance = 0.0
+    blnc = 0.0
 
-    for inface in unit.input_interfaces   # supply
+    for inface in unit.input_interfaces # supply
         if inface.source == caller
             continue
         end
 
-        if isa(inface.source, Bus)  
-            exchange = balance_nr(inface.source, unit)
-            balance_supply = max(exchange, inface.balance)
+        if isa(inface.source, Bus)
+            other_bus_balance = balance_nr(inface.source, unit)
+            balance_supply = max(other_bus_balance, inface.balance)
             if balance_supply < 0.0
                 continue
             end
         else
-            balance_supply = balance_on(inface, inface.source).balance
+            balance_supply = balance(balance_on(inface, inface.source))
         end
-        balance += balance_supply
+        blnc += balance_supply
     end
 
-    for outface in unit.output_interfaces  # demand
+    for outface in unit.output_interfaces # demand
         if outface.target == caller
             continue
         end
 
         if isa(outface.target, Bus)
-            exchange = balance_nr(outface.target, unit)
-            balance_demand = min(exchange, outface.balance)
+            other_bus_balance = balance_nr(outface.target, unit)
+            balance_demand = min(other_bus_balance, outface.balance)
             if balance_demand > 0.0
                 continue
             end
         else
-            balance_demand = balance_on(outface, outface.target).balance
+            balance_demand = balance(balance_on(outface, outface.target))
         end
-        balance += balance_demand
-
+        blnc += balance_demand
     end
 
-    return  balance + unit.remainder
+    return blnc + unit.remainder
 end
 
 """
@@ -144,25 +143,25 @@ end
 Energy balance on a bus component without considering any other connected bus components.
 """
 function balance_direct(unit::Bus)::Float64
-    balance = 0.0
+    blnc = 0.0
 
-    for inface in unit.input_interfaces  # supply
+    for inface in unit.input_interfaces # supply
         if isa(inface.source, Bus)
             continue
         else
-            balance += balance_on(inface, inface.source).balance
+            blnc += balance(balance_on(inface, inface.source))
         end
     end
 
-    for outface in unit.output_interfaces  # demand
+    for outface in unit.output_interfaces # demand
         if isa(outface.target, Bus)
             continue
         else
-            balance += balance_on(outface, outface.target).balance
+            blnc += balance(balance_on(outface, outface.target))
         end
     end
 
-    return balance + unit.remainder
+    return blnc + unit.remainder
 end
 
 function balance(unit::Bus)::Float64
@@ -203,15 +202,14 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::Bus
-)::NamedTuple{}
+)::Vector{EnergyExchange}
     input_index = nothing
     output_index = nothing
-    caller_is_input = nothing # == true if interface is input of unit (caller puts energy in unit); 
-                              # == false if interface is output of unit (caller gets energy from unit)
-    energy_tuple_result = create_interface_tuple()
+    caller_is_input = false # if interface is input of unit (caller puts energy in unit)
+    caller_is_output = false # if interface is output of unit (caller gets energy from unit)
 
-    # find the index of the input/output on the bus. if the method was called on an output,
-    # the input index will remain as nothing and vice versa.
+    # determine if the calling component is an input or output to the bus and remember the
+    # index within the list of input/output interfaces for later
     for (idx, input_interface) in pairs(unit.input_interfaces)
         if input_interface.source.uac == interface.source.uac
             input_index = idx
@@ -220,89 +218,149 @@ function balance_on(
         end
     end
 
-    if caller_is_input === nothing   # only check for outputs if no input was found
-        for (idx, output_interface) in pairs(unit.output_interfaces)
-            if output_interface.target.uac == interface.target.uac
-                output_index = idx
-                caller_is_input = false
-                break
-            end
+    for (idx, output_interface) in pairs(unit.output_interfaces)
+        if output_interface.target.uac == interface.target.uac
+            output_index = idx
+            caller_is_output = true
+            break
         end
     end
 
-    # iterate through outfaces to get storage loading and energy output potential, only if caller is input
-    if caller_is_input == true
+    # sanity check, as this situation should not happen
+    if (caller_is_input && caller_is_output) || (!caller_is_input && !caller_is_output)
+        throw(ArgumentError(
+            "Error in connnection of components on bus \"$(unit.uac)\". " * 
+            "Caller must be input XOR output."
+        ))
+    end
+
+    return_exchanges = []
+
+    # for inputs, only consider outputs
+    if caller_is_input
         for (idx, outface) in pairs(unit.output_interfaces)
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
-                unit.connectivity.storage_loading[input_index][idx] 
-                )
+                unit.connectivity.storage_loading[input_index][idx]
+            )
                 if isa(outface.target, Bus)
-                    exchange = balance_on(outface, outface.target)
-                    if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
-                        for i = 1:length(exchange.energy)
-                            exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-                            exchange.energy[i].storage_potential = 0.0
-                        end
-                    end
-                    # append exchange to current output
-                    push!(energy_tuple_result, exchange)
+                    # exchange = balance_on(outface, outface.target)
+                    # if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
+                    #     for i = 1:length(exchange.energy)
+                    #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+                    #         exchange.energy[i].storage_potential = 0.0
+                    #     end
+                    # end
+                    # # append exchange to current output
+                    # push!(energy_tuple_result, exchange)
                 else
-                    temperature = outface.temperature
-                    energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : -outface.max_energy
-                    if (                                               # check storage potential only for storages
+                    exchanges = balance_on(outface, outface.target)
+
+                    # check storage potential only for storages and make sure storages
+                    # don't load themselves. also the storage potential is only
+                    # considered if no energy was transfered over the interface yet
+                    if (
                         outface.target.sys_function === sf_storage &&
-                        outface.target.uac !== interface.source.uac && # never allow unloading of own storage load
-                        outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0    # do not consider storage_potential if energy has already been transferred through interface
-                        )
-                        storage_potential = balance_on(outface, outface.target).energy.storage_potential  # only one return will be given from storages!
+                        outface.target.uac !== interface.source.uac &&
+                        outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
+                    )
+                        storage_pot = storage_potential(exchanges)
                     else
-                        storage_potential = 0.0
+                        storage_pot = 0.0
                     end
-                    # append exchange to current output
-                    push!(energy_tuple_result, fill_interface_tuple(outface.target.uac, energy_potential, storage_potential, temperature=temperature))
+
+                    # if energy was already transfered over interface or no information is
+                    # available, set the energy potential to zero
+                    if (
+                        outface.max_energy === nothing
+                        || outface.sum_abs_change > 0.0
+                        || interface.sum_abs_change > 0.0
+                    )
+                        energy_pot = 0.0
+                    else
+                        energy_pot = energy_potential(exchanges)
+                    end
+
+                    temperature = outface.temperature
+
+                    push!(return_exchanges, EnEx(
+                        balance=balance(exchanges),
+                        uac=exchanges[1].uac,
+                        energy_potential=energy_pot,
+                        storage_potential=storage_pot,
+                        temperature=temperature,
+                        pressure=nothing,
+                        voltage=nothing
+                    ))
                 end
             end
         end
-    elseif caller_is_input == false
-        # iterate through infaces to get storage loading and energy input potential, only if caller is output
+    end
+
+    # for outputs, only consider inputs
+    if caller_is_output
         for (idx, inface) in pairs(unit.input_interfaces)  
             # check if energy flow beween input and output is allowed
             if (
                 unit.connectivity.storage_loading === nothing ||
                 unit.connectivity.storage_loading[idx][output_index]
-                )
+            )
                 if isa(inface.source, Bus)
-                    exchange = balance_on(inface, inface.source)
-                    if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
-                        for i = 1:length(exchange.energy)
-                            exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-                            exchange.energy[i].storage_potential = 0.0
-                        end
-                    end
-                    # append exchange to current output
-                    push!(energy_tuple_result, exchange)
+                    # exchange = balance_on(inface, inface.source)
+                    # if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
+                    #     for i = 1:length(exchange.energy)
+                    #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+                    #         exchange.energy[i].storage_potential = 0.0
+                    #     end
+                    # end
+                    # # append exchange to current output
+                    # push!(energy_tuple_result, exchange)
                 else
-                    temperature = inface.temperature
-                    energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) ? 0.0 : inface.max_energy
-                    if (                                                # check storage potential only for storages
+                    exchanges = balance_on(inface, inface.source)
+
+                    # check storage potential only for storages and make sure storages
+                    # don't load themselves. also the storage potential is only
+                    # considered if no energy was transfered over the interface yet
+                    if (
                         inface.source.sys_function === sf_storage &&
-                        inface.source.uac !== interface.target.uac &&   # do not allow loading of own storage
-                        inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0    # do not consider storage_potential if energy has already been transferred through interface
-                        )
-                        storage_potential = balance_on(inface, inface.source).energy.storage_potential  # only one return will be given from storages!
+                        inface.source.uac !== interface.target.uac &&
+                        inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
+                    )
+                        storage_pot = storage_potential(exchanges)
                     else
-                        storage_potential = 0.0
+                        storage_pot = 0.0
                     end
-                    # append exchange to current output
-                    push!(energy_tuple_result, fill_interface_tuple(inface.source.uac, energy_potential, storage_potential, temperature=temperature))
+
+                    # if energy was already transfered over interface or no information is
+                    # available, set the energy potential to zero
+                    if (
+                        inface.max_energy === nothing
+                        || inface.sum_abs_change > 0.0
+                        || interface.sum_abs_change > 0.0
+                    )
+                        energy_pot = 0.0
+                    else
+                        energy_pot = energy_potential(exchanges)
+                    end
+
+                    temperature = inface.temperature
+
+                    push!(return_exchanges, EnEx(
+                        balance=balance(exchanges),
+                        uac=exchanges[1].uac,
+                        energy_potential=energy_pot,
+                        storage_potential=storage_pot,
+                        temperature=temperature,
+                        pressure=nothing,
+                        voltage=nothing
+                    ))
                 end
             end
-        end
-    else
-        throw(ArgumentError("Error in connnection of components. Can not find connections of \"$(unit.uac)\"."))  # should acutally never happen
+        end  
     end
+
+    return return_exchanges
 
     # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
     #       energies that could be given or taken.
