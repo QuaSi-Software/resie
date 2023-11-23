@@ -105,17 +105,14 @@ function control(
 end
 
 function process(unit::BoundedSupply, parameters::Dict{String,Any})
-    outface = unit.output_interfaces[unit.medium]
-    # 1. @TODO: if disp. sources should be allowed to load storage components, then the potential
-    # must be handled here instead of being ignored
+    # 1. @TODO: if bounded sources should be allowed to load storage components, then the
+    # storage potential must be handled here instead of being ignored
     # 2. we also ignore the temperature of the interface as the source defines that itself
-    exchange = balance_on(outface, outface.target)
-    if exchange.balance < 0.0
-        add!(
-            outface,
-            min(abs(exchange.balance), unit.max_energy),
-            unit.temperature
-        )
+    outface = unit.output_interfaces[unit.medium]
+    exchanges = balance_on(outface, outface.target)
+    blnc = balance(exchanges)
+    if blnc < 0.0
+        add!(outface, min(abs(blnc), unit.max_energy), unit.temperature)
     end
 end
 
