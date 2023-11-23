@@ -62,102 +62,23 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     )
     EnergySystems.set_timestep(parameters["time_step_seconds"])
 
-    # read in flags, if all outputs should be printed and/or plotted
-    do_plot_all_outputs = false
-    do_create_plot = false
-    if haskey(project_config["io_settings"], "output_plot")
-        do_create_plot = true  # if the key exists, set do_create_plot to true by default
-        if project_config["io_settings"]["output_plot"] == "all"
-            do_plot_all_outputs = true
-        elseif project_config["io_settings"]["output_plot"] == "nothing"
-            do_create_plot = false
-        end
-    end
+    # get list of requested output keys for lineplot and csv export
+    output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
+    do_create_plot = !(output_keys_lineplot === nothing)
+    do_write_CSV = !(output_keys_to_csv === nothing)
 
-    do_write_all_CSV_outputs = false
-    do_write_CSV = false
-    if haskey(project_config["io_settings"], "output_keys")
-        do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if project_config["io_settings"]["output_keys"] == "all"
-            do_write_all_CSV_outputs = true
-        elseif project_config["io_settings"]["output_keys"] == "nothing"
-            do_write_CSV = false
-        end
-    end
-
-    # collect all possible outputs of all units if needed
-    if do_plot_all_outputs || do_write_all_CSV_outputs
-        all_output_keys = Vector{EnergySystems.OutputKey}()
-        for unit in components
-            temp_dict = Dict{String, Any}(unit[2].uac => output_values(unit[2]))
-            append!(all_output_keys, output_keys(components, temp_dict))
-        end
-    end
-
-    # collect output keys for lineplot and csv output
-    if do_create_plot  # line plot
-        output_keys_lineplot = do_plot_all_outputs ? all_output_keys : Vector{EnergySystems.OutputKey}()
-        # Collect output keys if not plotting all outputs
-        if !do_plot_all_outputs
-            for plot in project_config["io_settings"]["output_plot"]
-                key = plot[2]["key"]
-                append!(output_keys_lineplot, output_keys(components, key))
-            end
-        end
-        # Initialize the array for output plots
+    # Initialize the array for output plots
+    if do_create_plot
         output_data_lineplot = zeros(Float64, nr_of_steps, 1 + length(output_keys_lineplot))
     end
-
-    if do_write_CSV  # csv export
-        if do_write_all_CSV_outputs # gather all outputs
-            output_keys_to_csv = all_output_keys
-        else  # get only requested output keys from input file for CSV-export
-            output_keys_to_csv = output_keys(components, project_config["io_settings"]["output_keys"])
-        end
+    # reset CSV file
+    if do_write_CSV
         reset_file(project_config["io_settings"]["output_file"], output_keys_to_csv)
     end
-
-    ### prepare array for output of all energy flow of all system interfaces for Sankey
-    # get number of system interfaces for preallocation and medium, source and target of
-    # each interface for sankey diagram
-    nr_of_interfaces = 0
-    medium_of_interfaces = []
-    output_sourcenames_sankey = []
-    output_targetnames_sankey = []
-    for each_component in components
-        for each_outputinterface in each_component[2].output_interfaces
-            medium = nothing  # reset medium
-            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
-                medium = each_outputinterface[1] # then, the medium is stored separately
-                each_outputinterface = each_outputinterface[2]
-            end
-
-            if isdefined(each_outputinterface, :target)
-                # count interface
-                nr_of_interfaces += 1
-
-                #get name of source and sink
-                push!(output_sourcenames_sankey, each_outputinterface.source.uac)
-                push!(output_targetnames_sankey, each_outputinterface.target.uac)
-
-                # get name of medium
-                if isdefined(each_outputinterface.target, :medium)
-                    push!(medium_of_interfaces, each_outputinterface.target.medium)
-                elseif isdefined(each_outputinterface.source, :medium)
-                    push!(medium_of_interfaces, each_outputinterface.source.medium)
-                elseif !(medium === nothing)
-                    push!(medium_of_interfaces, medium)
-                else
-                    println("Warning: The name of the medium was not detected. This may lead to wrong colouring in Sankey plot.")
-                end
-            end
-        end
-    end
-    println(
-        length(medium_of_interfaces) !== nr_of_interfaces
-        ? "Warning: error in extracting information from input file for sankey plot."
-        : ""
-    )
+   
+    # get infomration about all interfaces for Sankey
+    nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey = get_interface_information(components)
+   
     # preallocate for speed: Matrix with data of interfaces in every timestep
     output_interface_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
 
@@ -186,33 +107,12 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(
-                            project_config["io_settings"]["output_file"],
-                            output_keys_to_csv,
-                            parameters["time"]
-                          )
+            write_to_file(project_config["io_settings"]["output_file"], output_keys_to_csv, parameters["time"])
         end
 
         # get the energy transported through each interface in every timestep for Sankey
-        # if the balance of an interface was not zero, the actual energy that was flowing
-        # is written to the outputs.
-        # Attention: This can lead to overfilling of demands which is currenlty not visible
-        # in the sankey diagram!
-        n = 1
-        for each_component in components
-            for each_outputinterface in each_component[2].output_interfaces
-                if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
-                    if isdefined(each_outputinterface[2], :target)
-                        output_interface_values[steps, n] = calculate_energy_flow(each_outputinterface[2])  
-                        n += 1
-                    end
-                elseif isdefined(each_outputinterface, :target)
-                    output_interface_values[steps, n] = calculate_energy_flow(each_outputinterface) 
-                    n += 1
-                end
-            end
-        end
-
+        output_interface_values[steps, :] = collect_interface_energies(components, nr_of_interfaces)
+      
         # gather output data of each component for line plot
         if do_create_plot
             output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, parameters["time"])
@@ -224,11 +124,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 
     ### create profile line plot
     if do_create_plot
-        create_profile_line_plots(  output_data_lineplot,
-                                    output_keys_lineplot,
-                                    do_plot_all_outputs,
-                                    do_plot_all_outputs ? nothing : project_config["io_settings"]["output_plot"]
-                                 )
+        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
     end
 
     ### create Sankey diagram
