@@ -743,3 +743,32 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         end
     end
 end
+
+"""
+get_timesteps(simulation_parameters)
+
+Function to read in the time step information from the input file.
+If no information is given in the input file, the following defaults 
+will be set:
+time_step = 900 s
+start_timestamp = 0 s
+end_timestamp = 900 s
+"""
+function get_timesteps(simulation_parameters::Dict{String, Any})
+    time_step = 900
+    if "time_step_seconds" in keys(simulation_parameters)
+        time_step = UInt(simulation_parameters["time_step_seconds"])
+    end
+
+    start_timestamp = 0
+    if "start" in keys(simulation_parameters)
+        start_timestamp = Integer(simulation_parameters["start"])
+    end
+
+    end_timestamp = 900
+    if "end" in keys(simulation_parameters)
+        end_timestamp = Integer(simulation_parameters["end"])
+    end
+
+    return time_step, start_timestamp, end_timestamp
+end
