@@ -38,21 +38,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         step_order = calculate_order_of_operations(components)
     end
 
-    time_step = 900
-    if "time_step_seconds" in keys(project_config["simulation_parameters"])
-        time_step = UInt(project_config["simulation_parameters"]["time_step_seconds"])
-    end
-
-    start_timestamp = 0
-    if "start" in keys(project_config["simulation_parameters"])
-        start_timestamp = Integer(project_config["simulation_parameters"]["start"])
-    end
-
-    end_timestamp = 900
-    if "end" in keys(project_config["simulation_parameters"])
-        end_timestamp = Integer(project_config["simulation_parameters"]["end"])
-    end
-
+    # get time steps from input file
+    time_step, start_timestamp, end_timestamp = get_timesteps(project_config["simulation_parameters"])  
     nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
 
     parameters = Dict{String,Any}(
