@@ -18,6 +18,7 @@ include("file_output.jl")
 
 using PlotlyJS
 using ColorSchemes
+using Colors
 
 """
     run_simulation()

@@ -117,6 +117,20 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 else
                     println("Warning: The name of the medium was not detected. This may lead to wrong colouring in Sankey plot.")
                 end
+
+                # add "real" demands and sources
+                if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
+                    push!(output_sourcenames_sankey, string(each_outputinterface.source.uac,"_total_supply"))
+                    push!(output_targetnames_sankey, each_outputinterface.source.uac)       
+                    push!(medium_of_interfaces, "hide_medium")
+                    nr_of_interfaces += 1
+                end
+                if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
+                    push!(output_sourcenames_sankey, each_outputinterface.target.uac)
+                    push!(output_targetnames_sankey, string(each_outputinterface.target.uac,"_total_demand"))       
+                    push!(medium_of_interfaces, "hide_medium")
+                    nr_of_interfaces += 1
+                end 
             end
         end
     end
@@ -144,13 +158,21 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
     for each_component in components
         for each_outputinterface in each_component[2].output_interfaces
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
-                if isdefined(each_outputinterface[2], :target)
-                    energies[n] = calculate_energy_flow(each_outputinterface[2])  
-                    n += 1
-                end
-            elseif isdefined(each_outputinterface, :target)
+                each_outputinterface = each_outputinterface[2]
+            end
+            if isdefined(each_outputinterface, :target)
                 energies[n] = calculate_energy_flow(each_outputinterface) 
                 n += 1
+                    
+                if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
+                    energies[n] = each_outputinterface.source.supply  
+                    n += 1
+                end
+                
+                if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
+                    energies[n] = each_outputinterface.target.demand
+                    n += 1 
+                end
             end
         end
     end
@@ -396,7 +418,22 @@ function create_sankey(
     # remove oxygen from data as the energy of oxygen is considered to be zero
     interface_new = 1
     for _ in 1:nr_of_interfaces
-        if medium_of_interfaces[interface_new] == :m_c_g_o2
+        if medium_of_interfaces[interface_new] == :m_c_g_o2   # ToDo: This should be done in a more generic way to exclude other media if needed!
+            deleteat!(output_all_sourcenames, interface_new)
+            deleteat!(output_all_targetnames, interface_new)
+            deleteat!(output_all_value_sum, interface_new)
+            deleteat!(medium_of_interfaces, interface_new)
+            interface_new -= 1
+            nr_of_interfaces -= 1
+        end
+        interface_new += 1
+    end
+
+    # remove real sinks and sources if they match the delivered energy
+    # to enable this to work, the "real" demand/supply needs to be always one entry below the delivered/requested one!
+    interface_new = 1
+    for _ in 1:nr_of_interfaces
+        if medium_of_interfaces[interface_new] == "hide_medium" && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
             deleteat!(output_all_value_sum, interface_new)
@@ -423,32 +460,59 @@ function create_sankey(
     if length(unique_medium_labels) > 1
         colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
         color_map = Dict(zip(unique_medium_labels, colors))
-        colors_for_medium_labels = map(x -> color_map[x], medium_labels)
-    else # account for cases with only one medium in the energy system
-        colors_for_medium_labels = get(ColorSchemes.roma, 0.5)
+        colors_for_medium = map(x -> color_map[x], medium_labels)
+    else # account for cases with only one medium in the system topology
+        colors_for_medium = get(ColorSchemes.roma, 0.5)
     end
 
+    do_hide_real_demands = true
+    if do_hide_real_demands
+        # hide sf_fixed_sink and sf_fixed_source interfaces
+        colors_for_medium_RGBA = Array{Any}(nothing, interface_new)
+        for (idx, medium) in pairs(medium_labels)
+            if medium == "hide_medium"
+                colors_for_medium_RGBA[idx] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                colors_for_medium_RGBA[idx] = colors_for_medium[idx]
+            end
+        end
+
+        # hide blocks and set position of sf_fixed_sink and sf_fixed_source blocks
+        block_colors = Array{Any}(nothing, length(block_labels))
+        for (idx, block) in pairs(block_labels)
+            if last(block, 12) == "total_demand" || last(block, 12) == "total_supply"
+                block_labels[idx] = ""
+                block_colors[idx] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                block_colors[idx] = "blue"
+            end
+        end
+    else
+        colors_for_medium_RGBA = colors_for_medium
+    end
+    
     # create plot
     p = plot(sankey(
             node=attr(
                 pad=25,
                 thickness=20,
-                line=attr(color="black", width=0.5),
+                line=do_hide_real_demands ? attr(color="white", width=0.0) : nothing,
                 label=block_labels,
-                color="blue"
+                color=do_hide_real_demands ? block_colors : "blue" ,
             ),
             link=attr(
                 source=output_all_source_num .- 1, # indices correspond to block_labels starting from index 0
                 target=output_all_target_num .- 1, # indices correspond to block_labels starting from index 0
                 value=output_all_value_sum,
                 label=medium_labels,
-                color=colors_for_medium_labels
+                color=colors_for_medium_RGBA
             )),
-        Layout(title_text="Sankey diagram of the energy system and energy flows", font_size=14)
+        Layout( title_text="Sankey diagram of system topology and energy flows", 
+                font_size=14,
+                )
     )
 
     # save plot
     savefig(p, "output/output_sankey.html")
-
 
 end

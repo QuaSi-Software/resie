@@ -526,7 +526,7 @@ the requested energy is returned. Comparing this to the bahaviour of busses, thi
 be non-intuitive.
 """
 function calculate_energy_flow(interface::SystemInterface)::Float64
-    return (interface.sum_abs_change - interface.balance) / 2
+    return (interface.sum_abs_change + interface.balance) / 2
 end
 
 """
