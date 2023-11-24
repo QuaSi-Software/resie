@@ -72,6 +72,22 @@ function control(
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
+function output_values(unit::Electrolyser)::Vector{String}
+    return [string(unit.m_el_in)*" IN", 
+            string(unit.m_h2_out)*" OUT",
+            string(unit.m_o2_out)*" OUT",
+            string(unit.m_heat_out)*" OUT"]
+end
+
+function output_value(unit::Electrolyser, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    end
+    throw(KeyError(key.value_key))
+end
+
 function set_max_energies!(
     unit::Electrolyser, el_in::Float64, heat_out::Float64,
     h2_out::Float64, o2_out::Float64
