@@ -352,6 +352,8 @@ function process(unit::Electrolyser, parameters::Dict{String,Any})
         add!(unit.output_interfaces[unit.m_heat_out], energies[3], unit.output_temperature)
         add!(unit.output_interfaces[unit.m_h2_out], energies[4])
         add!(unit.output_interfaces[unit.m_o2_out], energies[5])
+    else
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
     end
 end
 

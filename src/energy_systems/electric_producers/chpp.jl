@@ -279,6 +279,8 @@ function process(unit::CHPP, parameters::Dict{String,Any})
         sub!(unit.input_interfaces[unit.m_gas_in], energies[2])
         add!(unit.output_interfaces[unit.m_el_out], energies[3])
         add!(unit.output_interfaces[unit.m_heat_out], energies[4])
+    else
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
     end
 end
 

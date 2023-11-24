@@ -356,6 +356,8 @@ function process(unit::FuelBoiler, parameters::Dict{String,Any})
     if energies[1]
         sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])
         add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+    else
+        set_max_energies!(unit, 0.0, 0.0)
     end
 end
 

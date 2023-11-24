@@ -402,6 +402,8 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
         sub!(unit.input_interfaces[unit.m_el_in], energies[2])
         sub!(unit.input_interfaces[unit.m_heat_in], energies[3])
         add!(unit.output_interfaces[unit.m_heat_out], energies[4], out_temp)
+    else
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
     end
 end
 
