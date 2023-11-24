@@ -35,12 +35,12 @@ function test_demand_heating_temperature_values()
 
     EnergySystems.reset(demand)
 
-    @test demand.load == 0.0
+    @test demand.demand == 0.0
     @test demand.temperature === nothing
 
     EnergySystems.control(demand, components, simulation_parameters)
 
-    @test demand.load == 75.0
+    @test demand.demand == 75.0
     @test demand.temperature == 55.0
 
     EnergySystems.process(demand, simulation_parameters)

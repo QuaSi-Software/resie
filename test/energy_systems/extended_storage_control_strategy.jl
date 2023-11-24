@@ -90,7 +90,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
+            "static_demand" => 5000,
             "static_temperature" => 60
         ),
     )
@@ -242,7 +242,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
+            "static_demand" => 5000,
             "static_temperature" => 60
         ),
     )
@@ -398,7 +398,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
+            "static_demand" => 5000,
             "static_temperature" => 60
         ),
     )
@@ -484,7 +484,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.reset(boiler)
     EnergySystems.reset(demand)
 
-    demand.static_load = 2000
+    demand.static_demand = 2000
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(bus_2, components, simulation_parameters)

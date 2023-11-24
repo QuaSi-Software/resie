@@ -252,7 +252,7 @@ function test_demand_over_busses_supply_is_transformer()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
+            "static_demand" => 1000,
             "static_temperature" => 60,
             "scale" => 1
         ),
@@ -261,7 +261,7 @@ function test_demand_over_busses_supply_is_transformer()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
+            "static_demand" => 1000,
             "static_temperature" => 60,
             "scale" => 1
         ),

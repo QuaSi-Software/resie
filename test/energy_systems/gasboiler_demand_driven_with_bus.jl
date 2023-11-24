@@ -67,9 +67,9 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 12000/4
+    demand.demand = 12000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
@@ -124,9 +124,9 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 15000/4
+    demand.demand = 15000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
@@ -181,9 +181,9 @@ function test_gasboiler_demand_driven_with_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 10000/4
+    demand.demand = 10000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85
@@ -283,9 +283,9 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 12000/4
+    demand.demand = 12000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 12000/4
     demand.input_interfaces[demand.medium].temperature = 85
@@ -340,9 +340,9 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 15000/4
+    demand.demand = 15000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 15000/4
     demand.input_interfaces[demand.medium].temperature = 85
@@ -397,9 +397,9 @@ function test_gasboiler_demand_driven_without_bus()
     end
 
     EnergySystems.control(demand, components, simulation_parameters)
-    @test demand.load == demand.input_interfaces[demand.medium].max_energy
+    @test demand.demand == demand.input_interfaces[demand.medium].max_energy
     @test demand.temperature == demand.input_interfaces[demand.medium].temperature
-    demand.load = 10000/4
+    demand.demand = 10000/4
     demand.temperature = 85
     demand.input_interfaces[demand.medium].max_energy = 10000/4
     demand.input_interfaces[demand.medium].temperature = 85

@@ -66,7 +66,7 @@ function test_heat_pump_demand_driven_correct_order()
 
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.load = 900
+    demand.demand = 900
     demand.temperature = 45
     demand.input_interfaces[demand.medium].temperature = 45
 
@@ -112,7 +112,7 @@ function test_heat_pump_demand_driven_correct_order()
 
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.load = 2100
+    demand.demand = 2100
     demand.temperature = 75
     demand.input_interfaces[demand.medium].temperature = 75
 

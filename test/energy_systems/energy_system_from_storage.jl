@@ -90,7 +90,7 @@ function test_run_energy_system_from_storage()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
@@ -142,7 +142,7 @@ function test_run_energy_system_from_storage()
 
     lheat_storage.load = 100.0
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
@@ -267,7 +267,7 @@ function test_run_energy_system_from_storage_denied()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 

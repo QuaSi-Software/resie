@@ -92,8 +92,8 @@ function test_multiple_transformer_with_limitations()
     # first time step: demand is met perfectly 
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
-    demand_h2.load = 2400/4
-    demand_heat.load = 2240/4
+    demand_h2.demand = 2400/4
+    demand_heat.demand = 2240/4
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(electrolyser, components, simulation_parameters)
     EnergySystems.control(grid_el1, components, simulation_parameters)
@@ -173,8 +173,8 @@ function test_multiple_transformer_with_limitations()
 
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
-    demand_h2.load = 0.5*2400/4  # reducing h2 demand by half
-    demand_heat.load = 2240/4  # same heat demand as bevore
+    demand_h2.demand = 0.5*2400/4  # reducing h2 demand by half
+    demand_heat.demand = 2240/4  # same heat demand as bevore
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(electrolyser, components, simulation_parameters)
     EnergySystems.control(grid_el1, components, simulation_parameters)
