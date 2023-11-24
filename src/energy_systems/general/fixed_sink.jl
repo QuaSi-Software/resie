@@ -21,10 +21,10 @@ mutable struct FixedSink <: Component
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
 
-    load::Float64
+    demand::Float64
     temperature::Temperature
 
-    static_load::Union{Nothing,Float64}
+    static_demand::Union{Nothing,Float64}
     static_temperature::Temperature
 
     function FixedSink(uac::String, config::Dict{String,Any})
@@ -53,9 +53,9 @@ mutable struct FixedSink <: Component
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
             config["scale"], # scaling_factor
-            0.0, # load
+            0.0, # demand
             nothing, # temperature
-            default(config, "static_load", nothing), # static_load
+            default(config, "static_demand", nothing), # static_demand
             default(config, "static_temperature", nothing), # static_temperature
         )
     end
@@ -64,10 +64,10 @@ end
 function output_values(unit::FixedSink)::Vector{String}
     if unit.temperature_profile === nothing && unit.static_temperature === nothing
         return [string(unit.medium)*" IN",
-                "Load"]
+                "Demand"]
     else
         return [string(unit.medium)*" IN",
-                "Load",
+                "Demand",
                 "Temperature"]
     end
 end
@@ -75,8 +75,8 @@ end
 function output_value(unit::FixedSink, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
-    elseif key.value_key == "Load"
-        return unit.load
+    elseif key.value_key == "Demand"
+        return unit.demand
     elseif key.value_key == "Temperature"
         return unit.temperature
     end
@@ -90,16 +90,16 @@ function control(
 )
     move_state(unit, components, parameters)
 
-    if unit.static_load !== nothing
-        unit.load = unit.static_load
+    if unit.static_demand !== nothing
+        unit.demand = unit.static_demand
     elseif unit.energy_profile !== nothing
-        unit.load = unit.scaling_factor * Profiles.work_at_time(
+        unit.demand = unit.scaling_factor * Profiles.work_at_time(
             unit.energy_profile, parameters["time"]
         )
     else
-        unit.load = 0.0
+        unit.demand = 0.0
     end
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.load)
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.demand)
 
     if unit.static_temperature !== nothing
         unit.temperature = unit.static_temperature
@@ -116,7 +116,7 @@ end
 
 function process(unit::FixedSink, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    sub!(inface, unit.load, unit.temperature)
+    sub!(inface, unit.demand, unit.temperature)
 end
 
 """
