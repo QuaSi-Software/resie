@@ -133,10 +133,14 @@ function base_order(components_by_function)
     # place steps potential and process for transformers in order by "chains"
     chains = find_chains(components_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
-        if length(chain) > 1
+        nr_of_remaining_units_in_chain = length(chain)
+        if nr_of_remaining_units_in_chain > 1
             for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
-                initial_nr -= 1
+                if nr_of_remaining_units_in_chain > 1  # skip potential of last transformer in the chain
+                    push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                    nr_of_remaining_units_in_chain -= 1
+                end
             end
         end
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
