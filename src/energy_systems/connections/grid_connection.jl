@@ -17,8 +17,8 @@ mutable struct GridConnection <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    draw_sum::Float64
-    load_sum::Float64
+    output_sum::Float64
+    input_sum::Float64
 
     function GridConnection(uac::String, config::Dict{String,Any})
         medium = Symbol(config["medium"])
@@ -41,8 +41,8 @@ mutable struct GridConnection <: Component
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
-            0.0, # draw_sum,
-            0.0, # load_sum
+            0.0, # output_sum,
+            0.0, # input_sum
         )
     end
 end
@@ -67,14 +67,14 @@ function process(unit::GridConnection, parameters::Dict{String,Any})
         # must be handled here instead of being ignored
         exchange = balance_on(outface, outface.target)
         if exchange.balance < 0.0
-            unit.draw_sum += exchange.balance
+            unit.output_sum += exchange.balance
             add!(outface, abs(exchange.balance))
         end
     else
         inface = unit.input_interfaces[unit.medium]
         exchange = balance_on(inface, inface.source)
         if exchange.balance > 0.0
-            unit.load_sum += exchange.balance
+            unit.input_sum += exchange.balance
             sub!(inface, exchange.balance)
         end
     end
@@ -83,12 +83,10 @@ end
 function output_values(unit::GridConnection)::Vector{String}
     if unit.sys_function == sf_bounded_source
         return [string(unit.medium)*" OUT",
-                "Draw_sum",
-                "Load_sum"]
+                "Output_sum"]
     elseif unit.sys_function == sf_bounded_sink
         return [string(unit.medium)*" IN",
-                "Draw_sum",
-                "Load_sum"]
+                "Input_sum"]
     end
 end
 
@@ -97,10 +95,10 @@ function output_value(unit::GridConnection, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Draw_sum"
-        return unit.draw_sum
-    elseif key.value_key == "Load_sum"
-        return unit.load_sum
+    elseif key.value_key == "Output_sum"
+        return unit.output_sum
+    elseif key.value_key == "Input_sum"
+        return unit.input_sum
     end
     throw(KeyError(key.value_key))
 end
