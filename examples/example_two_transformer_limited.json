@@ -4,37 +4,49 @@
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "output_keys": {
-            "TST_DEM_ht_01": ["m_h_w_ht1 Load"],
-            "TST_DEM_H2_01": ["m_c_g_h2 Load"],
+            "TST_DEM_ht_01": ["m_h_w_ht1 Demand", "m_h_w_ht1 IN"],
+            "TST_DEM_H2_01": ["m_c_g_h2 Demand", "m_c_g_h2 IN"],
             "TST_HP_01": ["m_h_w_ht1 OUT"],
             "TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT", "m_c_g_h2 OUT"]
         },
         "output_plot": { 
             "1": {
-                "key": {"TST_DEM_ht_01": ["m_h_w_ht1 Load"]},
+                "key": {"TST_DEM_ht_01": ["m_h_w_ht1 Demand"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"TST_DEM_H2_01": ["m_c_g_h2 Load"]},
+                "key": {"TST_DEM_H2_01": ["m_c_g_h2 Demand"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_DEM_ht_01": ["m_h_w_ht1 IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
-                "key": {"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"]},
+                "key": {"TST_DEM_H2_01": ["m_c_g_h2 IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "5": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
                 "key": {"TST_01_ELT_01_ELY": ["m_c_g_h2 OUT"]},
                 "axis": "left",
                 "unit": "kWh",
