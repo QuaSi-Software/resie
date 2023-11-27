@@ -237,7 +237,7 @@
             "strategy": {
                 "name": "supply_driven"
             },
-            "power": 20000,
+            "power_th": 20000,
             "fixed_cop": 3.0
         },
         "TST_01_HZG_02_HTP": {
@@ -251,7 +251,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
+            "power_th": 20000,
             "fixed_cop": 3.0
         },
         "TST_01_HZG_00_BFT": {
@@ -296,7 +296,7 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.1
             },
-            "power": 40000
+            "power_th": 40000
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
@@ -312,7 +312,7 @@
                 "name": "demand_driven",
                 "m_heat_out" : false
             },
-            "power": 40000
+            "power_el": 40000
         },
         "TST_01_HZG_01_STS": {
             "type": "SeasonalThermalStorage",

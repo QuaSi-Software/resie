@@ -58,7 +58,7 @@ function test_run_energy_system_from_storage()
                 "name" => "demand_driven",
                 "unload_storages" => true
             ),
-            "power" => 12000,
+            "power_th" => 12000,
             "fixed_cop" => 3.0,
             "min_power_fraction" => 0.0
         ),
@@ -234,7 +234,7 @@ function test_run_energy_system_from_storage_denied()
                 "name" => "demand_driven",
                 "unload_storages" => false
             ),
-            "power" => 12000,
+            "power_th" => 12000,
             "fixed_cop" => 3.0,
             "min_power_fraction" => 0.0
         ),

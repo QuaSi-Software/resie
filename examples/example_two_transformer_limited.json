@@ -105,7 +105,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 5000,
+            "power_th": 5000,
             "fixed_cop": 3.0,
             "min_power_fraction": 0
         },
@@ -120,7 +120,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 4000,
+            "power_el": 4000,
             "min_run_time": 0,
             "min_power_fraction": 0
         }

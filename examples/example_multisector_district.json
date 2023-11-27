@@ -319,7 +319,7 @@
                 "name": "demand_driven",
                 "operation_profile_path": "profiles/district/4000hours_with_least_CO2_2022.prf"
             },
-            "power": 600000,
+            "power_el": 600000,
             "output_temperature": 50.0
         },
         "TST_CHP_01": {
@@ -333,7 +333,7 @@
                 "name": "demand_driven",
                 "load_storages": true
             },
-            "power": 150000,
+            "power_gas": 150000,
             "output_temperature": 60,
             "min_power_fraction": 1.0
         },
@@ -349,7 +349,7 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.5          
             },
-            "power": 400000,
+            "power_th": 400000,
             "output_temperature": 60,
             "min_power_fraction": 0.0
         },
@@ -393,7 +393,7 @@
                 "name": "demand_driven",
                 "load_storages": false
             },
-            "power": 550000,
+            "power_th": 550000,
             "fixed_cop": 3.0,
             "min_power_fraction": 0.2
         },
@@ -406,7 +406,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 300000,
+            "power_th": 300000,
             "fixed_cop": 3.5
         }
     },

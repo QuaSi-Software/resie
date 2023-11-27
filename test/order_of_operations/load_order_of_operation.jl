@@ -47,7 +47,7 @@ function load_order_of_operation()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 9000,
+            "power_th" => 9000,
             "fixed_cop" => 3.0,
             "min_power_fraction" => 0.0
         )  

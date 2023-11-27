@@ -39,7 +39,7 @@ function test_ooo_for_heat_pumps_wrong()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000,
+            "power_th" => 12000,
             "fixed_cop" => 3.0
         ),
     )

@@ -202,7 +202,7 @@ function test_demand_over_busses_supply_is_transformer()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
@@ -481,7 +481,7 @@ function test_demand_over_busses_supply_is_transformer()
     # not tests for balance_on() of busses here as for this function the missmatch of 
     # demand and supply is not important
 
-    boiler.power = 6000
+    boiler.power_th = 6000
 
     EnergySystems.reset(demand_2)
     EnergySystems.reset(demand_1)

@@ -22,7 +22,7 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_in::Symbol
 
-    power::Float64
+    power_th::Float64
     min_power_fraction::Float64
     min_run_time::UInt
     fixed_cop::Any
@@ -52,7 +52,7 @@ mutable struct HeatPump <: Component
             m_el_in,
             m_heat_out,
             m_heat_in,
-            config["power"], # power
+            config["power_th"], # power_th
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
             default(config, "fixed_cop", nothing),
@@ -212,7 +212,7 @@ function calculate_energies(
     end
 
     # maximum possible in and outputs of heat pump, not regarding any external limits!
-    max_produce_heat = watt_to_wh(unit.power)
+    max_produce_heat = watt_to_wh(unit.power_th)
     max_consume_heat = max_produce_heat * (1.0 - 1.0 / unit.cop)
     max_consume_el = max_produce_heat - max_consume_heat
 

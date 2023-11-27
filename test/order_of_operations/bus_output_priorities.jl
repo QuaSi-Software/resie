@@ -22,7 +22,7 @@ function test_ooo_bus_output_priorities()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",

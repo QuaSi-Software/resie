@@ -4,7 +4,7 @@ Implementation of an electrolyser, turning electricity and water into H2, O2 and
 For the moment this remains a simple implementation that converts electricity into
 the gases and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.6:0.4. Has a minimum
 run time of 3600s taken into consideration in its control behaviour and a minimum power
-fraction of 20%. The power is considered the maximum amount of electricity that the
+fraction of 20%. The power_el is considered the maximum amount of electricity that the
 electrolyser can consume.
 
 At the moment there is no operation strategy is implemented and the processing of the
@@ -23,7 +23,7 @@ mutable struct Electrolyser <: Component
     m_h2_out::Symbol
     m_o2_out::Symbol
 
-    power::Float64
+    power_el::Float64
     heat_fraction::Float64
     min_power_fraction::Float64
     min_run_time::UInt
@@ -54,7 +54,7 @@ mutable struct Electrolyser <: Component
             m_heat_out,
             m_h2_out,
             m_o2_out,
-            config["power"], # power
+            config["power_el"], # power_el
             default(config, "heat_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 3600),
@@ -200,11 +200,11 @@ function calculate_energies(
     potential_energy_o2_out = potentials[7]
     potential_storage_o2_out = potentials[8]
 
-    max_produce_heat = watt_to_wh(unit.power * unit.heat_fraction)
-    max_produce_h2 = watt_to_wh(unit.power * (1.0 - unit.heat_fraction))
+    max_produce_heat = watt_to_wh(unit.power_el * unit.heat_fraction)
+    max_produce_h2 = watt_to_wh(unit.power_el * (1.0 - unit.heat_fraction))
     # @TODO: handle O2 calculation if it ever becomes relevant. for now use molar ratio
     max_produce_o2 = 0.5 * max_produce_h2
-    max_consume_el = watt_to_wh(unit.power)
+    max_consume_el = watt_to_wh(unit.power_el)
 
     # get usage fraction of external profile (normalized from 0 to 1)
     usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])

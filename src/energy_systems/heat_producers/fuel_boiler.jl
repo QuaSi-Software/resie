@@ -16,7 +16,7 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
-    power::Float64
+    power_th::Float64
     is_plr_dependant::Bool
     max_consumable_fuel::Float64
     plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
@@ -29,7 +29,7 @@ mutable struct FuelBoiler <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_fuel_in, m_heat_out])
 
-        max_consumable_fuel = watt_to_wh(float(config["power"])) /
+        max_consumable_fuel = watt_to_wh(float(config["power_th"])) /
                              default(config, "max_thermal_efficiency", 1.0)
         # lookup table for conversion of part load ratio to expended energy
         plr_to_expended_energy = []
@@ -60,7 +60,7 @@ mutable struct FuelBoiler <: Component
             ),
             m_fuel_in,
             m_heat_out,
-            config["power"], # power
+            config["power_th"], # power_th
             default(config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
             max_consumable_fuel,
             plr_to_expended_energy,
@@ -207,24 +207,24 @@ function calculate_energies(
     potential_storage_heat_out = potentials[4]
 
     if unit.is_plr_dependant == false
-        max_produce_heat = watt_to_wh(unit.power)
+        max_produce_heat = watt_to_wh(unit.power_th)
         max_consume_fuel = max_produce_heat
     elseif unit.is_plr_dependant == true # part load ratio
         if unit.controller.strategy == "demand_driven"
-            # max_produce_heat should equal rated power, else when using demand heat, which
+            # max_produce_heat should equal rated power_th, else when using demand heat, which
             # can be inf, a non-physical state might occur
-            max_produce_heat = watt_to_wh(unit.power)
+            max_produce_heat = watt_to_wh(unit.power_th)
             demand_heat = -(unit.controller.parameter["load_storages"] ?
                             potential_energy_heat_out + potential_storage_heat_out :
                             potential_energy_heat_out)
             if demand_heat >= max_produce_heat
-                # set demand_heat to rated power -> prevent max_consume_fuel to equal inf
+                # set demand_heat to rated power_th -> prevent max_consume_fuel to equal inf
                 demand_heat = max_produce_heat
             elseif demand_heat < 0
                 # ensure that part-load-ratio is greater equal 0
                 demand_heat = 0
             end
-            part_load_ratio = demand_heat / watt_to_wh(unit.power)
+            part_load_ratio = demand_heat / watt_to_wh(unit.power_th)
             thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
             max_consume_fuel = max_produce_heat / thermal_efficiency
         elseif unit.controller.strategy == "supply_driven"

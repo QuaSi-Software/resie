@@ -90,7 +90,7 @@ function test_base_order()
                 "high_threshold" => 0.9,
                 "low_threshold" => 0.2
             ),
-            "power" => 12500
+            "power_gas" => 12500
         ),
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -103,7 +103,7 @@ function test_base_order()
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
             ),
-            "power" => 20000,
+            "power_th" => 20000,
             "fixed_cop" => 3.0
         ),
         "TST_01_HZG_01_BFT" => Dict{String,Any}(

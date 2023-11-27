@@ -163,7 +163,8 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
             if isdefined(each_outputinterface, :target)
                 energies[n] = calculate_energy_flow(each_outputinterface) 
                 n += 1
-                    
+                
+                # If source or target is fixed source or sink, gather also demand and supply
                 if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
                     energies[n] = each_outputinterface.source.supply  
                     n += 1

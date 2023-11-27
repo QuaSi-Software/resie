@@ -53,7 +53,7 @@ function test_multiple_transformer_with_limitations()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 4000,
+            "power_el" => 4000,
             "min_run_time" => 0.0,
             "min_power_fraction" => 0.0,
             "heat_fraction" => 0.4
@@ -65,7 +65,7 @@ function test_multiple_transformer_with_limitations()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 2240,
+            "power_th" => 2240,
             "fixed_cop" => 3.5,
             "min_power_fraction" => 0.0
         ),

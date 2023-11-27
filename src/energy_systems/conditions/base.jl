@@ -46,7 +46,7 @@ function load_condition_prototypes()
         ),
         function (condition, unit, simulation_parameters) # check_function
             return rel(condition, "buffer").capacity - rel(condition, "buffer").load <
-                   unit.power * unit.min_power_fraction
+                   unit.power_th * unit.min_power_fraction
         end
     )
 

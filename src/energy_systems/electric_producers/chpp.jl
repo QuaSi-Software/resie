@@ -4,7 +4,7 @@ Implementation of a combined-heat-power-plant (CHPP) component.
 For the moment this remains a simple implementation that converts natural gas into
 electricity and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.4:0.6. Has a minimum
 run time of 1800s taken into consideration in its control behaviour and a minimum power
-fraction of 20%. The power is considered the maximum amount of both heat and electricity
+fraction of 20%. The power_gas is considered the maximum amount of both heat and electricity
 that the CHPP can produce.
 
 The only currently implemented operation strategy involves checking the load of a linked
@@ -23,7 +23,7 @@ mutable struct CHPP <: Component
     m_heat_out::Symbol
     m_el_out::Symbol
 
-    power::Float64
+    power_gas::Float64
     electricity_fraction::Float64
     min_power_fraction::Float64
     min_run_time::UInt
@@ -51,7 +51,7 @@ mutable struct CHPP <: Component
             m_gas_in,
             m_heat_out,
             m_el_out,
-            config["power"], # power
+            config["power_gas"], # power_gas
             default(config, "electricity_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 1800),
@@ -156,8 +156,8 @@ function calculate_energies(
     potential_energy_heat_out = potentials[5]
     potential_storage_heat_out = potentials[6]
 
-    max_produce_heat = watt_to_wh(unit.power * (1.0 - unit.electricity_fraction))
-    max_produce_el = watt_to_wh(unit.power * unit.electricity_fraction)
+    max_produce_heat = watt_to_wh(unit.power_gas * (1.0 - unit.electricity_fraction))
+    max_produce_el = watt_to_wh(unit.power_gas * unit.electricity_fraction)
     max_consume_gas = max_produce_heat + max_produce_el
 
     # get usage fraction of external profile (normalized from 0 to 1)

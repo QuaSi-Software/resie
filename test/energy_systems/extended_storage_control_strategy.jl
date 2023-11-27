@@ -26,7 +26,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
@@ -179,7 +179,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
@@ -330,7 +330,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",

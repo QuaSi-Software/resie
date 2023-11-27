@@ -42,7 +42,7 @@ function test_gasboiler_demand_driven_with_bus()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000
+            "power_th" => 12000
         ),
     )
     components = Resie.load_components(components_config)
@@ -259,7 +259,7 @@ function test_gasboiler_demand_driven_without_bus()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000
+            "power_th" => 12000
         ),
     )
     components = Resie.load_components(components_config)

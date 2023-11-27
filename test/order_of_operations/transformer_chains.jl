@@ -159,7 +159,7 @@ function test_find_chains()
             "type" => "HeatPump",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
-            "power" => 12000,
+            "power_th" => 12000,
             "fixed_cop" => 3.0
         ),
         "TST_DEM_01" => Dict{String,Any}(

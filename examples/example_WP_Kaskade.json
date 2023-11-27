@@ -88,7 +88,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
+            "power_el": 20000,
             "m_heat_out": "m_h_w_lt1",
             "output_temperature": 25.0,
             "min_power_fraction": 0.0
@@ -102,7 +102,7 @@
             "strategy": {
                 "name": "supply_driven"
             },
-            "power": 10000,
+            "power_th": 10000,
             "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
             "min_power_fraction" : 0.0
@@ -116,7 +116,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 10000,
+            "power_th": 10000,
             "m_heat_in": "m_h_w_ht2",
             "min_power_fraction" : 0.0
         },
@@ -130,7 +130,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000,
+            "power_th": 40000,
             "min_power_fraction": 0.0
         },
         "TST_01_HZG_01_GRI": {

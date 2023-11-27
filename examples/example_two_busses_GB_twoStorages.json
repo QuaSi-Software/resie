@@ -100,7 +100,7 @@
                 "name": "demand_driven"
             },
             "min_power_fraction": 0,
-            "power": 1000
+            "power_th": 1000
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",
