@@ -80,7 +80,7 @@ function check_gas_in(
     unit::CHPP,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_gas_in"] == true
+    if unit.controller.parameter["consider_m_gas_in"] == true
         if (
             unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
             &&
@@ -108,7 +108,7 @@ function check_el_out(
     unit::CHPP,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_el_out"] == true
+    if unit.controller.parameter["consider_m_el_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_el_out],
             unit.output_interfaces[unit.m_el_out].target
@@ -128,7 +128,7 @@ function check_heat_out(
     unit::CHPP,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_heat_out"] == true
+    if unit.controller.parameter["consider_m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target

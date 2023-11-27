@@ -102,7 +102,7 @@ function check_el_in(
     unit::Electrolyser,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_el_in"] == true
+    if unit.controller.parameter["consider_m_el_in"] == true
         if (
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
             &&
@@ -130,7 +130,7 @@ function check_heat_out(
     unit::Electrolyser,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_heat_out"] == true
+    if unit.controller.parameter["consider_m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
@@ -150,7 +150,7 @@ function check_h2_out(
     unit::Electrolyser,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_h2_out"] == true
+    if unit.controller.parameter["consider_m_h2_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_h2_out],
             unit.output_interfaces[unit.m_h2_out].target
@@ -170,7 +170,7 @@ function check_o2_out(
     unit::Electrolyser,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_o2_out"] == true
+    if unit.controller.parameter["consider_m_o2_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_o2_out],
             unit.output_interfaces[unit.m_o2_out].target

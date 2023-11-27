@@ -113,7 +113,7 @@ function check_el_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_el_in"] == true
+    if unit.controller.parameter["consider_m_el_in"] == true
         if (
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
             &&
@@ -141,7 +141,7 @@ function check_heat_in(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_heat_in"] == true
+    if unit.controller.parameter["consider_m_heat_in"] == true
         if (
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
             &&
@@ -170,7 +170,7 @@ function check_heat_out(
     unit::HeatPump,
     parameters::Dict{String,Any}
 )
-    if unit.controller.parameter["m_heat_out"] == true
+    if unit.controller.parameter["consider_m_heat_out"] == true
         exchange = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
