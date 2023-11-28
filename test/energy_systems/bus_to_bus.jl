@@ -252,8 +252,8 @@ function test_demand_over_busses_supply_is_transformer()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_demand" => 1000,
-            "static_temperature" => 60,
+            "constant_demand" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
         "TST_DEM_02" => Dict{String,Any}(
@@ -261,8 +261,8 @@ function test_demand_over_busses_supply_is_transformer()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_demand" => 1000,
-            "static_temperature" => 60,
+            "constant_demand" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
     )

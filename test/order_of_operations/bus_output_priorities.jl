@@ -72,8 +72,8 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
-            "static_temperature" => 60,
+            "constant_load" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
         "TST_DEM_02" => Dict{String,Any}(
@@ -81,8 +81,8 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
-            "static_temperature" => 60,
+            "constant_load" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
     )

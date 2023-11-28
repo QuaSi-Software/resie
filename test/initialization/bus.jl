@@ -45,7 +45,7 @@ function energy_system()::Dict{String,Any}
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "scale" => 1,
-            "static_load" => 1000,
+            "constant_load" => 1000,
         ),
     )
 end

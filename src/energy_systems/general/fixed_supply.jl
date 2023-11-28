@@ -24,8 +24,8 @@ mutable struct FixedSupply <: Component
     supply::Float64
     temperature::Temperature
 
-    static_supply::Union{Nothing,Float64}
-    static_temperature::Temperature
+    constant_supply::Union{Nothing,Float64}
+    constant_temperature::Temperature
 
     function FixedSupply(uac::String, config::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
@@ -55,14 +55,14 @@ mutable struct FixedSupply <: Component
             config["scale"], # scaling_factor
             0.0, # supply
             nothing, # temperature
-            default(config, "static_supply", nothing), # static_supply
-            default(config, "static_temperature", nothing), # static_temperature
+            default(config, "constant_supply", nothing), # constant_supply
+            default(config, "constant_temperature", nothing), # constant_temperature
         )
     end
 end
 
 function output_values(unit::FixedSupply)::Vector{String}
-    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
         return [string(unit.medium)*" OUT",
                 "Supply"]
     else
@@ -90,8 +90,8 @@ function control(
 )
     move_state(unit, components, parameters)
 
-    if unit.static_supply !== nothing
-        unit.supply = unit.static_supply
+    if unit.constant_supply !== nothing
+        unit.supply = unit.constant_supply
     elseif unit.energy_profile !== nothing
         unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     else
@@ -99,8 +99,8 @@ function control(
     end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
 
-    if unit.static_temperature !== nothing
-        unit.temperature = unit.static_temperature
+    if unit.constant_temperature !== nothing
+        unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, parameters["time"])
     end

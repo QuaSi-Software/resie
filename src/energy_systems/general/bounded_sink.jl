@@ -21,8 +21,8 @@ mutable struct BoundedSink <: Component
 
     max_energy::Float64
     temperature::Temperature
-    static_power::Union{Nothing,Float64}
-    static_temperature::Temperature
+    constant_power::Union{Nothing,Float64}
+    constant_temperature::Temperature
 
     function BoundedSink(uac::String, config::Dict{String,Any})
         max_power_profile = "max_power_profile_file_path" in keys(config) ?
@@ -52,14 +52,14 @@ mutable struct BoundedSink <: Component
             config["scale"], # scaling_factor
             0.0, # max_energy
             nothing, # temperature
-            default(config, "static_power", nothing), # static_power
-            default(config, "static_temperature", nothing), # static_temperature
+            default(config, "constant_power", nothing), # constant_power
+            default(config, "constant_temperature", nothing), # constant_temperature
         )
     end
 end
 
 function output_values(unit::BoundedSink)::Vector{String}
-    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
         return [string(unit.medium)*" IN",
                 "Max_Energy"]
     else
@@ -87,8 +87,8 @@ function control(
 )
     move_state(unit, components, parameters)
 
-    if unit.static_power !== nothing
-        unit.max_energy = watt_to_wh(unit.static_power)
+    if unit.constant_power !== nothing
+        unit.max_energy = watt_to_wh(unit.constant_power)
     elseif unit.max_power_profile !== nothing
         unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
             unit.max_power_profile, parameters["time"]
@@ -98,8 +98,8 @@ function control(
     end
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
 
-    if unit.static_temperature !== nothing
-        unit.temperature = unit.static_temperature
+    if unit.constant_temperature !== nothing
+        unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(
             unit.temperature_profile, parameters["time"]

@@ -24,8 +24,8 @@ mutable struct FixedSink <: Component
     demand::Float64
     temperature::Temperature
 
-    static_demand::Union{Nothing,Float64}
-    static_temperature::Temperature
+    constant_demand::Union{Nothing,Float64}
+    constant_temperature::Temperature
 
     function FixedSink(uac::String, config::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
@@ -55,14 +55,14 @@ mutable struct FixedSink <: Component
             config["scale"], # scaling_factor
             0.0, # demand
             nothing, # temperature
-            default(config, "static_demand", nothing), # static_demand
-            default(config, "static_temperature", nothing), # static_temperature
+            default(config, "constant_demand", nothing), # constant_demand
+            default(config, "constant_temperature", nothing), # constant_temperature
         )
     end
 end
 
 function output_values(unit::FixedSink)::Vector{String}
-    if unit.temperature_profile === nothing && unit.static_temperature === nothing
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
         return [string(unit.medium)*" IN",
                 "Demand"]
     else
@@ -90,8 +90,8 @@ function control(
 )
     move_state(unit, components, parameters)
 
-    if unit.static_demand !== nothing
-        unit.demand = unit.static_demand
+    if unit.constant_demand !== nothing
+        unit.demand = unit.constant_demand
     elseif unit.energy_profile !== nothing
         unit.demand = unit.scaling_factor * Profiles.work_at_time(
             unit.energy_profile, parameters["time"]
@@ -101,8 +101,8 @@ function control(
     end
     set_max_energy!(unit.input_interfaces[unit.medium], unit.demand)
 
-    if unit.static_temperature !== nothing
-        unit.temperature = unit.static_temperature
+    if unit.constant_temperature !== nothing
+        unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(
             unit.temperature_profile, parameters["time"]

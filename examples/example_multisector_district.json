@@ -116,7 +116,7 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
-            "static_temperature": 60,
+            "constant_temperature": 60,
             "scale": 16000
         },
         "TST_DEM_TH_02": {
@@ -125,7 +125,7 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
-            "static_temperature": 60,
+            "constant_temperature": 60,
             "scale": 19000
         },
         "TST_DEM_EL_01": {
