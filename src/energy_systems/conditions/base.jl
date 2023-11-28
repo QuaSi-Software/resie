@@ -38,18 +38,6 @@ function load_condition_prototypes()
         end
     )
 
-    CONDITION_PROTOTYPES["Would overfill thermal buffer"] = ConditionPrototype(
-        "Would overfill thermal buffer", # name
-        Dict{String,Any}(), # parameters
-        EnSysRequirements( # required_components
-            "buffer" => (BufferTank, nothing)
-        ),
-        function (condition, unit, simulation_parameters) # check_function
-            return rel(condition, "buffer").capacity - rel(condition, "buffer").load <
-                   unit.power_th * unit.min_power_fraction
-        end
-    )
-
     CONDITION_PROTOTYPES["Little PV power"] = ConditionPrototype(
         "Little PV power", # name
         Dict{String,Any}( # parameters

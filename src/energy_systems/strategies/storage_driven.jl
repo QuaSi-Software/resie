@@ -31,20 +31,12 @@ function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
                         "Min run time",
                         Dict{String,Any}()
                     ),
-                    Condition(
-                        "Would overfill thermal buffer",
-                        Dict{String,Any}()
-                    ),
                 ],
                 table_data=Dict{Tuple,UInt}(
-                    (false, false, false) => 2,
-                    (false, true, false) => 2,
-                    (true, false, false) => 2,
-                    (true, true, false) => 1,
-                    (false, false, true) => 1,
-                    (false, true, true) => 1,
-                    (true, false, true) => 1,
-                    (true, true, true) => 1,
+                    (true, true) => 1,
+                    (false, true) => 2,
+                    (true, false) => 2,
+                    (false, false) => 2,
                 )
             ),
         )
@@ -65,8 +57,7 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
     conditions=[
         "Buffer < X%",
         "Buffer >= X%",
-        "Min run time",
-        "Would overfill thermal buffer"
+        "Min run time"
     ],
     strategy_parameters=Dict{String,Any}(
         "low_threshold" => 0.2,
