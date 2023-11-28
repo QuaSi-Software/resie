@@ -402,8 +402,9 @@ end
 
 Reset the given component back to zero.
 
-For most components this only resets the balances on the system interfaces but some
-components might require more complex reset handling.
+For most components this only resets the losses and the balances on the system interfaces,
+but some components might require more complex reset handling like for electrolysers due to
+several different losses present.
 """
 function reset(unit::Component)
     for inface in values(unit.input_interfaces)
@@ -415,6 +416,9 @@ function reset(unit::Component)
         if outface !== nothing
             reset!(outface)
         end
+    end
+    if hasfield(typeof(unit), Symbol("losses"))
+        unit.losses = 0.0
     end
 end
 

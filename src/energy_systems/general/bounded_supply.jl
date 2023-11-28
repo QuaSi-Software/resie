@@ -58,28 +58,6 @@ mutable struct BoundedSupply <: Component
     end
 end
 
-function output_values(unit::BoundedSupply)::Vector{String}
-    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" OUT",
-                "Max_Energy"]
-    else
-        return [string(unit.medium)*" OUT",
-                "Max_Energy",
-                "Temperature"]
-    end
-end
-
-function output_value(unit::BoundedSupply, key::OutputKey)::Float64
-    if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Max_Energy"
-        return unit.max_energy
-    elseif key.value_key == "Temperature"
-        return unit.temperature
-    end
-    throw(KeyError(key.value_key))
-end
-
 function control(
     unit::BoundedSupply,
     components::Grouping,
@@ -124,6 +102,28 @@ function process(unit::BoundedSupply, parameters::Dict{String,Any})
             unit.temperature
         )
     end
+end
+
+function output_values(unit::BoundedSupply)::Vector{String}
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
+        return [string(unit.medium)*" OUT",
+                "Max_Energy"]
+    else
+        return [string(unit.medium)*" OUT",
+                "Max_Energy",
+                "Temperature"]
+    end
+end
+
+function output_value(unit::BoundedSupply, key::OutputKey)::Float64
+    if key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Max_Energy"
+        return unit.max_energy
+    elseif key.value_key == "Temperature"
+        return unit.temperature
+    end
+    throw(KeyError(key.value_key))
 end
 
 export BoundedSupply

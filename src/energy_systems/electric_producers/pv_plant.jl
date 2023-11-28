@@ -47,20 +47,6 @@ mutable struct PVPlant <: Component
     end
 end
 
-function output_values(unit::PVPlant)::Vector{String}
-    return [string(unit.m_el_out)*" OUT",
-            "Supply"]
-end
-
-function output_value(unit::PVPlant, key::OutputKey)::Float64
-    if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Supply"
-        return unit.supply
-    end
-    throw(KeyError(key.value_key))
-end
-
 function control(
     unit::PVPlant,
     components::Grouping,
@@ -76,6 +62,20 @@ end
 function process(unit::PVPlant, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
+end
+
+function output_values(unit::PVPlant)::Vector{String}
+    return [string(unit.m_el_out)*" OUT",
+            "Supply"]
+end
+
+function output_value(unit::PVPlant, key::OutputKey)::Float64
+    if key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Supply"
+        return unit.supply
+    end
+    throw(KeyError(key.value_key))
 end
 
 export PVPlant

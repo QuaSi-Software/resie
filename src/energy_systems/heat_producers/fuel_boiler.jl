@@ -24,6 +24,8 @@ mutable struct FuelBoiler <: Component
     min_run_time::UInt          # operated
     output_temperature::Temperature
 
+    losses::Float64
+
     function FuelBoiler(uac::String, config::Dict{String,Any})
         m_fuel_in = Symbol(config["m_fuel_in"])
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -66,7 +68,8 @@ mutable struct FuelBoiler <: Component
             plr_to_expended_energy,
             default(config, "min_power_fraction", 0.1),
             default(config, "min_run_time", 0),
-            default(config, "output_temperature", nothing)
+            default(config, "output_temperature", nothing),
+            0.0, # losses
         )
     end
 end
@@ -356,9 +359,27 @@ function process(unit::FuelBoiler, parameters::Dict{String,Any})
     if energies[1]
         sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])
         add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+        unit.losses = energies[2] - energies[3]
     else
         set_max_energies!(unit, 0.0, 0.0)
     end
+end
+
+function output_values(unit::FuelBoiler)::Vector{String}
+    return [string(unit.m_fuel_in)*" IN", 
+            string(unit.m_heat_out)*" OUT",
+            "Losses"]
+end
+
+function output_value(unit::FuelBoiler, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Losses"
+        return unit.losses
+    end
+    throw(KeyError(key.value_key))
 end
 
 export FuelBoiler

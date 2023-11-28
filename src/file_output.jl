@@ -133,6 +133,14 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 end 
             end
         end
+
+        # add losses
+        if hasfield(typeof(each_component[2]), Symbol("losses"))
+            push!(output_sourcenames_sankey, each_component[2].uac)
+            push!(output_targetnames_sankey, "Losses")       
+            push!(medium_of_interfaces, "Losses")
+            nr_of_interfaces += 1
+        end
     end
     println(
         length(medium_of_interfaces) !== nr_of_interfaces
@@ -175,6 +183,12 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
                     n += 1 
                 end
             end
+        end
+
+        # add losses
+        if hasfield(typeof(each_component[2]), Symbol("losses"))
+            energies[n] = each_component[2].losses
+            n += 1
         end
     end
     return energies
@@ -436,8 +450,8 @@ function create_sankey(
         interface_new += 1
     end
 
-    # add 0.000001 to all interfaces to display interfaces that are zero
-    output_all_value_sum = output_all_value_sum .+ 0.000001
+    # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
+    output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
 
     # prepare data for sankey diagram and create sankey
     # set label of blocks

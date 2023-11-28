@@ -58,28 +58,6 @@ mutable struct BoundedSink <: Component
     end
 end
 
-function output_values(unit::BoundedSink)::Vector{String}
-    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" IN",
-                "Max_Energy"]
-    else
-        return [string(unit.medium)*" IN",
-                "Max_Energy",
-                "Temperature"]
-    end
-end
-
-function output_value(unit::BoundedSink, key::OutputKey)::Float64
-    if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
-    elseif key.value_key == "Max_Energy"
-        return unit.max_energy
-    elseif key.value_key == "Temperature"
-        return unit.temperature
-    end
-    throw(KeyError(key.value_key))
-end
-
 function control(
     unit::BoundedSink,
     components::Grouping,
@@ -120,6 +98,28 @@ function process(unit::BoundedSink, parameters::Dict{String,Any})
             min(abs(exchange.balance), unit.max_energy)
         )
     end
+end
+
+function output_values(unit::BoundedSink)::Vector{String}
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
+        return [string(unit.medium)*" IN",
+                "Max_Energy"]
+    else
+        return [string(unit.medium)*" IN",
+                "Max_Energy",
+                "Temperature"]
+    end
+end
+
+function output_value(unit::BoundedSink, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "Max_Energy"
+        return unit.max_energy
+    elseif key.value_key == "Temperature"
+        return unit.temperature
+    end
+    throw(KeyError(key.value_key))
 end
 
 export BoundedSink

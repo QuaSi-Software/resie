@@ -61,28 +61,6 @@ mutable struct FixedSupply <: Component
     end
 end
 
-function output_values(unit::FixedSupply)::Vector{String}
-    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" OUT",
-                "Supply"]
-    else
-        return [string(unit.medium)*" OUT",
-                "Supply",
-                "Temperature"]
-    end
-end
-
-function output_value(unit::FixedSupply, key::OutputKey)::Float64
-    if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Supply"
-        return unit.supply
-    elseif key.value_key == "Temperature"
-        return unit.temperature
-    end
-    throw(KeyError(key.value_key))
-end
-
 function control(
     unit::FixedSupply,
     components::Grouping,
@@ -110,6 +88,28 @@ end
 function process(unit::FixedSupply, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     add!(outface, unit.supply, unit.temperature)
+end
+
+function output_values(unit::FixedSupply)::Vector{String}
+    if unit.temperature_profile === nothing && unit.constant_temperature === nothing
+        return [string(unit.medium)*" OUT",
+                "Supply"]
+    else
+        return [string(unit.medium)*" OUT",
+                "Supply",
+                "Temperature"]
+    end
+end
+
+function output_value(unit::FixedSupply, key::OutputKey)::Float64
+    if key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Supply"
+        return unit.supply
+    elseif key.value_key == "Temperature"
+        return unit.temperature
+    end
+    throw(KeyError(key.value_key))
 end
 
 export FixedSupply

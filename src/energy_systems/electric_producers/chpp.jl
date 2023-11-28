@@ -29,6 +29,8 @@ mutable struct CHPP <: Component
     min_run_time::UInt
     output_temperature::Temperature
 
+    losses::Float64
+
     function CHPP(uac::String, config::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -56,7 +58,7 @@ mutable struct CHPP <: Component
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
-
+            0.0, # losses
         )
     end
 end
@@ -282,6 +284,24 @@ function process(unit::CHPP, parameters::Dict{String,Any})
     else
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     end
+end
+
+function output_values(unit::CHPP)::Vector{String}
+    return [string(unit.m_gas_in)*" IN", 
+            string(unit.m_el_out)*" OUT",
+            string(unit.m_heat_out)*" OUT",
+            "Losses"]
+end
+
+function output_value(unit::CHPP, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Losses"
+        return unit.losses
+    end
+    throw(KeyError(key.value_key))
 end
 
 export CHPP

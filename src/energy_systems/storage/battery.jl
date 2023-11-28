@@ -17,6 +17,7 @@ Base.@kwdef mutable struct Battery <: Component
 
     capacity::Float64
     load::Float64
+    losses::Float64
 
     function Battery(uac::String, config::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
@@ -36,7 +37,8 @@ Base.@kwdef mutable struct Battery <: Component
             ),
             medium,
             config["capacity"], # capacity
-            config["load"] # load
+            config["load"], # load
+            0.0  # losses
         )
     end
 end
@@ -119,7 +121,8 @@ function output_values(unit::Battery)::Vector{String}
             string(unit.medium)*" OUT",
             "Load",
             "Load%",
-            "Capacity"]
+            "Capacity",
+            "Losses"]
 end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
@@ -133,6 +136,8 @@ function output_value(unit::Battery, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

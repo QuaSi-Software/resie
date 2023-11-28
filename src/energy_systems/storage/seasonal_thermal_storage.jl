@@ -17,6 +17,7 @@ mutable struct SeasonalThermalStorage <: Component
 
     capacity::Float64
     load::Float64
+    losses::Float64
 
     use_adaptive_temperature::Bool
     switch_point::Float64
@@ -44,6 +45,7 @@ mutable struct SeasonalThermalStorage <: Component
             m_heat_out,
             config["capacity"], # capacity
             config["load"], # load
+            0.0, # losses
             default(config, "use_adaptive_temperature", false),
             default(config, "switch_point", 0.25),
             default(config, "high_temperature", 90.0),
@@ -155,7 +157,8 @@ function output_values(unit::SeasonalThermalStorage)::Vector{String}
             string(unit.m_heat_out)*" OUT",
             "Load",
             "Load%",
-            "Capacity"]
+            "Capacity",
+            "Losses"]
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
@@ -169,6 +172,8 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

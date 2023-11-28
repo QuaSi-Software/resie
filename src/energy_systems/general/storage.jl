@@ -16,6 +16,7 @@ mutable struct Storage <: Component
 
     capacity::Float64
     load::Float64
+    losses::Float64
 
     function Storage(uac::String, config::Dict{String,Any})
         medium = Symbol(config["medium"])
@@ -36,6 +37,7 @@ mutable struct Storage <: Component
             medium,
             config["capacity"], # capacity
             config["load"], # load
+            0.0, # losses
         )
     end
 end
@@ -113,7 +115,8 @@ function output_values(unit::Storage)::Vector{String}
             string(unit.medium)*" OUT",
             "Load",
             "Load%",
-            "Capacity"]
+            "Capacity",
+            "Losses"]
 end
 
 function output_value(unit::Storage, key::OutputKey)::Float64
@@ -127,6 +130,8 @@ function output_value(unit::Storage, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

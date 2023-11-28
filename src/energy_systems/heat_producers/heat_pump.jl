@@ -30,6 +30,8 @@ mutable struct HeatPump <: Component
     input_temperature::Temperature
     cop::Float64
 
+    losses::Float64
+
     function HeatPump(uac::String, config::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -59,6 +61,7 @@ mutable struct HeatPump <: Component
             default(config, "output_temperature", nothing),
             default(config, "input_temperature", nothing),
             0.0, # cop
+            0.0, # losses
         )
     end
 end
@@ -72,24 +75,6 @@ function control(
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
-end
-
-function output_values(unit::HeatPump)::Vector{String}
-    return [string(unit.m_el_in)*" IN", 
-            string(unit.m_heat_in)*" IN",
-            string(unit.m_heat_out)*" OUT",
-            "COP"]
-end
-
-function output_value(unit::HeatPump, key::OutputKey)::Float64
-    if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
-    elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "COP"
-        return unit.cop
-    end
-    throw(KeyError(key.value_key))
 end
 
 function set_max_energies!(
@@ -405,6 +390,27 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
     else
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     end
+end
+
+function output_values(unit::HeatPump)::Vector{String}
+    return [string(unit.m_el_in)*" IN", 
+            string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_out)*" OUT",
+            "COP", 
+            "Losses"]
+end
+
+function output_value(unit::HeatPump, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "COP"
+        return unit.cop
+    elseif key.value_key == "Losses"
+        return unit.losses
+    end
+    throw(KeyError(key.value_key))
 end
 
 export HeatPump

@@ -29,6 +29,9 @@ mutable struct Electrolyser <: Component
     min_run_time::UInt
     output_temperature::Temperature
 
+    losses_heat::Float32
+    losses_hydrogen::Float64
+
     function Electrolyser(uac::String, config::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -59,6 +62,8 @@ mutable struct Electrolyser <: Component
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 3600),
             default(config, "output_temperature", 55.0),
+            0.0, # Losses heat
+            0.0  # Losses hydrogen
         )
     end
 end
@@ -70,22 +75,6 @@ function control(
 )
     move_state(unit, components, parameters)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
-end
-
-function output_values(unit::Electrolyser)::Vector{String}
-    return [string(unit.m_el_in)*" IN", 
-            string(unit.m_h2_out)*" OUT",
-            string(unit.m_o2_out)*" OUT",
-            string(unit.m_heat_out)*" OUT"]
-end
-
-function output_value(unit::Electrolyser, key::OutputKey)::Float64
-    if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
-    elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    end
-    throw(KeyError(key.value_key))
 end
 
 function set_max_energies!(
@@ -355,6 +344,49 @@ function process(unit::Electrolyser, parameters::Dict{String,Any})
     else
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
     end
+end
+
+# has its own reset function as here more losses are present that need to be reset in every timestep
+function reset(unit::Electrolyser)
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing
+            reset!(inface)
+        end
+    end
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing
+            reset!(outface)
+        end
+    end
+
+    # reset losses
+    unit.losses_hydrogen = 0.0
+    unit.losses_heat = 0.0
+end
+
+function output_values(unit::Electrolyser)::Vector{String}
+    return [string(unit.m_el_in)*" IN", 
+            string(unit.m_h2_out)*" OUT",
+            string(unit.m_o2_out)*" OUT",
+            string(unit.m_heat_out)*" OUT",
+            "Losses",
+            "Losses_heat",
+            "Losses_hydrogen"]
+end
+
+function output_value(unit::Electrolyser, key::OutputKey)::Float64
+    if key.value_key == "IN"
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Losses_heat"
+        return unit.losses_heat
+    elseif key.value_key == "Losses_hydrogen"
+        return unit.losses_hydrogen
+    elseif key.value_key == "Losses"
+        return unit.losses_hydrogen + unit.losses_heat
+    end
+    throw(KeyError(key.value_key))
 end
 
 export Electrolyser
