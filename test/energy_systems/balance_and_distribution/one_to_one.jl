@@ -6,7 +6,7 @@ using Resie.Profiles
 
 EnergySystems.set_timestep(900)
 
-function test_demand_heating_temperature_values()
+function test_one_to_one()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
@@ -20,12 +20,12 @@ function test_demand_heating_temperature_values()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
-            "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
-            "scale" => 1000
+            "static_load" => 1000,
+            "static_temperature" => 55,
         ),
     )
     components = Resie.load_components(components_config)
+    grid = components["TST_GRI_01"]
     demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
@@ -34,21 +34,28 @@ function test_demand_heating_temperature_values()
     )
 
     EnergySystems.reset(demand)
+    EnergySystems.reset(grid)
 
     @test demand.load == 0.0
     @test demand.temperature === nothing
 
     EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
 
-    @test demand.load == 75.0
+    @test demand.load == 1000.0
     @test demand.temperature == 55.0
 
     EnergySystems.process(demand, simulation_parameters)
 
-    @test demand.input_interfaces[demand.medium].balance == -75.0
+    @test demand.input_interfaces[demand.medium].balance == -1000.0
+    @test demand.input_interfaces[demand.medium].temperature == 55.0
+
+    EnergySystems.process(grid, simulation_parameters)
+
+    @test demand.input_interfaces[demand.medium].balance == 0.0
     @test demand.input_interfaces[demand.medium].temperature == 55.0
 end
 
-@testset "demand_heating_temperature_values" begin
-    test_demand_heating_temperature_values()
+@testset "one_to_one" begin
+    test_one_to_one()
 end
