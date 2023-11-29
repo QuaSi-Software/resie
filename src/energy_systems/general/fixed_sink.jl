@@ -55,7 +55,7 @@ mutable struct FixedSink <: Component
             config["scale"], # scaling_factor
             0.0, # demand
             nothing, # temperature
-            default(config, "constant_demand", nothing), # constant_demand
+            default(config, "constant_demand", nothing), # constant_demand (power, not work!)
             default(config, "constant_temperature", nothing), # constant_temperature
         )
     end
@@ -69,7 +69,7 @@ function control(
     move_state(unit, components, parameters)
 
     if unit.constant_demand !== nothing
-        unit.demand = unit.constant_demand
+        unit.demand = watt_to_wh(unit.constant_demand)
     elseif unit.energy_profile !== nothing
         unit.demand = unit.scaling_factor * Profiles.work_at_time(
             unit.energy_profile, parameters["time"]

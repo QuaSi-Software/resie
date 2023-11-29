@@ -13,7 +13,7 @@ function test_gas_boiler_demand_driven_plr()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "constant_demand" => 1000,
+            "constant_demand" => 4000,
             "scale" => 1,
         ),
         "TST_GRI_01" => Dict{String,Any}(
@@ -79,7 +79,7 @@ function test_gas_boiler_demand_driven_plr()
         EnergySystems.reset(unit)
     end
 
-    demand.constant_demand = 500
+    demand.constant_demand = 2000
     expected_efficiency = 0.7440249999999999
 
     EnergySystems.control(demand, components, simulation_parameters)

@@ -87,7 +87,7 @@ function test_primary_producer_can_load_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "constant_demand" => 5000,
+            "constant_demand" => 20000,
             "constant_temperature" => 60
         ),
     )
@@ -172,7 +172,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.reset(tank)
     EnergySystems.reset(demand)
 
-    demand.constant_demand = 1500
+    demand.constant_demand = 6000
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(bus, components, simulation_parameters)

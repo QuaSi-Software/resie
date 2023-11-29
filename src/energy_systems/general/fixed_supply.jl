@@ -55,7 +55,7 @@ mutable struct FixedSupply <: Component
             config["scale"], # scaling_factor
             0.0, # supply
             nothing, # temperature
-            default(config, "constant_supply", nothing), # constant_supply
+            default(config, "constant_supply", nothing), # constant_supply (power, not work!)
             default(config, "constant_temperature", nothing), # constant_temperature
         )
     end
@@ -69,7 +69,7 @@ function control(
     move_state(unit, components, parameters)
 
     if unit.constant_supply !== nothing
-        unit.supply = unit.constant_supply
+        unit.supply = watt_to_wh(unit.constant_supply)
     elseif unit.energy_profile !== nothing
         unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
     else
