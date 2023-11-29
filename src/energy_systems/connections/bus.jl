@@ -198,6 +198,12 @@ function create_interface_tuple()
                             Union{Float64, Nothing}}}[]
 end
 
+function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)
+    return (
+        unit.connectivity.storage_loading !== nothing &&
+        unit.connectivity.storage_loading[input_idx][output_idx]
+    )
+end
 
 function balance_on(
     interface::SystemInterface,
@@ -236,128 +242,124 @@ function balance_on(
 
     return_exchanges = []
 
-    # for inputs, only consider outputs
-    if caller_is_input
-        for (idx, outface) in pairs(unit.output_interfaces)
-            # check if energy flow beween input and output is allowed
+    for (idx, outface) in pairs(unit.output_interfaces)
+        if (
+            caller_is_input && !energy_flow_is_allowed(unit, input_index, idx) ||
+            caller_is_output && idx == output_index
+        )
+            continue
+        end
+
+        if isa(outface.target, Bus)
+            # exchange = balance_on(outface, outface.target)
+            # if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
+            #     for i = 1:length(exchange.energy)
+            #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+            #         exchange.energy[i].storage_potential = 0.0
+            #     end
+            # end
+            # # append exchange to current output
+            # push!(energy_tuple_result, exchange)
+        else
+            exchanges = balance_on(outface, outface.target)
+
+            # check storage potential only for storages and make sure storages
+            # don't load themselves. also the storage potential is only
+            # considered if no energy was transfered over the interface yet
             if (
-                unit.connectivity.storage_loading === nothing ||
-                unit.connectivity.storage_loading[input_index][idx]
+                outface.target.sys_function === sf_storage &&
+                outface.target.uac !== interface.source.uac &&
+                outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
             )
-                if isa(outface.target, Bus)
-                    # exchange = balance_on(outface, outface.target)
-                    # if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
-                    #     for i = 1:length(exchange.energy)
-                    #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-                    #         exchange.energy[i].storage_potential = 0.0
-                    #     end
-                    # end
-                    # # append exchange to current output
-                    # push!(energy_tuple_result, exchange)
-                else
-                    exchanges = balance_on(outface, outface.target)
-
-                    # check storage potential only for storages and make sure storages
-                    # don't load themselves. also the storage potential is only
-                    # considered if no energy was transfered over the interface yet
-                    if (
-                        outface.target.sys_function === sf_storage &&
-                        outface.target.uac !== interface.source.uac &&
-                        outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
-                    )
-                        storage_pot = storage_potential(exchanges)
-                    else
-                        storage_pot = 0.0
-                    end
-
-                    # if energy was already transfered over interface or no information is
-                    # available, set the energy potential to zero
-                    if (
-                        outface.max_energy === nothing
-                        || outface.sum_abs_change > 0.0
-                        || interface.sum_abs_change > 0.0
-                    )
-                        energy_pot = 0.0
-                    else
-                        energy_pot = energy_potential(exchanges)
-                    end
-
-                    temperature = outface.temperature
-
-                    push!(return_exchanges, EnEx(
-                        balance=balance(exchanges),
-                        uac=exchanges[1].uac,
-                        energy_potential=energy_pot,
-                        storage_potential=storage_pot,
-                        temperature=temperature,
-                        pressure=nothing,
-                        voltage=nothing
-                    ))
-                end
+                storage_pot = storage_potential(exchanges)
+            else
+                storage_pot = 0.0
             end
+
+            # if energy was already transfered over interface or no information is
+            # available, set the energy potential to zero
+            if (
+                outface.max_energy === nothing
+                || outface.sum_abs_change > 0.0
+                || interface.sum_abs_change > 0.0
+            )
+                energy_pot = 0.0
+            else
+                energy_pot = energy_potential(exchanges)
+            end
+
+            temperature = outface.temperature
+
+            push!(return_exchanges, EnEx(
+                balance=balance(exchanges),
+                uac=exchanges[1].uac,
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
+                temperature=temperature,
+                pressure=nothing,
+                voltage=nothing
+            ))
         end
     end
 
-    # for outputs, only consider inputs
-    if caller_is_output
-        for (idx, inface) in pairs(unit.input_interfaces)  
-            # check if energy flow beween input and output is allowed
+    for (idx, inface) in pairs(unit.input_interfaces)
+        if (
+            caller_is_output && !energy_flow_is_allowed(unit, idx, output_index) ||
+            caller_is_input && idx == input_index
+        )
+            continue
+        end
+
+        if isa(inface.source, Bus)
+            # exchange = balance_on(inface, inface.source)
+            # if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
+            #     for i = 1:length(exchange.energy)
+            #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
+            #         exchange.energy[i].storage_potential = 0.0
+            #     end
+            # end
+            # # append exchange to current output
+            # push!(energy_tuple_result, exchange)
+        else
+            exchanges = balance_on(inface, inface.source)
+
+            # check storage potential only for storages and make sure storages
+            # don't load themselves. also the storage potential is only
+            # considered if no energy was transfered over the interface yet
             if (
-                unit.connectivity.storage_loading === nothing ||
-                unit.connectivity.storage_loading[idx][output_index]
+                inface.source.sys_function === sf_storage &&
+                inface.source.uac !== interface.target.uac &&
+                inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
             )
-                if isa(inface.source, Bus)
-                    # exchange = balance_on(inface, inface.source)
-                    # if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
-                    #     for i = 1:length(exchange.energy)
-                    #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-                    #         exchange.energy[i].storage_potential = 0.0
-                    #     end
-                    # end
-                    # # append exchange to current output
-                    # push!(energy_tuple_result, exchange)
-                else
-                    exchanges = balance_on(inface, inface.source)
-
-                    # check storage potential only for storages and make sure storages
-                    # don't load themselves. also the storage potential is only
-                    # considered if no energy was transfered over the interface yet
-                    if (
-                        inface.source.sys_function === sf_storage &&
-                        inface.source.uac !== interface.target.uac &&
-                        inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
-                    )
-                        storage_pot = storage_potential(exchanges)
-                    else
-                        storage_pot = 0.0
-                    end
-
-                    # if energy was already transfered over interface or no information is
-                    # available, set the energy potential to zero
-                    if (
-                        inface.max_energy === nothing
-                        || inface.sum_abs_change > 0.0
-                        || interface.sum_abs_change > 0.0
-                    )
-                        energy_pot = 0.0
-                    else
-                        energy_pot = energy_potential(exchanges)
-                    end
-
-                    temperature = inface.temperature
-
-                    push!(return_exchanges, EnEx(
-                        balance=balance(exchanges),
-                        uac=exchanges[1].uac,
-                        energy_potential=energy_pot,
-                        storage_potential=storage_pot,
-                        temperature=temperature,
-                        pressure=nothing,
-                        voltage=nothing
-                    ))
-                end
+                storage_pot = storage_potential(exchanges)
+            else
+                storage_pot = 0.0
             end
-        end  
+
+            # if energy was already transfered over interface or no information is
+            # available, set the energy potential to zero
+            if (
+                inface.max_energy === nothing
+                || inface.sum_abs_change > 0.0
+                || interface.sum_abs_change > 0.0
+            )
+                energy_pot = 0.0
+            else
+                energy_pot = energy_potential(exchanges)
+            end
+
+            temperature = inface.temperature
+
+            push!(return_exchanges, EnEx(
+                balance=balance(exchanges),
+                uac=exchanges[1].uac,
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
+                temperature=temperature,
+                pressure=nothing,
+                voltage=nothing
+            ))
+        end
     end
 
     return return_exchanges
