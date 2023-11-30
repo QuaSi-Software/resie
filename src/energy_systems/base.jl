@@ -403,15 +403,20 @@ const EnEx = EnergyExchange
 Sum of balances over the given list of energy exchanges.
 """
 function balance(entries::Vector{EnergyExchange})::Float64
-    return sum(e.balance for e in entries)
+    return sum(e.balance for e in entries; init=0.0)
 end
 
 function energy_potential(entries::Vector{EnergyExchange})::Float64
-    return sum(e.energy_potential for e in entries)
+    return sum(e.energy_potential for e in entries; init=0.0)
 end
 
 function storage_potential(entries::Vector{EnergyExchange})::Float64
-    return sum(e.storage_potential for e in entries)
+    return sum(e.storage_potential for e in entries; init=0.0)
+end
+
+function temperature_first(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature for e in entries if e.temperature !== nothing]
+    return length(temps) > 0 ? first(temps) : nothing
 end
 
 """
