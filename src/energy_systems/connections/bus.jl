@@ -251,15 +251,7 @@ function balance_on(
         end
 
         if isa(outface.target, Bus)
-            # exchange = balance_on(outface, outface.target)
-            # if (outface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0)  # reset potentials if energy has already been transferred through the interface
-            #     for i = 1:length(exchange.energy)
-            #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-            #         exchange.energy[i].storage_potential = 0.0
-            #     end
-            # end
-            # # append exchange to current output
-            # push!(energy_tuple_result, exchange)
+            append!(return_exchanges, balance_on(outface, outface.target))
         else
             exchanges = balance_on(outface, outface.target)
 
@@ -311,15 +303,7 @@ function balance_on(
         end
 
         if isa(inface.source, Bus)
-            # exchange = balance_on(inface, inface.source)
-            # if (inface.sum_abs_change > 0.0 || interface.sum_abs_change > 0.0) # reset potentials if energy has already been transferred through the interface
-            #     for i = 1:length(exchange.energy)
-            #         exchange.energy[i].energy_potential = 0.0  # ToDo: Not sure if that works here...
-            #         exchange.energy[i].storage_potential = 0.0
-            #     end
-            # end
-            # # append exchange to current output
-            # push!(energy_tuple_result, exchange)
+            append!(return_exchanges, balance_on(inface, inface.source))
         else
             exchanges = balance_on(inface, inface.source)
 
