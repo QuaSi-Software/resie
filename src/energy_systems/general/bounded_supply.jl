@@ -105,14 +105,21 @@ function control(
 end
 
 function process(unit::BoundedSupply, parameters::Dict{String,Any})
-    # 1. @TODO: if bounded sources should be allowed to load storage components, then the
-    # storage potential must be handled here instead of being ignored
-    # 2. we also ignore the temperature of the interface as the source defines that itself
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
     blnc = balance(exchanges)
+
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demand = blnc + storage_potential(exchanges)
+    else
+        energy_demand = blnc
+    end
+
     if blnc < 0.0
-        add!(outface, min(abs(blnc), unit.max_energy), unit.temperature)
+        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
     end
 end
 
