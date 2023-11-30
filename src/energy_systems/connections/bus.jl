@@ -363,17 +363,6 @@ function balance_on(
     end
 
     return return_exchanges
-
-    # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
-    #       energies that could be given or taken.
-    #       If a component connected to the interface of balance_on() has already been processed, the 
-    #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
-    #       calling component to avoid double counting of energies.
-
-    return (
-            balance = balance(unit),
-            energy = energy_tuple_result
-            )
 end
 
 function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
