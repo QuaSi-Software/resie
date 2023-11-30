@@ -200,7 +200,7 @@ end
 
 function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)
     return (
-        unit.connectivity.storage_loading !== nothing &&
+        unit.connectivity.storage_loading === nothing ||
         unit.connectivity.storage_loading[input_idx][output_idx]
     )
 end
