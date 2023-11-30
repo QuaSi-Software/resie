@@ -6,7 +6,7 @@
         "output_keys": {
             "TST_STH_01": ["m_h_w_ht1 OUT"],
             "TST_DEM_01": ["m_h_w_lt1 IN"],
-            "TST_GTP_01": ["borehole_temperature","thermal_resistance","average_fluid_temperature","Re","T_out","Q_out","Q_in"]
+            "TST_GTP_01": ["borehole_temperature","thermal_resistance","average_fluid_temperature","Re"]
 
         },
         "output_plot": {
@@ -61,24 +61,7 @@
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
-            },
-            "9": {
-                "key": {"TST_GTP_01": ["T_out"]},
-                "axis": "right",
-                "unit": "°C",
-                "scale_factor": 1
-            },
-            "10": {
-                "key": {"TST_GTP_01": ["Q_out"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "11": {
-                "key": {"TST_GTP_01": ["Q_in"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
+      
             }
            
             

@@ -2,6 +2,14 @@
 Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
 """
+file = open("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r")
+    q_nov_wgg = Vector{Float64}()
+    for line in eachline(file)
+        push!(q_nov_wgg, parse(Float64, line))
+    end
+close(file)
+
+
 mutable struct GeothermalHeatCollector <: ControlledComponent
     uac::String
     controller::Controller
@@ -24,7 +32,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     current_input_temperature::Temperature
     ambient_temperature::Temperature
     last_timestep_calculated::Float64
-
     soil_starting_temperature::Temperature
     soil_specific_heat_capacity::Float64
     soil_density::Float64
@@ -32,7 +39,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     soil_density_vector::Vector
     soil_heat_conductivity_vector::Vector
     soil_heat_fusion_energy::Float64
-
     phase_change_upper_boundary_temperature::Temperature
     phase_change_lower_boundary_temperature::Temperature
     surface_convective_heat_transfer_coefficient::Float64
@@ -71,6 +77,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     Re::Float64
     discretization_mode::Int
     t_avg_rand::Float64
+    q_in_out_nov::Vector
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -157,7 +164,8 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             1,          # time step of simulation in h to calculate power (W) out of energy (Wh) (wh_to_w_timestep), depending on simulation time step.
             0,          # Re-Number, to be calculated 
             0,          # discretization-mode. 0: Default. 1: read in dy-vector from Type 710 for validation purpose
-            16.0        # starting temperature of pipe. set for validation purpose.
+            16.0,        # starting temperature of pipe. set for validation purpose.
+            q_nov_wgg       # provisorisch!
             )
     end
 end
@@ -329,172 +337,240 @@ function calculate_new_temperature_field(unit::GeothermalHeatCollector)
     # calculate heat transfer coefficient and thermal resistance
     alpha_fluid = calculate_alpha_pipe(unit::GeothermalHeatCollector)   
     R_rohr = 1 / (2* pi) * (2 / (alpha_fluid * (2 * (unit.pipe_radius_outer - unit.pipe_thickness))) + 1 / unit.pipe_heat_conductivity * log(unit.pipe_radius_outer/(unit.pipe_radius_outer - unit.pipe_thickness)))    
-    
+        
     # calculate fluid temperature
+    h = 1
     for h = 1: (length(unit.dy)) 
-         
-            for i =1:2  
-                if unit.Fluid[h,i] == 1 
-                    n_rohr = 47 # number of pipes
-                    
-                    # calculate specific heat extraction for 1 pipe per length
-                    specific_heat_flux_pipe = (-1* unit.q_in_out_nov[unit.timestep_index]*1000/ (unit.pipe_length*n_rohr))
-                    unit.t_avg_rand = (unit.T1[h-1,i] + unit.T1[h+1,i] + unit.T1[h,i+1]) / 3        # deactivated during validation
-                    unit.fluid_temperature = unit.t_avg_rand + R_rohr * specific_heat_flux_pipe     # "+", because specific_heat_flux_pipe is negative during heat extraction.        
-                        
-                    unit.T2[h,i] = unit.fluid_temperature    
+        
+        for i =1:2  
+            if unit.Fluid[h,i] == 1 
+                n_rohr = 47 # number of pipes
                 
-                        
-                end    
-            end
-         
-    
- 
-    # calculate number of internal timesteps depending on internal time dt
-    n_it = unit.wh_to_w_timestep/unit.dt   * 3600      
+                # calculate specific heat extraction for 1 pipe per length
+                specific_heat_flux_pipe = (-1* unit.q_in_out_nov[unit.timestep_index]*1000/ (unit.pipe_length*n_rohr))
+                unit.t_avg_rand = (unit.T1[h-1,i] + unit.T1[h+1,i] + unit.T1[h,i+1]) / 3        # deactivated during validation
+                unit.fluid_temperature = unit.t_avg_rand + R_rohr * specific_heat_flux_pipe     # "+", because specific_heat_flux_pipe is negative during heat extraction.        
+                    
+                unit.T2[h,i] = unit.fluid_temperature
+                
+                # # Rohrrandvolumen, siehe Schmierblatt.
+                # Volumen_Rohrrand = (unit.dx[i+1]/2 * (unit.dy[h-1]+unit.dy[h]) + 
+                # unit.dx[i]*(unit.dy[h-2]/2 + unit.dy[h+1]/2) +
+                # unit.dx[i] * (unit.dy[h-1]+unit.dy[h]) - (pi * unit.dy[h]^2) / 2) * unit.dz
 
+                # # upper node
+                # unit.T2[h-1,i] = unit.T1[h-1,i] +      
+                # (unit.dz * 0.5 * (unit.dy[h-2]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+2] - unit.T1[h-1,i+1])/unit.dx[i] +    # WL in positve x-Richtung
+                # unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-2, i]-unit.T1[h-1,i])/(unit.dy[h-2]) +                       # WL in negatove y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3)                                                               # Quellterm
+                
+                # # lower node
+                # unit.T2[h+1,i] = unit.T1[h+1,i] +    
+                # (unit.dz * 0.5 * (unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1, i+2] - unit.T1[h+1,i+1])/unit.dx[i] +     # WL in positve x-Richtung
+                # unit.dz * unit.dx[i]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+2,i]-unit.T1[h+1,i])/(unit.dy[h]) +                         # WL in positive y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3)                                                       # Quellterm
+                    
+                # # right node
+                # dq_x_p = unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+2] - unit.T1[h,i+1])/unit.dx[i]
+                # dq_y_p = unit.dz * unit.dx[i+1]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i+1]-unit.T1[h,i+1])/(unit.dy[h])
+                # dq_y_n = unit.dz * unit.dx[i+1]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+1]-unit.T1[h,i+1])/(unit.dy[h-1])
+
+                # unit.T2[h,i+1] = unit.T1[h,i+1] +    
+                # (dq_x_p +   # WL in positve x-Richtung
+                # dq_y_n +    # WL in negative y-Richtung
+                # dq_y_p +    # WL in positive y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3)
+            
+                    
+            end    
+        end   
+    
+
+           
+    end 
+
+# calculate number of internal timesteps depending on internal time dt
+n_it = unit.wh_to_w_timestep/unit.dt   * 3600 
 for it=1:n_it
 
-n_rohr = 47
+    n_rohr = 47
 
-# Loop - vertical direction
-for h = 1: (length(unit.dy))
+    # Loop - vertical direction
+    for h = 1: (length(unit.dy))
 
-# Loop - horizontal direction
-for i = 1 : (length(unit.dx)+1)
-    
-    # calculate temperature of adjacent nodes to fluid
-    if unit.Fluid[h,i] == 1                  
+        # Loop - horizontal direction
+        for i = 1 : (length(unit.dx)+1)
+            
+            # calculate temperature of adjacent nodes to fluid
+            if unit.Fluid[h,i] == 1                  
+                
+                # # Rohrrandvolumen, siehe Schmierblatt.
+                # Volumen_Rohrrand = (unit.dx[i+1]/2 * (unit.dy[h-1]+unit.dy[h]) + 
+                # unit.dx[i]*(unit.dy[h-2]/2 + unit.dy[h+1]/2) +
+                # unit.dx[i] * (unit.dy[h-1]+unit.dy[h]) - (pi * unit.dy[h]^2) / 2) * unit.dz
 
-        # upper node
-        unit.T2[h-1,i] = unit.T1[h-1,i] +      
-        (unit.dz * 0.5 * (unit.dy[h-1]+unit.dy[h-2]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+2] - unit.T1[h-1,i+1])/unit.dx[i] +    # WL in positve x-Richtung
-        unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-2, i]-unit.T1[h-1,i])/(unit.dy[h-2]) +                       # WL in negatove y-Richtung
-        1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h-1,i]))  * 
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h-1]))                                                               # Quellterm
-        
-        # lower node
-        unit.T2[h+1,i] = unit.T1[h+1,i] +    
-        (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1, i+2] - unit.T1[h+1,i+1])/unit.dx[i] +     # WL in positve x-Richtung
-        unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+2,i]-unit.T1[h+1,i])/(unit.dy[h]) +                         # WL in positive y-Richtung
-        1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h+1,i]))*
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]))                                                        # Quellterm
-            
-        # right node
-        dq_x_p = unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+2] - unit.T1[h,i+1])/unit.dx[i]
-        dq_y_p = unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i+1]-unit.T1[h,i+1])/(unit.dy[h])
-        dq_y_n = unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+1]-unit.T1[h,i+1])/(unit.dy[h-1])
+                # # upper node
+                # unit.T2[h-1,i] = unit.T1[h-1,i] +      
+                # (unit.dz * 0.5 * (unit.dy[h-2]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+2] - unit.T1[h-1,i+1])/unit.dx[i] +    # WL in positve x-Richtung
+                # unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-2, i]-unit.T1[h-1,i])/(unit.dy[h-2]) +                       # WL in negatove y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr*n_it)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3)                                                               # Quellterm
+                
+                # # lower node
+                # unit.T2[h+1,i] = unit.T1[h+1,i] +    
+                # (unit.dz * 0.5 * (unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1, i+2] - unit.T1[h+1,i+1])/unit.dx[i] +     # WL in positve x-Richtung
+                # unit.dz * unit.dx[i]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+2,i]-unit.T1[h+1,i])/(unit.dy[h]) +                         # WL in positive y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr*n_it)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3)                                                       # Quellterm
+                    
+                # # right node
+                # dq_x_p = unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+2] - unit.T1[h,i+1])/unit.dx[i]
+                # dq_y_p = unit.dz * unit.dx[i+1]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i+1]-unit.T1[h,i+1])/(unit.dy[h])
+                # dq_y_n = unit.dz * unit.dx[i+1]/2 * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+1]-unit.T1[h,i+1])/(unit.dy[h-1])
 
-        unit.T2[h,i+1] = unit.T1[h,i+1] +    
-        (dq_x_p +   # WL in positve x-Richtung
-        dq_y_n +    # WL in negative y-Richtung
-        dq_y_p +    # WL in positive y-Richtung
-        1/(R_rohr*unit.dz)* unit.dz * unit.dy[i] * (unit.fluid_temperature - unit.T1[h,i+1]))* 
-        unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 *unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                   # Quellterm
+                # unit.T2[h,i+1] = unit.T1[h,i+1] +    
+                # (dq_x_p +   # WL in positve x-Richtung
+                # dq_y_n +    # WL in negative y-Richtung
+                # dq_y_p +    # WL in positive y-Richtung
+                # (-1* unit.q_in_out_nov[unit.timestep_index]*1000 / (n_rohr*n_it)))  * 
+                # unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * Volumen_Rohrrand/3) 
 
-    # adjacent nodes to fluid node have uniform temperature
-    unit.t_avg_rand = (unit.T2[h-1,i] + unit.T2[h+1,i] + unit.T2[h,i+1])/3
-    
-    unit.T2[h-1,i] = copy(unit.t_avg_rand)
-    unit.T2[h+1,i] = copy(unit.t_avg_rand)
-    unit.T2[h,i+1] = copy(unit.t_avg_rand)
-    unit.pipe_temperature = copy(unit.t_avg_rand)
 
-    unit.T2[h-1,i], unit.phase_change_state[h-1,i], unit.CP2[h-1,i] = freezing(unit::GeothermalHeatCollector, unit.T2[h-1,i],unit.phase_change_state[h-1,i]) 
-    unit.T2[h+1,i], unit.phase_change_state[h+1,i], unit.CP2[h+1,i] = freezing(unit::GeothermalHeatCollector, unit.T2[h+1,i],unit.phase_change_state[h+1,i])
-    unit.T2[h,i+1], unit.phase_change_state[h,i+1], unit.CP2[h,i+1] = freezing(unit::GeothermalHeatCollector, unit.T2[h,i+1],unit.phase_change_state[h,i+1])
 
-    
-    elseif unit.pipe_surrounding[h,i]==1           
-        unit.T2[h,i] = unit.T2[h,i]          # Skip re-calculation. already calculated.      
-    
-    # ground surface boundary 
-    elseif h==1
-        
-        # left boundary
-        if i ==1
-            unit.T2[h,i] = unit.T1[h,i] +
-            (unit.dz * 0.5 * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i]) +
-            unit.dz * 0.5 * unit.dx[i] * (1-unit.surface_reflection_factor) * unit.global_radiation +
-            unit.dz * 0.5 * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4) +
-            unit.dz * unit.dy[1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i] +
-            unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i] - unit.T1[h,i])/unit.dy[h]) * 
-            unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * unit.dy[h])
-            
-         
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i] = freezing(unit::GeothermalHeatCollector,unit.T2[h,i],unit.phase_change_state[h,i])
-        
-        # right boundary
-        elseif i == (length(unit.dx)+1)
-        unit.T2[h,i] = unit.T1[h,i] +
-             (unit.dz * 0.5 * unit.dx[i-1] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i]) +                                  # Convection on surface
-             unit.dz * 0.5 * unit.dx[i-1] * (1-unit.surface_reflection_factor)* unit.global_radiation +                                            # Radiation on surface
-             unit.dz * 0.5 * unit.dx[i-1] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4)+   # Radiation out of surface
-             unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+ 
-             unit.dz * unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h]) )* 
-             unit.dt * 1/(unit.soil_density_vector[h]*unit.CP1[h,i]*unit.dz*0.5*unit.dx[i-1]*unit.dy[1])
-            
+                # old
+                # upper node
+                unit.T2[h-1,i] = unit.T1[h-1,i] +      
+                (unit.dz * 0.5 * (unit.dy[h-1]+unit.dy[h-2]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+2] - unit.T1[h-1,i+1])/unit.dx[i] +    # WL in positve x-Richtung
+                unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-2, i]-unit.T1[h-1,i])/(unit.dy[h-2]) +                       # WL in negatove y-Richtung
+                1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h-1,i]))  * 
+                unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h-1]))                                                               # Quellterm
+                
+                # lower node
+                unit.T2[h+1,i] = unit.T1[h+1,i] +    
+                (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1, i+2] - unit.T1[h+1,i+1])/unit.dx[i] +     # WL in positve x-Richtung
+                unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+2,i]-unit.T1[h+1,i])/(unit.dy[h]) +                         # WL in positive y-Richtung
+                1/(R_rohr*unit.dz)* unit.dz * unit.dx[i] * (unit.fluid_temperature - unit.T1[h+1,i]))*
+                unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]))                                                        # Quellterm
+                    
+                # right node
+                dq_x_p = unit.dz * 0.5 * (unit.dy[h]+unit.dy[h+1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+2] - unit.T1[h,i+1])/unit.dx[i]
+                dq_y_p = unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i+1]-unit.T1[h,i+1])/(unit.dy[h])
+                dq_y_n = unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i+1]-unit.T1[h,i+1])/(unit.dy[h-1])
 
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
-            
-        else
-        unit.T2[h,i] = unit.T1[h,i] +
-            (unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i])+                                  # Convection on surface
-            unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * (1-unit.surface_reflection_factor)* unit.global_radiation+                                            # Radiation on surface
-            unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4)+   # Radiation out of surface
-            unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+                                           # WL in positve x-Richtung
-            unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+                                         # WL in negative x-Richtung
-            unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * 
-            unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[1])) * unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5*(unit.dx[i]+unit.dx[i-1])*unit.dy[1])                          # WL in y-Richtung
-            
+                unit.T2[h,i+1] = unit.T1[h,i+1] +    
+                (dq_x_p +   # WL in positve x-Richtung
+                dq_y_n +    # WL in negative y-Richtung
+                dq_y_p +    # WL in positive y-Richtung
+                1/(R_rohr*unit.dz)* unit.dz * unit.dy[i] * (unit.fluid_temperature - unit.T1[h,i+1]))* 
+                unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 *unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                                                   # Quellterm
 
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+            # adjacent nodes to fluid node have uniform temperature
+            unit.t_avg_rand = (unit.T2[h-1,i] + unit.T2[h+1,i] + unit.T2[h,i+1])/3
             
-        end 
-    else
-        # left boundary
-        if i == 1 && unit.pipe_surrounding[h,i] == 0
-        unit.T2[h,i] = unit.T1[h,i] +
-            (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+      # WL in positve x-Richtung
-            unit.dz * 0.5* unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+                  # WL in positive y-Richtung
-            unit.dz * 0.5* unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) * 
-            unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                # WL in negatove y-Richtung
-            
-        
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
-            
+            unit.T2[h-1,i] = copy(unit.t_avg_rand)
+            unit.T2[h+1,i] = copy(unit.t_avg_rand)
+            unit.T2[h,i+1] = copy(unit.t_avg_rand)
+            unit.pipe_temperature = copy(unit.t_avg_rand)
 
-        # right boundary 
-        elseif i == length(unit.dx)+1
-        unit.T2[h,i] = unit.T1[h,i] +
-            (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+   # WL in negative x-Richtung
-            unit.dz * 0.5*unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+                 # WL in positive y-Richtung
-            unit.dz * 0.5*unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) * 
-            unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i-1]* 0.5 * (unit.dy[h]+unit.dy[h-1]))               # WL in negatove y-Richtung
-        
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+            unit.T2[h-1,i], unit.phase_change_state[h-1,i], unit.CP2[h-1,i] = freezing(unit::GeothermalHeatCollector, unit.T2[h-1,i],unit.phase_change_state[h-1,i]) 
+            unit.T2[h+1,i], unit.phase_change_state[h+1,i], unit.CP2[h+1,i] = freezing(unit::GeothermalHeatCollector, unit.T2[h+1,i],unit.phase_change_state[h+1,i])
+            unit.T2[h,i+1], unit.phase_change_state[h,i+1], unit.CP2[h,i+1] = freezing(unit::GeothermalHeatCollector, unit.T2[h,i+1],unit.phase_change_state[h,i+1])
+
             
-        else
-        unit.T2[h,i] = unit.T1[h,i] +
-            (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+        # WL in positve x-Richtung
-            unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+       # WL in negative x-Richtung
-            unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+        # WL in positive y-Richtung
-            unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) *  
-            unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5*(unit.dx[i]+unit.dx[i-1])* 0.5 * (unit.dy[h]+unit.dy[h-1]))       # WL in negatove y-Richtung
+            elseif unit.pipe_surrounding[h,i]==1           
+                unit.T2[h,i] = unit.T2[h,i]          # Skip re-calculation. already calculated.      
             
-        unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
-            
+            # ground surface boundary 
+            elseif h==1
+                
+                # left boundary
+                if i ==1
+                    unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i]) +
+                    unit.dz * 0.5 * unit.dx[i] * (1-unit.surface_reflection_factor) * unit.global_radiation +
+                    unit.dz * 0.5 * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4) +
+                    unit.dz * unit.dy[1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i] +
+                    unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i] - unit.T1[h,i])/unit.dy[h]) * 
+                    unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * unit.dy[h])
+                    
+                
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i] = freezing(unit::GeothermalHeatCollector,unit.T2[h,i],unit.phase_change_state[h,i])
+                
+                # right boundary
+                elseif i == (length(unit.dx)+1)
+                unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * unit.dx[i-1] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i]) +                                  # Convection on surface
+                    unit.dz * 0.5 * unit.dx[i-1] * (1-unit.surface_reflection_factor)* unit.global_radiation +                                            # Radiation on surface
+                    unit.dz * 0.5 * unit.dx[i-1] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4)+   # Radiation out of surface
+                    unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+ 
+                    unit.dz * unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h]) )* 
+                    unit.dt * 1/(unit.soil_density_vector[h]*unit.CP1[h,i]*unit.dz*0.5*unit.dx[i-1]*unit.dy[1])
+                    
+
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+                    
+                else
+                unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.T1[h,i])+                                  # Convection on surface
+                    unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * (1-unit.surface_reflection_factor)* unit.global_radiation+                                            # Radiation on surface
+                    unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature+273.15)^4 - (unit.T1[h,i]+273.15)^4)+   # Radiation out of surface
+                    unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+                                           # WL in positve x-Richtung
+                    unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+                                         # WL in negative x-Richtung
+                    unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * 
+                    unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[1])) * unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5*(unit.dx[i]+unit.dx[i-1])*unit.dy[1])                          # WL in y-Richtung
+                    
+
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+                    
+                end 
+            else
+                # left boundary
+                if i == 1 && unit.pipe_surrounding[h,i] == 0
+                unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+      # WL in positve x-Richtung
+                    unit.dz * 0.5* unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+                  # WL in positive y-Richtung
+                    unit.dz * 0.5* unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) * 
+                    unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i] * 0.5 * (unit.dy[h]+unit.dy[h-1]))                # WL in negatove y-Richtung
+                    
+                
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+                    
+
+                # right boundary 
+                elseif i == length(unit.dx)+1
+                unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+   # WL in negative x-Richtung
+                    unit.dz * 0.5*unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+                 # WL in positive y-Richtung
+                    unit.dz * 0.5*unit.dx[i-1] * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) * 
+                    unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5 * unit.dx[i-1]* 0.5 * (unit.dy[h]+unit.dy[h-1]))               # WL in negatove y-Richtung
+                
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+                    
+                else
+                unit.T2[h,i] = unit.T1[h,i] +
+                    (unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i+1] - unit.T1[h,i])/unit.dx[i]+        # WL in positve x-Richtung
+                    unit.dz * 0.5 * (unit.dy[h]+unit.dy[h-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h,i-1] - unit.T1[h,i])/unit.dx[i-1]+       # WL in negative x-Richtung
+                    unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h+1,i]-unit.T1[h,i])/(unit.dy[h])+        # WL in positive y-Richtung
+                    unit.dz * 0.5 * (unit.dx[i]+unit.dx[i-1]) * unit.soil_heat_conductivity_vector[h] * (unit.T1[h-1,i]-unit.T1[h,i])/(unit.dy[h-1])) *  
+                    unit.dt * 1/(unit.soil_density_vector[h] * unit.CP1[h,i] * unit.dz * 0.5*(unit.dx[i]+unit.dx[i-1])* 0.5 * (unit.dy[h]+unit.dy[h-1]))       # WL in negatove y-Richtung
+                    
+                unit.T2[h,i], unit.phase_change_state[h,i], unit.CP2[h,i]= freezing(unit::GeothermalHeatCollector, unit.T2[h,i],unit.phase_change_state[h,i])
+                    
+                end 
+            end
+
         end 
     end
-
+    unit.T1 = copy(unit.T2)
+    unit.CP1 = copy(unit.CP2)
+    end
 end 
-end
-unit.T1 = copy(unit.T2)
-unit.CP1 = copy(unit.CP2)
-end
        
 
-end
+
 
 # function to check/set phase state and calculate specific heat capacity with apparent heat capacity method. Not validated yet.
 function freezing(unit::GeothermalHeatCollector,T2_in, phase_change_state_in)
@@ -547,10 +623,10 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector)
 n_rohr = 47
 d_i_pipe = 2*unit.pipe_radius_outer - (2*unit.pipe_thickness)
 
-if unit.validation_mode == 1
-    unit.Re = (4 * unit.m_in_validation[unit.timestep_index])/
-    (pi  * d_i_pipe * unit.fluid_kinematic_viscosity * unit.fluid_density)
-else 
+# if unit.validation_mode == 1
+#     unit.Re = (4 * unit.m_in_validation[unit.timestep_index])/
+#     (pi  * d_i_pipe * unit.fluid_kinematic_viscosity * unit.fluid_density)
+#else 
 
 # only for validation purpose! 
 unit.collector_total_heat_flux_in_out = unit.q_in_out_nov[unit.timestep_index]*1000
@@ -558,7 +634,7 @@ unit.collector_total_heat_flux_in_out = unit.q_in_out_nov[unit.timestep_index]*1
 # calculate reynolds number
 unit.Re = (unit.collector_total_heat_flux_in_out/n_rohr)/
         (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * d_i_pipe * unit.fluid_kinematic_viscosity * unit.fluid_density)
-end
+#end
 
 Re = copy(unit.Re)
     # check for laminar flow
@@ -691,7 +767,7 @@ function balance_on(
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
-    return ["IN", "OUT", "TEMPERATURE_#NodeNum","fluid_temperature","t_out","p_out"]
+    return ["IN", "OUT", "TEMPERATURE_#NodeNum","fluid_temperature"]
 end
 
 function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
