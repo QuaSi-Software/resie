@@ -118,7 +118,7 @@ function process(unit::BoundedSupply, parameters::Dict{String,Any})
         energy_demand = blnc
     end
 
-    if blnc < 0.0
+    if energy_demand < 0.0
         add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
     end
 end
