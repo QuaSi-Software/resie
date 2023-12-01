@@ -255,10 +255,11 @@ function balance_on(
         else
             exchanges = balance_on(outface, outface.target)
 
-            # check storage potential only for storages and make sure storages
+            # check storage potential only for outgoing storages and make sure storages
             # don't load themselves. also the storage potential is only
             # considered if no energy was transfered over the interface yet
             if (
+                caller_is_input &&
                 outface.target.sys_function === sf_storage &&
                 outface.target.uac !== interface.source.uac &&
                 outface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
@@ -269,10 +270,10 @@ function balance_on(
             end
 
             # if energy was already transfered over the interface or no information is
-            # available or we're checking the calling component, set the energy potential
+            # available or we're checking other outputs, set the energy potential
             # to zero
             if (
-                (caller_is_output && idx == output_index)
+                caller_is_output
                 || outface.max_energy === nothing
                 || outface.sum_abs_change > 0.0
                 || interface.sum_abs_change > 0.0
@@ -309,10 +310,11 @@ function balance_on(
         else
             exchanges = balance_on(inface, inface.source)
 
-            # check storage potential only for storages and make sure storages
+            # check storage potential only for incoming storages and make sure storages
             # don't load themselves. also the storage potential is only
             # considered if no energy was transfered over the interface yet
             if (
+                caller_is_output &&
                 inface.source.sys_function === sf_storage &&
                 inface.source.uac !== interface.target.uac &&
                 inface.sum_abs_change == 0.0 && interface.sum_abs_change == 0.0
@@ -323,10 +325,10 @@ function balance_on(
             end
 
             # if energy was already transfered over the interface or no information is
-            # available or we're checking the calling component, set the energy potential
+            # available or we're checking other inputs, set the energy potential
             # to zero
             if (
-                (caller_is_input && idx == input_index)
+                caller_is_input
                 || inface.max_energy === nothing
                 || inface.sum_abs_change > 0.0
                 || interface.sum_abs_change > 0.0
