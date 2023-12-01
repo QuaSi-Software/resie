@@ -107,7 +107,8 @@ end
     end
 
     include("initialization/bus.jl")
-
+    include("initialization/profiles.jl")
+    
     include("order_of_operations/base_order.jl")
     include("order_of_operations/load_order_of_operation.jl")
     include("order_of_operations/bus_output_priorities.jl")
