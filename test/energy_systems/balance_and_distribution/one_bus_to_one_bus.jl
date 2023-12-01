@@ -6,7 +6,7 @@ using Resie.Profiles
 
 EnergySystems.set_timestep(900)
 
-function test_busses_communicate_demand()
+function test_one_bus_to_one_bus()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
@@ -184,6 +184,6 @@ function test_busses_communicate_demand()
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 150.0
 end
 
-@testset "busses_communicate_demand" begin
-    test_busses_communicate_demand()
+@testset "one_bus_to_one_bus" begin
+    test_one_bus_to_one_bus()
 end

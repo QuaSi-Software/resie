@@ -7,7 +7,7 @@ using Test
     include("energy_systems/balance_and_distribution/one_to_many.jl")
     include("energy_systems/balance_and_distribution/many_plus_storage_to_one.jl")
     include("energy_systems/balance_and_distribution/one_plus_storage_to_many.jl")
-    include("energy_systems/balance_and_distribution/one_bus_to_one.jl")
+    include("energy_systems/balance_and_distribution/one_bus_to_one_bus.jl")
     include("energy_systems/heat_pump_demand_driven.jl")
     include("energy_systems/energy_system_from_storage.jl")
     include("energy_systems/bus_to_bus.jl")
