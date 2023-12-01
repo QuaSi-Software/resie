@@ -53,17 +53,18 @@ function test_busses_communicate_demand()
             "scale" => 1000
         ),
     )
-    components = Resie.load_components(components_config)
-    demand = components["TST_DEM_01"]
-    grid = components["TST_GRI_01"]
-    bus_1 = components["TST_BUS_01"]
-    bus_2 = components["TST_BUS_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
 
     EnergySystems.reset(demand)
     EnergySystems.reset(grid)
@@ -266,7 +267,14 @@ function test_demand_over_busses_supply_is_transformer()
             "scale" => 1
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand_1 = components["TST_DEM_01"]
     demand_2 = components["TST_DEM_02"]
     grid = components["TST_GRI_01"]
@@ -274,12 +282,6 @@ function test_demand_over_busses_supply_is_transformer()
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
     bus_3 = components["TST_BUS_03"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # first timestep, all works as expected, all demands can be met
 
@@ -637,19 +639,20 @@ function test_busses_communicate_storage_potential()
             "scale" => 1000
         ),
     )
-    components = Resie.load_components(components_config)
-    demand = components["TST_DEM_01"]
-    grid = components["TST_GRI_01"]
-    bus_1 = components["TST_BUS_01"]
-    bus_2 = components["TST_BUS_02"]
-    tank_1 = components["TST_BFT_01"]
-    tank_2 = components["TST_BFT_02"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+    tank_1 = components["TST_BFT_01"]
+    tank_2 = components["TST_BFT_02"]
 
     EnergySystems.reset(demand)
     EnergySystems.reset(bus_2)

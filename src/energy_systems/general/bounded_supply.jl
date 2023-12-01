@@ -24,12 +24,12 @@ mutable struct BoundedSupply <: Component
     constant_power::Union{Nothing,Float64}
     constant_temperature::Temperature
 
-    function BoundedSupply(uac::String, config::Dict{String,Any})
+    function BoundedSupply(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         max_power_profile = "max_power_profile_file_path" in keys(config) ?
-                            Profile(config["max_power_profile_file_path"]) :
+                            Profile(config["max_power_profile_file_path"], parameters) :
                             nothing
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
-                              Profile(config["temperature_profile_file_path"]) :
+                              Profile(config["temperature_profile_file_path"], parameters) :
                               nothing
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -37,7 +37,7 @@ mutable struct BoundedSupply <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_bounded_source, # sys_function
             medium, # medium

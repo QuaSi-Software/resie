@@ -24,7 +24,7 @@ mutable struct SeasonalThermalStorage <: Component
     high_temperature::Float64
     low_temperature::Float64
 
-    function SeasonalThermalStorage(uac::String, config::Dict{String,Any})
+    function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
@@ -32,7 +32,7 @@ mutable struct SeasonalThermalStorage <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces

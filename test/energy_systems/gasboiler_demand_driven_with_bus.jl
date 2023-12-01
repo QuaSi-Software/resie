@@ -45,17 +45,18 @@ function test_gasboiler_demand_driven_with_bus()
             "power_th" => 12000
         ),
     )
-    components = Resie.load_components(components_config)
-    gasboiler = components["TST_GB_01"]
-    grid = components["TST_GRI_01"]
-    demand = components["TST_DEM_01"]
-    bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
+    bus = components["TST_BUS_01"]
 
     # test if correct demand is processed by gasboiler to make sure that the information of
     # demand is transported through Bus.
@@ -262,16 +263,17 @@ function test_gasboiler_demand_driven_without_bus()
             "power_th" => 12000
         ),
     )
-    components = Resie.load_components(components_config)
-    gasboiler = components["TST_GB_01"]
-    grid = components["TST_GRI_01"]
-    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
 
     # test if correct demand is processed by gasboiler to make sure that the information of
     # demand is transported through Interface.

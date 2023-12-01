@@ -19,14 +19,14 @@ Base.@kwdef mutable struct Battery <: Component
     load::Float64
     losses::Float64
 
-    function Battery(uac::String, config::Dict{String,Any})
+    function Battery(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces

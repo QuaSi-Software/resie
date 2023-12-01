@@ -94,7 +94,14 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "constant_temperature" => 60
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -102,12 +109,6 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # Gasboiler IS NOT allowed to load storages, but storage_1 IS allowed to load storage_2.
     # As result the gasboilder should be provide max energy, the rest of the demand should be 
@@ -246,7 +247,14 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "constant_temperature" => 60
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -254,12 +262,6 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # Gasboiler IS NOT allowed to load storages, storage_1 IS NOT allowed to load storage_2.
     # As result the gasboilder should be provide max energy, the rest of the demand should be 
@@ -402,7 +404,14 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "constant_temperature" => 60
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -410,12 +419,6 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # timestep 1:
     # Gasboiler IS  allowed to load storages, and storage_1 IS allowed to load storage_2.

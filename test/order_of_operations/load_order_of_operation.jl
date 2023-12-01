@@ -97,7 +97,13 @@ function load_order_of_operation()
         ("TST_GRI_01", EnergySystems.s_process)
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     # from input file
     order_from_input_file = Resie.load_order_of_operations(order_of_operation, components)

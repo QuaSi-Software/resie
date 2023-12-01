@@ -63,18 +63,19 @@ function test_run_energy_system_from_storage()
             "min_power_fraction" => 0.0
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    hheat_demand = components["TST_DEM_01"]
-    power_grid = components["TST_GRI_01"]
-    lheat_storage = components["TST_BFT_01"]
-    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
 
     @test heat_pump.controller.state_machine.state == 1
 
@@ -239,18 +240,19 @@ function test_run_energy_system_from_storage_denied()
             "min_power_fraction" => 0.0
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    hheat_demand = components["TST_DEM_01"]
-    power_grid = components["TST_GRI_01"]
-    lheat_storage = components["TST_BFT_01"]
-    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
 
     @test heat_pump.controller.state_machine.state == 1
 

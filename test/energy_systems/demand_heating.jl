@@ -25,13 +25,14 @@ function test_demand_heating_temperature_values()
             "scale" => 1000
         ),
     )
-    components = Resie.load_components(components_config)
-    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    demand = components["TST_DEM_01"]
 
     EnergySystems.reset(demand)
 

@@ -27,12 +27,12 @@ mutable struct FixedSupply <: Component
     constant_supply::Union{Nothing,Float64}
     constant_temperature::Temperature
 
-    function FixedSupply(uac::String, config::Dict{String,Any})
+    function FixedSupply(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
-                         Profile(config["energy_profile_file_path"]) :
+                         Profile(config["energy_profile_file_path"], parameters) :
                          nothing
         temperature_profile = "temperature_profile_file_path" in keys(config) ?
-                              Profile(config["temperature_profile_file_path"]) :
+                              Profile(config["temperature_profile_file_path"], parameters) :
                               nothing
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -40,7 +40,7 @@ mutable struct FixedSupply <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_fixed_source, # sys_function
             medium, # medium

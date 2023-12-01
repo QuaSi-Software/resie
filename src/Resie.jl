@@ -30,15 +30,6 @@ Due to the complexity of required inputs of a simulation and how the outputs are
 nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
-    components = load_components(project_config["components"])
-
-    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        step_order = load_order_of_operations(project_config["order_of_operation"], components)
-        println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
-    else
-        step_order = calculate_order_of_operations(components)
-    end
-
     # get time steps from input file
     time_step, start_timestamp, end_timestamp = get_timesteps(project_config["simulation_parameters"])  
     nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
@@ -46,9 +37,19 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     parameters = Dict{String,Any}(
         "time" => start_timestamp,
         "time_step_seconds" => time_step,
+        "number_of_time_steps" => nr_of_steps,
         "epsilon" => 1e-9
     )
     EnergySystems.set_timestep(parameters["time_step_seconds"])
+
+    components = load_components(project_config["components"], parameters)
+
+    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
+        step_order = load_order_of_operations(project_config["order_of_operation"], components)
+        println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
+    else
+        step_order = calculate_order_of_operations(components)
+    end
 
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)

@@ -33,7 +33,14 @@ function test_data_input_priorities()
             )
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -164,7 +171,14 @@ function test_data_busses_distribute()
             "output_refs" => [],
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -281,7 +295,14 @@ function test_data_storage_loading()
             "load" => 0
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -508,7 +529,14 @@ function test_data_storage_loading_with_matrix()
             "load" => 0
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end

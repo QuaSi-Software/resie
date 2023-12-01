@@ -52,7 +52,14 @@ end
 
 function test_load_no_connection_matrix()
     components_config = energy_system()
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 2
@@ -71,7 +78,14 @@ function test_load_given_lists_empty()
         "input_order" => [],
         "output_order" => [],
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 0
@@ -99,7 +113,14 @@ function test_fully_specified()
             [1, 0]
         ]
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 2
     bus.connectivity.input_order[1] == "TST_PVP_01"

@@ -28,8 +28,12 @@ function test_load_from_dict()
             "fixed_cop" => 3.0
         ),
     )
-
-    components = Resie.load_components(components_config)
+    simulation_params = Dict{String,Any}(
+        "time" => 0,
+        "time_step_seconds" => 900,
+        "epsilon" => 1e-9
+    )
+    components = Resie.load_components(components_config, simulation_params)
     @test length(keys(components)) == 2
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
     @test components["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
@@ -65,7 +69,12 @@ function test_load_custom_medium_categories()
             "fixed_cop" => 3.0
         )
     )
-    components = Resie.load_components(components_config)
+    simulation_params = Dict{String,Any}(
+        "time" => 0,
+        "time_step_seconds" => 900,
+        "epsilon" => 1e-9
+    )
+    components = Resie.load_components(components_config, simulation_params)
     electrolyser = components["TST_ELY_01"]
     heat_pump = components["TST_HP_01"]
 

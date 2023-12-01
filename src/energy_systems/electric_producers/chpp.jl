@@ -31,7 +31,7 @@ mutable struct CHPP <: Component
 
     losses::Float64
 
-    function CHPP(uac::String, config::Dict{String,Any})
+    function CHPP(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
@@ -40,7 +40,7 @@ mutable struct CHPP <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces

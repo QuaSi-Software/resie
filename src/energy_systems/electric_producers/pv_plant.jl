@@ -22,17 +22,17 @@ mutable struct PVPlant <: Component
 
     supply::Float64
 
-    function PVPlant(uac::String, config::Dict{String,Any})
+    function PVPlant(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
         register_media([m_el_out])
 
         # load energy profile from path
-        energy_profile = Profile(config["energy_profile_file_path"])
+        energy_profile = Profile(config["energy_profile_file_path"], parameters)
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces

@@ -214,7 +214,13 @@ function test_base_order()
         [1258, ("TST_01_HZG_01_BUS", EnergySystems.s_distribute)],
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+    
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     steps = Resie.base_order(by_function)
     @test pwc_steps_astr(expected, steps) == ""

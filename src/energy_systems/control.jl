@@ -316,21 +316,22 @@ include("strategies/supply_driven.jl")
 include("strategies/extended_storage_control.jl")
 
 """
-    controller_for_strategy(strategy, parameters)
+    controller_for_strategy(strategy, strategy_config, parameters)
 
 Construct the controller for the strategy of the given name using the given parameters.
 
 # Arguments
 - `strategy::String`: Must be an exact match to the name defined in the strategy's code file.
-- `parameters::Dict{String, Any}`: Parameters for the configuration of the strategy. The
+- `strategy_config::Dict{String, Any}`: Parameters for the configuration of the strategy. The
     names must match those in the default parameter values dictionary defined in the
     strategy's code file. Given values override default values.
+- `parameters::Dict{String,Any}`: General simulation parameters
 # Returns
 - `Controller`: The constructed controller for the given strategy.
 """
-function controller_for_strategy(strategy::String, parameters::Dict{String,Any})::Controller
+function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, parameters::Dict{String,Any})::Controller
     if lowercase(strategy) == "default"
-        return Controller("default", parameters, StateMachine(), Grouping())
+        return Controller("default", strategy_config, StateMachine(), Grouping())
     end
 
     if !(strategy in keys(OP_STRATS))
@@ -338,18 +339,18 @@ function controller_for_strategy(strategy::String, parameters::Dict{String,Any})
     end
 
     # check if parameters given in input file for strategy are valid parameters:
-    for key in keys(parameters)
+    for key in keys(strategy_config)
         if !(key in keys(OP_STRATS[strategy].strategy_parameters)) && !(startswith(key, "_"))
             throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
         end
     end
 
-    params = merge(OP_STRATS[strategy].strategy_parameters, parameters)
+    params = merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
 
     # load operation profile if path is given in input file
     if haskey(params, "operation_profile_path")
         if params["operation_profile_path"]  !== nothing
-            params["operation_profile"] = Profile(params["operation_profile_path"])
+            params["operation_profile"] = Profile(params["operation_profile_path"], parameters)
         end
     end
     

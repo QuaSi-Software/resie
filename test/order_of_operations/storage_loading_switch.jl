@@ -113,7 +113,13 @@ function test_ooo_storage_loading_switch()
         ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end

@@ -43,17 +43,18 @@ function test_heat_pump_demand_driven_correct_order()
             "power_th" => 12000
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    source = components["TST_SRC_01"]
-    demand = components["TST_DEM_01"]
-    grid = components["TST_GRI_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
 
     @test heat_pump.controller.state_machine.state == 1
 

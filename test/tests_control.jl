@@ -28,13 +28,15 @@ function setup_control_tests()
             "fixed_cop" => 3.0
         ),
     )
-    components = Resie.load_components(components_config)
 
     simulation_params = Dict{String,Any}(
         "time" => 0,
         "time_step_seconds" => 900,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_params)
+
 
     return components, simulation_params
 end

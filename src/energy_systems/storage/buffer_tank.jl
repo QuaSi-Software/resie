@@ -23,14 +23,14 @@ mutable struct BufferTank <: Component
     high_temperature::Float64
     low_temperature::Float64
 
-    function BufferTank(uac::String, config::Dict{String,Any})
+    function BufferTank(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces

@@ -20,14 +20,14 @@ mutable struct GridConnection <: Component
     output_sum::Float64
     input_sum::Float64
 
-    function GridConnection(uac::String, config::Dict{String,Any})
+    function GridConnection(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             if Bool(config["is_source"])
                 sf_bounded_source

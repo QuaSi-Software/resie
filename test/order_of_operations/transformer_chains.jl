@@ -42,7 +42,14 @@ function test_distance_from_sink()
             "output_refs" => [],
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus) == 3
     @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus) == 2
@@ -95,7 +102,14 @@ function test_iteration_order()
             "output_refs" => [],
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     chain = [
         components["TST_BUS_01"],
@@ -172,7 +186,14 @@ function test_find_chains()
             "scale" => 1000
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     expected_1 = Set([
         components["TST_BUS_01"],

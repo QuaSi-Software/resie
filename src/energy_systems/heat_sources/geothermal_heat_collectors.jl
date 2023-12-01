@@ -35,19 +35,19 @@ mutable struct GeothermalHeatCollector <: Component
     ambient_temperature::Temperature
     last_timestep_calculated::Float64
 
-    function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
+    function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
         ambient_temperature_profile = "ambient_temperature_profile_path" in keys(config) ?
-                                      Profile(config["ambient_temperature_profile_path"]) :
+                                      Profile(config["ambient_temperature_profile_path"], parameters) :
                                       nothing
 
         return new(
             uac,                    # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_storage,             # sys_function
             InterfaceMap(           # input_interfaces

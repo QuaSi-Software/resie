@@ -32,7 +32,7 @@ mutable struct HeatPump <: Component
 
     losses::Float64
 
-    function HeatPump(uac::String, config::Dict{String,Any})
+    function HeatPump(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
@@ -41,7 +41,7 @@ mutable struct HeatPump <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], parameters
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces

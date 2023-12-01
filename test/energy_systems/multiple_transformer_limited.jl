@@ -70,7 +70,14 @@ function test_multiple_transformer_with_limitations()
             "min_power_fraction" => 0.0
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
     electrolyser = components["TST_ELY_01"]
     grid_el1 = components["TST_GRI_el_01"]
@@ -78,12 +85,6 @@ function test_multiple_transformer_with_limitations()
     demand_h2 = components["TST_DEM_H2_01"]
     demand_heat = components["TST_DEM_heat_01"]
     grid_o2 = components["TST_GRI_O2_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
 
     for unit in values(components)
         EnergySystems.reset(unit)
