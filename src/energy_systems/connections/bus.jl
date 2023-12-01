@@ -243,15 +243,15 @@ function balance_on(
     return_exchanges = []
 
     for (idx, outface) in pairs(unit.output_interfaces)
-        if (
-            caller_is_input && !energy_flow_is_allowed(unit, input_index, idx) ||
-            caller_is_output && idx == output_index
-        )
+        if caller_is_input && !energy_flow_is_allowed(unit, input_index, idx)
             continue
         end
 
         if isa(outface.target, Bus)
-            append!(return_exchanges, balance_on(outface, outface.target))
+            # don't recurse back into the bus which called balance_on
+            if !(caller_is_output && idx == output_index)
+                append!(return_exchanges, balance_on(outface, outface.target))
+            end
         else
             exchanges = balance_on(outface, outface.target)
 
@@ -268,10 +268,12 @@ function balance_on(
                 storage_pot = 0.0
             end
 
-            # if energy was already transfered over interface or no information is
-            # available, set the energy potential to zero
+            # if energy was already transfered over the interface or no information is
+            # available or we're checking the calling component, set the energy potential
+            # to zero
             if (
-                outface.max_energy === nothing
+                (caller_is_output && idx == output_index)
+                || outface.max_energy === nothing
                 || outface.sum_abs_change > 0.0
                 || interface.sum_abs_change > 0.0
             )
@@ -295,15 +297,15 @@ function balance_on(
     end
 
     for (idx, inface) in pairs(unit.input_interfaces)
-        if (
-            caller_is_output && !energy_flow_is_allowed(unit, idx, output_index) ||
-            caller_is_input && idx == input_index
-        )
+        if caller_is_output && !energy_flow_is_allowed(unit, idx, output_index)
             continue
         end
 
         if isa(inface.source, Bus)
-            append!(return_exchanges, balance_on(inface, inface.source))
+            # don't recurse back into the bus which called balance_on
+            if !(caller_is_input && idx == input_index)
+                append!(return_exchanges, balance_on(inface, inface.source))
+            end
         else
             exchanges = balance_on(inface, inface.source)
 
@@ -320,10 +322,12 @@ function balance_on(
                 storage_pot = 0.0
             end
 
-            # if energy was already transfered over interface or no information is
-            # available, set the energy potential to zero
+            # if energy was already transfered over the interface or no information is
+            # available or we're checking the calling component, set the energy potential
+            # to zero
             if (
-                inface.max_energy === nothing
+                (caller_is_input && idx == input_index)
+                || inface.max_energy === nothing
                 || inface.sum_abs_change > 0.0
                 || interface.sum_abs_change > 0.0
             )
