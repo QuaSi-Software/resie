@@ -1,5 +1,5 @@
 # time_step;900
-# is_power;false
+# is_power;true
 # data source: Deutscher Wetterdienst
 0	;	-0.3
 900	;	-0.3
