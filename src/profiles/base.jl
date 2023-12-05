@@ -133,58 +133,44 @@ end
 
 
 # Function to handle extensive profiles to the simulation time step  (e.g., energy demand)
-function convert_extensive_profile(values, timestamps, original_time_step, new_time_step)
-    if original_time_step == new_time_step  # no change
+ function convert_extensive_profile(values, timestamps, original_time_step, new_time_step)
+    if original_time_step == new_time_step
         return values
-    else # segmentation or aggragation 
-        # Initialize an array to store the converted profile
-        total_duration = ceil(Int, maximum(timestamps) / new_time_step) * new_time_step
-        old_length = length(values)
-        if original_time_step > new_time_step
-            new_length = ceil(Int, total_duration / new_time_step + original_time_step / new_time_step)
-        else
-            new_length = ceil(Int, total_duration / new_time_step)
-        end
-        converted_profile = zeros(new_length)
-    
-        begin_search = 1
-        for i in 1:new_length
-            new_start_time = (i - 1) * new_time_step
-            new_end_time = i * new_time_step
-        
-            for m in begin_search:old_length
-                timestamp = timestamps[m]
-                value = values[m]
-                old_start_time = timestamp
-                old_end_time = timestamp + original_time_step
-        
-                # Calculate the overlapping duration
-                overlap_start = max(new_start_time, old_start_time)
-                overlap_end = min(new_end_time, old_end_time)
-                overlap_duration = max(0, overlap_end - overlap_start)
-        
-                # Calculate the proportion of overlap and distribute the value
-                if overlap_duration > 0
-                    overlap_fraction = overlap_duration / original_time_step
-                    converted_profile[i] += value * overlap_fraction
-                end
-
-                if new_end_time <= old_start_time
-                    begin_search = m-1
-                    break
-                end
-
-            end     
-        end
-        return converted_profile
     end
- end
+
+    # handle segmentation and aggregation at once
+    new_max_timestep = ceil(Int, maximum(timestamps) / new_time_step) * new_time_step
+    if original_time_step > new_time_step
+        new_length = ceil(Int, new_max_timestep / new_time_step + original_time_step / new_time_step)
+    else
+        new_length = ceil(Int, new_max_timestep / new_time_step)
+    end
+    converted_profile = zeros(new_length)
+
+    for (timestamp, value) in zip(timestamps, values)
+        new_time_index_start = floor(Int, timestamp / new_time_step) + 1
+        new_time_index_end = floor(Int, (timestamp + original_time_step - 1) / new_time_step) + 1
+
+        for j in max(1, new_time_index_start):min(new_time_index_end, new_length)
+            overlap_timestamp_start = max((j - 1) * new_time_step, timestamp)
+            overlap_timestamp_end = min(j * new_time_step, timestamp + original_time_step)
+            overlap_time_duration = max(0, overlap_timestamp_end - overlap_timestamp_start)
+
+            if overlap_time_duration > 0
+                overlap_fraction = overlap_time_duration / original_time_step
+                converted_profile[j] += value * overlap_fraction
+            end
+        end
+    end
+
+    return converted_profile
+end
 
 # Function to convert intensive profiles to the simulation time step (e.g., temperature, power)
 function convert_intensive_profile(values, timestamps, original_time_step, new_time_step)
     if new_time_step == original_time_step # no change
         return values
-    elseif new_time_step < original_time_step  # Segmentation
+    elseif new_time_step < original_time_step  # segmentation
         interp = interpolate((timestamps,), values, Gridded(Linear()))
         new_timestamps = minimum(timestamps):new_time_step:maximum(timestamps)
         converted_profile = [interp(t) for t in new_timestamps]
@@ -193,36 +179,17 @@ function convert_intensive_profile(values, timestamps, original_time_step, new_t
             append!(converted_profile, converted_profile[end])
         end
         return converted_profile
-    else # Aggregation
-        # Note: If the original_time_step is not a divider of the new_time_step, there may be small errors
-        #       as there is no consideration of overlapping time steps here 
-        # Determine the length of the new profile
-        new_length = ceil(Int, maximum(timestamps) / new_time_step + original_time_step / new_time_step)
+    else # aggregation
+        aggregation_factor = new_time_step / original_time_step   # is always > 1 and of type {Int} as only full dividers are allowed
+        old_length = length(timestamps)
+        new_length = ceil(Int, old_length / aggregation_factor)
         converted_profile = zeros(new_length)
-
-        sum_values = 0.0
-        count_values = 0
-        j = 1
-
-        for i in eachindex(values)
-            # Aggregate values within the new timestep
-            if timestamps[i] < j * new_time_step
-                sum_values += values[i]
-                count_values += 1
-            else
-                # Calculate average for the previous timestep
-                if count_values != 0
-                    converted_profile[j] = sum_values / count_values
-                end
-                j += 1
-                sum_values = values[i]
-                count_values = 1
-            end
-        end
-
-        # Handle the last set of values
-        if count_values != 0
-            converted_profile[j] = sum_values / count_values
+        
+        for n in 1:new_length
+            old_index_start = Int((n-1) * aggregation_factor + 1)
+            old_index_end = Int(min(n * aggregation_factor, old_length))
+            old_number_of_steps = Int(old_index_end - old_index_start + 1)
+            converted_profile[n] = sum(values[old_index_start:old_index_end])/old_number_of_steps
         end
         return converted_profile
     end

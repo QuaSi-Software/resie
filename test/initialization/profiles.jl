@@ -70,32 +70,6 @@ function test_profile_aggregation_four()
     @test demand.temperature_profile.data == [66.5, 65.25, 68]
 end
 
-function test_profile_aggregation_non_divider()
-    components_config = energy_system()
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 2000,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
-
-    components = Resie.load_components(components_config, simulation_parameters)
-    demand = components["TST_DEM_01"]
-
-    @test demand.energy_profile.time_step == 2000
-    @test demand.energy_profile.is_power == false
-    @test all(demand.energy_profile.data .- [ 35.33333333333333, 
-                                              47.77777777777778,
-                                              27.72222222222222,
-                                              13.55555555555555,
-                                              42.11111111111114] .< simulation_parameters["epsilon"]) == true
-    @test sum(demand.energy_profile.data) == 166.5
-
-    @test demand.temperature_profile.time_step == 2000
-    @test demand.temperature_profile.is_power == true
-    @test demand.temperature_profile.data == [64.6, 69.5, 67.2, 62.25, 69.6]
-end
-
 function test_profile_segmentation_half()
     components_config = energy_system()
 
@@ -169,50 +143,9 @@ function test_profile_segmentation_third()
                                                 70] .< simulation_parameters["epsilon"]) == true
 end
 
-function test_profile_segmentation_non_divider()
-    components_config = energy_system()
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 500,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
-
-    components = Resie.load_components(components_config, simulation_parameters)
-    demand = components["TST_DEM_01"]
-
-    @test demand.energy_profile.time_step == 500
-    @test demand.energy_profile.is_power == false
-    @test all(demand.energy_profile.data .- [5.555555555555555,
-                                             5.777777777777778,
-                                             6.666666666666667,
-                                             17.33333333333333,
-                                             33.33333333333333,
-                                             13.33333333333333,
-                                             0.0,
-                                             1.111111111111111,
-                                             1.388888888888889,
-                                             12.77777777777778,
-                                             10.77777777777778,
-                                             2.777777777777778,
-                                             4.111111111111111,
-                                             6.111111111111111,
-                                             2.777777777777778,
-                                             0.555555555555555,
-                                             18.77777766666778,
-                                             23.3333333333333] .< simulation_parameters["epsilon"]) == true
-    @test sum(demand.energy_profile.data) == 166.5
-
-    @test demand.temperature_profile.time_step == 500
-    @test demand.temperature_profile.is_power == true
-    @test demand.temperature_profile.data == []
-end
-
 @testset "profiles" begin
     test_profile_aggregation_two()
     test_profile_aggregation_four()
-    # test_profile_aggregation_non_divider()
     test_profile_segmentation_half()
     test_profile_segmentation_third()
-    # test_profile_segmentation_non_divider()
 end
