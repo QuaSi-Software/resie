@@ -6,9 +6,17 @@ export Profile, power_at_time, work_at_time, value_at_time
 """
 Holds values from a file so they can be retrieved later and indexed by time.
 
-For now the implementation reads values as they are in the file, but this will later change,
-so that values are interpolated between the time steps of the simulation, making the profile
-values somewhat independant from it (the overall timespan still needs to be the same).
+Profiles are automatically aggregated or segmentated to fit the simulation time step.
+Currtently, this only works, if the time step of the profile is a multiple or a divisor 
+of the requested simulation timestep. Otherwise, an error will arise.
+
+This function can handle either a path to a .prf file, or the profile data can be
+handed over as vectors. Then, the profile with the corresponding timestamps, the time step
+and the flag is_power has to be provided as optional arguments. 
+
+The flag is_power is essential to make sure that the profile data is converted correcty.
+It has to be set true for all intensive values like temperatures, power, wind speed or
+for profiles containting states. Only for energies, is_power has to be set to false.
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
@@ -20,46 +28,59 @@ mutable struct Profile
     """Holds the profile values indexed by the time step number"""
     data::Vector{Float64}
 
-    """Construct a profile from the file at the given path."""
-    function Profile(file_path::String, parameters::Dict{String,Any})
-        profile_values = Vector{Float64}()
-        profile_timestamps = Vector{Float64}()
-        profile_time_step = 900
-        is_power = false
-        given_timestep = false
-        given_type = false
+    """Construct a profile from the file at the given path or convert given data to profile (optional)."""
+    function Profile(file_path::String, 
+                     parameters::Dict{String,Any}; 
+                     given_profile_values::Vector{Any}=[],
+                     given_timestamps::Vector{Int64}=[0],
+                     given_time_step::Int=0,
+                     given_is_power::Bool=false)
 
-        open(abspath(file_path), "r") do file_handle
-            for line in readlines(file_handle)
-                line = strip(line)
+        if given_profile_values == []  # read data from file_path
+            profile_values = Vector{Float64}()
+            profile_timestamps = Vector{Float64}()
+            profile_time_step = 900
+            is_power = false
+            given_timestep = false
+            given_type = false
 
-                if isempty(line) || length(line) < 2 # handle empty lines
-                    continue
-                elseif line[1] == '#'
-                    splitted = split(strip(line, '#'), ';')
-                    if strip(splitted[1]) == "time_step"
-                        profile_time_step = parse(Int, splitted[2])
-                        given_timestep = true
-                    elseif strip(splitted[1]) == "is_power"
-                        is_power = parse(Bool, splitted[2])
-                        given_type = true
+            open(abspath(file_path), "r") do file_handle
+                for line in readlines(file_handle)
+                    line = strip(line)
+
+                    if isempty(line) || length(line) < 2 # handle empty lines
+                        continue
+                    elseif line[1] == '#'
+                        splitted = split(strip(line, '#'), ';')
+                        if strip(splitted[1]) == "time_step"
+                            profile_time_step = parse(Int, splitted[2])
+                            given_timestep = true
+                        elseif strip(splitted[1]) == "is_power"
+                            is_power = parse(Bool, splitted[2])
+                            given_type = true
+                        end
+                    else
+                        splitted = split(line, ';')
+                        timestamp = parse(Float64, splitted[1])
+                        push!(profile_timestamps, timestamp)
+                        value = parse(Float64, splitted[2])
+                        push!(profile_values, value)
                     end
-                else
-                    splitted = split(line, ';')
-                    timestamp = parse(Float64, splitted[1])
-                    push!(profile_timestamps, timestamp)
-                    value = parse(Float64, splitted[2])
-                    push!(profile_values, value)
                 end
             end
-        end
 
-        if !given_timestep
-            profile_time_step = profile_timestamps[2] - profile_timestamps[1]
-            println("Warning: For the profile at " * file_path * " no timestep is given! A timestep of " * string(profile_time_step) * " seconds was detected.")
-        end
-        if !given_type
-            println("Warning: For the profile at " * file_path * " no profile type ('is_power') is given! An energy-profile (extensive) is assumed!")
+            if !given_timestep
+                profile_time_step = profile_timestamps[2] - profile_timestamps[1]
+                println("Warning: For the profile at " * file_path * " no timestep is given! A timestep of " * string(profile_time_step) * " seconds was detected.")
+            end
+            if !given_type
+                println("Warning: For the profile at " * file_path * " no profile type ('is_power') is given! An energy-profile (extensive) is assumed!")
+            end
+        else # data was read in from somewhere else and is provided as vector
+            profile_values = given_profile_values
+            profile_time_step = given_time_step
+            profile_timestamps = given_timestamps
+            is_power = given_is_power
         end
 
         simulation_time_step = parameters["time_step_seconds"]  # seconds 

@@ -9,6 +9,8 @@ module Resie
 
 include("profiles/base.jl")
 using .Profiles
+include("profiles/weatherdata.jl")
+using .Weatherdata
 
 include("energy_systems/base.jl")
 using .EnergySystems
@@ -50,6 +52,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
     else
         step_order = calculate_order_of_operations(components)
+    end
+
+    # load weather data 
+    if haskey(project_config["io_settings"], "weather_file_path") && length(project_config["io_settings"]["weather_file_path"]) > 0
+        parameters["weatherdata"] = WeatherData(project_config["io_settings"]["weather_file_path"], parameters)
     end
 
     # get list of requested output keys for lineplot and csv export
