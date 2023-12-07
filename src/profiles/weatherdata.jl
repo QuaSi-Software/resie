@@ -17,7 +17,7 @@ mutable struct WeatherData
     dirHorIrr::Profile
 
     """Diffuse horizontal irradiation, in W/m^2."""
-    diffHorIrr::Profile
+    difHorIrr::Profile
 
     """Global horizontal irradiation, in W/m^2."""
     globHorIrr::Profile
@@ -45,9 +45,9 @@ The returned values are of type WeaterData containing profiles of type Profile.
             temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             dirHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            diffHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["diffHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             globHorIrr      = deepcopy(dirHorIrr)
-            globHorIrr.data = globHorIrr.data .+ diffHorIrr.data
+            globHorIrr.data = globHorIrr.data .+ difHorIrr.data
     
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
@@ -57,15 +57,15 @@ The returned values are of type WeaterData containing profiles of type Profile.
             temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             globHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            diffHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             dirHorIrr       = deepcopy(globHorIrr)
-            dirHorIrr.data  = dirHorIrr.data .- diffHorIrr.data
+            dirHorIrr.data  = dirHorIrr.data .- difHorIrr.data
         end
     
         return new(temp_air, 
                    wind_speed, 
                    dirHorIrr, 
-                   diffHorIrr, 
+                   difHorIrr, 
                    globHorIrr)
     end
 end
@@ -159,7 +159,7 @@ function read_dat_file(weather_file_path::String)
     # Define column names of weatherdata_dict
     colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air", 
                 "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover", 
-                "precipitable_water", "relative_humidity", "dirHorIrr", "diffHorIrr", 
+                "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr", 
                 "athmospheric_heat_irr", "terrestric_heat_irr", "quality"]
 
     weatherdata_dict = Dict{String, Vector{Any}}()
