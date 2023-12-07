@@ -13,13 +13,13 @@ mutable struct WeatherData
     """Wind speed, in m/s."""
     wind_speed::Profile
 
-    """Direct horizontal irradiation, in W/m^2]."""
+    """Direct horizontal irradiation, in W/m^2."""
     dirHorIrr::Profile
 
-    """Diffuse horizontal irradiation, in W/m^2]."""
+    """Diffuse horizontal irradiation, in W/m^2."""
     diffHorIrr::Profile
 
-    """Global horizontal irradiation, in W/m^2]."""
+    """Global horizontal irradiation, in W/m^2."""
     globHorIrr::Profile
    
 """
@@ -42,24 +42,24 @@ The returned values are of type WeaterData containing profiles of type Profile.
             time_step = 900*4 # s, of weatherdata
     
             # convert required data to profile
-            temp_air             = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed           = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            dirHorIrr            = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            diffHorIrr           = Profile("", parameters, given_profile_values=weatherdata_dict["diffHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            globHorIrr           = deepcopy(dirHorIrr)
-            globHorIrr.data      = globHorIrr.data .+ diffHorIrr.data
+            temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            dirHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            diffHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["diffHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            globHorIrr      = deepcopy(dirHorIrr)
+            globHorIrr.data = globHorIrr.data .+ diffHorIrr.data
     
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
             timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
             time_step = 900*4 # s, of weatherdata   
             
-            temp_air             = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed           = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            globHorIrr           = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            diffHorIrr           = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            dirHorIrr            = deepcopy(globHorIrr)
-            dirHorIrr.data       = dirHorIrr.data .- diffHorIrr.data
+            temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            globHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            diffHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            dirHorIrr       = deepcopy(globHorIrr)
+            dirHorIrr.data  = dirHorIrr.data .- diffHorIrr.data
         end
     
         return new(temp_air, 
@@ -115,6 +115,7 @@ IL Qualitaetsbit bezueglich der Auswahlkriterien                           {0;1;
 """
 function read_dat_file(weather_file_path::String)
     local datfile
+    expected_length = 8760  # timesteps
     try 
         datfile = open(weather_file_path, "r") 
     catch e
@@ -123,86 +124,86 @@ function read_dat_file(weather_file_path::String)
         exit()
     end
 
-    weatherdata_dict = Dict{String, Vector{Any}}()
+    # Read header 
     headerdata = Dict()
+    for line in eachline(datfile)
+        row = split(rstrip(line), ":", limit=2)
+        current_name = rstrip(row[1])
+        try
+            if current_name == "Rechtswert"
+                value = parse(Int, split(row[2])[1])
+                headerdata["easting"] = value
+            elseif current_name == "Hochwert"
+                value = parse(Int, split(row[2])[1])
+                headerdata["northing"] = value
+            elseif current_name == "Hoehenlage"
+                value = parse(Float64, split(row[2])[1])
+                headerdata["altitude"] = value
+            elseif current_name == "Art des TRY"
+                headerdata["kind"] = row[2]
+            elseif current_name == "Bezugszeitraum"
+                headerdata["years"] = row[2]
+            end
+        catch e
+            println("Error reading the header of the DWD .dat file in $weather_file_path")
+            println("Check if the header meets the requirements.")
+            println("The following error occurred: $e")
+            exit()
+        end
+        if row[1] == "***"
+            break
+        end
+    end
 
+    # read data
     # Define column names of weatherdata_dict
     colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air", 
                 "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover", 
                 "precipitable_water", "relative_humidity", "dirHorIrr", "diffHorIrr", 
                 "athmospheric_heat_irr", "terrestric_heat_irr", "quality"]
+
+    weatherdata_dict = Dict{String, Vector{Any}}()
     for col_name in colnames
-        weatherdata_dict[col_name] = Vector{Any}()
+        weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
     end 
 
-    # Read header and data
-    data_has_started = false
+    dataline = 1
     for line in eachline(datfile)
-        if data_has_started
-            row = split(rstrip(line), ":", limit=2)
-            if row[1] == "***"
-                data_has_started = true
-                continue
-            end
-            current_name = rstrip(row[1])
-            try
-                if current_name == "Rechtswert"
-                    value = parse(Int, split(row[2])[1])
-                    headerdata["easting"] = value
-                elseif current_name == "Hochwert"
-                    value = parse(Int, split(row[2])[1])
-                    headerdata["northing"] = value
-                elseif current_name == "Hoehenlage"
-                    value = parse(Float64, split(row[2])[1])
-                    headerdata["altitude"] = value
-                elseif current_name == "Art des TRY"
-                    headerdata["kind"] = row[2]
-                elseif current_name == "Bezugszeitraum"
-                    headerdata["years"] = row[2]
-                end
-            catch e
-                println("Error reading the header of the DWD .dat file in $weather_file_path")
-                println("Check if the header meets the requirements.")
-                println("The following error occurred: $e")
-                exit()
-            end
-        else
-            row = split(rstrip(line), r"\s+")
-            row_converted = Vector{Any}(undef, length(row))
-            for (index, value) in enumerate(row)
-                if occursin('.', value)
-                    row_converted[index] = parse(Float64, value)
-                else
-                    row_converted[index] = parse(Int, value)
-                end
-            end
-            for (i, col_name) in enumerate(colnames)
-                push!(weatherdata_dict[col_name], row_converted[i])
+        row = split(rstrip(line), r"\s+")
+        if length(row) !== length(colnames)
+            println("Warning: In row $(dataline) ($(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values.")
+            println("Expected $(length(colnames)) but got $(length(row)) elements!")
+        end
+        for (index, value) in enumerate(row)
+            if occursin('.', value)
+                weatherdata_dict[colnames[index]][dataline] = parse(Float64, value)
+            else
+                weatherdata_dict[colnames[index]][dataline] = parse(Int, value)
             end
         end
+        dataline += 1
     end
 
     close(datfile)
 
-    # Check lengths
-    expected_length = 8760
-    for (key, value) in weatherdata_dict
-        if length(value) != expected_length
-            println("Error reading the weather dataset from $filename.")
-            println("Number of data points in '$(key)' is not $expected_length. Actual length: $(length(value))")
-            println("Check the file and make sure the data block starts with ***.")
-            return nothing
-        end
+    # Check length
+    if dataline-1 !== expected_length
+        println("Error reading the .dat weather dataset from $weather_file_path.")
+        println("The number of datapoints is $(dataline-1) and not as expected $expected_length.")
+        println("Check the file and make sure the data block starts with ***.")
+        exit()
     end
 
     println("The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read.")
     return weatherdata_dict, headerdata
 end
 
+
 """
 read_epw_file(weather_file_path)
 
 Function to read in an .epw weather file (EnergyPlus Weather File).
+For details, see: https://designbuilder.co.uk/cahelp/Content/EnergyPlusWeatherFileFormat.htm
 """
 function read_epw_file(weather_file_path::String)
     local ewpfile
@@ -215,7 +216,7 @@ function read_epw_file(weather_file_path::String)
         exit()
     end
 
-    # Read line with metadata
+    # Read fist line with metadata
     firstline = readline(ewpfile)
 
     head = ["loc", "city", "state-prov", "country", "data_type", "WMO_code",
@@ -251,7 +252,6 @@ function read_epw_file(weather_file_path::String)
     end
 
     # reading data
-    row_converted = Vector{Any}(undef, length(colnames))
     dataline = 1
     for line in eachline(ewpfile)
         row = split(rstrip(line), ',')
@@ -261,27 +261,24 @@ function read_epw_file(weather_file_path::String)
         end
         for (index, value) in enumerate(row)
             if occursin('.', value)
-                row_converted[index] = parse(Float64, value)
+                weatherdata_dict[colnames[index]][dataline] = parse(Float64, value)
             elseif occursin('?', value)
-                row_converted[index] = value
+                weatherdata_dict[colnames[index]][dataline] = value
             else
-                row_converted[index] = parse(Int, value)
+                weatherdata_dict[colnames[index]][dataline] = parse(Int, value)
             end
-        end
-        for (i, col_name) in enumerate(colnames)
-            weatherdata_dict[col_name][dataline] = row_converted[i]
         end
         dataline += 1
     end
 
     close(ewpfile)
 
-    # Check lengths
+    # Check length
     if dataline-1 !== expected_length
-        println("Error reading the EPW weather dataset from $filename.")
+        println("Error reading the EPW weather dataset from $weather_file_path.")
         println("The number of datapoints is $(dataline-1) and not as expected $expected_length.")
         println("Check the file for corruption.")
-        return nothing
+        exit()
     end
 
     println("The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read.")
