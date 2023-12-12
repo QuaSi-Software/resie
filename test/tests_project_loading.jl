@@ -103,6 +103,7 @@ end
     include("order_of_operations/load_order_of_operation.jl")
     include("order_of_operations/bus_output_priorities.jl")
     include("order_of_operations/bus_to_bus.jl")
+    include("order_of_operations/one_bus_to_many_with_storage.jl")
     include("order_of_operations/heat_pumps_wrong.jl")
     include("order_of_operations/reorderings.jl")
     include("order_of_operations/storage_loading_switch.jl")
