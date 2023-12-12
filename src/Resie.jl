@@ -45,6 +45,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     )
     EnergySystems.set_timestep(parameters["time_step_seconds"])
 
+    # load weather data 
+    if haskey(project_config["io_settings"], "weather_file_path") && length(project_config["io_settings"]["weather_file_path"]) > 0
+        parameters["weatherdata"] = WeatherData(project_config["io_settings"]["weather_file_path"], parameters)
+    end
+
     components = load_components(project_config["components"], parameters)
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
@@ -52,11 +57,6 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
     else
         step_order = calculate_order_of_operations(components)
-    end
-
-    # load weather data 
-    if haskey(project_config["io_settings"], "weather_file_path") && length(project_config["io_settings"]["weather_file_path"]) > 0
-        parameters["weatherdata"] = WeatherData(project_config["io_settings"]["weather_file_path"], parameters)
     end
 
     # get list of requested output keys for lineplot and csv export

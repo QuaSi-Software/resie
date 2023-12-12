@@ -31,9 +31,31 @@ mutable struct FixedSink <: Component
         energy_profile = "energy_profile_file_path" in keys(config) ?
                          Profile(config["energy_profile_file_path"], parameters) :
                          nothing
-        temperature_profile = "temperature_profile_file_path" in keys(config) ?
-                              Profile(config["temperature_profile_file_path"], parameters) :
-                              nothing
+
+        # check input
+        if (    haskey(config,"temperature_profile_file_path") + 
+                (haskey(config, "use_ambient_temperature_from_weather_file") && config["use_ambient_temperature_from_weather_file"]) + 
+                haskey(config, "constant_temperature")
+            ) > 1
+            println("Warning: Two or more temperature profile sources for $(uac) have been specified in the input file!")
+            # move to input check
+        end
+
+        # read temperature file
+        if haskey(config,"temperature_profile_file_path")
+            temperature_profile = Profile(config["temperature_profile_file_path"], parameters) 
+            # println("Info: For fixed sink '$uac', the temperature profile is taken from the user-defined .prf file.")
+        elseif haskey(config, "constant_temperature")
+            temperature_profile = nothing
+            # println("Info: For fixed sink '$uac', a constant temperature of $(config["constant_temperature"]) °C is set.")
+        elseif haskey(config, "use_ambient_temperature_from_weather_file") && config["use_ambient_temperature_from_weather_file"] && haskey(parameters, "weatherdata") 
+            temperature_profile = parameters["weatherdata"].temp_air
+            # println("Info: For fixed sink '$uac', the temperature profile is taken from the ambient temperature of the project-wide weather file.")
+        else
+            temperature_profile = nothing
+            # println("Info: For fixed sink '$uac', no temperature is set.")
+        end
+
         medium = Symbol(config["medium"])
         register_media([medium])
 

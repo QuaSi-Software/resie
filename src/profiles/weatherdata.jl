@@ -194,7 +194,7 @@ function read_dat_file(weather_file_path::String)
         exit()
     end
 
-    println("The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read.")
+    println("Info: The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read.")
     return weatherdata_dict, headerdata
 end
 
@@ -247,7 +247,7 @@ function read_epw_file(weather_file_path::String)
     end 
 
     # skip the next seven lines of the header
-    for i in 1:7
+    for _ in 1:7
         readline(ewpfile)
     end
 
@@ -281,7 +281,7 @@ function read_epw_file(weather_file_path::String)
         exit()
     end
 
-    println("The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read.")
+    println("Info: The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read.")
    
     return weatherdata_dict, headerdata
 end

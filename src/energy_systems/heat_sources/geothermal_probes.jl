@@ -39,10 +39,17 @@ mutable struct GeothermalProbes <: Component
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
-
-        ambient_temperature_profile = "ambient_temperature_profile_path" in keys(config) ?
-                                      Profile(config["ambient_temperature_profile_path"], parameters) :
-                                      nothing
+        
+        if haskey(config, "ambient_temperature_profile_path")
+            ambient_temperature_profile = Profile(config["ambient_temperature_profile_path"], parameters)
+            # println("Info: For geothermal probes '$uac', the given ambient temperature profile is chosen.")
+        elseif haskey(parameters, "weatherdata") 
+            ambient_temperature_profile = parameters["weatherdata"].temp_air
+            # println("Info: For geothermal probes '$uac', the ambient temperature profile is taken from the project-wide weather file.")
+        else
+            println("Error: No ambient temperature profile is given for geothermal probes '$uac'")
+            exit()
+        end
 
         return new(
             uac,                    # uac
