@@ -250,7 +250,19 @@ function balance_on(
         if isa(outface.target, Bus)
             # don't recurse back into the bus which called balance_on
             if !(caller_is_output && idx == output_index)
-                append!(return_exchanges, balance_on(outface, outface.target))
+                # append all exchanges from the outgoing bus, but filter them so storage and
+                # energy potentials are only considered if the caller is an input
+                for exchange in balance_on(outface, outface.target)
+                    push!(return_exchanges, EnEx(
+                        balance=exchange.balance,
+                        uac=exchange.uac,
+                        energy_potential=caller_is_input ? exchange.energy_potential : 0,
+                        storage_potential=caller_is_input ? exchange.storage_potential : 0,
+                        temperature=exchange.temperature,
+                        pressure=exchange.pressure,
+                        voltage=exchange.voltage
+                    ))
+                end
             end
         else
             exchanges = balance_on(outface, outface.target)
@@ -305,7 +317,19 @@ function balance_on(
         if isa(inface.source, Bus)
             # don't recurse back into the bus which called balance_on
             if !(caller_is_input && idx == input_index)
-                append!(return_exchanges, balance_on(inface, inface.source))
+                # append all exchanges from the incoming bus, but filter them so storage and
+                # energy potentials are only considered if the caller is an output
+                for exchange in balance_on(inface, inface.source)
+                    push!(return_exchanges, EnEx(
+                        balance=exchange.balance,
+                        uac=exchange.uac,
+                        energy_potential=caller_is_output ? exchange.energy_potential : 0,
+                        storage_potential=caller_is_output ? exchange.storage_potential : 0,
+                        temperature=exchange.temperature,
+                        pressure=exchange.pressure,
+                        voltage=exchange.voltage
+                    ))
+                end
             end
         else
             exchanges = balance_on(inface, inface.source)
