@@ -170,34 +170,6 @@ function balance(unit::Bus)::Float64
     return balance_nr(unit, unit)
 end
 
-
-# helper function to create a balance tuple with values while filling optional values with nothing
-function fill_interface_tuple(uac, energy_potential, storage_potential; temperature=nothing, pressure=nothing, voltage=nothing)
-    return (uac=uac,
-            energy_potential=energy_potential,
-            storage_potential=storage_potential,
-            temperature=temperature,
-            pressure=pressure,
-            voltage=voltage)
-end
-
-# helper function to create the structure of an array holding balance tuples. Returnes only the empty structure.
-function create_interface_tuple()
-    return NamedTuple{( :uac,
-                        :energy_potential,
-                        :storage_potential,
-                        :temperature,
-                        :pressure,
-                        :voltage),
-                        Tuple{
-                            String,
-                            Float64,
-                            Float64,
-                            Union{Temperature, Nothing},
-                            Union{Float64, Nothing},
-                            Union{Float64, Nothing}}}[]
-end
-
 function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)
     return (
         unit.connectivity.storage_loading === nothing ||

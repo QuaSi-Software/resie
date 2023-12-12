@@ -22,9 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest, collect_all_energy_potentials_of_interface_balance,
-    collect_all_storage_potentials_of_interface_balance,
-    collect_all_temperatures_of_interface_balance
+    highest
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -328,49 +326,6 @@ function highest(
         return temperature_1
     end
 end
-
-
-"""
-    collect_all_energy_potentials_of_interface_balance(input::Any)
-
-Input is exchange.energy, an array of tuples or a single tuple as
-return value of the balance_on().
-
-Returns a vector containing all energy_potentials listed in the tuples.
-"""
-function collect_all_energy_potentials_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.energy_potential for t in energy_tuples]
-end
-
-
-"""
-    collect_all_storage_potentials_of_interface_balance(input::Any)
-
-Input is exchange.energy, an array of tuples or a single tuple as
-return value of the balance_on().
-
-Returns a vector containing all storage_potentials listed in the tuples.
-"""
-function collect_all_storage_potentials_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.storage_potential for t in energy_tuples]
-end
-
-
-"""
-collect_all_temperatures_of_interface_balance(input::Any)
-
-Input is exchange.energy, an array of tuples or a single tuple as
-return value of the balance_on().
-
-Returns a vector containing all temperatures listed in the tuples.
-"""
-function collect_all_temperatures_of_interface_balance(input::Any)
-    energy_tuples = isa(input, NamedTuple) ? [input] : input
-    return [t.temperature for t in energy_tuples]
-end
-
 
 """
 Convenience type used define the required system interfaces of a component.
