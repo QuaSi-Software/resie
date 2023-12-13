@@ -42,24 +42,24 @@ The returned values are of type WeaterData containing profiles of type Profile.
             time_step = 900*4 # s, of weatherdata
     
             # convert required data to profile
-            temp_ambient_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            dirHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            globHorIrr      = deepcopy(dirHorIrr)
-            globHorIrr.data = globHorIrr.data .+ difHorIrr.data
+            temp_ambient_air  = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed        = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            dirHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            globHorIrr        = deepcopy(dirHorIrr)
+            globHorIrr.data   = globHorIrr.data .+ difHorIrr.data
     
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
             timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
             time_step = 900*4 # s, of weatherdata   
             
-            temp_ambient_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            globHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            dirHorIrr       = deepcopy(globHorIrr)
-            dirHorIrr.data  = dirHorIrr.data .- difHorIrr.data
+            temp_ambient_air  = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed        = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            globHorIrr        = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            dirHorIrr         = deepcopy(globHorIrr)
+            dirHorIrr.data    = dirHorIrr.data .- difHorIrr.data
         end
     
         return new(temp_ambient_air, 
