@@ -167,7 +167,7 @@ function test_one_bus_to_many_bus()
     @test EnergySystems.balance(exchanges) ≈ -100.0 # not -200 because we "call from" bus 2
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 100.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temperature_first(exchanges) === nothing
 
     EnergySystems.process(bus_2, simulation_parameters)
     EnergySystems.process(bus_1, simulation_parameters)
