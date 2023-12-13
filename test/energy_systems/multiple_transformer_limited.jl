@@ -89,7 +89,7 @@ function test_multiple_transformer_with_limitations()
         EnergySystems.reset(unit)
     end
 
-    # first time step: demand is met perfectly 
+    # first time step: demand is met perfectly
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
     demand_h2.load = 2400/4
@@ -110,10 +110,10 @@ function test_multiple_transformer_with_limitations()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy ≈ 2240/4 / 3.5
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy ≈ 2240/4
 
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ -2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].max_energy ≈ 2400/4/0.6*0.4
@@ -121,15 +121,15 @@ function test_multiple_transformer_with_limitations()
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy ≈ 2400/4/2
     @test electrolyser.input_interfaces[electrolyser.m_el_in].max_energy ≈ 2400/4/0.6
 
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ -2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
-    exchange = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ 2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].balance ≈ 1600/4
@@ -161,10 +161,10 @@ function test_multiple_transformer_with_limitations()
     # should also be less that nominal state.
     # 12 test are failing at the moment. Reasons:
     # - implemented stratey of electrolyse is not considering demand of H2
-    # - calculation of state of one energy system is only done once. If the required demand are not satisfied, this has 
-    #   no effect on the actual state of this energy system! 
+    # - calculation of state of one energy system is only done once. If the required demand are not satisfied, this has
+    #   no effect on the actual state of this energy system!
     #  --> electrolyser is running on 100% instead of 50% due to control stragety
-    #  --> if that is fixed, the heat pump is running on 100% instead of 50% due to lack of information that electrolyser 
+    #  --> if that is fixed, the heat pump is running on 100% instead of 50% due to lack of information that electrolyser
     #      can only run 50% due to a limitation in hydrogen demand
 
     for unit in values(components)
@@ -191,10 +191,10 @@ function test_multiple_transformer_with_limitations()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy ≈ 2240/4 / 3.5
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy ≈ 2240/4
 
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ -2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
     @test electrolyser.output_interfaces[electrolyser.m_heat_out].max_energy ≈ 0.5*2400/4/0.6*0.4
@@ -202,19 +202,19 @@ function test_multiple_transformer_with_limitations()
     @test electrolyser.output_interfaces[electrolyser.m_o2_out].max_energy ≈ 0.5*2400/4/2
     @test electrolyser.input_interfaces[electrolyser.m_el_in].max_energy ≈ 0.5*2400/4/0.6
 
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ -0.5*2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ -0.5*2400/4/0.6*0.4
 
-    exchange = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 0.0
-    @test exchange.energy_potential ≈ 0.5*2400/4/0.6*0.4
+    exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.5*2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)
     EnergySystems.process(heat_pump, simulation_parameters)
-    
+
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -0.5*2240/4
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 560+560/2
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -0.5*640/4

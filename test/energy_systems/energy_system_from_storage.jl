@@ -79,7 +79,7 @@ function test_run_energy_system_from_storage()
     @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump
-    
+
     for unit in values(components)
         EnergySystems.reset(unit)
     end
@@ -100,11 +100,11 @@ function test_run_energy_system_from_storage()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 30000
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 30000
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
@@ -152,11 +152,11 @@ function test_run_energy_system_from_storage()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 100
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.exchange.balance(exchanges) ≈ 0.0
+    @test EnergySystems.exchange.storage_potential(exchanges) ≈ 100
+    @test EnergySystems.exchange.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.exchange.temperature(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100*3/2
@@ -256,7 +256,7 @@ function test_run_energy_system_from_storage_denied()
 
     # first time step: storage is full to power heatpump, but heatpump unloading storages is test_run_energy_system_from_storage_denied
     # not energy should be transferred at all.
-    
+
     for unit in values(components)
         EnergySystems.reset(unit)
     end
@@ -277,11 +277,11 @@ function test_run_energy_system_from_storage_denied()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 30000
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 30000
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800
