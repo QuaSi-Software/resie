@@ -221,20 +221,29 @@ function balance_on(
 
         if isa(outface.target, Bus)
             # don't recurse back into the bus which called balance_on
-            if !(caller_is_output && idx == output_index)
-                # append all exchanges from the outgoing bus, but filter them so storage and
-                # energy potentials are only considered if the caller is an input
-                for exchange in balance_on(outface, outface.target)
-                    push!(return_exchanges, EnEx(
-                        balance=exchange.balance,
-                        uac=exchange.uac,
-                        energy_potential=caller_is_input ? exchange.energy_potential : 0,
-                        storage_potential=caller_is_input ? exchange.storage_potential : 0,
-                        temperature=exchange.temperature,
-                        pressure=exchange.pressure,
-                        voltage=exchange.voltage
-                    ))
-                end
+            if caller_is_output && idx == output_index; continue end
+
+            exchanges = balance_on(outface, outface.target)
+            if caller_is_output
+                # for other outputs on the bus, the entire chain of components and busses
+                # behind the output interface we are currently checking is only relevant for
+                # balance calculations. therefore we can replace it with a single exchange
+                # that is capped up at zero (since energy can't flow back into the
+                # current bus)
+                push!(return_exchanges, EnEx(
+                    balance=min(0.0, balance(exchanges)),
+                    uac=outface.target.uac,
+                    energy_potential=0.0,
+                    storage_potential=0.0,
+                    temperature=nothing,
+                    pressure=nothing,
+                    voltage=nothing
+                ))
+            else
+                # for inputs on the bus, we can add all exchanges of the outgoing bus to
+                # the list of exchanges. the potentials are filtered within the balance_on
+                # calculation of the outgoing bus
+                append!(return_exchanges, exchanges)
             end
         else
             exchanges = balance_on(outface, outface.target)
@@ -288,20 +297,29 @@ function balance_on(
 
         if isa(inface.source, Bus)
             # don't recurse back into the bus which called balance_on
-            if !(caller_is_input && idx == input_index)
-                # append all exchanges from the incoming bus, but filter them so storage and
-                # energy potentials are only considered if the caller is an output
-                for exchange in balance_on(inface, inface.source)
-                    push!(return_exchanges, EnEx(
-                        balance=exchange.balance,
-                        uac=exchange.uac,
-                        energy_potential=caller_is_output ? exchange.energy_potential : 0,
-                        storage_potential=caller_is_output ? exchange.storage_potential : 0,
-                        temperature=exchange.temperature,
-                        pressure=exchange.pressure,
-                        voltage=exchange.voltage
-                    ))
-                end
+            if caller_is_input && idx == input_index; continue end
+
+            exchanges = balance_on(inface, inface.source)
+            if caller_is_input
+                # for other inputs on the bus, the entire chain of components and busses
+                # behind the input interface we are currently checking is only relevant for
+                # balance calculations. therefore we can replace it with a single exchange
+                # that is capped down at zero (since energy can't flow back into the
+                # incoming bus)
+                push!(return_exchanges, EnEx(
+                    balance=max(0.0, balance(exchanges)),
+                    uac=inface.source.uac,
+                    energy_potential=0.0,
+                    storage_potential=0.0,
+                    temperature=nothing,
+                    pressure=nothing,
+                    voltage=nothing
+                ))
+            else
+                # for outputs on the bus, we can add all exchanges of the incoming bus to
+                # the list of exchanges. the potentials are filtered within the balance_on
+                # calculation of the incoming bus
+                append!(return_exchanges, exchanges)
             end
         else
             exchanges = balance_on(inface, inface.source)
