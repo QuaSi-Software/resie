@@ -22,17 +22,17 @@ mutable struct PVPlant <: Component
 
     supply::Float64
 
-    function PVPlant(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function PVPlant(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
         register_media([m_el_out])
 
         # load energy profile from path
-        energy_profile = Profile(config["energy_profile_file_path"], parameters)
+        energy_profile = Profile(config["energy_profile_file_path"], sim_params)
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
@@ -50,16 +50,16 @@ end
 function control(
     unit::PVPlant,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
-    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, parameters["time"])
+    move_state(unit, components, sim_params)
+    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 
 end
 
 
-function process(unit::PVPlant, parameters::Dict{String,Any})
+function process(unit::PVPlant, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
     add!(outface, unit.supply)
 end

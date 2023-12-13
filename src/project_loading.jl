@@ -32,12 +32,12 @@ The config must have the structure:
 }
 ```
 
-The required parameters to construct a component from one entry in the config must
+The required sim_params to construct a component from one entry in the config must
 match what is required for the particular component. The `type` parameter must be present and
 must match the symbol of the component class exactly. The structure is described in
 more detail in the accompanying documentation on the project file.
 """
-function load_components(config::Dict{String,Any}, parameters::Dict{String,Any})::Grouping
+function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})::Grouping
     components = Grouping()
     for (unit_key, entry) in pairs(config)
         default_dict = Dict{String,Any}(
@@ -48,7 +48,7 @@ function load_components(config::Dict{String,Any}, parameters::Dict{String,Any})
         symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.Component
-            instance = unit_class(unit_key, unit_config, parameters)
+            instance = unit_class(unit_key, unit_config, sim_params)
             components[unit_key] = instance
         end
     end

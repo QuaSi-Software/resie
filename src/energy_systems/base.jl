@@ -423,57 +423,57 @@ function reset(unit::Component)
 end
 
 """
-    control(unit, components, parameters)
+    control(unit, components, sim_params)
 
 Perform the control calculations for the given component.
 
 # Arguments
 - `unit::Component`: The component for which control is handled
 - `components::Grouping`: A reference dict to all components in the project
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function control(
     unit::Component,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 end
 
 """
-    potential(unit, parameters)
+    potential(unit, sim_params)
 
 Calculate potential energy processing for the given component.
 
 # Arguments
 - `unit::Component`: The component for which potentials are calculated
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function potential(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    process(unit, parameters)
+    process(unit, sim_params)
 
 Perform the processing calculations for the given component.
 
 # Arguments
 - `unit::Component`: The component that is processed
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function process(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    load(unit, parameters)
+    load(unit, sim_params)
 
 Load excess energy into storage components.
 
@@ -481,11 +481,11 @@ For non-storage components this function does nothing.
 
 # Arguments
 - `unit::Component`: The storage loading excess energy
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function load(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
@@ -673,7 +673,7 @@ function check_balances(
 end
 
 """
-    perform_steps(components, order_of_operations, parameters)
+    perform_steps(components, order_of_operations, sim_params)
 
 Perform the simulation steps of one time step for the given components in the given order.
 
@@ -685,7 +685,7 @@ Perform the simulation steps of one time step for the given components in the gi
     elsewhere, as this function only goes through and calls the appropriate functions. The
     first item of each entry must be the key of the component for which the following steps
     are performed.
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 
 # Examples
 ```
@@ -698,8 +698,8 @@ Perform the simulation steps of one time step for the given components in the gi
         ["component_b", EnergySystems.s_control, EnergySystems.s_process]
         ["component_a", EnergySystems.s_process]
     ]
-    parameters = Dict{String, Any}("time" => 0)
-    perform_steps(components, order, parameters)
+    sim_params = Dict{String, Any}("time" => 0)
+    perform_steps(components, order, sim_params)
 ```
 In this example the control of component A is performed first, then control and processing of
 component B and finally processing of component A.
@@ -707,7 +707,7 @@ component B and finally processing of component A.
 function perform_steps(
     components::Grouping,
     order_of_operations::StepInstructions,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     for entry in order_of_operations
         unit = components[entry[1]]
@@ -716,13 +716,13 @@ function perform_steps(
         if step == s_reset
             reset(unit)
         elseif step == s_control
-            control(unit, components, parameters)
+            control(unit, components, sim_params)
         elseif step == s_potential
-            potential(unit, parameters)
+            potential(unit, sim_params)
         elseif step == s_process
-            process(unit, parameters)
+            process(unit, sim_params)
         elseif step == s_load
-            load(unit, parameters)
+            load(unit, sim_params)
         elseif step == s_distribute
             distribute!(unit)
         end

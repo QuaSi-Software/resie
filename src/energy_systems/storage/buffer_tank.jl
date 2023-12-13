@@ -23,14 +23,14 @@ mutable struct BufferTank <: Component
     high_temperature::Float64
     low_temperature::Float64
 
-    function BufferTank(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -54,9 +54,9 @@ end
 function control(
     unit::BufferTank,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
     unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
 
@@ -88,7 +88,7 @@ function balance_on(
             )
 end
 
-function process(unit::BufferTank, parameters::Dict{String,Any})
+function process(unit::BufferTank, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
@@ -124,7 +124,7 @@ function process(unit::BufferTank, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::BufferTank, parameters::Dict{String,Any})
+function load(unit::BufferTank, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     supply_temp = exchange.temperature

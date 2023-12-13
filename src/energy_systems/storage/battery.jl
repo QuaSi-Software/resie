@@ -19,14 +19,14 @@ Base.@kwdef mutable struct Battery <: Component
     load::Float64
     losses::Float64
 
-    function Battery(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -60,7 +60,7 @@ function balance_on(
             )
 end
 
-function process(unit::Battery, parameters::Dict{String,Any})
+function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 2
         return
     end
@@ -93,7 +93,7 @@ function process(unit::Battery, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::Battery, parameters::Dict{String,Any})
+function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 1
         return
     end

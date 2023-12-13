@@ -20,14 +20,14 @@ mutable struct GridConnection <: Component
     output_sum::Float64
     input_sum::Float64
 
-    function GridConnection(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             if Bool(config["is_source"])
                 sf_bounded_source
@@ -50,9 +50,9 @@ end
 function control(
     unit::GridConnection,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     if unit.sys_function === sf_bounded_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else
@@ -60,7 +60,7 @@ function control(
     end
 end
 
-function process(unit::GridConnection, parameters::Dict{String,Any})
+function process(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
         # @TODO: if grids should be allowed to load storage components, then the potential

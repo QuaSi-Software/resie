@@ -24,9 +24,9 @@ mutable struct BoundedSink <: Component
     constant_power::Union{Nothing,Float64}
     constant_temperature::Temperature
 
-    function BoundedSink(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function BoundedSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         max_power_profile = "max_power_profile_file_path" in keys(config) ?
-                            Profile(config["max_power_profile_file_path"], parameters) :
+                            Profile(config["max_power_profile_file_path"], sim_params) :
                             nothing
 
         # check input
@@ -39,17 +39,17 @@ mutable struct BoundedSink <: Component
 
         # read temperature file
         if haskey(config,"temperature_profile_file_path")
-            temperature_profile = Profile(config["temperature_profile_file_path"], parameters) 
+            temperature_profile = Profile(config["temperature_profile_file_path"], sim_params) 
             # println("Info: For bounded sink '$uac', the temperature profile is taken from the user-defined .prf file.")
         elseif haskey(config, "constant_temperature")
             temperature_profile = nothing
             # println("Info: For bounded sink '$uac', a constant temperature of $(config["constant_temperature"]) °C is set.")
-        elseif haskey(config, "temperature_from_global_file") && haskey(parameters, "weatherdata")
-            if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(parameters["weatherdata"])))
-                temperature_profile = getfield(parameters["weatherdata"], Symbol(config["temperature_from_global_file"]))
+        elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
+            if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+                temperature_profile = getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
                 # println("Info: For bounded sink '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])")
             else
-                print("Error: For bounded sink '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(parameters["weatherdata"]))), ", ")).")
+                print("Error: For bounded sink '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
                 exit()
             end
         else
@@ -63,7 +63,7 @@ mutable struct BoundedSink <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_bounded_sink, # sys_function
             medium, # medium
@@ -87,15 +87,15 @@ end
 function control(
     unit::BoundedSink,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
     elseif unit.max_power_profile !== nothing
         unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
-            unit.max_power_profile, parameters["time"]
+            unit.max_power_profile, sim_params["time"]
         )
     else
         unit.max_energy = 0.0
@@ -106,7 +106,7 @@ function control(
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(
-            unit.temperature_profile, parameters["time"]
+            unit.temperature_profile, sim_params["time"]
         )
     end
     unit.input_interfaces[unit.medium].temperature = highest_temperature(
@@ -115,7 +115,7 @@ function control(
     )
 end
 
-function process(unit::BoundedSink, parameters::Dict{String,Any})
+function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     if exchange.balance > 0.0

@@ -23,14 +23,14 @@ mutable struct WeatherData
     globHorIrr::Profile
    
 """
-get_weather_data(weather_file_path, parameters)
+get_weather_data(weather_file_path, sim_params)
 
 Function to read in a weather file and hold the data. The data can either be
 a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
 
 The returned values are of type WeaterData containing profiles of type Profile.
 """
-    function WeatherData(weather_file_path::String, parameters::Dict{String,Any})
+    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
         if !isfile(weather_file_path)
             println("Error: The DWD weather file could not be found in: \n $weather_file_path")
             exit()
@@ -42,10 +42,10 @@ The returned values are of type WeaterData containing profiles of type Profile.
             time_step = 900*4 # s, of weatherdata
     
             # convert required data to profile
-            temp_ambient_air  = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            dirHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            temp_ambient_air  = Profile("", sim_params, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed        = Profile("", sim_params, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            dirHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             globHorIrr        = deepcopy(dirHorIrr)
             globHorIrr.data   = globHorIrr.data .+ difHorIrr.data
     
@@ -54,10 +54,10 @@ The returned values are of type WeaterData containing profiles of type Profile.
             timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
             time_step = 900*4 # s, of weatherdata   
             
-            temp_ambient_air  = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            globHorIrr        = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            temp_ambient_air  = Profile("", sim_params, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            wind_speed        = Profile("", sim_params, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            globHorIrr        = Profile("", sim_params, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
+            difHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             dirHorIrr         = deepcopy(globHorIrr)
             dirHorIrr.data    = dirHorIrr.data .- difHorIrr.data
         end

@@ -18,14 +18,14 @@ mutable struct Storage <: Component
     load::Float64
     losses::Float64
 
-    function Storage(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function Storage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -45,9 +45,9 @@ end
 function control(
     unit::Storage,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 end
 
 function balance_on(
@@ -65,7 +65,7 @@ function balance_on(
     )
 end
 
-function process(unit::Storage, parameters::Dict{String,Any})
+function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchange = balance_on(outface, outface.target)
 
@@ -91,7 +91,7 @@ function process(unit::Storage, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::Storage, parameters::Dict{String,Any})
+function load(unit::Storage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchange = balance_on(inface, inface.source)
     energy_available = exchange.balance

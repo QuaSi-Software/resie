@@ -24,7 +24,7 @@ mutable struct SeasonalThermalStorage <: Component
     high_temperature::Float64
     low_temperature::Float64
 
-    function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
@@ -32,7 +32,7 @@ mutable struct SeasonalThermalStorage <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -57,9 +57,9 @@ end
 function control(
     unit::SeasonalThermalStorage,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
@@ -91,7 +91,7 @@ function balance_on(
             )
 end
 
-function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
+function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchange = balance_on(outface, outface.target)
     demand_temp = exchange.temperature
@@ -127,7 +127,7 @@ function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
+function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchange = balance_on(inface, inface.source)
     supply_temp = exchange.temperature

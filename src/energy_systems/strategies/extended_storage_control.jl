@@ -1,4 +1,4 @@
-function strt_sm_extended_storage_control(parameters::Dict{String,Any})::StateMachine
+function strt_sm_extended_storage_control(cond_params::Dict{String,Any})::StateMachine
     return StateMachine()
 end
 

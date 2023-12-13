@@ -30,7 +30,7 @@ mutable struct Profile
 
     """Construct a profile from the file at the given path or convert given data to profile (optional)."""
     function Profile(file_path::String, 
-                     parameters::Dict{String,Any}; 
+                     sim_params::Dict{String,Any}; 
                      given_profile_values::Vector{Any}=[],
                      given_timestamps::Vector{Int64}=[0],
                      given_time_step::Int=0,
@@ -83,7 +83,7 @@ mutable struct Profile
             is_power = given_is_power
         end
 
-        simulation_time_step = parameters["time_step_seconds"]  # seconds 
+        simulation_time_step = sim_params["time_step_seconds"]  # seconds 
 
         if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0) 
             println("Error: The timestep of the profile " * file_path * 

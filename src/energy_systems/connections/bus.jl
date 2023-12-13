@@ -63,14 +63,14 @@ Base.@kwdef mutable struct Bus <: Component
 
     remainder::Float64
 
-    function Bus(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_bus, # sys_function
             medium, # medium

@@ -281,7 +281,7 @@ function write_to_file(
 end
 
 """
-dump_info(file_path, components, order_of_operations, parameters)
+dump_info(file_path, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
@@ -292,7 +292,7 @@ function dump_info(
     file_path::String,
     components::Grouping,
     order_of_operations::StepInstructions,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     open(abspath(file_path), "w") do file_handle
         write(file_handle, "# Simulation step order\n")

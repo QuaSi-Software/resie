@@ -32,7 +32,7 @@ mutable struct HeatPump <: Component
 
     losses::Float64
 
-    function HeatPump(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
@@ -41,7 +41,7 @@ mutable struct HeatPump <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
@@ -69,9 +69,9 @@ end
 function control(
     unit::HeatPump,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
     unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
@@ -96,7 +96,7 @@ end
 
 function check_el_in(
     unit::HeatPump,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
         if (
@@ -112,7 +112,7 @@ function check_el_in(
             )
             potential_energy_el = exchange.balance + exchange.energy_potential
             potential_storage_el = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= parameters["epsilon"]
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_el + potential_storage_el : potential_energy_el) <= sim_params["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el, potential_storage_el)
@@ -124,7 +124,7 @@ end
 
 function check_heat_in(
     unit::HeatPump,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_in"] == true
         if (
@@ -140,7 +140,7 @@ function check_heat_in(
             )
             potential_energy_heat_in = exchange.balance + exchange.energy_potential
             potential_storage_heat_in = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) <= parameters["epsilon"]
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_heat_in + potential_storage_heat_in : potential_energy_heat_in) <= sim_params["epsilon"]
                 return (nothing, nothing, exchange.temperature)
             end
             return (potential_energy_heat_in, potential_storage_heat_in, exchange.temperature)
@@ -153,7 +153,7 @@ end
 
 function check_heat_out(
     unit::HeatPump,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
         exchange = balance_on(
@@ -162,7 +162,7 @@ function check_heat_out(
         )
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         potential_storage_heat_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -sim_params["epsilon"]
             return (nothing, nothing, exchange.temperature)
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
@@ -173,7 +173,7 @@ end
 
 function calculate_energies(
     unit::HeatPump,
-    parameters::Dict{String,Any},
+    sim_params::Dict{String,Any},
     temperatures::Tuple{Temperature, Temperature},
     potentials::Vector{Float64}
 )
@@ -185,7 +185,7 @@ function calculate_energies(
     potential_storage_heat_out = potentials[6]
 
     # get usage fraction of external profile (normalized from 0 to 1)
-    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     if usage_fraction_operation_profile <= 0.0
         return (false, nothing, nothing, nothing)
     end
@@ -245,21 +245,21 @@ end
 
 function potential(
     unit::HeatPump,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
+    potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
+    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, sim_params)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, sim_params)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
@@ -302,7 +302,7 @@ function potential(
     end
 
     energies = calculate_energies(
-        unit, parameters,
+        unit, sim_params,
         (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,
@@ -318,20 +318,20 @@ function potential(
     end
 end
 
-function process(unit::HeatPump, parameters::Dict{String,Any})
-    potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
+function process(unit::HeatPump, sim_params::Dict{String,Any})
+    potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
     if potential_energy_el === nothing && potential_storage_el === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
+    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, sim_params)
     if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, sim_params)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
@@ -374,7 +374,7 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
     end
 
     energies = calculate_energies(
-        unit, parameters,
+        unit, sim_params,
         (in_temp, out_temp),
         [
             potential_energy_el, potential_storage_el,

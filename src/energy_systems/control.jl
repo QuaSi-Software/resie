@@ -15,7 +15,7 @@ struct ConditionPrototype
     name::String
 
     """Parameters the condition requires."""
-    parameters::Dict{String,Any}
+    cond_params::Dict{String,Any}
 
     """Defines which components the condition requires, indexed by an internal name.
 
@@ -42,7 +42,7 @@ struct Condition
     prototype::ConditionPrototype
 
     """Hold parameters the condition requires."""
-    parameters::Dict{String,Any}
+    cond_params::Dict{String,Any}
 
     """The components linked to the condition indexed by an internal name."""
     linked_components::Grouping
@@ -62,7 +62,7 @@ Constructor for Condition.
 
 # Arguments
 - `name::String`: The name of the condition
-- `parameters::Dict{String, Any]`: Parameters for the condition. Not to be confused with
+- `cond_params::Dict{String, Any]`: Parameters for the condition. Not to be confused with
     the project-wide parameters for the entire simulation.
 
 # Returns
@@ -71,12 +71,12 @@ Constructor for Condition.
 """
 function Condition(
     name::String,
-    parameters::Dict{String,Any}
+    cond_params::Dict{String,Any}
 )::Condition
     prototype = CONDITION_PROTOTYPES[name]
     return Condition(
         prototype,
-        merge(prototype.parameters, parameters),
+        merge(prototype.cond_params, cond_params),
         Grouping()
     )
 end
@@ -250,14 +250,14 @@ Base.@kwdef mutable struct Controller
 end
 
 """
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 
 Checks the controller of the given unit and moves the state machine to its new state.
 """
 function move_state(
     unit::Component,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     machine = unit.controller.state_machine
     old_state = machine.state
@@ -265,7 +265,7 @@ function move_state(
 
     if length(table.conditions) > 0
         evaluations = Tuple(
-            condition.prototype.check_function(condition, unit, parameters)
+            condition.prototype.check_function(condition, unit, sim_params)
             for condition in table.conditions
         )
         new_state = table.table_data[evaluations]
@@ -316,7 +316,7 @@ include("strategies/supply_driven.jl")
 include("strategies/extended_storage_control.jl")
 
 """
-    controller_for_strategy(strategy, strategy_config, parameters)
+    controller_for_strategy(strategy, strategy_config, sim_params)
 
 Construct the controller for the strategy of the given name using the given parameters.
 
@@ -325,11 +325,11 @@ Construct the controller for the strategy of the given name using the given para
 - `strategy_config::Dict{String, Any}`: Parameters for the configuration of the strategy. The
     names must match those in the default parameter values dictionary defined in the
     strategy's code file. Given values override default values.
-- `parameters::Dict{String,Any}`: General simulation parameters
+- `sim_params::Dict{String,Any}`: General simulation sim_params
 # Returns
 - `Controller`: The constructed controller for the given strategy.
 """
-function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, parameters::Dict{String,Any})::Controller
+function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, sim_params::Dict{String,Any})::Controller
     if lowercase(strategy) == "default"
         return Controller("default", strategy_config, StateMachine(), Grouping())
     end
@@ -350,7 +350,7 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
     # load operation profile if path is given in input file
     if haskey(params, "operation_profile_path")
         if params["operation_profile_path"]  !== nothing
-            params["operation_profile"] = Profile(params["operation_profile_path"], parameters)
+            params["operation_profile"] = Profile(params["operation_profile_path"], sim_params)
         end
     end
     

@@ -32,7 +32,7 @@ mutable struct Electrolyser <: Component
     losses_heat::Float32
     losses_hydrogen::Float64
 
-    function Electrolyser(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
@@ -42,7 +42,7 @@ mutable struct Electrolyser <: Component
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
@@ -71,9 +71,9 @@ end
 function control(
     unit::Electrolyser,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
 end
 
@@ -89,7 +89,7 @@ end
 
 function check_el_in(
     unit::Electrolyser,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
         if (
@@ -105,7 +105,7 @@ function check_el_in(
             )
             potential_energy_el_in = exchange.balance + exchange.energy_potential
             potential_storage_el_in = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) <= parameters["epsilon"]
+            if (unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) <= sim_params["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el_in, potential_storage_el_in)
@@ -117,7 +117,7 @@ end
 
 function check_heat_out(
     unit::Electrolyser,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
         exchange = balance_on(
@@ -126,7 +126,7 @@ function check_heat_out(
         )
         potential_energy_heat_out = exchange.balance + exchange.energy_potential
         potential_storage_heat_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
+        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -sim_params["epsilon"]
             return (nothing, nothing, exchange.temperature)
         end
         return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
@@ -137,7 +137,7 @@ end
 
 function check_h2_out(
     unit::Electrolyser,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_h2_out"] == true
         exchange = balance_on(
@@ -146,7 +146,7 @@ function check_h2_out(
         )
         potential_energy_h2_out = exchange.balance + exchange.energy_potential
         potential_storage_h2_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) >= -parameters["epsilon"]
+        if (unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) >= -sim_params["epsilon"]
             return (nothing, nothing)
         end
         return (potential_energy_h2_out, potential_storage_h2_out)
@@ -157,7 +157,7 @@ end
 
 function check_o2_out(
     unit::Electrolyser,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_o2_out"] == true
         exchange = balance_on(
@@ -166,7 +166,7 @@ function check_o2_out(
         )
         potential_energy_o2_out = exchange.balance + exchange.energy_potential
         potential_storage_o2_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) >= -parameters["epsilon"]
+        if (unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) >= -sim_params["epsilon"]
             return (nothing, nothing)
         end
         return (potential_energy_o2_out, potential_storage_o2_out)
@@ -177,7 +177,7 @@ end
 
 function calculate_energies(
     unit::Electrolyser,
-    parameters::Dict{String,Any},
+    sim_params::Dict{String,Any},
     potentials::Vector{Float64}
 )
     potential_energy_el_in = potentials[1]
@@ -196,7 +196,7 @@ function calculate_energies(
     max_consume_el = watt_to_wh(unit.power_el)
 
     # get usage fraction of external profile (normalized from 0 to 1)
-    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     if usage_fraction_operation_profile <= 0.0
         return (false, nothing, nothing, nothing, nothing)
     end
@@ -250,15 +250,15 @@ end
 
 function potential(
     unit::Electrolyser,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
+    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, sim_params)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, sim_params)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
@@ -268,20 +268,20 @@ function potential(
         return
     end
 
-    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, parameters)
+    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, sim_params)
     if potential_energy_h2_out === nothing && potential_storage_h2_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, parameters)
+    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, sim_params)
     if potential_energy_o2_out === nothing && potential_storage_o2_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
     energies = calculate_energies(
-        unit, parameters,
+        unit, sim_params,
         [
             potential_energy_el_in, potential_storage_el_in,
             potential_energy_heat_out, potential_storage_heat_out,
@@ -297,14 +297,14 @@ function potential(
     end
 end
 
-function process(unit::Electrolyser, parameters::Dict{String,Any})
-    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, parameters)
+function process(unit::Electrolyser, sim_params::Dict{String,Any})
+    potential_energy_el_in, potential_storage_el_in = check_el_in(unit, sim_params)
     if potential_energy_el_in === nothing && potential_storage_el_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, parameters)
+    potential_energy_heat_out, potential_storage_heat_out, temp_out = check_heat_out(unit, sim_params)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
@@ -314,20 +314,20 @@ function process(unit::Electrolyser, parameters::Dict{String,Any})
         return
     end
 
-    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, parameters)
+    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, sim_params)
     if potential_energy_h2_out === nothing && potential_storage_h2_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, parameters)
+    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, sim_params)
     if potential_energy_o2_out === nothing && potential_storage_o2_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
     energies = calculate_energies(
-        unit, parameters,
+        unit, sim_params,
         [
             potential_energy_el_in, potential_storage_el_in,
             potential_energy_heat_out, potential_storage_heat_out,

@@ -1,4 +1,4 @@
-function strt_sm_supply_driven(parameters::Dict{String,Any})::StateMachine
+function strt_sm_supply_driven(cond_params::Dict{String,Any})::StateMachine
     return StateMachine()
 end
 

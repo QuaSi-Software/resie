@@ -35,21 +35,21 @@ mutable struct GeothermalHeatCollector <: Component
     ambient_temperature::Temperature
     last_timestep_calculated::Float64
 
-    function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, parameters::Dict{String,Any})
+    function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
         
         if haskey(config, "ambient_temperature_profile_path")
-            ambient_temperature_profile = Profile(config["ambient_temperature_profile_path"], parameters)
+            ambient_temperature_profile = Profile(config["ambient_temperature_profile_path"], sim_params)
             # println("Info: For geothermal heat collector '$uac', the given ambient temperature profile is chosen.")
-        elseif haskey(config, "ambient_temperature_from_global_file") && haskey(parameters, "weatherdata")
-            if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(parameters["weatherdata"])))
-                ambient_temperature_profile = getfield(parameters["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
+        elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
+            if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+                ambient_temperature_profile = getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
                 # println("Info: For geothermal heat collector '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])")
             else
-                print("Error: For geothermal heat collector '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(parameters["weatherdata"]))), ", ")).")
+                print("Error: For geothermal heat collector '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
                 exit()
             end
         else
@@ -60,7 +60,7 @@ mutable struct GeothermalHeatCollector <: Component
         return new(
             uac,                    # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], parameters
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage,             # sys_function
             InterfaceMap(           # input_interfaces
@@ -92,13 +92,13 @@ end
 function control(
     unit::GeothermalHeatCollector,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # in case there is a state machine for geothermal heat collectors
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 
     # get ambient temperature from profile for current time step if needed (probably only for geothermal collectors)
-    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, parameters["time"])
+    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params["time"])
 
     ## Assumption:
         # Temperatur output of geothermal heat collector is independend of the maximum thermal energy output in the current timestep.
@@ -181,9 +181,9 @@ end
 
 # function that calculates the new state of the geothermal heat collector for the next timestep
 # currenlty only a dummy implementation that calculates physical nonsense!!
-function calculate_new_heat_collector_temperatures(unit::GeothermalHeatCollector, parameters::Dict{String,Any}, energy::Float64)
+function calculate_new_heat_collector_temperatures(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}, energy::Float64)
     # Note: energy is positive for loading (regeneration) and negative for unloading the heat collector as this point
-    current_timestep = parameters["time"]
+    current_timestep = sim_params["time"]
     if current_timestep == unit.last_timestep_calculated # check if current timestep has already been simulated
         if !iszero(energy) # this actually should never be the case if the GTP are not loaded AND unloaded within one timestep
             # not using ambient temperature here as this has already been calculated in the current timestep, but energy has changed, some
@@ -202,7 +202,7 @@ end
 
 # process function that provides energy from the geothermal heat collector and calculates new temperatures 
 # according to actual delivered or received energy
-function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
+function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]  # output interface
     exchange = balance_on(outface, outface.target)     # gather information of output interface
@@ -237,11 +237,11 @@ function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # no other limits are present as max_energy for geothermal heat collector was written in control-step!
     add!(outface, abs(energy_demand), unit.current_output_temperature)
     # recalculate heat collector temperatures for next timestep
-    calculate_new_heat_collector_temperatures(unit, parameters, energy_demand) # energy_demand is negative here and has to be negative in calculate_new_heat_collector_temperatures() for unloading
+    calculate_new_heat_collector_temperatures(unit, sim_params, energy_demand) # energy_demand is negative here and has to be negative in calculate_new_heat_collector_temperatures() for unloading
 
 end
 
-function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
+function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # we can assume that energy will be either be taken from or fed into the geothermal heat collector field within one time step,
     # but not both within one time step - right? Therefore we can call calculate_new_heat_collector_temperatures() from process
     # and from load, but it will never be calculated twice as only one call will be performed with energy>0. If both load
@@ -249,7 +249,7 @@ function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # in each timestep with the current implementation. This should work, but is not computationally effiecient.
     if !unit.regeneration
         # recalculate heat collector temperatures for next timestep (function checks if is has already been calculated in the current timestep)
-        calculate_new_heat_collector_temperatures(unit, parameters, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
+        calculate_new_heat_collector_temperatures(unit, sim_params, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
         return
     end
 
@@ -262,14 +262,14 @@ function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # no energy available for loading as load is only concerned when receiving energy from the target
     if energy_available <= 0.0
         # recalculate heat collector temperatures for next timestep (function checks if is has already been calculated in the current timestep)
-        calculate_new_heat_collector_temperatures(unit, parameters, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
+        calculate_new_heat_collector_temperatures(unit, sim_params, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
         return
     end
 
     # we can only take in energy if it's at a higher temperature than the heat collector lowest temperature
     if supply_temp !== nothing && supply_temp < unit.current_input_temperature
         # recalculate heat collector temperatures for next timestep (function checks if is has already been calculated in the current timestep)
-        calculate_new_heat_collector_temperatures(unit, parameters, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
+        calculate_new_heat_collector_temperatures(unit, sim_params, 0.0)  # call calculate_new_heat_collector_temperatures() to calculate new temperatures of field to account for possible ambient effects
         return
     end
     
@@ -277,7 +277,7 @@ function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
     # no other limits are present as max_energy for geothermal heat collector was written in control-step!
     sub!(inface, energy_available, unit.current_input_temperature)
     # recalculate heat collector temperatures for next timestep
-    calculate_new_heat_collector_temperatures(unit, parameters, energy_available)  # energy_availability is positive here
+    calculate_new_heat_collector_temperatures(unit, sim_params, energy_available)  # energy_availability is positive here
         
 end
 

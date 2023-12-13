@@ -1,4 +1,4 @@
-function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
+function strt_sm_storage_driven(cond_params::Dict{String,Any})::StateMachine
     return StateMachine(
         UInt(1), # state
         Dict{UInt,String}( # state_names
@@ -11,7 +11,7 @@ function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
                     Condition(
                         "Buffer < X%",
                         Dict{String,Any}(
-                            "percentage" => parameters["low_threshold"]
+                            "percentage" => cond_params["low_threshold"]
                         )
                     ),
                 ],
@@ -24,7 +24,7 @@ function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
                     Condition(
                         "Buffer >= X%",
                         Dict{String,Any}(
-                            "percentage" => parameters["high_threshold"]
+                            "percentage" => cond_params["high_threshold"]
                         )
                     ),
                     Condition(
