@@ -29,14 +29,12 @@ mutable struct BoundedSupply <: Component
                             Profile(config["max_power_profile_file_path"], parameters) :
                             nothing
 
-
         # check input
-        if (    haskey(config,"temperature_profile_file_path") + 
-                (haskey(config, "use_ambient_temperature_from_weather_file") && config["use_ambient_temperature_from_weather_file"]) + 
+        if (    haskey(config, "temperature_profile_file_path") + 
+                haskey(config, "temperature_from_global_file") + 
                 haskey(config, "constant_temperature")
             ) > 1
             println("Warning: Two or more temperature profile sources for $(uac) have been specified in the input file!")
-            # move to input check
         end
 
         # read temperature file
@@ -46,9 +44,14 @@ mutable struct BoundedSupply <: Component
         elseif haskey(config, "constant_temperature")
             temperature_profile = nothing
             # println("Info: For bounded supply '$uac', a constant temperature of $(config["constant_temperature"]) °C is set.")
-        elseif haskey(config, "use_ambient_temperature_from_weather_file") && config["use_ambient_temperature_from_weather_file"] && haskey(parameters, "weatherdata") 
-            temperature_profile = parameters["weatherdata"].temp_air
-            # println("Info: For bounded supply '$uac', the temperature profile is taken from the ambient temperature of the project-wide weather file.")
+        elseif haskey(config, "temperature_from_global_file") && haskey(parameters, "weatherdata")
+            if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(parameters["weatherdata"])))
+                temperature_profile = getfield(parameters["weatherdata"], Symbol(config["temperature_from_global_file"]))
+                # println("Info: For bounded supply '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])")
+            else
+                print("Error: For bounded supply '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(parameters["weatherdata"]))), ", ")).")
+                exit()
+            end
         else
             temperature_profile = nothing
             # println("Info: For bounded supply '$uac', no temperature is set.")

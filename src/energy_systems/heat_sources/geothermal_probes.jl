@@ -43,9 +43,14 @@ mutable struct GeothermalProbes <: Component
         if haskey(config, "ambient_temperature_profile_path")
             ambient_temperature_profile = Profile(config["ambient_temperature_profile_path"], parameters)
             # println("Info: For geothermal probes '$uac', the given ambient temperature profile is chosen.")
-        elseif haskey(parameters, "weatherdata") 
-            ambient_temperature_profile = parameters["weatherdata"].temp_air
-            # println("Info: For geothermal probes '$uac', the ambient temperature profile is taken from the project-wide weather file.")
+        elseif haskey(config, "ambient_temperature_from_global_file") && haskey(parameters, "weatherdata")
+            if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(parameters["weatherdata"])))
+                ambient_temperature_profile = getfield(parameters["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
+                # println("Info: For geothermal probes '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])")
+            else
+                print("Error: For geothermal probes '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(parameters["weatherdata"]))), ", ")).")
+                exit()
+            end
         else
             println("Error: No ambient temperature profile is given for geothermal probes '$uac'")
             exit()

@@ -8,7 +8,7 @@ export WeatherData
 """
 mutable struct WeatherData
     """Ambient air temperature, in °C."""
-    temp_air::Profile
+    temp_ambient_air::Profile
 
     """Wind speed, in m/s."""
     wind_speed::Profile
@@ -42,7 +42,7 @@ The returned values are of type WeaterData containing profiles of type Profile.
             time_step = 900*4 # s, of weatherdata
     
             # convert required data to profile
-            temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            temp_ambient_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             dirHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
@@ -54,7 +54,7 @@ The returned values are of type WeaterData containing profiles of type Profile.
             timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
             time_step = 900*4 # s, of weatherdata   
             
-            temp_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
+            temp_ambient_air        = Profile("", parameters, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             wind_speed      = Profile("", parameters, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
             globHorIrr      = Profile("", parameters, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
             difHorIrr       = Profile("", parameters, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
@@ -62,7 +62,7 @@ The returned values are of type WeaterData containing profiles of type Profile.
             dirHorIrr.data  = dirHorIrr.data .- difHorIrr.data
         end
     
-        return new(temp_air, 
+        return new(temp_ambient_air, 
                    wind_speed, 
                    dirHorIrr, 
                    difHorIrr, 
