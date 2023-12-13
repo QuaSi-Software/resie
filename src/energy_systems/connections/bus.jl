@@ -170,7 +170,20 @@ function balance(unit::Bus)::Float64
     return balance_nr(unit, unit)
 end
 
-function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)
+"""
+    energy_flow_is_allowed(bus, input_idx, output_idx)
+
+Checks the connectivity matrix of the bus as returns if energy is allowed to flow from the
+input with the given index to the output with the given index.
+
+Args:
+    `unit::Bus`: The bus to check
+    `input_idx::Integer`: Input index
+    `output_idx::Integer`: Output index
+Returns:
+    `Bool`: True if the flow is allowed, false otherwise
+"""
+function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)::Bool
     return (
         unit.connectivity.storage_loading === nothing ||
         unit.connectivity.storage_loading[input_idx][output_idx]
@@ -369,6 +382,22 @@ function balance_on(
     return return_exchanges
 end
 
+"""
+    filter_inputs(unit, condition, inclusive)
+
+Filters the input interfaces of the given bus based on a condition on the system function
+of the components on the source side of the interfaces. The condition can be negated with
+the argument `inclusive`.
+
+Args:
+    `unit::Bus`: The bus to check
+    `condition::SystemFunction`: Determines which components to filter in/out
+    `inclusive::Bool`: If true, the return list will include only interfaces to which the
+        condition applies. If false, the return list will include only interfaces to which
+        condition does not apply.
+Returns:
+    `Vector{SystemInterface}`: The filtered list of input interfaces of the bus
+"""
 function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     return [f for f in unit.input_interfaces
         if (inclusive && f.source.sys_function == condition)
@@ -376,6 +405,22 @@ function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     ]
 end
 
+"""
+    filter_outputs(unit, condition, inclusive)
+
+Filters the output interfaces of the given bus based on a condition on the system function
+of the components on the target side of the interfaces. The condition can be negated with
+the argument `inclusive`.
+
+Args:
+    `unit::Bus`: The bus to check
+    `condition::SystemFunction`: Determines which components to filter in/out
+    `inclusive::Bool`: If true, the return list will include only interfaces to which the
+        condition applies. If false, the return list will include only interfaces to which
+        condition does not apply.
+Returns:
+    `Vector{SystemInterface}`: The filtered list of output interfaces of the bus
+"""
 function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     return [f for f in unit.output_interfaces
         if (inclusive && f.target.sys_function == condition)

@@ -355,20 +355,58 @@ Convenience alias to EnergyExchange.
 const EnEx = EnergyExchange
 
 """
+    balance(exchanges)
+
 Sum of balances over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of balances
 """
 function balance(entries::Vector{EnergyExchange})::Float64
     return sum(e.balance for e in entries; init=0.0)
 end
 
+"""
+    energy_potential(exchanges)
+
+Sum of energy potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of energy potentials
+"""
 function energy_potential(entries::Vector{EnergyExchange})::Float64
     return sum(e.energy_potential for e in entries; init=0.0)
 end
 
+"""
+    storage_potential(exchanges)
+
+Sum of storage potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of storage potentials
+"""
 function storage_potential(entries::Vector{EnergyExchange})::Float64
     return sum(e.storage_potential for e in entries; init=0.0)
 end
 
+"""
+    temperature_first(exchanges)
+
+First not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
 function temperature_first(entries::Vector{EnergyExchange})::Temperature
     temps = [e.temperature for e in entries if e.temperature !== nothing]
     return length(temps) > 0 ? first(temps) : nothing
