@@ -90,8 +90,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "constant_demand" => 20000,
-            "constant_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
 
@@ -243,8 +242,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "constant_demand" => 20000,
-            "constant_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
 
@@ -400,8 +398,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "constant_demand" => 20000,
-            "constant_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
 
