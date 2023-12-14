@@ -40,21 +40,7 @@ mutable struct GeothermalProbes <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
         
-        if haskey(config, "ambient_temperature_profile_path")
-            ambient_temperature_profile = Profile(config["ambient_temperature_profile_path"], sim_params)
-            # println("Info: For geothermal probes '$uac', the given ambient temperature profile is chosen.")
-        elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
-            if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
-                ambient_temperature_profile = getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
-                # println("Info: For geothermal probes '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])")
-            else
-                print("Error: For geothermal probes '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
-                exit()
-            end
-        else
-            println("Error: No ambient temperature profile is given for geothermal probes '$uac'")
-            exit()
-        end
+        ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
 
         return new(
             uac,                    # uac

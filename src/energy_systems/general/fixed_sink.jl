@@ -32,33 +32,7 @@ mutable struct FixedSink <: Component
                          Profile(config["energy_profile_file_path"], sim_params) :
                          nothing
 
-        # check input
-        if (    haskey(config, "temperature_profile_file_path") + 
-                haskey(config, "temperature_from_global_file") + 
-                haskey(config, "constant_temperature")
-            ) > 1
-            println("Warning: Two or more temperature profile sources for $(uac) have been specified in the input file!")
-        end
-
-        # read temperature file
-        if haskey(config,"temperature_profile_file_path")
-            temperature_profile = Profile(config["temperature_profile_file_path"], sim_params) 
-            # println("Info: For fixed sink '$uac', the temperature profile is taken from the user-defined .prf file.")
-        elseif haskey(config, "constant_temperature")
-            temperature_profile = nothing
-            # println("Info: For fixed sink '$uac', a constant temperature of $(config["constant_temperature"]) °C is set.")
-        elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
-            if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
-                temperature_profile = getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
-                # println("Info: For fixed sink '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])")
-            else
-                print("Error: For fixed sink '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
-                exit()
-            end
-        else
-            temperature_profile = nothing
-            # println("Info: For fixed sink '$uac', no temperature is set.")
-        end
+        temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
 
         medium = Symbol(config["medium"])
         register_media([medium])
