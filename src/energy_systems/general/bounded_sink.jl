@@ -104,11 +104,12 @@ end
 
 function process(unit::BoundedSink, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    exchange = balance_on(inface, inface.source)
-    if exchange.balance > 0.0
+    exchanges = balance_on(inface, inface.source)
+    blnc = balance(exchanges)
+    if blnc > 0.0
         sub!(
             inface,
-            min(abs(exchange.balance), unit.max_energy)
+            min(abs(blnc), unit.max_energy)
         )
     end
 end

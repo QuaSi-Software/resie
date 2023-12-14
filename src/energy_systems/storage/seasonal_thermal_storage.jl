@@ -75,38 +75,35 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::SeasonalThermalStorage
-)::NamedTuple{}
-    
-    caller_is_input = unit.uac == interface.target.uac ? true : false
-    # ==true if interface is input of unit (caller puts energy in unit); 
-    # ==false if interface is output of unit (caller gets energy from unit)
-    
-    return (
-            balance = interface.balance,
-            energy = (  uac=unit.uac,
-                        energy_potential=0.0,
-                        storage_potential=caller_is_input ? -(unit.capacity-unit.load) : unit.load,
-                        temperature=interface.temperature,
-                        pressure=nothing,
-                        voltage=nothing),
-            )
+)::Vector{EnergyExchange}
+    caller_is_input = unit.uac == interface.target.uac
+
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=0.0,
+        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
-    exchange = balance_on(outface, outface.target)
-    demand_temp = exchange.temperature
+    exchanges = balance_on(outface, outface.target)
+    demand_temp = temperature_first(exchanges)
 
     if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
+        energy_demand = balance(exchanges)
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
+            energy_demand = balance(exchanges) + storage_potential(exchanges)
         else
-            energy_demand = exchange.balance
+            energy_demand = balance(exchanges)
         end
     else
-        energy_demand = exchange.balance
+        energy_demand = balance(exchanges)
     end
 
     if energy_demand >= 0.0
@@ -130,9 +127,9 @@ end
 
 function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
-    exchange = balance_on(inface, inface.source)
-    supply_temp = exchange.temperature
-    energy_available = exchange.balance
+    exchanges = balance_on(inface, inface.source)
+    supply_temp = temperature_first(exchanges)
+    energy_available = balance(exchanges)
 
     if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target

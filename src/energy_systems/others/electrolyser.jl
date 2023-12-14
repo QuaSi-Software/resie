@@ -94,13 +94,17 @@ function check_el_in(
         )
             return (Inf, Inf)
         else
-            exchange = balance_on(
+            exchanges = balance_on(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
-            potential_energy_el_in = exchange.balance + exchange.energy_potential
-            potential_storage_el_in = exchange.storage_potential
-            if (unit.controller.parameter["unload_storages"] ? potential_energy_el_in + potential_storage_el_in : potential_energy_el_in) <= parameters["epsilon"]
+            potential_energy_el_in = balance(exchanges) + energy_potential(exchanges)
+            potential_storage_el_in = storage_potential(exchanges)
+            if (
+                unit.controller.parameter["unload_storages"]
+                ? potential_energy_el_in + potential_storage_el_in
+                : potential_energy_el_in
+            ) <= parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el_in, potential_storage_el_in)
@@ -115,16 +119,24 @@ function check_heat_out(
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_heat_out"] == true
-        exchange = balance_on(
+        exchanges = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = exchange.balance + exchange.energy_potential
-        potential_storage_heat_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) >= -parameters["epsilon"]
-            return (nothing, nothing, exchange.temperature)
+        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+        potential_storage_heat_out = storage_potential(exchanges)
+        if (
+            unit.controller.parameter["load_storages"]
+            ? potential_energy_heat_out + potential_storage_heat_out
+            : potential_energy_heat_out
+        ) >= -parameters["epsilon"]
+            return (nothing, nothing, temperature_first(exchanges))
         end
-        return (potential_energy_heat_out, potential_storage_heat_out, exchange.temperature)
+        return (
+            potential_energy_heat_out,
+            potential_storage_heat_out,
+            temperature_first(exchanges)
+        )
     else
         return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
     end
@@ -135,13 +147,17 @@ function check_h2_out(
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_h2_out"] == true
-        exchange = balance_on(
+        exchanges = balance_on(
             unit.output_interfaces[unit.m_h2_out],
             unit.output_interfaces[unit.m_h2_out].target
         )
-        potential_energy_h2_out = exchange.balance + exchange.energy_potential
-        potential_storage_h2_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_h2_out + potential_storage_h2_out : potential_energy_h2_out) >= -parameters["epsilon"]
+        potential_energy_h2_out = balance(exchanges) + energy_potential(exchanges)
+        potential_storage_h2_out = storage_potential(exchanges)
+        if (
+            unit.controller.parameter["load_storages"]
+            ? potential_energy_h2_out + potential_storage_h2_out
+            : potential_energy_h2_out
+        ) >= -parameters["epsilon"]
             return (nothing, nothing)
         end
         return (potential_energy_h2_out, potential_storage_h2_out)
@@ -155,13 +171,17 @@ function check_o2_out(
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_o2_out"] == true
-        exchange = balance_on(
+        exchanges = balance_on(
             unit.output_interfaces[unit.m_o2_out],
             unit.output_interfaces[unit.m_o2_out].target
         )
-        potential_energy_o2_out = exchange.balance + exchange.energy_potential
-        potential_storage_o2_out = exchange.storage_potential
-        if (unit.controller.parameter["load_storages"] ? potential_energy_o2_out + potential_storage_o2_out : potential_energy_o2_out) >= -parameters["epsilon"]
+        potential_energy_o2_out = balance(exchanges) + energy_potential(exchanges)
+        potential_storage_o2_out = storage_potential(exchanges)
+        if (
+            unit.controller.parameter["load_storages"]
+            ? potential_energy_o2_out + potential_storage_o2_out
+            : potential_energy_o2_out
+        ) >= -parameters["epsilon"]
             return (nothing, nothing)
         end
         return (potential_energy_o2_out, potential_storage_o2_out)
