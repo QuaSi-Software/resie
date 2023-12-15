@@ -413,6 +413,49 @@ function temperature_first(entries::Vector{EnergyExchange})::Temperature
 end
 
 """
+    temperature_highest(exchanges)
+
+Highest not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
+function temperature_highest(entries::Vector{EnergyExchange})::Temperature
+    return max([e.temperature for e in entries if e.temperature !== nothing])
+end
+
+"""
+    temperature_all(exchanges)
+
+A list of all temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A list of temperatures
+"""
+function temperature_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries]
+end
+
+"""
+    temperature_all_non_empty(exchanges)
+
+A list of all not-nothing temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A (possibly empty) list of not-nothing temperatures
+"""
+function temperature_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries if e.temperature !== nothing]
+end
+
+"""
     balance_on(interface, unit)
 
 Return the balance of a unit in respect to the given interface.
