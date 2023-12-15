@@ -114,18 +114,21 @@ function check_el_in(
     if unit.controller.parameter["m_el_in"] == true
         if (
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-            &&
-            unit.input_interfaces[unit.m_el_in].max_energy === nothing
+            && unit.input_interfaces[unit.m_el_in].max_energy === nothing
         )
             return (Inf, Inf)
         else
-            exchange = balance_on(
+            exchanges = balance_on(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
-            potential_energy_el = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
-            potential_storage_el = collect_all_storage_potentials_of_interface_balance(exchange.energy)
-            if (unit.controller.parameter["unload_storages"] ? sum(potential_energy_el) + sum(potential_storage_el) : sum(potential_energy_el)) <= parameters["epsilon"]
+            potential_energy_el = balance(exchanges) + energy_potential(exchanges)
+            potential_storage_el = storage_potential(exchanges)
+            if (
+                unit.controller.parameter["unload_storages"]
+                ? potential_energy_el + potential_storage_el
+                : potential_energy_el
+            ) <= parameters["epsilon"]
                 return (nothing, nothing)
             end
             return (potential_energy_el, potential_storage_el)
@@ -142,27 +145,23 @@ function check_heat_in(
     if unit.controller.parameter["m_heat_in"] == true
         if (
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
-            &&
-            unit.input_interfaces[unit.m_heat_in].max_energy === nothing
+            && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
         )
-            return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)
+            return ([Inf], [Inf], [unit.input_interfaces[unit.m_heat_in].temperature])
         else
-            exchange = balance_on(
+            exchanges = balance_on(
                 unit.input_interfaces[unit.m_heat_in],
                 unit.input_interfaces[unit.m_heat_in].source
             )
-            potential_energy_heat_in = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
-            potential_storage_heat_in = collect_all_storage_potentials_of_interface_balance(exchange.energy)
-            temperatures = collect_all_temperatures_of_interface_balance(exchange.energy)
-            if (unit.controller.parameter["unload_storages"] ? sum(potential_energy_heat_in) + sum(potential_storage_heat_in) : sum(potential_energy_heat_in)) <= parameters["epsilon"]
-                return (nothing, nothing, temperatures)
-            end
-            return (potential_energy_heat_in, potential_storage_heat_in, temperatures)
+            return (
+                [e.balance + e.energy_potential for e in exchanges],
+                [e.storage_potential for e in exchanges],
+                temperature_all(exchanges)
+            )
         end
     else
-        return (Inf, Inf, unit.input_interfaces[unit.m_heat_in].temperature)  #ToDo not sure if that is correct here. Where is this written to the interface?
+        return ([Inf], [Inf], [unit.input_interfaces[unit.m_heat_in].temperature])
     end
-
 end
 
 function check_heat_out(
@@ -170,271 +169,214 @@ function check_heat_out(
     parameters::Dict{String,Any}
 )
     if unit.controller.parameter["m_heat_out"] == true
-        exchange = balance_on(
+        exchanges = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = exchange.balance == 0.0 ? collect_all_energy_potentials_of_interface_balance(exchange.energy) : [exchange.balance]
-        potential_storage_heat_out = collect_all_storage_potentials_of_interface_balance(exchange.energy)
-        temperatures = collect_all_temperatures_of_interface_balance(exchange.energy)
-        if (unit.controller.parameter["load_storages"] ? sum(potential_energy_heat_out) + sum(potential_storage_heat_out) : sum(potential_energy_heat_out)) >= -parameters["epsilon"]
-            return (nothing, nothing, temperatures)
+        potential_energy_heat_out = balance(exchanges)
+        potential_storage_heat_out = storage_potential(exchanges)
+        temperature = temperature_highest(exchanges)
+        if (
+            unit.controller.parameter["load_storages"]
+            ? potential_energy_heat_out + potential_storage_heat_out
+            : potential_energy_heat_out
+        ) >= -parameters["epsilon"]
+            return (nothing, nothing, temperature)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out, temperatures)
+        return (potential_energy_heat_out, potential_storage_heat_out, temperature)
     else
-        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature) #ToDo not sure if that is correct here. Where is this written to the interface?
+        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
     end
 end
 
 function calculate_energies(
     unit::HeatPump,
-    parameters::Dict{String,Any},
-    temperatures::Tuple{Vector{Float64}, Vector{Float64}},
-    potentials::Vector{Vector{Float64}}
+    parameters::Dict{String,Any}
 )
-    # rename variable for better readability
-    potential_energy_el = sum(potentials[1])        # no differenciation of power sources for now
-    potential_storage_el = sum(potentials[2])       # no differenciation of power sources for now
-    potential_energy_heat_in = potentials[3]
-    potential_storage_heat_in = potentials[4]
-    potential_energy_heat_out = sum(potentials[5])  # no differenciation of heat output layers for now
-    potential_storage_heat_out = sum(potentials[6]) # no differenciation of heat output layers for now
-
-    temperatures_in = temperatures[1]
-    temperatures_out = maximum(temperatures[2])     # no differenciation of heat output layers for now, maximum temperature is assumed
-
-    n_heat_in = length(potential_energy_heat_in)    # number of heat layers in input
-
     # get usage fraction of external profile (normalized from 0 to 1)
-    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
-    if usage_fraction_operation_profile <= 0.0
+    max_usage_fraction = (
+        unit.controller.parameter["operation_profile_path"] === nothing
+        ? 1.0
+        : value_at_time(unit.controller.parameter["operation_profile"], parameters["time"])
+    )
+    if max_usage_fraction <= 0.0
         return (false, nothing, nothing, nothing)
     end
 
-    # a fixed COP has priority. if it's not given the dynamic cop requires temperatures
-    cop = zeros(n_heat_in)
-    for n=1:n_heat_in
-        cop[n] = unit.fixed_cop === nothing ? dynamic_cop(temperatures_in[n], temperatures_out) : unit.fixed_cop
-        if cop[n] === nothing
+    # get potentials from inputs/outputs. only the heat input is calculated as vector,
+    # the electricity input and heat output are calculated as scalars
+    potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
+    potentials_energy_heat_in,
+        potentials_storage_heat_in,
+        in_temps = check_heat_in(unit, parameters)
+    potential_energy_heat_out,
+        potential_storage_heat_out,
+        out_temp = check_heat_out(unit, parameters)
+
+    available_el_in = unit.controller.parameter["unload_storages"] ?
+                      potential_energy_el + potential_storage_el :
+                      potential_energy_el
+
+    available_heat_out = unit.controller.parameter["load_storages"] ?
+                         potential_energy_heat_out + potential_storage_heat_out :
+                         potential_energy_heat_out
+
+    # limit heat output to design power
+    available_heat_out = min(abs(available_heat_out), watt_to_wh(unit.power))
+
+    # shortcut if we're limited by electricity input or heat output or the requested
+    # temperature is higher than a set limit of the heat pump
+    if (
+        potential_energy_el === nothing && potential_storage_el === nothing
+        || potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+        || available_el_in <= parameters["epsilon"]
+        || available_heat_out <= parameters["epsilon"]
+        || unit.output_temperature !== nothing && out_temp > unit.output_temperature
+    )
+        return (false, nothing, nothing, nothing)
+    end
+
+    layers_el_in = []
+    layers_heat_in = []
+    layers_heat_in_temperature = []
+    layers_heat_out = []
+
+    for (idx_layer, pot_heat_in) in pairs(potentials_energy_heat_in)
+        # if all electricity input or heat output was used up, skip through the rest
+        # of the heat input layers
+        if (
+            available_el_in <= parameters["epsilon"]
+            || available_heat_out <= parameters["epsilon"]
+        )
+            continue
+        end
+
+        # check if it is an "empty" layer, usually from other outputs on a bus, which are
+        # included for balance calculations but cannot offer energy
+        if (
+            unit.controller.parameter["unload_storages"]
+            ? pot_heat_in + potentials_storage_heat_in[idx_layer]
+            : pot_heat_in
+        ) <= parameters["epsilon"]
+            continue
+        end
+
+        # skip layer if available temperature is lower than optionally given
+        # minimum input_temperature
+        if (
+            unit.input_temperature !== nothing
+            && in_temps[idx_layer] < unit.input_temperature
+        )
+            continue
+        end
+
+        # a fixed COP has priority. if it's not given the dynamic cop requires temperatures
+        cop = unit.fixed_cop === nothing ?
+              dynamic_cop(in_temps[idx_layer], out_temp) :
+              unit.fixed_cop
+        if cop === nothing
             throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
         end
-    end
 
-    # extermal limits in possible in- and outputs of heat pump, not regarding the design power
-    # Note: el_in and heat_out are scalars while heat_in is a vector representing the different sources
-    el_in_potential = potential_energy_el + (unit.controller.parameter["unload_storages"] ? potential_storage_el : 0)
-    heat_in_potential = potential_energy_heat_in + (unit.controller.parameter["unload_storages"] ? potential_storage_heat_in : 0)
-    heat_out_potential = -(potential_energy_heat_out + (unit.controller.parameter["load_storages"] ? potential_storage_heat_out : 0))
-    
-    # limit heat_out by design power of heat pump and extermal usage_factor from profile
-    heat_out_potential = min(heat_out_potential, usage_fraction_operation_profile * watt_to_wh(unit.power) )
+        # energies for current layer with potential (+storage) heat in as basis
+        used_heat_in = unit.controller.parameter["unload_storages"] ?
+                       pot_heat_in + potentials_storage_heat_in[idx_layer] :
+                       pot_heat_in
+        used_el_in = used_heat_in / (cop - 1.0)
+        used_heat_out = used_heat_in + used_el_in
 
-    # calculate heat_out and el_in for given heat_in_potential vector while respecting the limits by heat_in_potential 
-    heat_out_max = cop ./ (cop .- 1) .* heat_in_potential
-
-    # check for limits by heat_out_potential 
-    for i in 1:n_heat_in
-        if heat_out_potential >= heat_out_max[i]
-            heat_out_potential -= heat_out_max[i]
-        else
-            heat_out_max[i] = heat_out_potential
-            heat_out_potential = 0.0
+        # check heat out as limiter
+        if used_heat_out > available_heat_out
+            used_heat_out = available_heat_out
+            used_el_in = used_heat_out / cop
+            used_heat_in = used_el_in * (cop - 1.0)
         end
-    end
-    # # faster but harder to read
-    # for i in 1:n_heat_in
-    #     available_heat_out = min(heat_out_potential, heat_out_max[i])
-    #     heat_out_potential -= available_heat_out
-    #     heat_out_max[i] = available_heat_out
-    # end
 
-    # calculate el_in_max
-    heat_in_max = heat_out_max .* (cop .- 1) ./ cop
-    el_in_max = heat_out_max .- heat_in_max
-
-    # check for limits by el_in_potential
-    for i in 1:n_heat_in
-        if el_in_potential >= el_in_max[i]
-            el_in_potential -= el_in_max[i]
-        else
-            el_in_max[i] = el_in_potential
-            el_in_potential = 0.0
+        # check electricity in as limiter
+        if used_el_in > available_el_in
+            used_el_in = available_el_in
+            used_heat_in = used_el_in * (cop - 1.0)
+            used_heat_out = used_heat_in + used_el_in
         end
+
+        # check if usage fraction went over the maximum, in which case the last layer added
+        # can't be fully utilised and is added with the remaining fraction to the max
+        old_usage_fraction = (sum(layers_heat_in; init=0.0)) / watt_to_wh(unit.power)
+        new_usage_fraction = (sum(layers_heat_in; init=0.0) + used_heat_out) /
+                             watt_to_wh(unit.power)
+        if new_usage_fraction > max_usage_fraction
+            used_heat_out *= (max_usage_fraction - old_usage_fraction)
+            used_el_in = used_heat_out * cop
+            used_heat_in = used_el_in * (cop - 1.0)
+        end
+
+        # finally all checks done, we add the layer and update remaining energies
+        push!(layers_el_in, used_el_in)
+        push!(layers_heat_in, used_heat_in)
+        push!(layers_heat_in_temperature, in_temps[idx_layer])
+        push!(layers_heat_out, used_heat_out)
+        available_el_in -= used_el_in
+        available_heat_out -= used_heat_out
     end
 
-    # recalculate energies to match all limits
-    heat_out_max = el_in_max .* cop
-    heat_in_max = heat_out_max .- el_in_max
-
-    # calculate sum_abs_change
-    heat_out = sum(heat_out_max)
-    heat_in = sum(heat_in_max)
-    el_in = sum(el_in_max)
-
-    # calculate overall cop
-    unit.cop = heat_out / (heat_out-heat_in)
-
-    # calculate overall input temperature
-    input_temperature = sum(heat_in_max .* temperatures_in) / heat_in
-
-    # calculate usage fraction related to he heat output and check for limits
-    usage_fraction = heat_out / watt_to_wh(unit.power)
+    # if all chosen heat layers combined are not enough to meet minimum power fraction,
+    # the heat pump doesn't run at all
+    usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power)
     if usage_fraction < unit.min_power_fraction
         return (false, nothing, nothing, nothing)
     end
 
     return (
         true,
-        el_in,
-        heat_in,
-        heat_out
+        layers_el_in,
+        layers_heat_in,
+        layers_heat_in_temperature,
+        layers_heat_out,
+        out_temp
     )
 end
 
-function potential(
-    unit::HeatPump,
-    parameters::Dict{String,Any}
-)
-    potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
-    if potential_energy_el === nothing && potential_storage_el === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
-    if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    # check if temperature has already been read from input and output interface, if not
-    # check by balance_on
-    if in_temp === nothing
-        exchange = balance_on(
-            unit.input_interfaces[unit.m_heat_in],
-            unit
-        )
-        in_temp = exchange.temperature
-    end
-
-    if out_temp === nothing
-        exchange = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        out_temp = exchange.temperature
-    end
-
-    # quit if requested temperature is higher than optionally given output_temperature
-    if unit.output_temperature !== nothing && out_temp > unit.output_temperature
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-        
-    # quit if available temperature is lower than optionally given input_temperature
-    if unit.input_temperature !== nothing && in_temp < unit.input_temperature
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    if out_temp === nothing && unit.fixed_cop === nothing
-        throw(ArgumentError("Heat pump $(unit.uac) has no requested output temperature. Please provide a temperature."))
-    elseif in_temp === nothing && unit.fixed_cop === nothing
-        throw(ArgumentError("Heat pump $(unit.uac) has no requested input temperature. Please provide a temperature."))
-    end
-
-    energies = calculate_energies(
-        unit, parameters,
-        (in_temp, out_temp),
-        [
-            potential_energy_el, potential_storage_el,
-            potential_energy_heat_in, potential_storage_heat_in,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
-    )
+function potential(unit::HeatPump, parameters::Dict{String,Any})
+    energies = calculate_energies(unit, parameters)
 
     if !energies[1]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[2], energies[3], energies[4])
+        set_max_energies!(
+            unit,
+            -sum(energies[2]; init=0.0),
+            -sum(energies[3]; init=0.0),
+            sum(energies[5]; init=0.0)
+        )
     end
 end
 
 function process(unit::HeatPump, parameters::Dict{String,Any})
-    potential_energy_el, potential_storage_el = check_el_in(unit, parameters)
-    if potential_energy_el === nothing && potential_storage_el === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+    energies = calculate_energies(unit, parameters)
+
+    el_in = sum(energies[2]; init=0.0)
+    heat_in = sum(energies[3]; init=0.0)
+    heat_out = sum(energies[5]; init=0.0)
+
+    if heat_out < parameters["epsilon"]
         return
     end
 
-    potential_energy_heat_in, potential_storage_heat_in, in_temp = check_heat_in(unit, parameters)
-    if potential_energy_heat_in === nothing && potential_storage_heat_in === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
+    if el_in > parameters["epsilon"]
+        unit.cop = heat_out / el_in
     end
 
-    potential_energy_heat_out, potential_storage_heat_out, out_temp = check_heat_out(unit, parameters)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
+    # calculate mixed temperature for heat input, as interfaces do not support vectorized
+    # energy balances (yet)
+    mixed_temperature = 0.0
+    for (layer_idx, layer_heat_in) in pairs(energies[3])
+        mixed_temperature += energies[4][layer_idx] * (layer_heat_in / heat_in)
     end
-
-    # check if temperature has already been read from input and output interface, if not
-    # check by balance_on
-    if in_temp === nothing
-        exchange = balance_on(
-            unit.input_interfaces[unit.m_heat_in],
-            unit
-        )
-        in_temp = exchange.temperature
-    end
-
-    if out_temp === nothing
-        exchange = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        out_temp = exchange.temperature
-    end
-
-    # quit if requested temperature is higher than optionally given output_temperature
-    if unit.output_temperature !== nothing && out_temp > unit.output_temperature
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-        
-    # quit if available temperature is higher than optionally given input_temperature
-    if unit.input_temperature !== nothing && in_temp < unit.input_temperature
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    if out_temp === nothing && unit.fixed_cop === nothing
-        throw(ArgumentError("Heat pump $(unit.uac) has no requested output temperature. Please provide a temperature."))
-    elseif in_temp === nothing && unit.fixed_cop === nothing
-        throw(ArgumentError("Heat pump $(unit.uac) has no requested input temperature. Please provide a temperature."))
-    end
-
-    energies = calculate_energies(
-        unit, parameters,
-        (in_temp, out_temp),
-        [
-            potential_energy_el, potential_storage_el,
-            potential_energy_heat_in, potential_storage_heat_in,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
-    )
 
     if energies[1]
-        sub!(unit.input_interfaces[unit.m_el_in], energies[2])
-        sub!(unit.input_interfaces[unit.m_heat_in], energies[3]) # revise! Should here the temperature (vector) be returned? ToDo 
-        add!(unit.output_interfaces[unit.m_heat_out], energies[4], maximum(out_temp))  # revise! This is not valid for cooling? ToDo
+        sub!(unit.input_interfaces[unit.m_el_in], el_in)
+        sub!(unit.input_interfaces[unit.m_heat_in], heat_in, mixed_temperature)
+        add!(unit.output_interfaces[unit.m_heat_out], heat_out, energies[6])
     end
 end
 
