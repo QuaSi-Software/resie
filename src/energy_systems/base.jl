@@ -424,7 +424,7 @@ Returns:
     `Temperature`: First not-nothing temperature found or nothing if no such exists
 """
 function temperature_highest(entries::Vector{EnergyExchange})::Temperature
-    return max([e.temperature for e in entries if e.temperature !== nothing])
+    return maximum(e.temperature for e in entries if e.temperature !== nothing)
 end
 
 """
