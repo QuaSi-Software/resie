@@ -355,6 +355,10 @@ end
 function process(unit::HeatPump, parameters::Dict{String,Any})
     energies = calculate_energies(unit, parameters)
 
+    if !energies[1]
+        return
+    end
+
     el_in = sum(energies[2]; init=0.0)
     heat_in = sum(energies[3]; init=0.0)
     heat_out = sum(energies[5]; init=0.0)
@@ -374,11 +378,9 @@ function process(unit::HeatPump, parameters::Dict{String,Any})
         mixed_temperature += energies[4][layer_idx] * (layer_heat_in / heat_in)
     end
 
-    if energies[1]
-        sub!(unit.input_interfaces[unit.m_el_in], el_in)
-        sub!(unit.input_interfaces[unit.m_heat_in], heat_in, mixed_temperature)
-        add!(unit.output_interfaces[unit.m_heat_out], heat_out, energies[6])
-    end
+    sub!(unit.input_interfaces[unit.m_el_in], el_in)
+    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, mixed_temperature)
+    add!(unit.output_interfaces[unit.m_heat_out], heat_out, energies[6])
 end
 
 export HeatPump
