@@ -129,7 +129,7 @@ function check_el_in(
                 ? potential_energy_el + potential_storage_el
                 : potential_energy_el
             ) <= parameters["epsilon"]
-                return (nothing, nothing)
+                return (0.0, 0.0)
             end
             return (potential_energy_el, potential_storage_el)
         end
@@ -181,7 +181,7 @@ function check_heat_out(
             ? potential_energy_heat_out + potential_storage_heat_out
             : potential_energy_heat_out
         ) >= -parameters["epsilon"]
-            return (nothing, nothing, temperature)
+            return (0.0, 0.0, temperature)
         end
         return (potential_energy_heat_out, potential_storage_heat_out, temperature)
     else
@@ -221,15 +221,16 @@ function calculate_energies(
                          potential_energy_heat_out + potential_storage_heat_out :
                          potential_energy_heat_out
 
+    # in the following we want to work with positive values as it is easier
+    available_heat_out = abs(available_heat_out)
+
     # limit heat output to design power
-    available_heat_out = min(abs(available_heat_out), watt_to_wh(unit.power))
+    available_heat_out = min(available_heat_out, watt_to_wh(unit.power))
 
     # shortcut if we're limited by electricity input or heat output or the requested
     # temperature is higher than a set limit of the heat pump
     if (
-        potential_energy_el === nothing && potential_storage_el === nothing
-        || potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        || available_el_in <= parameters["epsilon"]
+        available_el_in <= parameters["epsilon"]
         || available_heat_out <= parameters["epsilon"]
         || unit.output_temperature !== nothing && out_temp > unit.output_temperature
     )
