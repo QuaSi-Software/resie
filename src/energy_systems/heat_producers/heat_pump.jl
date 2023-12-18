@@ -305,8 +305,8 @@ function calculate_energies(
 
         # check if usage fraction went over the maximum, in which case the last layer added
         # can't be fully utilised and is added with the remaining fraction to the max
-        old_usage_fraction = (sum(layers_heat_in; init=0.0)) / watt_to_wh(unit.power)
-        new_usage_fraction = (sum(layers_heat_in; init=0.0) + used_heat_out) /
+        old_usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power)
+        new_usage_fraction = (sum(layers_heat_out; init=0.0) + used_heat_out) /
                              watt_to_wh(unit.power)
         if new_usage_fraction > max_usage_fraction
             used_heat_out *= (max_usage_fraction - old_usage_fraction)
