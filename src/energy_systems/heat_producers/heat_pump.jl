@@ -1,14 +1,9 @@
 """
 Implementation of a heat pump component.
 
-For the moment this remains a simple implementation that requires a low temperature heat
-and electricity input and produces high temperature heat. Has a fixed coefficient of
-performance (COP) of 3 and a minimum power fraction of 20%. The power parameter is
-considered the maximum power of heat output the heat pump can produce.
-
-The only currently implemented operation strategy involves checking the load of a linked
-buffer tank and en-/disabling the heat pump when a threshold is reached, in addition to an
-overfill shutoff condition.
+Can be given fixed input and output temperatures instead of checking the temperature
+potentials of other components. Can also be given a fixed COP instead of dynamically
+calculating it as a Carnot-COP by input/output temperatures.
 """
 mutable struct HeatPump <: Component
     uac::String
@@ -69,9 +64,17 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
-    unit.input_interfaces[unit.m_heat_in].temperature = highest(unit.input_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
+    # for fixed input/output temperatures, overwrite the interface with those. otherwise
+    # highest will choose the interface's temperature (including nothing)
+    unit.output_interfaces[unit.m_heat_out].temperature = highest(
+        unit.output_temperature,
+        unit.output_interfaces[unit.m_heat_out].temperature
+    )
+    unit.input_interfaces[unit.m_heat_in].temperature = highest(
+        unit.input_temperature,
+        unit.input_interfaces[unit.m_heat_in].temperature
+    )
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -102,10 +105,10 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     if (in_temp === nothing || out_temp === nothing)
         return nothing
     end
-    
-    return 0.4 * (273.15 + out_temp) / (out_temp - in_temp) # Carnot-COP with 40 % efficiency
-end
 
+    # Carnot-COP with 40 % efficiency
+    return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
+end
 
 function check_el_in(
     unit::HeatPump,
