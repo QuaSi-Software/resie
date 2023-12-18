@@ -104,7 +104,7 @@ function test_run_energy_system_from_storage()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 30000
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature(exchanges) === 35.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
@@ -113,7 +113,7 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -800/3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800*2/3
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === 35.0
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -153,10 +153,10 @@ function test_run_energy_system_from_storage()
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test EnergySystems.exchange.balance(exchanges) ≈ 0.0
-    @test EnergySystems.exchange.storage_potential(exchanges) ≈ 100
-    @test EnergySystems.exchange.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.exchange.temperature(exchanges) === 35.0
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 100
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100*3/2
@@ -165,7 +165,7 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(100*3/2)/3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -100
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === 35.0
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -281,7 +281,7 @@ function test_run_energy_system_from_storage_denied()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 30000
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature(exchanges) === 35.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800

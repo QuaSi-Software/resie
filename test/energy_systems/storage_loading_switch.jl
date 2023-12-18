@@ -132,6 +132,18 @@ function test_primary_producer_can_load_storage()
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
 
+    exchanges = EnergySystems.balance_on(
+        bus.input_interfaces[1], bus
+    )
+    @test EnergySystems.balance(exchanges) == -5000.0
+    @test EnergySystems.storage_potential(exchanges) == -40000.0
+
+    exchanges = EnergySystems.balance_on(
+        bus.input_interfaces[3], bus
+    )
+    @test EnergySystems.balance(exchanges) == -5000.0
+    @test EnergySystems.storage_potential(exchanges) == 0.0
+
     EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
@@ -149,13 +161,13 @@ function test_primary_producer_can_load_storage()
     EnergySystems.distribute!(bus)
 
     exchanges = EnergySystems.balance_on(
-        boiler_1.output_interfaces[boiler_1.m_heat_out], bus
+        bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == -40000.0
+    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     exchanges = EnergySystems.balance_on(
-        boiler_2.output_interfaces[boiler_2.m_heat_out], bus
+        bus.input_interfaces[3], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
     @test EnergySystems.storage_potential(exchanges) == 0.0
@@ -188,6 +200,12 @@ function test_primary_producer_can_load_storage()
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
 
+    exchanges = EnergySystems.balance_on(
+        bus.input_interfaces[1], bus
+    )
+    @test EnergySystems.balance(exchanges) == -1500.0
+    @test EnergySystems.storage_potential(exchanges) == -40000.0
+
     EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
 
@@ -208,13 +226,13 @@ function test_primary_producer_can_load_storage()
     @test boiler_1.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 5000.0
 
     exchanges = EnergySystems.balance_on(
-        boiler_1.output_interfaces[boiler_1.m_heat_out], bus
+        bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == -39000.0
+    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     exchanges = EnergySystems.balance_on(
-        boiler_2.output_interfaces[boiler_2.m_heat_out], bus
+        bus.input_interfaces[3], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
     @test EnergySystems.storage_potential(exchanges) == 0.0
