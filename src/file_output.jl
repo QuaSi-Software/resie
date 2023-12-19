@@ -115,7 +115,7 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 elseif !(medium === nothing)
                     push!(medium_of_interfaces, medium)
                 else
-                    println("Warning: The name of the medium was not detected. This may lead to wrong colouring in Sankey plot.")
+                    @warn "The name of the medium was not detected. This may lead to wrong colouring in Sankey plot."
                 end
 
                 # add "real" demands and sources
@@ -142,11 +142,9 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
             nr_of_interfaces += 1
         end
     end
-    println(
-        length(medium_of_interfaces) !== nr_of_interfaces
-        ? "Warning: error in extracting information from input file for sankey plot."
-        : ""
-    )
+    if length(medium_of_interfaces) !== nr_of_interfaces
+        @error "Error in extracting information from input file for sankey plot."
+    end
 
     return nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey
 end

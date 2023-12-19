@@ -32,7 +32,7 @@ The returned values are of type WeaterData containing profiles of type Profile.
 """
     function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
         if !isfile(weather_file_path)
-            println("Error: The DWD weather file could not be found in: \n $weather_file_path")
+            @error "The DWD weather file could not be found in: \n $weather_file_path"
             exit()
         end
     
@@ -119,8 +119,8 @@ function read_dat_file(weather_file_path::String)
     try 
         datfile = open(weather_file_path, "r") 
     catch e
-        println("Error reading the DWD .dat file in $weather_file_path. Please check the file.")
-        println("The following error occurred: $e")
+        @error "Error reading the DWD .dat file in $weather_file_path\n" *
+               "Please check the file. The following error occurred: $e"
         exit()
     end
 
@@ -145,9 +145,8 @@ function read_dat_file(weather_file_path::String)
                 headerdata["years"] = row[2]
             end
         catch e
-            println("Error reading the header of the DWD .dat file in $weather_file_path")
-            println("Check if the header meets the requirements.")
-            println("The following error occurred: $e")
+            @error "Error reading the header of the DWD .dat file in $weather_file_path\n" *
+                   "Check if the header meets the requirements. The following error occurred: $e"
             exit()
         end
         if row[1] == "***"
@@ -171,8 +170,8 @@ function read_dat_file(weather_file_path::String)
     for line in eachline(datfile)
         row = split(rstrip(line), r"\s+")
         if length(row) !== length(colnames)
-            println("Warning: In row $(dataline) ($(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values.")
-            println("Expected $(length(colnames)) but got $(length(row)) elements!")
+            @warn "In row $(dataline) ($(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values:\n" *
+                  "Expected $(length(colnames)) but got $(length(row)) elements!"
         end
         for (index, value) in enumerate(row)
             if occursin('.', value)
@@ -188,13 +187,13 @@ function read_dat_file(weather_file_path::String)
 
     # Check length
     if dataline-1 !== expected_length
-        println("Error reading the .dat weather dataset from $weather_file_path.")
-        println("The number of datapoints is $(dataline-1) and not as expected $expected_length.")
-        println("Check the file and make sure the data block starts with ***.")
+        @warn "Error reading the .dat weather dataset from $weather_file_path:\n" *
+              "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
+              "Check the file and make sure the data block starts with ***."
         exit()
     end
 
-    println("Info: The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read.")
+    @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
     return weatherdata_dict, headerdata
 end
 
@@ -211,8 +210,8 @@ function read_epw_file(weather_file_path::String)
     try 
         ewpfile = open(weather_file_path, "r") 
     catch e
-        println("Error reading the DWD .dat file in $weather_file_path. Please check the file.")
-        println("The following error occurred: $e")
+        @error "Error reading the DWD .dat file in $weather_file_path. Please check the file.\n" *
+               "The following error occurred: $e"
         exit()
     end
 
@@ -256,8 +255,8 @@ function read_epw_file(weather_file_path::String)
     for line in eachline(ewpfile)
         row = split(rstrip(line), ',')
         if length(row) !== length(colnames)
-            println("Warning: In row $(dataline) ($(row[1])-$(row[2])-$(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values.")
-            println("Expected $(length(colnames)) but got $(length(row)) elements!")
+            @warn "In row $(dataline) ($(row[1])-$(row[2])-$(row[3])-$(row[4])-$(row[5])) of the weather file is a missmatch of values.\n" *
+                  "Expected $(length(colnames)) but got $(length(row)) elements!"
         end
         for (index, value) in enumerate(row)
             if occursin('.', value)
@@ -275,13 +274,13 @@ function read_epw_file(weather_file_path::String)
 
     # Check length
     if dataline-1 !== expected_length
-        println("Error reading the EPW weather dataset from $weather_file_path.")
-        println("The number of datapoints is $(dataline-1) and not as expected $expected_length.")
-        println("Check the file for corruption.")
+        @error "Error reading the EPW weather dataset from $weather_file_path\n" *
+               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
+               "Check the file for corruption."
         exit()
     end
 
-    println("Info: The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read.")
+    @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
    
     return weatherdata_dict, headerdata
 end

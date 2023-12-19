@@ -18,6 +18,9 @@ using .EnergySystems
 include("project_loading.jl")
 include("file_output.jl")
 
+include("resie_logger.jl")
+using .Resie_Logger
+
 using PlotlyJS
 using ColorSchemes
 using Colors
@@ -54,7 +57,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
         step_order = load_order_of_operations(project_config["order_of_operation"], components)
-        println("The order of operations was successfully imported from the input file.\nNote that the order of operations has a major impact on the simulation result and should only be changed by experienced users!")
+        @info "The order of operations was successfully imported from the input file.\n" *
+              "Note that the order of operations has a major impact on the simulation result and should only be changed by experienced users!"
     else
         step_order = calculate_order_of_operations(components)
     end
@@ -94,9 +98,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # check if any component was not balanced
         warnings = check_balances(components, sim_params["epsilon"])
         if length(warnings) > 0
-            print("Time is $(sim_params["time"])\n")
             for (key, balance) in warnings
-                print("Warning: Balance for component $key was not zero: $balance\n")
+                @balanceWarn "Balance for component $key was not zero in timestep $(sim_params["time"]): $balance"
             end
         end
 
@@ -122,10 +125,17 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     ### create profile line plot
     if do_create_plot
         create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
+        @info "Line plot created and saved to .output/output_plot.html"
+
     end
 
     ### create Sankey diagram
     create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces)
+    @info "Sankey created and saved to .output/output_sankey.html"
+    
+    if do_write_CSV
+        @info "CSV-file with outputs written to $(project_config["io_settings"]["output_file"])"
+    end
 
 end
 
@@ -144,13 +154,13 @@ function load_and_run(filepath::String)
         project_config = read_JSON(abspath(filepath))
     catch exc
         if isa(exc, MethodError)
-            println("Could not parse project config file")
+            @error "Could not parse project config file at $(filepath)"
             return
         end
     end
 
     if project_config === nothing
-        println("Could not find or parse project config file")
+        @error "Could not find or parse project config file at $(filepath)"
         return
     end
 

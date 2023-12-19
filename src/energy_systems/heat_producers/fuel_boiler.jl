@@ -195,7 +195,7 @@ function calculate_plr_through_inversed_expended_energy(
                              (upper_x - lower_x) / (upper_y - lower_y)
         end
     catch
-        println("The intake_fuel value is not within the range of the lookup table.")
+        @warn "The intake_fuel value in component $(unit.uac) is not within the range of the lookup table."
     end
 end
 

@@ -231,11 +231,11 @@ function add!(
 
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature < temperature
-            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
+            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
         elseif interface.temperature !== nothing && interface.temperature > temperature
-            println("Warning: Temperature in interface is higher than delivered temperature on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
+            @warn ("Temperature in interface is higher than delivered temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -256,11 +256,11 @@ function sub!(
 
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature < temperature
-            println("Warning: Temperature in interface is lower than requested temperature on interface $(interface.source.uac)"
-                    * " -> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
+            @warn ("Temperature in interface is lower than requested temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
         elseif interface.temperature !== nothing && interface.temperature > temperature
-            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
+            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -746,26 +746,26 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
             haskey(config, "temperature_from_global_file") + 
             haskey(config, "constant_temperature")
             ) > 1
-        println("Warning: Two or more temperature profile sources for $(uac) have been specified in the input file!")
+        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
     end
 
     # determine temperature
     if haskey(config,"temperature_profile_file_path")
-        # println("Info: For '$uac', the temperature profile is taken from the user-defined .prf file.")
+        @info "For '$uac', the temperature profile is taken from the user-defined .prf file."
         return Profile(config["temperature_profile_file_path"], sim_params) 
     elseif haskey(config, "constant_temperature") && config["constant_temperature"] isa Number
-        # println("Info: For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set.")
+        @info "For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set."
         return nothing
     elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
         if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
-            # println("Info: For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])")                
+            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])"                
             return getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
         else
-            print("Error: For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
+            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
             exit()
         end
     else            
-        # println("Info: For '$uac', no temperature is set.")
+        @info "For '$uac', no temperature is set."
         return nothing
     end
 end
@@ -784,23 +784,23 @@ The function also checks whether more than one temperature source is specified a
 function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
     # check input
     if (haskey(config, "ambient_temperature_profile_path") + haskey(config, "ambient_temperature_from_global_file")) > 1
-        println("Warning: Two or more temperature profile sources for $(uac) have been specified in the input file!")
+        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
     end
 
     # determine temperature
     if haskey(config, "ambient_temperature_profile_path")
-        # println("Info: For '$uac', the given ambient temperature profile is chosen.")
+        @info "For '$uac', the given ambient temperature profile is chosen."
         return Profile(config["ambient_temperature_profile_path"], sim_params)
     elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
         if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
-            # println("Info: For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])")
+            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
             return getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
         else
-            print("Error: For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", ")).")
+            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
             exit()
         end
     else
-        println("Error: No ambient temperature profile is given for '$uac'")
+        @error "No ambient temperature profile is given for '$uac'"
         exit()
     end
 end

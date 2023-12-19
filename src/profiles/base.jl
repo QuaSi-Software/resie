@@ -71,10 +71,10 @@ mutable struct Profile
 
             if !given_timestep
                 profile_time_step = profile_timestamps[2] - profile_timestamps[1]
-                println("Warning: For the profile at " * file_path * " no timestep is given! A timestep of " * string(profile_time_step) * " seconds was detected.")
+                @warn "For the profile at " * file_path * " no timestep is given! A timestep of " * string(profile_time_step) * " seconds was detected."
             end
             if !given_type
-                println("Warning: For the profile at " * file_path * " no profile type ('is_power') is given! An energy-profile (extensive) is assumed!")
+                @warn "For the profile at " * file_path * " no profile type ('is_power') is given! An energy-profile (extensive) is assumed!"
             end
         else # data was read in from somewhere else and is provided as vector
             profile_values = given_profile_values
@@ -86,10 +86,8 @@ mutable struct Profile
         simulation_time_step = sim_params["time_step_seconds"]  # seconds 
 
         if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0) 
-            println("Error: The timestep of the profile " * file_path * 
-                    ", which is " * string(profile_time_step) * 
-                    " s, is not a multiple or a divisor of the requested simulation timestep of " * 
-                    string(simulation_time_step) * " s!")
+            @error ("The timestep of the profile " * file_path * ", which is " * string(profile_time_step) * " s,\n" *
+                    "is not a multiple or a divisor of the requested simulation timestep of " * string(simulation_time_step) * " s!")
             exit()
         end
 

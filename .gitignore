@@ -9,6 +9,7 @@ Manifest.toml
 *.csv
 *.html
 info_dump.md
+*.log
 
 # input files (test data and templates are added separately)
 *.json
