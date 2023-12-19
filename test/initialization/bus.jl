@@ -87,6 +87,7 @@ function test_fully_specified()
     components_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
         "input_order" => [
             "TST_PVP_01",
+            "TST_BAT_01",
             "TST_GRI_01",
         ],
         "output_order" => [
@@ -101,9 +102,10 @@ function test_fully_specified()
     )
     components = Resie.load_components(components_config)
     bus = components["TST_BUS_01"]
-    @test length(bus.connectivity.input_order) == 2
+    @test length(bus.connectivity.input_order) == 3
     bus.connectivity.input_order[1] == "TST_PVP_01"
-    bus.connectivity.input_order[2] == "TST_GRI_01"
+    bus.connectivity.input_order[2] == "TST_BAT_01"
+    bus.connectivity.input_order[3] == "TST_GRI_01"
     @test length(bus.connectivity.output_order) == 2
     bus.connectivity.output_order[1] == "TST_DEM_01"
     bus.connectivity.output_order[2] == "TST_BAT_01"
