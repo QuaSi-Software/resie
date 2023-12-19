@@ -217,6 +217,7 @@ function calculate_energies(
     # in the following we want to work with positive values as it is easier
     available_h2_out = abs(available_h2_out)
     available_o2_out = abs(available_o2_out)
+    potentials_energy_heat_out = map(abs, potentials_energy_heat_out)
 
     # limit electricity input to design power
     available_el_in = min(available_el_in, watt_to_wh(unit.power))
