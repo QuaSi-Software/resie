@@ -348,8 +348,8 @@ function potential(unit::HeatPump, parameters::Dict{String,Any})
     else
         set_max_energies!(
             unit,
-            -sum(energies[2]; init=0.0),
-            -sum(energies[3]; init=0.0),
+            sum(energies[2]; init=0.0),
+            sum(energies[3]; init=0.0),
             sum(energies[5]; init=0.0)
         )
     end
