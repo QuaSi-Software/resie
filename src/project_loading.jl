@@ -76,7 +76,8 @@ end
 """
 reorder_interfaces_of_busses(components)
 
-Reorder the input and output interfaces of busses according to their input and output priorities given in the connectivity matrix
+Reorder the input and output interfaces of busses according to their input and output
+priorities given in the connectivity matrix.
 """
 function reorder_interfaces_of_busses(components::Grouping)::Grouping
     for unit in each(components)
@@ -85,13 +86,26 @@ function reorder_interfaces_of_busses(components::Grouping)::Grouping
             output_order = unit.connectivity.output_order
             input_order = unit.connectivity.input_order
 
+            # check for misconfigured bus (it should have at least one input and at least
+            # one output)
+            if length(input_order) == 0 || length(output_order) == 0
+                continue
+            end
+
             # Create a dictionary to map 'uac' to its correct position
             output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
             input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
 
-            # Get the permutation indices that would sort the 'source'/'target' field by 'uac' order
-            output_perm_indices = sortperm([output_order_dict[unit.output_interfaces[i].target.uac] for i in 1:length(unit.output_interfaces)])
-            input_perm_indices = sortperm([input_order_dict[unit.input_interfaces[i].source.uac] for i in 1:length(unit.input_interfaces)])
+            # Get the permutation indices that would sort the 'source'/'target' field by
+            # 'uac' order
+            output_perm_indices = sortperm([
+                output_order_dict[unit.output_interfaces[i].target.uac]
+                for i in 1:length(unit.output_interfaces)
+            ])
+            input_perm_indices = sortperm([
+                input_order_dict[unit.input_interfaces[i].source.uac]
+                for i in 1:length(unit.input_interfaces)
+            ])
 
             # Reorder the input and output interfaces using the permutation indices
             unit.output_interfaces = unit.output_interfaces[output_perm_indices]
