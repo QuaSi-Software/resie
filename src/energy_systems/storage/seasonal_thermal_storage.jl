@@ -58,9 +58,13 @@ function control(
     parameters::Dict{String,Any}
 )
     move_state(unit, components, parameters)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest(temperature_at_load(unit), unit.output_interfaces[unit.m_heat_out].temperature)
-    unit.input_interfaces[unit.m_heat_in].temperature = highest(unit.high_temperature, unit.input_interfaces[unit.m_heat_in].temperature)
 
+    if unit.output_interfaces[unit.m_heat_out].temperature === nothing
+        unit.output_interfaces[unit.m_heat_out].temperature = temperature_at_load(unit)
+    end
+    if unit.input_interfaces[unit.m_heat_in].temperature === nothing
+        unit.input_interfaces[unit.m_heat_in].temperature = unit.high_temperature
+    end
 end
 
 function temperature_at_load(unit::SeasonalThermalStorage)::Temperature
@@ -90,63 +94,90 @@ function balance_on(
 end
 
 function process(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
-    outface = unit.output_interfaces[unit.m_heat_out]
+    outface = unit.output_interfaces[unit.m_heat_in]
     exchanges = balance_on(outface, outface.target)
-    demand_temp = temperature_first(exchanges)
+    energy_demanded = balance(exchanges)
 
-    if unit.controller.parameter["name"] == "default"
-        energy_demand = balance(exchanges)
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["load_any_storage"]
-            energy_demand = balance(exchanges) + storage_potential(exchanges)
-        else
-            energy_demand = balance(exchanges)
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demanded += storage_potential(exchanges)
+    end
+
+    # shortcut if there is no energy demanded
+    if energy_demanded >= -parameters["epsilon"]
+        return
+    end
+
+    for exchange in exchanges
+        demanded_on_interface = exchange.balance
+        if (
+            unit.controller.parameter["name"] == "extended_storage_control"
+            && unit.controller.parameter["load_any_storage"]
+        )
+            demanded_on_interface += exchange.storage_potential
         end
-    else
-        energy_demand = balance(exchanges)
-    end
 
-    if energy_demand >= 0.0
-        return # process is only concerned with moving energy to the target
-    end
+        if demanded_on_interface >= -parameters["epsilon"]
+            continue
+        end
 
-    if demand_temp !== nothing && demand_temp > temperature_at_load(unit)
-        return # we can only supply energy if it's at a higher temperature,
-        # effectively reducing the tank's capacity for any demand at
-        # a temperature higher than the lower limit of the tank
-    end
+        demand_temp = exchange.temperature
+        if demand_temp !== nothing && demand_temp > temperature_at_load(unit)
+            # we can only supply energy at a temperature at or below the tank's current
+            # output temperature
+            continue
+        end
 
-    if unit.load > abs(energy_demand)
-        unit.load += energy_demand
-        add!(outface, abs(energy_demand), demand_temp)
-    else
-        add!(outface, unit.load, demand_temp)
-        unit.load = 0.0
+        used_heat = min(abs(energy_demanded), abs(demanded_on_interface))
+
+        if unit.load > used_heat
+            unit.load -= used_heat
+            add!(outface, used_heat, temperature_at_load(unit))
+            energy_demanded += used_heat
+        else
+            add!(outface, unit.load, temperature_at_load(unit))
+            energy_demanded += unit.load
+            unit.load = 0.0
+        end
     end
 end
 
 function load(unit::SeasonalThermalStorage, parameters::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    supply_temp = temperature_first(exchanges)
     energy_available = balance(exchanges)
 
-    if energy_available <= 0.0
-        return # load is only concerned with receiving energy from the target
+    # shortcut if there is no energy to be used
+    if energy_available <= parameters["epsilon"]
+        return
     end
 
-    if supply_temp !== nothing && supply_temp < unit.low_temperature
-        return # we can only take in energy if it's at a higher temperature than the
-        # tank's lower limit
-    end
+    for exchange in exchanges
+        if exchange.balance < parameters["epsilon"]
+            continue
+        end
 
-    diff = unit.capacity - unit.load
-    if diff > energy_available
-        unit.load += energy_available
-        sub!(inface, energy_available, supply_temp)
-    else
-        unit.load = unit.capacity
-        sub!(inface, diff, supply_temp)
+        supply_temp = exchange.temperature
+        if supply_temp !== nothing && supply_temp < unit.high_temperature
+            # we can only take in energy if it's at a higher/equal temperature than the
+            # storage's upper limit for temperatures
+            continue
+        end
+
+        used_heat = min(energy_available, exchange.balance)
+        diff = unit.capacity - unit.load
+
+        if diff > used_heat
+            unit.load += used_heat
+            sub!(inface, used_heat, unit.high_temperature)
+            energy_available -= used_heat
+        else
+            unit.load = unit.capacity
+            sub!(inface, diff, unit.high_temperature)
+            energy_available -= diff
+        end
     end
 end
 
