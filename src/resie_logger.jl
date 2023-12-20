@@ -10,7 +10,7 @@ CustomLogger
 
 sets up a custom logger to enable logging to file and/or to the console while using CustomLogger
 logging formats.
-    io                  logging file path
+    io                  IO handler of Julia with opend log file (or nothing if log_to_file==false)
     log_to_console      bool if loogig to console shoule be enabled
     log_to_file         bool if logging to file path should be enabled
     min_level           minimum logging level for output, required by logger
