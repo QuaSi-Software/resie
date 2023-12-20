@@ -33,23 +33,37 @@ struct CustomLogger <: Logging.AbstractLogger
 end
 
 """
-BalanceWarnLogLevel
+CustomLevel
 
 defines a custom warn level for balance errors
     level       defines the Logging.LogLevel (see documentation of Logging-module for details)
     name        name of the custom logger
 """
-struct BalanceWarnLogLevel
+struct CustomLevel
     level::Int32
     name::String
 end
-const BalanceWarning = BalanceWarnLogLevel(500, "BalanceWarning")
 
-# define basic functions to handle the custom BalanceWarnLogLevel
-Base.isless(a::BalanceWarnLogLevel, b::LogLevel) = isless(a.level, b.level)
-Base.isless(a::LogLevel, b::BalanceWarnLogLevel) = isless(a.level, b.level)
-Base.convert(::Type{LogLevel}, level::BalanceWarnLogLevel) = LogLevel(level.level)
-Base.show(io::IO, level::BalanceWarnLogLevel) =
+"""
+Adding custom level "BalanceWarning" of level 500.
+This can be used with the @balanceWarn macro.
+
+To add further custom levels, you need to define a new constant using the 
+CustomLevel struct, the corresponding macro and export the macro. 
+Also define the behaviour in Base.show() and Logging.handle_message() below.
+"""
+const BalanceWarning = CustomLevel(500, "BalanceWarning")
+macro balanceWarn(exprs...)
+    quote
+        @logmsg BalanceWarning $(map(x -> esc(x), exprs)...)
+    end
+end
+
+# define basic functions to handle the CustomLevels
+Base.isless(a::CustomLevel, b::LogLevel) = isless(a.level, b.level)
+Base.isless(a::LogLevel, b::CustomLevel) = isless(a.level, b.level)
+Base.convert(::Type{LogLevel}, level::CustomLevel) = LogLevel(level.level)
+Base.show(io::IO, level::CustomLevel) =
     if level == BalanceWarning
         print(io, "BalanceWarning")
     else
@@ -57,12 +71,12 @@ Base.show(io::IO, level::BalanceWarnLogLevel) =
     end
 
 """
-handle CustomLogger
+handle CustomLogger and CustomLevel
 
 functions to handle CustomLogger.
 Current implementation:
 - log is written to console with standard ConsoleLogger
-- logs of BalanceWarnLogLevel are written using a simplified custom logger
+- logs of BalanceWarning are written using a simplified custom logger
 - all logs are written to a file without any formatting
 """
 Logging.min_enabled_level(logger::CustomLogger) = logger.min_level
@@ -112,13 +126,6 @@ function handle_BalanceWarning_message(level, message)
     printstyled(iob, prefix, bold=true, color=color)
     print(iob, " ", message, "\n")
     write(stream, take!(buf))
-end
-
-# macro as alias for BalanceWarning: @balanceWarn = @logmsg BalanceWarning
-macro balanceWarn(exprs...)
-    quote
-        @logmsg BalanceWarning $(map(x -> esc(x), exprs)...)
-    end
 end
 
 """
