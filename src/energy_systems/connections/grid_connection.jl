@@ -63,19 +63,21 @@ end
 function process(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
-        # @TODO: if grids should be allowed to load storage components, then the potential
-        # must be handled here instead of being ignored
-        exchange = balance_on(outface, outface.target)
-        if exchange.balance < 0.0
-            unit.output_sum += exchange.balance
-            add!(outface, abs(exchange.balance))
+        # @TODO: if grids should be allowed to load storage components, then the storage 
+        # potential must be handled here instead of being ignored
+        exchanges = balance_on(outface, outface.target)
+        blnc = balance(exchanges)
+        if blnc < 0.0
+            unit.output_sum += blnc
+            add!(outface, abs(blnc))
         end
     else
         inface = unit.input_interfaces[unit.medium]
-        exchange = balance_on(inface, inface.source)
-        if exchange.balance > 0.0
-            unit.input_sum += exchange.balance
-            sub!(inface, exchange.balance)
+        exchanges = balance_on(inface, inface.source)
+        blnc = balance(exchanges)
+        if blnc > 0.0
+            unit.input_sum += blnc
+            sub!(inface, abs(blnc))
         end
     end
 end

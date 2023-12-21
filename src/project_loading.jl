@@ -17,7 +17,7 @@ function read_JSON(filepath::String)::Dict{AbstractString,Any}
 end
 
 """
-load_components(config)
+load_components(config, sim_params)
 
 Construct instances of components from the given config.
 
@@ -32,10 +32,10 @@ The config must have the structure:
 }
 ```
 
-The required sim_params to construct a component from one entry in the config must
-match what is required for the particular component. The `type` parameter must be present and
-must match the symbol of the component class exactly. The structure is described in
-more detail in the accompanying documentation on the project file.
+The required config to construct a component from one entry in the config must match what is
+required for the particular component. The `type` parameter must be present and must match
+the symbol of the component class exactly. The structure is described in more detail in the
+accompanying documentation on the project file.
 """
 function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})::Grouping
     components = Grouping()
@@ -65,6 +65,53 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         end
     end
 
+    # busses are likely linked out-of-order in the config, so we need to fix the order of
+    # interfaces after all components have been loaded
+    components = reorder_interfaces_of_busses(components)
+
+    return components
+end
+
+
+"""
+reorder_interfaces_of_busses(components)
+
+Reorder the input and output interfaces of busses according to their input and output
+priorities given in the connectivity matrix.
+"""
+function reorder_interfaces_of_busses(components::Grouping)::Grouping
+    for unit in each(components)
+        if unit.sys_function == EnergySystems.sf_bus
+            # get correct order according to connectivity matrix
+            output_order = unit.connectivity.output_order
+            input_order = unit.connectivity.input_order
+
+            # check for misconfigured bus (it should have at least one input and at least
+            # one output)
+            if length(input_order) == 0 || length(output_order) == 0
+                continue
+            end
+
+            # Create a dictionary to map 'uac' to its correct position
+            output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
+            input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
+
+            # Get the permutation indices that would sort the 'source'/'target' field by
+            # 'uac' order
+            output_perm_indices = sortperm([
+                output_order_dict[unit.output_interfaces[i].target.uac]
+                for i in 1:length(unit.output_interfaces)
+            ])
+            input_perm_indices = sortperm([
+                input_order_dict[unit.input_interfaces[i].source.uac]
+                for i in 1:length(unit.input_interfaces)
+            ])
+
+            # Reorder the input and output interfaces using the permutation indices
+            unit.output_interfaces = unit.output_interfaces[output_perm_indices]
+            unit.input_interfaces = unit.input_interfaces[input_perm_indices]
+        end
+    end
     return components
 end
 

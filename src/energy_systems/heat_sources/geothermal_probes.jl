@@ -93,7 +93,7 @@ function control(
     # calculate maximum possible output temperatures for energy output and set temperature to output interface 
     # (make sure, that a possibly higher temeprature that is already written in the interface is not overwritten)
     unit.current_output_temperature = current_output_temperature(unit) # of geothermal probe field
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
+    unit.output_interfaces[unit.m_heat_out].temperature = highest(
                                                                             unit.current_output_temperature, 
                                                                             unit.output_interfaces[unit.m_heat_out].temperature
                                                                             )
@@ -103,7 +103,7 @@ function control(
     # (make sure, that a possibly higher temperature that is already written in the interface is not overwritten)
     if unit.regeneration
         unit.current_input_temperature = current_input_temperature(unit) # of geothermal probe field 
-        unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(
+        unit.input_interfaces[unit.m_heat_in].temperature = highest(
                                                                                 unit.current_input_temperature,
                                                                                 unit.input_interfaces[unit.m_heat_in].temperature
                                                                                 )
@@ -147,7 +147,7 @@ end
 # (higher temperature is always possible, here the minimum should be calculated!)
 # currenlty only a dummy implementation!!
 function current_input_temperature(unit::GeothermalProbes)::Temperature
-    input_temperature = highest_temperature(minimum(unit.temperature_field)+unit.loading_temperature_spread, unit.loading_temperature ) 
+    input_temperature = highest(minimum(unit.temperature_field)+unit.loading_temperature_spread, unit.loading_temperature ) 
     # could be the lowest outer borewhole temperature plot the given temperature spread or a user-specified loading_temperature if given
     return input_temperature
 end
@@ -277,9 +277,12 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = balance_written ? 0.0 : input_sign * interface.max_energy,  # geothermal probes are handled as storages currently!
-            energy_potential = 0.0,
-            temperature = interface.temperature
+            energy = (  uac=unit.uac,
+                        energy_potential=0.0,
+                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
+                        temperature=interface.temperature,
+                        pressure=nothing,
+                        voltage=nothing), # geothermal probes are handled as storages currently!
             )
 end
 

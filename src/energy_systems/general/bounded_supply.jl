@@ -49,7 +49,7 @@ mutable struct BoundedSupply <: Component
             ),
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # max_energy
             nothing, # temperature
             default(config, "constant_power", nothing), # constant_power
@@ -83,7 +83,7 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(
+    unit.output_interfaces[unit.medium].temperature = highest(
         unit.temperature,
         unit.output_interfaces[unit.medium].temperature
     )
@@ -91,16 +91,20 @@ end
 
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    # 1. @TODO: if disp. sources should be allowed to load storage components, then the potential
-    # must be handled here instead of being ignored
-    # 2. we also ignore the temperature of the interface as the source defines that itself
-    exchange = balance_on(outface, outface.target)
-    if exchange.balance < 0.0
-        add!(
-            outface,
-            min(abs(exchange.balance), unit.max_energy),
-            unit.temperature
-        )
+    exchanges = balance_on(outface, outface.target)
+    blnc = balance(exchanges)
+
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demand = blnc + storage_potential(exchanges)
+    else
+        energy_demand = blnc
+    end
+
+    if energy_demand < 0.0
+        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
     end
 end
 

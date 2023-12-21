@@ -52,7 +52,7 @@ mutable struct FixedSink <: Component
             ),
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # demand
             nothing, # temperature
             default(config, "constant_demand", nothing), # constant_demand (power, not work!)
@@ -86,7 +86,7 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.input_interfaces[unit.medium].temperature = highest_temperature(
+    unit.input_interfaces[unit.medium].temperature = highest(
         unit.temperature,
         unit.input_interfaces[unit.medium].temperature
     )

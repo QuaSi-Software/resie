@@ -80,7 +80,7 @@ function control(
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
+    unit.output_interfaces[unit.m_heat_out].temperature = highest(
         unit.output_temperature,
         unit.output_interfaces[unit.m_heat_out].temperature
     )
@@ -106,12 +106,12 @@ function check_fuel_in(
         )
             return (Inf, Inf)
         else
-            exchange = balance_on(
+            exchanges = balance_on(
                 unit.input_interfaces[unit.m_fuel_in],
                 unit.input_interfaces[unit.m_fuel_in].source
             )
-            potential_energy_fuel = exchange.balance + exchange.energy_potential
-            potential_storage_fuel = exchange.storage_potential
+            potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
+            potential_storage_fuel = storage_potential(exchanges)
             if (
                 unit.controller.parameter["unload_storages"] ?
                 potential_energy_fuel + potential_storage_fuel :
@@ -119,7 +119,7 @@ function check_fuel_in(
             ) <= sim_params["epsilon"]
                 return (nothing, nothing)
             end
-            return (potential_energy_fuel, potential_storage_fuel, exchange.temperature)
+            return (potential_energy_fuel, potential_storage_fuel)
         end
     else
         return (Inf, Inf)
@@ -131,12 +131,12 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        exchange = balance_on(
+        exchanges = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = exchange.balance + exchange.energy_potential
-        potential_storage_heat_out = exchange.storage_potential
+        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+        potential_storage_heat_out = storage_potential(exchanges)
         if (
             unit.controller.parameter["load_storages"] ?
             potential_energy_heat_out + potential_storage_heat_out :
