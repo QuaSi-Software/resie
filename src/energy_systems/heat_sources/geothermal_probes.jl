@@ -4,7 +4,7 @@ This implementations acts as storage as it can produce and load energy.
 """
 
 
-# Current solution to get g-function values
+# Current solution to get g-function values. Wi
 # read g-function .txt file
 file = open("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/g_ges_vector.txt", "r")
     g_function = Vector{Float64}()
@@ -32,48 +32,36 @@ mutable struct GeothermalProbes <: ControlledComponent
     max_input_energy::Float64
     current_output_temperature::Temperature
     current_input_temperature::Temperature  
-    undisturbed_ground_temperature::Temperature
+    soil_undisturbed_ground_temperature::Temperature
     soil_heat_conductivity::Float64
-    thermal_resistance::Float64
+    borehole_thermal_resistance::Float64
     g_function::Vector
     time_index::Int
-    average_fluid_temperature::Temperature
-    current_borehole_wall_temperature::Temperature
+    fluid_temperature::Temperature
+    borehole_current_wall_temperature::Temperature
 
     specific_heat_flux_in_out_absolut::Vector
     specific_heat_flux_in_out_step::Vector
 
     probe_depth::Float64
-    number_of_probes::Float64
+    probe_number::Float64
 
-    diameter_pipe_outer::Float64
-    diameter_pipe_inner::Float64
+    pipe_diameter_outer::Float64
+    pipe_diameter_inner::Float64
 
-    fluid_heat_capacity::Float64
+    fluid_specific_heat_capacity::Float64
     fluid_density::Float64
-    fluid_viscosity::Float64
-    fluid_lambda::Float64
-    fluid_prandtl::Float64
+    fluid_kinematic_viscosity::Float64
+    fluid_heat_conductivity::Float64
+    fluid_prandtl_number::Float64
 
-    grout_lambda::Float64
-    pipe_lambda::Float64
+    grout_heat_conductivity::Float64
+    pipe_heat_conductivity::Float64
 
-    diameter_borehole::Float64
+    borehole_diameter::Float64
     shank_spacing::Float64
 
-    Re::Float64
-
-    diameter_pipe_eq_inner::Float64
-    diameter_pipe_eq_outer::Float64
-
-    load_aggregation_mode::Float64
-    monthly_average_load::Vector
-    month_index::Integer
-    hour_index::Integer
-    monthly_average_load_step::Vector
-
-    hourly_history_period::Integer
-
+    fluid_reynolds_number::Float64
 
     function GeothermalProbes(uac::String, config::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -104,9 +92,9 @@ mutable struct GeothermalProbes <: ControlledComponent
             0.0,                         # max_input_energy in every time step, calculated in control()
             0.0,                         # output temperature in current time step, calculated in control()
             0.0,                         # input temperature in current time step, calculated in control()
-            default(config, "undisturbed_ground_temperature", 11.0),    # Considered as constant
+            default(config, "soil_undisturbed_ground_temperature", 11.0),    # Considered as constant
             default(config, "soil_heat_conductivity", 1.5),             # Heat conductivity of surrounding soil, homogenous and constant
-            default(config, "thermal_resistance", 0.10),                # thermal resistance in (m K)/W
+            default(config, "borehole_thermal_resistance", 0.10),                # thermal resistance in (m K)/W
             g_function,                      # pre-calculated multiscale g-function. Calculated in pre-processing.
             0,                                      # index of current time step to get access on time dependent g-function values
             0.0,                                    # average fluid temperature
@@ -116,30 +104,21 @@ mutable struct GeothermalProbes <: ControlledComponent
             default(config, "probe_depth", 150),    # depth (or length) of a single geothermal probe
             36,                                     # number of geothermal probes in the borefield
 
-            default(config, "diameter_pipe_outer", 0.032),  # outer pipe diameter
-            default(config, "diameter_pipe_inner", 0.026),  # inner pipe diameter
+            default(config, "pipe_diameter_outer", 0.032),  # outer pipe diameter
+            default(config, "pipe_diameter_inner", 0.026),  # inner pipe diameter
            
-            default(config, "fluid_heat_capacity", 3800),   # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_specific_heat_capacity", 3800),   # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
             default(config, "fluid_density", 1045),  # density brine at 0 °C (25 % glycol 75 % water (interpolated))
-            default(config, "fluid_viscosity", 3.9e-6), # viscosity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-            default(config, "fluid_lambda", 0.5) ,  # heat conductivity brine at 0 °C (25 % glycol 75 % water (interpolated))
-            default(config, "fluid_prandtl", 30),   # prandtl-number brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_kinematic_viscosity", 3.9e-6), # viscosity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_heat_conductivity", 0.5) ,  # heat conductivity brine at 0 °C (25 % glycol 75 % water (interpolated))
+            default(config, "fluid_prandtl_number", 30),   # prandtl-number brine at 0 °C (25 % glycol 75 % water (interpolated)) 
             
-            default(config, "grout_lambda", 2),      # lambda grout / filling material in W/(mK)   
-            default(config, "pipe_lambda", 0.42),   # lambda of inner pipes
-            default(config, "diameter_borehole", 0.15),    # borehole diameter in m.
-            0.1,     # shank-spacing = distance between inner pipes in borehole.
+            default(config, "grout_heat_conductivity", 2),      # lambda grout / filling material in W/(mK)   
+            default(config, "pipe_heat_conductivity", 0.42),   # lambda of inner pipes
+            default(config, "borehole_diameter", 0.15),    # borehole diameter in m.
+            0.1,     # shank-spacing = distance between inner pipes in borehole. Needed for calculation of thermal borehole resistance.
 
-            0,      # Reynoldsnumber. To be calculated in Function later.
-            0,      # eq diameter inner
-            0,      # eq diameter outer
-
-            2,       # 1: with load aggregation. 0: Without load aggregation. 2: Reduced Time Momory
-            zeros(13),   
-            1,      # month index.
-            1,
-            zeros(13), # monthly load step
-            730      # hourly history period (for load aggregation)
+            0      # Reynoldsnumber. To be calculated in Function later.
 
             )
     end
@@ -152,22 +131,6 @@ function control(
 )
     # time index, necessary for g-function approach
     unit.time_index = unit.time_index + 1 
-    
-    # For Load-Aggregation
-
-    # unit.hour_index = Int(floor((unit.time_index - 1)/4) - (unit.month_index-1) * 730)
-    # only needed if timestep < 1h.
-    # unit.subhour_index +=1
-    # if unit.subhour_index == 5
-    #     unit.subhour_index = 1
-    # end
-
-    unit.hour_index += 1
-    if unit.hour_index == 732
-        unit.monthly_average_load[unit.month_index] = sum(unit.specific_heat_flux_in_out_absolut[(unit.month_index)*730:(unit.month_index)*730+unit.hour_index])/730
-        unit.hour_index = 1
-        unit.month_index += 1
-    end
 
     # get input temperature for energy input (regeneration) and set temperature to input interface
     if unit.regeneration
@@ -205,16 +168,15 @@ end
 
 # function that calculates current (highest possible) output temperature of probe field that can be provided. (lower temp. is always possible!)
 function current_output_temperature(unit::GeothermalProbes)::Temperature
-    highest_outer_borehole_temp = unit.average_fluid_temperature + unit.unloading_temperature_spread/2
+    highest_outer_borehole_temp = unit.fluid_temperature + unit.unloading_temperature_spread/2
     return highest_outer_borehole_temp
 end
 
 # function that calculates current (minimum possible) input temperature of probe field that should be provided for regeneration 
 # (higher temperature is always possible, here the minimum should be calculated!)
-# currenlty only a dummy implementation!!
 function current_input_temperature(unit::GeothermalProbes)::Temperature
     # new: Min. current boreholewall temperature necessary to regenerate.
-    input_temperature = unit.average_fluid_temperature - unit.loading_temperature_spread/2
+    input_temperature = unit.fluid_temperature - unit.loading_temperature_spread/2
     return input_temperature
 end
 
@@ -223,31 +185,29 @@ end
 function get_max_output_power(unit::GeothermalProbes)::Float64
     # new: calculate max. outputpower based on max. temperature difference between borehallwall and min. average fluid temperature (VDI 4640-2 : Input should be >= 0°C most of the time)
     
-    max_output_power = unit.specific_heat_flux_in_out_absolut[unit.time_index]*unit.probe_depth*unit.number_of_probes
+    max_output_power = unit.specific_heat_flux_in_out_absolut[unit.time_index]*unit.probe_depth*unit.probe_number
     return max_output_power  
 end
 
 # function to calculate the maximum possible input energy in current time step
 function get_max_input_power(unit::GeothermalProbes)::Float64
     # Max. input temperature is 15 K above undistrubed ground temperature 
-    max_input_power = unit.specific_heat_flux_in_out_absolut[unit.time_index]*unit.probe_depth*unit.number_of_probes
+    max_input_power = unit.specific_heat_flux_in_out_absolut[unit.time_index]*unit.probe_depth*unit.probe_number
     return max(0,max_input_power)  
 end
 
 # function to calculate current new boreholewall temperature with g-functions
 function calculate_new_boreholewall_temperature(unit::GeothermalProbes)::Temperature
     
-    
     # calculate radius values
-    radius_pipe_inner = unit.diameter_pipe_inner  / 2
-    radius_pipe_outer = unit.diameter_pipe_outer / 2
-    radius_borehole = unit.diameter_borehole / 2   
+    radius_pipe_inner = unit.pipe_diameter_inner  / 2
+    radius_pipe_outer = unit.pipe_diameter_outer / 2
+    radius_borehole = unit.borehole_diameter / 2   
     
     # R_B with Hellström 
     radius_pipe_eq_inner = radius_pipe_inner
-    radius_pipe_eq_outer = radius_pipe_outer
-    unit.diameter_pipe_eq_inner = 2*radius_pipe_eq_inner
-    unit.diameter_pipe_eq_outer = 2*radius_pipe_eq_outer
+    unit.pipe_diameter_inner = 2*radius_pipe_eq_inner
+   
     
     # define variable for later calculations
     sum = 0
@@ -256,165 +216,95 @@ function calculate_new_boreholewall_temperature(unit::GeothermalProbes)::Tempera
     alpha_fluid = calculate_alpha_pipe(unit::GeothermalProbes)    
     
     # calculate effective thermal borehole resistance by multipole method (Hellström 1991) depending on alpha
-    
-    sigma = (unit.grout_lambda-unit.soil_heat_conductivity)/(unit.grout_lambda+unit.soil_heat_conductivity)   # dimensionless calculation factor
+    sigma = (unit.grout_heat_conductivity-unit.soil_heat_conductivity)/(unit.grout_heat_conductivity+unit.soil_heat_conductivity)   # dimensionless calculation factor
     distance_pipe_center = unit.shank_spacing / 2
-    beta = 1/(2*pi*alpha_fluid*radius_pipe_inner) + 1/(2*pi * unit.pipe_lambda) * log(radius_pipe_outer/radius_pipe_inner) # in (mK)/W
+    beta = 1/(2*pi*alpha_fluid*radius_pipe_inner) + 1/(2*pi * unit.pipe_heat_conductivity) * log(radius_pipe_outer/radius_pipe_inner) # in (mK)/W
     
-    R_1 = beta + 1/(2*pi*unit.grout_lambda)*
+    R_1 = beta + 1/(2*pi*unit.grout_heat_conductivity)*
     (log(radius_borehole^2/(2*radius_pipe_outer*distance_pipe_center))+
     sigma*log(radius_borehole^4/(radius_borehole^4-distance_pipe_center^4))-
     radius_pipe_outer^2/(4*distance_pipe_center^2)*(1-sigma*4*distance_pipe_center^4/(radius_borehole^4-distance_pipe_center^4))^2 /
-    ((1+2*pi*unit.grout_lambda*beta)/(1-2*pi*unit.grout_lambda*beta)+
+    ((1+2*pi*unit.grout_heat_conductivity*beta)/(1-2*pi*unit.grout_heat_conductivity*beta)+
     radius_pipe_outer^2/(4*distance_pipe_center^2)*(1+sigma*16*radius_borehole^4*distance_pipe_center^4/((radius_borehole^4-distance_pipe_center^4)^2))
     )
     )
 
-    unit.thermal_resistance = R_1/4
+    unit.borehole_thermal_resistance = R_1/4
     
-    if unit.load_aggregation_mode == 0
-        # g-function approach
-        if unit.time_index == 1
-            unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index]
-        else 
-            unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index] - unit.specific_heat_flux_in_out_absolut[unit.time_index - 1]
-        
-        end
-        
 
-        
-        for i in 0:(unit.time_index - 1)    
-            sum += unit.specific_heat_flux_in_out_step[unit.time_index-i] * unit.g_function[i+1] / (2*pi*unit.soil_heat_conductivity)
-        end
-        unit.current_borehole_wall_temperature = unit.undisturbed_ground_temperature + sum
-        unit.average_fluid_temperature = unit.current_borehole_wall_temperature + unit.specific_heat_flux_in_out_absolut[unit.time_index] * unit.thermal_resistance    
-    
-    elseif unit.load_aggregation_mode == 1
-    # Load Aggregation Approach
-    
-        if unit.month_index == 1
-            if unit.time_index == 1
-                unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index]
-            else 
-                unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index] - unit.specific_heat_flux_in_out_absolut[unit.time_index - 1]
-            end
-
-            
-            for i in 0:(unit.time_index - 1)
-                sum += unit.specific_heat_flux_in_out_step[unit.time_index-i] * unit.g_function[i+1] / (2*pi*unit.soil_heat_conductivity)
-            end
-            unit.current_borehole_wall_temperature = unit.undisturbed_ground_temperature + sum
-            unit.average_fluid_temperature = unit.current_borehole_wall_temperature + unit.specific_heat_flux_in_out_absolut[unit.time_index] * unit.thermal_resistance   
-        
-        else
-            dT_monthly = 0
-            dT_hourly = 0
-            # calculate monthly influence on temperature response
-            
-            if unit.month_index == 2    
-                unit.monthly_average_load_step[unit.month_index] = unit.monthly_average_load[2]
-            elseif unit.month_index > 2 
-                unit.monthly_average_load_step[unit.month_index] = unit.monthly_average_load[unit.month_index] -  unit.monthly_average_load[unit.month_index-1]        
-            
-            end
-            
-            for m = 0:unit.month_index-1
-                dT_monthly += unit.monthly_average_load_step[unit.month_index-m] * unit.g_function[m+1] / (2*pi*unit.soil_heat_conductivity)
-            end
-                
-            # calculate hourly influence on temperature response
-
-            if unit.hour_index == 1
-                unit.specific_heat_flux_in_out_step[unit.hour_index] = unit.specific_heat_flux_in_out_absolut[unit.hour_index]
-            elseif unit.hour_index == 0
-                unit.specific_heat_flux_in_out_step[unit.hour_index] = unit.specific_heat_flux_in_out_absolut[unit.hour_index] - unit.specific_heat_flux_in_out_absolut[unit.hour_index - 1]
-            else 
-                unit.specific_heat_flux_in_out_step[unit.hour_index] = unit.specific_heat_flux_in_out_absolut[unit.hour_index] - unit.specific_heat_flux_in_out_absolut[unit.hour_index - 1]
-            
-            end
-
-            if unit.hour_index == 0
-                dT_hourly = 0
-            else 
-                for i in 0:(unit.hour_index - 1)
-                    dT_hourly += unit.specific_heat_flux_in_out_step[unit.hour_index-i] * unit.g_function[i+1] / (2*pi*unit.soil_heat_conductivity)
-                end
-            end 
-            # calculate borehole temperature based on monthly and hourly influence
-            unit.current_borehole_wall_temperature = unit.undisturbed_ground_temperature + dT_monthly + dT_hourly
-
-            # calculate average fluid temperature
-            unit.average_fluid_temperature = unit.current_borehole_wall_temperature + unit.specific_heat_flux_in_out_absolut[unit.time_index] * unit.thermal_resistance   
-
-        end
-
-    elseif unit.load_aggregation_mode == 2
-              # g-function hourly history approach
-              if unit.time_index == 1
-                unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index]
-            else 
-                unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index] - unit.specific_heat_flux_in_out_absolut[unit.time_index - 1]
-            
-            end
-            
-    
-            
-            for i in max(0,unit.time_index-unit.hourly_history_period):(unit.time_index - 1)    # max(0,unit.time_index-730)
-                history_difference = max(0, unit.time_index-730 )
-                sum += unit.specific_heat_flux_in_out_step[unit.time_index-i+history_difference] * unit.g_function[i-history_difference+1] / (2*pi*unit.soil_heat_conductivity)
-            end
-            unit.current_borehole_wall_temperature = unit.undisturbed_ground_temperature + sum
-            unit.average_fluid_temperature = unit.current_borehole_wall_temperature + unit.specific_heat_flux_in_out_absolut[unit.time_index] * unit.thermal_resistance 
-
+    # g-function approach
+    if unit.time_index == 1
+        unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index]
+    else 
+        unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index] - unit.specific_heat_flux_in_out_absolut[unit.time_index - 1]
     
     end
-
+        
+    for i in 0:(unit.time_index - 1)    
+        sum += unit.specific_heat_flux_in_out_step[unit.time_index-i] * unit.g_function[i+1] / (2*pi*unit.soil_heat_conductivity)
+    end
+    unit.borehole_current_wall_temperature = unit.soil_undisturbed_ground_temperature + sum
+    unit.fluid_temperature = unit.borehole_current_wall_temperature + unit.specific_heat_flux_in_out_absolut[unit.time_index] * unit.borehole_thermal_resistance    
 
 end 
 
 function calculate_alpha_pipe(unit::GeothermalProbes)
-    # calculate reynolds-number to choose right Nusselt-calculation method
-    
+    # calculate temeprature-dependant Prantl-Number of the heat carrier fluid.
+    fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+    unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+    unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
 
-        unit.Re = (4 * abs(unit.specific_heat_flux_in_out_absolut[unit.time_index])/2 * unit.probe_depth)/
-        (unit.fluid_heat_capacity * unit.unloading_temperature_spread * pi  * unit.diameter_pipe_eq_inner * unit.fluid_viscosity * unit.fluid_density)
+    probe_total_heat_flux_in_out = abs(unit.specific_heat_flux_in_out_absolut[unit.time_index])/2 * unit.probe_depth
+    # calculate reynolds-number (based on dynamic viscosity)
+    unit.fluid_reynolds_number = (probe_total_heat_flux_in_out)/
+            (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * unit.pipe_diameter_inner * fluid_dynamic_viscosity)
+    
+    # # old: Reynoldsnumber calculation based on kinematic viscosity.
+    # # calculate reynolds-number to choose right Nusselt-calculation method
+    #     re_old = (4 * abs(unit.specific_heat_flux_in_out_absolut[unit.time_index])/2 * unit.probe_depth)/
+    #     (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi  * unit.pipe_diameter_inner * unit.fluid_kinematic_viscosity * unit.fluid_density)
  
      
     # check for laminar flow
-    if unit.Re <= 2300
-        Nu = calculate_Nu_laminar(unit::GeothermalProbes,unit.Re)
+    if unit.fluid_reynolds_number <= 2300
+        Nu = calculate_Nu_laminar(unit::GeothermalProbes,unit.fluid_reynolds_number)
         
     # check for transition flow
-    elseif unit.Re > 2300
+    elseif unit.fluid_reynolds_number > 2300
         # Gielinski
-        factor = (unit.Re - 2300)/(1e4-2300)
+        factor = (unit.fluid_reynolds_number - 2300)/(1e4-2300)
         Nu = (1- factor)*
         calculate_Nu_laminar(unit::GeothermalProbes, 2300) +
         factor * calculate_Nu_turbulent(unit::GeothermalProbes, 1e4)
         end
     
-    alpha = Nu * unit.fluid_lambda / unit.diameter_pipe_eq_inner
+    alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_diameter_inner
     
     return alpha
     end
     
-function calculate_Nu_laminar(unit::GeothermalProbes,Re)
-    # Stephan
-    Pr_water = 13.44 # Pr Number Water 0 °C
+function calculate_Nu_laminar(unit::GeothermalProbes,fluid_reynolds_number)
     
-    l_rohr = 2*unit.probe_depth # length down and up -> 2x probe depth.
-    Nu = 3.66 + (0.0677 * (Re * unit.fluid_prandtl * unit.diameter_pipe_eq_inner/l_rohr)^1.33) /
-        (1+0.1* unit.fluid_prandtl * (Re * unit.diameter_pipe_eq_inner/l_rohr)^0.83) *
-        (unit.fluid_prandtl/Pr_water)^ 0.1
+        # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
+        # TO DO: Need to be changed in documentation.
+        k_a = 0.0         # initializing k_a
+        k_n = 0.0        # initializing k_n
+        # substitutions: 
+        k_a = 1.1 - 1 / (3.4+0.0667*unit.fluid_prandtl_number)
+        k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
+    
+        # calculate Nu-Number
+        Nu = ((k_a/(1-k_n)*(unit.fluid_prandtl_number*unit.pipe_diameter_inner*unit.fluid_reynolds_number/(unit.probe_depth*2))^k_n)^3+4.364^3)^(1/3)
+    
     return Nu
     end 
     
-function calculate_Nu_turbulent(unit::GeothermalProbes,Re)
-    zeta = (1.8*log(Re)-1.5)^-2
+function calculate_Nu_turbulent(unit::GeothermalProbes,fluid_reynolds_number)
+    zeta = (1.8*log(fluid_reynolds_number)-1.5)^-2
     
     # Gielinski
-    Nu = (zeta/8 * Re * unit.fluid_prandtl)/
-        (1 + 12.7 * sqrt(zeta/8) * (unit.fluid_prandtl^(2/3)-1))
+    Nu = (zeta/8 * fluid_reynolds_number * unit.fluid_prandtl_number)/
+        (1 + 12.7 * sqrt(zeta/8) * (unit.fluid_prandtl_number^(2/3)-1))
     
     return Nu
 end
@@ -452,7 +342,7 @@ function process(unit::GeothermalProbes, parameters::Dict{String,Any})
         return # process is only concerned with moving energy to the target
     end
     # write output heat flux into vector
-    unit.specific_heat_flux_in_out_absolut[unit.time_index] = energy_demand  / (unit.probe_depth * unit.number_of_probes * 1) # from total energy to specific power of one single probe.
+    unit.specific_heat_flux_in_out_absolut[unit.time_index] = energy_demand  / (unit.probe_depth * unit.probe_number * 1) # from total energy to specific power of one single probe.
     add!(outface, abs(energy_demand), unit.current_output_temperature)
     
 end
@@ -483,7 +373,7 @@ function load(unit::GeothermalProbes, parameters::Dict{String,Any})
         return
     end
     # Add loaded specific heat flux to vector
-    unit.specific_heat_flux_in_out_absolut[unit.time_index] += energy_available / (unit.probe_depth * unit.number_of_probes * 1) # TO DO: Add Global Time Step!
+    unit.specific_heat_flux_in_out_absolut[unit.time_index] += energy_available / (unit.probe_depth * unit.probe_number * 1) # TO DO: Add Global Time Step!
 
     # calcute energy that acutally has beed delivered for regeneration and set it to interface 
     # no other limits are present as max_energy for geothermal probes was written in control-step!
@@ -512,7 +402,7 @@ function balance_on(
 end
 
 function output_values(unit::GeothermalProbes)::Vector{String}
-    return ["IN", "OUT", "TEMPERATURE_#NodeNum", "borehole_temperature","average_fluid_temperature","thermal_resistance","Re", "T_out", "Q_out", "Q_in"]
+    return ["IN", "OUT", "TEMPERATURE_#NodeNum", "borehole_temperature","fluid_temperature","borehole_thermal_resistance","fluid_reynolds_number", "T_out", "Q_out", "Q_in", "dT_monthly","dT_hourly" ]
 end
 
 function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
@@ -528,16 +418,20 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
             return unit.temperature_field[idx]
         end
     elseif key.value_key =="borehole_temperature"
-        return unit.current_borehole_wall_temperature
+        return unit.borehole_current_wall_temperature
 
-    elseif key.value_key =="average_fluid_temperature"
-        return unit.average_fluid_temperature
+    elseif key.value_key =="fluid_temperature"
+        return unit.fluid_temperature
 
-    elseif key.value_key =="thermal_resistance"
-        return unit.thermal_resistance
+    elseif key.value_key =="borehole_thermal_resistance"
+        return unit.borehole_thermal_resistance
     
-    elseif key.value_key =="Re"
-        return unit.Re
+    elseif key.value_key =="fluid_reynolds_number"
+        return unit.fluid_reynolds_number
+    elseif key.value_key =="dT_monthly"
+        return unit.dT_monthly
+    elseif key.value_key =="dT_hourly"
+        return unit.dT_hourly
     end
     throw(KeyError(key.value_key))
 end

@@ -6,8 +6,7 @@
         "output_keys": {
             "TST_STH_01": ["m_h_w_ht1 OUT"],
             "TST_DEM_01": ["m_h_w_lt1 IN"],
-            "TST_GTP_01": ["borehole_temperature","thermal_resistance","average_fluid_temperature","Re"]
-
+            "TST_GTP_01": ["borehole_temperature","borehole_thermal_resistance","fluid_temperature","fluid_reynolds_number"]
         },
         "output_plot": {
             
@@ -37,21 +36,21 @@
                 "scale_factor": 1
             },
             "5": {
-                "key": {"TST_GTP_01": ["average_fluid_temperature"]},
+                "key": {"TST_GTP_01": ["fluid_temperature"]},
                 "axis": "right",
                 "unit": "°C",
                 "scale_factor": 1
             },
 
             "6": {
-                "key": {"TST_GTP_01": ["thermal_resistance"]},
+                "key": {"TST_GTP_01": ["borehole_thermal_resistance"]},
                 "axis": "right",
                 "unit": "-",
                 "scale_factor": 1
             },
 
             "7": {
-                "key": {"TST_GTP_01": ["Re"]},
+                "key": {"TST_GTP_01": ["fluid_reynolds_number"]},
                 "axis": "left",
                 "unit": "-",
                 "scale_factor": 1
@@ -60,10 +59,10 @@
                 "key": {"TST_GTP_01": ["m_h_w_ht1 IN"]},
                 "axis": "left",
                 "unit": "kWh",
-                "scale_factor": 0.001
-      
+                "scale_factor": 0.001       
             }
-           
+        
+
             
         }    
     },
@@ -103,20 +102,20 @@
             "max_output_power": 600,
             "max_input_power": 300,
             "regeneration": true,
-            "undisturbed_ground_temperature": 12.0,
+            "soil_undisturbed_ground_temperature": 12.0,
             "soil_heat_conductivity": 1.6 ,
-            "thermal_resistance": 0.1, 
+            "borehole_thermal_resistance": 0.1, 
             "probe_depth": 150,
-            "diameter_pipe_outer": 0.032,
-            "diameter_pipe_inner": 0.026,
+            "pipe_diameter_outer": 0.032,
+            "pipe_diameter_inner": 0.026,
             "fluid_heat_capacity":3780,
             "fluid_density":1045,
-            "fluid_viscosity":3.9e-6,
-            "fluid_lambda":0.494,
-            "fluid_prandtl": 31.3,
-            "grout_lambda": 2,
-            "pipe_lambda": 0.42,
-            "diameter_borehole": 0.15
+            "fluid_kinematic_viscosity":3.9e-6,
+            "fluid_heat_conductivity":0.494,
+            "fluid_prandtl_number": 31.3,
+            "grout_heat_conductivity": 2,
+            "pipe_heat_conductivity": 0.42,
+            "borehole_diameter": 0.15
         }
                 
     }
