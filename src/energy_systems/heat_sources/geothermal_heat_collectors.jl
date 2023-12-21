@@ -212,8 +212,8 @@ function control(
         unit.T1[7:9,:] .= 13.5
         unit.T1[10:13,:] .= 15.5 
         unit.T1[14:18,:] .= unit.soil_starting_temperature 
-        unit.T1[19:25,:] .= 13      
-        unit.T1[26:30,:] .= 11
+        unit.T1[19:25,:] .= 15.5     
+        unit.T1[26:30,:] .= 15.5
         unit.T1[length(unit.dy)+1, :] .= 9    # TO DO: Use avg ambient temperature out of weather data set.
         unit.T2 = copy(unit.T1)
 
