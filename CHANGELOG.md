@@ -19,6 +19,26 @@ breaking changes may slip beneath notice.
 * Fix generic storage implementation not being available due to the module not being included
 * Fix the profile scaling factor of some components being required despite profiles being optional
 * Rename helper function highest_temperature to highest and add types to inputs
+* added missing output channels to electrolyser
+* renamed (input) variables:
+  Load --> Demand                     in output channel of FixedSink
+  static_load --> constant_demand     for sinks
+  static_* --> constant_*             for *=power, temperature, demand, suppy
+  draw sum --> output_sum             in grid_connextion outputs
+  load sum --> input_sum              in grid_connextion outputs
+  power --> power_type                for all transformers, like power_th, power_el
+  medium --> consider_medium          in control strategy of all transformers
+* removed last potential() step of transformer chains as this is not needed
+* Sankey distplays now the difference of requested and delivered energy in fixed sinks and sources 
+* added Julia packages: Colors, Interpolations, Dates, Logging
+* removed condition "would overfill thermal buffer" in storage_driven strategy as this is now handeled implicitly
+* added output channel "Losses" to all components and to Sankey output. Losses" are total losses, while "Losses_XX" are medium-wise break downs
+* contant_load and constant_supply for fixed sources and sinks are now power and not work anymore to be consistent with bounded sources and sinks
+* renamed simulation "parameters" to "sim_params" and added them to all components and profiles
+* added profile aggregation and segmentation and added testcases
+* added import of weather files in EPW format and .dat format (DWD)
+* added functionality to map profiles from weather file to component profiles, like ambient temperature from the weather file to a geothermal collector
+* added global logging functionalities with the following categories: Debug, Info, BalanceWarn, Warn, Error and redirected all println() to logger (console and/or logging files, separately for general logs and Balancewarn)
 
 ## Version 0.6.5
 * "output_keys" and "output_plot" in the input file can now be "all", "nothing" or a list of entries for custom outputs of the CSV file and lineplot (backwards compatibility is given)
