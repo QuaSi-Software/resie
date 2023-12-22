@@ -347,6 +347,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if !energies[1]
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
@@ -355,6 +356,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     heat_out = sum(energies[5]; init=0.0)
 
     if heat_out < sim_params["epsilon"]
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
@@ -377,6 +379,7 @@ end
 function output_values(unit::HeatPump)::Vector{String}
     return [string(unit.m_el_in)*" IN", 
             string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_in)*" IN_temp",
             string(unit.m_heat_out)*" OUT",
             "COP", 
             "Losses"]
@@ -385,6 +388,8 @@ end
 function output_value(unit::HeatPump, key::OutputKey)::Float64
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
+    elseif key.value_key == "IN_temp"
+        return unit.input_interfaces[unit.m_heat_in].temperature
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"

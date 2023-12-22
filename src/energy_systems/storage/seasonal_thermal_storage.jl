@@ -96,7 +96,7 @@ function balance_on(
 end
 
 function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    outface = unit.output_interfaces[unit.m_heat_in]
+    outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
     energy_demanded = balance(exchanges)
 
