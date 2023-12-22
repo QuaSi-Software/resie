@@ -52,7 +52,7 @@ mutable struct FixedSupply <: Component
             ),
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # supply
             nothing, # temperature
             default(config, "constant_supply", nothing), # constant_supply (power, not work!)
@@ -82,7 +82,7 @@ function control(
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
     end
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(unit.temperature, unit.output_interfaces[unit.medium].temperature)
+    unit.output_interfaces[unit.medium].temperature = highest(unit.temperature, unit.output_interfaces[unit.medium].temperature)
 end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})

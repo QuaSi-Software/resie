@@ -49,7 +49,7 @@ mutable struct BoundedSink <: Component
             ),
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
-            config["scale"], # scaling_factor
+            default(config, "scale", 1.0), # scaling_factor
             0.0, # max_energy
             nothing, # temperature
             default(config, "constant_power", nothing), # constant_power
@@ -83,7 +83,7 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.input_interfaces[unit.medium].temperature = highest_temperature(
+    unit.input_interfaces[unit.medium].temperature = highest(
         unit.temperature,
         unit.input_interfaces[unit.medium].temperature
     )
@@ -91,11 +91,12 @@ end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    exchange = balance_on(inface, inface.source)
-    if exchange.balance > 0.0
+    exchanges = balance_on(inface, inface.source)
+    blnc = balance(exchanges)
+    if blnc > 0.0
         sub!(
             inface,
-            min(abs(exchange.balance), unit.max_energy)
+            min(abs(blnc), unit.max_energy)
         )
     end
 end

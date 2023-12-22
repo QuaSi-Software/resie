@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest_temperature
+    highest
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -307,14 +307,17 @@ end
 
 
 """
-    highest_temperature(temperature_1, temperature_2)::Temperature
+    highest(temperature_1, temperature_2)::Temperature
 
-Returns the highest temperature::Temperature and handles nothing-values:
+Returns the highest temperature of the two inputs and handles nothing-values:
 - If both of the inputs are floats, the maximum will be returned.
 - If one of the inputs is nothing and one a float, the float will be returned.
 - If both of the inputs are nothing, nothing will be returned.
 """
-function highest_temperature(temperature_1, temperature_2)::Temperature
+function highest(
+    temperature_1::Temperature,
+    temperature_2::Temperature
+)::Temperature
     if temperature_1 !== nothing && temperature_2 !== nothing
         return max(temperature_1, temperature_2)
     elseif temperature_1 === nothing && temperature_2 !== nothing
@@ -332,6 +335,125 @@ whole energy system has been loaded, it maps a medium category to either nothing
 components are linked) or a SystemInterface instance.
 """
 const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
+
+"""
+Contains the data on the energy exchance (and related information) on an interface.
+"""
+Base.@kwdef mutable struct EnergyExchange
+    balance::Float64
+    uac::String
+    energy_potential::Float64
+    storage_potential::Float64
+    temperature::Temperature
+    pressure::Union{Nothing,Float64}
+    voltage::Union{Nothing,Float64}
+end
+
+"""
+Convenience alias to EnergyExchange.
+"""
+const EnEx = EnergyExchange
+
+"""
+    balance(exchanges)
+
+Sum of balances over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of balances
+"""
+function balance(entries::Vector{EnergyExchange})::Float64
+    return sum(e.balance for e in entries; init=0.0)
+end
+
+"""
+    energy_potential(exchanges)
+
+Sum of energy potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of energy potentials
+"""
+function energy_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.energy_potential for e in entries; init=0.0)
+end
+
+"""
+    storage_potential(exchanges)
+
+Sum of storage potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of storage potentials
+"""
+function storage_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.storage_potential for e in entries; init=0.0)
+end
+
+"""
+    temperature_first(exchanges)
+
+First not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
+function temperature_first(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature for e in entries if e.temperature !== nothing]
+    return length(temps) > 0 ? first(temps) : nothing
+end
+
+"""
+    temperature_highest(exchanges)
+
+Highest not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
+function temperature_highest(entries::Vector{EnergyExchange})::Temperature
+    return maximum(e.temperature for e in entries if e.temperature !== nothing)
+end
+
+"""
+    temperature_all(exchanges)
+
+A list of all temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A list of temperatures
+"""
+function temperature_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries]
+end
+
+"""
+    temperature_all_non_empty(exchanges)
+
+A list of all not-nothing temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A (possibly empty) list of not-nothing temperatures
+"""
+function temperature_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries if e.temperature !== nothing]
+end
 
 """
     balance_on(interface, unit)
@@ -355,18 +477,19 @@ without having to check if its connected to a Bus or directly to a component.
 - "energy_potential"::Float64:  The maximum enery an interface can provide or consume
 - "temperature"::Temperature:   The temperature of the interface
 """
-function balance_on(
-    interface::SystemInterface,
-    unit::Component
-)::NamedTuple{}
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
+function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
-    return (
-            balance = interface.balance,
-            storage_potential = 0.0,
-            energy_potential = balance_written ? 0.0 : input_sign * interface.max_energy,
-            temperature = interface.temperature
-            )
+    input_sign = unit.uac == interface.target.uac ? -1 : +1
+
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
+        storage_potential=0.0,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 """
@@ -572,6 +695,7 @@ include("general/fixed_sink.jl")
 include("general/fixed_supply.jl")
 include("general/bounded_supply.jl")
 include("general/bounded_sink.jl")
+include("general/storage.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")

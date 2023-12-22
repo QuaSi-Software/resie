@@ -14,6 +14,12 @@ versions prior to 1.0.0 any release might break compatability. To alleviate this
 the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
 breaking changes may slip beneath notice.
 
+## Version 0.7.0
+* Change the inputs and outputs of busses such that the order matches the input and output priorities
+* Fix generic storage implementation not being available due to the module not being included
+* Fix the profile scaling factor of some components being required despite profiles being optional
+* Rename helper function highest_temperature to highest and add types to inputs
+
 ## Version 0.6.5
 * "output_keys" and "output_plot" in the input file can now be "all", "nothing" or a list of entries for custom outputs of the CSV file and lineplot (backwards compatibility is given)
 * output_values() of all components was changed to not only return the available channels, but also the corresponding media
