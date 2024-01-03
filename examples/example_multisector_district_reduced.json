@@ -166,7 +166,7 @@
                 "TST_ELY_01",
                 "TST_HTP_02"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_PVP_EL_01",
                     "TST_CHP_01",
@@ -192,7 +192,7 @@
                 "TST_BUS_TH_01",
                 "TST_STES_TH_01"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_HTP_02",
                     "TST_HTP_01",
@@ -218,7 +218,7 @@
                 "TST_DEM_TH_01",
                 "TST_BFT_TH_01"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_BUS_TH_00",
                     "TST_BFT_TH_01",
@@ -243,7 +243,7 @@
                 "TST_DEM_TH_02",
                 "TST_BFT_TH_02"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_BUS_TH_00",
                     "TST_BFT_TH_02"
@@ -262,7 +262,7 @@
                 "TST_CHP_01",
                 "TST_GBO_01"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_GRI_EG_01"
                 ],

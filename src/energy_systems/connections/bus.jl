@@ -12,18 +12,18 @@ Base.@kwdef mutable struct ConnectionMatrix
         output_order = [String(u) for u in config["output_refs"]]
         storage_loading = nothing
 
-        if "connection_matrix" in keys(config)
-            if "input_order" in keys(config["connection_matrix"])
-                input_order = [String(u) for u in config["connection_matrix"]["input_order"]]
+        if "connections" in keys(config)
+            if "input_order" in keys(config["connections"])
+                input_order = [String(u) for u in config["connections"]["input_order"]]
             end
 
-            if "output_order" in keys(config["connection_matrix"])
-                output_order = [String(u) for u in config["connection_matrix"]["output_order"]]
+            if "output_order" in keys(config["connections"])
+                output_order = [String(u) for u in config["connections"]["output_order"]]
             end
 
-            if "storage_loading" in keys(config["connection_matrix"])
+            if "storage_loading" in keys(config["connections"])
                 storage_loading = []
-                for row in config["connection_matrix"]["storage_loading"]
+                for row in config["connections"]["storage_loading"]
                     vec = [Bool(v) for v in row]
                     push!(storage_loading, vec)
                 end

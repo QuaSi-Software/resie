@@ -22,7 +22,7 @@ function test_run_energy_system_from_storage()
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
             "output_refs" => ["TST_HP_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
                 ],
@@ -199,7 +199,7 @@ function test_run_energy_system_from_storage_denied()
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
             "output_refs" => ["TST_HP_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
                 ],

@@ -24,7 +24,7 @@ function test_ooo_one_bus_to_many_with_storage()
                 "TST_BUS_02",
                 "TST_BUS_02",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_01",
                 ],
@@ -42,7 +42,7 @@ function test_ooo_one_bus_to_many_with_storage()
                 "TST_DEM_01",
                 "TST_TES_01",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_TES_01",
@@ -61,7 +61,7 @@ function test_ooo_one_bus_to_many_with_storage()
                 "TST_DEM_02",
                 "TST_TES_02",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_TES_02",

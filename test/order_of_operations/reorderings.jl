@@ -24,7 +24,7 @@ function test_data_input_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
                     "TST_BUS_01",
@@ -119,7 +119,7 @@ function test_data_busses_distribute()
                 "TST_BUS_03",
                 "TST_BUS_02",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
                     "TST_BUS_04",
@@ -142,7 +142,7 @@ function test_data_busses_distribute()
                 "TST_BUS_06",
                 "TST_BUS_05",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                 ],
@@ -246,7 +246,7 @@ function test_data_storage_loading()
                 "TST_BFT_01",
                 "TST_BUS_03",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
                     "TST_BUS_02",
@@ -447,7 +447,7 @@ function test_data_storage_loading_with_matrix()
                 "TST_BFT_01",
                 "TST_BUS_03",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
                     "TST_GRI_01"
@@ -468,7 +468,7 @@ function test_data_storage_loading_with_matrix()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
                     "TST_BUS_01"
@@ -487,7 +487,7 @@ function test_data_storage_loading_with_matrix()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BFT_03"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_03",
                     "TST_BUS_01"

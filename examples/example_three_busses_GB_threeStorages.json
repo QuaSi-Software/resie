@@ -144,7 +144,7 @@
                 "ESS_BUS_TH_02",
                 "TST_BFT_TH_03"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_GBO_01",
                     "TST_BFT_TH_03"
@@ -168,7 +168,7 @@
                 "TST_DEM_01",
                 "TST_BFT_TH_01"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_01"
@@ -191,7 +191,7 @@
                 "TST_DEM_02",
                 "TST_BFT_TH_02"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_02"

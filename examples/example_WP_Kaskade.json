@@ -49,7 +49,7 @@
                 "TST_01_HZG_02_HTP",
                 "TST_01_ELT_01_ELY"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
                 ],
@@ -67,7 +67,7 @@
             "output_refs": [
                 "TST_01_HZG_01_DEM"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_HZG_02_HTP",
                     "TST_01_HZG_01_GBO"

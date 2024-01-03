@@ -74,7 +74,7 @@ function test_many_to_many()
                 "TST_TES_01",
                 "TST_TES_02",
             ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01",
                     "TST_TES_01",

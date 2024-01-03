@@ -118,7 +118,7 @@
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_HZG_01_CHP",
                     "TST_01_HZG_01_HTP",
@@ -140,7 +140,7 @@
                 "TST_01_ELT_01_BAT",
                 "TST_01_ELT_01_GRO"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_ELT_01_PVP",
                     "TST_01_HZG_01_CHP",

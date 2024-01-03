@@ -20,7 +20,7 @@ function test_one_bus_to_one_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GRI_01",
                 ],
@@ -34,7 +34,7 @@ function test_one_bus_to_one_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                 ],

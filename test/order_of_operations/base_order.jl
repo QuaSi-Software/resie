@@ -41,7 +41,7 @@ function test_base_order()
                 "TST_01_HZG_01_DEM",
                 "TST_01_HZG_01_BFT"
             ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_HZG_01_CHP",
                     "TST_01_HZG_01_HTP",
@@ -63,7 +63,7 @@ function test_base_order()
                 "TST_01_ELT_01_BAT",
                 "TST_01_ELT_01_GRO"
             ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELT_01_PVP",
                     "TST_01_HZG_01_CHP",

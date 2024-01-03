@@ -33,7 +33,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -49,7 +49,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"
@@ -186,7 +186,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -202,7 +202,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"
@@ -337,7 +337,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -353,7 +353,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"

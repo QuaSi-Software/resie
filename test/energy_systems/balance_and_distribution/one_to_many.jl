@@ -40,7 +40,7 @@ function test_many_to_one()
                 "TST_DEM_01",
                 "TST_DEM_02",
             ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01",
                 ],

@@ -53,7 +53,7 @@ function test_primary_producer_can_load_storage()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01",

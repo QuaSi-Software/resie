@@ -50,7 +50,7 @@ function energy_system()::Dict{String,Any}
     )
 end
 
-function test_load_no_connection_matrix()
+function test_load_no_connections()
     components_config = energy_system()
 
     simulation_parameters = Dict{String,Any}(
@@ -68,13 +68,13 @@ function test_load_no_connection_matrix()
     @test bus.connectivity.storage_loading === nothing
 end
 
-@testset "load_no_connection_matrix" begin
-    test_load_no_connection_matrix()
+@testset "load_no_connections" begin
+    test_load_no_connections()
 end
 
 function test_load_given_lists_empty()
     components_config = energy_system()
-    components_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
+    components_config["TST_BUS_01"]["connections"] = Dict{String,Any}(
         "input_order" => [],
         "output_order" => [],
     )
@@ -98,7 +98,7 @@ end
 
 function test_fully_specified()
     components_config = energy_system()
-    components_config["TST_BUS_01"]["connection_matrix"] = Dict{String,Any}(
+    components_config["TST_BUS_01"]["connections"] = Dict{String,Any}(
         "input_order" => [
             "TST_PVP_01",
             "TST_BAT_01",

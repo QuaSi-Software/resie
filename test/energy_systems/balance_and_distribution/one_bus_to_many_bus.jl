@@ -28,7 +28,7 @@ function test_one_bus_to_many_bus()
                 "TST_BUS_02",
                 "TST_BUS_03",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_01",
                 ],
@@ -46,7 +46,7 @@ function test_one_bus_to_many_bus()
                 "TST_DEM_01",
                 "TST_TES_01",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_TES_01",
@@ -65,7 +65,7 @@ function test_one_bus_to_many_bus()
                 "TST_DEM_02",
                 "TST_TES_02",
             ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_TES_02",

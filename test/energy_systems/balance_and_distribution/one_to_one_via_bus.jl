@@ -30,7 +30,7 @@ function test_one_to_one_via_bus()
             "output_refs" => [
                 "TST_DEM_01",
             ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01",
                 ],
