@@ -363,6 +363,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if !energies[1]
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
@@ -372,6 +373,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     o2_out = sum(energies[6]; init=0.0)
 
     if el_in < sim_params["epsilon"]
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 

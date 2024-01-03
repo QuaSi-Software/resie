@@ -347,6 +347,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if !energies[1]
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
@@ -355,6 +356,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     heat_out = sum(energies[5]; init=0.0)
 
     if heat_out < sim_params["epsilon"]
+        set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
