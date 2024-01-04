@@ -11,19 +11,24 @@ function test_data_input_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_03"],
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_03"],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
@@ -114,11 +119,6 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_04",
-                "TST_BUS_03",
-                "TST_BUS_02",
-            ],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
@@ -132,16 +132,15 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_06",
-                "TST_BUS_05",
-            ],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -156,19 +155,28 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
     )
 
@@ -241,13 +249,10 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_02",
-                "TST_BFT_01",
-                "TST_BUS_03",
-            ],
             "connections" => Dict{String, Any}(
-                "input_order" => [],
+                "input_order" => [
+                    "TST_BFT_01"
+                ],
                 "output_order" => [
                     "TST_BUS_02",
                     "TST_BFT_01",
@@ -259,13 +264,29 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_02"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                    "TST_BFT_02"
+                ],
+                "output_order" => [
+                    "TST_BFT_02",
+                ],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                    "TST_BFT_03"
+                ],
+                "output_order" => [
+                    "TST_BFT_03",
+                ],
+            )
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -442,11 +463,6 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_02",
-                "TST_BFT_01",
-                "TST_BUS_03",
-            ],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
@@ -467,7 +483,6 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_02"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
@@ -486,7 +501,6 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_03"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_03",
@@ -574,10 +588,6 @@ function test_find_storages_ordered_with_matrix()
     @test pwc_units_astr(expected_results, result) == ""
     @test pwc_units_astr(expected_limits, limits) == ""
 
-end
-
-@testset "find_storages_ordered" begin
-    test_find_storages_ordered()
 end
 
 function test_storage_loading_reorder_steps_with_matrix_1()

@@ -23,7 +23,6 @@ function energy_system()::Dict{String,Any}
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BAT_01"],
         ),
         "TST_BAT_01" => Dict{String,Any}(
             "type" => "Battery",
@@ -62,9 +61,7 @@ function test_load_no_connections()
     components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
-    @test length(bus.connectivity.output_order) == 2
-    @test bus.connectivity.output_order[1] == "TST_DEM_01"
-    @test bus.connectivity.output_order[2] == "TST_BAT_01"
+    @test length(bus.connectivity.output_order) == 0
     @test bus.connectivity.storage_loading === nothing
 end
 

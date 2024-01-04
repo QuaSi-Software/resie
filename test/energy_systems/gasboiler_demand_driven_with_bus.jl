@@ -21,7 +21,6 @@ function test_gasboiler_demand_driven_with_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01"],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_GB_01"],
                 "output_order" => ["TST_DEM_01"]

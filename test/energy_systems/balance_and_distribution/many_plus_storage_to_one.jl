@@ -52,10 +52,6 @@ function test_many_plus_storage_to_one()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_DEM_01",
-                "TST_TES_01",
-            ],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01",

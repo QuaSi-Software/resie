@@ -59,14 +59,30 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
             link_control_with(components[unit_key], others)
         end
 
-        if length(entry["output_refs"]) > 0
+        if (
+            String(entry["type"]) != "Bus"
+            && haskey(entry, "output_refs")
+            && length(entry["output_refs"]) > 0
+        )
             others = Grouping(key => components[key] for key in entry["output_refs"])
+            link_output_with(components[unit_key], others)
+
+        elseif (
+            String(entry["type"]) == "Bus"
+            && haskey(entry, "connections")
+            && length(entry["connections"]) > 0
+        )
+            others = Grouping(
+                key => components[key]
+                for key in entry["connections"]["output_order"]
+            )
             link_output_with(components[unit_key], others)
         end
     end
 
-    # busses are likely linked out-of-order in the config, so we need to fix the order of
-    # interfaces after all components have been loaded
+    # the input/output interfaces of busses are constructed in the order of appearance in
+    # the config, so after all components are loaded they need to be reordered to match
+    # the input/output priorities
     components = reorder_interfaces_of_busses(components)
 
     return components

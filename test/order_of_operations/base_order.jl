@@ -37,10 +37,6 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_01_HZG_01_DEM",
-                "TST_01_HZG_01_BFT"
-            ],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_HZG_01_CHP",
@@ -57,12 +53,6 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_01_ELT_01_DEM",
-                "TST_01_HZG_01_HTP",
-                "TST_01_ELT_01_BAT",
-                "TST_01_ELT_01_GRO"
-            ],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELT_01_PVP",

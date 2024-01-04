@@ -8,25 +8,19 @@ Base.@kwdef mutable struct ConnectionMatrix
     storage_loading::Union{Nothing,Vector{Vector{Bool}}}
 
     function ConnectionMatrix(config::Dict{String,Any})
-        input_order = []
-        output_order = [String(u) for u in config["output_refs"]]
+        if !haskey(config, "connections")
+            return new([], [], nothing)
+        end
+
+        input_order = [String(u) for u in config["connections"]["input_order"]]
+        output_order = [String(u) for u in config["connections"]["output_order"]]
+
         storage_loading = nothing
-
-        if "connections" in keys(config)
-            if "input_order" in keys(config["connections"])
-                input_order = [String(u) for u in config["connections"]["input_order"]]
-            end
-
-            if "output_order" in keys(config["connections"])
-                output_order = [String(u) for u in config["connections"]["output_order"]]
-            end
-
-            if "storage_loading" in keys(config["connections"])
-                storage_loading = []
-                for row in config["connections"]["storage_loading"]
-                    vec = [Bool(v) for v in row]
-                    push!(storage_loading, vec)
-                end
+        if haskey(config["connections"], "storage_loading")
+            storage_loading = []
+            for row in config["connections"]["storage_loading"]
+                vec = [Bool(v) for v in row]
+                push!(storage_loading, vec)
             end
         end
 

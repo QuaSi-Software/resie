@@ -27,9 +27,6 @@ function test_one_to_one_via_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_DEM_01",
-            ],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01",

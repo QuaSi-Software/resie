@@ -28,7 +28,6 @@ function test_ooo_bus_output_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BUS_03"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -43,7 +42,6 @@ function test_ooo_bus_output_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -57,7 +55,6 @@ function test_ooo_bus_output_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_02"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",

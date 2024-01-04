@@ -19,7 +19,6 @@ function test_one_bus_to_one_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GRI_01",
@@ -33,7 +32,6 @@ function test_one_bus_to_one_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01"],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
