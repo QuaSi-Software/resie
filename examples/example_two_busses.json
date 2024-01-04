@@ -37,9 +37,6 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "output_refs": [
-                "ESS_BUS_TH_02"
-            ],
             "connections": {
                 "input_order": [
                     "TST_GRI_01"
@@ -53,9 +50,6 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_01"
-            ],
             "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01"

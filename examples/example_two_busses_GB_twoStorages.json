@@ -106,10 +106,6 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "ESS_BUS_TH_02",
-                "TST_BFT_TH_01"
-            ],
             "connections": {
                 "input_order": [
                     "ESS_GBO_01",
@@ -119,7 +115,7 @@
                     "ESS_BUS_TH_02",
                     "TST_BFT_TH_01"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]
@@ -129,10 +125,6 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_01",
-                "TST_BFT_TH_02"
-            ],
             "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
@@ -142,7 +134,7 @@
                     "TST_DEM_01",
                     "TST_BFT_TH_02"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]

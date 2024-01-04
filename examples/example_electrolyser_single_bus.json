@@ -91,11 +91,6 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_DEM",
-                "TST_01_HZG_01_BFT",
-                "TST_01_HZG_01_STS"
-            ],
             "connections": {
                 "input_order": [
                     "TST_01_HZG_01_HTP",
@@ -108,7 +103,7 @@
                     "TST_01_HZG_01_BFT",
                     "TST_01_HZG_01_STS"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1, 1],
                     [1, 1, 0],
                     [1, 0, 0],
@@ -120,16 +115,11 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_HZG_02_HTP",
-                "TST_01_ELT_01_ELY"
-            ],
             "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
                 ],
-                "output_order": [
+                "energy_flow": [
                     "TST_01_HZG_01_HTP",
                     "TST_01_HZG_02_HTP",
                     "TST_01_ELT_01_ELY"
