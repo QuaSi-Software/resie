@@ -81,7 +81,7 @@ function test_many_to_many()
                     "TST_TES_01",
                     "TST_TES_02",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1,1,1,1],
                     [1,0,0,0],
                     [0,1,0,0],

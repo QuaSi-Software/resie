@@ -59,7 +59,7 @@ function test_ooo_storage_loading_switch()
                     "TST_DEM_01",
                     "TST_BFT_01"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 1],
                     [1, 0],
                     [1, 0]

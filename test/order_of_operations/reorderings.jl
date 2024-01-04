@@ -473,7 +473,7 @@ function test_data_storage_loading_with_matrix()
                     "TST_BFT_01",
                     "TST_BUS_03",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 0, 1],
                     [1, 0, 1]
                 ]
@@ -491,7 +491,7 @@ function test_data_storage_loading_with_matrix()
                 "output_order" => [
                     "TST_BFT_02"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [0],
                     [0]
                 ]
@@ -509,7 +509,7 @@ function test_data_storage_loading_with_matrix()
                 "output_order" => [
                     "TST_BFT_03"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [0],
                     [1]
                 ]

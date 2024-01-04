@@ -62,7 +62,7 @@ function test_load_no_connections()
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 0
-    @test bus.connectivity.storage_loading === nothing
+    @test bus.connectivity.energy_flow === nothing
 end
 
 @testset "load_no_connections" begin
@@ -86,7 +86,7 @@ function test_load_given_lists_empty()
     bus = components["TST_BUS_01"]
     @test length(bus.connectivity.input_order) == 0
     @test length(bus.connectivity.output_order) == 0
-    @test bus.connectivity.storage_loading === nothing
+    @test bus.connectivity.energy_flow === nothing
 end
 
 @testset "load_given_lists_empty" begin
@@ -105,7 +105,7 @@ function test_fully_specified()
             "TST_DEM_01",
             "TST_BAT_01"
         ],
-        "storage_loading" => [
+        "energy_flow" => [
             [1, 1],
             [1, 0],
             [1, 0]
@@ -127,13 +127,13 @@ function test_fully_specified()
     @test length(bus.connectivity.output_order) == 2
     bus.connectivity.output_order[1] == "TST_DEM_01"
     bus.connectivity.output_order[2] == "TST_BAT_01"
-    @test length(bus.connectivity.storage_loading) == 3
-    @test bus.connectivity.storage_loading[1][1]
-    @test bus.connectivity.storage_loading[1][2]
-    @test bus.connectivity.storage_loading[2][1]
-    @test !bus.connectivity.storage_loading[2][2]
-    @test bus.connectivity.storage_loading[3][1]
-    @test !bus.connectivity.storage_loading[3][2]
+    @test length(bus.connectivity.energy_flow) == 3
+    @test bus.connectivity.energy_flow[1][1]
+    @test bus.connectivity.energy_flow[1][2]
+    @test bus.connectivity.energy_flow[2][1]
+    @test !bus.connectivity.energy_flow[2][2]
+    @test bus.connectivity.energy_flow[3][1]
+    @test !bus.connectivity.energy_flow[3][2]
 end
 
 @testset "fully_specified" begin

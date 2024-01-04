@@ -62,7 +62,7 @@ function test_primary_producer_can_load_storage()
                     "TST_DEM_01",
                     "TST_BFT_01"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 1],
                     [1, 0],
                     [1, 0]

@@ -643,43 +643,40 @@ end
 
 
 """
-    get_storage_loading_entry(bus, storage, source)
+    check_energy_flow(bus, target, source)
 
-checks if the storage has a limitation in the bus' storage_loading matrix coming from source and
-returns true (1 in storage_loading matrix) if not and false (0) if a limitation is present.
+Checks if the energy is allowed to flow from the source to the target via the bus.
 
 # Arguments
 -`bus::Component`: The bus that is in the middle of source and storage
--`storage::Component`: The storage connected to the bus
--`source::Component`: The source of the bus from where the search has startet. 
-                         Can be nothing, then true will be returned.
+-`target::Component`: The target component to check
+-`source::Union{Component,Nothing}`: The source component to check. If the source is
+    nothing, the energy flow is allowed.
 """
-function get_storage_loading_entry(bus, storage, source)
-    storage_loading_matrix = bus.connectivity.storage_loading
-    if storage_loading_matrix === nothing || source === nothing
-        return true   # if no storage loading matrix is given, storage loading is assumed to be allowed
+function check_energy_flow(bus, target, source)::Bool
+    if bus.connectivity.energy_flow === nothing || source === nothing
+        # if no energy flow matrix or source is given, flow is assumed to be allowed
+        return true
+    end
+
+    output_idx = nothing
+    for (idx,output_uac) in pairs(bus.connectivity.output_order)
+        if output_uac == target.uac
+            output_idx = idx
+        end
+    end
+
+    input_idx = nothing
+    for (idx,input_uac) in pairs(bus.connectivity.input_order)
+        if input_uac == source.uac
+            input_idx = idx
+        end
+    end
+
+    if input_idx !== nothing && output_idx !== nothing
+        return bus.connectivity.energy_flow[input_idx][output_idx] == 1
     else
-        output_uac = storage.uac
-        connectivity_output_idx = []
-        for (idx,connectivity_output_uac) in pairs(bus.connectivity.output_order)
-            if connectivity_output_uac == output_uac
-                connectivity_output_idx = idx
-            end
-        end
-
-        input_uac = source.uac
-        connectivity_input_idx = []
-        for (idx,connectivity_input_uac) in pairs(bus.connectivity.input_order)
-            if connectivity_input_uac == input_uac
-                connectivity_input_idx = idx
-            end
-        end
-
-        if storage_loading_matrix[connectivity_input_idx][connectivity_output_idx] == 1
-            return true
-        else
-            return false
-        end        
+        return false
     end
 end
 
@@ -703,7 +700,7 @@ function find_storages_ordered(bus, components, source; reverse=false)
         unit = components[unit_uac]
         if unit.sys_function == EnergySystems.sf_storage
             pushing(storages, unit)
-            if get_storage_loading_entry(bus, unit, source)
+            if check_energy_flow(bus, unit, source)
                 pushing(limited, true)
             else
                 pushing(limited, false)
@@ -764,7 +761,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
                         for bus_input_interface in storage_input_interface.source.input_interfaces      # iterate through input interfaces of this bus
                             if bus_input_interface.source.sys_function == EnergySystems.sf_transformer  # and check if they are fed by transformers. 
                                 if (                                                                    # if yes, check if the transfomer is allowed to load the storage
-                                    get_storage_loading_entry(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
+                                    check_energy_flow(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
                                     &&                                                                  # and
                                     storage_input_interface.source !== bus                              # do not consider the trunk bus
                                 )

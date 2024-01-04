@@ -62,7 +62,7 @@ function test_many_plus_storage_to_one()
                     "TST_DEM_01",
                     "TST_TES_01",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1,1],
                     [1,1],
                     [1,0],

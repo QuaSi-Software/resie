@@ -5,7 +5,7 @@ for bus components.
 Base.@kwdef mutable struct ConnectionMatrix
     input_order::Vector{String}
     output_order::Vector{String}
-    storage_loading::Union{Nothing,Vector{Vector{Bool}}}
+    energy_flow::Union{Nothing,Vector{Vector{Bool}}}
 
     function ConnectionMatrix(config::Dict{String,Any})
         if !haskey(config, "connections")
@@ -15,19 +15,19 @@ Base.@kwdef mutable struct ConnectionMatrix
         input_order = [String(u) for u in config["connections"]["input_order"]]
         output_order = [String(u) for u in config["connections"]["output_order"]]
 
-        storage_loading = nothing
-        if haskey(config["connections"], "storage_loading")
-            storage_loading = []
-            for row in config["connections"]["storage_loading"]
+        energy_flow = nothing
+        if haskey(config["connections"], "energy_flow")
+            energy_flow = []
+            for row in config["connections"]["energy_flow"]
                 vec = [Bool(v) for v in row]
-                push!(storage_loading, vec)
+                push!(energy_flow, vec)
             end
         end
 
         return new(
             input_order,
             output_order,
-            storage_loading,
+            energy_flow,
         )
     end
 end
@@ -179,8 +179,8 @@ Returns:
 """
 function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)::Bool
     return (
-        unit.connectivity.storage_loading === nothing ||
-        unit.connectivity.storage_loading[input_idx][output_idx]
+        unit.connectivity.energy_flow === nothing ||
+        unit.connectivity.energy_flow[input_idx][output_idx]
     )
 end
 

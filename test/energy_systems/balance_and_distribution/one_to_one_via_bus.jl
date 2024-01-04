@@ -34,7 +34,7 @@ function test_one_to_one_via_bus()
                 "output_order" => [
                     "TST_DEM_01",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1],
                 ],
             ),

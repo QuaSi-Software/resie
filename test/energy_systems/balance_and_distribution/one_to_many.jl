@@ -44,7 +44,7 @@ function test_many_to_one()
                     "TST_DEM_01",
                     "TST_DEM_02",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 1],
                 ],
             ),
