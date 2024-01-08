@@ -336,7 +336,8 @@ create a line plot with data and label. user_input is dict from input file
 function create_profile_line_plots(
     outputs_plot_data::Matrix{Float64},
     outputs_plot_keys::Vector{EnergySystems.OutputKey},
-    project_config::Dict{AbstractString, Any}
+    project_config::Dict{AbstractString, Any},
+    sim_params::Dict{String, Any}
 )
     plot_all = project_config["io_settings"]["output_plot"] == "all"
     
@@ -393,7 +394,7 @@ function create_profile_line_plots(
         push!(traces, trace)
     end
 
-    layout = Layout(title_text="Plot of outputs as defined in the input-file",
+    layout = Layout(title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within the current time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
         xaxis_title_text="Time [hour]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))

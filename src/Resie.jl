@@ -124,7 +124,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 
     ### create profile line plot
     if do_create_plot
-        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
+        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config, sim_params)
         @info "Line plot created and saved to .output/output_plot.html"
 
     end
