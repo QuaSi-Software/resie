@@ -1,5 +1,5 @@
 # this file contains functionality for writing output of the simulation to files.
-
+using Dates
 
 """
 get_output_keys(config[io_settings], components)
@@ -377,14 +377,29 @@ function create_profile_line_plots(
     end
 
     # create plot
-    x = outputs_plot_data[:, 1]
+    if project_config["io_settings"]["output_plot_time_unit"] == "seconds"
+        x = outputs_plot_data[:, 1]
+    elseif project_config["io_settings"]["output_plot_time_unit"] == "minutes"
+        x = outputs_plot_data[:, 1] / 60
+    elseif  project_config["io_settings"]["output_plot_time_unit"] == "hours"
+        x = outputs_plot_data[:, 1] / 60 / 60
+    elseif  project_config["io_settings"]["output_plot_time_unit"] == "date"
+        if sim_params["start_date"] === nothing
+            start_date = Dates.DateTime("2015/1/1 00:00:00","yyyy/m/d HH:MM:SS")
+            @info ("Date of first data point in ouput line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
+        else
+            start_date = Dates.DateTime(year(sim_params["start_date"]), 1, 1, 0, 0 ,0)
+        end
+        x = [start_date + Dates.Second(s) for s in outputs_plot_data[:, 1]]
+    end
+    
     y = outputs_plot_data[:, 2:end]
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
-            trace = scatter(x=x / 60 / 60, y=y[:, i], mode="lines", name=labels[i])            
+            trace = scatter(x=x, y=y[:, i], mode="lines", name=labels[i])            
         else
-            trace = scatter(x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+            trace = scatter(x=x, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
             if axis[i] == "right"
                 trace.yaxis = "y2"
             else  # default is left axis
@@ -395,7 +410,7 @@ function create_profile_line_plots(
     end
 
     layout = Layout(title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within the current time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
-        xaxis_title_text="Time [hour]",
+        xaxis_title_text="Time [$(project_config["io_settings"]["output_plot_time_unit"])]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))
 

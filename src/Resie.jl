@@ -37,13 +37,14 @@ nothing.
 """
 function run_simulation(project_config::Dict{AbstractString,Any})
     # get time steps from input file
-    time_step, start_timestamp, end_timestamp = get_timesteps(project_config["simulation_parameters"])  
+    time_step, start_timestamp, end_timestamp, start_date = get_timesteps(project_config["simulation_parameters"])  
     nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
 
     sim_params = Dict{String,Any}(
         "time" => start_timestamp,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
+        "start_date" => start_date,
         "epsilon" => 1e-9
     )
     EnergySystems.set_timestep(sim_params["time_step_seconds"])

@@ -802,24 +802,44 @@ Function to read in the time step information from the input file.
 If no information is given in the input file, the following defaults 
 will be set:
 time_step = 900 s
-start_timestamp = 0 s
-end_timestamp = 900 s
 """
 function get_timesteps(simulation_parameters::Dict{String, Any})
-    time_step = 900
-    if "time_step_seconds" in keys(simulation_parameters)
-        time_step = UInt(simulation_parameters["time_step_seconds"])
+    start_date = nothing
+
+    if simulation_parameters["start_end_unit"] == "seconds"
+        start_timestamp = simulation_parameters["start"]
+        end_timestamp = simulation_parameters["end"]
+    elseif simulation_parameters["start_end_unit"] == "hours"
+        start_timestamp = simulation_parameters["start"] * 60 * 60
+        end_timestamp = simulation_parameters["end"] * 60 * 60
+    else
+        try
+            start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
+            end_timestamp_input = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
+
+            start_of_year = Dates.DateTime(year(start_date), 1, 1, 0, 0 ,0)
+            start_timestamp = Dates.value(Second(start_date - start_of_year))
+            end_timestamp = Dates.value(Second(end_timestamp_input - start_of_year))
+
+        catch e
+            @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
+                   "'start_end_unit' has to be 'seconds', 'hours' or a specific daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
+                   "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
+                   "The following error occured: $e")
+            exit()  
+        end
     end
 
-    start_timestamp = 0
-    if "start" in keys(simulation_parameters)
-        start_timestamp = Integer(simulation_parameters["start"])
+    if simulation_parameters["time_step_unit"] == "seconds"
+        time_step = simulation_parameters["time_step"]
+    elseif simulation_parameters["time_step_unit"] == "minutes"
+        time_step = simulation_parameters["time_step"] * 60
+    elseif simulation_parameters["time_step_unit"] == "hours"
+        time_step = simulation_parameters["time_step"] * 60 * 60
+    else
+        time_step = 900
+        @info("The simulation time step is set to 900 s as default, as it could not be found in the input file (`time_step` and `time_step_unit` has to be given!).")
     end
 
-    end_timestamp = 900
-    if "end" in keys(simulation_parameters)
-        end_timestamp = Integer(simulation_parameters["end"])
-    end
-
-    return time_step, start_timestamp, end_timestamp
+    return UInt(time_step), Int64(start_timestamp), Int64(end_timestamp), start_date
 end
