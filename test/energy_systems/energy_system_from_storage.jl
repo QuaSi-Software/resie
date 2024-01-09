@@ -113,7 +113,7 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -800/3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800*2/3
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === 35.0
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -165,7 +165,7 @@ function test_run_energy_system_from_storage()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(100*3/2)/3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -100
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === 35.0
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature === nothing
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)

@@ -364,15 +364,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         unit.cop = heat_out / el_in
     end
 
-    # calculate mixed temperature for heat input, as interfaces do not support vectorized
-    # energy balances (yet)
-    mixed_temperature = 0.0
-    for (layer_idx, layer_heat_in) in pairs(energies[3])
-        mixed_temperature += energies[4][layer_idx] * (layer_heat_in / heat_in)
-    end
-
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, mixed_temperature)
+    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, nothing)
     add!(unit.output_interfaces[unit.m_heat_out], heat_out, energies[6])
 end
 
