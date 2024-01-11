@@ -184,6 +184,14 @@ function calculate_energies(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
+    # check operational strategy, specifically storage_driven
+    if (
+        unit.controller.strategy == "storage_driven"
+        && unit.controller.state_machine.state != 2
+    )
+        return (false, nothing, nothing, nothing)
+    end
+
     # get usage fraction of external profile (normalized from 0 to 1)
     max_usage_fraction = (
         unit.controller.parameter["operation_profile_path"] === nothing
