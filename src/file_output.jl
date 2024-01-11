@@ -466,7 +466,7 @@ function create_sankey(
         color_map = Dict(zip(unique_medium_labels, colors))
         colors_for_medium = map(x -> color_map[x], medium_labels)
     else # account for cases with only one medium in the system topology
-        colors_for_medium = get(ColorSchemes.roma, 0.5)
+        colors_for_medium = [get(ColorSchemes.roma, 0.5)]
     end
 
     do_hide_real_demands = true
