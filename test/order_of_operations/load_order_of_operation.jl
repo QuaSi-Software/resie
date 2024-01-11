@@ -48,7 +48,7 @@ function load_order_of_operation()
                 "name" => "demand_driven"
             ),
             "power_th" => 9000,
-            "fixed_cop" => 3.0,
+            "constant_cop" => 3.0,
             "min_power_fraction" => 0.0
         )  
     )

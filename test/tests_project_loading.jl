@@ -25,7 +25,7 @@ function test_load_from_dict()
                 "low_threshold" => 0.1
             ),
             "power_th" => 20000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         ),
     )
     simulation_params = Dict{String,Any}(
@@ -66,7 +66,7 @@ function test_load_custom_medium_categories()
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",
             "power_th" => 12000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         )
     )
     simulation_params = Dict{String,Any}(

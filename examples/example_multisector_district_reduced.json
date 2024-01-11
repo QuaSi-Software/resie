@@ -340,7 +340,7 @@
                 "load_storages": false
             },
             "power_th": 550000,
-            "fixed_cop": 3.0,
+            "constant_cop": 3.0,
             "min_power_fraction": 0.2
         },
         "TST_HTP_02": {
@@ -353,7 +353,7 @@
                 "name": "demand_driven"
             },
             "power_th": 330000,
-            "fixed_cop": 3.5
+            "constant_cop": 3.5
         }
     }
 }

@@ -40,7 +40,7 @@ function test_ooo_for_heat_pumps_wrong()
                 "name" => "demand_driven",
             ),
             "power_th" => 12000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         ),
     )
 

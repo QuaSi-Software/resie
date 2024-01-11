@@ -94,7 +94,7 @@ function test_base_order()
                 "low_threshold" => 0.1
             ),
             "power_th" => 20000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         ),
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",

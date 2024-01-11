@@ -25,7 +25,7 @@ function setup_control_tests()
                 "low_threshold" => 0.2
             ),
             "power_th" => 20000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         ),
     )
 

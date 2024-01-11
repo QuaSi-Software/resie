@@ -66,7 +66,7 @@ function test_multiple_transformer_with_limitations()
                 "name" => "demand_driven",
             ),
             "power_th" => 2240,
-            "fixed_cop" => 3.5,
+            "constant_cop" => 3.5,
             "min_power_fraction" => 0.0
         ),
     )

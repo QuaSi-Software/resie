@@ -225,7 +225,7 @@ function test_find_chains()
             "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
             "power_th" => 12000,
-            "fixed_cop" => 3.0
+            "constant_cop" => 3.0
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

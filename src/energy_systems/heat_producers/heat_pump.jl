@@ -20,7 +20,7 @@ mutable struct HeatPump <: Component
     power_th::Float64
     min_power_fraction::Float64
     min_run_time::UInt
-    fixed_cop::Any
+    constant_cop::Any
     output_temperature::Temperature
     input_temperature::Temperature
     cop::Float64
@@ -52,7 +52,7 @@ mutable struct HeatPump <: Component
             config["power_th"], # power_th
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 0),
-            default(config, "fixed_cop", nothing),
+            default(config, "constant_cop", nothing),
             default(config, "output_temperature", nothing),
             default(config, "input_temperature", nothing),
             0.0, # cop
@@ -262,10 +262,10 @@ function calculate_energies(
             continue
         end
 
-        # a fixed COP has priority. if it's not given the dynamic cop requires temperatures
-        cop = unit.fixed_cop === nothing ?
+        # a constant COP has priority. if it's not given the dynamic cop requires temperatures
+        cop = unit.constant_cop === nothing ?
               dynamic_cop(in_temps[idx_layer], out_temp) :
-              unit.fixed_cop
+              unit.constant_cop
         if cop === nothing
             throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
         end

@@ -10,6 +10,7 @@ As per the definition of semantic versioning and the reality of early developmen
   * Load --> Demand                     in output channel of FixedSink
   * static_load --> constant_demand     for parameters of sinks
   * static_* --> constant_*             for parameters where * in (power, temperature, demand, supply)
+  * fixed_cop --> constant_cop          for HeatPump
   * draw sum --> output_sum             in output channel of GridConnection
   * load sum --> input_sum              in output channel of GridConnection
   * power --> power_*                   for parameters of all transformers, where * in (el, th)
