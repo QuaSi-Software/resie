@@ -164,7 +164,7 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
         )
-        potential_energy_heat_out = balance(exchanges)
+        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
         potential_storage_heat_out = storage_potential(exchanges)
         temperature = temperature_highest(exchanges)
         if (
