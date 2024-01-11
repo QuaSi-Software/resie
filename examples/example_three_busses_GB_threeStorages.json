@@ -133,18 +133,13 @@
                 "name": "demand_driven"
             },
             "min_power_fraction": 0,
-            "power": 1500
+            "power_th": 1500
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "ESS_BUS_TH_03",
-                "ESS_BUS_TH_02",
-                "TST_BFT_TH_03"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_GBO_01",
                     "TST_BFT_TH_03"
@@ -154,7 +149,7 @@
                     "ESS_BUS_TH_02",
                     "TST_BFT_TH_03"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1, 1],
                     [1, 1, 0]
                 ]
@@ -164,11 +159,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_01",
-                "TST_BFT_TH_01"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_01"
@@ -177,7 +168,7 @@
                     "TST_DEM_01",
                     "TST_BFT_TH_01"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]
@@ -187,11 +178,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_02",
-                "TST_BFT_TH_02"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_02"
@@ -200,7 +187,7 @@
                     "TST_DEM_02",
                     "TST_BFT_TH_02"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]

@@ -26,14 +26,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -48,8 +47,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"
@@ -90,11 +88,17 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
-            "static_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -102,12 +106,6 @@ function test_extended_storage_control_strategy_allow_loading_by_storage()
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # Gasboiler IS NOT allowed to load storages, but storage_1 IS allowed to load storage_2.
     # As result the gasboilder should be provide max energy, the rest of the demand should be 
@@ -179,14 +177,13 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -201,8 +198,7 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"
@@ -242,11 +238,17 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
-            "static_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -254,12 +256,6 @@ function test_extended_storage_control_strategy_deny_loading_by_storage()
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # Gasboiler IS NOT allowed to load storages, storage_1 IS NOT allowed to load storage_2.
     # As result the gasboilder should be provide max energy, the rest of the demand should be 
@@ -330,14 +326,13 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01"
@@ -352,8 +347,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                     "TST_BFT_02"
@@ -398,11 +392,17 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "static_load" => 5000,
-            "static_temperature" => 60
+            "constant_demand" => 20000
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
@@ -410,12 +410,6 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     storage_1 = components["TST_BFT_01"]
     storage_2 = components["TST_BFT_02"]
     boiler = components["TST_GBO_01"]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
 
     # timestep 1:
     # Gasboiler IS  allowed to load storages, and storage_1 IS allowed to load storage_2.
@@ -484,7 +478,7 @@ function test_extended_storage_control_strategy_allow_loading_by_storage_and_gas
     EnergySystems.reset(boiler)
     EnergySystems.reset(demand)
 
-    demand.static_load = 2000
+    demand.constant_demand = 8000
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(bus_2, components, simulation_parameters)

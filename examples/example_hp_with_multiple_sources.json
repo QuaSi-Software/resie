@@ -1,0 +1,234 @@
+{
+    "io_settings": {
+        "output_file": "./output/out.csv",
+        "dump_info": true,
+        "dump_info_file": "./output/info_dump.md",
+        "output_keys": {
+			"TST_HP_01": [
+                "m_h_w_lt1 IN",
+                "m_h_w_ht1 OUT",
+                "m_e_ac_230v IN",
+                "COP"
+            ],
+            "TST_DEM_01": ["Temperature"],
+            "TST_SRC_01": ["Temperature", "Max_Energy"]
+        },
+        "output_plot": {
+            "1": {
+                "key": {"TST_SRC_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_SRC_02": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_BFT_TH_01": ["m_h_w_lt1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_BFT_TH_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_BFT_TH_02": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"TST_BFT_TH_02": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "8": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "9": {
+                "key": {"TST_BFT_TH_01": ["Load%"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1.0
+            },
+            "10": {
+                "key": {"TST_BFT_TH_02": ["Load%"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1.0
+            },
+            "11": {
+                "key": {"TST_DEM_01": ["m_h_w_lt1 IN"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "12": {
+                "key": {"TST_DEM_02": ["m_h_w_ht1 IN"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "13": {
+                "key": {"TST_HP_01": ["COP"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1.0
+            }
+        }
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 86400,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "constant_temperature": 40,
+            "scale": 1500
+        },
+        "TST_DEM_02": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "constant_temperature": 85,
+            "scale": 1500
+        },
+        "TST_SRC_01": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "constant_temperature": 40,
+            "scale": 1000
+        },
+        "TST_SRC_02": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
+            "constant_temperature": 20,
+            "scale": 2000
+        },
+        "TST_BFT_TH_01": {
+            "type": "BufferTank",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "capacity": 150000,
+            "load": 70000,
+            "high_temperature": 40.0,
+            "low_temperature": 25.0,
+            "use_adaptive_temperature": true
+        },
+        "TST_BFT_TH_02": {
+            "type": "BufferTank",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_02"
+            ],
+            "capacity": 150000,
+            "load": 70000,
+            "high_temperature": 85.0,
+            "low_temperature": 50.0,
+            "use_adaptive_temperature": false
+        },
+        "TST_BUS_TH_01": {
+            "type": "Bus",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_SRC_01",
+                    "TST_SRC_02",
+                    "TST_BFT_TH_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_HP_01",
+                    "TST_BFT_TH_01"
+                ],
+                "energy_flow": [
+                    [1, 1, 1],
+                    [1, 1, 0],
+                    [1, 1, 0]
+                ]
+            }
+        },
+        "TST_BUS_TH_02": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_HP_01",
+                    "TST_BFT_TH_02"
+                ],
+                "output_order": [
+                    "TST_DEM_02",
+                    "TST_BFT_TH_02"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 0]
+                ]
+            }
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "control_refs": [
+                "TST_DEM_02"
+            ],
+            "output_refs": [
+                "TST_BUS_TH_02"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 9000,
+            "min_power_fraction": 0.0
+        }
+    }
+}

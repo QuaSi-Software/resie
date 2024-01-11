@@ -37,11 +37,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_01_HZG_01_DEM",
-                "TST_01_HZG_01_BFT"
-            ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_HZG_01_CHP",
                     "TST_01_HZG_01_HTP",
@@ -57,13 +53,7 @@ function test_base_order()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_01_ELT_01_DEM",
-                "TST_01_HZG_01_HTP",
-                "TST_01_ELT_01_BAT",
-                "TST_01_ELT_01_GRO"
-            ],
-            "connection_matrix" => Dict{String,Any}(
+            "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELT_01_PVP",
                     "TST_01_HZG_01_CHP",
@@ -90,7 +80,7 @@ function test_base_order()
                 "high_threshold" => 0.9,
                 "low_threshold" => 0.2
             ),
-            "power" => 12500
+            "power_gas" => 12500
         ),
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -103,8 +93,8 @@ function test_base_order()
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
             ),
-            "power" => 20000,
-            "fixed_cop" => 3.0
+            "power_th" => 20000,
+            "constant_cop" => 3.0
         ),
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -214,7 +204,13 @@ function test_base_order()
         [1258, ("TST_01_HZG_01_BUS", EnergySystems.s_distribute)],
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+    
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     steps = Resie.base_order(by_function)
     @test pwc_steps_astr(expected, steps) == ""

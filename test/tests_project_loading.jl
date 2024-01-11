@@ -24,16 +24,20 @@ function test_load_from_dict()
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
             ),
-            "power" => 20000,
-            "fixed_cop" => 3.0
+            "power_th" => 20000,
+            "constant_cop" => 3.0
         ),
     )
-
-    components = Resie.load_components(components_config)
+    simulation_params = Dict{String,Any}(
+        "time" => 0,
+        "time_step_seconds" => 900,
+        "epsilon" => 1e-9
+    )
+    components = Resie.load_components(components_config, simulation_params)
     @test length(keys(components)) == 2
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
     @test components["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
-    @test components["TST_HP_01"].power == 20000
+    @test components["TST_HP_01"].power_th == 20000
 end
 
 function test_load_custom_medium_categories()
@@ -42,7 +46,7 @@ function test_load_custom_medium_categories()
             "type" => "Electrolyser",
             "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
-            "power" => 1000,
+            "power_el" => 1000,
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_out" => "m_h_w_55c",
             "m_h2_out" => "m_c_g_h2-pure",
@@ -61,11 +65,16 @@ function test_load_custom_medium_categories()
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",
-            "power" => 12000,
-            "fixed_cop" => 3.0
+            "power_th" => 12000,
+            "constant_cop" => 3.0
         )
     )
-    components = Resie.load_components(components_config)
+    simulation_params = Dict{String,Any}(
+        "time" => 0,
+        "time_step_seconds" => 900,
+        "epsilon" => 1e-9
+    )
+    components = Resie.load_components(components_config, simulation_params)
     electrolyser = components["TST_ELY_01"]
     heat_pump = components["TST_HP_01"]
 
@@ -98,11 +107,13 @@ end
     end
 
     include("initialization/bus.jl")
-
+    include("initialization/profiles.jl")
+    
     include("order_of_operations/base_order.jl")
     include("order_of_operations/load_order_of_operation.jl")
     include("order_of_operations/bus_output_priorities.jl")
     include("order_of_operations/bus_to_bus.jl")
+    include("order_of_operations/one_bus_to_many_with_storage.jl")
     include("order_of_operations/heat_pumps_wrong.jl")
     include("order_of_operations/reorderings.jl")
     include("order_of_operations/storage_loading_switch.jl")

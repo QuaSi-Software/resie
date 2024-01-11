@@ -17,7 +17,8 @@ Resie is released under the MIT license. You can find a copy of the license in f
 1. Start the julia REPL with `julia`
 1. Switch to the package REPL with `]` (no enter necessary)
 1. Activate the project environment: `activate .`
-1. Add required packages: `add ColorSchemes Debugger Infiltrator JSON PlotlyJS ResumableFunctions Test`
+1. Add required packages: `add ColorSchemes Colors Dates Interpolations JSON Logging PlotlyJS`
+1. (Optional) For development of ReSiE, some additional packages are necessary: `add Debugger Test`
 1. Exit out of the package REPL with shortcut `Ctrl+c`
 1. Exit out of the julia REPL with `exit()`
 

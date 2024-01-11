@@ -17,15 +17,16 @@ Base.@kwdef mutable struct Battery <: Component
 
     capacity::Float64
     load::Float64
+    losses::Float64
 
-    function Battery(uac::String, config::Dict{String,Any})
+    function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -36,7 +37,8 @@ Base.@kwdef mutable struct Battery <: Component
             ),
             medium,
             config["capacity"], # capacity
-            config["load"] # load
+            config["load"], # load
+            0.0  # losses
         )
     end
 end
@@ -44,38 +46,38 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::Battery
-)::NamedTuple{}
+)::Vector{EnergyExchange}
+    caller_is_input = unit.uac == interface.target.uac
 
-    caller_is_input = unit.uac == interface.target.uac ? true : false
-    # ==true if interface is input of unit (caller puts energy in unit); 
-    # ==false if interface is output of unit (caller gets energy from unit)
-
-    return (
-            balance = interface.balance,
-            storage_potential = caller_is_input ? -(unit.capacity-unit.load) : unit.load,
-            energy_potential = 0.0,
-            temperature = interface.temperature
-            )
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=0.0,
+        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
-function process(unit::Battery, parameters::Dict{String,Any})
+function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 2
         return
     end
 
     outface = unit.output_interfaces[unit.medium]
-    exchange = balance_on(outface, outface.target)
+    exchanges = balance_on(outface, outface.target)
 
     if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
+        energy_demand = balance(exchanges)
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
+            energy_demand = balance(exchanges) + storage_potential(exchanges)
         else
-            energy_demand = exchange.balance
+            energy_demand = balance(exchanges)
         end
     else
-        energy_demand = exchange.balance
+        energy_demand = balance(exchanges)
     end
 
     if energy_demand >= 0.0
@@ -91,14 +93,14 @@ function process(unit::Battery, parameters::Dict{String,Any})
     end
 end
 
-function load(unit::Battery, parameters::Dict{String,Any})
+function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 1
         return
     end
 
     inface = unit.input_interfaces[unit.medium]
-    exchange = balance_on(inface, inface.source)
-    energy_available = exchange.balance
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges)
 
     if energy_available <= 0.0
         return # load is only concerned with receiving energy from the target
@@ -119,7 +121,8 @@ function output_values(unit::Battery)::Vector{String}
             string(unit.medium)*" OUT",
             "Load",
             "Load%",
-            "Capacity"]
+            "Capacity",
+            "Losses"]
 end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
@@ -133,6 +136,8 @@ function output_value(unit::Battery, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

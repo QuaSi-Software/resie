@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest_temperature
+    highest
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -231,11 +231,11 @@ function add!(
 
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature < temperature
-            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
+            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
         elseif interface.temperature !== nothing && interface.temperature > temperature
-            println("Warning: Temperature in interface is higher than delivered temperature on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
+            @warn ("Temperature in interface is higher than delivered temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -256,11 +256,11 @@ function sub!(
 
     if temperature !== nothing
         if interface.temperature !== nothing && interface.temperature < temperature
-            println("Warning: Temperature in interface is lower than requested temperature on interface $(interface.source.uac)"
-                    * " -> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
+            @warn ("Temperature in interface is lower than requested temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
         elseif interface.temperature !== nothing && interface.temperature > temperature
-            println("Warning: Temperatures are chilled on interface $(interface.source.uac)"
-            * " -> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
+            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
         end
         interface.temperature = temperature
     end
@@ -307,14 +307,17 @@ end
 
 
 """
-    highest_temperature(temperature_1, temperature_2)::Temperature
+    highest(temperature_1, temperature_2)::Temperature
 
-Returns the highest temperature::Temperature and handles nothing-values:
+Returns the highest temperature of the two inputs and handles nothing-values:
 - If both of the inputs are floats, the maximum will be returned.
 - If one of the inputs is nothing and one a float, the float will be returned.
 - If both of the inputs are nothing, nothing will be returned.
 """
-function highest_temperature(temperature_1, temperature_2)::Temperature
+function highest(
+    temperature_1::Temperature,
+    temperature_2::Temperature
+)::Temperature
     if temperature_1 !== nothing && temperature_2 !== nothing
         return max(temperature_1, temperature_2)
     elseif temperature_1 === nothing && temperature_2 !== nothing
@@ -332,6 +335,125 @@ whole energy system has been loaded, it maps a medium category to either nothing
 components are linked) or a SystemInterface instance.
 """
 const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
+
+"""
+Contains the data on the energy exchance (and related information) on an interface.
+"""
+Base.@kwdef mutable struct EnergyExchange
+    balance::Float64
+    uac::String
+    energy_potential::Float64
+    storage_potential::Float64
+    temperature::Temperature
+    pressure::Union{Nothing,Float64}
+    voltage::Union{Nothing,Float64}
+end
+
+"""
+Convenience alias to EnergyExchange.
+"""
+const EnEx = EnergyExchange
+
+"""
+    balance(exchanges)
+
+Sum of balances over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of balances
+"""
+function balance(entries::Vector{EnergyExchange})::Float64
+    return sum(e.balance for e in entries; init=0.0)
+end
+
+"""
+    energy_potential(exchanges)
+
+Sum of energy potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of energy potentials
+"""
+function energy_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.energy_potential for e in entries; init=0.0)
+end
+
+"""
+    storage_potential(exchanges)
+
+Sum of storage potentials over the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges to sum over
+Returns:
+    `Float64`: Sum of storage potentials
+"""
+function storage_potential(entries::Vector{EnergyExchange})::Float64
+    return sum(e.storage_potential for e in entries; init=0.0)
+end
+
+"""
+    temperature_first(exchanges)
+
+First not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
+function temperature_first(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature for e in entries if e.temperature !== nothing]
+    return length(temps) > 0 ? first(temps) : nothing
+end
+
+"""
+    temperature_highest(exchanges)
+
+Highest not-nothing temperature of the given list of energy exchanges. If no not-nothing
+temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing temperature found or nothing if no such exists
+"""
+function temperature_highest(entries::Vector{EnergyExchange})::Temperature
+    return maximum(e.temperature for e in entries if e.temperature !== nothing)
+end
+
+"""
+    temperature_all(exchanges)
+
+A list of all temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A list of temperatures
+"""
+function temperature_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries]
+end
+
+"""
+    temperature_all_non_empty(exchanges)
+
+A list of all not-nothing temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A (possibly empty) list of not-nothing temperatures
+"""
+function temperature_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature for e in entries if e.temperature !== nothing]
+end
 
 """
     balance_on(interface, unit)
@@ -355,18 +477,19 @@ without having to check if its connected to a Bus or directly to a component.
 - "energy_potential"::Float64:  The maximum enery an interface can provide or consume
 - "temperature"::Temperature:   The temperature of the interface
 """
-function balance_on(
-    interface::SystemInterface,
-    unit::Component
-)::NamedTuple{}
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
+function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
-    return (
-            balance = interface.balance,
-            storage_potential = 0.0,
-            energy_potential = balance_written ? 0.0 : input_sign * interface.max_energy,
-            temperature = interface.temperature
-            )
+    input_sign = unit.uac == interface.target.uac ? -1 : +1
+
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
+        storage_potential=0.0,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 """
@@ -402,8 +525,9 @@ end
 
 Reset the given component back to zero.
 
-For most components this only resets the balances on the system interfaces but some
-components might require more complex reset handling.
+For most components this only resets the losses and the balances on the system interfaces,
+but some components might require more complex reset handling like for electrolysers due to
+several different losses present.
 """
 function reset(unit::Component)
     for inface in values(unit.input_interfaces)
@@ -416,60 +540,63 @@ function reset(unit::Component)
             reset!(outface)
         end
     end
+    if hasfield(typeof(unit), Symbol("losses"))
+        unit.losses = 0.0
+    end
 end
 
 """
-    control(unit, components, parameters)
+    control(unit, components, sim_params)
 
 Perform the control calculations for the given component.
 
 # Arguments
 - `unit::Component`: The component for which control is handled
 - `components::Grouping`: A reference dict to all components in the project
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function control(
     unit::Component,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 end
 
 """
-    potential(unit, parameters)
+    potential(unit, sim_params)
 
 Calculate potential energy processing for the given component.
 
 # Arguments
 - `unit::Component`: The component for which potentials are calculated
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function potential(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    process(unit, parameters)
+    process(unit, sim_params)
 
 Perform the processing calculations for the given component.
 
 # Arguments
 - `unit::Component`: The component that is processed
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function process(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
 
 """
-    load(unit, parameters)
+    load(unit, sim_params)
 
 Load excess energy into storage components.
 
@@ -477,11 +604,11 @@ For non-storage components this function does nothing.
 
 # Arguments
 - `unit::Component`: The storage loading excess energy
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 """
 function load(
     unit::Component,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # default implementation is to do nothing
 end
@@ -526,7 +653,7 @@ the requested energy is returned. Comparing this to the bahaviour of busses, thi
 be non-intuitive.
 """
 function calculate_energy_flow(interface::SystemInterface)::Float64
-    return (interface.sum_abs_change - interface.balance) / 2
+    return (interface.sum_abs_change + interface.balance) / 2
 end
 
 """
@@ -568,6 +695,7 @@ include("general/fixed_sink.jl")
 include("general/fixed_supply.jl")
 include("general/bounded_supply.jl")
 include("general/bounded_sink.jl")
+include("general/storage.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
 include("storage/battery.jl")
@@ -669,7 +797,7 @@ function check_balances(
 end
 
 """
-    perform_steps(components, order_of_operations, parameters)
+    perform_steps(components, order_of_operations, sim_params)
 
 Perform the simulation steps of one time step for the given components in the given order.
 
@@ -681,7 +809,7 @@ Perform the simulation steps of one time step for the given components in the gi
     elsewhere, as this function only goes through and calls the appropriate functions. The
     first item of each entry must be the key of the component for which the following steps
     are performed.
-- `parameters::Dict{String, Any}`: Project-wide parameters
+- `sim_params::Dict{String, Any}`: Project-wide simulation parameters
 
 # Examples
 ```
@@ -694,8 +822,8 @@ Perform the simulation steps of one time step for the given components in the gi
         ["component_b", EnergySystems.s_control, EnergySystems.s_process]
         ["component_a", EnergySystems.s_process]
     ]
-    parameters = Dict{String, Any}("time" => 0)
-    perform_steps(components, order, parameters)
+    sim_params = Dict{String, Any}("time" => 0)
+    perform_steps(components, order, sim_params)
 ```
 In this example the control of component A is performed first, then control and processing of
 component B and finally processing of component A.
@@ -703,7 +831,7 @@ component B and finally processing of component A.
 function perform_steps(
     components::Grouping,
     order_of_operations::StepInstructions,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     for entry in order_of_operations
         unit = components[entry[1]]
@@ -712,16 +840,92 @@ function perform_steps(
         if step == s_reset
             reset(unit)
         elseif step == s_control
-            control(unit, components, parameters)
+            control(unit, components, sim_params)
         elseif step == s_potential
-            potential(unit, parameters)
+            potential(unit, sim_params)
         elseif step == s_process
-            process(unit, parameters)
+            process(unit, sim_params)
         elseif step == s_load
-            load(unit, parameters)
+            load(unit, sim_params)
         elseif step == s_distribute
             distribute!(unit)
         end
+    end
+end
+
+"""
+get_temperature_profile_from_config(config, simulation_parameter, uac)
+
+Function to determine the source of the temperature profile for fixed and bouded sinks and sources.
+If no information is given, nothing will be returned.
+If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
+If a constant_temperature is set, this will be used.
+If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
+
+The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
+"""
+function get_temperature_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
+    # check input
+    if (    haskey(config, "temperature_profile_file_path") + 
+            haskey(config, "temperature_from_global_file") + 
+            haskey(config, "constant_temperature")
+            ) > 1
+        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
+    end
+
+    # determine temperature
+    if haskey(config,"temperature_profile_file_path")
+        @info "For '$uac', the temperature profile is taken from the user-defined .prf file."
+        return Profile(config["temperature_profile_file_path"], sim_params) 
+    elseif haskey(config, "constant_temperature") && config["constant_temperature"] isa Number
+        @info "For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set."
+        return nothing
+    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
+        if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])"                
+            return getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
+        else
+            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            exit()
+        end
+    else            
+        @info "For '$uac', no temperature is set."
+        return nothing
+    end
+end
+
+
+"""
+get_ambient_temperature_profile_from_config(config, simulation_parameter, uac)
+
+Function to determine the source of the ambient temperature profile for geothermal sources.
+If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
+If a constant_temperature is set, this will be used.
+If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
+
+The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
+"""
+function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
+    # check input
+    if (haskey(config, "ambient_temperature_profile_path") + haskey(config, "ambient_temperature_from_global_file")) > 1
+        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
+    end
+
+    # determine temperature
+    if haskey(config, "ambient_temperature_profile_path")
+        @info "For '$uac', the given ambient temperature profile is chosen."
+        return Profile(config["ambient_temperature_profile_path"], sim_params)
+    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
+        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
+            return getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
+        else
+            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            exit()
+        end
+    else
+        @error "No ambient temperature profile is given for '$uac'"
+        exit()
     end
 end
 

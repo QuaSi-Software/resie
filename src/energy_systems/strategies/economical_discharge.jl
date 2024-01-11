@@ -1,4 +1,4 @@
-function strt_sm_economical_discharge(parameters::Dict{String,Any})::StateMachine
+function strt_sm_economical_discharge(cond_params::Dict{String,Any})::StateMachine
     return StateMachine(
         UInt(1), # state
         Dict{UInt,String}( # state_names
@@ -11,13 +11,13 @@ function strt_sm_economical_discharge(parameters::Dict{String,Any})::StateMachin
                     Condition(
                         "Little PV power",
                         Dict{String,Any}(
-                            "threshold" => parameters["pv_threshold"]
+                            "threshold" => cond_params["pv_threshold"]
                         )
                     ),
                     Condition(
                         "Sufficient charge",
                         Dict{String,Any}(
-                            "threshold" => parameters["min_charge"]
+                            "threshold" => cond_params["min_charge"]
                         )
                     )
                 ],
@@ -32,13 +32,13 @@ function strt_sm_economical_discharge(parameters::Dict{String,Any})::StateMachin
                     Condition(
                         "Little PV power",
                         Dict{String,Any}(
-                            "threshold" => parameters["pv_threshold"]
+                            "threshold" => cond_params["pv_threshold"]
                         )
                     ),
                     Condition(
                         "Sufficient charge",
                         Dict{String,Any}(
-                            "threshold" => parameters["discharge_limit"]
+                            "threshold" => cond_params["discharge_limit"]
                         )
                     )
                 ],

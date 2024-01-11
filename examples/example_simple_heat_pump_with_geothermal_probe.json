@@ -80,7 +80,7 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
-            "static_temperature": 45,
+            "constant_temperature": 45,
             "scale": 100
         },
         "TST_STH_01": {
@@ -123,7 +123,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 9000,
+            "power_th": 9000,
             "min_power_fraction": 0.0
         }
     }

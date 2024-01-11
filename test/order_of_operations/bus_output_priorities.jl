@@ -22,14 +22,13 @@ function test_ooo_bus_output_priorities()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 10000
+            "power_th" => 10000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BUS_03"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                 ],
@@ -43,8 +42,7 @@ function test_ooo_bus_output_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                 ],
@@ -57,8 +55,7 @@ function test_ooo_bus_output_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                 ],
@@ -72,8 +69,8 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
-            "static_temperature" => 60,
+            "constant_demand" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
         "TST_DEM_02" => Dict{String,Any}(
@@ -81,8 +78,8 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
-            "static_temperature" => 60,
+            "constant_demand" => 1000,
+            "constant_temperature" => 60,
             "scale" => 1
         ),
     )
@@ -114,7 +111,13 @@ function test_ooo_bus_output_priorities()
         ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end

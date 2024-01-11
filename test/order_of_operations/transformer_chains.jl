@@ -9,40 +9,65 @@ function test_distance_from_sink()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BUS_03"],
+            "connections" => Dict{String,Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_02", "TST_BUS_03"]
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_04", "TST_BUS_05"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_BUS_04", "TST_BUS_05"]
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_06"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => ["TST_BUS_06"]
+            )
         ),
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_05"],
+                "output_order" => [],
+            )
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus) == 3
     @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus) == 2
@@ -62,40 +87,65 @@ function test_iteration_order()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BUS_03"],
+            "connections" => Dict{String,Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_02", "TST_BUS_03"]
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_04", "TST_BUS_05"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_BUS_04", "TST_BUS_05"]
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_06"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => ["TST_BUS_06"]
+            )
         ),
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_06"],
+                "output_order" => [],
+            )
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     chain = [
         components["TST_BUS_01"],
@@ -129,50 +179,71 @@ function test_find_chains()
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02"],
+            "connections" => Dict{String,Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_02"]
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "output_refs" => ["TST_HTP_01", "TST_DEM_01"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_HTP_01", "TST_DEM_01"]
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_04", "TST_BUS_05"],
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_HTP_01"],
+                "output_order" => ["TST_BUS_04", "TST_BUS_05"]
+            )
         ),
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
         "TST_HTP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
-            "power" => 12000,
-            "fixed_cop" => 3.0
+            "power_th" => 12000,
+            "constant_cop" => 3.0
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     expected_1 = Set([
         components["TST_BUS_01"],

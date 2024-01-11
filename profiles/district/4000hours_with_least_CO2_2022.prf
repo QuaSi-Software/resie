@@ -1,5 +1,5 @@
 # time_step;900
-# is_power;false
+# is_power;true
 0	;	1
 900	;	1
 1800	;	1

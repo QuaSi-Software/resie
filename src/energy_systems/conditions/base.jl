@@ -9,7 +9,7 @@ function load_condition_prototypes()
         ),
         function (condition, unit, simulation_parameters) # check_function
             return rel(condition, "buffer").load <
-                   condition.parameters["percentage"] * rel(condition, "buffer").capacity
+                   condition.cond_params["percentage"] * rel(condition, "buffer").capacity
         end
     )
 
@@ -23,7 +23,7 @@ function load_condition_prototypes()
         ),
         function (condition, unit, simulation_parameters) # check_function
             return rel(condition, "buffer").load >=
-                   condition.parameters["percentage"] * rel(condition, "buffer").capacity
+                   condition.cond_params["percentage"] * rel(condition, "buffer").capacity
         end
     )
 
@@ -35,18 +35,6 @@ function load_condition_prototypes()
             return unit.controller.state_machine.time_in_state *
                    simulation_parameters["time_step_seconds"] >=
                    unit.min_run_time
-        end
-    )
-
-    CONDITION_PROTOTYPES["Would overfill thermal buffer"] = ConditionPrototype(
-        "Would overfill thermal buffer", # name
-        Dict{String,Any}(), # parameters
-        EnSysRequirements( # required_components
-            "buffer" => (BufferTank, nothing)
-        ),
-        function (condition, unit, simulation_parameters) # check_function
-            return rel(condition, "buffer").capacity - rel(condition, "buffer").load <
-                   unit.power * unit.min_power_fraction
         end
     )
 
@@ -64,7 +52,7 @@ function load_condition_prototypes()
                     outface.sum_abs_change :
                     outface.sum_abs_change * 0.5
             ) <
-                   condition.parameters["threshold"] * rel(condition, "pv_plant").supply * 0.25
+                   condition.cond_params["threshold"] * rel(condition, "pv_plant").supply * 0.25
         end
     )
 
@@ -75,7 +63,7 @@ function load_condition_prototypes()
         ),
         EnSysRequirements(), # required_components
         function (condition, unit, simulation_parameters) # check_function
-            return unit.load >= condition.parameters["threshold"] * unit.capacity
+            return unit.load >= condition.cond_params["threshold"] * unit.capacity
         end
     )
 
