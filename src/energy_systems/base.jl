@@ -239,6 +239,20 @@ function add!(
         end
         interface.temperature = temperature
     end
+
+    if interface.source.sys_function == sf_bus
+        add_balance!(interface.source, interface.target, false, change)
+        set_temperatures!(
+            interface.source, interface.target, false,
+            interface.temperature, interface.temperature
+        )
+    elseif interface.target.sys_function == sf_bus
+        add_balance!(interface.target, interface.source, true, change)
+        set_temperatures!(
+            interface.target, interface.source, true,
+            interface.temperature, interface.temperature
+        )
+    end
 end
 
 """
@@ -264,6 +278,20 @@ function sub!(
         end
         interface.temperature = temperature
     end
+
+    if interface.source.sys_function == sf_bus
+        sub_balance!(interface.source, interface.target, false, change)
+        set_temperatures!(
+            interface.source, interface.target, false,
+            interface.temperature, interface.temperature
+        )
+    elseif interface.target.sys_function == sf_bus
+        sub_balance!(interface.target, interface.source, true, change)
+        set_temperatures!(
+            interface.target, interface.source, true,
+            interface.temperature, interface.temperature
+        )
+    end
 end
 
 """
@@ -286,6 +314,18 @@ function set_temperature!(
     temperature::Temperature=nothing
 )
     interface.temperature = temperature
+
+    if interface.source.sys_function == sf_bus
+        set_temperatures!(
+            interface.source, interface.target, false,
+            temperature, temperature
+        )
+    elseif interface.target.sys_function == sf_bus
+        set_temperatures!(
+            interface.target, interface.source, true,
+            temperature, temperature
+        )
+    end
 end
 
 """
@@ -298,6 +338,12 @@ function set_max_energy!(
     value::Union{Nothing,Float64}
 )
     interface.max_energy = value
+
+    if interface.source.sys_function == sf_bus
+        set_max_energy!(interface.source, interface.target, false, value)
+    elseif interface.target.sys_function == sf_bus
+        set_max_energy!(interface.target, interface.source, true, value)
+    end
 end
 
 """

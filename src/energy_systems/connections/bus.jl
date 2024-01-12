@@ -184,6 +184,24 @@ function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integ
     )
 end
 
+function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+end
+
+function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+end
+
+function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+end
+
+function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+end
+
+function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+end
+
+function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Float64, value_max::Float64)
+end
+
 function balance_on(
     interface::SystemInterface,
     unit::Bus
