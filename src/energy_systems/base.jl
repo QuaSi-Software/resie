@@ -281,6 +281,13 @@ function set!(
     interface.temperature = temperature
 end
 
+function set_temperature!(
+    interface::SystemInterface,
+    temperature::Temperature=nothing
+)
+    interface.temperature = temperature
+end
+
 """
     set_max_energy!(interface, value)
 

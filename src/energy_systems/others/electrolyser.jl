@@ -72,7 +72,7 @@ function control(
 )
     move_state(unit, components, sim_params)
     if unit.output_interfaces[unit.m_heat_out].temperature === nothing
-        unit.output_interfaces[unit.m_heat_out].temperature = unit.output_temperature
+        set_temperature!(unit.output_interfaces[unit.m_heat_out], unit.output_temperature)
     end
 end
 

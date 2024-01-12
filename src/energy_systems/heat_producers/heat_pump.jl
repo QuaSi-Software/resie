@@ -70,14 +70,14 @@ function control(
 
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest(
+    set_temperature!(unit.output_interfaces[unit.m_heat_out], highest(
         unit.output_temperature,
         unit.output_interfaces[unit.m_heat_out].temperature
-    )
-    unit.input_interfaces[unit.m_heat_in].temperature = highest(
+    ))
+    set_temperature!(unit.input_interfaces[unit.m_heat_in], highest(
         unit.input_temperature,
         unit.input_interfaces[unit.m_heat_in].temperature
-    )
+    ))
 end
 
 function set_max_energies!(
