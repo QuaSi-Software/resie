@@ -579,6 +579,19 @@ function balance(unit::Component)::Float64
 end
 
 """
+    initialise!(unit)
+
+Perform steps to initialise the component in addition to the constructor.
+
+# Arguments
+- `unit::Component`: The component to initialise
+- `sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function initialise!(unit::Component, sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+end
+
+"""
     reset(unit)
 
 Reset the given component back to zero.

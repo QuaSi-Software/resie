@@ -91,6 +91,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         )
     end
 
+    # initialisation before the main loop
+    for component in values(components)
+        initialise!(component, sim_params)
+    end
+
     for steps = 1:nr_of_steps
         # perform the simulation
         perform_steps(components, step_order, sim_params)
