@@ -162,6 +162,11 @@ Convenience alias for temperatures which can be a number or "nothing".
 const Temperature = Union{Nothing,Float64}
 
 """
+Convenience alias for a float that can also have a value of "nothing".
+"""
+const Floathing = Union{Nothing,Float64}
+
+"""
 Holds the options which output values should be recorded.
 
 This is a specific data structure intended to speed up recording output by avoiding the
