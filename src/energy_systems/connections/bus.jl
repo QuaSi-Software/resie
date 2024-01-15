@@ -32,6 +32,38 @@ Base.@kwdef mutable struct ConnectionMatrix
     end
 end
 
+Base.@kwdef mutable struct BTInputRow
+    source::Component
+    energy_potential::Floathing = nothing
+    storage_potential::Floathing = nothing
+    balance::Floathing = nothing
+    temperature::Temperature = nothing
+end
+
+function reset!(row::BTInputRow)
+    row.energy_potential = nothing
+    row.storage_potential = nothing
+    row.balance = nothing
+    row.temperature = nothing
+end
+
+Base.@kwdef mutable struct BTOutputRow
+    target::Component
+    energy_potential::Floathing = nothing
+    storage_potential::Floathing = nothing
+    balance::Floathing = nothing
+    temperature_min::Temperature = nothing
+    temperature_max::Temperature = nothing
+end
+
+function reset!(row::BTOutputRow)
+    row.energy_potential = nothing
+    row.storage_potential = nothing
+    row.balance = nothing
+    row.temperature_min = nothing
+    row.temperature_max = nothing
+end
+
 """
 Imnplementation of a bus component for balancing multiple inputs and outputs.
 
@@ -55,6 +87,9 @@ Base.@kwdef mutable struct Bus <: Component
 
     remainder::Float64
 
+    balance_table_inputs::Vector{BTInputRow}
+    balance_table_outputs::Vector{BTOutputRow}
+
     function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -68,9 +103,20 @@ Base.@kwdef mutable struct Bus <: Component
             medium, # medium
             [], # input_interfaces
             [], # output_interfaces,
-            ConnectionMatrix(config),
-            0.0 # remainder
+            ConnectionMatrix(config), # connectivity
+            0.0, # remainder
+            Vector{BTInputRow}(), # balance_table_inputs
+            Vector{BTOutputRow}() # balance_table_outputs
         )
+    end
+end
+
+function initialise!(unit::Bus, sim_params::Dict{String,Any})
+    for inface in unit.input_interfaces
+        push!(unit.balance_table_inputs, BTInputRow(source=inface.source))
+    end
+    for outface in unit.output_interfaces
+        push!(unit.balance_table_outputs, BTOutputRow(target=outface.target))
     end
 end
 
@@ -81,7 +127,15 @@ function reset(unit::Bus)
     for outface in unit.output_interfaces
         reset!(outface)
     end
+
     unit.remainder = 0.0
+
+    for row in unit.balance_table_inputs
+        reset!(row)
+    end
+    for row in unit.balance_table_outputs
+        reset!(row)
+    end
 end
 
 """
