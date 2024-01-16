@@ -85,9 +85,10 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
     # the input/output priorities
     components = reorder_interfaces_of_busses(components)
 
+    EnergySystems.initialise_components(components, sim_params)
+
     return components
 end
-
 
 """
 reorder_interfaces_of_busses(components)

@@ -837,6 +837,12 @@ function link_output_with(unit::Component, components::Grouping)
     end
 end
 
+function initialise_components(components::Grouping, sim_params::Dict{String,Any})
+    for component in values(components)
+        initialise!(component, sim_params)
+    end
+end
+
 """
     check_balances(components, epsilon)
 
