@@ -83,7 +83,7 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    set_temperature!(unit.unit.input_interfaces[unit.medium], highest(
+    set_temperature!(unit.input_interfaces[unit.medium], highest(
         unit.temperature,
         unit.input_interfaces[unit.medium].temperature
     ))
