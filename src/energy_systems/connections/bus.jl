@@ -34,32 +34,34 @@ end
 
 Base.@kwdef mutable struct BTInputRow
     source::Component
+    priority::Integer
     energy_potential::Floathing = nothing
     storage_potential::Floathing = nothing
-    balance::Floathing = nothing
+    energy_delivered::Floathing = nothing
     temperature::Temperature = nothing
 end
 
 function reset!(row::BTInputRow)
     row.energy_potential = nothing
     row.storage_potential = nothing
-    row.balance = nothing
+    row.energy_delivered = nothing
     row.temperature = nothing
 end
 
 Base.@kwdef mutable struct BTOutputRow
     target::Component
-    energy_potential::Floathing = nothing
+    priority::Integer
+    energy_requested::Floathing = nothing
     storage_potential::Floathing = nothing
-    balance::Floathing = nothing
+    energy_taken::Floathing = nothing
     temperature_min::Temperature = nothing
     temperature_max::Temperature = nothing
 end
 
 function reset!(row::BTOutputRow)
-    row.energy_potential = nothing
+    row.energy_requested = nothing
     row.storage_potential = nothing
-    row.balance = nothing
+    row.energy_taken = nothing
     row.temperature_min = nothing
     row.temperature_max = nothing
 end
@@ -87,8 +89,8 @@ Base.@kwdef mutable struct Bus <: Component
 
     remainder::Float64
 
-    balance_table_inputs::Vector{BTInputRow}
-    balance_table_outputs::Vector{BTOutputRow}
+    balance_table_inputs::Dict{String,BTInputRow}
+    balance_table_outputs::Dict{String,BTOutputRow}
 
     function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
@@ -105,18 +107,29 @@ Base.@kwdef mutable struct Bus <: Component
             [], # output_interfaces,
             ConnectionMatrix(config), # connectivity
             0.0, # remainder
-            Vector{BTInputRow}(), # balance_table_inputs
-            Vector{BTOutputRow}() # balance_table_outputs
+            Dict{String,BTInputRow}(), # balance_table_inputs
+            Dict{String,BTOutputRow}() # balance_table_outputs
         )
     end
 end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
+    p = 1
     for inface in unit.input_interfaces
-        push!(unit.balance_table_inputs, BTInputRow(source=inface.source))
+        unit.balance_table_inputs[inface.source.uac] = BTInputRow(
+            source=inface.source,
+            priority=p
+        )
+        p += 1
     end
+
+    p = 1
     for outface in unit.output_interfaces
-        push!(unit.balance_table_outputs, BTOutputRow(target=outface.target))
+        unit.balance_table_outputs[outface.target.uac] = BTOutputRow(
+            target=outface.target,
+            priority=p
+        )
+        p += 1
     end
 end
 
@@ -130,10 +143,10 @@ function reset(unit::Bus)
 
     unit.remainder = 0.0
 
-    for row in unit.balance_table_inputs
+    for row in values(unit.balance_table_inputs)
         reset!(row)
     end
-    for row in unit.balance_table_outputs
+    for row in values(unit.balance_table_outputs)
         reset!(row)
     end
 end
@@ -238,22 +251,67 @@ function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integ
     )
 end
 
+function _sub(first::Float64, second::Float64) return first - second end
+function _sub(first::Nothing, second::Float64) return -second end
+function _sub(first::Float64, second::Nothing) return first end
+function _sub(first::Nothing, second::Nothing) return nothing end
+
+function _add(first::Float64, second::Float64) return first + second end
+function _add(first::Nothing, second::Float64) return second end
+function _add(first::Float64, second::Nothing) return first end
+function _add(first::Nothing, second::Nothing) return nothing end
+
 function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    if is_input
+        unit.balance_table_inputs[comp.uac].energy_potential = value
+    else
+        unit.balance_table_outputs[comp.uac].energy_requested = value
+    end
 end
 
 function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    if is_input
+        unit.balance_table_inputs[comp.uac].storage_potential = value
+    else
+        unit.balance_table_outputs[comp.uac].storage_potential = value
+    end
 end
 
 function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    if is_input
+        unit.balance_table_inputs[comp.uac].energy_delivered =
+            _add(unit.balance_table_inputs[comp.uac].energy_delivered, value)
+    else
+        unit.balance_table_outputs[comp.uac].energy_taken =
+            _add(unit.balance_table_outputs[comp.uac].energy_taken, value)
+    end
 end
 
 function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    if is_input
+        unit.balance_table_inputs[comp.uac].energy_delivered =
+            _sub(unit.balance_table_inputs[comp.uac].energy_delivered, value)
+    else
+        unit.balance_table_outputs[comp.uac].energy_taken =
+            _sub(unit.balance_table_outputs[comp.uac].energy_taken, value)
+    end
 end
 
 function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    if is_input
+        unit.balance_table_inputs[comp.uac].energy_delivered = value
+    else
+        unit.balance_table_outputs[comp.uac].energy_taken = value
+    end
 end
 
-function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Float64, value_max::Float64)
+function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Temperature, value_max::Temperature)
+    if is_input
+        unit.balance_table_inputs[comp.uac].temperature = value_min
+    else
+        unit.balance_table_outputs[comp.uac].temperature_min = value_min
+        unit.balance_table_outputs[comp.uac].temperature_max = value_max
+    end
 end
 
 function balance_on(
