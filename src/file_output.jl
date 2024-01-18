@@ -447,6 +447,7 @@ function create_sankey(
         end
         interface_new += 1
     end
+    interface_new -= 1
 
     # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
     output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
@@ -466,10 +467,10 @@ function create_sankey(
         color_map = Dict(zip(unique_medium_labels, colors))
         colors_for_medium = map(x -> color_map[x], medium_labels)
     else # account for cases with only one medium in the system topology
-        colors_for_medium = [get(ColorSchemes.roma, 0.5)]
+        colors_for_medium = get(ColorSchemes.roma, 0.7)
     end
 
-    do_hide_real_demands = true
+    do_hide_real_demands = false
     if do_hide_real_demands
         # hide sf_fixed_sink and sf_fixed_source interfaces
         colors_for_medium_RGBA = Array{Any}(nothing, interface_new)
@@ -477,7 +478,11 @@ function create_sankey(
             if medium == "hide_medium"
                 colors_for_medium_RGBA[idx] = parse(RGBA, "rgba(0,0,0,0)")
             else
-                colors_for_medium_RGBA[idx] = colors_for_medium[idx]
+                if length(unique_medium_labels) > 1 
+                    colors_for_medium_RGBA[idx] = colors_for_medium[idx]
+                else
+                    colors_for_medium_RGBA[idx] = colors_for_medium
+                end
             end
         end
 
@@ -492,7 +497,11 @@ function create_sankey(
             end
         end
     else
-        colors_for_medium_RGBA = colors_for_medium
+        if length(unique_medium_labels) > 1 
+            colors_for_medium_RGBA = colors_for_medium
+        else
+            colors_for_medium_RGBA = fill(colors_for_medium, interface_new)
+        end
     end
     
     # create plot
