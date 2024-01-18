@@ -4,7 +4,7 @@
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "sankey_plot": "default",
-        "output_keys": {
+        "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"]
         },
         "output_plot": {

@@ -28,11 +28,11 @@ function get_output_keys(io_settings::Dict{String, Any},
 
     do_write_all_CSV_outputs = false
     do_write_CSV = false
-    if haskey(io_settings, "output_keys")
+    if haskey(io_settings, "csv_output_keys")
         do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["output_keys"] == "all"
+        if io_settings["csv_output_keys"] == "all"
             do_write_all_CSV_outputs = true
-        elseif io_settings["output_keys"] == "nothing"
+        elseif io_settings["csv_output_keys"] == "nothing"
             do_write_CSV = false
         end
     end
@@ -64,7 +64,7 @@ function get_output_keys(io_settings::Dict{String, Any},
         if do_write_all_CSV_outputs # gather all outputs
             output_keys_to_csv = all_output_keys
         else  # get only requested output keys from input file for CSV-export
-            output_keys_to_csv = output_keys(components, io_settings["output_keys"])
+            output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
         end
     else
         output_keys_to_csv = nothing

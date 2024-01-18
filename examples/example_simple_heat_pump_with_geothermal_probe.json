@@ -4,7 +4,7 @@
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "sankey_plot": "default",
-        "output_keys": {
+        "csv_output_keys": {
         },
         "output_plot": {
             "1": {

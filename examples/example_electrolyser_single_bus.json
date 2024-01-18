@@ -12,7 +12,7 @@
             "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
         },
-        "output_keys": {
+        "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
