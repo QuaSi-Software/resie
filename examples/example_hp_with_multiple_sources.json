@@ -3,6 +3,12 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
+        "sankey_plot": {
+            "m_h_w_lt1": "red",
+            "m_h_w_ht1": "darkred",
+            "m_e_ac_230v": "darkgoldenrod1",
+            "Losses": "black"
+        },
         "output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1 IN",

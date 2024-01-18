@@ -77,11 +77,14 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         reset_file(project_config["io_settings"]["output_file"], output_keys_to_csv)
     end
    
-    # get infomration about all interfaces for Sankey
-    nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey = get_interface_information(components)
-   
-    # preallocate for speed: Matrix with data of interfaces in every timestep
-    output_interface_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
+    # check if sankey should be plotted
+    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") && project_config["io_settings"]["sankey_plot"] !== "nothing"
+    if do_create_sankey
+        # get infomration about all interfaces for Sankey
+        nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey = get_interface_information(components)
+        # preallocate for speed: Matrix with data of interfaces in every timestep
+        output_interface_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
+    end 
 
     # export order or operatin (OoO)
     if project_config["io_settings"]["dump_info"]
@@ -111,8 +114,10 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         end
 
         # get the energy transported through each interface in every timestep for Sankey
-        output_interface_values[steps, :] = collect_interface_energies(components, nr_of_interfaces)
-      
+        if do_create_sankey
+            output_interface_values[steps, :] = collect_interface_energies(components, nr_of_interfaces)
+        end
+
         # gather output data of each component for line plot
         if do_create_plot
             output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, sim_params["time"])
@@ -126,12 +131,13 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     if do_create_plot
         create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
         @info "Line plot created and saved to .output/output_plot.html"
-
     end
 
     ### create Sankey diagram
-    create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces)
-    @info "Sankey created and saved to .output/output_sankey.html"
+    if do_create_sankey
+        create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces, project_config["io_settings"])
+        @info "Sankey created and saved to .output/output_sankey.html"
+    end
     
     if do_write_CSV
         @info "CSV-file with outputs written to $(project_config["io_settings"]["output_file"])"

@@ -420,6 +420,7 @@ function create_sankey(
     output_all_values::Matrix{Float64},
     medium_of_interfaces::Vector{Any},
     nr_of_interfaces::Int64,
+    io_settings::Dict{String, Any}
 )
 
     # sum up data of each interface
@@ -462,13 +463,36 @@ function create_sankey(
     # set label and colour of interfaces
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
-    if length(unique_medium_labels) > 1
-        colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
-        color_map = Dict(zip(unique_medium_labels, colors))
-        colors_for_medium = map(x -> color_map[x], medium_labels)
-    else # account for cases with only one medium in the system topology
-        colors_for_medium = get(ColorSchemes.roma, 0.7)
+
+    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], Dict{})
+        if length(unique_medium_labels) > 1
+            colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
+            color_map = Dict(zip(unique_medium_labels, colors))
+        else
+            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
+        end
+    else
+        color_map = Dict{String, Any}(io_settings["sankey_plot"])
+        for (medium, color) in color_map
+            try
+                color_entry = Colors.color_names[color]
+                color_map[medium] = RGB(color_entry[1]/255, color_entry[2]/255, color_entry[3]/255)
+            catch e
+                @error "The color for the sankey '$color' of medium '$medium' could not be detected. The following error occured: $e\n" *
+                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                exit()
+            end
+        end
+        for medium in unique_medium_labels
+            if medium in keys(color_map)
+                continue
+            else
+                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                exit()
+            end
+        end
     end
+    colors_for_medium = map(x -> color_map[x], medium_labels)
 
     do_hide_real_demands = true
     if do_hide_real_demands
@@ -478,11 +502,7 @@ function create_sankey(
             if medium == "hide_medium"
                 colors_for_medium_RGBA[idx] = parse(RGBA, "rgba(0,0,0,0)")
             else
-                if length(unique_medium_labels) > 1 
-                    colors_for_medium_RGBA[idx] = colors_for_medium[idx]
-                else
-                    colors_for_medium_RGBA[idx] = colors_for_medium
-                end
+                colors_for_medium_RGBA[idx] = colors_for_medium[idx]
             end
         end
 
@@ -497,11 +517,7 @@ function create_sankey(
             end
         end
     else
-        if length(unique_medium_labels) > 1 
-            colors_for_medium_RGBA = colors_for_medium
-        else
-            colors_for_medium_RGBA = fill(colors_for_medium, interface_new)
-        end
+        colors_for_medium_RGBA = colors_for_medium
     end
     
     # create plot
