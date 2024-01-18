@@ -470,7 +470,7 @@ function create_sankey(
         colors_for_medium = get(ColorSchemes.roma, 0.7)
     end
 
-    do_hide_real_demands = false
+    do_hide_real_demands = true
     if do_hide_real_demands
         # hide sf_fixed_sink and sf_fixed_source interfaces
         colors_for_medium_RGBA = Array{Any}(nothing, interface_new)
