@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.7.1
+* bugfix in sankey diagram if only one medium is present
+* added possibility to not plot the sankey by adding "sankey_plot" to "io_settings"
+* added possibility to define custom colors in sankey for each medium
+* renamed input variable "output_keys" --> "csv_output_keys" in input file
+
 ### Version 0.7.0
 #### Input and output
 * Rename parameters and output variables across several components:
