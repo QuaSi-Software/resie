@@ -35,6 +35,7 @@ end
 Base.@kwdef mutable struct BTInputRow
     source::Component
     priority::Integer
+    input_index::Integer
     energy_potential::Floathing = nothing
     storage_potential::Floathing = nothing
     energy_delivered::Floathing = nothing
@@ -51,6 +52,7 @@ end
 Base.@kwdef mutable struct BTOutputRow
     target::Component
     priority::Integer
+    output_index::Integer
     energy_requested::Floathing = nothing
     storage_potential::Floathing = nothing
     energy_taken::Floathing = nothing
@@ -115,19 +117,21 @@ end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
     p = 1
-    for inface in unit.input_interfaces
+    for (idx, inface) in pairs(unit.input_interfaces)
         unit.balance_table_inputs[inface.source.uac] = BTInputRow(
             source=inface.source,
-            priority=p
+            priority=p,
+            input_index=idx
         )
         p += 1
     end
 
     p = 1
-    for outface in unit.output_interfaces
+    for (idx, outface) in pairs(unit.output_interfaces)
         unit.balance_table_outputs[outface.target.uac] = BTOutputRow(
             target=outface.target,
-            priority=p
+            priority=p,
+            output_index=idx
         )
         p += 1
     end
