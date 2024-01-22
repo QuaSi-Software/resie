@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"],
             "TST_BFT_TH_01": ["Load"],
             "TST_DEM_TH_02": ["m_h_w_ht1 IN"],

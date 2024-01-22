@@ -3,13 +3,14 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
+        "sankey_plot": "default",
         "__heating_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
 			"TST_01_ELT_01_ELY": ["m_e_ac_230v IN"]
         },
-        "output_keys": {
+        "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
 			"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"],

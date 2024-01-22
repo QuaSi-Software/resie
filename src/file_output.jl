@@ -28,11 +28,11 @@ function get_output_keys(io_settings::Dict{String, Any},
 
     do_write_all_CSV_outputs = false
     do_write_CSV = false
-    if haskey(io_settings, "output_keys")
+    if haskey(io_settings, "csv_output_keys")
         do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["output_keys"] == "all"
+        if io_settings["csv_output_keys"] == "all"
             do_write_all_CSV_outputs = true
-        elseif io_settings["output_keys"] == "nothing"
+        elseif io_settings["csv_output_keys"] == "nothing"
             do_write_CSV = false
         end
     end
@@ -64,7 +64,7 @@ function get_output_keys(io_settings::Dict{String, Any},
         if do_write_all_CSV_outputs # gather all outputs
             output_keys_to_csv = all_output_keys
         else  # get only requested output keys from input file for CSV-export
-            output_keys_to_csv = output_keys(components, io_settings["output_keys"])
+            output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
         end
     else
         output_keys_to_csv = nothing
@@ -420,6 +420,7 @@ function create_sankey(
     output_all_values::Matrix{Float64},
     medium_of_interfaces::Vector{Any},
     nr_of_interfaces::Int64,
+    io_settings::Dict{String, Any}
 )
 
     # sum up data of each interface
@@ -447,6 +448,7 @@ function create_sankey(
         end
         interface_new += 1
     end
+    interface_new -= 1
 
     # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
     output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
@@ -461,13 +463,36 @@ function create_sankey(
     # set label and colour of interfaces
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
-    if length(unique_medium_labels) > 1
-        colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
-        color_map = Dict(zip(unique_medium_labels, colors))
-        colors_for_medium = map(x -> color_map[x], medium_labels)
-    else # account for cases with only one medium in the system topology
-        colors_for_medium = [get(ColorSchemes.roma, 0.5)]
+
+    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], Dict{})
+        if length(unique_medium_labels) > 1
+            colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
+            color_map = Dict(zip(unique_medium_labels, colors))
+        else
+            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
+        end
+    else
+        color_map = Dict{String, Any}(io_settings["sankey_plot"])
+        for (medium, color) in color_map
+            try
+                color_entry = Colors.color_names[color]
+                color_map[medium] = RGB(color_entry[1]/255, color_entry[2]/255, color_entry[3]/255)
+            catch e
+                @error "The color for the sankey '$color' of medium '$medium' could not be detected. The following error occured: $e\n" *
+                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                exit()
+            end
+        end
+        for medium in unique_medium_labels
+            if medium in keys(color_map)
+                continue
+            else
+                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                exit()
+            end
+        end
     end
+    colors_for_medium = map(x -> color_map[x], medium_labels)
 
     do_hide_real_demands = true
     if do_hide_real_demands
