@@ -214,8 +214,11 @@ Base.@kwdef mutable struct SystemInterface
     """The sum of absolute changes to the interface's balance"""
     sum_abs_change::Float64 = 0.0
 
-    """Current temperature of the medium on this interface"""
-    temperature::Temperature = nothing
+    """Minimum temperature of the medium on this interface"""
+    temperature_min::Temperature = nothing
+
+    """Maximum temperature of the medium on this interface"""
+    temperature_max::Temperature = nothing
 
     """Maximum energy the source can provide in the current timestep"""
     max_energy::Union{Nothing,Float64} = nothing
@@ -235,28 +238,20 @@ function add!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature < temperature
-            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
-        elseif interface.temperature !== nothing && interface.temperature > temperature
-            @warn ("Temperature in interface is higher than delivered temperature on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
+        if interface.temperature_min !== nothing && temperature < interface.temperature_min
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
+        elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
+            @warn ("Given temperature $(interface.temperature) on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
         interface.temperature = temperature
     end
 
     if interface.source.sys_function == sf_bus
         add_balance!(interface.source, interface.target, false, change)
-        set_temperatures!(
-            interface.source, interface.target, false,
-            interface.temperature, interface.temperature
-        )
     elseif interface.target.sys_function == sf_bus
         add_balance!(interface.target, interface.source, true, change)
-        set_temperatures!(
-            interface.target, interface.source, true,
-            interface.temperature, interface.temperature
-        )
     end
 end
 
@@ -274,28 +269,19 @@ function sub!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature < temperature
-            @warn ("Temperature in interface is lower than requested temperature on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
-        elseif interface.temperature !== nothing && interface.temperature > temperature
-            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
+        if interface.temperature_min !== nothing && temperature < interface.temperature_min
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
+        elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
+            @warn ("Given temperature $(interface.temperature) on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
-        interface.temperature = temperature
     end
 
     if interface.source.sys_function == sf_bus
         sub_balance!(interface.source, interface.target, false, change)
-        set_temperatures!(
-            interface.source, interface.target, false,
-            interface.temperature, interface.temperature
-        )
     elseif interface.target.sys_function == sf_bus
         sub_balance!(interface.target, interface.source, true, change)
-        set_temperatures!(
-            interface.target, interface.source, true,
-            interface.temperature, interface.temperature
-        )
     end
 end
 
@@ -306,29 +292,29 @@ Set the balance of the interface to the given new value.
 """
 function set!(
     interface::SystemInterface,
-    new_val::Float64,
-    temperature::Temperature=nothing
+    new_val::Float64
 )
     interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
-    interface.temperature = temperature
 end
 
 function set_temperature!(
     interface::SystemInterface,
-    temperature::Temperature=nothing
+    temperature_min::Temperature=nothing,
+    temperature_max::Temperature=nothing
 )
-    interface.temperature = temperature
+    interface.temperature_min = temperature_min
+    interface.temperature_max = temperature_max
 
     if interface.source.sys_function == sf_bus
         set_temperatures!(
             interface.source, interface.target, false,
-            temperature, temperature
+            temperature_min, temperature_max
         )
     elseif interface.target.sys_function == sf_bus
         set_temperatures!(
             interface.target, interface.source, true,
-            temperature, temperature
+            temperature_min, temperature_max
         )
     end
 end
@@ -359,7 +345,8 @@ Reset the interface back to zero.
 function reset!(interface::SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
-    interface.temperature = nothing
+    interface.temperature_min = nothing
+    interface.temperature_max = nothing
     interface.max_energy = nothing
 end
 
@@ -544,7 +531,7 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         uac=unit.uac,
         energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
         storage_potential=0.0,
-        temperature=interface.temperature,
+        temperature=interface.temperature_min,
         pressure=nothing,
         voltage=nothing,
     )]

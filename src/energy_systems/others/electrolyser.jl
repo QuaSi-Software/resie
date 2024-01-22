@@ -71,9 +71,11 @@ function control(
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
-    if unit.output_interfaces[unit.m_heat_out].temperature === nothing
-        set_temperature!(unit.output_interfaces[unit.m_heat_out], unit.output_temperature)
-    end
+    set_temperature!(
+        unit.output_interfaces[unit.m_heat_out],
+        nothing,
+        unit.output_temperature
+    )
 end
 
 function set_max_energies!(

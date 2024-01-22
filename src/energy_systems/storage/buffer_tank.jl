@@ -58,12 +58,16 @@ function control(
 )
     move_state(unit, components, sim_params)
 
-    if unit.output_interfaces[unit.medium].temperature === nothing
-        set_temperature!(unit.output_interfaces[unit.medium], temperature_at_load(unit))
-    end
-    if unit.input_interfaces[unit.medium].temperature === nothing
-        set_temperature!(unit.input_interfaces[unit.medium], unit.high_temperature)
-    end
+    set_temperature!(
+        unit.output_interfaces[unit.medium],
+        nothing,
+        temperature_at_load(unit)
+    )
+    set_temperature!(
+        unit.input_interfaces[unit.medium],
+        unit.high_temperature,
+        unit.high_temperature
+    )
 end
 
 function temperature_at_load(unit::BufferTank)::Temperature
@@ -86,7 +90,7 @@ function balance_on(
         uac=unit.uac,
         energy_potential=0.0,
         storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        temperature=interface.temperature,
+        temperature=interface.temperature_min,
         pressure=nothing,
         voltage=nothing,
     )]

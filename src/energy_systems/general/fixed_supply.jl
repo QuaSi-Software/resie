@@ -83,9 +83,11 @@ function control(
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
     end
 
-    set_temperature!(unit.output_interfaces[unit.medium], highest(
-        unit.temperature, unit.output_interfaces[unit.medium].temperature
-    ))
+    set_temperature!(
+        unit.output_interfaces[unit.medium],
+        unit.temperature,
+        unit.temperature
+    )
 end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})

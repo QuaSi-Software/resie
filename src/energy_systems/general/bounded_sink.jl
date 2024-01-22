@@ -83,10 +83,11 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    set_temperature!(unit.input_interfaces[unit.medium], highest(
+    set_temperature!(
+        unit.input_interfaces[unit.medium],
         unit.temperature,
-        unit.input_interfaces[unit.medium].temperature
-    ))
+        unit.temperature
+    )
 end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})

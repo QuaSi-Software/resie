@@ -69,9 +69,11 @@ function control(
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out], highest(
-        unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature
-    ))
+    set_temperature!(
+        unit.output_interfaces[unit.m_heat_out],
+        nothing,
+        unit.output_temperature,
+    )
 end
 
 function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
