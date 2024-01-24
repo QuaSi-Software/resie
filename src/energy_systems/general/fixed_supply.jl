@@ -17,8 +17,6 @@ mutable struct FixedSupply <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    is_heating::Bool
-
     energy_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
@@ -52,7 +50,6 @@ mutable struct FixedSupply <: Component
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
-            default(config, "is_heating", true), # is_heating
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
             default(config, "scale", 1.0), # scaling_factor
@@ -88,8 +85,8 @@ function control(
 
     set_temperature!(
         unit.output_interfaces[unit.medium],
-        unit.is_heating ? nothing : unit.temperature,
-        unit.is_heating ? unit.temperature : nothing
+        unit.temperature,
+        unit.temperature
     )
 end
 

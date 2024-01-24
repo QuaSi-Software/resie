@@ -68,7 +68,6 @@ function test_ooo_bus_to_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000

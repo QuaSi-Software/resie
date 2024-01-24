@@ -21,7 +21,6 @@ function test_base_order()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 10000.0
@@ -137,7 +136,6 @@ function test_base_order()
             "output_refs" => [
                 "TST_01_HZG_01_HTP"
             ],
-            "is_heating" => true,
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
             "temperature_profile_file_path" => "./profiles/tests/source_heat_temperature.prf",
             "scale" => 25000
