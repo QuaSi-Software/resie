@@ -85,7 +85,7 @@ function control(
 
     set_temperature!(
         unit.output_interfaces[unit.medium],
-        unit.temperature,
+        nothing,
         unit.temperature
     )
 end
