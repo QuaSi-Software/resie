@@ -99,7 +99,7 @@ Base.@kwdef mutable struct Bus <: Component
 
     balance_table_inputs::Dict{String,BTInputRow}
     balance_table_outputs::Dict{String,BTOutputRow}
-    balance_table::Array{Float64, 2}
+    balance_table::Array{Union{Nothing, Float64}, 2}
 
     function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
@@ -160,12 +160,14 @@ function reset(unit::Bus)
     for row in values(unit.balance_table_outputs)
         reset!(row)
     end
-
-    unit.balance_table = Array{Float64, 2}(
-        0,
-        length(unit.balance_table_inputs),
-        length(unit.balance_table_outputs)
-    )
+   
+    unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
+    for i in 1:length(unit.balance_table_inputs)
+        for j in 2:2:(2*length(unit.balance_table_outputs))
+            unit.balance_table[i, j] = nothing
+        end
+    end
+    
 end
 
 """
@@ -280,17 +282,17 @@ function _add(first::Nothing, second::Nothing) return nothing end
 
 function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     if is_input
-        unit.balance_table_inputs[comp.uac].energy_potential = value
+        unit.balance_table_inputs[comp.uac].energy_potential = abs(value)
     else
-        unit.balance_table_outputs[comp.uac].energy_potential = value
+        unit.balance_table_outputs[comp.uac].energy_potential = abs(value)
     end
 end
 
 function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     if is_input
-        unit.balance_table_inputs[comp.uac].storage_potential = value
+        unit.balance_table_inputs[comp.uac].storage_potential = abs(value)
     else
-        unit.balance_table_outputs[comp.uac].storage_potential = value
+        unit.balance_table_outputs[comp.uac].storage_potential = abs(value)
     end
 end
 
@@ -298,21 +300,21 @@ function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     if is_input
         if comp.sys_function == sf_storage
             unit.balance_table_inputs[comp.uac].storage_pool =
-                _add(unit.balance_table_inputs[comp.uac].storage_pool, value)
+                _add(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_inputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_inputs[comp.uac].energy_pool =
-                _add(unit.balance_table_inputs[comp.uac].energy_pool, value)
+                _add(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
             unit.balance_table_outputs[comp.uac].storage_pool =
-                _add(unit.balance_table_outputs[comp.uac].storage_pool, value)
+                _add(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_outputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_outputs[comp.uac].energy_pool =
-                _add(unit.balance_table_outputs[comp.uac].energy_pool, value)
+                _add(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
@@ -322,21 +324,21 @@ function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     if is_input
         if comp.sys_function == sf_storage
             unit.balance_table_inputs[comp.uac].storage_pool =
-                _sub(unit.balance_table_inputs[comp.uac].storage_pool, value)
+                _sub(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_inputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_inputs[comp.uac].energy_pool =
-                _sub(unit.balance_table_inputs[comp.uac].energy_pool, value)
+                _sub(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
             unit.balance_table_outputs[comp.uac].storage_pool =
-                _sub(unit.balance_table_outputs[comp.uac].storage_pool, value)
+                _sub(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_outputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_outputs[comp.uac].energy_pool =
-                _sub(unit.balance_table_outputs[comp.uac].energy_pool, value)
+                _sub(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
@@ -345,18 +347,18 @@ end
 function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     if is_input
         if comp.sys_function == sf_storage
-            unit.balance_table_inputs[comp.uac].storage_pool = value
+            unit.balance_table_inputs[comp.uac].storage_pool = abs(value)
             unit.balance_table_inputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_inputs[comp.uac].energy_pool = value
+            unit.balance_table_inputs[comp.uac].energy_pool = abs(value)
             unit.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
-            unit.balance_table_outputs[comp.uac].storage_pool = value
+            unit.balance_table_outputs[comp.uac].storage_pool = abs(value)
             unit.balance_table_outputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_outputs[comp.uac].energy_pool = value
+            unit.balance_table_outputs[comp.uac].energy_pool = abs(value)
             unit.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
@@ -425,12 +427,12 @@ function balance_on(
                 uac=output_row.target.uac,
                 energy_potential=interface.max_energy === nothing ?
                     _add(output_row.energy_pool, output_row.energy_potential)
-                        - (is_storage ? 0 : unit.balance_table[input_row.priority][output_row.priority*2-1]) :
-                    unit.balance_table[input_row.priority][output_row.priority*2-1],
+                        - (is_storage ? 0 : unit.balance_table[input_row.priority, output_row.priority*2-1]) :
+                    unit.balance_table[input_row.priority, output_row.priority*2-1],
                 storage_potential=interface.max_energy === nothing ?
                     _add(output_row.storage_pool, output_row.storage_potential)
-                        - (is_storage ? unit.balance_table[input_row.priority][output_row.priority*2-1] : 0) :
-                    unit.balance_table[input_row.priority][output_row.priority*2-1],
+                        - (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0) :
+                    unit.balance_table[input_row.priority, output_row.priority*2-1],
                 temperature_min=output_row.temperature_min,
                 temperature_max=output_row.temperature_max,
                 pressure=nothing,
@@ -451,12 +453,12 @@ function balance_on(
                 uac=input_row.source.uac,
                 energy_potential=interface.max_energy === nothing ?
                     _add(input_row.energy_pool, input_row.energy_potential)
-                        - (is_storage ? 0 : unit.balance_table[input_row.priority][output_row.priority*2-1]) :
-                    unit.balance_table[input_row.priority][output_row.priority*2-1],
+                        - (is_storage ? 0 : unit.balance_table[input_row.priority, output_row.priority*2-1]) :
+                    unit.balance_table[input_row.priority, output_row.priority*2-1],
                 storage_potential=interface.max_energy === nothing ?
                     _add(input_row.storage_pool, input_row.storage_potential)
-                        - (is_storage ? unit.balance_table[input_row.priority][output_row.priority*2-1] : 0) :
-                    unit.balance_table[input_row.priority][output_row.priority*2-1],
+                        - (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0) :
+                    unit.balance_table[input_row.priority, output_row.priority*2-1],
                 temperature_min=input_row.temperature_min,
                 temperature_max=input_row.temperature_max,
                 pressure=nothing,
@@ -471,7 +473,7 @@ end
 function inner_distribute!(unit::Bus)
     for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
         for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
-            if !energy_flow_is_allowed(unit, input_index, output_row.output_index)
+            if !energy_flow_is_allowed(unit, input_row.input_index, output_row.output_index)
                 continue
             end
 
@@ -482,30 +484,30 @@ function inner_distribute!(unit::Bus)
             end
 
             bt_input_row_sum = 0
-            for idx in range(1,length(unit.balance_table_outputs),step=2)
-                bt_input_row_sum += unit.balance_table[input_row.priority][idx]
+            for idx in 1:2:length(unit.balance_table_outputs)
+                bt_input_row_sum += unit.balance_table[input_row.priority, idx]
             end
-            available_energy = _add(_add(_add(
+            available_energy = _sub(_add(_add(_add(
                 input_row.energy_potential,
                 input_row.energy_pool),
                 input_row.storage_potential),
                 input_row.storage_pool
-            ) - bt_input_row_sum
+            ), bt_input_row_sum)
 
             bt_output_row_sum = 0
             for idx in range(1,length(unit.balance_table_inputs))
-                bt_output_row_sum += unit.balance_table[idx][output_row.priority*2-1]
+                bt_output_row_sum += unit.balance_table[idx, output_row.priority*2-1]
             end
-            target_energy = _add(_add(_add(
+            target_energy = _sub(_add(_add(_add(
                 output_row.energy_potential,
                 output_row.energy_pool),
                 output_row.storage_potential),
                 output_row.storage_pool
-            ) - bt_output_row_sum
+            ), bt_output_row_sum)
 
-            unit.balance_table[input_row.priority][output_row.priority*2-1] =
+            unit.balance_table[input_row.priority, output_row.priority*2-1] =
                 available_energy < target_energy ? available_energy : target_energy
-            unit.balance_table[input_row.priority][output_row.priority*2] = max_min
+            unit.balance_table[input_row.priority, output_row.priority*2] = max_min
         end
     end
 end

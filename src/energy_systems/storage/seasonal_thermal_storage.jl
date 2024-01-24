@@ -62,12 +62,12 @@ function control(
     move_state(unit, components, sim_params)
 
     set_temperature!(
-        unit.output_interfaces[unit.medium],
+        unit.output_interfaces[unit.m_heat_out],
         nothing,
         temperature_at_load(unit)
     )
     set_temperature!(
-        unit.input_interfaces[unit.medium],
+        unit.input_interfaces[unit.m_heat_in],
         unit.high_temperature,
         unit.high_temperature
     )
