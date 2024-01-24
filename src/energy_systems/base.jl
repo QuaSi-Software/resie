@@ -241,7 +241,7 @@ function add!(
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
-        elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
+        elseif interface.temperature_max !== nothing && temperature > interface.temperature_max
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
@@ -271,7 +271,7 @@ function sub!(
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
-        elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
+        elseif interface.temperature_max !== nothing && temperature > interface.temperature_max
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
