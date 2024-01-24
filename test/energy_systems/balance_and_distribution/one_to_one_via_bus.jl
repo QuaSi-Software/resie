@@ -20,6 +20,7 @@ function test_one_to_one_via_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "constant_demand" => 4000,
             "constant_temperature" => 55,
         ),

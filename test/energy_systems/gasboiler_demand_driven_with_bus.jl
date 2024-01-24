@@ -13,6 +13,7 @@ function test_gasboiler_demand_driven_with_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -240,6 +241,7 @@ function test_gasboiler_demand_driven_without_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500

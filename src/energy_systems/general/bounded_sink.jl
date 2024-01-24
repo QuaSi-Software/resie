@@ -15,6 +15,8 @@ mutable struct BoundedSink <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
+    is_heating::Bool
+
     max_power_profile::Union{Profile,Nothing}
     temperature_profile::Union{Profile,Nothing}
     scaling_factor::Float64
@@ -47,6 +49,7 @@ mutable struct BoundedSink <: Component
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
+            default(config, "is_heating", true), # is_heating
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
             default(config, "scale", 1.0), # scaling_factor
@@ -85,8 +88,8 @@ function control(
     end
     set_temperature!(
         unit.input_interfaces[unit.medium],
-        unit.temperature,
-        unit.temperature
+        unit.is_heating ? unit.temperature : nothing,
+        unit.is_heating ? nothing : unit.temperature
     )
 end
 

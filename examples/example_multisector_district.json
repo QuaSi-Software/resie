@@ -115,6 +115,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
+            "is_heating": true,
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "constant_temperature": 60,
             "scale": 16000
@@ -124,6 +125,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
+            "is_heating": true,
             "energy_profile_file_path": "./profiles/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
             "constant_temperature": 60,
             "scale": 19000

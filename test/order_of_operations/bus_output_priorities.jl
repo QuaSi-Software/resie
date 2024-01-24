@@ -69,6 +69,7 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "constant_demand" => 1000,
             "constant_temperature" => 60,
             "scale" => 1
@@ -78,6 +79,7 @@ function test_ooo_bus_output_priorities()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "constant_demand" => 1000,
             "constant_temperature" => 60,
             "scale" => 1

@@ -105,6 +105,7 @@
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [],
+            "is_heating": true,
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature": 40,
             "scale": 1500
@@ -114,6 +115,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
+            "is_heating": true,
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature": 85,
             "scale": 1500
@@ -125,6 +127,7 @@
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
+            "is_heating": true,
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
             "constant_temperature": 40,
             "scale": 1000
@@ -136,6 +139,7 @@
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
+            "is_heating": true,
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
             "constant_temperature": 20,
             "scale": 2000

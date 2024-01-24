@@ -46,6 +46,7 @@ function test_one_bus_to_one_bus()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "constant_demand" => 300.0,
             "constant_temperature" => 55.0,
         ),

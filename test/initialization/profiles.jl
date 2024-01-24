@@ -18,6 +18,7 @@ function energy_system()::Dict{String,Any}
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/heating_demand_short.prf",
             "temperature_profile_file_path" => "./profiles/tests/temperature_short.prf",
             "scale" => 1

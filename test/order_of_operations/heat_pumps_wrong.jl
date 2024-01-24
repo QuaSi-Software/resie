@@ -12,6 +12,7 @@ function test_ooo_for_heat_pumps_wrong()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
+            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1500
@@ -21,6 +22,7 @@ function test_ooo_for_heat_pumps_wrong()
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
+            "is_heating" => true,
             "max_power_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 6000

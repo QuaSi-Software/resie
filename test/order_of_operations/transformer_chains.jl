@@ -231,6 +231,7 @@ function test_find_chains()
             "type" => "Demand",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
+            "is_heating" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000
