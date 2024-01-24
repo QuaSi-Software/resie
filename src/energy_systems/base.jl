@@ -242,10 +242,9 @@ function add!(
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
         elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
-            @warn ("Given temperature $(interface.temperature) on interface $(interface.source.uac) " *
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
-        interface.temperature = temperature
     end
 
     if interface.source.sys_function == sf_bus
@@ -273,7 +272,7 @@ function sub!(
             @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
         elseif interface.temperature.max !== nothing && temperature > interface.temperature.max
-            @warn ("Given temperature $(interface.temperature) on interface $(interface.source.uac) " *
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
                     "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
     end
@@ -389,7 +388,8 @@ Base.@kwdef mutable struct EnergyExchange
     uac::String
     energy_potential::Float64
     storage_potential::Float64
-    temperature::Temperature
+    temperature_min::Temperature
+    temperature_max::Temperature
     pressure::Union{Nothing,Float64}
     voltage::Union{Nothing,Float64}
 end
@@ -442,7 +442,7 @@ function storage_potential(entries::Vector{EnergyExchange})::Float64
 end
 
 """
-    temperature_first(exchanges)
+    temp_min_first(exchanges)
 
 First not-nothing temperature of the given list of energy exchanges. If no not-nothing
 temperature can be found, returns nothing.
@@ -452,52 +452,81 @@ Args:
 Returns:
     `Temperature`: First not-nothing temperature found or nothing if no such exists
 """
-function temperature_first(entries::Vector{EnergyExchange})::Temperature
-    temps = [e.temperature for e in entries if e.temperature !== nothing]
+function temp_min_first(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature_min for e in entries if e.temperature_min !== nothing]
     return length(temps) > 0 ? first(temps) : nothing
 end
 
 """
-    temperature_highest(exchanges)
+    temp_min_highest(exchanges)
 
-Highest not-nothing temperature of the given list of energy exchanges. If no not-nothing
-temperature can be found, returns nothing.
+Highest not-nothing minimum temperature of the given list of energy exchanges. If no
+not-nothing temperature can be found, returns nothing.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
 Returns:
-    `Temperature`: First not-nothing temperature found or nothing if no such exists
+    `Temperature`: First not-nothing minimum temperature found or nothing if no such exists
 """
-function temperature_highest(entries::Vector{EnergyExchange})::Temperature
-    return maximum(e.temperature for e in entries if e.temperature !== nothing)
+function temp_min_highest(entries::Vector{EnergyExchange})::Temperature
+    return maximum(e.temperature_min for e in entries if e.temperature_min !== nothing)
 end
 
 """
-    temperature_all(exchanges)
+    temp_max_highest(exchanges)
 
-A list of all temperatures of the given list of energy exchanges.
+Highest not-nothing maximum temperature of the given list of energy exchanges. If no
+not-nothing temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing maximum temperature found or nothing if no such exists
+"""
+function temp_max_highest(entries::Vector{EnergyExchange})::Temperature
+    return maximum(e.temperature_max for e in entries if e.temperature_max !== nothing)
+end
+
+"""
+    temp_min_all(exchanges)
+
+A list of all minimum temperatures of the given list of energy exchanges.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
 Returns:
-    `Vector{Temperature}`: A list of temperatures
+    `Vector{Temperature}`: A list of minimum temperatures
 """
-function temperature_all(entries::Vector{EnergyExchange})::Vector{Temperature}
-    return [e.temperature for e in entries]
+function temp_min_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_min for e in entries]
 end
 
 """
-    temperature_all_non_empty(exchanges)
+    temp_max_all(exchanges)
 
-A list of all not-nothing temperatures of the given list of energy exchanges.
+A list of all maximum temperatures of the given list of energy exchanges.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
 Returns:
-    `Vector{Temperature}`: A (possibly empty) list of not-nothing temperatures
+    `Vector{Temperature}`: A list of maximum temperatures
 """
-function temperature_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
-    return [e.temperature for e in entries if e.temperature !== nothing]
+function temp_max_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_max for e in entries]
+end
+
+"""
+    temp_min_all_non_empty(exchanges)
+
+A list of all not-nothing minimum temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A (possibly empty) list of not-nothing minimum temperatures
+"""
+function temp_min_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_min for e in entries if e.temperature_min !== nothing]
 end
 
 """
@@ -531,7 +560,8 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         uac=unit.uac,
         energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
         storage_potential=0.0,
-        temperature=interface.temperature_min,
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
         pressure=nothing,
         voltage=nothing,
     )]

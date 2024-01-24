@@ -131,10 +131,10 @@ function check_heat_out(
         return (
             [e.balance + e.energy_potential for e in exchanges],
             [e.storage_potential for e in exchanges],
-            temperature_all(exchanges)
+            temp_min_all(exchanges)
         )
     else
-        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
+        return ([-Inf], [-Inf], [nothing])
     end
 end
 
@@ -205,7 +205,7 @@ function calculate_energies(
     potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
     potentials_energy_heat_out,
         potentials_storage_heat_out,
-        out_temps = check_heat_out(unit, sim_params)
+        out_temps_min = check_heat_out(unit, sim_params)
     potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, sim_params)
     potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, sim_params)
 
@@ -265,8 +265,11 @@ function calculate_energies(
             continue
         end
 
-        # skip layer if requested temperature is higher than the output temperature
-        if out_temps[idx_layer] > unit.output_temperature
+        # skip layer if output temperature is lower than minimum temperature of layer
+        if (
+            out_temps_min[idx_layer] !== nothing
+            && out_temps_min[idx_layer] > unit.output_temperature
+        )
             continue
         end
 
@@ -317,7 +320,7 @@ function calculate_energies(
         # finally all checks done, we add the layer and update remaining energies
         push!(layers_el_in, used_el_in)
         push!(layers_heat_out, used_heat_out)
-        push!(layers_heat_out_temperature, out_temps[idx_layer])
+        push!(layers_heat_out_temperature, out_temps_min[idx_layer])
         push!(layers_h2_out, used_h2_out)
         push!(layers_o2_out, used_o2_out)
         available_el_in -= used_el_in
@@ -379,15 +382,8 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
-    # calculate mixed temperature for heat output, as interfaces do not support vectorized
-    # energy balances (yet)
-    mixed_temperature = 0.0
-    for (layer_idx, layer_heat_out) in pairs(energies[3])
-        mixed_temperature += energies[4][layer_idx] * (layer_heat_out / heat_out)
-    end
-
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    add!(unit.output_interfaces[unit.m_heat_out], heat_out, mixed_temperature)
+    add!(unit.output_interfaces[unit.m_heat_out], heat_out)
     add!(unit.output_interfaces[unit.m_h2_out], h2_out)
     add!(unit.output_interfaces[unit.m_o2_out], o2_out)
 end

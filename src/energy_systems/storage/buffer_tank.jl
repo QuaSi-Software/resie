@@ -90,7 +90,8 @@ function balance_on(
         uac=unit.uac,
         energy_potential=0.0,
         storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        temperature=interface.temperature_min,
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
         pressure=nothing,
         voltage=nothing,
     )]
@@ -126,8 +127,11 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        demand_temp = exchange.temperature
-        if demand_temp !== nothing && demand_temp > temperature_at_load(unit)
+        tank_temp = temperature_at_load(unit)
+        if (
+            exchange.temperature_min !== nothing
+            && exchange.temperature_min > tank_temp
+        )
             # we can only supply energy at a temperature at or below the tank's current
             # output temperature
             continue
@@ -137,10 +141,10 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
         if unit.load > used_heat
             unit.load -= used_heat
-            add!(outface, used_heat, temperature_at_load(unit))
+            add!(outface, used_heat, tank_temp)
             energy_demanded += used_heat
         else
-            add!(outface, unit.load, temperature_at_load(unit))
+            add!(outface, unit.load, tank_temp)
             energy_demanded += unit.load
             unit.load = 0.0
         end
@@ -162,8 +166,12 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        supply_temp = exchange.temperature
-        if supply_temp !== nothing && supply_temp < unit.high_temperature
+        if (
+            exchange.temperature_min !== nothing
+                && exchange.temperature_min > unit.high_temperature
+            || exchange.temperature_max !== nothing
+                && exchange.temperature_max < unit.high_temperature
+        )
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue
@@ -174,11 +182,11 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 
         if diff > used_heat
             unit.load += used_heat
-            sub!(inface, used_heat, supply_temp)
+            sub!(inface, used_heat, unit.high_temperature)
             energy_available -= used_heat
         else
             unit.load = unit.capacity
-            sub!(inface, diff, supply_temp)
+            sub!(inface, diff, unit.high_temperature)
             energy_available -= diff
         end
     end

@@ -54,7 +54,8 @@ function balance_on(
         uac=unit.uac,
         energy_potential=0.0,
         storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        temperature=interface.temperature_min,
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
         pressure=nothing,
         voltage=nothing,
     )]

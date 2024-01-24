@@ -144,7 +144,7 @@ function check_heat_in(
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
         )
-            return ([Inf], [Inf], [unit.input_interfaces[unit.m_heat_in].temperature])
+            return ([Inf], [Inf], [nothing], [nothing])
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_heat_in],
@@ -153,11 +153,12 @@ function check_heat_in(
             return (
                 [e.balance + e.energy_potential for e in exchanges],
                 [e.storage_potential for e in exchanges],
-                temperature_all(exchanges)
+                temp_min_all(exchanges),
+                temp_max_all(exchanges)
             )
         end
     else
-        return ([Inf], [Inf], [unit.input_interfaces[unit.m_heat_in].temperature])
+        return ([Inf], [Inf], [nothing], [nothing])
     end
 end
 
@@ -172,7 +173,7 @@ function check_heat_out(
         )
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
         potential_storage_heat_out = storage_potential(exchanges)
-        temperature = temperature_highest(exchanges)
+        temperature = temp_min_highest(exchanges)
         if (
             unit.controller.parameter["load_storages"]
             ? potential_energy_heat_out + potential_storage_heat_out
@@ -182,7 +183,7 @@ function check_heat_out(
         end
         return (potential_energy_heat_out, potential_storage_heat_out, temperature)
     else
-        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
+        return (-Inf, -Inf, nothing)
     end
 end
 
@@ -213,7 +214,8 @@ function calculate_energies(
     potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
     potentials_energy_heat_in,
         potentials_storage_heat_in,
-        in_temps = check_heat_in(unit, sim_params)
+        in_temps_min,
+        in_temps_max = check_heat_in(unit, sim_params)
     potential_energy_heat_out,
         potential_storage_heat_out,
         out_temp = check_heat_out(unit, sim_params)
@@ -267,18 +269,23 @@ function calculate_energies(
             continue
         end
 
-        # skip layer if available temperature is lower than optionally given
-        # minimum input_temperature
+        # skip layer if optionally given fixed input temperature is not within
+        # temperature band of the layer
         if (
             unit.input_temperature !== nothing
-            && in_temps[idx_layer] < unit.input_temperature
+                && in_temps_min[idx_layer] !== nothing
+                && in_temps_min[idx_layer] > unit.input_temperature
+            || unit.input_temperature !== nothing
+                && in_temps_max[idx_layer] !== nothing
+                && in_temps_max[idx_layer] < unit.input_temperature
         )
             continue
         end
+        in_temp = highest(in_temps_min[idx_layer], in_temps_max[idx_layer])
 
         # a constant COP has priority. if it's not given the dynamic cop requires temperatures
         cop = unit.constant_cop === nothing ?
-              dynamic_cop(in_temps[idx_layer], out_temp) :
+              dynamic_cop(in_temp, out_temp) :
               unit.constant_cop
         if cop === nothing
             throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
@@ -319,7 +326,7 @@ function calculate_energies(
         # finally all checks done, we add the layer and update remaining energies
         push!(layers_el_in, used_el_in)
         push!(layers_heat_in, used_heat_in)
-        push!(layers_heat_in_temperature, in_temps[idx_layer])
+        push!(layers_heat_in_temperature, in_temp)
         push!(layers_heat_out, used_heat_out)
         available_el_in -= used_el_in
         available_heat_out -= used_heat_out
