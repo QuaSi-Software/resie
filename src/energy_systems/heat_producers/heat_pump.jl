@@ -281,7 +281,9 @@ function calculate_energies(
         )
             continue
         end
-        in_temp = highest(in_temps_min[idx_layer], in_temps_max[idx_layer])
+        in_temp = unit.input_temperature !== nothing ?
+            unit.input_temperature :
+            highest(in_temps_min[idx_layer], in_temps_max[idx_layer])
 
         # a constant COP has priority. if it's not given the dynamic cop requires temperatures
         cop = unit.constant_cop === nothing ?
