@@ -384,6 +384,27 @@ function highest(
 end
 
 """
+    lowest(temperature_1, temperature_2)::Temperature
+
+Returns the lowest temperature of the two inputs and handles nothing-values:
+- If both of the inputs are floats, the minimum will be returned.
+- If one of the inputs is nothing and one a float, the float will be returned.
+- If both of the inputs are nothing, nothing will be returned.
+"""
+function lowest(
+    temperature_1::Temperature,
+    temperature_2::Temperature
+)::Temperature
+    if temperature_1 !== nothing && temperature_2 !== nothing
+        return min(temperature_1, temperature_2)
+    elseif temperature_1 === nothing && temperature_2 !== nothing
+        return temperature_2
+    elseif temperature_1 !== nothing && temperature_2 === nothing
+        return temperature_1
+    end
+end
+
+"""
 Convenience type used define the required system interfaces of a component.
 
 To simultaneously define what is required and then hold references to instances after the
