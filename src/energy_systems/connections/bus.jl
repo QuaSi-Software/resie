@@ -414,7 +414,7 @@ function balance_on(
     return_exchanges = []
 
     if caller_is_input
-        input_row = [x for x in unit.balance_table_inputs if x.uac == interface.source.uac][1]
+        input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
         for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
             if !energy_flow_is_allowed(unit, input_index, output_row.output_index)
                 continue
@@ -440,9 +440,9 @@ function balance_on(
             ))
         end
     else
-        output_row = [x for x in unit.balance_table_outputs if x.uac == interface.target.uac][1]
+        output_row = [row for row in values(unit.balance_table_outputs) if row.target.uac == interface.target.uac][1]
         for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
-            if !energy_flow_is_allowed(unit, input.input_index, output_index)
+            if !energy_flow_is_allowed(unit, input_row.input_index, output_index)
                 continue
             end
 
