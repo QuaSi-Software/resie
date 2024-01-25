@@ -324,21 +324,21 @@ function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     if is_input
         if comp.sys_function == sf_storage
             unit.balance_table_inputs[comp.uac].storage_pool =
-                _sub(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
+                _add(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_inputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_inputs[comp.uac].energy_pool =
-                _sub(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
+                _add(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
             unit.balance_table_outputs[comp.uac].storage_pool =
-                _sub(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
+                _add(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
             unit.balance_table_outputs[comp.uac].storage_potential = nothing
         else
             unit.balance_table_outputs[comp.uac].energy_pool =
-                _sub(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
+                _add(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
             unit.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
@@ -506,7 +506,7 @@ function inner_distribute!(unit::Bus)
             ), bt_output_row_sum)
 
             unit.balance_table[input_row.priority, output_row.priority*2-1] =
-                available_energy < target_energy ? available_energy : target_energy
+                abs(available_energy) < abs(target_energy) ? available_energy : target_energy
             unit.balance_table[input_row.priority, output_row.priority*2] = max_min
         end
     end
