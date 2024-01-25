@@ -162,7 +162,7 @@ end
 function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges)
+    energy_available = balance(exchanges) + energy_potential(exchanges) + storage_potential(exchanges)
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
@@ -171,7 +171,8 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        if exchange.balance < sim_params["epsilon"]
+        exchange_energy_available = exchange.balance + exchange.energy_potential + exchange.storage_potential
+        if exchange_energy_available < sim_params["epsilon"]
             continue
         end
 
@@ -186,7 +187,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
             continue
         end
 
-        used_heat = min(energy_available, exchange.balance)
+        used_heat = min(energy_available, exchange_energy_available)
         diff = unit.capacity - unit.load
 
         if diff > used_heat

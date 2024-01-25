@@ -120,7 +120,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        demanded_on_interface = exchange.balance
+        demanded_on_interface = exchange.balance + exchange.energy_potential
         if (
             unit.controller.parameter["name"] == "extended_storage_control"
             && unit.controller.parameter["load_any_storage"]
@@ -159,7 +159,7 @@ end
 function load(unit::BufferTank, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges)
+    energy_available = balance(exchanges) + energy_potential(exchanges) + storage_potential(exchanges)
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
@@ -168,7 +168,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        if exchange.balance < sim_params["epsilon"]
+        exchange_energy_available = exchange.balance + exchange.energy_potential + exchange.storage_potential
+        if exchange_energy_available < sim_params["epsilon"]
             continue
         end
 
@@ -183,7 +184,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        used_heat = min(energy_available, exchange.balance)
+        used_heat = min(energy_available, exchange_energy_available)
         diff = unit.capacity - unit.load
 
         if diff > used_heat

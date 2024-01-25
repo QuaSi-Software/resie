@@ -289,6 +289,14 @@ function _add(first::Nothing, second::Float64) return second end
 function _add(first::Float64, second::Nothing) return first end
 function _add(first::Nothing, second::Nothing) return nothing end
 
+function _sum(vector::Vector{Union{Float64, Nothing}})
+    sum = nothing
+    for entry in vector
+        sum = _add(sum, entry)
+    end
+    return sum
+end
+
 function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     if is_input
         unit.balance_table_inputs[comp.uac].energy_potential = abs(value)
@@ -433,9 +441,9 @@ function balance_on(
 
             if interface.max_energy === nothing
                 energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
-                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]))) # this must be the output_row sum!
+                    (is_storage ? 0.0 : _sum(unit.balance_table[:, output_row.priority*2-1]))))
                 storage_pot = -(_sub(_add(output_row.storage_pool, output_row.storage_potential),
-                    (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)))
+                    (is_storage ? _sum(unit.balance_table[:, output_row.priority*2-1]) : 0.0)))
             else
                 energy_pot = -(is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1])
                 storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
@@ -463,9 +471,9 @@ function balance_on(
 
             if interface.max_energy === nothing
                 energy_pot = _sub(_add(input_row.energy_pool, input_row.energy_potential),
-                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]))
+                    (is_storage ? 0.0 : _sum(unit.balance_table[input_row.priority, 1:2:end])))
                 storage_pot = _sub(_add(input_row.storage_pool, input_row.storage_potential),
-                    (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0))
+                    (is_storage ? _sum(unit.balance_table[input_row.priority, 1:2:end]) : 0.0))
             else
                 energy_pot = is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]
                 storage_pot = (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
@@ -506,9 +514,9 @@ function inner_distribute!(unit::Bus)
                 continue
             end
 
-            if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
-                continue
-            end
+            # if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
+            #     continue
+            # end
 
             max_min = highest(input_row.temperature_min, output_row.temperature_min)
             min_max = lowest(input_row.temperature_max, output_row.temperature_max)
@@ -542,6 +550,10 @@ function inner_distribute!(unit::Bus)
                 reset_balance_table!(unit::Bus)
                 continue_iteration = false
                 break
+            end
+            
+            if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
+                println("debug")
             end
 
             unit.balance_table[input_row.priority, output_row.priority*2-1] =
@@ -622,6 +634,7 @@ order, which is explained in more detail in the documentation. Essentially it st
 the leaves of the chain and progresses to the roots.
 """
 function distribute!(unit::Bus)
+    inner_distribute!(unit::Bus)
     balance = balance_direct(unit)
 
     # reset all non-bus input interfaces
