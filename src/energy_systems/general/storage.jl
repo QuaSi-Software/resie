@@ -68,7 +68,7 @@ end
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges)
+    blnc = balance(exchanges) + energy_potential(exchanges)
 
     if (
         unit.controller.parameter["name"] == "extended_storage_control"

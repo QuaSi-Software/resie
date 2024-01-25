@@ -70,15 +70,15 @@ function process(unit::Battery, sim_params::Dict{String,Any})
     exchanges = balance_on(outface, outface.target)
 
     if unit.controller.parameter["name"] == "default"
-        energy_demand = balance(exchanges)
+        energy_demand = balance(exchanges) + energy_potential(exchanges)
     elseif unit.controller.parameter["name"] == "extended_storage_control"
         if unit.controller.parameter["load_any_storage"]
-            energy_demand = balance(exchanges) + storage_potential(exchanges)
+            energy_demand = balance(exchanges)  + energy_potential(exchanges) + storage_potential(exchanges)
         else
-            energy_demand = balance(exchanges)
+            energy_demand = balance(exchanges) + energy_potential(exchanges)
         end
     else
-        energy_demand = balance(exchanges)
+        energy_demand = balance(exchanges) + energy_potential(exchanges)
     end
 
     if energy_demand >= 0.0

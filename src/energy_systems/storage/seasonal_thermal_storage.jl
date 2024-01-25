@@ -103,7 +103,7 @@ end
 function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
-    energy_demanded = balance(exchanges)
+    energy_demanded = balance(exchanges) + energy_potential(exchanges)
 
     if (
         unit.controller.parameter["name"] == "extended_storage_control"
@@ -157,7 +157,7 @@ end
 function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]

@@ -66,7 +66,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
         # @TODO: if grids should be allowed to load storage components, then the storage 
         # potential must be handled here instead of being ignored
         exchanges = balance_on(outface, outface.target)
-        blnc = balance(exchanges)
+        blnc = balance(exchanges) + energy_potential(exchanges)
         if blnc < 0.0
             unit.output_sum += blnc
             add!(outface, abs(blnc))
@@ -74,7 +74,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
     else
         inface = unit.input_interfaces[unit.medium]
         exchanges = balance_on(inface, inface.source)
-        blnc = balance(exchanges)
+        blnc = balance(exchanges) + energy_potential(exchanges)
         if blnc > 0.0
             unit.input_sum += blnc
             sub!(inface, abs(blnc))
