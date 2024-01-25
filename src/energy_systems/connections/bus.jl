@@ -74,6 +74,15 @@ function reset!(row::BTOutputRow)
     row.temperature_max = nothing
 end
 
+function is_empty(row::Union{BTInputRow, BTOutputRow})
+    return (
+        row.energy_potential === nothing
+        && row.energy_pool === nothing
+        && row.storage_potential === nothing
+        && row.storage_pool === nothing
+    )
+end
+
 """
 Imnplementation of a bus component for balancing multiple inputs and outputs.
 
@@ -479,8 +488,20 @@ function balance_on(
 end
 
 function inner_distribute!(unit::Bus)
+    continue_iteration = true
+
     for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
+        continue_iteration = continue_iteration && !is_empty(input_row)
+        if !continue_iteration
+            break
+        end
+
         for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
+            continue_iteration = continue_iteration && !is_empty(output_row)
+            if !continue_iteration
+                break
+            end
+
             if !energy_flow_is_allowed(unit, input_row.input_index, output_row.output_index)
                 continue
             end
