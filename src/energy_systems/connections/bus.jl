@@ -433,11 +433,11 @@ function balance_on(
 
             if interface.max_energy === nothing
                 energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
-                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1])))
+                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]))) # this must be the output_row sum!
                 storage_pot = -(_sub(_add(output_row.storage_pool, output_row.storage_potential),
                     (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)))
             else
-                energy_pot = -unit.balance_table[input_row.priority, output_row.priority*2-1]
+                energy_pot = -(is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1])
                 storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
@@ -467,7 +467,7 @@ function balance_on(
                 storage_pot = _sub(_add(input_row.storage_pool, input_row.storage_potential),
                     (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0))
             else
-                energy_pot = unit.balance_table[input_row.priority, output_row.priority*2-1]
+                energy_pot = is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]
                 storage_pot = (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
@@ -538,11 +538,29 @@ function inner_distribute!(unit::Bus)
                 output_row.storage_pool
             ), bt_output_row_sum)
 
+            if available_energy < 0.0 || target_energy < 0.0
+                reset_balance_table!(unit::Bus)
+                continue_iteration = false
+                break
+            end
+
             unit.balance_table[input_row.priority, output_row.priority*2-1] =
                 abs(available_energy) < abs(target_energy) ? available_energy : target_energy
             unit.balance_table[input_row.priority, output_row.priority*2] = max_min
         end
     end
+end
+
+function reset_balance_table!(unit::Bus)
+
+    unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
+    for i in 1:length(unit.balance_table_inputs)
+        for j in 2:2:(2*length(unit.balance_table_outputs))
+            unit.balance_table[i, j] = nothing
+        end
+    end
+
+    inner_distribute!(unit)
 end
 
 """

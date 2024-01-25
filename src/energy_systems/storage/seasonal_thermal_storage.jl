@@ -71,6 +71,10 @@ function control(
         unit.high_temperature,
         unit.high_temperature
     )
+
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.capacity - unit.load)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.load)
+
 end
 
 function temperature_at_load(unit::SeasonalThermalStorage)::Temperature
@@ -114,6 +118,7 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)    
         return
     end
 
@@ -161,6 +166,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         return
     end
 

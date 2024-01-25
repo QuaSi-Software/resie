@@ -342,9 +342,17 @@ function set_max_energy!(
     interface.max_energy = value
 
     if interface.source.sys_function == sf_bus
-        set_max_energy!(interface.source, interface.target, false, value)
+        if interface.target.sys_function == sf_storage
+            set_storage_potential!(interface.source, interface.target, false, value)
+        else
+            set_max_energy!(interface.source, interface.target, false, value)
+        end
     elseif interface.target.sys_function == sf_bus
-        set_max_energy!(interface.target, interface.source, true, value)
+        if interface.source.sys_function == sf_storage
+            set_storage_potential!(interface.target, interface.source, true, value)
+        else
+            set_max_energy!(interface.target, interface.source, true, value)
+        end
     end
 end
 

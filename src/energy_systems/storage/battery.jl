@@ -43,6 +43,19 @@ Base.@kwdef mutable struct Battery <: Component
     end
 end
 
+function control(
+    unit::Battery,
+    components::Grouping,
+    sim_params::Dict{String,Any}
+)
+    move_state(unit, components, sim_params)
+
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
+
+end
+
+
 function balance_on(
     interface::SystemInterface,
     unit::Battery
@@ -63,6 +76,7 @@ end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 2
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return
     end
 
@@ -82,6 +96,7 @@ function process(unit::Battery, sim_params::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return # process is only concerned with moving energy to the target
     end
 
@@ -96,6 +111,7 @@ end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.controller.state_machine.state != 1
+        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
     end
 
@@ -104,6 +120,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
     energy_available = balance(exchanges)
 
     if energy_available <= 0.0
+        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return # load is only concerned with receiving energy from the target
     end
 

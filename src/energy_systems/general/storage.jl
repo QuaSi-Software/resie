@@ -48,6 +48,10 @@ function control(
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
+
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
+
 end
 
 function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
@@ -80,6 +84,7 @@ function process(unit::Storage, sim_params::Dict{String,Any})
     end
 
     if energy_demand >= 0.0
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return # process is only concerned with moving energy to the target
     end
 
@@ -98,6 +103,7 @@ function load(unit::Storage, sim_params::Dict{String,Any})
     energy_available = balance(exchanges)
 
     if energy_available <= 0.0
+        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return # load is only concerned with receiving energy from the source
     end
 
