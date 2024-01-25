@@ -422,17 +422,21 @@ function balance_on(
 
             is_storage = output_row.target.sys_function == sf_storage
 
+            if interface.max_energy === nothing
+                energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
+                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1])))
+                storage_pot = -(_sub(_add(output_row.storage_pool, output_row.storage_potential),
+                    (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)))
+            else
+                energy_pot = -unit.balance_table[input_row.priority, output_row.priority*2-1]
+                storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=output_row.target.uac,
-                energy_potential=interface.max_energy === nothing ?
-                    _add(output_row.energy_pool, output_row.energy_potential)
-                        - (is_storage ? 0 : unit.balance_table[input_row.priority, output_row.priority*2-1]) :
-                    unit.balance_table[input_row.priority, output_row.priority*2-1],
-                storage_potential=interface.max_energy === nothing ?
-                    _add(output_row.storage_pool, output_row.storage_potential)
-                        - (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0) :
-                    unit.balance_table[input_row.priority, output_row.priority*2-1],
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
                 temperature_min=output_row.temperature_min,
                 temperature_max=output_row.temperature_max,
                 pressure=nothing,
@@ -448,17 +452,21 @@ function balance_on(
 
             is_storage = input_row.source.sys_function == sf_storage
 
+            if interface.max_energy === nothing
+                energy_pot = _sub(_add(input_row.energy_pool, input_row.energy_potential),
+                    (is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]))
+                storage_pot = _sub(_add(input_row.storage_pool, input_row.storage_potential),
+                    (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0))
+            else
+                energy_pot = unit.balance_table[input_row.priority, output_row.priority*2-1]
+                storage_pot = (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=input_row.source.uac,
-                energy_potential=interface.max_energy === nothing ?
-                    _add(input_row.energy_pool, input_row.energy_potential)
-                        - (is_storage ? 0 : unit.balance_table[input_row.priority, output_row.priority*2-1]) :
-                    unit.balance_table[input_row.priority, output_row.priority*2-1],
-                storage_potential=interface.max_energy === nothing ?
-                    _add(input_row.storage_pool, input_row.storage_potential)
-                        - (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0) :
-                    unit.balance_table[input_row.priority, output_row.priority*2-1],
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
                 temperature_min=input_row.temperature_min,
                 temperature_max=input_row.temperature_max,
                 pressure=nothing,
