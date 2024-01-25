@@ -502,7 +502,8 @@ Returns:
     `Temperature`: First not-nothing minimum temperature found or nothing if no such exists
 """
 function temp_min_highest(entries::Vector{EnergyExchange})::Temperature
-    return maximum(e.temperature_min for e in entries if e.temperature_min !== nothing)
+    temps = [e.temperature_min for e in entries if e.temperature_min !== nothing]
+    return length(temps) > 0 ? maximum(temps) : nothing
 end
 
 """
@@ -517,7 +518,8 @@ Returns:
     `Temperature`: First not-nothing maximum temperature found or nothing if no such exists
 """
 function temp_max_highest(entries::Vector{EnergyExchange})::Temperature
-    return maximum(e.temperature_max for e in entries if e.temperature_max !== nothing)
+    temps = [e.temperature_max for e in entries if e.temperature_max !== nothing]
+    return length(temps) > 0 ? maximum(temps) : nothing
 end
 
 """
