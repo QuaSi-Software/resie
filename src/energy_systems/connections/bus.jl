@@ -485,6 +485,10 @@ function inner_distribute!(unit::Bus)
                 continue
             end
 
+            if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
+                continue
+            end
+
             max_min = highest(input_row.temperature_min, output_row.temperature_min)
             min_max = lowest(input_row.temperature_max, output_row.temperature_max)
             if max_min !== nothing && min_max !== nothing && max_min > min_max
