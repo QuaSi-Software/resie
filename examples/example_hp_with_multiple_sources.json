@@ -3,16 +3,13 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
-			"TST_HP_01": [
-                "m_h_w_lt1 IN",
-                "m_h_w_ht1 OUT",
-                "m_e_ac_230v IN",
-                "COP"
-            ],
-            "TST_DEM_01": ["Temperature"],
-            "TST_SRC_01": ["Temperature", "Max_Energy"]
+        "sankey_plot": {
+            "m_h_w_lt1": "red",
+            "m_h_w_ht1": "darkred",
+            "m_e_ac_230v": "darkgoldenrod1",
+            "Losses": "black"
         },
+        "csv_output_keys": "all",
         "output_plot": {
             "1": {
                 "key": {"TST_SRC_01": ["m_h_w_lt1 OUT"]},

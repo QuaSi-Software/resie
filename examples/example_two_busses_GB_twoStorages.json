@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
             "TST_DEM_01": ["m_h_w_ht1 IN"],
             "ESS_BUS_TH_01": ["Balance"],
             "ESS_BUS_TH_02": ["Balance"],

@@ -3,14 +3,15 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "__heating_output_keys": {
+        "sankey_plot": "default",
+        "__heating_csv_output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT", "COP"],
             "TST_01_HZG_01_BUS": ["Balance"],
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
         },
-        "__electricity_output_keys": {
+        "__electricity_csv_output_keys": {
             "TST_01_ELT_01_PVP": ["m_e_ac_230v OUT"],
             "TST_01_HZG_01_CHP": ["m_e_ac_230v OUT"],
             "TST_01_ELT_01_DEM": ["m_e_ac_230v IN"],
@@ -20,7 +21,7 @@
             "TST_01_ELT_01_GRI": ["m_e_ac_230v OUT"],
             "TST_01_ELT_01_GRO": ["m_e_ac_230v IN"]
         },
-        "output_keys": {
+        "csv_output_keys": {
             "TST_01_HZG_01_BFT": ["Load"],
             "TST_01_HZG_01_CHP": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT", "COP"],
