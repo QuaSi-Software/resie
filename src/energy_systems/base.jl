@@ -222,6 +222,20 @@ Base.@kwdef mutable struct SystemInterface
 
     """Maximum energy the source can provide in the current timestep"""
     max_energy::Union{Nothing,Float64} = nothing
+
+    """Flag to decide if storage potentials are transferred over the interface."""
+    do_storage_transfer::Bool = true
+end
+
+"""
+    set_storage_transfer!(interface, value)
+
+Sets the flag to decide over storage potential transfer to the given boolean value. Note
+that if the flag is already set to false, no further changes will set it back to true. This
+is to prevent components overwriting the values of others.
+"""
+function set_storage_transfer!(interface::SystemInterface, flag::Bool)
+    interface.do_storage_transfer = interface.do_storage_transfer && flag
 end
 
 """

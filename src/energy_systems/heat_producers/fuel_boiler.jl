@@ -74,6 +74,21 @@ mutable struct FuelBoiler <: Component
     end
 end
 
+function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_fuel_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+end
+
 function control(
     unit::FuelBoiler,
     components::Grouping,

@@ -42,6 +42,21 @@ mutable struct Storage <: Component
     end
 end
 
+function initialise!(unit::Storage, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::Storage,
     components::Grouping,

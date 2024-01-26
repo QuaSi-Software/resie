@@ -47,6 +47,15 @@ mutable struct PVPlant <: Component
     end
 end
 
+function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_el_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
+        )
+    )
+end
+
 function control(
     unit::PVPlant,
     components::Grouping,

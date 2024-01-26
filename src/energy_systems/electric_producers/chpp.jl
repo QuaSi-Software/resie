@@ -63,6 +63,27 @@ mutable struct CHPP <: Component
     end
 end
 
+function initialise!(unit::CHPP, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_gas_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_gas_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_el_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
+        )
+    )
+end
+
 function control(
     unit::CHPP,
     components::Grouping,

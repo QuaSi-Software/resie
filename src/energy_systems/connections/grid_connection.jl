@@ -47,6 +47,24 @@ mutable struct GridConnection <: Component
     end
 end
 
+function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
+    if unit.sys_function === sf_bounded_source
+        set_storage_transfer!(
+            unit.output_interfaces[unit.medium],
+            default(
+                unit.controller.parameter, "load_storages " * String(unit.medium), true
+            )
+        )
+    else
+        set_storage_transfer!(
+            unit.input_interfaces[unit.medium],
+            default(
+                unit.controller.parameter, "unload_storages " * String(unit.medium), true
+            )
+        )
+    end
+end
+
 function control(
     unit::GridConnection,
     components::Grouping,

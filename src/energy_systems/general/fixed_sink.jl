@@ -61,6 +61,15 @@ mutable struct FixedSink <: Component
     end
 end
 
+function initialise!(unit::FixedSink, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::FixedSink,
     components::Grouping,

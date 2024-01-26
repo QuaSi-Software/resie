@@ -58,6 +58,15 @@ mutable struct BoundedSupply <: Component
     end
 end
 
+function initialise!(unit::BoundedSupply, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::BoundedSupply,
     components::Grouping,
