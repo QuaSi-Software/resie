@@ -119,14 +119,9 @@ end
 function process(unit::BufferTank, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    energy_demanded = balance(exchanges) + energy_potential(exchanges)
-
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demanded += storage_potential(exchanges)
-    end
+    energy_demanded = balance(exchanges) +
+        energy_potential(exchanges) +
+        (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
@@ -135,13 +130,9 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        demanded_on_interface = exchange.balance + exchange.energy_potential
-        if (
-            unit.controller.parameter["name"] == "extended_storage_control"
-            && unit.controller.parameter["load_any_storage"]
-        )
-            demanded_on_interface += exchange.storage_potential
-        end
+        demanded_on_interface = exchange.balance +
+            exchange.energy_potential +
+            (outface.do_storage_transfer ? exchange.storage_potential : 0.0)
 
         if demanded_on_interface >= -sim_params["epsilon"]
             continue
@@ -174,7 +165,9 @@ end
 function load(unit::BufferTank, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges) + storage_potential(exchanges)
+    energy_available = balance(exchanges) +
+        energy_potential(exchanges) +
+        (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
@@ -183,7 +176,10 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        exchange_energy_available = exchange.balance + exchange.energy_potential + exchange.storage_potential
+        exchange_energy_available = exchange.balance +
+            exchange.energy_potential +
+            (inface.do_storage_transfer ? exchange.storage_potential : 0.0)
+
         if exchange_energy_available < sim_params["epsilon"]
             continue
         end

@@ -102,16 +102,9 @@ end
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges) + energy_potential(exchanges)
-
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demand = blnc + storage_potential(exchanges)
-    else
-        energy_demand = blnc
-    end
+    energy_demand = balance(exchanges) +
+        energy_potential(exchanges) +
+        (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     if energy_demand < 0.0
         add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)

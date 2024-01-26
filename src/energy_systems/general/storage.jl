@@ -87,16 +87,9 @@ end
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges) + energy_potential(exchanges)
-
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demand = blnc + storage_potential(exchanges)
-    else
-        energy_demand = blnc
-    end
+    energy_demand = balance(exchanges) +
+        energy_potential(exchanges) +
+        (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     if energy_demand >= 0.0
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
@@ -115,7 +108,9 @@ end
 function load(unit::Storage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges) + storage_potential(exchanges)
+    energy_available = balance(exchanges) +
+        energy_potential(exchanges) +
+        (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)

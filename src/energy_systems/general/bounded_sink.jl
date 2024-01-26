@@ -102,7 +102,9 @@ end
 function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    blnc = balance(exchanges) + energy_potential(exchanges)
+    blnc = balance(exchanges) +
+        energy_potential(exchanges) +
+        (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
     if blnc > 0.0
         sub!(
             inface,
