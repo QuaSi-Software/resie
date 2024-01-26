@@ -36,6 +36,7 @@ Base.@kwdef mutable struct BTInputRow
     source::Component
     priority::Integer
     input_index::Integer
+    do_storage_transfer::Bool
     energy_potential::Floathing = nothing
     energy_pool::Floathing = nothing
     storage_potential::Floathing = nothing
@@ -57,6 +58,7 @@ Base.@kwdef mutable struct BTOutputRow
     target::Component
     priority::Integer
     output_index::Integer
+    do_storage_transfer::Bool
     energy_potential::Floathing = nothing
     energy_pool::Floathing = nothing
     storage_potential::Floathing = nothing
@@ -137,7 +139,8 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
         unit.balance_table_inputs[inface.source.uac] = BTInputRow(
             source=inface.source,
             priority=p,
-            input_index=idx
+            input_index=idx,
+            do_storage_transfer = inface.do_storage_transfer
         )
         p += 1
     end
@@ -147,7 +150,8 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
         unit.balance_table_outputs[outface.target.uac] = BTOutputRow(
             target=outface.target,
             priority=p,
-            output_index=idx
+            output_index=idx,
+            do_storage_transfer = outface.do_storage_transfer
         )
         p += 1
     end
@@ -520,6 +524,11 @@ function inner_distribute!(unit::Bus)
                 continue
             end
 
+            if ((input_row.source.sys_function == sf_storage && !output_row.do_storage_transfer) ||
+               (output_row.target.sys_function == sf_storage && !input_row.do_storage_transfer))
+               continue
+            end
+
             bt_input_row_sum = _sum(unit.balance_table[input_row.priority, 1:2:end])
 
             available_energy = _sub(_add(_add(_add(
@@ -529,14 +538,14 @@ function inner_distribute!(unit::Bus)
                 input_row.storage_pool
             ), bt_input_row_sum)
 
-            bt_output_row_sum = _sum(unit.balance_table[:, output_row.priority*2-1])
+            bt_output_row_sum = _sum(unit.balance_table[:, output_row.priority*2-1]) 
 
             target_energy = _sub(_add(_add(_add(
                 output_row.energy_potential,
                 output_row.energy_pool),
                 output_row.storage_potential),
                 output_row.storage_pool
-            ), bt_output_row_sum)
+            ), bt_output_row_sum)               
 
             if available_energy < 0.0 || target_energy < 0.0
                 reset_balance_table!(unit::Bus)
