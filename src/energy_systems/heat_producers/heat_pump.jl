@@ -143,7 +143,7 @@ function check_el_in(
             potential_energy_el = balance(exchanges) + energy_potential(exchanges)
             potential_storage_el = storage_potential(exchanges)
             if (
-                unit.controller.parameter["unload_storages"]
+                unit.input_interfaces[unit.m_el_in].do_storage_transfer
                 ? potential_energy_el + potential_storage_el
                 : potential_energy_el
             ) <= sim_params["epsilon"]
@@ -204,7 +204,7 @@ function check_heat_out(
         potential_storage_heat_out = storage_potential(exchanges)
         temperature = temp_min_highest(exchanges)
         if (
-            unit.controller.parameter["load_storages"]
+            unit.output_interfaces[unit.m_heat_out].do_storage_transfer
             ? potential_energy_heat_out + potential_storage_heat_out
             : potential_energy_heat_out
         ) >= -sim_params["epsilon"]
@@ -249,11 +249,11 @@ function calculate_energies(
         potential_storage_heat_out,
         out_temp = check_heat_out(unit, sim_params)
 
-    available_el_in = unit.controller.parameter["unload_storages"] ?
+    available_el_in = unit.input_interfaces[unit.m_el_in].do_storage_transfer ?
                       potential_energy_el + potential_storage_el :
                       potential_energy_el
 
-    available_heat_out = unit.controller.parameter["load_storages"] ?
+    available_heat_out = unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
                          potential_energy_heat_out + potential_storage_heat_out :
                          potential_energy_heat_out
 
@@ -291,7 +291,7 @@ function calculate_energies(
         # check if it is an "empty" layer, usually from other outputs on a bus, which are
         # included for balance calculations but cannot offer energy
         if (
-            unit.controller.parameter["unload_storages"]
+            unit.input_interfaces[unit.m_heat_in].do_storage_transfer
             ? pot_heat_in + potentials_storage_heat_in[idx_layer]
             : pot_heat_in
         ) <= sim_params["epsilon"]
@@ -324,7 +324,7 @@ function calculate_energies(
         end
 
         # energies for current layer with potential (+storage) heat in as basis
-        used_heat_in = unit.controller.parameter["unload_storages"] ?
+        used_heat_in = unit.input_interfaces[unit.m_heat_in].do_storage_transfer ?
                        pot_heat_in + potentials_storage_heat_in[idx_layer] :
                        pot_heat_in
         used_el_in = used_heat_in / (cop - 1.0)

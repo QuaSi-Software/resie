@@ -133,7 +133,7 @@ function check_el_in(
             potential_energy_el = balance(exchanges) + energy_potential(exchanges)
             potential_storage_el = storage_potential(exchanges)
             if (
-                unit.controller.parameter["unload_storages"]
+                unit.input_interfaces[unit.m_el_in].do_storage_transfer
                 ? potential_energy_el + potential_storage_el
                 : potential_energy_el
             ) <= sim_params["epsilon"]
@@ -177,7 +177,7 @@ function check_h2_out(
         potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
         potential_storage_h2 = storage_potential(exchanges)
         if (
-            unit.controller.parameter["load_storages"]
+            unit.output_interfaces[unit.m_h2_out].do_storage_transfer
             ? potential_energy_h2 + potential_storage_h2
             : potential_energy_h2
         ) >= -sim_params["epsilon"]
@@ -201,7 +201,7 @@ function check_o2_out(
         potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
         potential_storage_o2 = storage_potential(exchanges)
         if (
-            unit.controller.parameter["load_storages"]
+            unit.output_interfaces[unit.m_o2_out].do_storage_transfer
             ? potential_energy_o2 + potential_storage_o2
             : potential_energy_o2
         ) >= -sim_params["epsilon"]
@@ -236,15 +236,15 @@ function calculate_energies(
     potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, sim_params)
     potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, sim_params)
 
-    available_el_in = unit.controller.parameter["unload_storages"] ?
+    available_el_in = unit.input_interfaces[unit.m_el_in].do_storage_transfer ?
                       potential_energy_el + potential_storage_el :
                       potential_energy_el
 
-    available_h2_out = unit.controller.parameter["load_storages"] ?
+    available_h2_out = unit.output_interfaces[unit.m_h2_out].do_storage_transfer ?
                          potential_energy_h2_out + potential_storage_h2_out :
                          potential_energy_h2_out
 
-    available_o2_out = unit.controller.parameter["load_storages"] ?
+    available_o2_out = unit.output_interfaces[unit.m_o2_out].do_storage_transfer ?
                         potential_energy_o2_out + potential_storage_o2_out :
                         potential_energy_o2_out
 
@@ -285,7 +285,7 @@ function calculate_energies(
         # check if it is an "empty" layer, usually from other inputs on a bus, which are
         # included for balance calculations but cannot take in energy from the electorlyser
         if (
-            unit.controller.parameter["load_storages"]
+            unit.output_interfaces[unit.m_heat_out].do_storage_transfer
             ? pot_heat_out + potentials_storage_heat_out[idx_layer]
             : pot_heat_out
         ) <= sim_params["epsilon"]
@@ -301,7 +301,7 @@ function calculate_energies(
         end
 
         # energies for current layer with potential (+storage) heat out as basis
-        used_heat_out = unit.controller.parameter["load_storages"] ?
+        used_heat_out = unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
             pot_heat_out + potentials_storage_heat_out[idx_layer] :
             pot_heat_out
         used_el_in = used_heat_out / unit.heat_fraction

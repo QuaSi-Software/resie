@@ -129,7 +129,7 @@ function check_fuel_in(
             potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
             potential_storage_fuel = storage_potential(exchanges)
             if (
-                unit.controller.parameter["unload_storages"] ?
+                unit.input_interfaces[unit.m_fuel_in].do_storage_transfer ?
                 potential_energy_fuel + potential_storage_fuel :
                 potential_energy_fuel
             ) <= sim_params["epsilon"]
@@ -154,7 +154,7 @@ function check_heat_out(
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
         potential_storage_heat_out = storage_potential(exchanges)
         if (
-            unit.controller.parameter["load_storages"] ?
+            unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
             potential_energy_heat_out + potential_storage_heat_out :
             potential_energy_heat_out
         ) >= -sim_params["epsilon"]
@@ -233,7 +233,7 @@ function calculate_energies(
             # max_produce_heat should equal rated power_th, else when using demand heat, which
             # can be inf, a non-physical state might occur
             max_produce_heat = watt_to_wh(unit.power_th)
-            demand_heat = -(unit.controller.parameter["load_storages"] ?
+            demand_heat = -(unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
                             potential_energy_heat_out + potential_storage_heat_out :
                             potential_energy_heat_out)
             if demand_heat >= max_produce_heat
@@ -273,10 +273,10 @@ function calculate_energies(
         unit.controller.strategy == "storage_driven" &&
         unit.controller.state_machine.state == 2
     )
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
                                      potential_energy_heat_out + potential_storage_heat_out :
                                      potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
+        usage_fraction_fuel_in = +((unit.input_interfaces[unit.m_fuel_in].do_storage_transfer ?
                                    potential_energy_fuel_in + potential_storage_fuel_in :
                                    potential_energy_fuel_in) / max_consume_fuel)
 
@@ -284,18 +284,18 @@ function calculate_energies(
         return (false, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
                                      potential_energy_heat_out + potential_storage_heat_out :
                                      potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
+        usage_fraction_fuel_in = +((unit.input_interfaces[unit.m_fuel_in].do_storage_transfer ?
                                    potential_energy_fuel_in + potential_storage_fuel_in :
                                    potential_energy_fuel_in) / max_consume_fuel)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
                                      potential_energy_heat_out + potential_storage_heat_out :
                                      potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
+        usage_fraction_fuel_in = +((unit.input_interfaces[unit.m_fuel_in].do_storage_transfer ?
                                    potential_energy_fuel_in + potential_storage_fuel_in :
                                    potential_energy_fuel_in) / max_consume_fuel)
     end
