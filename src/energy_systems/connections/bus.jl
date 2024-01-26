@@ -514,20 +514,14 @@ function inner_distribute!(unit::Bus)
                 continue
             end
 
-            # if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
-            #     continue
-            # end
-
             max_min = highest(input_row.temperature_min, output_row.temperature_min)
             min_max = lowest(input_row.temperature_max, output_row.temperature_max)
             if max_min !== nothing && min_max !== nothing && max_min > min_max
                 continue
             end
 
-            bt_input_row_sum = 0
-            for idx in 1:2:length(unit.balance_table_outputs)
-                bt_input_row_sum += unit.balance_table[input_row.priority, idx]
-            end
+            bt_input_row_sum = _sum(unit.balance_table[input_row.priority, 1:2:end])
+
             available_energy = _sub(_add(_add(_add(
                 input_row.energy_potential,
                 input_row.energy_pool),
@@ -535,10 +529,8 @@ function inner_distribute!(unit::Bus)
                 input_row.storage_pool
             ), bt_input_row_sum)
 
-            bt_output_row_sum = 0
-            for idx in range(1,length(unit.balance_table_inputs))
-                bt_output_row_sum += unit.balance_table[idx, output_row.priority*2-1]
-            end
+            bt_output_row_sum = _sum(unit.balance_table[:, output_row.priority*2-1])
+
             target_energy = _sub(_add(_add(_add(
                 output_row.energy_potential,
                 output_row.energy_pool),
@@ -551,13 +543,8 @@ function inner_distribute!(unit::Bus)
                 continue_iteration = false
                 break
             end
-            
-            if unit.balance_table[input_row.priority, output_row.priority*2-1] != 0.0
-                println("debug")
-            end
 
-            unit.balance_table[input_row.priority, output_row.priority*2-1] =
-                abs(available_energy) < abs(target_energy) ? available_energy : target_energy
+            unit.balance_table[input_row.priority, output_row.priority*2-1] += min(target_energy, available_energy) 
             unit.balance_table[input_row.priority, output_row.priority*2] = max_min
         end
     end

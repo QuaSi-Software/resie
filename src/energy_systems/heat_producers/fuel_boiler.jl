@@ -249,7 +249,7 @@ function calculate_energies(
         1.0 :
         value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     if usage_fraction_operation_profile <= 0.0
-        return # no operation allowed from external profile
+        return (false, nothing, nothing) # no operation allowed from external profile
     end
 
     # all three standard operating strategies behave the same, but it is better to be
@@ -266,7 +266,7 @@ function calculate_energies(
                                    potential_energy_fuel_in) / max_consume_fuel)
 
     elseif unit.controller.strategy == "storage_driven"
-        return (false, nothing, nothing, nothing)
+        return (false, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
         usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
