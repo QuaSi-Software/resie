@@ -313,7 +313,6 @@ include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 include("strategies/demand_driven.jl")
 include("strategies/supply_driven.jl")
-include("strategies/extended_storage_control.jl")
 
 """
     controller_for_strategy(strategy, strategy_config, sim_params)
@@ -353,7 +352,7 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
             params["operation_profile"] = Profile(params["operation_profile_path"], sim_params)
         end
     end
-    
+
     machine = OP_STRATS[strategy].sm_constructor(params)
     return Controller(strategy, params, machine, Grouping())
 end
