@@ -125,7 +125,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) +
-        energy_potential(extanges) +
+        energy_potential(exchanges) +
         (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
 
     if energy_available <= 0.0

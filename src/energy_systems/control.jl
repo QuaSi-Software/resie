@@ -339,7 +339,12 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
 
     # check if parameters given in input file for strategy are valid parameters:
     for key in keys(strategy_config)
-        if !(key in keys(OP_STRATS[strategy].strategy_parameters)) && !(startswith(key, "_"))
+        if  (
+            !(key in keys(OP_STRATS[strategy].strategy_parameters)) &&
+            !(startswith(key, "load_storages")) && 
+            !(startswith(key, "unload_storages")) && 
+            !(startswith(key, "_"))
+            )
             throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
         end
     end
