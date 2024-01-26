@@ -55,8 +55,9 @@ function test_run_energy_system_from_storage()
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
-                "unload_storages" => true
+                "unload_storages m_e_ac_230v" => true
             ),
+            "m_el_in": "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,
             "min_power_fraction" => 0.0
@@ -231,8 +232,9 @@ function test_run_energy_system_from_storage_denied()
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
-                "unload_storages" => false
+                "unload_storages m_e_ac_230v" => false
             ),
+            "m_el_in": "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,
             "min_power_fraction" => 0.0

@@ -311,8 +311,11 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "load_storages": true
+                "load_storages m_h_w_ht1": true,
+                "load_storages m_e_ac_230v": true
             },
+            "m_heat_out": "m_h_w_ht1",
+            "m_el_out": "m_e_ac_230v",
             "power_gas": 150000,
             "output_temperature": 60,
             "min_power_fraction": 1.0
@@ -371,8 +374,9 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "load_storages": false
+                "load_storages m_h_w_ht1": false
             },
+            "m_heat_out": "m_h_w_ht1",
             "power_th": 550000,
             "constant_cop": 3.0,
             "min_power_fraction": 0.2

@@ -12,10 +12,6 @@ function test_one_bus_to_many_bus()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "strategy" => Dict{String,Any}(
-                "name" => "extended_storage_control",
-                "load_any_storage" => true,
-            ),
             "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
             "constant_power" => 400,

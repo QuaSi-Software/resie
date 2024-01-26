@@ -12,10 +12,6 @@ function test_many_plus_storage_to_one()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "strategy" => Dict{String,Any}(
-                "name" => "extended_storage_control",
-                "load_any_storage" => true,
-            ),
             "output_refs" => ["TST_BUS_TH_01"],
             "constant_power" => 2000,
             "constant_temperature" => 55,
@@ -24,10 +20,6 @@ function test_many_plus_storage_to_one()
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "strategy" => Dict{String,Any}(
-                "name" => "extended_storage_control",
-                "load_any_storage" => true,
-            ),
             "output_refs" => ["TST_BUS_TH_01"],
             "constant_power" => 2000,
             "constant_temperature" => 55,
