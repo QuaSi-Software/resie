@@ -144,7 +144,11 @@ function check_heat_in(
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
         )
-            return ([Inf], [Inf], [nothing], [nothing])
+            return ([Inf], 
+                    [Inf], 
+                    [unit.input_interfaces[unit.m_heat_in].temperature_min], 
+                    [unit.input_interfaces[unit.m_heat_in].temperature_max]
+                )
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_heat_in],
@@ -158,7 +162,11 @@ function check_heat_in(
             )
         end
     else
-        return ([Inf], [Inf], [nothing], [nothing])
+        return ([Inf], 
+                [Inf], 
+                [unit.input_interfaces[unit.m_heat_in].temperature_min], 
+                [unit.input_interfaces[unit.m_heat_in].temperature_max]
+            )
     end
 end
 
@@ -290,7 +298,8 @@ function calculate_energies(
               dynamic_cop(in_temp, out_temp) :
               unit.constant_cop
         if cop === nothing
-            throw(ArgumentError("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop."))
+            @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
+            exit()
         end
 
         # energies for current layer with potential (+storage) heat in as basis
