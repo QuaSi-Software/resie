@@ -112,6 +112,8 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table_outputs::Dict{String,BTOutputRow}
     balance_table::Array{Union{Nothing, Float64}, 2}
 
+    epsilon::Float64
+
     function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -128,7 +130,9 @@ Base.@kwdef mutable struct Bus <: Component
             ConnectionMatrix(config), # connectivity
             0.0, # remainder
             Dict{String,BTInputRow}(), # balance_table_inputs
-            Dict{String,BTOutputRow}() # balance_table_outputs
+            Dict{String,BTOutputRow}(), # balance_table_outputs
+            Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table, filled in reset()
+            sim_params["epsilon"] # system-wide epsilon for easy access within the bus functions
         )
     end
 end
@@ -547,7 +551,7 @@ function inner_distribute!(unit::Bus)
                 output_row.storage_pool
             ), bt_output_row_sum)               
 
-            if available_energy < 0.0 || target_energy < 0.0
+            if available_energy < -unit.epsilon || target_energy < -unit.epsilon
                 reset_balance_table!(unit::Bus)
                 continue_iteration = false
                 break
