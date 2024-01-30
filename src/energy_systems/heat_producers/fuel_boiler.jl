@@ -28,11 +28,11 @@ mutable struct FuelBoiler <: Component
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_fuel_in = Symbol(config["m_fuel_in"])
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        m_heat_out = Symbol(default(uac, config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_fuel_in, m_heat_out])
 
         max_consumable_fuel = watt_to_wh(float(config["power_th"])) /
-                             default(config, "max_thermal_efficiency", 1.0)
+                             default(uac, config, "max_thermal_efficiency", 1.0)
         # lookup table for conversion of part load ratio to expended energy
         plr_to_expended_energy = []
         # fill up plr_to_expended_energy lookup table
@@ -63,12 +63,12 @@ mutable struct FuelBoiler <: Component
             m_fuel_in,
             m_heat_out,
             config["power_th"], # power_th
-            default(config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
+            default(uac, config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
             max_consumable_fuel,
             plr_to_expended_energy,
-            default(config, "min_power_fraction", 0.1),
-            default(config, "min_run_time", 0),
-            default(config, "output_temperature", nothing),
+            default(uac, config, "min_power_fraction", 0.1),
+            default(uac, config, "min_run_time", 0),
+            default(uac, config, "output_temperature", nothing),
             0.0, # losses
         )
     end
@@ -78,13 +78,13 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_fuel_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
         )
     )
 end

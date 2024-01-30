@@ -36,8 +36,8 @@ mutable struct GeothermalProbes <: Component
     last_timestep_calculated::Float64
 
     function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
+        m_heat_in = Symbol(default(uac, config, "m_heat_in", "m_h_w_ht1"))
+        m_heat_out = Symbol(default(uac, config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
         
         ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
@@ -57,12 +57,12 @@ mutable struct GeothermalProbes <: Component
             m_heat_in,                      # medium name of input interface
             m_heat_out,                     # medium name of output interface
             ambient_temperature_profile,    # ambient temperature profile
-            default(config, "unloading_temperature_spread", 5.0),   # temperature spread between forward and return flow during unloading            
-            default(config, "loading_temperature", nothing),        # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
-            default(config, "loading_temperature_spread", 5.0),     # temperature spread between forward and return flow during loading         
+            default(uac, config, "unloading_temperature_spread", 5.0),   # temperature spread between forward and return flow during unloading            
+            default(uac, config, "loading_temperature", nothing),        # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
+            default(uac, config, "loading_temperature_spread", 5.0),     # temperature spread between forward and return flow during loading         
             config["max_output_power"],  # maximum output power set by user, may change later to be calculated from other inputs like specific heat transfer rate
             config["max_input_power"],   # maximum input power set by user, may change later to be calculated from other inputs like specific heat transfer rate
-            default(config, "regeneration", true),   # flag if regeneration should be taken into account
+            default(uac, config, "regeneration", true),   # flag if regeneration should be taken into account
             fill(15, 100),               # temperature_field of probe field with initially temperature of equally 8.5°, acts currently only as dummy!
             0.0,                         # max_output_energy in every time step, calculated in control()
             0.0,                         # max_input_energy in every time step, calculated in control()

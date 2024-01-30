@@ -52,11 +52,11 @@ mutable struct FixedSupply <: Component
             ),
             energy_profile, # energy_profile
             temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
+            default(uac, config, "scale", 1.0), # scaling_factor
             0.0, # supply
             nothing, # temperature
-            default(config, "constant_supply", nothing), # constant_supply (power, not work!)
-            default(config, "constant_temperature", nothing), # constant_temperature
+            default(uac, config, "constant_supply", nothing), # constant_supply (power, not work!)
+            default(uac, config, "constant_temperature", nothing), # constant_temperature
         )
     end
 end
@@ -65,7 +65,7 @@ function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.medium), true
         )
     )
 end

@@ -24,7 +24,7 @@ mutable struct BufferTank <: Component
     low_temperature::Float64
 
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(default(config, "medium", "m_h_w_ht1"))
+        medium = Symbol(default(uac, config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
         return new(
@@ -43,10 +43,10 @@ mutable struct BufferTank <: Component
             config["capacity"], # capacity
             config["load"], # load
             0.0, # losses
-            default(config, "use_adaptive_temperature", false),
-            default(config, "switch_point", 0.15),
-            default(config, "high_temperature", 75.0),
-            default(config, "low_temperature", 20),
+            default(uac, config, "use_adaptive_temperature", false),
+            default(uac, config, "switch_point", 0.15),
+            default(uac, config, "high_temperature", 75.0),
+            default(uac, config, "low_temperature", 20),
         )
     end
 end
@@ -55,13 +55,13 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.medium), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.medium), true
         )
     )
 end

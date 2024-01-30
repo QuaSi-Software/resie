@@ -28,9 +28,9 @@ mutable struct HeatPump <: Component
     losses::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
+        m_el_in = Symbol(default(uac, config, "m_el_in", "m_e_ac_230v"))
+        m_heat_out = Symbol(default(uac, config, "m_heat_out", "m_h_w_ht1"))
+        m_heat_in = Symbol(default(uac, config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in])
 
         return new(
@@ -50,11 +50,11 @@ mutable struct HeatPump <: Component
             m_heat_out,
             m_heat_in,
             config["power_th"], # power_th
-            default(config, "min_power_fraction", 0.2),
-            default(config, "min_run_time", 0),
-            default(config, "constant_cop", nothing),
-            default(config, "output_temperature", nothing),
-            default(config, "input_temperature", nothing),
+            default(uac, config, "min_power_fraction", 0.2),
+            default(uac, config, "min_run_time", 0),
+            default(uac, config, "constant_cop", nothing),
+            default(uac, config, "output_temperature", nothing),
+            default(uac, config, "input_temperature", nothing),
             0.0, # cop
             0.0, # losses
         )
@@ -65,19 +65,19 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_heat_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
         )
     )
     set_storage_transfer!(
         unit.input_interfaces[unit.m_el_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
         )
     )
 end

@@ -49,11 +49,11 @@ mutable struct BoundedSupply <: Component
             ),
             max_power_profile, # max_power_profile
             temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
+            default(uac, config, "scale", 1.0), # scaling_factor
             0.0, # max_energy
             nothing, # temperature
-            default(config, "constant_power", nothing), # constant_power
-            default(config, "constant_temperature", nothing), # constant_temperature
+            default(uac, config, "constant_power", nothing), # constant_power
+            default(uac, config, "constant_temperature", nothing), # constant_temperature
         )
     end
 end
@@ -62,7 +62,7 @@ function initialise!(unit::BoundedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.medium), true
         )
     )
 end

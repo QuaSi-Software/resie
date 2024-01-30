@@ -23,7 +23,7 @@ mutable struct PVPlant <: Component
     supply::Float64
 
     function PVPlant(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
+        m_el_out = Symbol(default(uac, config, "m_el_out", "m_e_ac_230v"))
         register_media([m_el_out])
 
         # load energy profile from path
@@ -51,7 +51,7 @@ function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.m_el_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
         )
     )
 end

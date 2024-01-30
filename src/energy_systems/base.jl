@@ -27,9 +27,14 @@ export check_balances, Component, each, Grouping, link_output_with, perform_step
 """
 Convenience function to get the value of a key from a config dict using a default value.
 """
-default(config::Dict{String,Any}, name::String, default_val::Any)::Any =
-    return name in keys(config) ? config[name] : default_val
-
+function default(uac::String, config::Dict{String,Any}, name::String, default_val::Any)::Any
+    if name in keys(config)
+        return config[name]
+    else
+        @info "For '$uac', the parameter '$name' is set to the default value of '$default_val'."
+        return default_val
+    end
+end
 
 """
 The number of hours per time step, used by various utility functions.

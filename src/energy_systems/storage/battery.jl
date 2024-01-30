@@ -20,7 +20,7 @@ Base.@kwdef mutable struct Battery <: Component
     losses::Float64
 
     function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(default(config, "medium", "m_e_ac_230v"))
+        medium = Symbol(default(uac, config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
         return new(
@@ -47,13 +47,13 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.medium), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.medium), true
         )
     )
 end

@@ -30,10 +30,10 @@ mutable struct Electrolyser <: Component
     losses_hydrogen::Float64
 
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
-        m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
-        m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
+        m_el_in = Symbol(default(uac, config, "m_el_in", "m_e_ac_230v"))
+        m_heat_out = Symbol(default(uac, config, "m_heat_out", "m_h_w_lt1"))
+        m_h2_out = Symbol(default(uac, config, "m_h2_out", "m_c_g_h2"))
+        m_o2_out = Symbol(default(uac, config, "m_o2_out", "m_c_g_o2"))
         register_media([m_el_in, m_heat_out, m_h2_out, m_o2_out])
 
         return new(
@@ -55,10 +55,10 @@ mutable struct Electrolyser <: Component
             m_h2_out,
             m_o2_out,
             config["power_el"], # power_el
-            default(config, "heat_fraction", 0.4),
-            default(config, "min_power_fraction", 0.2),
-            default(config, "min_run_time", 3600),
-            default(config, "output_temperature", 55.0),
+            default(uac, config, "heat_fraction", 0.4),
+            default(uac, config, "min_power_fraction", 0.2),
+            default(uac, config, "min_run_time", 3600),
+            default(uac, config, "output_temperature", 55.0),
             0.0, # Losses heat
             0.0  # Losses hydrogen
         )
@@ -69,25 +69,25 @@ function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_el_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_h2_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_o2_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
         )
     )
 end

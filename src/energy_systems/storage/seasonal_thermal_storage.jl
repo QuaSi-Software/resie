@@ -25,8 +25,8 @@ mutable struct SeasonalThermalStorage <: Component
     low_temperature::Float64
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
+        m_heat_in = Symbol(default(uac, config, "m_heat_in", "m_h_w_ht1"))
+        m_heat_out = Symbol(default(uac, config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
         return new(
@@ -46,10 +46,10 @@ mutable struct SeasonalThermalStorage <: Component
             config["capacity"], # capacity
             config["load"], # load
             0.0, # losses
-            default(config, "use_adaptive_temperature", false),
-            default(config, "switch_point", 0.25),
-            default(config, "high_temperature", 90.0),
-            default(config, "low_temperature", 15.0),
+            default(uac, config, "use_adaptive_temperature", false),
+            default(uac, config, "switch_point", 0.25),
+            default(uac, config, "high_temperature", 90.0),
+            default(uac, config, "low_temperature", 15.0),
         )
     end
 end
@@ -58,13 +58,13 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_heat_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
+            unit.uac, unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
         )
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_in), true
+            unit.uac, unit.controller.parameter, "load_storages " * String(unit.m_heat_in), true
         )
     )
 end
