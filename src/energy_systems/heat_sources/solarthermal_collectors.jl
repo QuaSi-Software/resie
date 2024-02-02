@@ -1,13 +1,17 @@
 """
 Implementation of a solarthermal collector.
 Works for flat plate collectors, vacuum tube collectors and PVT modules.
+The calculation is based on EN ISO 9806:2017 for quasi-dynamic models.
 
 Stagnation is ignored under the assumption that the system has either measures to prevent 
-stagnation harming the collectors or the designed size is small enough for stagnation not 
-to become a problem.
+stagnation harming the collectors or the designed size is small enough in comparision to 
+the total system for stagnation not to become a problem.
 
 ## ATTENTION: Geothermal heat collector is currently work in progress and not completed!!
 """
+using Interpolations
+using Impute
+
 mutable struct SolarthermalCollector <: Component
     uac::String
     controller::Controller
@@ -18,18 +22,33 @@ mutable struct SolarthermalCollector <: Component
 
     m_heat_out::Symbol
 
+    collector_gross_area::Float64
+    tilt_angle::Float64
+    azimut_angle::Float64
+
+    eta_0_b::Float64
+    K_b_array::Array{Union{Missing, Float64}}(missing, 3, 10)
+    K_b::Float64
+    K_d::Float64
+    a_params::zeros(8)
+    sigma::Float64
+
     ambient_temperature_profile::Union{Profile,Nothing}
+    direct_solar_irradiance_profile::Union{Profile,Nothing}
+    diffuse_solar_irradiance_profile::Union{Profile,Nothing}
+    long_wave_irradiance_profile::Union{Profile,Nothing}
+    wind_speed_profile::Union{Profile,Nothing}
 
     current_output_temperature::Temperature
     current_input_temperature::Temperature
-    ambient_temperature::Temperature
+    current_average_temperature::Temperature
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any})
 
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_heat_out])
 
-        return new(
+        return new(                                                 #TODO add all values
             uac, # uac
             controller_for_strategy( # controller
                 config["strategy"]["name"], config["strategy"]
@@ -42,11 +61,27 @@ mutable struct SolarthermalCollector <: Component
                 m_heat_out => nothing
             ),
             m_heat_out, # medium name of output interface
-            ambient_temperature_profile, # ambient temperature profile
+            
+            config("collector_gross_area"),
+            config("tilt_angle"),
+            config("azimut_angle"),
+        
+            config("eta_0_b"),
+            config["K_b_array"],
+            find_K_b(config),
+            config("K_d"),
+            config("a_params"),
+            5.670374419*10^-8, # Stefan Bolzmann Constant
+        
+            ambient_temperature_profile, #TODO Profile einbinden wie?
+            direct_solar_irradiance_profile,
+            diffuse_solar_irradiance_profile,
+            long_wave_irradiance_profile,
+            wind_speed_profile,
 
             nothing, # output temperature in current time step, calculated in control()
             nothing, # input temperature in current time step, calculated in control()
-            nothing, # ambient temperature in current time step, calculated in control()
+            nothing, # average temperature in current time step, calculated in control()
         )
     end
 end
@@ -73,12 +108,11 @@ function control(
 )
     move_state(unit, components, parameters)
 
+    current_power = collector_gross_area * (eta_0_b * K_b_)
+
     # set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_energy)
 
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
-        unit.temperature,
-        unit.output_interfaces[unit.m_heat_out].temperature
-    )
+    unit.output_interfaces[unit.m_heat_out].temperature = unit.current_output_temperature
 end
 
 function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
@@ -94,3 +128,22 @@ function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
 end
 
 export SolarthermalCollector
+
+function find_K_b(config)
+    K_b_array = config["K_b_array"]
+    tilt_angle = config["tilt_angle"]
+    azimut_angle = config["azimut_angle"]
+
+    if nothing in K_b_array
+        K_b_array[:,1] = [0,1,1]
+        K_b_array[:,10] = [90,0,0]
+        K_b_array = Impute.interp(K_b_array; dims=1)
+    end
+
+    interp_tilt = linear_interpolation(K_b_array[1,:], K_b_array[2,:])
+    interp_azimut = linear_interpolation(K_b_array[1,:], K_b_array[3,:])
+    K_b = (interp_tilt(tilt_angle) + interp_azimut(azimut_angle)) / 2
+
+    return K_b
+
+end
