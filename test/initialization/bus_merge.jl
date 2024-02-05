@@ -124,3 +124,65 @@ end
 @testset "deep_copy" begin
     test_deep_copy()
 end
+
+function test_merge_busses()
+    components_config = energy_system_simple()
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    new_bus = EnergySystems.merge(
+        components["TST_BUS_01"],
+        components["TST_BUS_02"]
+    )
+
+    expected = [
+        "TST_SRC_01",
+        "TST_SRC_02",
+    ]
+    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    @test inputs == expected
+    @test new_bus.connectivity.input_order == expected
+
+    expected = [
+        "TST_DEM_01",
+        "TST_DEM_02",
+    ]
+    outputs = [f.target.uac for f in new_bus.output_interfaces]
+    @test outputs == expected
+    @test new_bus.connectivity.output_order == expected
+
+    expected = [
+        ("TST_SRC_01", 1),
+        ("TST_SRC_02", 2),
+    ]
+    inputs = [
+        (row.source.uac, row.priority)
+        for row in sort(collect(values(new_bus.balance_table_inputs)), by=x->x.priority)
+    ]
+    @test inputs == expected
+
+    expected = [
+        ("TST_DEM_01", 1),
+        ("TST_DEM_02", 2),
+    ]
+    outputs = [
+        (row.target.uac, row.priority)
+        for row in sort(collect(values(new_bus.balance_table_outputs)), by=x->x.priority)
+    ]
+    @test outputs == expected
+
+    expected = [
+        [true,true],
+        [false,true]
+    ]
+    @test new_bus.connectivity.energy_flow == expected
+end
+
+@testset "merge_busses" begin
+    test_merge_busses()
+end
