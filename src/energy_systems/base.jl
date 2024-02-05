@@ -227,6 +227,28 @@ Base.@kwdef mutable struct SystemInterface
     do_storage_transfer::Bool = true
 end
 
+function SystemInterface(other::SystemInterface, do_shallow_copy::Bool=false)::SystemInterface
+    # source and target must not be deep-copied, while the other attributes are
+    # immutable. hence there is no difference between shallow and deep copy
+    return SystemInterface(
+        other.source,
+        other.target,
+        other.balance,
+        other.sum_abs_change,
+        other.temperature_min,
+        other.temperature_max,
+        other.max_energy,
+        other.do_storage_transfer,
+    )
+end
+
+"""
+Creates deep copy of the given SystemInterface.
+"""
+function deepcopy(other::SystemInterface)
+    return SystemInterface(other, false)
+end
+
 """
     set_storage_transfer!(interface, value)
 

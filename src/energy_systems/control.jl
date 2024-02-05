@@ -82,6 +82,33 @@ function Condition(
 end
 
 """
+Copy constructor for Condition.
+"""
+function Condition(other::Condition, do_shallow_copy::Bool=false)::Condition
+    if do_shallow_copy
+        components = other.linked_components
+    else
+        components = Grouping()
+        for (key, value) in pairs(other.linked_components)
+            components[key] = value
+        end
+    end
+
+    return Condition(
+        other.prototype,
+        do_shallow_copy ? other.cond_params : Base.deepcopy(other.cond_params),
+        components
+    )
+end
+
+"""
+Creates deep copy of the given Condition.
+"""
+function deepcopy(other::Condition)
+    return Condition(other, false)
+end
+
+"""
     link(condition, components)
 
 Look for the condition's required components in the given set and link the condition to them.
@@ -186,6 +213,20 @@ Base.@kwdef struct TruthTable
     table_data::Dict{Tuple,UInt}
 end
 
+function TruthTable(other::TruthTable, do_shallow_copy::Bool=false)::TruthTable
+    return TruthTable(
+        do_shallow_copy ? other.conditions : Base.deepcopy(other.conditions),
+        do_shallow_copy ? other.table_data : Base.deepcopy(other.table_data),
+    )
+end
+
+"""
+Creates deep copy of the given TruthTable.
+"""
+function deepcopy(other::TruthTable)
+    return TruthTable(other, false)
+end
+
 """
 Implementation of state machines with generalized conditions instead of an input alphabet.
 
@@ -240,6 +281,23 @@ StateMachine() = StateMachine(
 )
 
 """
+Copy constructor that creates a shallow or deep copy of the given state machine.
+"""
+StateMachine(other::StateMachine, do_shallow_copy::Bool=false) = StateMachine(
+    do_shallow_copy ? other.state : Base.deepcopy(other.state),
+    do_shallow_copy ? other.state_names : Base.deepcopy(other.state_names),
+    do_shallow_copy ? other.transitions : Base.deepcopy(other.transitions),
+    do_shallow_copy ? other.time_in_state : Base.deepcopy(other.time_in_state),
+)
+
+"""
+Creates deep copy of the given StateMachine.
+"""
+function deepcopy(other::StateMachine)
+    return StateMachine(other, false)
+end
+
+"""
 Wraps around the mechanism of control for the operation strategy of a Component.
 """
 Base.@kwdef mutable struct Controller
@@ -247,6 +305,31 @@ Base.@kwdef mutable struct Controller
     parameter::Dict{String,Any}
     state_machine::StateMachine
     linked_components::Grouping
+end
+
+function Controller(other::Controller, do_shallow_copy::Bool=false)::Controller
+    if do_shallow_copy
+        components = other.linked_components
+    else
+        components = Grouping()
+        for (key, value) in pairs(other.linked_components)
+            components[key] = value
+        end
+    end
+
+    return Controller(
+        do_shallow_copy ? other.strategy : Base.deepcopy(other.strategy),
+        do_shallow_copy ? other.parameter : Base.deepcopy(other.parameter),
+        do_shallow_copy ? other.state_machine : deepcopy(other.state_machine),
+        components,
+    )
+end
+
+"""
+Creates deep copy of the given Controller.
+"""
+function deepcopy(other::Controller)
+    return Controller(other, false)
 end
 
 """

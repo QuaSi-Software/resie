@@ -6,30 +6,45 @@ Base.@kwdef mutable struct ConnectionMatrix
     input_order::Vector{String}
     output_order::Vector{String}
     energy_flow::Union{Nothing,Vector{Vector{Bool}}}
+end
 
-    function ConnectionMatrix(config::Dict{String,Any})
-        if !haskey(config, "connections")
-            return new([], [], nothing)
-        end
-
-        input_order = [String(u) for u in config["connections"]["input_order"]]
-        output_order = [String(u) for u in config["connections"]["output_order"]]
-
-        energy_flow = nothing
-        if haskey(config["connections"], "energy_flow")
-            energy_flow = []
-            for row in config["connections"]["energy_flow"]
-                vec = [Bool(v) for v in row]
-                push!(energy_flow, vec)
-            end
-        end
-
-        return new(
-            input_order,
-            output_order,
-            energy_flow,
-        )
+function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
+    if !haskey(config, "connections")
+        return new([], [], nothing)
     end
+
+    input_order = [String(u) for u in config["connections"]["input_order"]]
+    output_order = [String(u) for u in config["connections"]["output_order"]]
+
+    energy_flow = nothing
+    if haskey(config["connections"], "energy_flow")
+        energy_flow = []
+        for row in config["connections"]["energy_flow"]
+            vec = [Bool(v) for v in row]
+            push!(energy_flow, vec)
+        end
+    end
+
+    return ConnectionMatrix(
+        input_order,
+        output_order,
+        energy_flow,
+    )
+end
+
+function ConnectionMatrix(other::ConnectionMatrix, do_shallow_copy::Bool=false)::ConnectionMatrix
+    return ConnectionMatrix(
+        do_shallow_copy ? other.input_order : Base.deepcopy(other.input_order),
+        do_shallow_copy ? other.output_order : Base.deepcopy(other.output_order),
+        do_shallow_copy ? other.energy_flow : Base.deepcopy(other.energy_flow),
+    )
+end
+
+"""
+Creates deep copy of the given ConnectionMatrix.
+"""
+function deepcopy(other::ConnectionMatrix)
+    return ConnectionMatrix(other, false)
 end
 
 Base.@kwdef mutable struct BTInputRow
@@ -43,6 +58,28 @@ Base.@kwdef mutable struct BTInputRow
     storage_pool::Floathing = nothing
     temperature_min::Temperature = nothing
     temperature_max::Temperature = nothing
+end
+
+function BTInputRow(other::BTInputRow, do_shallow_copy::Bool=false)::BTInputRow
+    return BTInputRow(
+        other.source, # deepcopy doesn't cover composition
+        do_shallow_copy ? other.priority : Base.deepcopy(other.priority),
+        do_shallow_copy ? other.input_index : Base.deepcopy(other.input_index),
+        do_shallow_copy ? other.do_storage_transfer : Base.deepcopy(other.do_storage_transfer),
+        do_shallow_copy ? other.energy_potential : Base.deepcopy(other.energy_potential),
+        do_shallow_copy ? other.energy_pool : Base.deepcopy(other.energy_pool),
+        do_shallow_copy ? other.storage_potential : Base.deepcopy(other.storage_potential),
+        do_shallow_copy ? other.storage_pool : Base.deepcopy(other.storage_pool),
+        do_shallow_copy ? other.temperature_min : Base.deepcopy(other.temperature_min),
+        do_shallow_copy ? other.temperature_max : Base.deepcopy(other.temperature_max),
+    )
+end
+
+"""
+Creates deep copy of the given BTInputRow.
+"""
+function deepcopy(other::BTInputRow)
+    return BTInputRow(other, false)
 end
 
 function reset!(row::BTInputRow)
@@ -65,6 +102,28 @@ Base.@kwdef mutable struct BTOutputRow
     storage_pool::Floathing = nothing
     temperature_min::Temperature = nothing
     temperature_max::Temperature = nothing
+end
+
+function BTOutputRow(other::BTOutputRow, do_shallow_copy::Bool=false)
+    return BTOutputRow(
+        other.target, # deepcopy doesn't cover composition
+        do_shallow_copy ? other.priority : deepcopy(other.priority),
+        do_shallow_copy ? other.output_index : deepcopy(other.output_index),
+        do_shallow_copy ? other.do_storage_transfer : deepcopy(other.do_storage_transfer),
+        do_shallow_copy ? other.energy_potential : deepcopy(other.energy_potential),
+        do_shallow_copy ? other.energy_pool : deepcopy(other.energy_pool),
+        do_shallow_copy ? other.storage_potential : deepcopy(other.storage_potential),
+        do_shallow_copy ? other.storage_pool : deepcopy(other.storage_pool),
+        do_shallow_copy ? other.temperature_min : deepcopy(other.temperature_min),
+        do_shallow_copy ? other.temperature_max : deepcopy(other.temperature_max),
+    )
+end
+
+"""
+Creates deep copy of the given BTOutputRow.
+"""
+function deepcopy(other::BTOutputRow)
+    return BTOutputRow(other, false)
 end
 
 function reset!(row::BTOutputRow)
@@ -113,28 +172,52 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table::Array{Union{Nothing, Float64}, 2}
 
     epsilon::Float64
+end
 
-    function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(config["medium"])
-        register_media([medium])
+function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
+    medium = Symbol(config["medium"])
+    register_media([medium])
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
-            sf_bus, # sys_function
-            medium, # medium
-            [], # input_interfaces
-            [], # output_interfaces,
-            ConnectionMatrix(config), # connectivity
-            0.0, # remainder
-            Dict{String,BTInputRow}(), # balance_table_inputs
-            Dict{String,BTOutputRow}(), # balance_table_outputs
-            Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table, filled in reset()
-            sim_params["epsilon"] # system-wide epsilon for easy access within the bus functions
-        )
-    end
+    return Bus(
+        uac, # uac
+        controller_for_strategy( # controller
+            config["strategy"]["name"], config["strategy"], sim_params
+        ),
+        sf_bus, # sys_function
+        medium, # medium
+        [], # input_interfaces
+        [], # output_interfaces,
+        ConnectionMatrix(config), # connectivity
+        0.0, # remainder
+        Dict{String,BTInputRow}(), # balance_table_inputs
+        Dict{String,BTOutputRow}(), # balance_table_outputs
+        Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table, filled in reset()
+        sim_params["epsilon"] # system-wide epsilon for easy access within the bus functions
+    )
+end
+
+function Bus(other::Bus, do_shallow_copy::Bool=false)::Bus
+    return Bus(
+        do_shallow_copy ? other.uac : Base.deepcopy(other.uac),
+        do_shallow_copy ? other.controller : deepcopy(other.controller),
+        do_shallow_copy ? other.sys_function : Base.deepcopy(other.sys_function),
+        do_shallow_copy ? other.medium : Base.deepcopy(other.medium),
+        [do_shallow_copy ? f : deepcopy(f) for f in other.input_interfaces],
+        [do_shallow_copy ? f : deepcopy(f) for f in other.output_interfaces],
+        do_shallow_copy ? other.connectivity : deepcopy(other.connectivity),
+        do_shallow_copy ? other.remainder : Base.deepcopy(other.remainder),
+        do_shallow_copy ? other.balance_table_inputs : Base.deepcopy(other.balance_table_inputs),
+        do_shallow_copy ? other.balance_table_outputs : Base.deepcopy(other.balance_table_outputs),
+        do_shallow_copy ? other.balance_table : Base.deepcopy(other.balance_table),
+        do_shallow_copy ? other.epsilon : Base.deepcopy(other.epsilon),
+    )
+end
+
+"""
+Creates deep copy of the given Bus.
+"""
+function deepcopy(other::Bus)
+    return Bus(other, false)
 end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
