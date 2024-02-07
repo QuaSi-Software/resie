@@ -137,7 +137,8 @@ function test_merge_busses()
     components = Resie.load_components(components_config, simulation_parameters)
     new_bus = EnergySystems.merge(
         components["TST_BUS_01"],
-        components["TST_BUS_02"]
+        components["TST_BUS_02"],
+        "TST_BUS_01"
     )
 
     expected = [
@@ -431,11 +432,13 @@ function test_merge_busses_cross_shape_half()
     components = Resie.load_components(components_config, simulation_parameters)
     new_bus = EnergySystems.merge(
         components["TST_BUS_03"],
-        components["TST_BUS_05"]
+        components["TST_BUS_05"],
+        "TST_BUS_03"
     )
     new_bus = EnergySystems.merge(
         new_bus,
-        components["TST_BUS_04"]
+        components["TST_BUS_04"],
+        new_bus.uac
     )
 
     expected = [

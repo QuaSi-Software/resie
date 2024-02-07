@@ -772,8 +772,9 @@ function output_value(unit::Bus, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-function merge(first::Bus, second::Bus)::Bus
+function merge(first::Bus, second::Bus, uac::String)::Bus
     new_bus = deepcopy(first)
+    new_bus.uac = uac
 
     # insert outputs of second to outputs of first in place of bus->bus interface
     output_idx = [
