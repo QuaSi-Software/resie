@@ -1,5 +1,6 @@
 using Interpolations
 using Impute
+using Roots
 
 """
 Implementation of a solarthermal collector.
@@ -35,10 +36,11 @@ mutable struct SolarthermalCollector <: Component
 
     ambient_temperature_profile::Union{Profile,Nothing}
 
-    T_target::Float32
+    target_temperature::Float32
     delta_T::Float32
 
     max_energy::Float64
+    used_energy::Float64
     output_temperature::Temperature
     input_temperature::Temperature
     average_temperature::Temperature
@@ -102,13 +104,14 @@ mutable struct SolarthermalCollector <: Component
             long_wave_irradiance_profile,
             wind_speed_profile,
             
-            config["T_target"], # Target temperature for the output of the thermal collector
+            config["target_temperature"], # Target temperature for the output of the thermal collector
             default(config, "delta_T", 8), # delta_T between input and output temperature
 
             0.0, # maximum available energy
-            nothing, # output temperature in current time step, calculated in control()
-            nothing, # input temperature in current time step, calculated in control()
-            nothing, # average temperature in current time step, calculated in control()
+            0.0, # excess energy that is left in the system
+            0.0, # output temperature in current time step, calculated in control()
+            0.0, # input temperature in current time step, calculated in control()
+            0.0, # average temperature in current time step, calculated in control()
                      # TODO: initilaize values with ambient_temperature
             0.0, # average temperature from last time step, calculated in control()
             0.0, # ambient temperature from profile
@@ -150,10 +153,7 @@ function control(
 
     unit.K_b = find_K_b!(unit.K_b_array, unit.tilt_angle, unit.azimut_angle)
     
-    unit.output_temperature = unit.T_target
-    unit.input_temperature = unit.output_temperature - unit.delta_T
-    unit.average_temperature = (unit.input_temperature + unit.output_temperature) / 2
-
+    # get values from profiles
     direct_solar_irradiance = Profiles.value_at_time(
         unit.direct_solar_irradiance_profile, parameters["time"]
         )
@@ -163,27 +163,71 @@ function control(
     unit.ambient_temperature = Profiles.value_at_time(
         unit.ambient_temperature_profile, parameters["time"]
         )
-    reduced_wind_speed = Profiles.value_at_time(
-        unit.wind_speed_profile, parameters["time"]
-        ) - 3
+    reduced_wind_speed = min(
+        Profiles.value_at_time(unit.wind_speed_profile, parameters["time"]) - 3,
+        0
+        )
     long_wave_irradiance = Profiles.value_at_time(
         unit.long_wave_irradiance_profile, parameters["time"]
         )
 
+    """
+    unit.output_temperature = unit.target_temperature
+    unit.input_temperature = unit.output_temperature - unit.delta_T
+    unit.average_temperature = (unit.input_temperature + unit.output_temperature) / 2
+    """
+    # get average temperature based on used energy in previous time step
+    function spec_thermal_power_func(t_avg)         
+        unit.eta_0_b * unit.K_b * direct_solar_irradiance +
+        unit.eta_0_b * unit.K_d * diffuse_solar_irradiance -
+        unit.a_params[1] * (t_avg - unit.ambient_temperature) -
+        unit.a_params[2] * (t_avg - unit.ambient_temperature)^2 -
+        unit.a_params[3] * reduced_wind_speed * (t_avg - unit.ambient_temperature) +
+        unit.a_params[4] * (long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
+        unit.a_params[5] * ((t_avg-unit.last_average_temperature) / parameters["time_step_seconds"]) -
+        unit.a_params[6] * reduced_wind_speed * (direct_solar_irradiance + diffuse_solar_irradiance) -
+        unit.a_params[7] * reduced_wind_speed * (long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
+        unit.a_params[8] * (t_avg - unit.ambient_temperature)^4 -
+        unit.used_energy / unit.collector_gross_area
+    end
+    
+    function derivate_spec_thermal_power_func(t_avg)
+        unit.a_params[1] * (-1) -
+        unit.a_params[2] * 2 * (t_avg - unit.ambient_temperature) -
+        unit.a_params[3] * reduced_wind_speed -
+        unit.a_params[5] * 1 / parameters["time_step_seconds"] -
+        unit.a_params[8] * 4 * (t_avg - unit.ambient_temperature)^3
+    end
+
+    unit.average_temperature = find_zero(
+        (spec_thermal_power_func, derivate_spec_thermal_power_func), 
+        unit.last_average_temperature, 
+        Roots.Newton()
+        )
+
+    unit.output_temperature = unit.average_temperature + unit.delta_T / 2
+
+    if unit.output_temperature > unit.target_temperature && unit.used_energy < 10
+        unit.average_temperature = unit.target_temperature - unit.delta_T / 2
+        unit.output_temperature = unit.target_temperature
+    end
+
+    # cacluate new specific thermal power
     spec_thermal_power = 
         unit.eta_0_b * unit.K_b * direct_solar_irradiance +
         unit.eta_0_b * unit.K_d * diffuse_solar_irradiance -
         unit.a_params[1] * (unit.average_temperature - unit.ambient_temperature) -
         unit.a_params[2] * (unit.average_temperature - unit.ambient_temperature)^2 -
-        unit.a_params[3] * reduced_wind_speed * (unit.average_temperature - unit.ambient_temperature) -
+        unit.a_params[3] * reduced_wind_speed * (unit.average_temperature - unit.ambient_temperature) +
         unit.a_params[4] * (long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
         unit.a_params[5] * ((unit.average_temperature-unit.last_average_temperature) / parameters["time_step_seconds"]) -
         unit.a_params[6] * reduced_wind_speed * (direct_solar_irradiance + diffuse_solar_irradiance) -
         unit.a_params[7] * reduced_wind_speed * (long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
         unit.a_params[8] * (unit.average_temperature - unit.ambient_temperature)^4
-    
-    spec_mass_flow = spec_thermal_power / (unit.delta_T * 4.18) #TODO Add C_p calculation
-    unit.max_energy = watt_to_wh(spec_thermal_power * unit.collector_gross_area)
+
+    # spec_mass_flow = spec_thermal_power / (unit.delta_T * 4.18) #TODO Add C_p calculation
+    # test if temp erreicht wird mit neuer Energie
+    unit.max_energy = watt_to_wh(max(spec_thermal_power * unit.collector_gross_area, 0))
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
     unit.output_interfaces[unit.medium].temperature = unit.output_temperature
@@ -195,8 +239,10 @@ end
 
 function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    exchange = balance_on(outface, outface.target)
+    exchange = balance_on(outface, outface.target) # Temperatur aus exchange berechnen für nächsten Zeitschritt
+
     if exchange.balance < 0.0
+        unit.used_energy = min(abs(exchange.balance), unit.max_energy)
         add!(
             outface,
             min(abs(exchange.balance), unit.max_energy),
@@ -218,7 +264,6 @@ function find_K_b!(K_b_array, tilt_angle, azimut_angle)
     K_b = interp_tilt(tilt_angle) * interp_azimut(azimut_angle)
 
     return K_b
-
 end
 
 export SolarthermalCollector
