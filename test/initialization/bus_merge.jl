@@ -420,7 +420,7 @@ function energy_system_complicated()::Dict{String,Any}
     )
 end
 
-function test_merge_busses_cross_shape_half()
+function test_merge_busses_cross_shape_half_manual()
     components_config = energy_system_complicated()
 
     simulation_parameters = Dict{String,Any}(
@@ -510,11 +510,11 @@ function test_merge_busses_cross_shape_half()
     @test new_bus.connectivity.energy_flow == expected
 end
 
-@testset "merge_busses_cross_shape_half" begin
-    test_merge_busses_cross_shape_half()
+@testset "merge_busses_cross_shape_half_manual" begin
+    test_merge_busses_cross_shape_half_manual()
 end
 
-function test_merge_busses_cross_shape_full()
+function test_merge_busses_cross_shape_full_manual()
     components_config = energy_system_complicated()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -704,6 +704,6 @@ function test_merge_busses_cross_shape_full()
 
 end
 
-@testset "merge_busses_cross_shape_full" begin
-    test_merge_busses_cross_shape_full()
+@testset "merge_busses_cross_shape_full_manual" begin
+    test_merge_busses_cross_shape_full_manual()
 end
