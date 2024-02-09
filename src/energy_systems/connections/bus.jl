@@ -779,7 +779,7 @@ function merge(first::Bus, second::Bus, uac::String)::Bus
     # insert outputs of second to outputs of first in place of bus->bus interface
     output_idx = [
         idx for (idx,f) in pairs(first.output_interfaces)
-            if f.target.uac == second.uac
+            if occursin(f.target.uac, second.uac)
     ][1]
     splice!(new_bus.output_interfaces, output_idx, second.output_interfaces)
     splice!(
@@ -791,7 +791,7 @@ function merge(first::Bus, second::Bus, uac::String)::Bus
     # insert inputs of first to inputs of second in place of bus->bus interface
     input_idx = [
         idx for (idx,f) in pairs(second.input_interfaces)
-            if f.source.uac == first.uac
+            if occursin(f.source.uac, first.uac)
     ][1]
     new_bus.input_interfaces = Base.deepcopy(second.input_interfaces)
     splice!(new_bus.input_interfaces, input_idx, first.input_interfaces)
