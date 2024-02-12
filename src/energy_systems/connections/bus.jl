@@ -551,6 +551,11 @@ function balance_on(
 
             is_storage = output_row.target.sys_function == sf_storage
 
+           # if is_storage && !input_row.do_storage_transfer
+            #     continue
+            # end
+            # then it is not neccessary to check this in each component! ToDo
+
             if interface.max_energy === nothing
                 energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
                     (is_storage ? 0.0 : _sum(unit.balance_table[:, output_row.priority*2-1]))))
@@ -580,6 +585,11 @@ function balance_on(
             end
 
             is_storage = input_row.source.sys_function == sf_storage
+
+            # if is_storage && !output_row.do_storage_transfer
+            #     continue
+            # end
+            # then it is not neccessary to check this in each component!  ToDo
 
             if interface.max_energy === nothing
                 energy_pot = _sub(_add(input_row.energy_pool, input_row.energy_potential),
