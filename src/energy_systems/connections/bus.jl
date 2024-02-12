@@ -196,6 +196,27 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
     )
 end
 
+function Bus(
+    uac::String,
+    medium::Symbol,
+    epsilon::Float64
+)
+    return Bus(
+        uac,
+        controller_for_strategy("default", Dict{String,Any}(), Dict{String,Any}()),
+        sf_bus,
+        medium,
+        [], # input_interfaces
+        [], # output_interfaces
+        ConnectionMatrix([], [], nothing), # connectivity
+        0.0, # remainder
+        Dict{String,BTInputRow}(), # balance_table_inputs
+        Dict{String,BTOutputRow}(), # balance_table_outputs
+        Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table
+        epsilon
+    )
+end
+
 function Bus(other::Bus, do_shallow_copy::Bool=false)::Bus
     return Bus(
         do_shallow_copy ? other.uac : Base.deepcopy(other.uac),
