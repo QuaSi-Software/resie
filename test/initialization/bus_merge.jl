@@ -135,53 +135,36 @@ function test_merge_busses()
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
+    busses = Grouping(
+        key => bus for (key,bus) in pairs(components)
+                   if bus.sys_function == EnergySystems.sf_bus
+    )
+    nodes = EnergySystems.nodes_from_components(busses)
     new_bus = EnergySystems.merge(
-        components["TST_BUS_01"],
-        components["TST_BUS_02"],
-        "TST_BUS_01"
+        nodes["TST_BUS_01"],
+        nodes["TST_BUS_02"],
+        "TST_BUS_01" * "TST_BUS_02"
     )
 
     expected = [
         "TST_SRC_01",
         "TST_SRC_02",
     ]
-    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    inputs = [f.uac for f in new_bus.inputs]
     @test inputs == expected
-    @test new_bus.connectivity.input_order == expected
 
     expected = [
         "TST_DEM_01",
         "TST_DEM_02",
     ]
-    outputs = [f.target.uac for f in new_bus.output_interfaces]
-    @test outputs == expected
-    @test new_bus.connectivity.output_order == expected
-
-    expected = [
-        ("TST_SRC_01", 1),
-        ("TST_SRC_02", 2),
-    ]
-    inputs = [
-        (row.source.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_inputs)), by=x->x.priority)
-    ]
-    @test inputs == expected
-
-    expected = [
-        ("TST_DEM_01", 1),
-        ("TST_DEM_02", 2),
-    ]
-    outputs = [
-        (row.target.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_outputs)), by=x->x.priority)
-    ]
+    outputs = [f.uac for f in new_bus.outputs]
     @test outputs == expected
 
     expected = [
-        [true,true],
-        [false,true]
+        1 1;
+        0 1
     ]
-    @test new_bus.connectivity.energy_flow == expected
+    @test new_bus.energy_flow == expected
 end
 
 @testset "merge_busses" begin
@@ -430,15 +413,29 @@ function test_merge_busses_cross_shape_half_manual()
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
+    busses = Grouping(
+        key => bus for (key,bus) in pairs(components)
+                   if bus.sys_function == EnergySystems.sf_bus
+    )
+    nodes = EnergySystems.nodes_from_components(busses)
     new_bus = EnergySystems.merge(
-        components["TST_BUS_03"],
-        components["TST_BUS_05"],
-        "TST_BUS_03"
+        nodes["TST_BUS_03"],
+        nodes["TST_BUS_05"],
+        "TST_BUS_03" * "TST_BUS_05"
+    )
+    EnergySystems.update_nodes!(
+        nodes, "TST_BUS_03", "TST_BUS_05", new_bus
     )
     new_bus = EnergySystems.merge(
         new_bus,
-        components["TST_BUS_04"],
-        new_bus.uac
+        nodes["TST_BUS_04"],
+        new_bus.uac * "TST_BUS_04"
+    )
+    EnergySystems.update_nodes!(
+        nodes,
+        "TST_BUS_04",
+        "TST_BUS_04TST_BUS_03TST_BUS_05",
+        new_bus
     )
 
     expected = [
@@ -451,9 +448,8 @@ function test_merge_busses_cross_shape_half_manual()
         "TST_BFT_05",
         "TST_BFT_04",
     ]
-    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    inputs = [f.uac for f in new_bus.inputs]
     @test inputs == expected
-    @test new_bus.connectivity.input_order == expected
 
     expected = [
         "TST_DEM_03",
@@ -463,51 +459,20 @@ function test_merge_busses_cross_shape_half_manual()
         "TST_DEM_05",
         "TST_BFT_05",
     ]
-    outputs = [f.target.uac for f in new_bus.output_interfaces]
-    @test outputs == expected
-    @test new_bus.connectivity.output_order == expected
-
-    expected = [
-        ("TST_SRC_04",1),
-        ("TST_SRC_05",2),
-        ("TST_SRC_03",3),
-        ("TST_BUS_02",4),
-        ("TST_BUS_01",5),
-        ("TST_BFT_03",6),
-        ("TST_BFT_05",7),
-        ("TST_BFT_04",8),
-    ]
-    inputs = [
-        (row.source.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_inputs)), by=x->x.priority)
-    ]
-    @test inputs == expected
-
-    expected = [
-        ("TST_DEM_03",1),
-        ("TST_BFT_03",2),
-        ("TST_DEM_04",3),
-        ("TST_BFT_04",4),
-        ("TST_DEM_05",5),
-        ("TST_BFT_05",6),
-    ]
-    outputs = [
-        (row.target.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_outputs)), by=x->x.priority)
-    ]
+    outputs = [f.uac for f in new_bus.outputs]
     @test outputs == expected
 
     expected = [
-        [0,0,1,1,0,0],
-        [0,0,0,0,1,1],
-        [1,1,1,1,1,1],
-        [1,1,1,1,1,1],
-        [1,1,1,1,1,1],
-        [1,0,1,1,1,1],
-        [0,0,0,0,1,0],
-        [0,0,1,0,0,0],
+        0 0 1 1 0 0;
+        0 0 0 0 1 1;
+        1 1 1 1 1 1;
+        1 1 1 1 1 1;
+        1 1 1 1 1 1;
+        1 0 1 1 1 1;
+        0 0 0 0 1 0;
+        0 0 1 0 0 0;
     ]
-    @test new_bus.connectivity.energy_flow == expected
+    @test new_bus.energy_flow == expected
 end
 
 @testset "merge_busses_cross_shape_half_manual" begin
@@ -522,21 +487,43 @@ function test_merge_busses_cross_shape_full_manual()
         "epsilon" => 1e-9
     )
     components = Resie.load_components(components_config, simulation_parameters)
-
+    busses = Grouping(
+        key => bus for (key,bus) in pairs(components)
+                   if bus.sys_function == EnergySystems.sf_bus
+    )
+    nodes = EnergySystems.nodes_from_components(busses)
     new_bus = EnergySystems.merge(
-        components["TST_BUS_03"],
-        components["TST_BUS_05"],
-        "TST_BUS_03"
+        nodes["TST_BUS_03"],
+        nodes["TST_BUS_05"],
+        "TST_BUS_03" * "TST_BUS_05"
+    )
+    EnergySystems.update_nodes!(
+        nodes,
+        "TST_BUS_03",
+        "TST_BUS_05",
+        new_bus
     )
     new_bus = EnergySystems.merge(
         new_bus,
-        components["TST_BUS_04"],
-        new_bus.uac
+        nodes["TST_BUS_04"],
+        new_bus.uac * "TST_BUS_04"
+    )
+    EnergySystems.update_nodes!(
+        nodes,
+        "TST_BUS_03TST_BUS_05",
+        "TST_BUS_04",
+        new_bus
     )
     new_bus = EnergySystems.merge(
-        components["TST_BUS_01"],
+        nodes["TST_BUS_01"],
         new_bus,
-        new_bus.uac
+        new_bus.uac * "TST_BUS_01"
+    )
+    EnergySystems.update_nodes!(
+        nodes,
+        "TST_BUS_01",
+        "TST_BUS_03TST_BUS_05TST_BUS_04",
+        new_bus
     )
 
     expected = [
@@ -550,9 +537,8 @@ function test_merge_busses_cross_shape_full_manual()
         "TST_BFT_05",
         "TST_BFT_04",
     ]
-    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    inputs = [f.uac for f in new_bus.inputs]
     @test inputs == expected
-    @test new_bus.connectivity.input_order == expected
 
     expected = [
         "TST_DEM_01",
@@ -564,60 +550,32 @@ function test_merge_busses_cross_shape_full_manual()
         "TST_DEM_05",
         "TST_BFT_05",
     ]
-    outputs = [f.target.uac for f in new_bus.output_interfaces]
-    @test outputs == expected
-    @test new_bus.connectivity.output_order == expected
-
-    expected = [
-        ("TST_SRC_04",1),
-        ("TST_SRC_05",2),
-        ("TST_SRC_03",3),
-        ("TST_BUS_02",4),
-        ("TST_SRC_01",5),
-        ("TST_BFT_01",6),
-        ("TST_BFT_03",7),
-        ("TST_BFT_05",8),
-        ("TST_BFT_04",9),
-    ]
-    inputs = [
-        (row.source.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_inputs)), by=x->x.priority)
-    ]
-    @test inputs == expected
-
-    expected = [
-        ("TST_DEM_01",1),
-        ("TST_BFT_01",2),
-        ("TST_DEM_03",3),
-        ("TST_BFT_03",4),
-        ("TST_DEM_04",5),
-        ("TST_BFT_04",6),
-        ("TST_DEM_05",7),
-        ("TST_BFT_05",8),
-    ]
-    outputs = [
-        (row.target.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_outputs)), by=x->x.priority)
-    ]
+    outputs = [f.uac for f in new_bus.outputs]
     @test outputs == expected
 
     expected = [
-        [0,0,0,0,1,1,0,0],
-        [0,0,0,0,0,0,1,1],
-        [0,0,1,1,1,1,1,1],
-        [0,0,1,1,1,1,1,1],
-        [1,1,1,1,1,1,1,1],
-        [1,0,0,0,0,0,0,0],
-        [0,0,1,0,1,1,1,1],
-        [0,0,0,0,0,0,1,0],
-        [0,0,0,0,1,0,0,0],
+        0 0 0 0 1 1 0 0;
+        0 0 0 0 0 0 1 1;
+        0 0 1 1 1 1 1 1;
+        0 0 1 1 1 1 1 1;
+        1 1 1 1 1 1 1 1;
+        1 0 0 0 0 0 0 0;
+        0 0 1 0 1 1 1 1;
+        0 0 0 0 0 0 1 0;
+        0 0 0 0 1 0 0 0;
     ]
-    @test new_bus.connectivity.energy_flow == expected
+    @test new_bus.energy_flow == expected
 
     new_bus = EnergySystems.merge(
-        components["TST_BUS_02"],
+        nodes["TST_BUS_02"],
         new_bus,
-        "TST_BUS_03"
+        "TST_BUS_02" * new_bus.uac
+    )
+    EnergySystems.update_nodes!(
+        nodes,
+        "TST_BUS_02",
+        "TST_BUS_01TST_BUS_03TST_BUS_05TST_BUS_04",
+        new_bus
     )
 
     expected = [
@@ -632,9 +590,8 @@ function test_merge_busses_cross_shape_full_manual()
         "TST_BFT_05",
         "TST_BFT_04",
     ]
-    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    inputs = [f.uac for f in new_bus.inputs]
     @test inputs == expected
-    @test new_bus.connectivity.input_order == expected
 
     expected = [
         "TST_DEM_02",
@@ -648,60 +605,22 @@ function test_merge_busses_cross_shape_full_manual()
         "TST_DEM_05",
         "TST_BFT_05",
     ]
-    outputs = [f.target.uac for f in new_bus.output_interfaces]
-    @test outputs == expected
-    @test new_bus.connectivity.output_order == expected
-
-    expected = [
-        ("TST_SRC_04",1),
-        ("TST_SRC_05",2),
-        ("TST_SRC_03",3),
-        ("TST_SRC_02",4),
-        ("TST_BFT_02",5),
-        ("TST_SRC_01",6),
-        ("TST_BFT_01",7),
-        ("TST_BFT_03",8),
-        ("TST_BFT_05",9),
-        ("TST_BFT_04",10),
-    ]
-    inputs = [
-        (row.source.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_inputs)), by=x->x.priority)
-    ]
-    @test inputs == expected
-
-    expected = [
-        ("TST_DEM_02",1),
-        ("TST_BFT_02",2),
-        ("TST_DEM_01",3),
-        ("TST_BFT_01",4),
-        ("TST_DEM_03",5),
-        ("TST_BFT_03",6),
-        ("TST_DEM_04",7),
-        ("TST_BFT_04",8),
-        ("TST_DEM_05",9),
-        ("TST_BFT_05",10),
-    ]
-    outputs = [
-        (row.target.uac, row.priority)
-        for row in sort(collect(values(new_bus.balance_table_outputs)), by=x->x.priority)
-    ]
+    outputs = [f.uac for f in new_bus.outputs]
     @test outputs == expected
 
     expected = [
-        [0,0,0,0,0,0,1,1,0,0],
-        [0,0,0,0,0,0,0,0,1,1],
-        [0,0,0,0,1,1,1,1,1,1],
-        [1,1,0,0,1,1,1,1,1,1],
-        [1,0,0,0,0,0,0,0,0,0],
-        [0,0,1,1,1,1,1,1,1,1],
-        [0,0,1,0,0,0,0,0,0,0],
-        [0,0,0,0,1,0,1,1,1,1],
-        [0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,1,0,0,0],
+        0 0 0 0 0 0 1 1 0 0;
+        0 0 0 0 0 0 0 0 1 1;
+        0 0 0 0 1 1 1 1 1 1;
+        1 1 0 0 1 1 1 1 1 1;
+        1 0 0 0 0 0 0 0 0 0;
+        0 0 1 1 1 1 1 1 1 1;
+        0 0 1 0 0 0 0 0 0 0;
+        0 0 0 0 1 0 1 1 1 1;
+        0 0 0 0 0 0 0 0 1 0;
+        0 0 0 0 0 0 1 0 0 0;
     ]
-    @test new_bus.connectivity.energy_flow == expected
-
+    @test new_bus.energy_flow == expected
 end
 
 @testset "merge_busses_cross_shape_full_manual" begin
@@ -716,12 +635,10 @@ function test_merge_busses_cross_shape_full_automatic()
         "epsilon" => 1e-9
     )
     components = Resie.load_components(components_config, simulation_parameters)
-    busses = Grouping()
-    for (key,val) in pairs(components)
-        if val.sys_function == EnergySystems.sf_bus
-            busses[key] = val
-        end
-    end
+    busses = Grouping(
+        key => bus for (key,bus) in pairs(components)
+                   if bus.sys_function == EnergySystems.sf_bus
+    )
     new_bus = EnergySystems.merge_busses(busses, components)
 
     expected = [
