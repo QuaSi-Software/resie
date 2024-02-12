@@ -52,26 +52,26 @@ mutable struct SolarthermalCollector <: Component
     average_temperature::Temperature
     last_average_temperature::Temperature
 
-    function SolarthermalCollector(uac::String, config::Dict{String,Any})
+    function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         ambient_temperature_profile = 
             "ambient_temperature_profile_file_path" in keys(config) ?
-            Profile(config["ambient_temperature_profile_file_path"]) :
+            Profile(config["ambient_temperature_profile_file_path"], sim_params) :
             nothing
         direct_solar_irradiance_profile = 
             "direct_solar_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["direct_solar_irradiance_profile_file_path"]) :
+            Profile(config["direct_solar_irradiance_profile_file_path"], sim_params) :
             nothing
         diffuse_solar_irradiance_profile = 
             "diffuse_solar_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["diffuse_solar_irradiance_profile_file_path"]) :
+            Profile(config["diffuse_solar_irradiance_profile_file_path"], sim_params) :
             nothing
         long_wave_irradiance_profile = 
             "long_wave_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["long_wave_irradiance_profile_file_path"]) :
+            Profile(config["long_wave_irradiance_profile_file_path"], sim_params) :
             nothing
         wind_speed_profile = 
             "wind_speed_profile_file_path" in keys(config) ?
-            Profile(config["wind_speed_profile_file_path"]) :
+            Profile(config["wind_speed_profile_file_path"], sim_params) :
             nothing
 
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
@@ -80,7 +80,7 @@ mutable struct SolarthermalCollector <: Component
         return new(                                                
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_bounded_source, # sys_function
             InterfaceMap(), # input_interfaces
@@ -100,7 +100,7 @@ mutable struct SolarthermalCollector <: Component
                                  # row3: longitudinal/azimut/orientation
             1, # Calculate K_b from K_b_array in control()
             config["K_d"], # collector parameter for diffuse irradiance 
-            config["a_params"], # collector parameters a1 to a8 EN ISO 9806:2017
+            config["a_params"], # collector sim_params a1 to a8 EN ISO 9806:2017
             5.670374419*10^-8, # Stefan Bolzmann Constant
         
             ambient_temperature_profile,
@@ -163,36 +163,36 @@ end
 function control(
     unit::SolarthermalCollector,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 
     unit.K_b = find_K_b!(unit.K_b_array, unit.tilt_angle, unit.azimut_angle)
     
     # get values from profiles
     unit.direct_solar_irradiance = Profiles.value_at_time(
-        unit.direct_solar_irradiance_profile, parameters["time"]
+        unit.direct_solar_irradiance_profile, sim_params["time"]
         )
     unit.diffuse_solar_irradiance = Profiles.value_at_time(
-        unit.diffuse_solar_irradiance_profile, parameters["time"]
+        unit.diffuse_solar_irradiance_profile, sim_params["time"]
         )
     unit.ambient_temperature = Profiles.value_at_time(
-        unit.ambient_temperature_profile, parameters["time"]
+        unit.ambient_temperature_profile, sim_params["time"]
         )
     unit.reduced_wind_speed = min(
-        Profiles.value_at_time(unit.wind_speed_profile, parameters["time"]) - 3,
+        Profiles.value_at_time(unit.wind_speed_profile, sim_params["time"]) - 3,
         0
         )
     unit.long_wave_irradiance = Profiles.value_at_time(
-        unit.long_wave_irradiance_profile, parameters["time"]
+        unit.long_wave_irradiance_profile, sim_params["time"]
         )
 
     unit.output_temperature = unit.average_temperature + unit.delta_T / 2
 
-    # if unit.output_temperature > unit.target_temperature && unit.used_energy < 10
-    #    unit.average_temperature = unit.target_temperature - unit.delta_T / 2
-    #    unit.output_temperature = unit.target_temperature
-    # end
+    if unit.output_temperature > unit.target_temperature
+       unit.average_temperature = unit.target_temperature - unit.delta_T / 2
+       unit.output_temperature = unit.target_temperature
+    end
 
     # TODO: Collector Temperatur wird begrenzt
     # unit.average_temperature = unit.target_temperature - unit.delta_T / 2
@@ -206,7 +206,7 @@ function control(
         unit.a_params[2] * (unit.average_temperature - unit.ambient_temperature)^2 -
         unit.a_params[3] * unit.reduced_wind_speed * (unit.average_temperature - unit.ambient_temperature) +
         unit.a_params[4] * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
-        unit.a_params[5] * ((unit.average_temperature-unit.last_average_temperature) / parameters["time_step_seconds"]) -
+        unit.a_params[5] * ((unit.average_temperature-unit.last_average_temperature) / sim_params["time_step_seconds"]) -
         unit.a_params[6] * unit.reduced_wind_speed * (unit.direct_solar_irradiance + unit.diffuse_solar_irradiance) -
         unit.a_params[7] * unit.reduced_wind_speed * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
         unit.a_params[8] * (unit.average_temperature - unit.ambient_temperature)^4
@@ -223,15 +223,25 @@ end
 
 #TODO: define function process 
 
-function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
+function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    exchange = balance_on(outface, outface.target)
+    exchanges = balance_on(outface, outface.target)
+    blnc = balance(exchanges)
 
-    if exchange.balance < 0.0
-        unit.used_energy = min(abs(exchange.balance), unit.max_energy)
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demand = blnc + storage_potential(exchanges)
+    else
+        energy_demand = blnc
+    end
+
+    if energy_demand < 0.0
+        unit.used_energy = min(abs(energy_demand), unit.max_energy)
         add!(
             outface,
-            min(abs(exchange.balance), unit.max_energy),
+            min(abs(energy_demand), unit.max_energy),
             unit.output_temperature
         )
         
@@ -243,7 +253,7 @@ function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
             unit.a_params[2] * (t_avg - unit.ambient_temperature)^2 -
             unit.a_params[3] * unit.reduced_wind_speed * (t_avg - unit.ambient_temperature) +
             unit.a_params[4] * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
-            unit.a_params[5] * ((t_avg-unit.last_average_temperature) / parameters["time_step_seconds"]) -
+            unit.a_params[5] * ((t_avg-unit.last_average_temperature) / sim_params["time_step_seconds"]) -
             unit.a_params[6] * unit.reduced_wind_speed * (unit.direct_solar_irradiance + unit.diffuse_solar_irradiance) -
             unit.a_params[7] * unit.reduced_wind_speed * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
             unit.a_params[8] * (t_avg - unit.ambient_temperature)^4 -
@@ -254,7 +264,7 @@ function process(unit::SolarthermalCollector, parameters::Dict{String,Any})
             unit.a_params[1] * (-1) -
             unit.a_params[2] * 2 * (t_avg - unit.ambient_temperature) -
             unit.a_params[3] * unit.reduced_wind_speed -
-            unit.a_params[5] * 1 / parameters["time_step_seconds"] -
+            unit.a_params[5] * 1 / sim_params["time_step_seconds"] -
             unit.a_params[8] * 4 * (t_avg - unit.ambient_temperature)^3
         end
     
