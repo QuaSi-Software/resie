@@ -16,20 +16,21 @@ mutable struct BufferTank <: Component
 
     capacity::Float64
     load::Float64
+    losses::Float64
 
     use_adaptive_temperature::Bool
     switch_point::Float64
     high_temperature::Float64
     low_temperature::Float64
 
-    function BufferTank(uac::String, config::Dict{String,Any})
+    function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
@@ -41,6 +42,7 @@ mutable struct BufferTank <: Component
             medium,
             config["capacity"], # capacity
             config["load"], # load
+            0.0, # losses
             default(config, "use_adaptive_temperature", false),
             default(config, "switch_point", 0.15),
             default(config, "high_temperature", 75.0),
@@ -52,12 +54,16 @@ end
 function control(
     unit::BufferTank,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
-    unit.output_interfaces[unit.medium].temperature = highest_temperature(temperature_at_load(unit), unit.output_interfaces[unit.medium].temperature)
-    unit.input_interfaces[unit.medium].temperature = highest_temperature(unit.high_temperature, unit.input_interfaces[unit.medium].temperature)
+    move_state(unit, components, sim_params)
 
+    if unit.output_interfaces[unit.medium].temperature === nothing
+        unit.output_interfaces[unit.medium].temperature = temperature_at_load(unit)
+    end
+    if unit.input_interfaces[unit.medium].temperature === nothing
+        unit.input_interfaces[unit.medium].temperature = unit.high_temperature
+    end
 end
 
 function temperature_at_load(unit::BufferTank)::Temperature
@@ -72,78 +78,105 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::BufferTank
-)::NamedTuple{}
+)::Vector{EnergyExchange}
+    caller_is_input = unit.uac == interface.target.uac
 
-    caller_is_input = unit.uac == interface.target.uac ? true : false
-    # ==true if interface is input of unit (caller puts energy in unit); 
-    # ==false if interface is output of unit (caller gets energy from unit)
-
-    return (
-            balance = interface.balance,
-            storage_potential = caller_is_input ? -(unit.capacity-unit.load) : unit.load,
-            energy_potential = 0.0,
-            temperature = interface.temperature
-            )
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=0.0,
+        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        temperature=interface.temperature,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
-function process(unit::BufferTank, parameters::Dict{String,Any})
+function process(unit::BufferTank, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    exchange = balance_on(outface, outface.target)
-    demand_temp = exchange.temperature
+    exchanges = balance_on(outface, outface.target)
+    energy_demanded = balance(exchanges)
 
-    if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
-        else
-            energy_demand = exchange.balance
+    if (
+        unit.controller.parameter["name"] == "extended_storage_control"
+        && unit.controller.parameter["load_any_storage"]
+    )
+        energy_demanded += storage_potential(exchanges)
+    end
+
+    # shortcut if there is no energy demanded
+    if energy_demanded >= -sim_params["epsilon"]
+        return
+    end
+
+    for exchange in exchanges
+        demanded_on_interface = exchange.balance
+        if (
+            unit.controller.parameter["name"] == "extended_storage_control"
+            && unit.controller.parameter["load_any_storage"]
+        )
+            demanded_on_interface += exchange.storage_potential
         end
-    else
-        energy_demand = exchange.balance
-    end
 
-    if energy_demand >= 0.0
-        return # process is only concerned with moving energy to the target
-    end
+        if demanded_on_interface >= -sim_params["epsilon"]
+            continue
+        end
 
-    if demand_temp !== nothing && demand_temp > temperature_at_load(unit)
-        return # we can only supply energy if it's at a higher temperature,
-        # effectively reducing the tank's capacity for any demand at
-        # a temperature higher than the lower limit of the tank
-    end
+        demand_temp = exchange.temperature
+        if demand_temp !== nothing && demand_temp > temperature_at_load(unit)
+            # we can only supply energy at a temperature at or below the tank's current
+            # output temperature
+            continue
+        end
 
-    if unit.load > abs(energy_demand)
-        unit.load += energy_demand
-        add!(outface, abs(energy_demand), demand_temp)
-    else
-        add!(outface, unit.load, demand_temp)
-        unit.load = 0.0
+        used_heat = min(abs(energy_demanded), abs(demanded_on_interface))
+
+        if unit.load > used_heat
+            unit.load -= used_heat
+            add!(outface, used_heat, temperature_at_load(unit))
+            energy_demanded += used_heat
+        else
+            add!(outface, unit.load, temperature_at_load(unit))
+            energy_demanded += unit.load
+            unit.load = 0.0
+        end
     end
 end
 
-function load(unit::BufferTank, parameters::Dict{String,Any})
+function load(unit::BufferTank, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    exchange = balance_on(inface, inface.source)
-    supply_temp = exchange.temperature
-    energy_available = exchange.balance
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges)
 
-    if energy_available <= 0.0
-        return # load is only concerned with receiving energy from the target
+    # shortcut if there is no energy to be used
+    if energy_available <= sim_params["epsilon"]
+        return
     end
 
-    if supply_temp !== nothing && supply_temp < unit.low_temperature
-        return # we can only take in energy if it's at a higher temperature than the
-        # tank's lower limit
-    end
+    for exchange in exchanges
+        if exchange.balance < sim_params["epsilon"]
+            continue
+        end
 
-    diff = unit.capacity - unit.load
-    if diff > energy_available
-        unit.load += energy_available
-        sub!(inface, energy_available, supply_temp)
-    else
-        unit.load = unit.capacity
-        sub!(inface, diff, supply_temp)
+        supply_temp = exchange.temperature
+        if supply_temp !== nothing && supply_temp < unit.high_temperature
+            # we can only take in energy if it's at a higher/equal temperature than the
+            # tank's upper limit for temperatures
+            continue
+        end
+
+        used_heat = min(energy_available, exchange.balance)
+        diff = unit.capacity - unit.load
+
+        if diff > used_heat
+            unit.load += used_heat
+            sub!(inface, used_heat, supply_temp)
+            energy_available -= used_heat
+        else
+            unit.load = unit.capacity
+            sub!(inface, diff, supply_temp)
+            energy_available -= diff
+        end
     end
 end
 
@@ -152,7 +185,8 @@ function output_values(unit::BufferTank)::Vector{String}
             string(unit.medium)*" OUT",
             "Load",
             "Load%",
-            "Capacity"]
+            "Capacity",
+            "Losses"]
 end
 
 function output_value(unit::BufferTank, key::OutputKey)::Float64
@@ -166,6 +200,8 @@ function output_value(unit::BufferTank, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

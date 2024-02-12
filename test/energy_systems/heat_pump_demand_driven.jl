@@ -40,20 +40,21 @@ function test_heat_pump_demand_driven_correct_order()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000
+            "power_th" => 12000
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    source = components["TST_SRC_01"]
-    demand = components["TST_DEM_01"]
-    grid = components["TST_GRI_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
 
     @test heat_pump.controller.state_machine.state == 1
 
@@ -66,7 +67,7 @@ function test_heat_pump_demand_driven_correct_order()
 
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.load = 900
+    demand.demand = 900
     demand.temperature = 45
     demand.input_interfaces[demand.medium].temperature = 45
 
@@ -112,7 +113,7 @@ function test_heat_pump_demand_driven_correct_order()
 
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.load = 2100
+    demand.demand = 2100
     demand.temperature = 75
     demand.input_interfaces[demand.medium].temperature = 75
 

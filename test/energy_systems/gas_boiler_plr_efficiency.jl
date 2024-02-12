@@ -13,7 +13,7 @@ function test_gas_boiler_demand_driven_plr()
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [],
-            "static_load" => 1000,
+            "constant_demand" => 4000,
             "scale" => 1,
         ),
         "TST_GRI_01" => Dict{String,Any}(
@@ -31,21 +31,22 @@ function test_gas_boiler_demand_driven_plr()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 4000,
+            "power_th" => 4000,
             "is_plr_dependant" => true,
             "max_thermal_efficiency" => 1.0,
         ),
     )
-    components = Resie.load_components(components_config)
-    gasboiler = components["TST_GB_01"]
-    grid = components["TST_GRI_01"]
-    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
 
     # test if the thermal efficiency for a gas boiler in demand-driven mode is calculated
     # correctly depending on the part-load-ratio (PLR)
@@ -79,7 +80,7 @@ function test_gas_boiler_demand_driven_plr()
         EnergySystems.reset(unit)
     end
 
-    demand.static_load = 500
+    demand.constant_demand = 2000
     expected_efficiency = 0.7440249999999999
 
     EnergySystems.control(demand, components, simulation_parameters)
@@ -126,21 +127,22 @@ function test_gas_boiler_supply_driven_plr()
             "strategy" => Dict{String,Any}(
                 "name" => "supply_driven",
             ),
-            "power" => 4000,
+            "power_th" => 4000,
             "is_plr_dependant" => true,
             "max_thermal_efficiency" => 1.0,
         ),
     )
-    components = Resie.load_components(components_config)
-    gasboiler = components["TST_GB_01"]
-    grid = components["TST_GRI_01"]
-    demand = components["TST_DEM_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9
     )
+    
+    components = Resie.load_components(components_config, simulation_parameters)
+    gasboiler = components["TST_GB_01"]
+    grid = components["TST_GRI_01"]
+    demand = components["TST_DEM_01"]
 
     # test if the thermal efficiency for a gas boiler in supply-driven mode is calculated
     # correctly depending on the part-load-ratio (PLR)

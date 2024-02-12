@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"]
         },
         "output_plot": {
@@ -158,20 +159,11 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "output_refs": [
-                "TST_GRI_EL_01_out",
-                "TST_HTP_01",
-                "TST_DEM_EL_01",
-                "TST_DEM_EL_02",
-                "TST_ELY_01",
-                "TST_HTP_02"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_PVP_EL_01",
                     "TST_CHP_01",
                     "TST_GRI_EL_01"
-
                 ],
                 "output_order": [
                     "TST_DEM_EL_01",
@@ -187,12 +179,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_BUS_TH_02",
-                "TST_BUS_TH_01",
-                "TST_STES_TH_01"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_HTP_02",
                     "TST_HTP_01",
@@ -203,7 +190,7 @@
                     "TST_BUS_TH_01",
                     "TST_STES_TH_01"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1, 1],
                     [1, 1, 0],
                     [1, 1, 0]
@@ -214,11 +201,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_TH_01",
-                "TST_BFT_TH_01"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_BUS_TH_00",
                     "TST_BFT_TH_01",
@@ -228,7 +211,7 @@
                     "TST_DEM_TH_01",
                     "TST_BFT_TH_01"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 1],
                     [1, 0]
@@ -243,7 +226,7 @@
                 "TST_DEM_TH_02",
                 "TST_BFT_TH_02"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_BUS_TH_00",
                     "TST_BFT_TH_02"
@@ -262,7 +245,7 @@
                 "TST_CHP_01",
                 "TST_GBO_01"
             ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_GRI_EG_01"
                 ],
@@ -284,7 +267,7 @@
                 "name": "demand_driven",
                 "operation_profile_path": "profiles/district/4000hours_with_least_CO2_2022.prf"
             },
-            "power": 750000,
+            "power_el": 750000,
             "output_temperature": 50.0
         },
         "TST_CHP_01": {
@@ -298,7 +281,7 @@
                 "name": "demand_driven",
                 "load_storages": false
             },
-            "power": 300000,
+            "power_gas": 300000,
             "output_temperature": 60,
             "min_power_fraction": 0.0
         },
@@ -314,7 +297,7 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.5          
             },
-            "power": 400000,
+            "power_th": 400000,
             "output_temperature": 60
         },
         "TST_BFT_TH_01": {
@@ -357,8 +340,8 @@
                 "name": "demand_driven",
                 "load_storages": false
             },
-            "power": 550000,
-            "fixed_cop": 3.0,
+            "power_th": 550000,
+            "constant_cop": 3.0,
             "min_power_fraction": 0.2
         },
         "TST_HTP_02": {
@@ -370,8 +353,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 330000,
-            "fixed_cop": 3.5
+            "power_th": 330000,
+            "constant_cop": 3.5
         }
     }
 }

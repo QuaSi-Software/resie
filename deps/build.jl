@@ -1,2 +1,2 @@
-println("Now performing custom build steps")
-println("Done")
+@info "Now performing custom build steps"
+@info "Done"

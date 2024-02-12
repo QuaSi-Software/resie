@@ -19,8 +19,7 @@ function test_ooo_bus_to_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_02", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
                     "TST_GRI_01"
@@ -44,8 +43,7 @@ function test_ooo_bus_to_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
                     "TST_BUS_01"
@@ -101,7 +99,13 @@ function test_ooo_bus_to_bus()
         ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end

@@ -39,8 +39,8 @@ function test_ooo_for_heat_pumps_wrong()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 12000,
-            "fixed_cop" => 3.0
+            "power_th" => 12000,
+            "constant_cop" => 3.0
         ),
     )
 
@@ -59,7 +59,13 @@ function test_ooo_for_heat_pumps_wrong()
         ("TST_GRI_01", EnergySystems.s_process),
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end

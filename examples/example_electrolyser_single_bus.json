@@ -3,6 +3,7 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
+        "sankey_plot": "default",
         "__heating_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
@@ -11,7 +12,7 @@
             "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
         },
-        "output_keys": {
+        "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
             "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
@@ -91,12 +92,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_DEM",
-                "TST_01_HZG_01_BFT",
-                "TST_01_HZG_01_STS"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_HZG_01_HTP",
                     "TST_01_HZG_02_HTP",
@@ -108,7 +104,7 @@
                     "TST_01_HZG_01_BFT",
                     "TST_01_HZG_01_STS"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1, 1],
                     [1, 1, 0],
                     [1, 0, 0],
@@ -120,16 +116,11 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_HZG_02_HTP",
-                "TST_01_ELT_01_ELY"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
                 ],
-                "output_order": [
+                "energy_flow": [
                     "TST_01_HZG_01_HTP",
                     "TST_01_HZG_02_HTP",
                     "TST_01_ELT_01_ELY"
@@ -145,8 +136,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
-            "fixed_cop": 3.0
+            "power_th": 20000,
+            "constant_cop": 3.0
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -159,8 +150,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
-            "fixed_cop": 3.0
+            "power_th": 20000,
+            "constant_cop": 3.0
         },
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",
@@ -183,7 +174,7 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.1
             },
-            "power": 40000
+            "power_th": 40000
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
@@ -196,10 +187,9 @@
                 "TST_01_ELT_01_GRO"
             ],
             "strategy": {
-                "name": "demand_driven",
-                "m_heat_out": false
+                "name": "demand_driven"
             },
-            "power": 40000
+            "power_el": 40000
         },
         "TST_01_HZG_01_STS": {
             "type": "SeasonalThermalStorage",

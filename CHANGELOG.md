@@ -1,29 +1,67 @@
 # Changes made, features added and bugs fixed
-In general the development follows the [semantic versioning](https://semver.org/) scheme.
-As the simulation is parameterized by the project file, the structure and meaning of this
-file represents the API of the simulation engine. Evaluating compatability then follows
-required changes in the project file. This is complicated by the implementation of the
-individual energy systems, which happens within the framework but also reasonably
-independant of the simulation model. A change in the implementation may have big effects
-on simulation results without requiring any change in the project file. It is up to the
-developers to find a workable middle ground.
+In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatability then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independant of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
 
 ## Pre-1.0-releases
-As per the definition of semantic versioning and the reality of early development, in
-versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat,
-the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
-breaking changes may slip beneath notice.
+As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
-## Version 0.6.5
+### Version 0.7.1
+* bugfix in sankey diagram if only one medium is present
+* added possibility to not plot the sankey by adding "sankey_plot" to "io_settings"
+* added possibility to define custom colors in sankey for each medium
+* renamed input variable "output_keys" --> "csv_output_keys" in input file
+
+### Version 0.7.0
+#### Input and output
+* Rename parameters and output variables across several components:
+  * Load --> Demand                     in output channel of FixedSink
+  * static_load --> constant_demand     for parameters of sinks
+  * static_* --> constant_*             for parameters where * in (power, temperature, demand, supply)
+  * fixed_cop --> constant_cop          for HeatPump
+  * draw sum --> output_sum             in output channel of GridConnection
+  * load sum --> input_sum              in output channel of GridConnection
+  * power --> power_*                   for parameters of all transformers, where * in (el, th)
+  * medium --> consider_medium          for control strategy parameters of all transformers
+* Add output channel "Losses" to all components and to Sankey output. "Losses" are total losses, while "Losses_XX" are medium-wise break downs
+* Constant values for fixed sources and sinks are now given as power instead of work/energy to be consistent with bounded sources and sinks
+* Add global logging functionalities with the following categories: Debug, Info, BalanceWarn, Warn, Error and redirected all println() to logger (console and/or logging files, separately for general logs and Balancewarn)
+* Update configuration options for busses:
+  * Rename "connection_matrix" to "connections"
+  * Rename "storage_loading" to "energy_flow"
+  * Make "connections" a required part of the config for a bus, including items "input_order" and "output_order", however "energy_flow" remains optional
+  * Remove "output_refs" item as "output_order" contains the same information and is now required
+
+#### Functionality
+* Sankey diagrams now display the difference of requested and delivered energy in fixed sinks and sources
+* Remove condition "would overfill thermal buffer" in storage_driven strategy as this is now handled implicitly
+* Add profile aggregation and segmentation with testcases
+* Add import of weather files in EPW format and .dat format (DWD)
+* Add functionality to map profiles from weather file to component profiles, like ambient temperature from the weather file to a geothermal collector
+
+#### Fixes
+* Fix generic storage implementation not being available due to the module not being included
+* Fix the profile scaling factor of some components being required despite profiles being optional
+* Add missing output channels to Electrolyser
+
+#### Refactorings
+* Change the input and output interfaces of busses such that the order matches the input and output priorities
+* Rename helper function highest_temperature to highest and add types to inputs
+* Provide docstrings for some structs and functions that were missing them
+* Rename internal variables to match changes in the input and output variables mentioned above
+* Remove last potential() step of transformer chains as this is not needed
+* Add required Julia packages: Colors, Interpolations, Dates, Logging
+* Rename argument "parameters" for simulation parameters to "sim_params" and add them to all components and profiles
+* Rework communication of balances, energy/storage potentials and temperatures via busses. This is an extensive rework that touches almost all components and how the `process` and `potential` simulation steps work. Please note that the rework is not finished with v0.7.0 and will continue to support more energy systems and component configurations that might be of interest to users. However no compatability is knowingly broken with examples that worked in previous versions.
+
+### Version 0.6.5
 * "output_keys" and "output_plot" in the input file can now be "all", "nothing" or a list of entries for custom outputs of the CSV file and lineplot (backwards compatibility is given)
 * output_values() of all components was changed to not only return the available channels, but also the corresponding media
 * restructured "run_simulation()" for better readability
 
-## Version 0.6.4
+### Version 0.6.4
 * Generalise implementation of gas boiler to that of a fuel boiler
   * Although this implicates the use of a chemical fuel to generate heat, the current implementation works with any kind of input including electricity
 
-## Version 0.6.3
+### Version 0.6.3
 * Remove abstract subtype ControlledComponent and use abstract top-level type Component in its stead
 * Add a generic implementation for storage components
 * Standardise the generic implementations of fixed/bounded sources/sinks by:
@@ -31,13 +69,13 @@ breaking changes may slip beneath notice.
   * making Demand an alias to generic implementation FixedSink
 * Add "Load%" output for storage components making outputting the state of charge more convenient
 
-## Version 0.6.2
+### Version 0.6.2
 * Added part-load-ratio efficiency calculation for gas boiler component
 
-## Version 0.6.1
+### Version 0.6.1
 * corrected wrong units given for output_plot in example files
 
-## Version 0.6.0
+### Version 0.6.0
 * Refactor terms and names used to refer to various concepts in the simulation model:
   * energy system => component
   * energy network / system topology => energy system

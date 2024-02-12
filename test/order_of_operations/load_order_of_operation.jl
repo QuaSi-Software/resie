@@ -47,8 +47,8 @@ function load_order_of_operation()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 9000,
-            "fixed_cop" => 3.0,
+            "power_th" => 9000,
+            "constant_cop" => 3.0,
             "min_power_fraction" => 0.0
         )  
     )
@@ -97,7 +97,13 @@ function load_order_of_operation()
         ("TST_GRI_01", EnergySystems.s_process)
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
 
     # from input file
     order_from_input_file = Resie.load_order_of_operations(order_of_operation, components)
