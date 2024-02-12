@@ -1,6 +1,6 @@
 # Mesh automatization
 
-# TO DO: Modify "Special" Node(s) between increasing and decreasing mesh width. Should not be smaller than previous mesh width or min. mesh width.
+# TODO: Modify "Special" Node(s) between increasing and decreasing mesh width. Should not be smaller than previous mesh width or min. mesh width.
 function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_laying_depth,pipe_diameter_outer, total_depth_simulation_domain)
     # function to create varying mesh-width array in y-direction.
 

@@ -4,15 +4,13 @@
 # overlap calculated g-function values to composite g-function array
 
 # Packages
-using SpecialFunctions  # To use "expint"-function; Pkg.add("SpecialFunctions").
+using SpecialFunctions  # To use "expint"-function
 using JSON              # To read g-function values out of open source library in JSON-format. 
-using JSON2              # To read g-function values out of open source library in JSON-format. 
-using Interpolations    # Pkg.add("SpecialFunctions")
+using JSON2             # To read g-function values out of open source library in JSON-format. 
+using Interpolations    # Interpolations
 using CSV               # For validation purposes of this PreProcessing file.             
 using Plots             # For validation purposes of this PreProcessing file. 
 using DataFrames        # For writing CSV
-
-# Funktionen:
 
 function infinite_line_source(borehole_radius, soil_diffusivity, g_time_vector)
     # function calculates g-function solution of an infinite line source/sink by Kelvin. 
@@ -44,7 +42,7 @@ function ln_to_normal(library_grid_points_normalized_time, steady_state_time)
     return time
 end
 
-function round_to_simulation_step_width(grid_point,simulation_step_width)
+function round_to_simulation_step_width(grid_point, simulation_step_width)
     # making sure, that time stamps from library fit into simulation step width.
     grid_point_rounded = zeros(length(grid_point))
     
@@ -57,9 +55,14 @@ end
 
 function get_library_g_values(borehole_depth, borehole_radius,borehole_spacing, m, n, t)
     # Load library file using the JSON package - change path to library-file-path
-    # There are various sets of grid points refering to different borehole depths. Two sets of grid points have to be read out of .json library-file to do interpolation, as they are refered to specific borehole depth.
-    # check, which two sets of grid points (refered to borehole depth borehole_depth_library_lower and borehole depth borehole_depth_library_upper) will be read out of json file later.
-    # first, each set of grid points is refered to a default borehole radius (borehole_radius_library_lower, borehole_radius_library_upper). Later, the grid points will be corrected to the real borehole radius.
+    # There are various sets of grid points refering to different borehole depths.
+    # Two sets of grid points have to be read out of .json library-file to do interpolation, 
+    # as they are refered to specific borehole depth.
+    # Check, which two sets of grid points (refered to borehole depth borehole_depth_library_lower 
+    # and borehole depth borehole_depth_library_upper) will be read out of json file later.
+    # First, each set of grid points is refered to a default borehole radius 
+    # (borehole_radius_library_lower, borehole_radius_library_upper). 
+    # Later, the grid points will be corrected to the real borehole radius.
 
     # borehole_depth will be set by user. Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
     if borehole_depth >= 24 && borehole_depth <= 48

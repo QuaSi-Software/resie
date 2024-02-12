@@ -4,9 +4,9 @@ This implementations acts as storage as it can produce and load energy.
 """
 
 
-# Current solution to get g-function values. Wi
+# Current solution to get g-function values.
 # read g-function .txt file
-file = open("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/g_ges_vector.txt", "r")
+file = open("C:/Users/steinacker/Lokal/git_Resie/src/energy_systems/heat_sources/g_ges_vector.txt", "r") # TODO
     g_function = Vector{Float64}()
     for line in eachline(file)
         push!(g_function, parse(Float64, line))

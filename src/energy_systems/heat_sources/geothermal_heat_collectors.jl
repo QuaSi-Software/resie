@@ -3,7 +3,7 @@ Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
 """
 # only for validation purposes. 
-file = open("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r")
+file = open("C:/Users/steinacker/Lokal/git_Resie/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r") # TODO
     q_nov_wgg = Vector{Float64}()
     for line in eachline(file)
         push!(q_nov_wgg, parse(Float64, line))
@@ -88,8 +88,8 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
                                       nothing
         # read in ambient global radiation profilfe (downloaded from dwd)
         global_radiation_profile = "global_radiation_profile_path" in keys(config) ?
-                                      Profile(config["global_radiation_profile_path"]) :
-                                      nothing                              
+                                   Profile(config["global_radiation_profile_path"]) :
+                                   nothing                              
 
         return new(
             uac,                    # uac
@@ -163,8 +163,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             1,              # time step of simulation in h to calculate power (W) out of energy (Wh) (wh_to_w_timestep), depending on simulation time step.
             0,              # fluid_reynolds_number-Number, to be calculated in function.
             16.0,           # starting temperature of pipe. set for validation purpose.
-            q_nov_wgg       # provisorisch!
-
+            q_nov_wgg       # provisorisch! TODO
             )
     end
 end
