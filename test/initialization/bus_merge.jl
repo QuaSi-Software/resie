@@ -722,7 +722,7 @@ function test_merge_busses_cross_shape_full_automatic()
             busses[key] = val
         end
     end
-    new_bus = EnergySystems.merge_busses(busses)
+    new_bus = EnergySystems.merge_busses(busses, components)
 
     expected = [
         "TST_SRC_04",
@@ -911,11 +911,6 @@ function energy_system_busses_only()::Dict{String,Any}
                     "TST_BUS_05",
                 ],
                 "output_order" => [],
-                "energy_flow" => [
-                    [1,1],
-                    [1,1],
-                    [1,0],
-                ]
             )
         ),
         "TST_BUS_08" => Dict{String,Any}(
@@ -945,7 +940,7 @@ function test_merge_busses_order_of_merges()
     for component in chains[1]
         chain[component.uac] = component
     end
-    merged = EnergySystems.merge_busses(chain)
+    merged = EnergySystems.merge_busses(chain, components)
     @test merged isa Bus
 end
 
