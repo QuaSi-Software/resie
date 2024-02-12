@@ -76,7 +76,7 @@ function Condition(
     prototype = CONDITION_PROTOTYPES[name]
     return Condition(
         prototype,
-        merge(prototype.cond_params, cond_params),
+        Base.merge(prototype.cond_params, cond_params),
         Grouping()
     )
 end
@@ -432,7 +432,7 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
         end
     end
 
-    params = merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
+    params = Base.merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
 
     # load operation profile if path is given in input file
     if haskey(params, "operation_profile_path")

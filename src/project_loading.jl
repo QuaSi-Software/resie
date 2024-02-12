@@ -43,7 +43,7 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         default_dict = Dict{String,Any}(
             "strategy" => Dict{String,Any}("name" => "default")
         )
-        unit_config = merge(default_dict, entry)
+        unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
