@@ -83,7 +83,7 @@ mutable struct GeothermalProbes <: ControlledComponent
             m_heat_in,                      # medium name of input interface
             m_heat_out,                     # medium name of output interface
             default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading            
-            default(config, "loading_temperature", nothing),        # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
+            default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
             default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading         
             config["max_output_power"],  # maximum output power set by user, may change later to be calculated from other inputs like specific heat transfer rate
             config["max_input_power"],   # maximum input power set by user, may change later to be calculated from other inputs like specific heat transfer rate
@@ -93,9 +93,9 @@ mutable struct GeothermalProbes <: ControlledComponent
             0.0,                         # output temperature in current time step, calculated in control()
             0.0,                         # input temperature in current time step, calculated in control()
             default(config, "soil_undisturbed_ground_temperature", 11.0),    # Considered as constant
-            default(config, "soil_heat_conductivity", 1.5),             # Heat conductivity of surrounding soil, homogenous and constant
-            default(config, "borehole_thermal_resistance", 0.10),                # thermal resistance in (m K)/W
-            g_function,                      # pre-calculated multiscale g-function. Calculated in pre-processing.
+            default(config, "soil_heat_conductivity", 1.5),                  # Heat conductivity of surrounding soil, homogenous and constant
+            default(config, "borehole_thermal_resistance", 0.10),            # thermal resistance in (m K)/W
+            g_function,                             # pre-calculated multiscale g-function. Calculated in pre-processing.
             0,                                      # index of current time step to get access on time dependent g-function values
             0.0,                                    # average fluid temperature
             4,                                      # set boreholewall-starting-temperature
@@ -107,19 +107,17 @@ mutable struct GeothermalProbes <: ControlledComponent
             default(config, "pipe_diameter_outer", 0.032),  # outer pipe diameter
             default(config, "pipe_diameter_inner", 0.026),  # inner pipe diameter
            
-            default(config, "fluid_specific_heat_capacity", 3800),   # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-            default(config, "fluid_density", 1045),  # density brine at 0 °C (25 % glycol 75 % water (interpolated))
-            default(config, "fluid_kinematic_viscosity", 3.9e-6), # viscosity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-            default(config, "fluid_heat_conductivity", 0.5) ,  # heat conductivity brine at 0 °C (25 % glycol 75 % water (interpolated))
-            default(config, "fluid_prandtl_number", 30),   # prandtl-number brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_specific_heat_capacity", 3800),  # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_density", 1045),                 # density brine at 0 °C (25 % glycol 75 % water (interpolated))
+            default(config, "fluid_kinematic_viscosity", 3.9e-6),   # viscosity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
+            default(config, "fluid_heat_conductivity", 0.5) ,       # heat conductivity brine at 0 °C (25 % glycol 75 % water (interpolated))
+            default(config, "fluid_prandtl_number", 30),            # prandtl-number brine at 0 °C (25 % glycol 75 % water (interpolated)) 
             
-            default(config, "grout_heat_conductivity", 2),      # lambda grout / filling material in W/(mK)   
-            default(config, "pipe_heat_conductivity", 0.42),   # lambda of inner pipes
-            default(config, "borehole_diameter", 0.15),    # borehole diameter in m.
+            default(config, "grout_heat_conductivity", 2),          # lambda grout / filling material in W/(mK)   
+            default(config, "pipe_heat_conductivity", 0.42),        # lambda of inner pipes
+            default(config, "borehole_diameter", 0.15),             # borehole diameter in m.
             0.1,     # shank-spacing = distance between inner pipes in borehole. Needed for calculation of thermal borehole resistance.
-
-            0      # Reynoldsnumber. To be calculated in Function later.
-
+            0        # Reynoldsnumber. To be calculated in Function later.
             )
     end
 end
@@ -183,8 +181,8 @@ end
 # function to calculate the maximum possible output energy in current time step
 # currenlty only a dummy implementation with simple user-input!!
 function get_max_output_power(unit::GeothermalProbes)::Float64
-    # new: calculate max. outputpower based on max. temperature difference between borehallwall and min. average fluid temperature (VDI 4640-2 : Input should be >= 0°C most of the time)
-    
+    # new: calculate max. outputpower based on max. temperature difference between borehallwall and min. average fluid temperature 
+    # (VDI 4640-2 : Input should be >= 0°C most of the time)
     max_output_power = unit.specific_heat_flux_in_out_absolut[unit.time_index]*unit.probe_depth*unit.probe_number
     return max_output_power  
 end
@@ -208,7 +206,6 @@ function calculate_new_boreholewall_temperature(unit::GeothermalProbes)::Tempera
     radius_pipe_eq_inner = radius_pipe_inner
     unit.pipe_diameter_inner = 2*radius_pipe_eq_inner
    
-    
     # define variable for later calculations
     sum = 0
 
@@ -221,23 +218,19 @@ function calculate_new_boreholewall_temperature(unit::GeothermalProbes)::Tempera
     beta = 1/(2*pi*alpha_fluid*radius_pipe_inner) + 1/(2*pi * unit.pipe_heat_conductivity) * log(radius_pipe_outer/radius_pipe_inner) # in (mK)/W
     
     R_1 = beta + 1/(2*pi*unit.grout_heat_conductivity)*
-    (log(radius_borehole^2/(2*radius_pipe_outer*distance_pipe_center))+
-    sigma*log(radius_borehole^4/(radius_borehole^4-distance_pipe_center^4))-
-    radius_pipe_outer^2/(4*distance_pipe_center^2)*(1-sigma*4*distance_pipe_center^4/(radius_borehole^4-distance_pipe_center^4))^2 /
-    ((1+2*pi*unit.grout_heat_conductivity*beta)/(1-2*pi*unit.grout_heat_conductivity*beta)+
-    radius_pipe_outer^2/(4*distance_pipe_center^2)*(1+sigma*16*radius_borehole^4*distance_pipe_center^4/((radius_borehole^4-distance_pipe_center^4)^2))
-    )
-    )
+          (log(radius_borehole^2/(2*radius_pipe_outer*distance_pipe_center))+
+          sigma*log(radius_borehole^4/(radius_borehole^4-distance_pipe_center^4))-
+          radius_pipe_outer^2/(4*distance_pipe_center^2)*(1-sigma*4*distance_pipe_center^4/(radius_borehole^4-distance_pipe_center^4))^2 /
+          ((1+2*pi*unit.grout_heat_conductivity*beta)/(1-2*pi*unit.grout_heat_conductivity*beta)+
+          radius_pipe_outer^2/(4*distance_pipe_center^2)*(1+sigma*16*radius_borehole^4*distance_pipe_center^4/((radius_borehole^4-distance_pipe_center^4)^2))))
 
     unit.borehole_thermal_resistance = R_1/4
     
-
     # g-function approach
     if unit.time_index == 1
         unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index]
     else 
         unit.specific_heat_flux_in_out_step[unit.time_index] = unit.specific_heat_flux_in_out_absolut[unit.time_index] - unit.specific_heat_flux_in_out_absolut[unit.time_index - 1]
-    
     end
         
     for i in 0:(unit.time_index - 1)    
@@ -257,13 +250,12 @@ function calculate_alpha_pipe(unit::GeothermalProbes)
     probe_total_heat_flux_in_out = abs(unit.specific_heat_flux_in_out_absolut[unit.time_index])/2 * unit.probe_depth
     # calculate reynolds-number (based on dynamic viscosity)
     unit.fluid_reynolds_number = (probe_total_heat_flux_in_out)/
-            (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * unit.pipe_diameter_inner * fluid_dynamic_viscosity)
+                                 (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * unit.pipe_diameter_inner * fluid_dynamic_viscosity)
     
     # # old: Reynoldsnumber calculation based on kinematic viscosity.
     # # calculate reynolds-number to choose right Nusselt-calculation method
     #     re_old = (4 * abs(unit.specific_heat_flux_in_out_absolut[unit.time_index])/2 * unit.probe_depth)/
     #     (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi  * unit.pipe_diameter_inner * unit.fluid_kinematic_viscosity * unit.fluid_density)
- 
      
     # check for laminar flow
     if unit.fluid_reynolds_number <= 2300
@@ -274,30 +266,30 @@ function calculate_alpha_pipe(unit::GeothermalProbes)
         # Gielinski
         factor = (unit.fluid_reynolds_number - 2300)/(1e4-2300)
         Nu = (1- factor)*
-        calculate_Nu_laminar(unit::GeothermalProbes, 2300) +
-        factor * calculate_Nu_turbulent(unit::GeothermalProbes, 1e4)
-        end
+             calculate_Nu_laminar(unit::GeothermalProbes, 2300) +
+             factor * calculate_Nu_turbulent(unit::GeothermalProbes, 1e4)
+    end
     
     alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_diameter_inner
     
     return alpha
-    end
+end
     
 function calculate_Nu_laminar(unit::GeothermalProbes,fluid_reynolds_number)
     
-        # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
-        # TO DO: Need to be changed in documentation.
-        k_a = 0.0         # initializing k_a
-        k_n = 0.0        # initializing k_n
-        # substitutions: 
-        k_a = 1.1 - 1 / (3.4+0.0667*unit.fluid_prandtl_number)
-        k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
+    # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
+    # TODO: Need to be changed in documentation.
+    k_a = 0.0         # initializing k_a
+    k_n = 0.0        # initializing k_n
+    # substitutions: 
+    k_a = 1.1 - 1 / (3.4+0.0667*unit.fluid_prandtl_number)
+    k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
     
-        # calculate Nu-Number
-        Nu = ((k_a/(1-k_n)*(unit.fluid_prandtl_number*unit.pipe_diameter_inner*unit.fluid_reynolds_number/(unit.probe_depth*2))^k_n)^3+4.364^3)^(1/3)
+    # calculate Nu-Number
+    Nu = ((k_a/(1-k_n)*(unit.fluid_prandtl_number*unit.pipe_diameter_inner*unit.fluid_reynolds_number/(unit.probe_depth*2))^k_n)^3+4.364^3)^(1/3)
     
     return Nu
-    end 
+end 
     
 function calculate_Nu_turbulent(unit::GeothermalProbes,fluid_reynolds_number)
     zeta = (1.8*log(fluid_reynolds_number)-1.5)^-2
@@ -354,26 +346,17 @@ function load(unit::GeothermalProbes, parameters::Dict{String,Any})
     supply_temp = exchange.temperature              # get temperature delivered by source 
     energy_available = exchange.balance             # get energy that is provided  
    
-    if !unit.regeneration
+    if (!unit.regeneration ||                                                        # no energy available if regeneration is turned off
+        energy_available <= 0.0 ||                                                   # no energy available for loading as load is only concerned when receiving energy from the target
+        (supply_temp !== nothing && supply_temp < unit.current_input_temperature)    # we can only take in energy if it's at a higher temperature than the probe fields lowest temperature
+    )
         # recalculate borehole temperature for next timestep
         calculate_new_boreholewall_temperature(unit::GeothermalProbes)
         return
     end
 
-    # no energy available for loading as load is only concerned when receiving energy from the target
-    if energy_available <= 0.0
-        # recalculate borehole temperature for next timestep    
-        calculate_new_boreholewall_temperature(unit::GeothermalProbes)
-        return
-    end
-
-    # we can only take in energy if it's at a higher temperature than the probe fields lowest temperature
-    if supply_temp !== nothing && supply_temp < unit.current_input_temperature
-        calculate_new_boreholewall_temperature(unit::GeothermalProbes)
-        return
-    end
     # Add loaded specific heat flux to vector
-    unit.specific_heat_flux_in_out_absolut[unit.time_index] += energy_available / (unit.probe_depth * unit.probe_number * 1) # TO DO: Add Global Time Step!
+    unit.specific_heat_flux_in_out_absolut[unit.time_index] += energy_available / (unit.probe_depth * unit.probe_number * 1) # TODO: Add Global Time Step!
 
     # calcute energy that acutally has beed delivered for regeneration and set it to interface 
     # no other limits are present as max_energy for geothermal probes was written in control-step!
@@ -419,13 +402,10 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         end
     elseif key.value_key =="borehole_temperature"
         return unit.borehole_current_wall_temperature
-
     elseif key.value_key =="fluid_temperature"
         return unit.fluid_temperature
-
     elseif key.value_key =="borehole_thermal_resistance"
         return unit.borehole_thermal_resistance
-    
     elseif key.value_key =="fluid_reynolds_number"
         return unit.fluid_reynolds_number
     elseif key.value_key =="dT_monthly"

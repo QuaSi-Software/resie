@@ -1,13 +1,13 @@
 # Mesh automatization
 
 # TO DO: Modify "Special" Node(s) between increasing and decreasing mesh width. Should not be smaller than previous mesh width or min. mesh width.
-function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_laying_depth,Pipe_Diameter_outer, total_depth_simulation_domain)
+function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_laying_depth,pipe_diameter_outer, total_depth_simulation_domain)
     # function to create varying mesh-width array in y-direction.
 
     # define segments of the computing grid in y-direction 
     sy1 = 0                                                 # surface
-    sy2 = pipe_laying_depth - 0.5*Pipe_Diameter_outer       # node above fluid node
-    sy3 = pipe_laying_depth + 0.5*Pipe_Diameter_outer       # node below fluid node
+    sy2 = pipe_laying_depth - 0.5*pipe_diameter_outer       # node above fluid node
+    sy3 = pipe_laying_depth + 0.5*pipe_diameter_outer       # node below fluid node
     sy4 = total_depth_simulation_domain                     # lower simulation boundary
     segment_array_y = [sy1, sy2, sy3, sy4]                  # array containing segment points
     
@@ -66,7 +66,7 @@ function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_layi
     end
     
     # segment 2: pipe node 
-    dy_2 = [Pipe_Diameter_outer/2 Pipe_Diameter_outer/2]
+    dy_2 = [pipe_diameter_outer/2 pipe_diameter_outer/2]
 
     # segment 3: below pipe node to lower simulation boundary
     for j = 1: Int(floor((segment_array_y[4] - segment_array_y[3]) / min_mesh_width))
@@ -125,18 +125,18 @@ function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_layi
     return dy
 end 
 
-function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, Pipe_Diameter_outer)
+function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer)
     # generating expanding mesh in x-direction. 
     # define segments of the computing grid in x-direction 
     sx1 = 0                             # left boundary
-    sx2 = 0.5*Pipe_Diameter_outer       # node right next to fluid node
+    sx2 = 0.5*pipe_diameter_outer       # node right next to fluid node
     sx3 = fluid_pipe_distance           # right simulation boundary
     segment_array_x = [sx1, sx2, sx3]   # array containing segment points
 
     number_of_nodes_dx_2 = 0            # to cut dx_2 array later
 
     # segment 1
-    dx_1 = [0.5*Pipe_Diameter_outer]
+    dx_1 = [0.5*pipe_diameter_outer]
     dx_2 = zeros(100)
     # segment 2 
     for i in 1:Int(floor((segment_array_x[3] - segment_array_x[2]) / min_mesh_width))
@@ -177,12 +177,12 @@ end
 # set collector properties
 total_depth_simulation_domain = 10          # total depth of simulation area in y direction
 pipe_laying_depth = 2                       # laying depth below surface
-Pipe_Diameter_outer = 0.040                 # outer pipe diameter [m]
+pipe_diameter_outer = 0.040                 # outer pipe diameter [m]
 fluid_pipe_distance = 1                     # spacing between two adjacent collector pipes [m]
 
 # define minimal mesh width - TO DO: choose between fine or rough grid
-min_mesh_width = Pipe_Diameter_outer/4  # minimal mesh width in x- and y-direction [- current value could be min_mesh_width for fine grid]
-max_mesh_width = Pipe_Diameter_outer * 128
+min_mesh_width = pipe_diameter_outer/4  # minimal mesh width in x- and y-direction [- current value could be min_mesh_width for fine grid]
+max_mesh_width = pipe_diameter_outer * 128
 expansion_factor = 2  
 
 
@@ -190,19 +190,19 @@ expansion_factor = 2
 accuracy_mode = "normal"
 
 if accuracy_mode == "normal"
-    min_mesh_width = Pipe_Diameter_outer/4  
-    max_mesh_width = Pipe_Diameter_outer * 32  # TO DO
+    min_mesh_width = pipe_diameter_outer/4  
+    max_mesh_width = pipe_diameter_outer * 32  # TO DO
     expansion_factor = 2
 
 elseif accuracy_mode == "high"
-    min_mesh_width = Pipe_Diameter_outer/8  
-    max_mesh_width = Pipe_Diameter_outer * 16  # TO DO
+    min_mesh_width = pipe_diameter_outer/8  
+    max_mesh_width = pipe_diameter_outer * 16  # TO DO
     expansion_factor = 1.75
 
 end 
 
-dy = create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, Pipe_Diameter_outer, total_depth_simulation_domain)
-dx = create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, Pipe_Diameter_outer)
+dy = create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_diameter_outer, total_depth_simulation_domain)
+dx = create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer)
 
 # can be deleted later, only for debugging
 println(dy[:])

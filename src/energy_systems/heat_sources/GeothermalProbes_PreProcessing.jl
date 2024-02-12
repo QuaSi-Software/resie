@@ -45,91 +45,93 @@ function ln_to_normal(library_grid_points_normalized_time, steady_state_time)
 end
 
 function round_to_simulation_step_width(grid_point,simulation_step_width)
-# making sure, that time stamps from library fit into simulation step width.
-grid_point_rounded = zeros(length(grid_point))
-for i=1:length(grid_point)
-    grid_point_rounded[i] = floor(Int(round(grid_point[i]/simulation_step_width))) * simulation_step_width
-end 
+    # making sure, that time stamps from library fit into simulation step width.
+    grid_point_rounded = zeros(length(grid_point))
+    
+    for i=1:length(grid_point)
+        grid_point_rounded[i] = floor(Int(round(grid_point[i]/simulation_step_width))) * simulation_step_width
+    end 
+    
     return grid_point_rounded
 end
 
 function get_library_g_values(borehole_depth, borehole_radius,borehole_spacing, m, n, t)
-# Load library file using the JSON package - change path to library-file-path
-# There are various sets of grid points refering to different borehole depths. Two sets of grid points have to be read out of .json library-file to do interpolation, as they are refered to specific borehole depth.
-# check, which two sets of grid points (refered to borehole depth borehole_depth_library_lower and borehole depth borehole_depth_library_upper) will be read out of json file later.
-# first, each set of grid points is refered to a default borehole radius (borehole_radius_library_lower, borehole_radius_library_upper). Later, the grid points will be corrected to the real borehole radius.
+    # Load library file using the JSON package - change path to library-file-path
+    # There are various sets of grid points refering to different borehole depths. Two sets of grid points have to be read out of .json library-file to do interpolation, as they are refered to specific borehole depth.
+    # check, which two sets of grid points (refered to borehole depth borehole_depth_library_lower and borehole depth borehole_depth_library_upper) will be read out of json file later.
+    # first, each set of grid points is refered to a default borehole radius (borehole_radius_library_lower, borehole_radius_library_upper). Later, the grid points will be corrected to the real borehole radius.
 
-# borehole_depth will be set by user. Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
-if borehole_depth >= 24 && borehole_depth <= 48
-    borehole_depth_library_lower = 24
-    borehole_radius_library_lower = 0.075
+    # borehole_depth will be set by user. Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
+    if borehole_depth >= 24 && borehole_depth <= 48
+        borehole_depth_library_lower = 24
+        borehole_radius_library_lower = 0.075
 
-    borehole_depth_library_upper = 48
-    borehole_radius_library_upper = 0.075
+        borehole_depth_library_upper = 48
+        borehole_radius_library_upper = 0.075
 
-elseif borehole_depth >= 48 && borehole_depth <= 96
-    borehole_depth_library_lower = 48
-    borehole_radius_library_lower = 0.075
+    elseif borehole_depth >= 48 && borehole_depth <= 96
+        borehole_depth_library_lower = 48
+        borehole_radius_library_lower = 0.075
 
-    borehole_depth_library_upper = 96 
-    borehole_radius_library_upper = 075
+        borehole_depth_library_upper = 96 
+        borehole_radius_library_upper = 075
 
-elseif borehole_depth >= 96 && borehole_depth <= 192
-    borehole_depth_library_lower = 96
-    borehole_radius_library_lower = 0.075
-    
-    borehole_depth_library_upper = 192
-    borehole_radius_library_upper = 0.08
+    elseif borehole_depth >= 96 && borehole_depth <= 192
+        borehole_depth_library_lower = 96
+        borehole_radius_library_lower = 0.075
+        
+        borehole_depth_library_upper = 192
+        borehole_radius_library_upper = 0.08
 
-elseif borehole_depth >= 192 && borehole_depth <= 384
-    borehole_depth_library_lower = 192
-    borehole_radius_library_lower = 0.08
+    elseif borehole_depth >= 192 && borehole_depth <= 384
+        borehole_depth_library_lower = 192
+        borehole_radius_library_lower = 0.08
 
-    borehole_depth_library_upper = 384 
-    borehole_radius_library_upper = 0.0875
+        borehole_depth_library_upper = 384 
+        borehole_radius_library_upper = 0.0875
 
-end
+    end
 
-# Attention. At the moment, only Open rectangle configurations are considered. 
-# More library files can be downloaded from the open source library. User-Input: Probe-field geometry.
-Library = JSON.parsefile("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/Open_configurations_5m_v1.0.json")
+    # Attention. At the moment, only Open rectangle configurations are considered. 
+    # More library files can be downloaded from the open source library. User-Input: Probe-field geometry.
+    Library = JSON.parsefile("C:/Users/vollmer/Documents/GitHub/resie/src/energy_systems/heat_sources/Open_configurations_5m_v1.0.json")
 
-# Create keys to read gridpoint-sets out of library-file.
-key1 = "$(m)_$(n)"
-key2 = "$(t)"
+    # Create keys to read gridpoint-sets out of library-file.
+    key1 = "$(m)_$(n)"
+    key2 = "$(t)"
 
-# Get a specific configuration from the library
-configuration = Library[key1][key2]
+    # Get a specific configuration from the library
+    configuration = Library[key1][key2]
 
-# Get values from the configuration
-gVals = configuration["g"]
+    # Get values from the configuration
+    gVals = configuration["g"]
 
-# Getting a Specific G-Function for the default configuration
-borehole_spacing_library_default = 5   # Default borehole spacing for eacht configuration.
-g_values_library_lower = gVals["$borehole_spacing_library_default._$borehole_depth_library_lower._$borehole_radius_library_lower"]
-g_values_library_upper = gVals["$borehole_spacing_library_default._$borehole_depth_library_upper._$borehole_radius_library_upper"]
+    # Getting a Specific G-Function for the default configuration
+    borehole_spacing_library_default = 5   # Default borehole spacing for eacht configuration.
+    g_values_library_lower = gVals["$borehole_spacing_library_default._$borehole_depth_library_lower._$borehole_radius_library_lower"]
+    g_values_library_upper = gVals["$borehole_spacing_library_default._$borehole_depth_library_upper._$borehole_radius_library_upper"]
 
-# Linear Intepolation between upper and lower default g_values on B/H-ratio. B: Borehole spacing. H: Borehole depth.
-B_H_ratio_configuration = borehole_spacing / borehole_depth
-B_H_ratio_library_default_lower = borehole_spacing_library_default / borehole_depth_library_lower
-B_H_ratio_library_default_upper = borehole_spacing_library_default / borehole_depth_library_upper
+    # Linear Intepolation between upper and lower default g_values on B/H-ratio. B: Borehole spacing. H: Borehole depth.
+    B_H_ratio_configuration = borehole_spacing / borehole_depth
+    B_H_ratio_library_default_lower = borehole_spacing_library_default / borehole_depth_library_lower
+    B_H_ratio_library_default_upper = borehole_spacing_library_default / borehole_depth_library_upper
 
-# Substitution "Interpolation_Faktor" to save space. Describes, if B_H_ratio_configuration is closer to B_H_ratio_library_default_lower or B_H_ratio_library_default_upper
-Interpolation_Faktor = (B_H_ratio_configuration-B_H_ratio_library_default_lower)/(B_H_ratio_library_default_upper-B_H_ratio_library_default_lower)
+    # Substitution "Interpolation_Faktor" to save space. Describes, if B_H_ratio_configuration is closer to B_H_ratio_library_default_lower or B_H_ratio_library_default_upper
+    Interpolation_Faktor = (B_H_ratio_configuration-B_H_ratio_library_default_lower)/(B_H_ratio_library_default_upper-B_H_ratio_library_default_lower)
 
-g_values_library_interpolated = g_values_library_upper-(1-Interpolation_Faktor)*(g_values_library_upper-g_values_library_lower)
+    g_values_library_interpolated = g_values_library_upper-(1-Interpolation_Faktor)*(g_values_library_upper-g_values_library_lower)
 
-# g_values_library_interpolated are refered to a not existing boreholeradius (borehole_radius_interpolated), because Interpolation is based on B/H.
-# Within the interpolation based on B/H, the ratio r_b/H is interpolated, too. That's why a correction is needed to refer to the real borehole radius (which is set by user or default).
-r_b_H_ratio_library_default_lower = borehole_radius_library_lower/borehole_depth_library_lower
-r_b_H_ratio_library_default_upper = borehole_radius_library_upper/borehole_depth_library_upper
+    # g_values_library_interpolated are refered to a not existing boreholeradius (borehole_radius_interpolated), because Interpolation is based on B/H.
+    # Within the interpolation based on B/H, the ratio r_b/H is interpolated, too. That's why a correction is needed to refer to the real borehole radius (which is set by user or default).
+    r_b_H_ratio_library_default_lower = borehole_radius_library_lower/borehole_depth_library_lower
+    r_b_H_ratio_library_default_upper = borehole_radius_library_upper/borehole_depth_library_upper
 
-borehole_radius_interpolated = (r_b_H_ratio_library_default_upper+(1-Interpolation_Faktor)*
-(r_b_H_ratio_library_default_lower-r_b_H_ratio_library_default_upper)) * borehole_depth 
+    borehole_radius_interpolated = (r_b_H_ratio_library_default_upper+(1-Interpolation_Faktor)*
+                                   (r_b_H_ratio_library_default_lower-r_b_H_ratio_library_default_upper)) * borehole_depth 
 
-g_values_library_corrected = g_values_library_interpolated .- log(borehole_radius/(borehole_radius_interpolated))
+    g_values_library_corrected = g_values_library_interpolated .- log(borehole_radius/(borehole_radius_interpolated))
 
-return g_values_library_corrected
+    return g_values_library_corrected
 
 end
 
@@ -158,10 +160,10 @@ t = 1
 
 # Get pre-caluclated g-function values out of open source library json file
 # time stamps are the same for each set of grid points out of the library, as follows:
-library_grid_points_normalized_time = [-8.5, -7.8, -7.2, -6.5, -5.9, -5.2, -4.5, 
-    -3.963, -3.27, -2.864, -2.577, -2.171, -1.884, 
-    -1.191, -0.497, -0.274, -0.051, 0.196, 0.419, 
-    0.642, 0.873, 1.112, 1.335, 1.679, 2.028, 2.275, 3.003]
+library_grid_points_normalized_time = [-8.5,  -7.8,   -7.2,   -6.5,   -5.9,   -5.2,   -4.5, 
+                                      -3.963, -3.27,  -2.864, -2.577, -2.171, -1.884, -1.191,
+                                      -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,  
+                                       1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
 
 library_grid_points_g_values = get_library_g_values(borehole_depth,borehole_radius,borehole_spacing,m,n,t)
 println(library_grid_points_g_values)
