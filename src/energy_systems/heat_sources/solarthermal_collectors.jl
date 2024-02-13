@@ -218,7 +218,11 @@ function control(
 
     # spec_mass_flow = spec_thermal_power / (unit.delta_T * 4.18) #TODO Add C_p calculation
     # test if temp erreicht wird mit neuer Energie
-    unit.max_energy = watt_to_wh(max(spec_thermal_power * unit.collector_gross_area, 0))
+    if unit.output_temperature < unit.target_temperature
+        unit.max_energy = 0
+    else
+        unit.max_energy = watt_to_wh(max(spec_thermal_power * unit.collector_gross_area, 0))
+    end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
     # unit.output_interfaces[unit.medium].temperature = unit.output_temperature
@@ -249,7 +253,10 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
             min(abs(energy_demand), unit.max_energy),
             unit.output_temperature
         )
-        
+        #TODO put spec_mass_flow in system definition TODO Add C_p calculation
+        spec_vol_flow = 0.004167
+        used_spec_power = min(wh_to_watt(unit.used_energy) / unit.collector_gross_area, spec_vol_flow * unit.delta_T * 4.18/1000)
+
         # get average temperature based on used energy
         function spec_thermal_power_func(t_avg)         
             unit.eta_0_b * unit.K_b * unit.direct_solar_irradiance +
@@ -262,7 +269,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
             unit.a_params[6] * unit.reduced_wind_speed * (unit.direct_solar_irradiance + unit.diffuse_solar_irradiance) -
             unit.a_params[7] * unit.reduced_wind_speed * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
             unit.a_params[8] * (t_avg - unit.ambient_temperature)^4 -
-            wh_to_watt(unit.used_energy) / unit.collector_gross_area
+            used_spec_power
         end
         
         function derivate_spec_thermal_power_func(t_avg)
