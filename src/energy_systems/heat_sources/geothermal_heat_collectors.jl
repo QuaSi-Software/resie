@@ -36,13 +36,13 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     phase_change_lower_boundary_temperature::Temperature
     surface_convective_heat_transfer_coefficient::Float64
     surface_reflection_factor::Float64
-    t1::Array
-    t2::Array
-    phase_change_state::Array
-    cp1::Array
-    cp2::Array
-    fluid::Array
-    pipe_surrounding::Array
+    t1::Array{Float64}
+    t2::Array{Float64}
+    phase_change_state::Array{Float64}
+    cp1::Array{Float64}
+    cp2::Array{Float64}
+    fluid::Array{Float64}
+    pipe_surrounding::Array{Float64}
     pipe_radius_outer::Float64
     pipe_thickness::Float64
     pipe_d_i::Float64
@@ -54,8 +54,8 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     global_radiation::Float64
     boltzmann_constant::Float64
     surface_emissivity::Float64
-    dx::Vector
-    dy::Vector
+    dx::Vector{Float64}
+    dy::Vector{Float64}
     dz::Float64
     dt::Integer
     timestep_index::Integer
@@ -71,6 +71,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     specific_heat_flux_in_out::Float64
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
+    q_in_out_nov::Vector
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -85,6 +86,15 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
                                    Profile(config["global_radiation_profile_path"]) :
                                    nothing                              
 
+                                   
+        # only for validation purposes. 
+        file = open("C:/Users/steinacker/Lokal/git_Resie/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r")
+        q_nov_wgg = Vector{Float64}()
+        for line in eachline(file)
+            push!(q_nov_wgg, parse(Float64, line))
+        end
+        close(file)
+        
         return new(
             uac,                    # uac
             controller_for_strategy( # controller
@@ -158,7 +168,8 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             default(config, "fluid_heat_conductivity",0.5),             # fluid_heat_conductivity at 30 % glycol, 0 °C  in W/(mK)
             default(config, "specific_heat_flux_in_out",20),            # max. specific heat flux extractable (in and out!) out of soil in W/m^2. Depending on ground and climate localization. [VDI 4640-2.]
             0,              # fluid_reynolds_number-Number, to be calculated in function.
-            16.0            # starting temperature of pipe. set for validation purpose.
+            16.0,            # starting temperature of pipe. set for validation purpose.
+            q_nov_wgg
             )
     end
 end
@@ -260,6 +271,7 @@ function control(
     move_state(unit, components, parameters)
 
     # get ambient temperature and global radiation from profile for current time step if needed (probably only for geothermal collectors)
+    # TODO: add link to global weather file
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, parameters["time"])
     unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, parameters["time"]))  # from Wh/m^2 to W/m^2
 
@@ -319,7 +331,6 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     # calculate fluid temperature
     h = 1
     for h = 1: (length(unit.dy)) 
-        
         for i =1:2  
             if unit.fluid[h,i] == 1         
                 # calculate specific heat extraction for 1 pipe per length
@@ -600,7 +611,7 @@ function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
         return # process is only concerned with moving energy to the target
     end
 
-    energy_demand = min(-unit.max_output_energy, energy_demand)
+    energy_demand = -1000*unit.q_in_out_nov[unit.timestep_index] #min(-unit.max_output_energy, energy_demand)
     unit.collector_total_heat_energy_in_out = energy_demand
     # calcute energy that acutally can be delivered and set it to the output interface 
     # no other limits are present as max_energy for geothermal heat collector was written in control-step
@@ -623,7 +634,7 @@ function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
         return
     end
     
-    energy_available = min(unit.max_input_energy, energy_available)
+    energy_available = 0.0 #min(unit.max_input_energy, energy_available)
     unit.collector_total_heat_energy_in_out += energy_available
 
     # calcute energy that acutally has beed delivered for regeneration and set it to interface 

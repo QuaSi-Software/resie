@@ -125,7 +125,7 @@ function create_mesh_y(min_mesh_width,max_mesh_width, expansion_factor,pipe_layi
     return dy
 end 
 
-function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer)
+function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer, fluid_pipe_distance)
     # generating expanding mesh in x-direction. 
     # define segments of the computing grid in x-direction 
     sx1 = 0                             # left boundary
@@ -202,7 +202,7 @@ elseif accuracy_mode == "high"
 end 
 
 dy = create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_diameter_outer, total_depth_simulation_domain)
-dx = create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer)
+dx = create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer, fluid_pipe_distance)
 
 # can be deleted later, only for debugging
 println(dy[:])
