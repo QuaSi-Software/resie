@@ -11,20 +11,24 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     output_interfaces::InterfaceMap
     m_heat_in::Symbol
     m_heat_out::Symbol
+
     ambient_temperature_profile::Union{Profile,Nothing}
     global_radiation_profile::Union{Profile,Nothing}
     unloading_temperature_spread::Temperature
     loading_temperature::Temperature
     loading_temperature_spread::Temperature
+
     max_output_power::Union{Nothing,Float64}
     max_input_power::Union{Nothing,Float64}
     regeneration::Bool
     max_output_energy::Float64
     max_input_energy::Float64
+
     current_output_temperature::Temperature
     current_input_temperature::Temperature
     ambient_temperature::Temperature
     last_timestep_calculated::Float64
+
     soil_starting_temperature::Temperature
     soil_specific_heat_capacity::Float64
     soil_density::Float64
@@ -32,10 +36,13 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     soil_density_vector::Vector
     soil_heat_conductivity_vector::Vector
     soil_heat_fusion_energy::Float64
+
     phase_change_upper_boundary_temperature::Temperature
     phase_change_lower_boundary_temperature::Temperature
+
     surface_convective_heat_transfer_coefficient::Float64
     surface_reflection_factor::Float64
+
     t1::Array{Float64}
     t2::Array{Float64}
     phase_change_state::Array{Float64}
@@ -43,6 +50,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     cp2::Array{Float64}
     fluid::Array{Float64}
     pipe_surrounding::Array{Float64}
+
     pipe_radius_outer::Float64
     pipe_thickness::Float64
     pipe_d_i::Float64
@@ -51,17 +59,23 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     pipe_length::Float64
     number_of_pipes::Float64
     pipe_spacing::Float64
+
     global_radiation::Float64
     boltzmann_constant::Float64
     surface_emissivity::Float64
+
     dx::Vector{Float64}
     dy::Vector{Float64}
     dz::Float64
     dt::Integer
+
     timestep_index::Integer
+
     fluid_temperature::Temperature
     pipe_temperature::Temperature
+
     collector_total_heat_energy_in_out::Float64
+
     pipe_heat_conductivity::Float64
     fluid_specific_heat_capacity::Float64
     fluid_prantl_number::Float64
@@ -69,6 +83,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     fluid_kinematic_viscosity::Float64
     fluid_heat_conductivity::Float64
     specific_heat_flux_in_out::Float64
+
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
 
@@ -79,11 +94,11 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
         # read in ambient temperature profilfe (downloaded from dwd)
         ambient_temperature_profile = "ambient_temperature_profile_path" in keys(config) ?
                                       Profile(config["ambient_temperature_profile_path"]) :
-                                      nothing
+                                      nothing           # TODO: add global weather file
         # read in ambient global radiation profilfe (downloaded from dwd)
         global_radiation_profile = "global_radiation_profile_path" in keys(config) ?
                                    Profile(config["global_radiation_profile_path"]) :
-                                   nothing                              
+                                   nothing              # TODO: add global weather file                   
         
         return new(
             uac,                    # uac
@@ -529,7 +544,15 @@ end
 
 # function to calculate heat transfer coefficient alpha.
 function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
-    # calculate reynolds-number to choose right Nusselt-calculation method, based on kinematic viscosity.
+    # # dynamic fluid properties, adapted from TRNSYS Type 710:
+    # fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+    # unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+    # unit.fluid_prantl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
+    
+    # # calculate reynolds-number based on dynamic viscosity.
+    # fluid_reynolds_number = (unit.collector_total_heat_flux_in_out)/(unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * d_i_pipe * fluid_dynamic_viscosity)
+
+    # calculate reynolds-number to choose right Nusselt-calculation method, based on kinematic viscosity with constant fluid properties.
     collector_power_in_out_per_pipe = wh_to_watts(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
     temperature_spread = q_in_out > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe / (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
@@ -544,8 +567,8 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     elseif fluid_reynolds_number > 2300
         # Gielinski 1995
         factor = (fluid_reynolds_number - 2300) / (1e4 - 2300)
-        Nu = (1 - factor) * calculate_Nu_laminar(unit, 2300) +
-             factor * calculate_Nu_turbulent(unit, 1e4)
+        Nu = (1 - factor) * calculate_Nu_laminar(unit, 2300.0) +
+             factor * calculate_Nu_turbulent(unit, 10_000.0)
     end
 
     alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_d_i
@@ -674,10 +697,6 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         return unit.fluid_reynolds_number
     elseif key.value_key =="ambient_temperature"
         return unit.ambient_temperature
-    elseif key.value_key =="solar_radiation"
-        return unit.global_radiation
-    elseif key.value_key =="alpha_fluid"
-        return unit.alpha_fluid
     end
     throw(KeyError(key.value_key))
 end
