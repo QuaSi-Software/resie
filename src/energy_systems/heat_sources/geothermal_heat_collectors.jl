@@ -71,7 +71,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     specific_heat_flux_in_out::Float64
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
-    q_in_out_nov::Vector
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -85,15 +84,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
         global_radiation_profile = "global_radiation_profile_path" in keys(config) ?
                                    Profile(config["global_radiation_profile_path"]) :
                                    nothing                              
-
-                                   
-        # only for validation purposes. 
-        file = open("C:/Users/steinacker/Lokal/git_Resie/src/energy_systems/heat_sources/q_in_out_nov_h.txt", "r")
-        q_nov_wgg = Vector{Float64}()
-        for line in eachline(file)
-            push!(q_nov_wgg, parse(Float64, line))
-        end
-        close(file)
         
         return new(
             uac,                    # uac
@@ -168,8 +158,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             default(config, "fluid_heat_conductivity",0.5),             # fluid_heat_conductivity at 30 % glycol, 0 °C  in W/(mK)
             default(config, "specific_heat_flux_in_out",20),            # max. specific heat flux extractable (in and out!) out of soil in W/m^2. Depending on ground and climate localization. [VDI 4640-2.]
             0,              # fluid_reynolds_number-Number, to be calculated in function.
-            16.0,            # starting temperature of pipe. set for validation purpose.
-            q_nov_wgg
+            16.0            # starting temperature of pipe. set for validation purpose.
             )
     end
 end
@@ -181,6 +170,9 @@ function control(
 )
 
     unit.timestep_index += 1
+
+    # reset energy summarizer
+    unit.collector_total_heat_energy_in_out = 0.0
 
     # Discretization and starting Temperature-Field. --> ADD PREPROCESSING!
     if unit.timestep_index == 1
@@ -552,8 +544,8 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     elseif fluid_reynolds_number > 2300
         # Gielinski 1995
         factor = (fluid_reynolds_number - 2300) / (1e4 - 2300)
-        Nu = (1 - factor) * calculate_Nu_laminar(unit, fluid_reynolds_number) +
-             factor * calculate_Nu_turbulent(unit, fluid_reynolds_number)
+        Nu = (1 - factor) * calculate_Nu_laminar(unit, 2300) +
+             factor * calculate_Nu_turbulent(unit, 1e4)
     end
 
     alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_d_i
@@ -611,7 +603,7 @@ function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
         return # process is only concerned with moving energy to the target
     end
 
-    energy_demand = -1000*unit.q_in_out_nov[unit.timestep_index] #min(-unit.max_output_energy, energy_demand)
+    energy_demand = min(-unit.max_output_energy, energy_demand)
     unit.collector_total_heat_energy_in_out = energy_demand
     # calcute energy that acutally can be delivered and set it to the output interface 
     # no other limits are present as max_energy for geothermal heat collector was written in control-step
@@ -634,7 +626,7 @@ function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
         return
     end
     
-    energy_available = 0.0 #min(unit.max_input_energy, energy_available)
+    energy_available = min(unit.max_input_energy, energy_available)
     unit.collector_total_heat_energy_in_out += energy_available
 
     # calcute energy that acutally has beed delivered for regeneration and set it to interface 
@@ -682,6 +674,10 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         return unit.fluid_reynolds_number
     elseif key.value_key =="ambient_temperature"
         return unit.ambient_temperature
+    elseif key.value_key =="solar_radiation"
+        return unit.global_radiation
+    elseif key.value_key =="alpha_fluid"
+        return unit.alpha_fluid
     end
     throw(KeyError(key.value_key))
 end
