@@ -25,22 +25,26 @@ function is_linear_connection(parent::BusNode, child::BusNode)::Bool
     return nr_children == 1 && nr_parents == 1
 end
 
-function find_next_linear_connection(
-    chain::Dict{String,BusNode}
-)::Tuple{Union{Nothing,BusNode},Union{Nothing,BusNode}}
-    for bus in values(chain)
+function find_linear_connections(
+    nodes::Dict{String,BusNode}
+)::Vector{Tuple{Integer,BusNode,BusNode}}
+    connections = []
+
+    for bus in values(nodes)
         for child in bus_outputs(bus)
             if is_linear_connection(bus, child)
-                return (bus, child)
+                push!(connections, (1, bus, child))
             end
         end
+
         for parent in bus_inputs(bus)
             if is_linear_connection(parent, bus)
-                return (parent, bus)
+                push!(connections, (1, parent, bus))
             end
         end
     end
-    return (nothing, nothing)
+
+    return connections
 end
 
 function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
@@ -195,21 +199,21 @@ function priority_of_parent(parent::BusNode, child::BusNode)::Integer
     return length(indices) != 1 || indices[1] === nothing ? 0 : indices[1]
 end
 
-function find_single_parent_leaves(
+function find_single_parent_sinks(
     nodes::Dict{String,BusNode}
 )::Vector{Tuple{Integer,BusNode,BusNode}}
-    leaves = []
+    sinks = []
     for node in values(nodes)
         if length(bus_inputs(node)) != 1 || length(bus_outputs(node)) > 0
             continue
         end
         parent = bus_inputs(node)[1]
-        push!(leaves, (priority_of_child(parent, node), parent, node))
+        push!(sinks, (priority_of_child(parent, node), parent, node))
     end
-    return leaves
+    return sinks
 end
 
-function find_parents_of_leaves(
+function find_parents_of_sinks(
     nodes::Dict{String,BusNode}
 )::Vector{Tuple{Integer,BusNode,BusNode}}
     parents = []
@@ -279,26 +283,34 @@ end
 function merge_busses(busses_to_merge::Grouping, components::Grouping)::Union{Nothing,Bus}
     nodes = nodes_from_components(busses_to_merge)
 
-    # first remove all linear connections
-    parent, child = find_next_linear_connection(nodes)
-    while parent !== nothing
-        new_uac = parent.uac * child.uac
-        new_node = merge(parent, child, new_uac)
-        nodes[new_uac] = new_node
-
-        update_nodes!(nodes, parent.uac, child.uac, new_node)
-        delete!(nodes, parent.uac)
-        delete!(nodes, child.uac)
-
-        parent, child = find_next_linear_connection(nodes)
-    end
-
-    # now keep merging until we have only one node left
+    # keep merging until we have only one node left
     while length(nodes) > 1
-        # prioritise leaves with only one parent and order by descending priority
-        leaves = find_single_parent_leaves(nodes)
-        if length(leaves) > 0
-            next = sort(leaves, by=x->x[1], rev=true)[1]
+        next = nothing
+
+        # first remove all linear connections
+        candidates = find_linear_connections(nodes)
+        if length(candidates) > 0
+            next = candidates[1] # no particular order
+        end
+
+        # then prioritise sinks with only one parent and order by descending priority
+        if next === nothing
+            candidates = find_single_parent_sinks(nodes)
+            if length(candidates) > 0
+                next = sort(candidates, by=x->x[1], rev=true)[1]
+            end
+        end
+
+        # finally, for sinks with multiple parents, merge into those with the last priority
+        if next === nothing
+            candidates = find_parents_of_sinks(nodes)
+            if length(candidates) > 0
+                next = sort(candidates, by=x->x[1], rev=true)[1]
+            end
+        end
+
+        # now merge the candidate parent->child pair and update nodes
+        if next !== nothing
             parent = next[2]
             child = next[3]
 
@@ -309,31 +321,11 @@ function merge_busses(busses_to_merge::Grouping, components::Grouping)::Union{No
             update_nodes!(nodes, parent.uac, child.uac, new_node)
             delete!(nodes, parent.uac)
             delete!(nodes, child.uac)
-
-            continue
+        else
+            # if we got here, something went wrong and would result in an endless loop
+            @error("Could not resolve merging of busses")
+            break
         end
-
-        # for leaves with multiple parents, merge into those with the last priority
-        parents = find_parents_of_leaves(nodes)
-        if length(parents) > 0
-            next = sort(parents, by=x->x[1], rev=true)[1]
-            parent = next[2]
-            child = next[3]
-
-            new_uac = parent.uac * child.uac
-            new_node = merge(parent, child, new_uac)
-            nodes[new_uac] = new_node
-
-            update_nodes!(nodes, parent.uac, child.uac, new_node)
-            delete!(nodes, parent.uac)
-            delete!(nodes, child.uac)
-
-            continue
-        end
-
-        # if we got here, something went wrong and would result in an endless loop
-        @error("Could not resolve merging of busses")
-        break
     end
 
     return bus_from_node(
