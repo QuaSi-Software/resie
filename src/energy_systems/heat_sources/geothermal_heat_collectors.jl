@@ -559,16 +559,15 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     
     fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_d_i * pi)
 
-    # check for laminar flow
-    if fluid_reynolds_number <= 2300
+    if fluid_reynolds_number <= 2300  # laminar
         Nu = calculate_Nu_laminar(unit, fluid_reynolds_number)
-        # check for transition flow
-
-    elseif fluid_reynolds_number > 2300
+    elseif fluid_reynolds_number > 2300 && fluid_reynolds_number <= 1e4 # transitional
         # Gielinski 1995
         factor = (fluid_reynolds_number - 2300) / (1e4 - 2300)
         Nu = (1 - factor) * calculate_Nu_laminar(unit, 2300.0) +
              factor * calculate_Nu_turbulent(unit, 10_000.0)
+    else  # turbulent
+        Nu = calculate_Nu_turbulent(unit, fluid_reynolds_number)
     end
 
     alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_d_i
