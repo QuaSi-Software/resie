@@ -103,14 +103,14 @@ mutable struct GeothermalProbes <: ControlledComponent
             g_function,                             # pre-calculated multiscale g-function. Calculated in pre-processing.
             0,                                      # index of current time step to get access on time dependent g-function values
             0.0,                                    # average fluid temperature
-            4.0,                                    # set boreholewall-starting-temperature
+            4.0,                                    # set boreholewall-starting-temperature TODO
             
             [],                                     # vector to hold specific energy sum (in and out) per probe meter in each time step
             [],                                     # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
 
             default(config, "probe_depth", 150.0),  # depth (or length) of a single geothermal probe
-            36,                                     # number of geothermal probes in the borefield
-            default(config, "probe_type", 1),       # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
+            36,                                     # number of geothermal probes in the borefield TODO
+            default(config, "probe_type", 2),       # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
 
             default(config, "pipe_diameter_outer", 0.032),  # outer pipe diameter
             default(config, "pipe_diameter_inner", 0.026),  # inner pipe diameter
@@ -129,7 +129,7 @@ mutable struct GeothermalProbes <: ControlledComponent
             default(config, "pipe_heat_conductivity", 0.42),         # lambda of inner pipes
 
             default(config, "borehole_diameter", 0.15),              # borehole diameter in m.
-            0.1,       # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. Needed for calculation of thermal borehole resistance.
+            default(config, "shank_spacing", 0.1),                   # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. Needed for calculation of thermal borehole resistance.
 
             0.0        # Reynoldsnumber. To be calculated in function later.
             )
@@ -235,22 +235,23 @@ function calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
 end
 
 function calculate_alpha_pipe(unit::GeothermalProbes)
-    # # calculate dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
-    # fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
-    # unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
-    # unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
-
-    # # calculate reynolds-number based on dynamic viscosity
-    # unit.fluid_reynolds_number = (abs(unit.energy_in_out_per_probe_meter[unit.time_index]) * unit.probe_depth / unit.probe_type)/
-    #                              (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * unit.pipe_diameter_inner * fluid_dynamic_viscosity)
-    
-    # calculate reynolds-number to choose right Nusselt-calculation method, based on kinematic viscosity with constant fluid properties.
+    # calculate mass flow in pipe
     power_in_out_per_pipe = wh_to_watts(abs(unit.energy_in_out_per_probe_meter[unit.time_index])) * unit.probe_depth / unit.probe_type  # W/pipe
     temperature_spread = unit.energy_in_out_per_probe_meter[unit.time_index] > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     mass_flow_per_pipe = power_in_out_per_pipe / (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
 
-    fluid_reynolds_number = (4 * mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_diameter_inner * pi)
-
+    use_dynamic_fluid_properties = false
+    if use_dynamic_fluid_properties
+        # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
+        fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+        unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
+        fluid_reynolds_number = (4 * mass_flow_per_pipe) / (fluid_dynamic_viscosity * unit.pipe_diameter_inner * pi)
+    else 
+        # calculate reynolds-number based on kinematic viscosity with constant fluid properties.
+        fluid_reynolds_number = (4 * mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_diameter_inner * pi)
+    end
+    
     if fluid_reynolds_number <= 2300  # laminar
         Nu = calculate_Nu_laminar(unit, fluid_reynolds_number)
     elseif fluid_reynolds_number > 2300 && fluid_reynolds_number <= 1e4 # transitional
@@ -317,6 +318,8 @@ function process(unit::GeothermalProbes, parameters::Dict{String,Any})
         # no calculate_new_probe_field() as this will be done in load() step to avoid double calling!
         return # process is only concerned with moving energy to the target
     end
+    energy_demand = max(energy_demand, -unit.max_output_energy)
+
     # write output heat flux into vector
     unit.energy_in_out_per_probe_meter[unit.time_index] = energy_demand  / (unit.probe_depth * unit.number_of_probes) # from total energy to specific power of one single probe.
     add!(outface, abs(energy_demand), unit.current_output_temperature)
@@ -338,6 +341,8 @@ function load(unit::GeothermalProbes, parameters::Dict{String,Any})
         calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
         return
     end
+
+    energy_available = min(energy_available, unit.max_input_energy)
 
     # Add loaded specific heat flux to vector
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_available / (unit.probe_depth * unit.number_of_probes)

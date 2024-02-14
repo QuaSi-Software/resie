@@ -99,8 +99,8 @@
                 "TST_DEM_01"
             ],
             "ambient_temperature_profile_path": "./profiles/district/Regeneration_GEW_25years.prf",
-            "max_output_power": 600,
-            "max_input_power": 300,
+            "max_output_power": 50,
+            "max_input_power": 50,
             "regeneration": true,
             "soil_undisturbed_ground_temperature": 12.0,
             "soil_heat_conductivity": 1.6 ,
