@@ -544,20 +544,23 @@ end
 
 # function to calculate heat transfer coefficient alpha.
 function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
-    # # dynamic fluid properties, adapted from TRNSYS Type 710:
-    # fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
-    # unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
-    # unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
-    
-    # # calculate reynolds-number based on dynamic viscosity.
-    # fluid_reynolds_number = (unit.collector_total_heat_flux_in_out)/(unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * d_i_pipe * fluid_dynamic_viscosity)
 
-    # calculate reynolds-number to choose right Nusselt-calculation method, based on kinematic viscosity with constant fluid properties.
+    # calculate mass flow in pipe
     collector_power_in_out_per_pipe = wh_to_watts(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
     temperature_spread = q_in_out > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe / (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
-    
-    fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_d_i * pi)
+
+    use_dynamic_fluid_properties = false
+    if use_dynamic_fluid_properties
+        # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
+        fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+        unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
+        fluid_reynolds_number = (unit.collector_total_heat_flux_in_out)/(unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 * d_i_pipe * fluid_dynamic_viscosity)
+    else
+        # calculate reynolds-number, based on kinematic viscosity with constant fluid properties.
+        fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_d_i * pi)
+    end
 
     if fluid_reynolds_number <= 2300  # laminar
         Nu = calculate_Nu_laminar(unit, fluid_reynolds_number)
@@ -625,7 +628,7 @@ function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
         return # process is only concerned with moving energy to the target
     end
 
-    energy_demand = min(-unit.max_output_energy, energy_demand)
+    energy_demand = max(-unit.max_output_energy, energy_demand)
     unit.collector_total_heat_energy_in_out = energy_demand
     # calcute energy that acutally can be delivered and set it to the output interface 
     # no other limits are present as max_energy for geothermal heat collector was written in control-step
