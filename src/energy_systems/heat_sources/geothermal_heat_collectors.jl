@@ -82,7 +82,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     fluid_density::Float64
     fluid_kinematic_viscosity::Float64
     fluid_heat_conductivity::Float64
-    specific_heat_flux_in_out::Float64
 
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
@@ -117,10 +116,10 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             ambient_temperature_profile,    # ambient temperature profile
             global_radiation_profile,
             default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading            
-            default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal heat collector storage, can also be set from other end of interface
+            default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal heat collector storage, can also be set from other end of interface TODO
             default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading         
-            default(config, "max_output_power", nothing),         # maximum output power set by user, may change later to be calculated from other inputs like specific heat transfer rate
-            default(config, "max_input_power", nothing),          # maximum input power set by user, may change later to be calculated from other inputs like specific heat transfer rate
+            default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
+            default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
             default(config, "regeneration", true),                # flag if regeneration should be taken into account
             0.0,                        # max_output_energy in every time step, calculated in control()
             0.0,                        # max_input_energy in every time step, calculated in control()
@@ -171,7 +170,6 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
             default(config, "fluid_density", 1045),                     # fluid density at 30 % glycol, 0 °C in kg/m^3
             default(config, "fluid_kinematic_viscosity", 3.9e-6),       # fluid_kinematic_viscosity at 30 % glycol, 0 °C in m^2/s
             default(config, "fluid_heat_conductivity",0.5),             # fluid_heat_conductivity at 30 % glycol, 0 °C  in W/(mK)
-            default(config, "specific_heat_flux_in_out",20),            # max. specific heat flux extractable (in and out!) out of soil in W/m^2. Depending on ground and climate localization. [VDI 4640-2.]
             0,              # fluid_reynolds_number-Number, to be calculated in function.
             16.0            # starting temperature of pipe. set for validation purpose.
             )
@@ -189,23 +187,17 @@ function control(
     # reset energy summarizer
     unit.collector_total_heat_energy_in_out = 0.0
 
-    # Discretization and starting Temperature-Field. --> ADD PREPROCESSING!
+    # Discretization and starting Temperature-Field. --> ADD PREPROCESSING! TODO
     if unit.timestep_index == 1
         
         # calculate diameters of pipe
         unit.pipe_d_i = 2 * unit.pipe_radius_outer - (2 * unit.pipe_thickness)
         unit.pipe_d_o = 2 * unit.pipe_radius_outer 
 
-        if unit.max_output_power === nothing
-            A_collector = unit.pipe_length * unit.pipe_spacing * (unit.number_of_pipes - 1)
-            unit.max_output_power = A_collector * unit.specific_heat_flux_in_out
-            # TODO: Add log message
-        end
-        if unit.max_input_power === nothing
-            A_collector = unit.pipe_length * unit.pipe_spacing * (unit.number_of_pipes - 1)
-            unit.max_input_power = A_collector * unit.specific_heat_flux_in_out
-            # TODO: Add log message
-        end
+        # calculate max energies
+        A_collector = unit.pipe_length * unit.pipe_spacing * (unit.number_of_pipes - 1)
+        unit.max_output_energy = watt_to_wh(unit.max_output_power * A_collector)
+        unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
 
         # Discretization. Will be done in Pre-Processing. TODO.
         dx_R = [unit.pipe_radius_outer]
@@ -302,23 +294,23 @@ function control(
         # This works as the control step of transformers is always calculated earlier than the one of storages. If temperatures
         # are written to the connected interface by a transformer, this is already done at this point.
     if unit.output_interfaces[unit.m_heat_out].temperature > unit.current_output_temperature
-        unit.max_output_energy = 0.0  # no energy can be provided if requested temperature is higher than max. temperature of heat collector
+        max_output_energy = 0.0  # no energy can be provided if requested temperature is higher than max. temperature of heat collector
     else
-        unit.max_output_energy = watt_to_wh(unit.max_output_power)  
+        max_output_energy = unit.max_output_energy
     end
 
     if unit.regeneration
         if unit.input_interfaces[unit.m_heat_in].temperature < unit.current_input_temperature
-            unit.max_input_energy = 0.0 # no energy can be taken if available temperature is less than minimum possible temperature to load the heat collector
+            max_input_energy = 0.0 # no energy can be taken if available temperature is less than minimum possible temperature to load the heat collector
         else
-            unit.max_input_energy = watt_to_wh(unit.max_input_power) 
+            max_input_energy = unit.max_input_energy
         end
     end
 
     # set max_energy to interfaces to provide information for connected components
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], max_output_energy)
     if unit.regeneration
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy)
     end
 
 end
