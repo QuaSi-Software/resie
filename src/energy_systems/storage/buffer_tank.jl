@@ -62,7 +62,7 @@ function control(
         unit.output_interfaces[unit.medium].temperature = temperature_at_load(unit)
     end
     if unit.input_interfaces[unit.medium].temperature === nothing
-        unit.input_interfaces[unit.medium].temperature = unit.high_temperature
+        unit.input_interfaces[unit.medium].temperature = temperature_at_load(unit)
     end
 end
 
@@ -159,7 +159,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
         end
 
         supply_temp = exchange.temperature
-        if supply_temp !== nothing && supply_temp < unit.high_temperature
+        if supply_temp !== nothing && supply_temp < temperature_at_load(unit)
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue

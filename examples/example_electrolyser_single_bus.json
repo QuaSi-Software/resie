@@ -120,7 +120,7 @@
                 "input_order": [
                     "TST_01_ELT_01_GRI"
                 ],
-                "energy_flow": [
+                "output_order": [
                     "TST_01_HZG_01_HTP",
                     "TST_01_HZG_02_HTP",
                     "TST_01_ELT_01_ELY"
