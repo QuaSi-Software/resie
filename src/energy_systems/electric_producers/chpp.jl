@@ -208,22 +208,22 @@ function calculate_energies(
     # all three standard operating strategies behave the same, but it is better to be
     # explicit about the behaviour rather than grouping all together
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
+        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
 
     elseif unit.controller.strategy == "storage_driven"
         return (false, nothing, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
+        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
+        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
+        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
 
     end
 
