@@ -87,6 +87,9 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
 
     EnergySystems.initialise_components(components, sim_params)
 
+    chains = find_chains(values(components), EnergySystems.sf_bus)
+    EnergySystems.merge_bus_chains(chains, components, sim_params)
+
     return components
 end
 
@@ -303,7 +306,7 @@ A chain is a subgraph of the graph spanned by all connections of the given compo
 which is a directed graph. The subgraph is defined by all connected components of the given
 system function.
 """
-function find_chains(components, sys_function)
+function find_chains(components, sys_function)::Vector{Set{Component}}
     chains = []
 
     for unit in components

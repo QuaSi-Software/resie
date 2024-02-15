@@ -917,6 +917,25 @@ function initialise_components(components::Grouping, sim_params::Dict{String,Any
     end
 end
 
+function merge_bus_chains(
+    chains::Vector{Set{Component}},
+    components::Grouping,
+    sim_params::Dict{String,Any}
+)
+    for chain in chains
+        if length(chain) < 2
+            continue
+        end
+
+        comp_as_grouping = Grouping(comp.uac=>comp for comp in chain)
+        merged = merge_busses(comp_as_grouping, components)
+        for bus in chain
+            bus.proxy = merged
+        end
+        components[merged.uac] = merged
+    end
+end
+
 """
     check_balances(components, epsilon)
 
