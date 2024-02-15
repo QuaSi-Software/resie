@@ -186,10 +186,6 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
 end
 
 function reset(unit::Bus)
-    if unit.proxy !== nothing
-        reset(unit.proxy)
-    end
-
     for inface in unit.input_interfaces
         reset!(inface)
     end
@@ -696,8 +692,7 @@ the leaves of the chain and progresses to the roots.
 """
 function distribute!(unit::Bus)
     if unit.proxy !== nothing
-        distribute!(unit.proxy)
-        return
+        return # the proxy has its own distribute step
     end
 
     inner_distribute!(unit::Bus)
