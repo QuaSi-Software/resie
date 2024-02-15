@@ -697,6 +697,7 @@ the leaves of the chain and progresses to the roots.
 function distribute!(unit::Bus)
     if unit.proxy !== nothing
         distribute!(unit.proxy)
+        return
     end
 
     inner_distribute!(unit::Bus)
@@ -704,12 +705,14 @@ function distribute!(unit::Bus)
 
     # reset all non-bus input interfaces
     for inface in filter_inputs(unit, sf_bus, false)
-        set!(inface, 0.0)
+        principal = inface.source.output_interfaces[unit.medium]
+        set!(principal, 0.0)
     end
 
     # reset all non-bus output interfaces
     for outface in filter_outputs(unit, sf_bus, false)
-        set!(outface, 0.0)
+        principal = outface.target.input_interfaces[unit.medium]
+        set!(principal, 0.0)
     end
 
     # distribute to outgoing busses according to output priority
