@@ -270,7 +270,8 @@ function balance_direct(unit::Bus)::Float64
         if isa(inface.source, Bus)
             continue
         else
-            blnc += balance(balance_on(inface, inface.source))
+            principal = inface.source.output_interfaces[unit.medium]
+            blnc += balance(balance_on(principal, principal.source))
         end
     end
 
@@ -278,7 +279,8 @@ function balance_direct(unit::Bus)::Float64
         if isa(outface.target, Bus)
             continue
         else
-            blnc += balance(balance_on(outface, outface.target))
+            principal = outface.target.input_interfaces[unit.medium]
+            blnc += balance(balance_on(principal, principal.target))
         end
     end
 
