@@ -186,6 +186,10 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
 end
 
 function reset(unit::Bus)
+    if unit.proxy !== nothing
+        reset(unit.proxy)
+    end
+
     for inface in unit.input_interfaces
         reset!(inface)
     end
@@ -286,9 +290,13 @@ function balance_direct(unit::Bus)::Float64
 end
 
 function balance(unit::Bus)::Float64
-    # we can use the non-recursive version of the method as a bus will never
-    # be connected to itself... right?
-    return balance_nr(unit, unit)
+    if unit.proxy === nothing
+        # we can use the non-recursive version of the method as a bus will never
+        # be connected to itself... right?
+        return balance_nr(unit, unit)
+    else
+        return balance_direct(unit.proxy)
+    end
 end
 
 """
@@ -330,96 +338,111 @@ function _sum(vector::Vector{Union{Float64, Nothing}})
 end
 
 function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        unit.balance_table_inputs[comp.uac].energy_potential = abs(value)
+        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
     else
-        unit.balance_table_outputs[comp.uac].energy_potential = abs(value)
+        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
     end
 end
 
 function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        unit.balance_table_inputs[comp.uac].storage_potential = abs(value)
+        bus.balance_table_inputs[comp.uac].storage_potential = abs(value)
     else
-        unit.balance_table_outputs[comp.uac].storage_potential = abs(value)
+        bus.balance_table_outputs[comp.uac].storage_potential = abs(value)
     end
 end
 
 function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         if comp.sys_function == sf_storage
-            unit.balance_table_inputs[comp.uac].storage_pool =
-                _add(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
-            unit.balance_table_inputs[comp.uac].storage_potential = nothing
+            bus.balance_table_inputs[comp.uac].storage_pool =
+                _add(bus.balance_table_inputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_inputs[comp.uac].energy_pool =
-                _add(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
-            unit.balance_table_inputs[comp.uac].energy_potential = nothing
+            bus.balance_table_inputs[comp.uac].energy_pool =
+                _add(bus.balance_table_inputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
-            unit.balance_table_outputs[comp.uac].storage_pool =
-                _add(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
-            unit.balance_table_outputs[comp.uac].storage_potential = nothing
+            bus.balance_table_outputs[comp.uac].storage_pool =
+                _add(bus.balance_table_outputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_outputs[comp.uac].energy_pool =
-                _add(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
-            unit.balance_table_outputs[comp.uac].energy_potential = nothing
+            bus.balance_table_outputs[comp.uac].energy_pool =
+                _add(bus.balance_table_outputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
 end
 
 function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         if comp.sys_function == sf_storage
-            unit.balance_table_inputs[comp.uac].storage_pool =
-                _add(unit.balance_table_inputs[comp.uac].storage_pool, abs(value))
-            unit.balance_table_inputs[comp.uac].storage_potential = nothing
+            bus.balance_table_inputs[comp.uac].storage_pool =
+                _add(bus.balance_table_inputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_inputs[comp.uac].energy_pool =
-                _add(unit.balance_table_inputs[comp.uac].energy_pool, abs(value))
-            unit.balance_table_inputs[comp.uac].energy_potential = nothing
+            bus.balance_table_inputs[comp.uac].energy_pool =
+                _add(bus.balance_table_inputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
-            unit.balance_table_outputs[comp.uac].storage_pool =
-                _add(unit.balance_table_outputs[comp.uac].storage_pool, abs(value))
-            unit.balance_table_outputs[comp.uac].storage_potential = nothing
+            bus.balance_table_outputs[comp.uac].storage_pool =
+                _add(bus.balance_table_outputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_outputs[comp.uac].energy_pool =
-                _add(unit.balance_table_outputs[comp.uac].energy_pool, abs(value))
-            unit.balance_table_outputs[comp.uac].energy_potential = nothing
+            bus.balance_table_outputs[comp.uac].energy_pool =
+                _add(bus.balance_table_outputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
 end
 
 function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         if comp.sys_function == sf_storage
-            unit.balance_table_inputs[comp.uac].storage_pool = abs(value)
-            unit.balance_table_inputs[comp.uac].storage_potential = nothing
+            bus.balance_table_inputs[comp.uac].storage_pool = abs(value)
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_inputs[comp.uac].energy_pool = abs(value)
-            unit.balance_table_inputs[comp.uac].energy_potential = nothing
+            bus.balance_table_inputs[comp.uac].energy_pool = abs(value)
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
         end
     else
         if comp.sys_function == sf_storage
-            unit.balance_table_outputs[comp.uac].storage_pool = abs(value)
-            unit.balance_table_outputs[comp.uac].storage_potential = nothing
+            bus.balance_table_outputs[comp.uac].storage_pool = abs(value)
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
         else
-            unit.balance_table_outputs[comp.uac].energy_pool = abs(value)
-            unit.balance_table_outputs[comp.uac].energy_potential = nothing
+            bus.balance_table_outputs[comp.uac].energy_pool = abs(value)
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
         end
     end
 end
 
 function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Temperature, value_max::Temperature)
+    bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        unit.balance_table_inputs[comp.uac].temperature_min = value_min
-        unit.balance_table_inputs[comp.uac].temperature_max = value_max
+        bus.balance_table_inputs[comp.uac].temperature_min = value_min
+        bus.balance_table_inputs[comp.uac].temperature_max = value_max
     else
-        unit.balance_table_outputs[comp.uac].temperature_min = value_min
-        unit.balance_table_outputs[comp.uac].temperature_max = value_max
+        bus.balance_table_outputs[comp.uac].temperature_min = value_min
+        bus.balance_table_outputs[comp.uac].temperature_max = value_max
+    end
+end
+
+function find_interface_on_proxy(proxy::Bus, needle::SystemInterface)
+    for inface in proxy.input_interfaces
+        if inface.source == needle.source return inface end
+    end
+    for outface in proxy.output_interfaces
+        if outface.target == needle.target return outface end
     end
 end
 
@@ -427,6 +450,10 @@ function balance_on(
     interface::SystemInterface,
     unit::Bus
 )::Vector{EnergyExchange}
+    if unit.proxy !== nothing
+        return balance_on(find_interface_on_proxy(unit.proxy, interface), unit.proxy)
+    end
+
     input_index = nothing
     output_index = nothing
     caller_is_input = false # if interface is input of unit (caller puts energy in unit)
@@ -668,6 +695,10 @@ order, which is explained in more detail in the documentation. Essentially it st
 the leaves of the chain and progresses to the roots.
 """
 function distribute!(unit::Bus)
+    if unit.proxy !== nothing
+        distribute!(unit.proxy)
+    end
+
     inner_distribute!(unit::Bus)
     balance = balance_direct(unit)
 
