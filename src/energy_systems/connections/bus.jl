@@ -111,6 +111,7 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table_inputs::Dict{String,BTInputRow}
     balance_table_outputs::Dict{String,BTOutputRow}
     balance_table::Array{Union{Nothing, Float64}, 2}
+    proxy::Union{Nothing,Bus}
 
     epsilon::Float64
 end
@@ -133,6 +134,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
         Dict{String,BTInputRow}(), # balance_table_inputs
         Dict{String,BTOutputRow}(), # balance_table_outputs
         Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table, filled in reset()
+        nothing, # proxy
         sim_params["epsilon"] # system-wide epsilon for easy access within the bus functions
     )
 end
@@ -154,6 +156,7 @@ function Bus(
         Dict{String,BTInputRow}(), # balance_table_inputs
         Dict{String,BTOutputRow}(), # balance_table_outputs
         Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table
+        nothing, # proxy
         epsilon
     )
 end
