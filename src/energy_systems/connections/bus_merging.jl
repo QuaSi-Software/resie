@@ -1,6 +1,7 @@
 Base.@kwdef mutable struct ComponentNode
     uac::String
     sys_function::SystemFunction
+    do_storage_transfer::Bool
 end
 
 Base.@kwdef mutable struct BusNode
@@ -70,7 +71,8 @@ function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
             else
                 push!(node.inputs, ComponentNode(
                     uac=input.uac,
-                    sys_function=input.sys_function
+                    sys_function=input.sys_function,
+                    do_storage_transfer=inface.do_storage_transfer
                 ))
             end
         end
@@ -82,7 +84,8 @@ function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
             else
                 push!(node.outputs, ComponentNode(
                     uac=output.uac,
-                    sys_function=output.sys_function
+                    sys_function=output.sys_function,
+                    do_storage_transfer=outface.do_storage_transfer
                 ))
             end
         end
@@ -236,14 +239,14 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
         push!(bus.input_interfaces, SystemInterface(
             source=components[input.uac],
             target=bus,
-            do_storage_transfer=true # TODO: take the actual value, probably add it to ComponentNode
+            do_storage_transfer=input.do_storage_transfer
         ))
         push!(bus.connectivity.input_order, input.uac)
         bus.balance_table_inputs[input.uac] = BTInputRow(
             source=components[input.uac],
             priority=idx,
             input_index=idx,
-            do_storage_transfer=true # TODO
+            do_storage_transfer=input.do_storage_transfer
         )
     end
 
@@ -252,14 +255,14 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
         push!(bus.output_interfaces, SystemInterface(
             source=bus,
             target=components[output.uac],
-            do_storage_transfer=true # TODO
+            do_storage_transfer=output.do_storage_transfer
         ))
         push!(bus.connectivity.output_order, output.uac)
         bus.balance_table_outputs[output.uac] = BTOutputRow(
             target=components[output.uac],
             priority=idx,
             output_index=idx,
-            do_storage_transfer=true # TODO
+            do_storage_transfer=output.do_storage_transfer
         )
     end
 

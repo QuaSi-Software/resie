@@ -813,3 +813,69 @@ end
 @testset "merge_busses_order_of_merges" begin
     test_merge_busses_order_of_merges()
 end
+
+function test_merge_preserves_storage_transfer()
+    components_config = energy_system_simple()
+    push!(components_config["TST_BUS_02"]["connections"]["input_order"], "TST_BFT_02")
+    push!(components_config["TST_BUS_02"]["connections"]["output_order"], "TST_BFT_02")
+    components_config["TST_BUS_02"]["connections"]["energy_flow"] = [
+        [1,1],
+        [1,1],
+        [1,0],
+    ]
+    components_config["TST_BFT_02"] = Dict{String,Any}(
+        "type" => "Storage",
+        "medium" => "m_h_w_ht1",
+        "control_refs" => [],
+        "output_refs" => ["TST_BUS_02"],
+        "capacity" => 4000,
+        "load" => 2000,
+    )
+    components_config["TST_SRC_01"]["strategy"] = Dict{String,Any}(
+        "name" => "default",
+        "load_storages m_h_w_ht1" => false
+    )
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+    components = Resie.load_components(components_config, simulation_parameters)
+    busses = Grouping(
+        key => bus for (key,bus) in pairs(components)
+                   if bus.sys_function == EnergySystems.sf_bus
+    )
+    new_bus = EnergySystems.merge_busses(busses, components)
+
+    expected = [
+        "TST_SRC_01",
+        "TST_SRC_02",
+        "TST_BFT_02",
+    ]
+    inputs = [f.source.uac for f in new_bus.input_interfaces]
+    @test inputs == expected
+    @test new_bus.connectivity.input_order == expected
+
+    expected = [
+        "TST_DEM_01",
+        "TST_DEM_02",
+        "TST_BFT_02",
+    ]
+    outputs = [f.target.uac for f in new_bus.output_interfaces]
+    @test outputs == expected
+    @test new_bus.connectivity.output_order == expected
+
+    expected = [
+        [1,1,1],
+        [0,1,1],
+        [0,1,0],
+    ]
+    @test new_bus.connectivity.energy_flow == expected
+
+    @test new_bus.input_interfaces[1].source.uac == "TST_SRC_01"
+    @test new_bus.input_interfaces[1].do_storage_transfer == false
+end
+
+@testset "merge_preserves_storage_transfer" begin
+    test_merge_preserves_storage_transfer()
+end
