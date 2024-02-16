@@ -364,7 +364,12 @@ function set_max_energy!(
     interface::SystemInterface,
     value::Union{Nothing,Float64}
 )
-    interface.max_energy = value
+    
+    if interface.max_energy === nothing
+        interface.max_energy = value
+    else
+        interface.max_energy = min(interface.max_energy, value)
+    end
 
     if interface.source.sys_function == sf_bus
         if interface.target.sys_function == sf_storage
