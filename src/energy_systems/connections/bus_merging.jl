@@ -283,6 +283,14 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
     return bus
 end
 
+function get_new_uac(parent_uac::String, child_uac::String)::String
+    if startswith(parent_uac, "Proxy-")
+        return parent_uac * "|" *  child_uac
+    else
+        return "Proxy-" * parent_uac * "|" * child_uac
+    end
+end
+
 function merge_busses(busses_to_merge::Grouping, components::Grouping)::Union{Nothing,Bus}
     nodes = nodes_from_components(busses_to_merge)
 
@@ -317,7 +325,7 @@ function merge_busses(busses_to_merge::Grouping, components::Grouping)::Union{No
             parent = next[2]
             child = next[3]
 
-            new_uac = parent.uac * child.uac
+            new_uac = get_new_uac(parent.uac, child.uac)
             new_node = merge(parent, child, new_uac)
             nodes[new_uac] = new_node
 
