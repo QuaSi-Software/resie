@@ -99,7 +99,10 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 each_outputinterface = each_outputinterface[2]
             end
 
-            if isdefined(each_outputinterface, :target)
+            if (isdefined(each_outputinterface, :target) && 
+               !startswith(each_outputinterface.target.uac, "Proxy") &&
+               !startswith(each_outputinterface.source.uac, "Proxy"))
+
                 # count interface
                 nr_of_interfaces += 1
 
@@ -166,7 +169,10 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                 each_outputinterface = each_outputinterface[2]
             end
-            if isdefined(each_outputinterface, :target)
+            if (isdefined(each_outputinterface, :target) && 
+               !startswith(each_outputinterface.target.uac, "Proxy") &&
+               !startswith(each_outputinterface.source.uac, "Proxy"))
+               
                 energies[n] = calculate_energy_flow(each_outputinterface) 
                 n += 1
                 
@@ -442,9 +448,6 @@ function create_sankey(
                 medium_of_interfaces[interface_new] == "hide_medium"
                 && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
             )
-            # remove connections from/to proxy busses
-            || startswith(output_all_sourcenames[interface_new], "Proxy")
-            || startswith(output_all_targetnames[interface_new], "Proxy")
         )
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
@@ -493,6 +496,8 @@ function create_sankey(
         for medium in unique_medium_labels
             if medium in keys(color_map)
                 continue
+            elseif medium == "hide_medium"
+                color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
                 @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
                 exit()
