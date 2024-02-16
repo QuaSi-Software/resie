@@ -288,13 +288,10 @@ function balance_direct(unit::Bus)::Float64
 end
 
 function balance(unit::Bus)::Float64
-    if unit.proxy === nothing
-        # we can use the non-recursive version of the method as a bus will never
-        # be connected to itself... right?
-        return balance_nr(unit, unit)
-    else
-        return balance_direct(unit.proxy)
-    end
+    # if there is a proxy bus, the balance is only correct on its calculation, which happens
+    # seperately. if there is no proxy, there are also no bus components connected to the
+    # given bus
+    return balance_direct(unit)
 end
 
 """
