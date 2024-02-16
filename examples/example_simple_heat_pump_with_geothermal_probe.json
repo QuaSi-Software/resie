@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
             "TST_STH_01": ["m_h_w_ht1 OUT"],
             "TST_DEM_01": ["m_h_w_lt1 IN"],
             "TST_GTP_01": ["borehole_temperature","borehole_thermal_resistance","fluid_temperature","fluid_reynolds_number"]
@@ -98,7 +99,6 @@
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "ambient_temperature_profile_path": "./profiles/district/Regeneration_GEW_25years.prf",
             "max_output_power": 50,
             "max_input_power": 50,
             "regeneration": true,

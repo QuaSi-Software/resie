@@ -3,7 +3,7 @@ Implementation of geothermal probes.
 This implementations acts as storage as it can produce and load energy.
 """
 
-mutable struct GeothermalProbes <: ControlledComponent
+mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -136,6 +136,21 @@ mutable struct GeothermalProbes <: ControlledComponent
     end
 end
 
+function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_heat_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+end
+
 function control(
     unit::GeothermalProbes,
     components::Grouping,
@@ -151,52 +166,35 @@ function control(
         unit.energy_in_out_per_probe_meter = zeros(219000)  # TODO change to global number of time steps 
         unit.energy_in_out_difference_per_probe_meter = zeros(219000) # TODO change to global number of time steps 
 
-        unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)  
-        unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)  
-
         unit.radius_pipe_inner = unit.pipe_diameter_inner / 2
         unit.radius_pipe_outer = unit.pipe_diameter_outer / 2
         unit.radius_borehole = unit.borehole_diameter / 2
         unit.distance_pipe_center = unit.shank_spacing / 2
     
+        unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
+        unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)  
     end
 
     # get output temperature for energy output and set temperature and max_energy to output interface
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread/2
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
-                                                          unit.current_output_temperature,
-                                                          unit.output_interfaces[unit.m_heat_out].temperature
-                                                          )
-
-    # calculate maximum energy that is possible in current time step
-        # sets max_energy to zero if requested/available temperature does not fit to temperature of geothermal probe field.
-        # This works as the control step of transformers is always calculated earlier than the one of storages. If temperatures
-        # are written to the connected interface by a transformer, this is already done at this point.
-    if unit.output_interfaces[unit.m_heat_out].temperature > unit.current_output_temperature
-        max_output_energy = 0.0  # no energy can be provided if requested temperature is higher than max. temperature of probe field
-    else
-        max_output_energy = unit.max_output_energy
-    end
+    set_temperature!(unit.output_interfaces[unit.m_heat_out],
+                     nothing,
+                     unit.current_output_temperature
+                     )
 
     # set max_energy to output interface to provide information for connected components
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_output_energy)
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread/2 # of geothermal probe field 
-        unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(
-                                                                                unit.current_input_temperature,
-                                                                                unit.input_interfaces[unit.m_heat_in].temperature
-                                                                                )
+        set_temperature!(unit.input_interfaces[unit.m_heat_in],
+                         unit.current_input_temperature,
+                         nothing
+                         )
         
-        if unit.input_interfaces[unit.m_heat_in].temperature < unit.current_input_temperature
-            max_input_energy = 0.0 # no energy can be taken if available temperature is less than minimum possible temperature to load the probe field
-        else
-            max_input_energy = unit.max_input_energy
-        end
-
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy)
-    end                                                                        
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+    end
 
 end
 
@@ -290,66 +288,102 @@ end
 # according to actual delivered or received energy
 function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # get actual required energy from output interface
-    outface = unit.output_interfaces[unit.m_heat_out]  # output interface
-    exchange = balance_on(outface, outface.target)     # gather information of output interface
-    demand_temp = exchange.temperature                 # get temperature requested by demand (equals max(unit.temperature_field) 
-                                                        # from control-step if demand is not requesting a temperature)
+    outface = unit.output_interfaces[unit.m_heat_out]
+    exchanges = balance_on(outface, outface.target)
+    energy_demanded = balance(exchanges) +
+                      energy_potential(exchanges) +
+                      (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_available = unit.max_output_energy  # is positive
 
-    # check if temperature can be met
-    if demand_temp !== nothing && demand_temp > unit.current_output_temperature
-        # no calculate_new_probe_field() as this will be done in load() step to avoid double calling!
-        return  # no energy delivery possible as requested temperature can not be provided!
+    # shortcut if there is no energy demanded
+    if energy_demanded >= -sim_params["epsilon"]
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)    
+        return
     end
 
-    # calculate energy demand with respect to the defined control stratey
-    if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
-        else
-            energy_demand = exchange.balance
+    for exchange in exchanges
+        demanded_on_interface = exchange.balance +
+                                exchange.energy_potential +
+                                (outface.do_storage_transfer ? exchange.storage_potential : 0.0)
+
+        if demanded_on_interface >= -sim_params["epsilon"]
+            continue
         end
-    else
-        energy_demand = exchange.balance
-    end
 
-    if energy_demand >= 0.0
-        # no calculate_new_probe_field() as this will be done in load() step to avoid double calling!
-        return # process is only concerned with moving energy to the target
+        if (
+            exchange.temperature_min !== nothing
+            && exchange.temperature_min > unit.current_output_temperature
+        )
+            # we can only supply energy at a temperature at or below the tank's current
+            # output temperature
+            continue
+        end
+
+        used_heat = abs(demanded_on_interface)
+
+        if energy_available > used_heat
+            energy_available -= used_heat
+            add!(outface, used_heat, unit.current_output_temperature)
+        else
+            add!(outface, energy_available, unit.current_output_temperature)
+            energy_available = 0.0
+        end
     end
-    energy_demand = max(energy_demand, -unit.max_output_energy)
 
     # write output heat flux into vector
-    unit.energy_in_out_per_probe_meter[unit.time_index] = energy_demand  / (unit.probe_depth * unit.number_of_probes) # from total energy to specific power of one single probe.
-    add!(outface, abs(energy_demand), unit.current_output_temperature)
+    energy_delivered = -(unit.max_output_energy - energy_available)
+    unit.energy_in_out_per_probe_meter[unit.time_index] = energy_delivered  / (unit.probe_depth * unit.number_of_probes) # from total energy to specific power of one single probe.
     
 end
 
-function load(unit::GeothermalProbes, parameters::Dict{String,Any})
-  
-    inface = unit.input_interfaces[unit.m_heat_in]  # input interface
-    exchange = balance_on(inface, inface.source)    # gather information of input interface
-    supply_temp = exchange.temperature              # get temperature delivered by source 
-    energy_available = exchange.balance             # get energy that is provided  
-   
-    if (!unit.regeneration ||                                                        # no energy available if regeneration is turned off
-        energy_available <= 0.0 ||                                                   # no energy available for loading as load is only concerned when receiving energy from the target
-        (supply_temp !== nothing && supply_temp < unit.current_input_temperature)    # we can only take in energy if it's at a higher temperature than the probe fields lowest temperature
-    )
-        # recalculate borehole temperature for next timestep
+function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
+    inface = unit.input_interfaces[unit.m_heat_in]
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges) +
+                       energy_potential(exchanges) +
+                       (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demand = unit.max_input_energy  # is positive
+
+    # shortcut if there is no energy to be used
+    if ( energy_available <= sim_params["epsilon"] ||
+         !unit.regeneration)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
         return
     end
 
-    energy_available = min(energy_available, unit.max_input_energy)
+    for exchange in exchanges
+        exchange_energy_available = exchange.balance +
+                                    exchange.energy_potential +
+                                    (inface.do_storage_transfer ? exchange.storage_potential : 0.0)
+
+        if exchange_energy_available < sim_params["epsilon"]
+            continue
+        end
+
+        if (
+            exchange.temperature_min !== nothing
+                && exchange.temperature_min > unit.current_input_temperature
+            || exchange.temperature_max !== nothing
+                && exchange.temperature_max < unit.current_input_temperature
+        )
+            # we can only take in energy if it's at a higher/equal temperature than the
+            # tank's upper limit for temperatures
+            continue
+        end
+
+        if energy_demand > exchange_energy_available
+            energy_demand -= exchange_energy_available
+            sub!(inface, exchange_energy_available, unit.current_input_temperature)
+        else
+            sub!(inface, energy_demand, unit.current_input_temperature)
+            energy_demand = 0.0
+        end
+    end
 
     # Add loaded specific heat flux to vector
-    unit.energy_in_out_per_probe_meter[unit.time_index] += energy_available / (unit.probe_depth * unit.number_of_probes)
-
-    # calcute energy that acutally has beed delivered for regeneration and set it to interface 
-    # no other limits are present as max_energy for geothermal probes was written in control-step!
-    sub!(inface, energy_available, unit.current_input_temperature)
+    energy_taken = unit.max_input_energy - energy_demand
+    unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
     
     # recalculate borehole temperature for next timestep
     calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
@@ -359,25 +393,35 @@ end
 function balance_on(
     interface::SystemInterface,
     unit::GeothermalProbes
-)::NamedTuple{}
-    # check if interface is input or output on unit
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
-    # check if a balance was already written --> if yes, storage potential will be set to zero as storage was already processed/loaded
-    balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
+)::Vector{EnergyExchange}
 
-    return (
-            balance = interface.balance,
-            energy = (  uac=unit.uac,
-                        energy_potential=0.0,
-                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
-                        temperature=interface.temperature,
-                        pressure=nothing,
-                        voltage=nothing), # geothermal probes are handled as storages currently!
-            )
+caller_is_input = unit.uac == interface.target.uac
+
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=0.0,
+        storage_potential=caller_is_input ? - unit.max_input_energy : unit.max_output_energy,  # TODO is this to be assuemd as storage_potential?
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 function output_values(unit::GeothermalProbes)::Vector{String}
-    return ["IN", "OUT", "TEMPERATURE_#NodeNum", "borehole_temperature","fluid_temperature","borehole_thermal_resistance","fluid_reynolds_number", "T_out", "Q_out", "Q_in", "dT_monthly","dT_hourly" ]
+    return [string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_out)*" OUT",
+            "TEMPERATURE_#NodeNum",
+            "borehole_temperature",
+            "fluid_temperature",
+            "borehole_thermal_resistance",
+            "fluid_reynolds_number",
+            "T_out",
+            "Q_out",
+            "Q_in",
+            "dT_monthly",
+            "dT_hourly" ]
 end
 
 function output_value(unit::GeothermalProbes, key::OutputKey)::Float64

@@ -3,7 +3,7 @@ Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
 """
 
-mutable struct GeothermalHeatCollector <: ControlledComponent
+mutable struct GeothermalHeatCollector <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -92,12 +92,12 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
         register_media([m_heat_in, m_heat_out])
         # read in ambient temperature profilfe (downloaded from dwd)
         ambient_temperature_profile = "ambient_temperature_profile_path" in keys(config) ?
-                                      Profile(config["ambient_temperature_profile_path"]) :
-                                      nothing           # TODO: add global weather file
+                                      Profile(config["ambient_temperature_profile_path"], sim_params) :
+                                      nothing            # TODO: add global weather file
         # read in ambient global radiation profilfe (downloaded from dwd)
         global_radiation_profile = "global_radiation_profile_path" in keys(config) ?
-                                   Profile(config["global_radiation_profile_path"]) :
-                                   nothing              # TODO: add global weather file                   
+                                   Profile(config["global_radiation_profile_path"], sim_params) :
+                                   nothing               # TODO: add global weather file                   
         
         return new(
             uac,                    # uac
@@ -176,6 +176,21 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     end
 end
 
+function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_heat_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+end
+
 function control(
     unit::GeothermalHeatCollector,
     components::Grouping,
@@ -194,7 +209,7 @@ function control(
         unit.pipe_d_i = 2 * unit.pipe_radius_outer - (2 * unit.pipe_thickness)
         unit.pipe_d_o = 2 * unit.pipe_radius_outer 
 
-        # calculate max energies
+        # calculate max_energy
         A_collector = unit.pipe_length * unit.pipe_spacing * (unit.number_of_pipes - 1)
         unit.max_output_energy = watt_to_wh(unit.max_output_power * A_collector)
         unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
@@ -271,46 +286,26 @@ function control(
 
     # get ambient temperature and global radiation from profile for current time step if needed (probably only for geothermal collectors)
     # TODO: add link to global weather file
-    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, parameters["time"])
-    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, parameters["time"]))  # from Wh/m^2 to W/m^2
+    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params["time"])
+    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params["time"]))  # from Wh/m^2 to W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread/2
-    unit.output_interfaces[unit.m_heat_out].temperature = highest_temperature(
-                                                                            unit.current_output_temperature, 
-                                                                            unit.output_interfaces[unit.m_heat_out].temperature
-                                                                            )
+    set_temperature!(unit.output_interfaces[unit.m_heat_out],
+                     nothing,
+                     unit.current_output_temperature
+                     )
 
-    # get input temperature for energy input (regeneration) and set temperature to input interface
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_output_energy)
+
+    # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.average_temperature_adjacent_to_pipe - unit.loading_temperature_spread/2 # of geothermal heat collector 
-        unit.input_interfaces[unit.m_heat_in].temperature = highest_temperature(
-                                                                                unit.current_input_temperature,
-                                                                                unit.input_interfaces[unit.m_heat_in].temperature
-                                                                                )
-    end                                                                        
+        set_temperature!(unit.input_interfaces[unit.m_heat_in],
+                         unit.current_input_temperature,
+                         nothing
+                         )
 
-    # calculate maximum input and output energy that is possible in current time step
-        # sets max_energy to zero if requested/available temperature does not fit to temperature of geothermal heat collector.
-        # This works as the control step of transformers is always calculated earlier than the one of storages. If temperatures
-        # are written to the connected interface by a transformer, this is already done at this point.
-    if unit.output_interfaces[unit.m_heat_out].temperature > unit.current_output_temperature
-        max_output_energy = 0.0  # no energy can be provided if requested temperature is higher than max. temperature of heat collector
-    else
-        max_output_energy = unit.max_output_energy
-    end
-
-    if unit.regeneration
-        if unit.input_interfaces[unit.m_heat_in].temperature < unit.current_input_temperature
-            max_input_energy = 0.0 # no energy can be taken if available temperature is less than minimum possible temperature to load the heat collector
-        else
-            max_input_energy = unit.max_input_energy
-        end
-    end
-
-    # set max_energy to interfaces to provide information for connected components
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], max_output_energy)
-    if unit.regeneration
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
     end
 
 end
@@ -592,88 +587,127 @@ end
 # according to actual delivered or received energy
 function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # get actual required energy from output interface
-    outface = unit.output_interfaces[unit.m_heat_out]  # output interface
-    exchange = balance_on(outface, outface.target)     # gather information of output interface
-    demand_temp = exchange.temperature                 # get temperature requested by demand (equals max(unit.temperature_field) 
-            	                                       # from control-step if demand is not requesting a temperature
-    # check if temperature can be met
-    if demand_temp !== nothing && demand_temp > unit.current_output_temperature
-        # no calculate_new_heat_collector_temperatures() as this will be done in load() step to avoid double calling!
-        return  # no energy delivery possible as requested temperature can not be provided
+    outface = unit.output_interfaces[unit.m_heat_out]
+    exchanges = balance_on(outface, outface.target)
+    energy_demanded = balance(exchanges) +
+                      energy_potential(exchanges) +
+                      (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_available = unit.max_output_energy  # is positive
+
+    # shortcut if there is no energy demanded
+    if energy_demanded >= -sim_params["epsilon"]
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)    
+        return
     end
 
-    # calculate energy demand with respect to the defined control stratey
-    if unit.controller.parameter["name"] == "default"
-        energy_demand = exchange.balance
-    elseif unit.controller.parameter["name"] == "extended_storage_control"
-        if unit.controller.parameter["load_any_storage"]
-            energy_demand = exchange.balance + exchange.storage_potential
-        else
-            energy_demand = exchange.balance
+    for exchange in exchanges
+        demanded_on_interface = exchange.balance +
+                                exchange.energy_potential +
+                                (outface.do_storage_transfer ? exchange.storage_potential : 0.0)
+
+        if demanded_on_interface >= -sim_params["epsilon"]
+            continue
         end
-    else
-        energy_demand = exchange.balance
+
+        if (
+            exchange.temperature_min !== nothing
+            && exchange.temperature_min > unit.current_output_temperature
+        )
+            # we can only supply energy at a temperature at or below the tank's current
+            # output temperature
+            continue
+        end
+
+        used_heat = abs(demanded_on_interface)
+
+        if energy_available > used_heat
+            energy_available -= used_heat
+            add!(outface, used_heat, unit.current_output_temperature)
+        else
+            add!(outface, energy_available, unit.current_output_temperature)
+            energy_available = 0.0
+        end
     end
 
-    if energy_demand >= 0.0
-        # no calculate_new_heat_collector_temperatures() as this will be done in load() step to avoid double calling
-        return # process is only concerned with moving energy to the target
-    end
-
-    energy_demand = max(-unit.max_output_energy, energy_demand)
-    unit.collector_total_heat_energy_in_out = energy_demand
-    # calcute energy that acutally can be delivered and set it to the output interface 
-    # no other limits are present as max_energy for geothermal heat collector was written in control-step
-    add!(outface, abs(energy_demand), unit.current_output_temperature)
+    # write output heat flux into vector
+    energy_delivered = -(unit.max_output_energy - energy_available)
+    unit.collector_total_heat_energy_in_out = energy_delivered
 end
 
-function load(unit::GeothermalHeatCollector, parameters::Dict{String,Any})   
-     # get actual delivered energy from input interface
-     inface = unit.input_interfaces[unit.m_heat_in]  # input interface
-     exchange = balance_on(inface, inface.source)    # gather information of input interface
-     supply_temp = exchange.temperature              # get temperature delivered by source 
-     energy_available = exchange.balance             # get energy that is provided
+function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})   
+    inface = unit.input_interfaces[unit.m_heat_in]
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges) +
+                       energy_potential(exchanges) +
+                       (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demand = unit.max_input_energy  # is positive
 
-    if  (!unit.regeneration ||                                                      # no energy available if regeneration is turned off
-        energy_available <= 0.0 ||                                                 # no energy available for loading as load is only concerned when receiving energy from the target
-        (supply_temp !== nothing && supply_temp < unit.current_input_temperature)  # we can only take in energy if it's at a higher temperature than the heat collector lowest temperature
-    )
-        # recalculate heat collector temperatures for next timestep (function checks if is has already been calculated in the current timestep)
+    # shortcut if there is no energy to be used
+    if ( energy_available <= sim_params["epsilon"] ||
+         !unit.regeneration)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out)  # call calculate_new_heat_collector_temperatures!() to calculate new temperatures of field to account for possible ambient effects
         return
     end
-    
-    energy_available = min(unit.max_input_energy, energy_available)
-    unit.collector_total_heat_energy_in_out += energy_available
 
-    # calcute energy that acutally has beed delivered for regeneration and set it to interface 
-    # no other limits are present as max_energy for geothermal heat collector was written in control-step!
-    sub!(inface, energy_available, unit.current_input_temperature)
+    for exchange in exchanges
+        exchange_energy_available = exchange.balance +
+                                    exchange.energy_potential +
+                                    (inface.do_storage_transfer ? exchange.storage_potential : 0.0)
+
+        if exchange_energy_available < sim_params["epsilon"]
+            continue
+        end
+
+        if (
+            exchange.temperature_min !== nothing
+                && exchange.temperature_min > unit.current_input_temperature
+            || exchange.temperature_max !== nothing
+                && exchange.temperature_max < unit.current_input_temperature
+        )
+            # we can only take in energy if it's at a higher/equal temperature than the
+            # tank's upper limit for temperatures
+            continue
+        end
+
+        if energy_demand > exchange_energy_available
+            energy_demand -= exchange_energy_available
+            sub!(inface, exchange_energy_available, unit.current_input_temperature)
+        else
+            sub!(inface, energy_demand, unit.current_input_temperature)
+            energy_demand = 0.0
+        end
+    end
+
+    energy_taken = unit.max_input_energy - energy_demand
+    unit.collector_total_heat_energy_in_out += energy_taken
     calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out) 
 end
 
 function balance_on(
     interface::SystemInterface,
     unit::GeothermalHeatCollector
-)::NamedTuple{}
-    # check if interface is input or output on unit
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
-    # check if a balance was already written --> if yes, storage potential will be set to zero as storage was already processed/loaded
-    balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
+)::Vector{EnergyExchange}
 
-    return (
-            balance = interface.balance,
-            energy = (  uac=unit.uac, 
-                        energy_potential=0.0,
-                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
-                        temperature=interface.temperature,
-                        pressure=nothing,
-                        voltage=nothing),   # geothermal heat collector are handled as storages currently!
-            )
+caller_is_input = unit.uac == interface.target.uac
+
+    return [EnEx(
+        balance=interface.balance,
+        uac=unit.uac,
+        energy_potential=0.0,
+        storage_potential=caller_is_input ? - unit.max_input_energy : unit.max_output_energy,   # TODO is this to be assuemd as storage_potential?
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
+        pressure=nothing,
+        voltage=nothing,
+    )]
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
-    return ["IN", "OUT", "TEMPERATURE_#NodeNum","fluid_temperature"]
+    return [string(unit.m_heat_in)*" IN",
+            string(unit.m_heat_out)*" OUT",
+            "TEMPERATURE_#NodeNum",
+            "fluid_temperature"]
 end
 
 function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
