@@ -510,6 +510,10 @@ function balance_on(
                 storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
+            if output_row.energy_pool == -Inf || output_row.energy_potential == -Inf
+                energy_pot = -Inf
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=output_row.target.uac,
@@ -541,6 +545,10 @@ function balance_on(
             else
                 energy_pot = is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]
                 storage_pot = (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
+            end
+
+            if input_row.energy_pool == Inf || input_row.energy_potential == Inf
+                energy_pot = Inf
             end
 
             push!(return_exchanges, EnEx(
