@@ -201,13 +201,8 @@ function reset(unit::Bus)
     for row in values(unit.balance_table_outputs)
         reset!(row)
     end
-   
-    unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
-    for i in 1:length(unit.balance_table_inputs)
-        for j in 2:2:(2*length(unit.balance_table_outputs))
-            unit.balance_table[i, j] = nothing
-        end
-    end
+
+    reset_balance_table!(unit::Bus, false)
     
 end
 
@@ -356,6 +351,7 @@ function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, valu
     else
         bus.balance_table_outputs[comp.uac].storage_potential = abs(value)
     end
+    set_max_energy!(unit, comp, is_input, 0.0)
 end
 
 function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
@@ -612,7 +608,7 @@ function inner_distribute!(unit::Bus)
             ), bt_output_row_sum)               
 
             if available_energy < -unit.epsilon || target_energy < -unit.epsilon
-                reset_balance_table!(unit::Bus)
+                reset_balance_table!(unit::Bus, true)
                 continue_iteration = false
                 break
             end
@@ -623,8 +619,7 @@ function inner_distribute!(unit::Bus)
     end
 end
 
-function reset_balance_table!(unit::Bus)
-
+function reset_balance_table!(unit::Bus, call_inner_distribute::Bool)
     unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
     for i in 1:length(unit.balance_table_inputs)
         for j in 2:2:(2*length(unit.balance_table_outputs))
@@ -632,7 +627,9 @@ function reset_balance_table!(unit::Bus)
         end
     end
 
-    inner_distribute!(unit)
+    if call_inner_distribute
+        inner_distribute!(unit)
+    end
 end
 
 """
