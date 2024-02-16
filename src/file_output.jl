@@ -167,7 +167,8 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
                 each_outputinterface = each_outputinterface[2]
             end
             if isdefined(each_outputinterface, :target)
-                energies[n] = calculate_energy_flow(each_outputinterface) 
+                energies[n] = min(calculate_energy_flow(each_outputinterface, each_outputinterface.source),
+                                  calculate_energy_flow(each_outputinterface, each_outputinterface.target))
                 n += 1
                 
                 # If source or target is fixed source or sink, gather also demand and supply

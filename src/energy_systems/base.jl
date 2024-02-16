@@ -801,7 +801,7 @@ function output_values(unit::Component)::Vector{String}
 end
 
 """
-    calculate_energy_flow(interface)
+    calculate_energy_flow(interface, calling_unit)
 
 Calculates the energy flow in an interface and returns the energy.
 If the balance in an interface was not zero, the requested amount of energy and not
@@ -813,8 +813,9 @@ Replacing the - below by a +, this can be changed, then the delivered energy and
 the requested energy is returned. Comparing this to the bahaviour of busses, this can 
 be non-intuitive.
 """
-function calculate_energy_flow(interface::SystemInterface)::Float64
-    return (interface.sum_abs_change + interface.balance) / 2
+function calculate_energy_flow(interface::SystemInterface, calling_unit::Component)::Float64
+    sign = interface.source == calling_unit ? +1 : -1
+    return (interface.sum_abs_change + (sign * interface.balance)) / 2
 end
 
 """
@@ -837,9 +838,9 @@ Throws:
 """
 function output_value(unit::Component, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
+        return calculate_energy_flow(unit.input_interfaces[key.medium], unit.input_interfaces[key.medium].target)
     elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
+        return calculate_energy_flow(unit.output_interfaces[key.medium], unit.output_interfaces[key.medium].source)
     end
     throw(KeyError(key.value_key))
 end

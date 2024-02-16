@@ -126,7 +126,7 @@ end
 
 function output_value(unit::BoundedSink, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
+        return calculate_energy_flow(unit.input_interfaces[key.medium], unit)
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
     elseif key.value_key == "Temperature"
