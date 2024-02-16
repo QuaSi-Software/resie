@@ -298,9 +298,9 @@ end
 
 function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
+        return calculate_energy_flow(unit.input_interfaces[key.medium], unit)
     elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
+        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
     elseif startswith(key.value_key, "Temperature_")
         idx = parse(Int, split(key.value_key, "_")[2])
         if !(1 <= idx <= length(unit.temperature_field)) 

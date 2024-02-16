@@ -389,9 +389,9 @@ end
 
 function output_value(unit::FuelBoiler, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
+        return calculate_energy_flow(unit.input_interfaces[key.medium], unit)
     elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
+        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
     elseif key.value_key == "Losses"
         return unit.losses
     end

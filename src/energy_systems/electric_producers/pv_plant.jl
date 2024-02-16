@@ -80,7 +80,7 @@ end
 
 function output_value(unit::PVPlant, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
+        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
     elseif key.value_key == "Supply"
         return unit.supply
     end

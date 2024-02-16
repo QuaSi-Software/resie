@@ -124,7 +124,7 @@ end
 
 function output_value(unit::BoundedSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
+        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
     elseif key.value_key == "Temperature"
