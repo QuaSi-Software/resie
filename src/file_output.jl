@@ -432,12 +432,19 @@ function create_sankey(
     # remove data that should not be plotted in Sankey
     interface_new = 1
     for _ in 1:nr_of_interfaces
-        if ( 
+        if (
             # remove oxygen from data as the energy of oxygen is considered to be zero
-            medium_of_interfaces[interface_new] == :m_c_g_o2 ||  
+            medium_of_interfaces[interface_new] == :m_c_g_o2
             # remove real sinks and sources if they match the delivered energy
-            # to enable this to work, the "real" demand/supply needs to be always one entry below the delivered/requested one in the array!
-             (medium_of_interfaces[interface_new] == "hide_medium" && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1])
+            # to enable this to work, the "real" demand/supply needs to be always one entry
+            # below the delivered/requested one in the array!
+            || (
+                medium_of_interfaces[interface_new] == "hide_medium"
+                && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
+            )
+            # remove connections from/to proxy busses
+            || startswith(output_all_sourcenames[interface_new], "Proxy")
+            || startswith(output_all_targetnames[interface_new], "Proxy")
         )
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
