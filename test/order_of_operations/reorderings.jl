@@ -11,20 +11,25 @@ function test_data_input_priorities()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_03"],
+            )
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BUS_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [],
+                "output_order" => ["TST_BUS_03"],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
                     "TST_BUS_01",
@@ -33,7 +38,14 @@ function test_data_input_priorities()
             )
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -107,12 +119,7 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_04",
-                "TST_BUS_03",
-                "TST_BUS_02",
-            ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
                     "TST_BUS_04",
@@ -125,17 +132,16 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_06",
-                "TST_BUS_05",
-            ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
                 ],
@@ -149,22 +155,38 @@ function test_data_busses_distribute()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => ["TST_BUS_03"],
+                "output_order" => [],
+            )
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -227,13 +249,10 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_02",
-                "TST_BFT_01",
-                "TST_BUS_03",
-            ],
-            "connection_matrix" => Dict{String, Any}(
-                "input_order" => [],
+            "connections" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BFT_01"
+                ],
                 "output_order" => [
                     "TST_BUS_02",
                     "TST_BFT_01",
@@ -245,13 +264,29 @@ function test_data_storage_loading()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_02"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                    "TST_BFT_02"
+                ],
+                "output_order" => [
+                    "TST_BFT_02",
+                ],
+            )
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_03"],
+            "connections" => Dict{String, Any}(
+                "input_order" => [
+                    "TST_BUS_01",
+                    "TST_BFT_03"
+                ],
+                "output_order" => [
+                    "TST_BFT_03",
+                ],
+            )
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -281,7 +316,14 @@ function test_data_storage_loading()
             "load" => 0
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -421,12 +463,7 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_02",
-                "TST_BFT_01",
-                "TST_BUS_03",
-            ],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
                     "TST_GRI_01"
@@ -436,7 +473,7 @@ function test_data_storage_loading_with_matrix()
                     "TST_BFT_01",
                     "TST_BUS_03",
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 0, 1],
                     [1, 0, 1]
                 ]
@@ -446,8 +483,7 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_02"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
                     "TST_BUS_01"
@@ -455,7 +491,7 @@ function test_data_storage_loading_with_matrix()
                 "output_order" => [
                     "TST_BFT_02"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [0],
                     [0]
                 ]
@@ -465,8 +501,7 @@ function test_data_storage_loading_with_matrix()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_BFT_03"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_03",
                     "TST_BUS_01"
@@ -474,7 +509,7 @@ function test_data_storage_loading_with_matrix()
                 "output_order" => [
                     "TST_BFT_03"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [0],
                     [1]
                 ]
@@ -508,7 +543,14 @@ function test_data_storage_loading_with_matrix()
             "load" => 0
         ),
     )
-    components = Resie.load_components(components_config)
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
 end
@@ -546,10 +588,6 @@ function test_find_storages_ordered_with_matrix()
     @test pwc_units_astr(expected_results, result) == ""
     @test pwc_units_astr(expected_limits, limits) == ""
 
-end
-
-@testset "find_storages_ordered" begin
-    test_find_storages_ordered()
 end
 
 function test_storage_loading_reorder_steps_with_matrix_1()

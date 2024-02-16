@@ -58,7 +58,7 @@ mutable struct GeothermalProbes <: ControlledComponent
 
     fluid_reynolds_number::Float64
 
-    function GeothermalProbes(uac::String, config::Dict{String,Any})
+    function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
@@ -75,7 +75,7 @@ mutable struct GeothermalProbes <: ControlledComponent
         return new(
             uac,                     # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage,              # sys_function
             InterfaceMap(            # input_interfaces
@@ -139,7 +139,7 @@ end
 function control(
     unit::GeothermalProbes,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
     # time index, necessary for g-function approach
     unit.time_index = unit.time_index + 1 
@@ -288,7 +288,7 @@ end
 
 # process function that provides energy from the geothermal probes
 # according to actual delivered or received energy
-function process(unit::GeothermalProbes, parameters::Dict{String,Any})
+function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]  # output interface
     exchange = balance_on(outface, outface.target)     # gather information of output interface
@@ -367,9 +367,12 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = balance_written ? 0.0 : input_sign * interface.max_energy,  # geothermal probes are handled as storages currently!
-            energy_potential = 0.0,
-            temperature = interface.temperature
+            energy = (  uac=unit.uac,
+                        energy_potential=0.0,
+                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
+                        temperature=interface.temperature,
+                        pressure=nothing,
+                        voltage=nothing), # geothermal probes are handled as storages currently!
             )
 end
 

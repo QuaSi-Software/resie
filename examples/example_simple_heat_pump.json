@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1 IN",
                 "m_h_w_ht1 OUT",
@@ -104,8 +105,8 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 9000,
-            "fixed_cop": 3.0,
+            "power_th": 9000,
+            "constant_cop": 3.0,
             "min_power_fraction": 0.0
         }
     }

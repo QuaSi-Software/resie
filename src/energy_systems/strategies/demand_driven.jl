@@ -1,4 +1,4 @@
-function strt_sm_demand_driven(parameters::Dict{String,Any})::StateMachine
+function strt_sm_demand_driven(cond_params::Dict{String,Any})::StateMachine
     return StateMachine()
 end
 
@@ -19,16 +19,15 @@ OP_STRATS["demand_driven"] = OperationalStrategyType(
     conditions=[],
     strategy_parameters=Dict{String,Any}(
         "name" => "demand_driven",
-        "load_storages" => true,
-        "unload_storages" => true,
         "operation_profile_path" => nothing,
-        "m_el_in" => true,
-        "m_el_out" => true,
-        "m_gas_in" => true,
-        "m_h2_out" => true,
-        "m_o2_out" => true,
-        "m_heat_out" => true,
-        "m_heat_in" => true
+        "consider_m_el_in" => true,
+        "consider_m_el_out" => true,
+        "consider_m_gas_in" => true,
+        "consider_m_fuel_in" => true,
+        "consider_m_h2_out" => true,
+        "consider_m_o2_out" => true,
+        "consider_m_heat_out" => true,
+        "consider_m_heat_in" => true
     ),
     required_components=EnSysRequirements(
         "receiver" => (Component, nothing)

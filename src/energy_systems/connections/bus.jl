@@ -1,5 +1,3 @@
-using ResumableFunctions
-
 """
 Utility struct to contain the connections, input/output priorities and other related data
 for bus components.
@@ -7,37 +5,84 @@ for bus components.
 Base.@kwdef mutable struct ConnectionMatrix
     input_order::Vector{String}
     output_order::Vector{String}
-    storage_loading::Union{Nothing,Vector{Vector{Bool}}}
+    energy_flow::Union{Nothing,Vector{Vector{Bool}}}
+end
 
-    function ConnectionMatrix(config::Dict{String,Any})
-        input_order = []
-        output_order = [String(u) for u in config["output_refs"]]
-        storage_loading = nothing
-
-        if "connection_matrix" in keys(config)
-            if "input_order" in keys(config["connection_matrix"])
-                input_order = [String(u) for u in config["connection_matrix"]["input_order"]]
-            end
-
-            if "output_order" in keys(config["connection_matrix"])
-                output_order = [String(u) for u in config["connection_matrix"]["output_order"]]
-            end
-
-            if "storage_loading" in keys(config["connection_matrix"])
-                storage_loading = []
-                for row in config["connection_matrix"]["storage_loading"]
-                    vec = [Bool(v) for v in row]
-                    push!(storage_loading, vec)
-                end
-            end
-        end
-
-        return new(
-            input_order,
-            output_order,
-            storage_loading,
-        )
+function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
+    if !haskey(config, "connections")
+        return new([], [], nothing)
     end
+
+    input_order = [String(u) for u in config["connections"]["input_order"]]
+    output_order = [String(u) for u in config["connections"]["output_order"]]
+
+    energy_flow = nothing
+    if haskey(config["connections"], "energy_flow")
+        energy_flow = []
+        for row in config["connections"]["energy_flow"]
+            vec = [Bool(v) for v in row]
+            push!(energy_flow, vec)
+        end
+    end
+
+    return ConnectionMatrix(
+        input_order,
+        output_order,
+        energy_flow,
+    )
+end
+
+Base.@kwdef mutable struct BTInputRow
+    source::Component
+    priority::Integer
+    input_index::Integer
+    do_storage_transfer::Bool
+    energy_potential::Floathing = nothing
+    energy_pool::Floathing = nothing
+    storage_potential::Floathing = nothing
+    storage_pool::Floathing = nothing
+    temperature_min::Temperature = nothing
+    temperature_max::Temperature = nothing
+end
+
+function reset!(row::BTInputRow)
+    row.energy_potential = nothing
+    row.energy_pool = nothing
+    row.storage_potential = nothing
+    row.storage_pool = nothing
+    row.temperature_min = nothing
+    row.temperature_max = nothing
+end
+
+Base.@kwdef mutable struct BTOutputRow
+    target::Component
+    priority::Integer
+    output_index::Integer
+    do_storage_transfer::Bool
+    energy_potential::Floathing = nothing
+    energy_pool::Floathing = nothing
+    storage_potential::Floathing = nothing
+    storage_pool::Floathing = nothing
+    temperature_min::Temperature = nothing
+    temperature_max::Temperature = nothing
+end
+
+function reset!(row::BTOutputRow)
+    row.energy_potential = nothing
+    row.energy_pool = nothing
+    row.storage_potential = nothing
+    row.storage_pool = nothing
+    row.temperature_min = nothing
+    row.temperature_max = nothing
+end
+
+function is_empty(row::Union{BTInputRow, BTOutputRow})
+    return (
+        row.energy_potential === nothing
+        && row.energy_pool === nothing
+        && row.storage_potential === nothing
+        && row.storage_pool === nothing
+    )
 end
 
 """
@@ -51,7 +96,7 @@ connection between both components.
 
 The function and purpose is described in more detail in the accompanying documentation.
 """
-Base.@kwdef mutable struct Bus <: ControlledComponent
+Base.@kwdef mutable struct Bus <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -63,33 +108,111 @@ Base.@kwdef mutable struct Bus <: ControlledComponent
 
     remainder::Float64
 
-    function Bus(uac::String, config::Dict{String,Any})
-        medium = Symbol(config["medium"])
-        register_media([medium])
+    balance_table_inputs::Dict{String,BTInputRow}
+    balance_table_outputs::Dict{String,BTOutputRow}
+    balance_table::Array{Union{Nothing, Float64}, 2}
+    proxy::Union{Nothing,Bus}
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
-            ),
-            sf_bus, # sys_function
-            medium, # medium
-            [], # input_interfaces
-            [], # output_interfaces,
-            ConnectionMatrix(config),
-            0.0 # remainder
+    epsilon::Float64
+end
+
+function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
+    medium = Symbol(config["medium"])
+    register_media([medium])
+
+    return Bus(
+        uac, # uac
+        controller_for_strategy( # controller
+            config["strategy"]["name"], config["strategy"], sim_params
+        ),
+        sf_bus, # sys_function
+        medium, # medium
+        [], # input_interfaces
+        [], # output_interfaces,
+        ConnectionMatrix(config), # connectivity
+        0.0, # remainder
+        Dict{String,BTInputRow}(), # balance_table_inputs
+        Dict{String,BTOutputRow}(), # balance_table_outputs
+        Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table, filled in reset()
+        nothing, # proxy
+        sim_params["epsilon"] # system-wide epsilon for easy access within the bus functions
+    )
+end
+
+function Bus(
+    uac::String,
+    medium::Symbol,
+    epsilon::Float64
+)
+    return Bus(
+        uac,
+        controller_for_strategy("default", Dict{String,Any}(), Dict{String,Any}()),
+        sf_bus,
+        medium,
+        [], # input_interfaces
+        [], # output_interfaces
+        ConnectionMatrix([], [], nothing), # connectivity
+        0.0, # remainder
+        Dict{String,BTInputRow}(), # balance_table_inputs
+        Dict{String,BTOutputRow}(), # balance_table_outputs
+        Array{Union{Nothing, Float64}, 2}(undef, 0, 0), # balance_table
+        nothing, # proxy
+        epsilon
+    )
+end
+
+function initialise!(unit::Bus, sim_params::Dict{String,Any})
+    p = 1
+    for (idx, inface) in pairs(unit.input_interfaces)
+        unit.balance_table_inputs[inface.source.uac] = BTInputRow(
+            source=inface.source,
+            priority=p,
+            input_index=idx,
+            do_storage_transfer = inface.do_storage_transfer
         )
+        p += 1
+    end
+
+    p = 1
+    for (idx, outface) in pairs(unit.output_interfaces)
+        unit.balance_table_outputs[outface.target.uac] = BTOutputRow(
+            target=outface.target,
+            priority=p,
+            output_index=idx,
+            do_storage_transfer = outface.do_storage_transfer
+        )
+        p += 1
     end
 end
 
 function reset(unit::Bus)
+    if unit.proxy !== nothing
+        reset(unit.proxy)
+    end
+
     for inface in unit.input_interfaces
         reset!(inface)
     end
     for outface in unit.output_interfaces
         reset!(outface)
     end
+
     unit.remainder = 0.0
+
+    for row in values(unit.balance_table_inputs)
+        reset!(row)
+    end
+    for row in values(unit.balance_table_outputs)
+        reset!(row)
+    end
+   
+    unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
+    for i in 1:length(unit.balance_table_inputs)
+        for j in 2:2:(2*length(unit.balance_table_outputs))
+            unit.balance_table[i, j] = nothing
+        end
+    end
+    
 end
 
 """
@@ -100,44 +223,43 @@ balance, but does so in a non-recursive manner such that any bus in the chain of
 bus components is only considered once.
 """
 function balance_nr(unit::Bus, caller::Bus)::Float64
-    balance = 0.0
+    blnc = 0.0
 
-    for inface in unit.input_interfaces   # supply
+    for inface in unit.input_interfaces # supply
         if inface.source == caller
             continue
         end
 
-        if isa(inface.source, Bus)  
-            exchange = balance_nr(inface.source, unit)
-            balance_supply = max(exchange, inface.balance)
+        if isa(inface.source, Bus)
+            other_bus_balance = balance_nr(inface.source, unit)
+            balance_supply = max(other_bus_balance, inface.balance)
             if balance_supply < 0.0
                 continue
             end
         else
-            balance_supply = balance_on(inface, inface.source).balance
+            balance_supply = balance(balance_on(inface, inface.source))
         end
-        balance += balance_supply
+        blnc += balance_supply
     end
 
-    for outface in unit.output_interfaces  # demand
+    for outface in unit.output_interfaces # demand
         if outface.target == caller
             continue
         end
 
         if isa(outface.target, Bus)
-            exchange = balance_nr(outface.target, unit)
-            balance_demand = min(exchange, outface.balance)
+            other_bus_balance = balance_nr(outface.target, unit)
+            balance_demand = min(other_bus_balance, outface.balance)
             if balance_demand > 0.0
                 continue
             end
         else
-            balance_demand = balance_on(outface, outface.target).balance
+            balance_demand = balance(balance_on(outface, outface.target))
         end
-        balance += balance_demand
-
+        blnc += balance_demand
     end
 
-    return  balance + unit.remainder
+    return blnc + unit.remainder
 end
 
 """
@@ -146,224 +268,418 @@ end
 Energy balance on a bus component without considering any other connected bus components.
 """
 function balance_direct(unit::Bus)::Float64
-    balance = 0.0
+    blnc = 0.0
 
-    for inface in unit.input_interfaces  # supply
+    for inface in unit.input_interfaces # supply
         if isa(inface.source, Bus)
             continue
         else
-            balance += balance_on(inface, inface.source).balance
+            blnc += balance(balance_on(inface, inface.source))
         end
     end
 
-    for outface in unit.output_interfaces  # demand
+    for outface in unit.output_interfaces # demand
         if isa(outface.target, Bus)
             continue
         else
-            balance += balance_on(outface, outface.target).balance
+            blnc += balance(balance_on(outface, outface.target))
         end
     end
 
-    return balance + unit.remainder
+    return blnc + unit.remainder
 end
 
 function balance(unit::Bus)::Float64
-    # we can use the non-recursive version of the method as a bus will never
-    # be connected to itself... right?
-    return balance_nr(unit, unit)
+    if unit.proxy === nothing
+        # we can use the non-recursive version of the method as a bus will never
+        # be connected to itself... right?
+        return balance_nr(unit, unit)
+    else
+        return balance_direct(unit.proxy)
+    end
+end
+
+"""
+    energy_flow_is_allowed(bus, input_idx, output_idx)
+
+Checks the connectivity matrix of the bus as returns if energy is allowed to flow from the
+input with the given index to the output with the given index.
+
+Args:
+    `unit::Bus`: The bus to check
+    `input_idx::Integer`: Input index
+    `output_idx::Integer`: Output index
+Returns:
+    `Bool`: True if the flow is allowed, false otherwise
+"""
+function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)::Bool
+    return (
+        unit.connectivity.energy_flow === nothing ||
+        unit.connectivity.energy_flow[input_idx][output_idx]
+    )
+end
+
+function _sub(first::Float64, second::Float64) return first - second end
+function _sub(first::Nothing, second::Float64) return -second end
+function _sub(first::Float64, second::Nothing) return first end
+function _sub(first::Nothing, second::Nothing) return nothing end
+
+function _add(first::Float64, second::Float64) return first + second end
+function _add(first::Nothing, second::Float64) return second end
+function _add(first::Float64, second::Nothing) return first end
+function _add(first::Nothing, second::Nothing) return nothing end
+
+function _sum(vector::Vector{Union{Float64, Nothing}})
+    sum = nothing
+    for entry in vector
+        sum = _add(sum, entry)
+    end
+    return sum
+end
+
+function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
+    else
+        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
+    end
+end
+
+function set_storage_potential!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        bus.balance_table_inputs[comp.uac].storage_potential = abs(value)
+    else
+        bus.balance_table_outputs[comp.uac].storage_potential = abs(value)
+    end
+end
+
+function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        if comp.sys_function == sf_storage
+            bus.balance_table_inputs[comp.uac].storage_pool =
+                _add(bus.balance_table_inputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_inputs[comp.uac].energy_pool =
+                _add(bus.balance_table_inputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
+        end
+    else
+        if comp.sys_function == sf_storage
+            bus.balance_table_outputs[comp.uac].storage_pool =
+                _add(bus.balance_table_outputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_outputs[comp.uac].energy_pool =
+                _add(bus.balance_table_outputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
+        end
+    end
+end
+
+function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        if comp.sys_function == sf_storage
+            bus.balance_table_inputs[comp.uac].storage_pool =
+                _add(bus.balance_table_inputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_inputs[comp.uac].energy_pool =
+                _add(bus.balance_table_inputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
+        end
+    else
+        if comp.sys_function == sf_storage
+            bus.balance_table_outputs[comp.uac].storage_pool =
+                _add(bus.balance_table_outputs[comp.uac].storage_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_outputs[comp.uac].energy_pool =
+                _add(bus.balance_table_outputs[comp.uac].energy_pool, abs(value))
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
+        end
+    end
+end
+
+function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        if comp.sys_function == sf_storage
+            bus.balance_table_inputs[comp.uac].storage_pool = abs(value)
+            bus.balance_table_inputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_inputs[comp.uac].energy_pool = abs(value)
+            bus.balance_table_inputs[comp.uac].energy_potential = nothing
+        end
+    else
+        if comp.sys_function == sf_storage
+            bus.balance_table_outputs[comp.uac].storage_pool = abs(value)
+            bus.balance_table_outputs[comp.uac].storage_potential = nothing
+        else
+            bus.balance_table_outputs[comp.uac].energy_pool = abs(value)
+            bus.balance_table_outputs[comp.uac].energy_potential = nothing
+        end
+    end
+end
+
+function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Temperature, value_max::Temperature)
+    bus = unit.proxy === nothing ? unit : unit.proxy
+    if is_input
+        bus.balance_table_inputs[comp.uac].temperature_min = value_min
+        bus.balance_table_inputs[comp.uac].temperature_max = value_max
+    else
+        bus.balance_table_outputs[comp.uac].temperature_min = value_min
+        bus.balance_table_outputs[comp.uac].temperature_max = value_max
+    end
+end
+
+function find_interface_on_proxy(proxy::Bus, needle::SystemInterface)
+    for inface in proxy.input_interfaces
+        if inface.source == needle.source return inface end
+    end
+    for outface in proxy.output_interfaces
+        if outface.target == needle.target return outface end
+    end
 end
 
 function balance_on(
     interface::SystemInterface,
     unit::Bus
-)::NamedTuple{}
-    highest_demand_temp = -1e9
-    storage_potential_outputs = 0.0
-    storage_potential_inputs = 0.0
+)::Vector{EnergyExchange}
+    if unit.proxy !== nothing
+        return balance_on(find_interface_on_proxy(unit.proxy, interface), unit.proxy)
+    end
+
     input_index = nothing
     output_index = nothing
-    caller_is_input = nothing # == true if interface is input of unit (caller puts energy in unit); 
-                              # == false if interface is output of unit (caller gets energy from unit)
-    energy_potential_outputs = 0.0
-    energy_potential_inputs = 0.0
+    caller_is_input = false # if interface is input of unit (caller puts energy in unit)
+    caller_is_output = false # if interface is output of unit (caller gets energy from unit)
 
-    # find the index of the input/output on the bus. if the method was called on an output,
-    # the input index will remain as nothing and vice versa.
-    # Attention: unit.connectivity.input_order is mandatory to have a list of all inputs! 
-    #            Maybe change to unit.output_interfaces in future versions or set any order in 
-    #            connectivity.input_order if nothing is given in the input file?
-    for (idx, input_uac) in pairs(unit.connectivity.input_order)
-        if input_uac == interface.source.uac
+    # determine if the calling component is an input or output to the bus and remember the
+    # index within the list of input/output interfaces for later
+    for (idx, input_interface) in pairs(unit.input_interfaces)
+        if input_interface.source.uac == interface.source.uac
             input_index = idx
             caller_is_input = true
             break
         end
     end
 
-    for (idx, output_uac) in pairs(unit.connectivity.output_order)
-        if output_uac == interface.target.uac
+    for (idx, output_interface) in pairs(unit.output_interfaces)
+        if output_interface.target.uac == interface.target.uac
             output_index = idx
-            caller_is_input = false
+            caller_is_output = true
             break
         end
     end
 
-    # helper functions to get corresponding input/output index in connectivity matrix from index of output interface
-    # ToDo: Maybe avoid this function and make shure that the order of output_interfaces in unit is the 
-    #       same as specified in the connectivity matrix at the beginning of the simulation?
-    function get_connectivity_output_index(unit, output_interface_index)::Int
-        output_interface_uac = unit.output_interfaces[output_interface_index].target.uac
-        for  (idx,connectivity_output_uac) in pairs(unit.connectivity.output_order)
-            if connectivity_output_uac == output_interface_uac
-                return idx
-            end
-        end
+    # sanity check, as this situation should not happen
+    if (caller_is_input && caller_is_output) || (!caller_is_input && !caller_is_output)
+        throw(ArgumentError(
+            "Error in connnection of components on bus \"$(unit.uac)\". " * 
+            "Caller must be input XOR output."
+        ))
     end
 
-    function get_connectivity_input_index(unit, input_interface_index)::Int
-        input_interface_uac = unit.input_interfaces[input_interface_index].source.uac
-        for  (idx,connectivity_input_uac) in pairs(unit.connectivity.input_order)
-            if connectivity_input_uac == input_interface_uac
-                return idx
+    inner_distribute!(unit)
+
+    return_exchanges = []
+
+    if caller_is_input
+        input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
+        for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
+            if !energy_flow_is_allowed(unit, input_index, output_row.output_index)
+                continue
             end
-        end
-    end
-    
-    # iterate through outfaces to get storage loading and energy output potential, only if caller is input
-    if caller_is_input == true
-        for (idx, outface) in pairs(unit.output_interfaces)
-            if outface.target.sys_function === sf_bus
-                exchange = balance_on(outface, outface.target)
-                balance = exchange.balance
-                storage_potential = exchange.storage_potential
-                energy_potential = outface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
-                temperature = exchange.temperature
+
+            is_storage = output_row.target.sys_function == sf_storage
+
+           # if is_storage && !input_row.do_storage_transfer
+            #     continue
+            # end
+            # then it is not neccessary to check this in each component! ToDo
+
+            if interface.max_energy === nothing
+                energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
+                    (is_storage ? 0.0 : _sum(unit.balance_table[:, output_row.priority*2-1]))))
+                storage_pot = -(_sub(_add(output_row.storage_pool, output_row.storage_potential),
+                    (is_storage ? _sum(unit.balance_table[:, output_row.priority*2-1]) : 0.0)))
             else
-                temperature = outface.temperature
-                energy_potential = (outface.max_energy === nothing || outface.sum_abs_change > 0.0 ) ? 0.0 : -outface.max_energy 
-                if (
-                    outface.target.sys_function === sf_storage
-                    &&
-                    outface.target.uac !== interface.source.uac  # never allow unloading of own storage load
-                    &&
-                    (
-                        input_index === nothing
-                        || unit.connectivity.storage_loading === nothing
-                        || unit.connectivity.storage_loading[input_index][get_connectivity_output_index(unit, idx)]
-                    )
-                )
-                    exchange = balance_on(outface, outface.target)
-                    storage_potential = exchange.storage_potential
-                else
-                    storage_potential = 0.0
-                end
+                energy_pot = -(is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1])
+                storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
-            highest_demand_temp = highest_temperature(temperature, highest_demand_temp)
-            storage_potential_outputs += storage_potential  # is negative to be consistent with requested demand
-            energy_potential_outputs += energy_potential # is negative to be consistent with requested demand
+            push!(return_exchanges, EnEx(
+                balance=0.0,
+                uac=output_row.target.uac,
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
+                temperature_min=output_row.temperature_min,
+                temperature_max=output_row.temperature_max,
+                pressure=nothing,
+                voltage=nothing
+            ))
         end
-    end 
+    else
+        output_row = [row for row in values(unit.balance_table_outputs) if row.target.uac == interface.target.uac][1]
+        for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
+            if !energy_flow_is_allowed(unit, input_row.input_index, output_index)
+                continue
+            end
 
-    # iterate through infaces to get storage loading and energy input potential, only if caller is output
-    if caller_is_input == false
-        for (idx, inface) in pairs(unit.input_interfaces)
-            if inface.source.sys_function === sf_bus
-                exchange = balance_on(inface, inface.source)
-                storage_potential = exchange.storage_potential
-                energy_potential = inface.sum_abs_change > 0.0 ? 0.0 : exchange.energy_potential
-                temperature = exchange.temperature
+            is_storage = input_row.source.sys_function == sf_storage
+
+            # if is_storage && !output_row.do_storage_transfer
+            #     continue
+            # end
+            # then it is not neccessary to check this in each component!  ToDo
+
+            if interface.max_energy === nothing
+                energy_pot = _sub(_add(input_row.energy_pool, input_row.energy_potential),
+                    (is_storage ? 0.0 : _sum(unit.balance_table[input_row.priority, 1:2:end])))
+                storage_pot = _sub(_add(input_row.storage_pool, input_row.storage_potential),
+                    (is_storage ? _sum(unit.balance_table[input_row.priority, 1:2:end]) : 0.0))
             else
-                temperature = inface.temperature
-                energy_potential = (inface.max_energy === nothing || inface.sum_abs_change > 0.0 ) ? 0.0 : inface.max_energy
-                if (
-                    inface.source.sys_function === sf_storage
-                    &&
-                    inface.source.uac !== interface.target.uac # do not allow loading of own storage
-                    &&
-                    (
-                        output_index === nothing
-                        || unit.connectivity.storage_loading === nothing
-                        || unit.connectivity.storage_loading[get_connectivity_input_index(unit, idx)][output_index]
-                    )
-                )
-                    exchange = balance_on(inface, inface.source)
-                    storage_potential = exchange.storage_potential
-                else
-                    storage_potential = 0.0
-                end
+                energy_pot = is_storage ? 0.0 : unit.balance_table[input_row.priority, output_row.priority*2-1]
+                storage_pot = (is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
-            highest_demand_temp = highest_temperature(temperature, highest_demand_temp)
-            storage_potential_inputs += storage_potential # is positive to be consistent with supplied supply
-            energy_potential_inputs += energy_potential # is positive to be consistent with supplied supply
+            push!(return_exchanges, EnEx(
+                balance=0.0,
+                uac=input_row.source.uac,
+                energy_potential=energy_pot,
+                storage_potential=storage_pot,
+                temperature_min=input_row.temperature_min,
+                temperature_max=input_row.temperature_max,
+                pressure=nothing,
+                voltage=nothing
+            ))
         end
     end
 
-    # if temperature is still nothing, check if temperature is given in current interface
-    if highest_demand_temp <= -1e9 && interface.temperature !== nothing
-        highest_demand_temp = interface.temperature
-    end
-
-    # Note: For now, only the load and processing of storages are regulated in the connectivity matrix.
-    #       For storages, max_energy is set to 0.0 in their control step, so this doesn't need to be 
-    #       considered here for energy_potential.
-    # Note: The balance is used for actual balance while energy_potential and storage_potential are potential
-    #       energies that could be given or taken.
-    #       If a component connected to the interface of balance_on() has already been processed, the 
-    #       max_energy is ignored and set to zero by balance_on(). Then, only the balance can be used in the 
-    #       calling component to avoid double counting of energies.
-    balance_written = interface.sum_abs_change > 0.0
-    return (
-            balance = balance(unit),
-            storage_potential = caller_is_input ? storage_potential_outputs : storage_potential_inputs,
-            energy_potential = balance_written ? 0.0 : (caller_is_input ? energy_potential_outputs : energy_potential_inputs) ,
-            temperature = (highest_demand_temp <= -1e9 ? nothing : highest_demand_temp)
-            )
+    return return_exchanges
 end
 
-# """
-#     for x in bus_infaces(bus)
+function inner_distribute!(unit::Bus)
+    continue_iteration = true
 
-# Iterator over the input interfaces that connect the given bus to other busses.
-# """
-@resumable function bus_infaces(unit::Bus)
-    # for every input UAC (to ensure the correct order)...
-    for input_uac in unit.connectivity.input_order
-        # ...seach corresponding input inferface by...
-        for inface in unit.input_interfaces
-            # ...making sure the input interface is of type bus...
-            if inface.source.sys_function === sf_bus
-                # ...and the source's UAC matches the one in the input_priority.
-                if inface.source.uac === input_uac
-                    @yield inface
-                    break # we found the match, so we can break out of the inner loop.
-                end
+    for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
+        continue_iteration = continue_iteration && !is_empty(input_row)
+        if !continue_iteration
+            break
+        end
+
+        for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
+            continue_iteration = continue_iteration && !is_empty(output_row)
+            if !continue_iteration
+                break
             end
+
+            if !energy_flow_is_allowed(unit, input_row.input_index, output_row.output_index)
+                continue
+            end
+
+            max_min = highest(input_row.temperature_min, output_row.temperature_min)
+            min_max = lowest(input_row.temperature_max, output_row.temperature_max)
+            if max_min !== nothing && min_max !== nothing && max_min > min_max
+                continue
+            end
+
+            if ((input_row.source.sys_function == sf_storage && !output_row.do_storage_transfer) ||
+               (output_row.target.sys_function == sf_storage && !input_row.do_storage_transfer))
+               continue
+            end
+
+            bt_input_row_sum = _sum(unit.balance_table[input_row.priority, 1:2:end])
+
+            available_energy = _sub(_add(_add(_add(
+                input_row.energy_potential,
+                input_row.energy_pool),
+                input_row.storage_potential),
+                input_row.storage_pool
+            ), bt_input_row_sum)
+
+            bt_output_row_sum = _sum(unit.balance_table[:, output_row.priority*2-1]) 
+
+            target_energy = _sub(_add(_add(_add(
+                output_row.energy_potential,
+                output_row.energy_pool),
+                output_row.storage_potential),
+                output_row.storage_pool
+            ), bt_output_row_sum)               
+
+            if available_energy < -unit.epsilon || target_energy < -unit.epsilon
+                reset_balance_table!(unit::Bus)
+                continue_iteration = false
+                break
+            end
+
+            unit.balance_table[input_row.priority, output_row.priority*2-1] += min(target_energy, available_energy) 
+            unit.balance_table[input_row.priority, output_row.priority*2] = max_min
         end
     end
 end
 
-# """
-#     for x in bus_outfaces(bus)
+function reset_balance_table!(unit::Bus)
 
-# Iterator over the output interfaces that connect the given bus to other busses.
-# """
-@resumable function bus_outfaces(unit::Bus)
-    # for every output UAC (to ensure the correct order)...
-    for output_uac in unit.connectivity.output_order
-        # ...seach corresponding output inferface by...
-        for outface in unit.output_interfaces
-            # ...making sure the output interface is of type bus...
-            if outface.target.sys_function === sf_bus
-                # ...and the target's UAC matches the one in the output_priority.
-                if outface.target.uac === output_uac
-                    @yield outface
-                    break # we found the match, so we can break out of the inner loop.
-                end
-            end
+    unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
+    for i in 1:length(unit.balance_table_inputs)
+        for j in 2:2:(2*length(unit.balance_table_outputs))
+            unit.balance_table[i, j] = nothing
         end
     end
+
+    inner_distribute!(unit)
+end
+
+"""
+    filter_inputs(unit, condition, inclusive)
+
+Filters the input interfaces of the given bus based on a condition on the system function
+of the components on the source side of the interfaces. The condition can be negated with
+the argument `inclusive`.
+
+Args:
+    `unit::Bus`: The bus to check
+    `condition::SystemFunction`: Determines which components to filter in/out
+    `inclusive::Bool`: If true, the return list will include only interfaces to which the
+        condition applies. If false, the return list will include only interfaces to which
+        condition does not apply.
+Returns:
+    `Vector{SystemInterface}`: The filtered list of input interfaces of the bus
+"""
+function filter_inputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
+    return [f for f in unit.input_interfaces
+        if (inclusive && f.source.sys_function == condition)
+            || (!inclusive && f.source.sys_function != condition)
+    ]
+end
+
+"""
+    filter_outputs(unit, condition, inclusive)
+
+Filters the output interfaces of the given bus based on a condition on the system function
+of the components on the target side of the interfaces. The condition can be negated with
+the argument `inclusive`.
+
+Args:
+    `unit::Bus`: The bus to check
+    `condition::SystemFunction`: Determines which components to filter in/out
+    `inclusive::Bool`: If true, the return list will include only interfaces to which the
+        condition applies. If false, the return list will include only interfaces to which
+        condition does not apply.
+Returns:
+    `Vector{SystemInterface}`: The filtered list of output interfaces of the bus
+"""
+function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
+    return [f for f in unit.output_interfaces
+        if (inclusive && f.target.sys_function == condition)
+            || (!inclusive && f.target.sys_function != condition)
+    ]
 end
 
 """
@@ -379,30 +695,34 @@ order, which is explained in more detail in the documentation. Essentially it st
 the leaves of the chain and progresses to the roots.
 """
 function distribute!(unit::Bus)
+    if unit.proxy !== nothing
+        distribute!(unit.proxy)
+        return
+    end
+
+    inner_distribute!(unit::Bus)
     balance = balance_direct(unit)
 
     # reset all non-bus input interfaces
-    for inface in unit.input_interfaces
-        if inface.source.sys_function !== sf_bus
-            set!(inface, 0.0, inface.temperature)
-        end
+    for inface in filter_inputs(unit, sf_bus, false)
+        principal = inface.source.output_interfaces[unit.medium]
+        set!(principal, 0.0)
     end
 
     # reset all non-bus output interfaces
-    for outface in unit.output_interfaces
-        if outface.target.sys_function !== sf_bus
-            set!(outface, 0.0, outface.temperature)
-        end
+    for outface in filter_outputs(unit, sf_bus, false)
+        principal = outface.target.input_interfaces[unit.medium]
+        set!(principal, 0.0)
     end
 
     # distribute to outgoing busses according to output priority
     if balance > 0.0
-        for outface in bus_outfaces(unit)
+        for outface in filter_outputs(unit, sf_bus, true)
             if balance > abs(outface.balance)
-                balance += outface.balance
-                set!(outface, 0.0, outface.temperature)
+                balance -= abs(outface.balance)
+                set!(outface, 0.0)
             else
-                add!(outface, balance, outface.temperature)
+                set!(outface, outface.balance - balance)
                 balance = 0.0
             end
         end
@@ -413,8 +733,8 @@ function distribute!(unit::Bus)
     # through output priorities of the input bus), this effectively writes all the
     # remaining demand into the first input according to the priority.
     if balance < 0.0
-        for inface in bus_infaces(unit)
-            add!(inface, balance)
+        for inface in filter_inputs(unit, sf_bus, true)
+            set!(inface, balance + inface.balance)
             balance = 0.0
         end
     end
@@ -436,5 +756,8 @@ function output_value(unit::Bus, key::OutputKey)::Float64
     end
     throw(KeyError(key.value_key))
 end
+
+# merge functionality is in an extra file
+include("./bus_merging.jl")
 
 export Bus

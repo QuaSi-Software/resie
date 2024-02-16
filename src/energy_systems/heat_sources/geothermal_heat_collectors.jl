@@ -86,7 +86,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
 
-    function GeothermalHeatCollector(uac::String, config::Dict{String,Any})
+    function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
@@ -102,7 +102,7 @@ mutable struct GeothermalHeatCollector <: ControlledComponent
         return new(
             uac,                    # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             sf_storage,             # sys_function
             InterfaceMap(           # input_interfaces
@@ -179,7 +179,7 @@ end
 function control(
     unit::GeothermalHeatCollector,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
 
     unit.timestep_index += 1
@@ -267,7 +267,7 @@ function control(
     end
 
     # in case there is a state machine for geothermal heat collectors
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
 
     # get ambient temperature and global radiation from profile for current time step if needed (probably only for geothermal collectors)
     # TODO: add link to global weather file
@@ -590,7 +590,7 @@ end
 
 # process function that provides energy from the geothermal heat collector and calculates new temperatures 
 # according to actual delivered or received energy
-function process(unit::GeothermalHeatCollector, parameters::Dict{String,Any})
+function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]  # output interface
     exchange = balance_on(outface, outface.target)     # gather information of output interface
@@ -663,9 +663,12 @@ function balance_on(
 
     return (
             balance = interface.balance,
-            storage_potential = balance_written ? 0.0 : input_sign * interface.max_energy,  # geothermal heat collector are handled as storages currently!
-            energy_potential = 0.0,
-            temperature = interface.temperature
+            energy = (  uac=unit.uac, 
+                        energy_potential=0.0,
+                        storage_potential=balance_written ? 0.0 : input_sign * interface.max_energy,
+                        temperature=interface.temperature,
+                        pressure=nothing,
+                        voltage=nothing),   # geothermal heat collector are handled as storages currently!
             )
 end
 

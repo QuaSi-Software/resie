@@ -3,13 +3,14 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
+        "sankey_plot": "default",
         "__heating_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
             "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
 			"TST_01_ELT_01_ELY": ["m_e_ac_230v IN"]
         },
-        "output_keys": {
+        "csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
 			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
 			"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"],
@@ -44,12 +45,7 @@
             "type": "Bus",
             "medium": "m_e_ac_230v",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_HZG_02_HTP",
-                "TST_01_ELT_01_ELY"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
                 ],
@@ -64,10 +60,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_01_HZG_01_DEM"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_01_HZG_02_HTP",
                     "TST_01_HZG_01_GBO"
@@ -88,7 +81,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 20000,
+            "power_el": 20000,
             "m_heat_out": "m_h_w_lt1",
             "output_temperature": 25.0,
             "min_power_fraction": 0.0
@@ -102,7 +95,7 @@
             "strategy": {
                 "name": "supply_driven"
             },
-            "power": 10000,
+            "power_th": 10000,
             "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
             "min_power_fraction" : 0.0
@@ -116,12 +109,13 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 10000,
+            "power_th": 10000,
             "m_heat_in": "m_h_w_ht2",
             "min_power_fraction" : 0.0
         },
         "TST_01_HZG_01_GBO": {
-            "type": "GasBoiler",
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
             "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_BUS"
@@ -129,7 +123,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000,
+            "power_th": 40000,
             "min_power_fraction": 0.0
         },
         "TST_01_HZG_01_GRI": {

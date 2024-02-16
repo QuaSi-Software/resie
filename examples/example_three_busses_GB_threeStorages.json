@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": "default",
+        "csv_output_keys": {
             "TST_DEM_01": ["m_h_w_ht1 IN"],
             "ESS_BUS_TH_01": ["Balance"],
             "ESS_BUS_TH_02": ["Balance"],
@@ -123,7 +124,8 @@
             "is_source": true
         },
         "ESS_GBO_01": {
-            "type": "GasBoiler",
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
             "control_refs": ["ESS_BUS_TH_01"],
             "output_refs": [
                 "ESS_BUS_TH_01"
@@ -132,18 +134,13 @@
                 "name": "demand_driven"
             },
             "min_power_fraction": 0,
-            "power": 1500
+            "power_th": 1500
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "ESS_BUS_TH_03",
-                "ESS_BUS_TH_02",
-                "TST_BFT_TH_03"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_GBO_01",
                     "TST_BFT_TH_03"
@@ -153,7 +150,7 @@
                     "ESS_BUS_TH_02",
                     "TST_BFT_TH_03"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1, 1],
                     [1, 1, 0]
                 ]
@@ -163,11 +160,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_01",
-                "TST_BFT_TH_01"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_01"
@@ -176,7 +169,7 @@
                     "TST_DEM_01",
                     "TST_BFT_TH_01"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]
@@ -186,11 +179,7 @@
             "type": "Bus",
             "medium": "m_h_w_ht1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_02",
-                "TST_BFT_TH_02"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
                     "TST_BFT_TH_02"
@@ -199,7 +188,7 @@
                     "TST_DEM_02",
                     "TST_BFT_TH_02"
                 ],
-                "storage_loading": [
+                "energy_flow": [
                     [1, 1],
                     [1, 0]
                 ]
@@ -212,9 +201,10 @@
                 "ESS_BUS_TH_02"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
         },
@@ -225,9 +215,10 @@
                 "ESS_BUS_TH_03"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
         },
@@ -238,9 +229,10 @@
                 "ESS_BUS_TH_01"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 15000,
             "load": 7000
         }

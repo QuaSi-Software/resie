@@ -21,8 +21,7 @@ function test_run_energy_system_from_storage()
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "output_refs" => ["TST_HP_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
                 ],
@@ -56,19 +55,14 @@ function test_run_energy_system_from_storage()
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
-                "unload_storages" => true
+                "unload_storages m_e_ac_230v" => true
             ),
-            "power" => 12000,
-            "fixed_cop" => 3.0,
+            "m_el_in": "m_e_ac_230v",
+            "power_th" => 12000,
+            "constant_cop" => 3.0,
             "min_power_fraction" => 0.0
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    hheat_demand = components["TST_DEM_01"]
-    power_grid = components["TST_GRI_01"]
-    lheat_storage = components["TST_BFT_01"]
-    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -76,10 +70,17 @@ function test_run_energy_system_from_storage()
         "epsilon" => 1e-9
     )
 
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
+
     @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump
-    
+
     for unit in values(components)
         EnergySystems.reset(unit)
     end
@@ -90,7 +91,7 @@ function test_run_energy_system_from_storage()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
@@ -100,11 +101,11 @@ function test_run_energy_system_from_storage()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 30000
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 30000
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
@@ -142,7 +143,7 @@ function test_run_energy_system_from_storage()
 
     lheat_storage.load = 100.0
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
@@ -152,11 +153,11 @@ function test_run_energy_system_from_storage()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 100
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 100
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100*3/2
@@ -197,8 +198,7 @@ function test_run_energy_system_from_storage_denied()
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
             "control_refs" => [],
-            "output_refs" => ["TST_HP_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
                 ],
@@ -232,19 +232,14 @@ function test_run_energy_system_from_storage_denied()
             "output_refs" => ["TST_DEM_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
-                "unload_storages" => false
+                "unload_storages m_e_ac_230v" => false
             ),
-            "power" => 12000,
-            "fixed_cop" => 3.0,
+            "m_el_in": "m_e_ac_230v",
+            "power_th" => 12000,
+            "constant_cop" => 3.0,
             "min_power_fraction" => 0.0
         ),
     )
-    components = Resie.load_components(components_config)
-    heat_pump = components["TST_HP_01"]
-    hheat_demand = components["TST_DEM_01"]
-    power_grid = components["TST_GRI_01"]
-    lheat_storage = components["TST_BFT_01"]
-    lheat_bus = components["TST_BUS_01"]
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -252,11 +247,18 @@ function test_run_energy_system_from_storage_denied()
         "epsilon" => 1e-9
     )
 
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    hheat_demand = components["TST_DEM_01"]
+    power_grid = components["TST_GRI_01"]
+    lheat_storage = components["TST_BFT_01"]
+    lheat_bus = components["TST_BUS_01"]
+
     @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump, but heatpump unloading storages is test_run_energy_system_from_storage_denied
     # not energy should be transferred at all.
-    
+
     for unit in values(components)
         EnergySystems.reset(unit)
     end
@@ -267,7 +269,7 @@ function test_run_energy_system_from_storage_denied()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.load = 800
+    hheat_demand.demand = 800
     hheat_demand.temperature = 45.0
     hheat_demand.input_interfaces[hheat_demand.medium].temperature = 45.0
 
@@ -277,11 +279,11 @@ function test_run_energy_system_from_storage_denied()
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
-    exchange = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
-    @test exchange.balance ≈ 0.0
-    @test exchange.storage_potential ≈ 30000
-    @test exchange.energy_potential ≈ 0.0
-    @test exchange.temperature === 35.0
+    exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
+    @test EnergySystems.balance(exchanges) ≈ 0.0
+    @test EnergySystems.storage_potential(exchanges) ≈ 30000
+    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.temperature_first(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800

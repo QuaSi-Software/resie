@@ -1,4 +1,4 @@
-function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
+function strt_sm_storage_driven(cond_params::Dict{String,Any})::StateMachine
     return StateMachine(
         UInt(1), # state
         Dict{UInt,String}( # state_names
@@ -11,7 +11,7 @@ function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
                     Condition(
                         "Buffer < X%",
                         Dict{String,Any}(
-                            "percentage" => parameters["low_threshold"]
+                            "percentage" => cond_params["low_threshold"]
                         )
                     ),
                 ],
@@ -24,27 +24,19 @@ function strt_sm_storage_driven(parameters::Dict{String,Any})::StateMachine
                     Condition(
                         "Buffer >= X%",
                         Dict{String,Any}(
-                            "percentage" => parameters["high_threshold"]
+                            "percentage" => cond_params["high_threshold"]
                         )
                     ),
                     Condition(
                         "Min run time",
                         Dict{String,Any}()
                     ),
-                    Condition(
-                        "Would overfill thermal buffer",
-                        Dict{String,Any}()
-                    ),
                 ],
                 table_data=Dict{Tuple,UInt}(
-                    (false, false, false) => 2,
-                    (false, true, false) => 2,
-                    (true, false, false) => 2,
-                    (true, true, false) => 1,
-                    (false, false, true) => 1,
-                    (false, true, true) => 1,
-                    (true, false, true) => 1,
-                    (true, true, true) => 1,
+                    (true, true) => 1,
+                    (false, true) => 2,
+                    (true, false) => 2,
+                    (false, false) => 2,
                 )
             ),
         )
@@ -65,23 +57,21 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
     conditions=[
         "Buffer < X%",
         "Buffer >= X%",
-        "Min run time",
-        "Would overfill thermal buffer"
+        "Min run time"
     ],
     strategy_parameters=Dict{String,Any}(
         "low_threshold" => 0.2,
         "high_threshold" => 0.95,
         "name" => "storage_driven",
-        "load_storages" => true,
-        "unload_storages" => true,
         "operation_profile_path" => nothing,
-        "m_el_in" => true,
-        "m_el_out" => true,
-        "m_gas_in" => true,
-        "m_h2_out" => true,
-        "m_o2_out" => true,
-        "m_heat_out" => true,
-        "m_heat_in" => true,
+        "consider_m_el_in" => true,
+        "consider_m_el_out" => true,
+        "consider_m_gas_in" => true,
+        "consider_m_fuel_in" => true,
+        "consider_m_h2_out" => true,
+        "consider_m_o2_out" => true,
+        "consider_m_heat_out" => true,
+        "consider_m_heat_in" => true,
     ),
     required_components=EnSysRequirements()
 )

@@ -22,7 +22,8 @@ function test_ooo_storage_loading_switch()
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"
@@ -30,10 +31,11 @@ function test_ooo_storage_loading_switch()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 40000
+            "power_th" => 40000
         ),
         "TST_GBO_02" => Dict{String,Any}(
-            "type" => "GasBoiler",
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"
@@ -41,14 +43,13 @@ function test_ooo_storage_loading_switch()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 40000
+            "power_th" => 40000
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "control_refs" => [],
-            "output_refs" => ["TST_DEM_01", "TST_BFT_01"],
-            "connection_matrix" => Dict{String, Any}(
+            "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
                     "TST_BFT_01",
@@ -58,7 +59,7 @@ function test_ooo_storage_loading_switch()
                     "TST_DEM_01",
                     "TST_BFT_01"
                 ],
-                "storage_loading" => [
+                "energy_flow" => [
                     [1, 1],
                     [1, 0],
                     [1, 0]
@@ -111,7 +112,13 @@ function test_ooo_storage_loading_switch()
         ("TST_BUS_01", EnergySystems.s_distribute),
     ]
 
-    components = Resie.load_components(components_config)
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)
     @test pwc_steps_astr(expected, ooo) == ""
 end

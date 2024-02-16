@@ -17,7 +17,7 @@ function read_JSON(filepath::String)::Dict{AbstractString,Any}
 end
 
 """
-load_components(config)
+load_components(config, sim_params)
 
 Construct instances of components from the given config.
 
@@ -32,23 +32,23 @@ The config must have the structure:
 }
 ```
 
-The required parameters to construct a component from one entry in the config must
-match what is required for the particular component. The `type` parameter must be present and
-must match the symbol of the component class exactly. The structure is described in
-more detail in the accompanying documentation on the project file.
+The required config to construct a component from one entry in the config must match what is
+required for the particular component. The `type` parameter must be present and must match
+the symbol of the component class exactly. The structure is described in more detail in the
+accompanying documentation on the project file.
 """
-function load_components(config::Dict{String,Any})::Grouping
+function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})::Grouping
     components = Grouping()
     for (unit_key, entry) in pairs(config)
         default_dict = Dict{String,Any}(
             "strategy" => Dict{String,Any}("name" => "default")
         )
-        unit_config = merge(default_dict, entry)
+        unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
         if unit_class <: EnergySystems.Component
-            instance = unit_class(unit_key, unit_config)
+            instance = unit_class(unit_key, unit_config, sim_params)
             components[unit_key] = instance
         end
     end
@@ -59,12 +59,79 @@ function load_components(config::Dict{String,Any})::Grouping
             link_control_with(components[unit_key], others)
         end
 
-        if length(entry["output_refs"]) > 0
+        if (
+            String(entry["type"]) != "Bus"
+            && haskey(entry, "output_refs")
+            && length(entry["output_refs"]) > 0
+        )
             others = Grouping(key => components[key] for key in entry["output_refs"])
+            link_output_with(components[unit_key], others)
+
+        elseif (
+            String(entry["type"]) == "Bus"
+            && haskey(entry, "connections")
+            && length(entry["connections"]) > 0
+        )
+            others = Grouping(
+                key => components[key]
+                for key in entry["connections"]["output_order"]
+            )
             link_output_with(components[unit_key], others)
         end
     end
 
+    # the input/output interfaces of busses are constructed in the order of appearance in
+    # the config, so after all components are loaded they need to be reordered to match
+    # the input/output priorities
+    components = reorder_interfaces_of_busses(components)
+
+    EnergySystems.initialise_components(components, sim_params)
+
+    chains = find_chains(values(components), EnergySystems.sf_bus)
+    EnergySystems.merge_bus_chains(chains, components, sim_params)
+
+    return components
+end
+
+"""
+reorder_interfaces_of_busses(components)
+
+Reorder the input and output interfaces of busses according to their input and output
+priorities given in the connectivity matrix.
+"""
+function reorder_interfaces_of_busses(components::Grouping)::Grouping
+    for unit in each(components)
+        if unit.sys_function == EnergySystems.sf_bus
+            # get correct order according to connectivity matrix
+            output_order = unit.connectivity.output_order
+            input_order = unit.connectivity.input_order
+
+            # check for misconfigured bus (it should have at least one input and at least
+            # one output)
+            if length(input_order) == 0 || length(output_order) == 0
+                continue
+            end
+
+            # Create a dictionary to map 'uac' to its correct position
+            output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
+            input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
+
+            # Get the permutation indices that would sort the 'source'/'target' field by
+            # 'uac' order
+            output_perm_indices = sortperm([
+                output_order_dict[unit.output_interfaces[i].target.uac]
+                for i in 1:length(unit.output_interfaces)
+            ])
+            input_perm_indices = sortperm([
+                input_order_dict[unit.input_interfaces[i].source.uac]
+                for i in 1:length(unit.input_interfaces)
+            ])
+
+            # Reorder the input and output interfaces using the permutation indices
+            unit.output_interfaces = unit.output_interfaces[output_perm_indices]
+            unit.input_interfaces = unit.input_interfaces[input_perm_indices]
+        end
+    end
     return components
 end
 
@@ -133,10 +200,14 @@ function base_order(components_by_function)
     # place steps potential and process for transformers in order by "chains"
     chains = find_chains(components_by_function[4], EnergySystems.sf_transformer)
     for chain in chains
-        if length(chain) > 1
+        nr_of_remaining_units_in_chain = length(chain)
+        if nr_of_remaining_units_in_chain > 1
             for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
-                initial_nr -= 1
+                if nr_of_remaining_units_in_chain > 1  # skip potential of last transformer in the chain
+                    push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                    nr_of_remaining_units_in_chain -= 1
+                end
             end
         end
         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
@@ -235,7 +306,7 @@ A chain is a subgraph of the graph spanned by all connections of the given compo
 which is a directed graph. The subgraph is defined by all connected components of the given
 system function.
 """
-function find_chains(components, sys_function)
+function find_chains(components, sys_function)::Vector{Set{Component}}
     chains = []
 
     for unit in components
@@ -576,43 +647,40 @@ end
 
 
 """
-    get_storage_loading_entry(bus, storage, source)
+    check_energy_flow(bus, target, source)
 
-checks if the storage has a limitation in the bus' storage_loading matrix coming from source and
-returns true (1 in storage_loading matrix) if not and false (0) if a limitation is present.
+Checks if the energy is allowed to flow from the source to the target via the bus.
 
 # Arguments
 -`bus::Component`: The bus that is in the middle of source and storage
--`storage::Component`: The storage connected to the bus
--`source::Component`: The source of the bus from where the search has startet. 
-                         Can be nothing, then true will be returned.
+-`target::Component`: The target component to check
+-`source::Union{Component,Nothing}`: The source component to check. If the source is
+    nothing, the energy flow is allowed.
 """
-function get_storage_loading_entry(bus, storage, source)
-    storage_loading_matrix = bus.connectivity.storage_loading
-    if storage_loading_matrix === nothing || source === nothing
-        return true   # if no storage loading matrix is given, storage loading is assumed to be allowed
+function check_energy_flow(bus, target, source)::Bool
+    if bus.connectivity.energy_flow === nothing || source === nothing
+        # if no energy flow matrix or source is given, flow is assumed to be allowed
+        return true
+    end
+
+    output_idx = nothing
+    for (idx,output_uac) in pairs(bus.connectivity.output_order)
+        if output_uac == target.uac
+            output_idx = idx
+        end
+    end
+
+    input_idx = nothing
+    for (idx,input_uac) in pairs(bus.connectivity.input_order)
+        if input_uac == source.uac
+            input_idx = idx
+        end
+    end
+
+    if input_idx !== nothing && output_idx !== nothing
+        return bus.connectivity.energy_flow[input_idx][output_idx] == 1
     else
-        output_uac = storage.uac
-        connectivity_output_idx = []
-        for (idx,connectivity_output_uac) in pairs(bus.connectivity.output_order)
-            if connectivity_output_uac == output_uac
-                connectivity_output_idx = idx
-            end
-        end
-
-        input_uac = source.uac
-        connectivity_input_idx = []
-        for (idx,connectivity_input_uac) in pairs(bus.connectivity.input_order)
-            if connectivity_input_uac == input_uac
-                connectivity_input_idx = idx
-            end
-        end
-
-        if storage_loading_matrix[connectivity_input_idx][connectivity_output_idx] == 1
-            return true
-        else
-            return false
-        end        
+        return false
     end
 end
 
@@ -636,7 +704,7 @@ function find_storages_ordered(bus, components, source; reverse=false)
         unit = components[unit_uac]
         if unit.sys_function == EnergySystems.sf_storage
             pushing(storages, unit)
-            if get_storage_loading_entry(bus, unit, source)
+            if check_energy_flow(bus, unit, source)
                 pushing(limited, true)
             else
                 pushing(limited, false)
@@ -697,7 +765,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
                         for bus_input_interface in storage_input_interface.source.input_interfaces      # iterate through input interfaces of this bus
                             if bus_input_interface.source.sys_function == EnergySystems.sf_transformer  # and check if they are fed by transformers. 
                                 if (                                                                    # if yes, check if the transfomer is allowed to load the storage
-                                    get_storage_loading_entry(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
+                                    check_energy_flow(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
                                     &&                                                                  # and
                                     storage_input_interface.source !== bus                              # do not consider the trunk bus
                                 )
@@ -742,4 +810,33 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
             end
         end
     end
+end
+
+"""
+get_timesteps(simulation_parameters)
+
+Function to read in the time step information from the input file.
+If no information is given in the input file, the following defaults 
+will be set:
+time_step = 900 s
+start_timestamp = 0 s
+end_timestamp = 900 s
+"""
+function get_timesteps(simulation_parameters::Dict{String, Any})
+    time_step = 900
+    if "time_step_seconds" in keys(simulation_parameters)
+        time_step = UInt(simulation_parameters["time_step_seconds"])
+    end
+
+    start_timestamp = 0
+    if "start" in keys(simulation_parameters)
+        start_timestamp = Integer(simulation_parameters["start"])
+    end
+
+    end_timestamp = 900
+    if "end" in keys(simulation_parameters)
+        end_timestamp = Integer(simulation_parameters["end"])
+    end
+
+    return time_step, start_timestamp, end_timestamp
 end

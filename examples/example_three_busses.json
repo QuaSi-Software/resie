@@ -3,7 +3,8 @@
         "output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
-        "output_keys": {
+        "sankey_plot": {"m_h_w_lt1": "red"},
+        "csv_output_keys": {
             "TST_DEM_01": ["m_h_w_lt1 IN"],
             "ESS_BUS_TH_01": ["Balance"],
             "ESS_BUS_TH_02": ["Balance"],
@@ -46,11 +47,7 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "output_refs": [
-                "ESS_BUS_TH_02",
-                "ESS_BUS_TH_03"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "TST_GRI_01"
                 ],
@@ -64,10 +61,7 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_01"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01"
                 ],
@@ -81,10 +75,7 @@
             "type": "Bus",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "output_refs": [
-                "TST_DEM_02"
-            ],
-            "connection_matrix": {
+            "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01"
                 ],

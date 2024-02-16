@@ -8,7 +8,7 @@ remaining demand of energy or take in any excess of energy. To make it possible 
 one-way connection they are split into two instances for providing or receiving energy and
 must be handled as such in the input for constructing a project.
 """
-mutable struct GridConnection <: ControlledComponent
+mutable struct GridConnection <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -17,17 +17,17 @@ mutable struct GridConnection <: ControlledComponent
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    draw_sum::Float64
-    load_sum::Float64
+    output_sum::Float64
+    input_sum::Float64
 
-    function GridConnection(uac::String, config::Dict{String,Any})
+    function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(
             uac, # uac
             controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"]
+                config["strategy"]["name"], config["strategy"], sim_params
             ),
             if Bool(config["is_source"])
                 sf_bounded_source
@@ -41,8 +41,26 @@ mutable struct GridConnection <: ControlledComponent
             InterfaceMap( # output_interfaces
                 medium => nothing
             ),
-            0.0, # draw_sum,
-            0.0, # load_sum
+            0.0, # output_sum,
+            0.0, # input_sum
+        )
+    end
+end
+
+function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
+    if unit.sys_function === sf_bounded_source
+        set_storage_transfer!(
+            unit.output_interfaces[unit.medium],
+            default(
+                unit.controller.parameter, "load_storages " * String(unit.medium), false
+            )
+        )
+    else
+        set_storage_transfer!(
+            unit.input_interfaces[unit.medium],
+            default(
+                unit.controller.parameter, "unload_storages " * String(unit.medium), false
+            )
         )
     end
 end
@@ -50,9 +68,9 @@ end
 function control(
     unit::GridConnection,
     components::Grouping,
-    parameters::Dict{String,Any}
+    sim_params::Dict{String,Any}
 )
-    move_state(unit, components, parameters)
+    move_state(unit, components, sim_params)
     if unit.sys_function === sf_bounded_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else
@@ -60,28 +78,38 @@ function control(
     end
 end
 
-function process(unit::GridConnection, parameters::Dict{String,Any})
+function process(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
-        # @TODO: if grids should be allowed to load storage components, then the potential
-        # must be handled here instead of being ignored
-        exchange = balance_on(outface, outface.target)
-        if exchange.balance < 0.0
-            unit.draw_sum += exchange.balance
-            add!(outface, abs(exchange.balance))
+        exchanges = balance_on(outface, outface.target)
+        blnc = balance(exchanges) +
+            energy_potential(exchanges) +
+            (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+        if blnc < 0.0
+            unit.output_sum += blnc
+            add!(outface, abs(blnc))
         end
     else
         inface = unit.input_interfaces[unit.medium]
-        exchange = balance_on(inface, inface.source)
-        if exchange.balance > 0.0
-            unit.load_sum += exchange.balance
-            sub!(inface, exchange.balance)
+        exchanges = balance_on(inface, inface.source)
+        blnc = balance(exchanges) +
+            energy_potential(exchanges) +
+            (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+        if blnc > 0.0
+            unit.input_sum += blnc
+            sub!(inface, abs(blnc))
         end
     end
 end
 
 function output_values(unit::GridConnection)::Vector{String}
-    return ["IN", "OUT", "Draw sum", "Load sum"]
+    if unit.sys_function == sf_bounded_source
+        return [string(unit.medium)*" OUT",
+                "Output_sum"]
+    elseif unit.sys_function == sf_bounded_sink
+        return [string(unit.medium)*" IN",
+                "Input_sum"]
+    end
 end
 
 function output_value(unit::GridConnection, key::OutputKey)::Float64
@@ -89,10 +117,10 @@ function output_value(unit::GridConnection, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Draw sum"
-        return unit.draw_sum
-    elseif key.value_key == "Load sum"
-        return unit.load_sum
+    elseif key.value_key == "Output_sum"
+        return unit.output_sum
+    elseif key.value_key == "Input_sum"
+        return unit.input_sum
     end
     throw(KeyError(key.value_key))
 end
