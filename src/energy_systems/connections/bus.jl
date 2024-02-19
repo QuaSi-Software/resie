@@ -289,23 +289,29 @@ function balance(unit::Bus)::Float64
     return balance_direct(unit)
 end
 
-"""
-    energy_flow_is_allowed(bus, input_idx, output_idx)
 
-Checks the connectivity matrix of the bus as returns if energy is allowed to flow from the
-input with the given index to the output with the given index.
+"""
+energy_flow_is_denied(bus, input_row, output_row)
+
+Checks the connectivity matrix of the bus and returns if energy is allowed to flow from the
+input_row to the output_row. Also checks the storage loading control specified by the component
+in the interface and denies self-feeding of components and grids feeding into other grids.
 
 Args:
     `unit::Bus`: The bus to check
-    `input_idx::Integer`: Input index
-    `output_idx::Integer`: Output index
+    `input_row::BTInputRow`: Input row
+    `output_row::BTOutputRow`: Output row
 Returns:
-    `Bool`: True if the flow is allowed, false otherwise
+    `Bool`: True if the flow is denied, false otherwise
 """
-function energy_flow_is_allowed(unit::Bus, input_idx::Integer, output_idx::Integer)::Bool
+function energy_flow_is_denied(unit::Bus, input_row::BTInputRow, output_row::BTOutputRow)::Bool
     return (
-        unit.connectivity.energy_flow === nothing ||
-        unit.connectivity.energy_flow[input_idx][output_idx]
+        !(unit.connectivity.energy_flow === nothing ||
+            unit.connectivity.energy_flow[input_row.input_index][output_row.output_index])    ||  # check energy_flow matrix
+        (output_row.target.sys_function == sf_storage) && !input_row.do_storage_transfer      ||  # check storage loading control
+        (input_row.source.sys_function == sf_storage) && !output_row.do_storage_transfer      ||  # check storage unloading control
+        output_row.target.uac == input_row.source.uac                                         ||  # do not allow self-feeding of any component
+        (output_row.energy_potential == Inf && input_row.energy_potential == Inf)                 # do not allow grids to feed into grids
     )
 end
 
@@ -491,15 +497,11 @@ function balance_on(
     if caller_is_input
         input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
         for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
-            if !energy_flow_is_allowed(unit, input_index, output_row.output_index)
+            if energy_flow_is_denied(unit, input_row, output_row)
                 continue
             end
 
             is_storage = output_row.target.sys_function == sf_storage
-            if is_storage && !input_row.do_storage_transfer
-                continue
-            end
-
             if interface.max_energy === nothing
                 energy_pot = -(_sub(_add(output_row.energy_pool, output_row.energy_potential),
                     (is_storage ? 0.0 : _sum(unit.balance_table[:, output_row.priority*2-1]))))
@@ -510,7 +512,7 @@ function balance_on(
                 storage_pot = -(is_storage ? unit.balance_table[input_row.priority, output_row.priority*2-1] : 0.0)
             end
 
-            if output_row.energy_pool == -Inf || output_row.energy_potential == -Inf
+            if output_row.energy_pool == Inf || output_row.energy_potential == Inf
                 energy_pot = -Inf
             end
 
@@ -528,15 +530,11 @@ function balance_on(
     else
         output_row = [row for row in values(unit.balance_table_outputs) if row.target.uac == interface.target.uac][1]
         for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
-            if !energy_flow_is_allowed(unit, input_row.input_index, output_index)
+            if energy_flow_is_denied(unit, input_row, output_row)
                 continue
             end
 
             is_storage = input_row.source.sys_function == sf_storage
-            if is_storage && !output_row.do_storage_transfer
-                continue
-            end
-
             if interface.max_energy === nothing
                 energy_pot = _sub(_add(input_row.energy_pool, input_row.energy_potential),
                     (is_storage ? 0.0 : _sum(unit.balance_table[input_row.priority, 1:2:end])))
@@ -582,7 +580,7 @@ function inner_distribute!(unit::Bus)
                 break
             end
 
-            if !energy_flow_is_allowed(unit, input_row.input_index, output_row.output_index)
+            if energy_flow_is_denied(unit, input_row, output_row)
                 continue
             end
 
@@ -590,11 +588,6 @@ function inner_distribute!(unit::Bus)
             min_max = lowest(input_row.temperature_max, output_row.temperature_max)
             if max_min !== nothing && min_max !== nothing && max_min > min_max
                 continue
-            end
-
-            if ((input_row.source.sys_function == sf_storage && !output_row.do_storage_transfer) ||
-               (output_row.target.sys_function == sf_storage && !input_row.do_storage_transfer))
-               continue
             end
 
             bt_input_row_sum = _sum(unit.balance_table[input_row.priority, 1:2:end])
