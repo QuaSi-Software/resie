@@ -22,7 +22,7 @@
                 "load_storages m_h_w_ht1": false
             },
             "output_refs": ["TST_BUS_01"],
-            "constant_supply": 6000,
+            "constant_power": 6000,
             "constant_temperature": 65
         },
         "TST_SRC_02": {
@@ -30,7 +30,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": ["TST_BUS_02"],
-            "constant_supply": 2000,
+            "constant_supply": 1500,
             "constant_temperature": 40
         },
         "TST_BUS_01": {
@@ -56,9 +56,9 @@
             "control_refs": [],
             "connections": {
                 "input_order": [
-                    "TST_BUS_01",
                     "TST_SRC_02",
-                    "TST_BFT_02"
+                    "TST_BFT_02",
+                    "TST_BUS_01"
                 ],
                 "output_order": [
                     "TST_DEM_02",
@@ -66,8 +66,8 @@
                 ],
                 "energy_flow": [
                     [1,1],
-                    [1,1],
-                    [1,0]
+                    [1,0],
+                    [1,1]
                 ]
             }
         },
@@ -94,8 +94,8 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": ["TST_BUS_02"],
-            "capacity": 40000,
-            "load": 20000
+            "capacity": 10000,
+            "load": 5000
         }
     }
 }
