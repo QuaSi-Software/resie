@@ -432,9 +432,9 @@ end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium], unit)
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"
         return unit.cop
     elseif key.value_key == "Losses"

@@ -120,7 +120,7 @@ end
 
 function output_value(unit::FixedSink, key::OutputKey)::Float64
     if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium], unit)
+        return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Demand"
         return unit.demand
     elseif key.value_key == "Temperature"
