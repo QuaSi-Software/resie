@@ -808,7 +808,7 @@ If the balance in an interface was not zero, the actual transferred energy is re
 
 """
 function calculate_energy_flow(interface::SystemInterface)::Float64
-    return min(interface.sum_abs_change + interface.balance, interface.sum_abs_change - interface.balance) / 2
+    return (interface.sum_abs_change - abs(interface.balance)) / 2
 end
 
 """
