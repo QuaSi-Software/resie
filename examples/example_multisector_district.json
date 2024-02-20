@@ -393,7 +393,5 @@
             "power_th": 300000,
             "constant_cop": 3.5
         }
-    },
-    "order_of_operation": [
-    ]
+    }
 }
