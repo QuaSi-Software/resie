@@ -117,7 +117,7 @@ end
 
 function output_value(unit::FixedSupply, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium], unit)
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Supply"
         return unit.supply
     elseif key.value_key == "Temperature"
