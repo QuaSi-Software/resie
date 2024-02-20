@@ -17,7 +17,6 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            
             "2": {
                 "key": {"TST_GTP_01": ["m_h_w_lt1 OUT"]},
                 "axis": "left",
@@ -61,9 +60,19 @@
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001       
+            },
+            "9": {
+                "key": {"TST_STH_01": ["m_h_w_ht1 Supply"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "10": {
+                "key": {"TST_DEM_01": ["m_h_w_lt1 Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
             }
-        
-
             
         }    
     },
@@ -80,7 +89,7 @@
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
             "static_temperature": 12,
-            "scale": 1
+            "scale": 10
         },
         "TST_STH_01": {
             "type": "PVPlant",
@@ -90,7 +99,7 @@
                 "TST_GTP_01"
             ],
             "energy_profile_file_path": "./profiles/district/Regeneration_GEW_25years.prf",
-            "scale": 1
+            "scale": 5
         },
         "TST_GTP_01": {
             "type": "GeothermalProbes",
