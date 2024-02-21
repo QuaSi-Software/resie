@@ -730,7 +730,8 @@ Reorder components such the loading (and unloading) of storages follows the prio
 busses, including communication across connected busses.
 """
 function reorder_storage_loading(simulation_order, components, components_by_function)
-    for bus_chain in find_chains(components_by_function[3], EnergySystems.sf_bus)
+    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
+    for bus_chain in find_chains(non_proxy_busses, EnergySystems.sf_bus)
         for bus in iterate_chain(bus_chain, EnergySystems.sf_bus)
             storages, limitations = find_storages_ordered(bus, components, nothing, reverse=true)
             if length(storages) < 2

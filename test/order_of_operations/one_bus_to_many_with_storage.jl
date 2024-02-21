@@ -99,6 +99,7 @@ function test_ooo_one_bus_to_many_with_storage()
         ("TST_DEM_01", EnergySystems.s_reset),
         ("TST_BUS_02", EnergySystems.s_reset),
         ("TST_BUS_01", EnergySystems.s_reset),
+        ("Proxy-TST_BUS_01|TST_BUS_03|TST_BUS_02", EnergySystems.s_reset),
         ("TST_BUS_03", EnergySystems.s_reset),
         ("TST_TES_02", EnergySystems.s_reset),
         ("TST_TES_01", EnergySystems.s_reset),
@@ -107,6 +108,7 @@ function test_ooo_one_bus_to_many_with_storage()
         ("TST_DEM_01", EnergySystems.s_control),
         ("TST_BUS_02", EnergySystems.s_control),
         ("TST_BUS_01", EnergySystems.s_control),
+        ("Proxy-TST_BUS_01|TST_BUS_03|TST_BUS_02", EnergySystems.s_control),
         ("TST_BUS_03", EnergySystems.s_control),
         ("TST_TES_02", EnergySystems.s_control),
         ("TST_TES_01", EnergySystems.s_control),
@@ -115,6 +117,7 @@ function test_ooo_one_bus_to_many_with_storage()
         ("TST_DEM_01", EnergySystems.s_process),
         ("TST_BUS_02", EnergySystems.s_process),
         ("TST_BUS_01", EnergySystems.s_process),
+        ("Proxy-TST_BUS_01|TST_BUS_03|TST_BUS_02", EnergySystems.s_process),
         ("TST_BUS_03", EnergySystems.s_process),
         ("TST_TES_01", EnergySystems.s_process),
         ("TST_TES_02", EnergySystems.s_process),
@@ -124,6 +127,7 @@ function test_ooo_one_bus_to_many_with_storage()
         ("TST_BUS_02", EnergySystems.s_distribute),
         ("TST_BUS_03", EnergySystems.s_distribute),
         ("TST_BUS_01", EnergySystems.s_distribute),
+        ("Proxy-TST_BUS_01|TST_BUS_03|TST_BUS_02", EnergySystems.s_distribute),
     ]
 
     simulation_parameters = Dict{String,Any}(

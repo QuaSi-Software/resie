@@ -262,7 +262,10 @@ function test_find_chains()
         components["TST_BUS_05"],
     ])
 
-    chains = Resie.find_chains([u for u in values(components)], EnergySystems.sf_bus)
+    chains = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_bus
+    )
 
     @test length(chains) == 2
     @test chains[1] == expected_1
