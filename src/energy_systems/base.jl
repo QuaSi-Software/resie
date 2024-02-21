@@ -793,17 +793,11 @@ end
     calculate_energy_flow(interface)
 
 Calculates the energy flow in an interface and returns the energy.
-If the balance in an interface was not zero, the requested amount of energy and not
-the acutal energy that has been provided is returned! 
-This is conformily of the output interfaces of busses to non-busses which are set
-to the requested energy, not regarding the energy that has been delivered!
+If the balance in an interface was not zero, the actual transferred energy is returned.
 
-Replacing the - below by a +, this can be changed, then the delivered energy and not
-the requested energy is returned. Comparing this to the bahaviour of busses, this can 
-be non-intuitive.
 """
 function calculate_energy_flow(interface::SystemInterface)::Float64
-    return (interface.sum_abs_change + interface.balance) / 2
+    return (interface.sum_abs_change - abs(interface.balance)) / 2
 end
 
 """
