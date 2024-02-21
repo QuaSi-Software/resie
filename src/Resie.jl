@@ -25,7 +25,6 @@ using PlotlyJS
 using ColorSchemes
 using Colors
 using Interpolations
-using SpecialFunctions  # To use "expint"-function in geothermal probe 
 using JSON
 
 

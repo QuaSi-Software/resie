@@ -5,7 +5,6 @@ This implementations acts as storage as it can produce and load energy.
 
 using JSON
 using Interpolations
-using SpecialFunctions
 mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
@@ -118,7 +117,7 @@ mutable struct GeothermalProbes <: Component
 
             default(config, "probe_depth", 150.0),  # depth (or length) of a single geothermal probe
             default(config, "number_of_probes", 1), # number of geothermal probes in the borefield
-            default(config, "borehole_spacing", 1), # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
+            default(config, "borehole_spacing", 5), # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
             default(config, "probe_type", 2),       # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
 
             default(config, "pipe_diameter_outer", 0.032),  # outer pipe diameter
@@ -181,7 +180,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     m = 10
     n = 10
     key1 = "$(m)_$(n)"      # Note that  m <= n!
-    key2 = "1"
+    key2 = "3"
     libfile_path = "c:/Users/steinacker/Lokal/g-function_library_1.0/Open_configurations_5m_v1.0.json"
 
     # calculate g-functions
@@ -200,85 +199,27 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # Change normalized time values to absolut time and round to fit into simulation step width.
     library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized, steady_state_time), sim_params["time_step_seconds"])
 
-    # Time-Interpolation
-    # Interpolation between grid points of library, to get g-function values for eacht time-step. Short time-step solution will be calculated later.
+    # Interpolation between grid points of library, to get g-function values for eacht time-step.
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
-    simulation_time_grid_precalculated = collect(library_time_grid_absolute[1]:sim_params["time_step_seconds"]:simulation_end_timestamp)  # time array, where g-values are available
+    simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
 
-    itp = Interpolations.LinearInterpolation(library_time_grid_absolute, g_values_long_term_library, )
-    g_values_long_term_library_interpolated = round.(itp(simulation_time_grid_precalculated), digits=4)
+    itp = interpolate((vcat(0,library_time_grid_absolute),), vcat(0,g_values_long_term_library), Gridded(Linear()))
+    unit.g_function = itp.(simulation_time_grid_precalculated)
 
-    # caluclate g-function values for short timesteps with infinite linesource approach by Kelvin
-    simulation_time_grid_total = 0:sim_params["time_step_seconds"]:simulation_end_timestamp  # total time incl. time slots for unknown g-values.
-    g_values_short_term = infinite_line_source(unit.radius_borehole, soil_diffusivity, simulation_time_grid_total)
+    # # spline interpolation using the package "Dierckx"
+    # spl = Spline1D(vcat(0,library_time_grid_absolute), vcat(0,g_values_long_term_library))
+    # unit.g_function = [spl(t) for t in simulation_time_grid_precalculated]
 
-    # fill long term g-function with missing short term values with zeros
-    time_index_starting_long_term_data = length(g_values_short_term) - length(g_values_long_term_library_interpolated) + 1
-    g_values_long_term = vcat(zeros(time_index_starting_long_term_data - 1), g_values_long_term_library_interpolated)
-
-    # Find intersection between short term and long term g-function values.
-    intersection_found = false
-    merge_index = time_index_starting_long_term_data
-    for i in time_index_starting_long_term_data:(length(g_values_long_term)-1)
-        if (g_values_long_term[i] <= g_values_short_term[i] &&
-            g_values_long_term[i+1] >= g_values_short_term[i+1]
-        )
-            intersection_found = true
-            merge_index = i
-            break
-        end
-    end
-
-    unit.g_function = copy(g_values_short_term)
-    if intersection_found
-        # Merge at the intersection point
-        unit.g_function[merge_index:end] = g_values_long_term[merge_index:end]
-    else
-        # Merge at the first non-zero point if no intersection was found
-        unit.g_function[time_index_starting_long_term_data:end] = g_values_long_term[time_index_starting_long_term_data:end]
-    end
+    # # create and save plots using the package "Plots"
+    # plot!(1:length(unit.g_function), unit.g_function, label="merged g-function", linewidth=2)
+    # savefig("output/g_funcion.png")
 
     # # Convert unit.g_function to a DataFrame and write to file (add using DataFrame)
     # df = DataFrame(GValues = unit.g_function[1:sim_params["number_of_time_steps"]])
     # CSV.write("g_function.csv", df)
 
-    # # create and save plots (add using Plots)
-    # plot(1:length(g_values_long_term), g_values_short_term, label="short term g-function", linewidth=2)
-    # plot!(1:length(g_values_long_term), g_values_long_term, label="long term g-function", linewidth=2)
-    # plot!(1:length(g_values_long_term), unit.g_function, label="merged g-function", linewidth=2)
-    # savefig("output/g_funcion.png")
-
     @info "Successfully calculated g-function for geothermal probe field $(unit.uac)"
 
-end
-
-
-"""
-    infinite_line_source()
-
-Calculates the g-function of an infinite line source/sink by Kelvin as short-term 
-responses of a single borehole.
-
-Inputs:
-    borehole_radius::Float64                    - radius of the borehole in [m]
-    soil_diffusivity::Float64                   - soil diffusivity around the borehole in [m^2/s]    
-    g_time_vector::StepRange{UInt64, UInt64}    - StepRange with time index of requested short-term g-function
-Output:
-    g_ILS::Vector{Floats64}                     - g-function values corresponding to g_time_vector for a single borehole
-
-"""
-function infinite_line_source(borehole_radius::Float64, soil_diffusivity::Float64, g_time_vector::StepRange{UInt64,UInt64})
-    g_ILS = zeros(length(g_time_vector))
-
-    for i in eachindex(g_time_vector)
-        if g_time_vector[i] == 0    # if time vector starts at 0, g-function will be set to 0.
-            g_ILS[i] = 0
-        else
-            g_ILS[i] = round.(0.5 * expint(borehole_radius^2 / (4 * soil_diffusivity * g_time_vector[i])), digits=4)
-        end
-    end
-
-    return g_ILS
 end
 
 """
