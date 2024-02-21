@@ -679,67 +679,74 @@ function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     ]
 end
 
+function input_bus_sum(proxy::Bus, left::Bus, right::Bus)::Float64
+    bus_sum = 0.0
+
+    for input_uac in keys(left.balance_table_inputs)
+        input_row = proxy.balance_table_inputs[input_uac]
+        input_sum = 0.0
+
+        for output_uac in keys(right.balance_table_outputs)
+            output_row = proxy.balance_table_outputs[output_uac]
+            input_sum += proxy.balance_table[
+                input_row.input_index,
+                output_row.output_index*2-1
+            ]
+        end
+
+        bus_sum += input_sum
+    end
+
+    return bus_sum
+end
+
 """
     distribute!(unit)
 
 Bus-specific implementation of distribute!.
 
-This moves the energy from connected component from supply to demand components both
-on the bus directly as well as taking other bus components into account. This allows busses
-to be connected in chains (but not loops) and "communicate" the energy across. The method
-implicitly requires that each bus on the chain is called with distribute!() in a specific
-order, which is explained in more detail in the documentation. Essentially it starts from
-the leaves of the chain and progresses to the roots.
+This balances the busses in the chain and sets the energy transfered between busses as the
+value on the connecting interfaces. The actual balancing is done in the balance table
+calculations of balance_on, so this serves as the last call to distribution functions at the
+end of a timestep. The function is designed to work both for single busses and busses in a
+chain. However it makes it necessary that proxy busses get distributed before any of their
+principals.
 """
 function distribute!(unit::Bus)
+    # the proxy bus has its own distribute step, such that the principal busses only
+    # have to handle the interfaces between busses
     if unit.proxy !== nothing
-        return # the proxy has its own distribute step
+        # set energy between busses by requesting the value from the proxy. we do this for
+        # outgoing busses only so the connections are not counted twice
+        for outface in filter_outputs(unit, sf_bus, true)
+            val = input_bus_sum(unit.proxy, unit, outface.target)
+            set!(outface, val)
+        end
+
+        return
     end
 
+    # this is not always necessary as calls to balance_on usually call the inner distribute
+    # function, however some components might have changed the balance without calling
+    # balance_on
     inner_distribute!(unit::Bus)
-    balance = balance_direct(unit)
 
-    # reset all non-bus input interfaces
+    # if there is a balance unequal zero remaining, this means the energy balance across
+    # the chain of buses was not upheld. we save the balance in the remainder such that
+    # subsequent calls to balance consider the missing/extra energy accordingly
+    unit.remainder = balance_direct(unit)
+
+    # reset all principal non-bus input interfaces from the original busses
     for inface in filter_inputs(unit, sf_bus, false)
         principal = inface.source.output_interfaces[unit.medium]
         set!(principal, 0.0)
     end
 
-    # reset all non-bus output interfaces
+    # reset all principal non-bus output interfaces from the original busses
     for outface in filter_outputs(unit, sf_bus, false)
         principal = outface.target.input_interfaces[unit.medium]
         set!(principal, 0.0)
     end
-
-    # distribute to outgoing busses according to output priority
-    if balance > 0.0
-        for outface in filter_outputs(unit, sf_bus, true)
-            if balance > abs(outface.balance)
-                balance -= abs(outface.balance)
-                set!(outface, 0.0)
-            else
-                set!(outface, outface.balance - balance)
-                balance = 0.0
-            end
-        end
-    end
-
-    # write any remaining demand into input bus interfaces (if any) according to input
-    # priority, however as available supply is not considered (as this happens implicitly
-    # through output priorities of the input bus), this effectively writes all the
-    # remaining demand into the first input according to the priority.
-    if balance < 0.0
-        for inface in filter_inputs(unit, sf_bus, true)
-            set!(inface, balance + inface.balance)
-            balance = 0.0
-        end
-    end
-
-    # if there is a balance unequal zero remaining, this happens either because there is
-    # no input bus or the balance was positive and is thus not communicated "backwards" to
-    # the input bus. the balance is saved in the remainder so it is available for further
-    # balance calculations
-    unit.remainder = balance
 end
 
 function output_values(unit::Bus)::Vector{String}
