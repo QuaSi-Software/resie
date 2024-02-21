@@ -220,6 +220,13 @@ function test_find_chains()
                 "output_order" => [],
             )
         ),
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "output_refs" => ["TST_HTP_01"],
+            "is_source" => true,
+        ),
         "TST_HTP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => [],
