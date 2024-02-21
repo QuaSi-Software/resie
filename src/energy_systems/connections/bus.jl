@@ -10,7 +10,7 @@ end
 
 function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
     if !haskey(config, "connections")
-        return new([], [], nothing)
+        return ConnectionMatrix([], [], nothing)
     end
 
     input_order = [String(u) for u in config["connections"]["input_order"]]
