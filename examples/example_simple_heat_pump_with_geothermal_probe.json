@@ -78,7 +78,7 @@
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 31536000,
+        "end": 157680000,
         "time_step_seconds": 3600
     },
     "components": {
@@ -92,9 +92,9 @@
             "scale": 10
         },
         "TST_STH_01": {
-            "type": "PVPlant",
+            "type": "FixedSupply",
             "control_refs": [],
-            "m_el_out": "m_h_w_ht1",
+            "medium": "m_h_w_ht1",
             "output_refs": [
                 "TST_GTP_01"
             ],
@@ -114,6 +114,11 @@
             "soil_undisturbed_ground_temperature": 12.0,
             "soil_heat_conductivity": 1.6 ,
             "borehole_thermal_resistance": 0.1, 
+            "probe_field_geometry": "rectangle",
+            "number_of_probes_x": 5, 
+            "number_of_probes_y": 15,
+            "probe_field_key_2": "",
+            "borehole_spacing": 1,
             "probe_depth": 150,
             "pipe_diameter_outer": 0.032,
             "pipe_diameter_inner": 0.026,
@@ -124,7 +129,7 @@
             "fluid_prandtl_number": 31.3,
             "grout_heat_conductivity": 2,
             "pipe_heat_conductivity": 0.42,
-            "borehole_diameter": 0.15
+            "borehole_diameter": 0.16
         }
                 
     }
