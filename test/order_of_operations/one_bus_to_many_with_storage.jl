@@ -124,10 +124,10 @@ function test_ooo_one_bus_to_many_with_storage()
         ("TST_TES_01", EnergySystems.s_load),
         ("TST_TES_02", EnergySystems.s_load),
         ("TST_SRC_01", EnergySystems.s_process),
-        ("TST_BUS_02", EnergySystems.s_distribute),
-        ("TST_BUS_03", EnergySystems.s_distribute),
-        ("TST_BUS_01", EnergySystems.s_distribute),
         ("Proxy-TST_BUS_01|TST_BUS_03|TST_BUS_02", EnergySystems.s_distribute),
+        ("TST_BUS_02", EnergySystems.s_distribute),
+        ("TST_BUS_01", EnergySystems.s_distribute),
+        ("TST_BUS_03", EnergySystems.s_distribute),
     ]
 
     simulation_parameters = Dict{String,Any}(

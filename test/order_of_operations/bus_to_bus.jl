@@ -98,9 +98,9 @@ function test_ooo_bus_to_bus()
         ("TST_BFT_02", EnergySystems.s_load),
         ("TST_BFT_01", EnergySystems.s_load),
         ("TST_GRI_01", EnergySystems.s_process),
+        ("Proxy-TST_BUS_01|TST_BUS_02", EnergySystems.s_distribute),
         ("TST_BUS_02", EnergySystems.s_distribute),
         ("TST_BUS_01", EnergySystems.s_distribute),
-        ("Proxy-TST_BUS_01|TST_BUS_02", EnergySystems.s_distribute),
     ]
 
     simulation_parameters = Dict{String,Any}(

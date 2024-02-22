@@ -605,25 +605,8 @@ end
 """
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
 
-Reorder the distribution of busses so that any chain of busses connected to each other
-have the "sink" busses before the "source" busses while also considering the output
-priorities of two or more sink busses connected to the same source bus.
-
-In the following, assume energy flows from left to right:
-
-               ------------
-               |   Bus 2  |   ------------
-               ------------   |   Bus 5  |
-             /              / ------------
-------------   ------------
-|   Bus 1  |---|   Bus 3  |
-------------   -----------`
-             `              ` ------------
-               `-----------   |   Bus 6  |
-               |   Bus 4  |   ------------
-               ------------
-With input priorities (4,3,2) on bus 1 and (6,5) on bus 3 this would result in an order
-of: 4,6,5,3,2,1
+Reorder the distribution of busses so that for chains of busses larger than one the proxy
+bus for that chain is distributed first.
 """
 function reorder_distribution_of_busses(simulation_order, components, components_by_function)
     non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
