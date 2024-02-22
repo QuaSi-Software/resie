@@ -244,35 +244,6 @@ function base_order(components_by_function)
 end
 
 """
-    idx_of(order, uac, step)
-
-Helper function to find the index of a given combination of step and unit (by its UAC).
-"""
-function idx_of(order, uac, step)
-    for idx in eachindex(order)
-        if order[idx][2][1].uac == uac && order[idx][2][2] == step
-            return idx
-        end
-    end
-    return 0
-end
-
-"""
-    uac_is_bus(component, uac)
-
-Helper function to check if the given UAC corresponds to a bus in the outputs of the
-given component.
-"""
-function uac_is_bus(component, uac)
-    for output_interface in component.output_interfaces
-        if (output_interface.target.uac === uac && output_interface.target.sys_function === EnergySystems.sf_bus)
-            return true
-        end
-    end
-    return false
-end
-
-"""
     add_non_recursive!(node_set, unit, caller_uac)
 
 Add connected units of the same system function to the node set in a non-recursive manner.
@@ -629,84 +600,6 @@ function reorder_distribution_of_busses(simulation_order, components, components
             )
         end
     end
-end
-
-
-"""
-    check_energy_flow(bus, target, source)
-
-Checks if the energy is allowed to flow from the source to the target via the bus.
-
-# Arguments
--`bus::Component`: The bus that is in the middle of source and storage
--`target::Component`: The target component to check
--`source::Union{Component,Nothing}`: The source component to check. If the source is
-    nothing, the energy flow is allowed.
-"""
-function check_energy_flow(bus, target, source)::Bool
-    if bus.connectivity.energy_flow === nothing || source === nothing
-        # if no energy flow matrix or source is given, flow is assumed to be allowed
-        return true
-    end
-
-    output_idx = nothing
-    for (idx,output_uac) in pairs(bus.connectivity.output_order)
-        if output_uac == target.uac
-            output_idx = idx
-        end
-    end
-
-    input_idx = nothing
-    for (idx,input_uac) in pairs(bus.connectivity.input_order)
-        if input_uac == source.uac
-            input_idx = idx
-        end
-    end
-
-    if input_idx !== nothing && output_idx !== nothing
-        return bus.connectivity.energy_flow[input_idx][output_idx] == 1
-    else
-        return false
-    end
-end
-
-"""
-    find_storages_ordered(bus, components, source)
-
-Finds storage components in the given bus and all successor busses ordered by the output priorities.
-
-# Arguments
--`bus::Component`: The bus from which to start the search
--`components::Grouping`: All components in the energy system
--`source::Component`: The source from which bus was reached out. Can be nothing if bus is first bus.
--`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
-"""
-function find_storages_ordered(bus, components, source; reverse=false)
-    storages = []
-    limited = []
-    pushing = reverse ? pushfirst! : push!
-
-    for unit_uac in bus.connectivity.output_order
-        unit = components[unit_uac]
-        if unit.sys_function == EnergySystems.sf_storage
-            pushing(storages, unit)
-            if check_energy_flow(bus, unit, source)
-                pushing(limited, true)
-            else
-                pushing(limited, false)
-            end
-        elseif unit.sys_function == EnergySystems.sf_bus
-            storages_returned, limits = find_storages_ordered(unit, components, bus)
-            for storage in storages_returned
-                pushing(storages, storage)
-            end
-            for limit in limits
-                pushing(limited, limit)
-            end
-        end
-    end
-
-    return storages, limited
 end
 
 """

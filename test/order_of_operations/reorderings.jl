@@ -330,30 +330,6 @@ function test_data_storage_loading()
     return components, by_function
 end
 
-function test_find_storages_ordered()
-    components, _ = test_data_storage_loading()
-
-    expected = [
-        components["TST_BFT_02"],
-        components["TST_BFT_01"],
-        components["TST_BFT_03"],
-    ]
-    result, limits = Resie.find_storages_ordered(components["TST_BUS_01"], components, nothing)
-    @test pwc_units_astr(expected, result) == ""
-
-    expected = [
-        components["TST_BFT_03"],
-        components["TST_BFT_01"],
-        components["TST_BFT_02"],
-    ]
-    result, limits = Resie.find_storages_ordered(components["TST_BUS_01"], components, nothing, reverse=true)
-    @test pwc_units_astr(expected, result) == ""
-end
-
-@testset "find_storages_ordered" begin
-    test_find_storages_ordered()
-end
-
 function test_storage_loading_no_change()
     components, by_function = test_data_storage_loading()
     steps = [
@@ -555,41 +531,6 @@ function test_data_storage_loading_with_matrix()
     components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
     return components, by_function
-end
-
-function test_find_storages_ordered_with_matrix()
-    components, _ = test_data_storage_loading_with_matrix()
-
-    expected_results = [
-        components["TST_BFT_02"],
-        components["TST_BFT_01"],
-        components["TST_BFT_03"],
-    ]
-
-    expected_limits = [
-        true,
-        false,
-        false
-    ]
-    result, limits = Resie.find_storages_ordered(components["TST_BUS_01"], components, nothing)
-    @test pwc_units_astr(expected_results, result) == ""
-    @test pwc_units_astr(expected_limits, limits) == ""
-
-    expected_results = [
-        components["TST_BFT_03"],
-        components["TST_BFT_01"],
-        components["TST_BFT_02"],
-    ]
-
-    expected_limits = [
-        false,
-        false,
-        true
-    ]
-    result, limits = Resie.find_storages_ordered(components["TST_BUS_01"], components, nothing, reverse=true)
-    @test pwc_units_astr(expected_results, result) == ""
-    @test pwc_units_astr(expected_limits, limits) == ""
-
 end
 
 function test_storage_loading_reorder_steps_with_matrix_1()
