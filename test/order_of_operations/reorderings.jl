@@ -355,20 +355,20 @@ end
 function test_storage_loading_no_change()
     components, by_function = test_data_storage_loading()
     steps = [
-        [100, ("TST_BFT_02", EnergySystems.s_process)],
-        [99, ("TST_BFT_01", EnergySystems.s_process)],
-        [98, ("TST_BFT_03", EnergySystems.s_process)],
+        [100, ("TST_BFT_01", EnergySystems.s_process)],
+        [99, ("TST_BFT_03", EnergySystems.s_process)],
+        [98, ("TST_BFT_02", EnergySystems.s_process)],
         [97, ("TST_BFT_02", EnergySystems.s_load)],
         [96, ("TST_BFT_01", EnergySystems.s_load)],
         [95, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     expected = [
-        [100, ("TST_BFT_02", EnergySystems.s_process)],
-        [99, ("TST_BFT_01", EnergySystems.s_process)],
-        [98, ("TST_BFT_03", EnergySystems.s_process)],
-        [97, ("TST_BFT_02", EnergySystems.s_load)],
-        [96, ("TST_BFT_01", EnergySystems.s_load)],
-        [95, ("TST_BFT_03", EnergySystems.s_load)],
+        [100, ("TST_BFT_01", EnergySystems.s_process)],
+        [99, ("TST_BFT_03", EnergySystems.s_process)],
+        [98, ("TST_BFT_02", EnergySystems.s_process)],
+        [95, ("TST_BFT_02", EnergySystems.s_load)],
+        [94, ("TST_BFT_01", EnergySystems.s_load)],
+        [93, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
     @test pwc_steps_astr(expected, steps) == ""
@@ -389,12 +389,12 @@ function test_storage_loading_reorder_steps_1()
         [95, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     expected = [
-        [98, ("TST_BFT_01", EnergySystems.s_process)],
-        [99, ("TST_BFT_02", EnergySystems.s_process)],
-        [97, ("TST_BFT_03", EnergySystems.s_process)],
-        [94, ("TST_BFT_01", EnergySystems.s_load)],
-        [95, ("TST_BFT_02", EnergySystems.s_load)],
-        [93, ("TST_BFT_03", EnergySystems.s_load)],
+        [100, ("TST_BFT_01", EnergySystems.s_process)],
+        [98, ("TST_BFT_02", EnergySystems.s_process)],
+        [99, ("TST_BFT_03", EnergySystems.s_process)],
+        [93, ("TST_BFT_01", EnergySystems.s_load)],
+        [94, ("TST_BFT_02", EnergySystems.s_load)],
+        [92, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
     @test pwc_steps_astr(expected, steps) == ""
@@ -411,12 +411,12 @@ function test_storage_loading_reorder_steps_2()
         [95, ("TST_BFT_01", EnergySystems.s_load)],
     ]
     expected = [
-		[96, ("TST_BFT_03", EnergySystems.s_process)],
-        [99, ("TST_BFT_02", EnergySystems.s_process)],
-        [97, ("TST_BFT_01", EnergySystems.s_process)],
-        [91, ("TST_BFT_03", EnergySystems.s_load)],
+		[97, ("TST_BFT_03", EnergySystems.s_process)],
+        [96, ("TST_BFT_02", EnergySystems.s_process)],
+        [98, ("TST_BFT_01", EnergySystems.s_process)],
+        [92, ("TST_BFT_03", EnergySystems.s_load)],
         [94, ("TST_BFT_02", EnergySystems.s_load)],
-        [92, ("TST_BFT_01", EnergySystems.s_load)],
+        [93, ("TST_BFT_01", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
     @test pwc_steps_astr(expected, steps) == ""
@@ -433,9 +433,9 @@ function test_storage_loading_reorder_steps_3()
         [95, ("TST_BFT_02", EnergySystems.s_load)],
     ]
     expected = [
-        [96, ("TST_BFT_03", EnergySystems.s_process)],
-        [97, ("TST_BFT_01", EnergySystems.s_process)],
-        [98, ("TST_BFT_02", EnergySystems.s_process)],
+        [98, ("TST_BFT_03", EnergySystems.s_process)],
+        [99, ("TST_BFT_01", EnergySystems.s_process)],
+        [97, ("TST_BFT_02", EnergySystems.s_process)],
         [91, ("TST_BFT_03", EnergySystems.s_load)],
         [92, ("TST_BFT_01", EnergySystems.s_load)],
         [93, ("TST_BFT_02", EnergySystems.s_load)],
@@ -601,11 +601,11 @@ function test_storage_loading_reorder_steps_with_matrix_1()
         [95, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     expected = [
-        [98, ("TST_BFT_01", EnergySystems.s_process)],
-        [96, ("TST_BFT_02", EnergySystems.s_process)],
-        [97, ("TST_BFT_03", EnergySystems.s_process)],
+        [97, ("TST_BFT_01", EnergySystems.s_process)],
+        [99, ("TST_BFT_02", EnergySystems.s_process)],
+        [98, ("TST_BFT_03", EnergySystems.s_process)],
         [93, ("TST_BFT_01", EnergySystems.s_load)],
-        [91, ("TST_BFT_02", EnergySystems.s_load)],
+        [94, ("TST_BFT_02", EnergySystems.s_load)],
         [92, ("TST_BFT_03", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
@@ -623,12 +623,12 @@ function test_storage_loading_reorder_steps_with_matrix_2()
         [95, ("TST_BFT_01", EnergySystems.s_load)],
     ]
     expected = [
-		[96, ("TST_BFT_03", EnergySystems.s_process)],
-        [95, ("TST_BFT_02", EnergySystems.s_process)],
+		[98, ("TST_BFT_03", EnergySystems.s_process)],
+        [99, ("TST_BFT_02", EnergySystems.s_process)],
         [97, ("TST_BFT_01", EnergySystems.s_process)],
-        [90, ("TST_BFT_03", EnergySystems.s_load)],
-        [89, ("TST_BFT_02", EnergySystems.s_load)],
-        [91, ("TST_BFT_01", EnergySystems.s_load)],
+        [92, ("TST_BFT_03", EnergySystems.s_load)],
+        [94, ("TST_BFT_02", EnergySystems.s_load)],
+        [93, ("TST_BFT_01", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
     @test pwc_steps_astr(expected, steps) == ""
@@ -645,12 +645,12 @@ function test_storage_loading_reorder_steps_with_matrix_3()
         [95, ("TST_BFT_02", EnergySystems.s_load)],
     ]
     expected = [
-        [96, ("TST_BFT_03", EnergySystems.s_process)],
-        [97, ("TST_BFT_01", EnergySystems.s_process)],
-        [95, ("TST_BFT_02", EnergySystems.s_process)],
-        [90, ("TST_BFT_03", EnergySystems.s_load)],
-        [91, ("TST_BFT_01", EnergySystems.s_load)],
-        [89, ("TST_BFT_02", EnergySystems.s_load)],
+        [97, ("TST_BFT_03", EnergySystems.s_process)],
+        [96, ("TST_BFT_01", EnergySystems.s_process)],
+        [98, ("TST_BFT_02", EnergySystems.s_process)],
+        [91, ("TST_BFT_03", EnergySystems.s_load)],
+        [92, ("TST_BFT_01", EnergySystems.s_load)],
+        [93, ("TST_BFT_02", EnergySystems.s_load)],
     ]
     Resie.reorder_storage_loading(steps, components, by_function)
     @test pwc_steps_astr(expected, steps) == ""
