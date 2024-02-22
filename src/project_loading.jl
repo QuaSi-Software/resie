@@ -626,22 +626,24 @@ With input priorities (4,3,2) on bus 1 and (6,5) on bus 3 this would result in a
 of: 4,6,5,3,2,1
 """
 function reorder_distribution_of_busses(simulation_order, components, components_by_function)
-    # for every bus chain...
-    for bus_chain in find_chains(components_by_function[3], EnergySystems.sf_bus)
-        # ...by sources-first ordering...
-        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus, reverse=true)
-            output_order = length(bus.connectivity.output_order) > 0 ?
-                           bus.connectivity.output_order :
-                           [u.target.uac for u in bus.output_interfaces]
-            # ...make sure every successor bus...
-            for successor_uac in output_order
-                # ...has a higher priority in the order they are appear in the list
-                place_one_higher!(
-                    simulation_order,
-                    (bus.uac, EnergySystems.s_distribute),
-                    (successor_uac, EnergySystems.s_distribute)
-                )
-            end
+    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
+    for bus_chain in find_chains(non_proxy_busses, EnergySystems.sf_bus)
+        # for a single bus we don't need to do anything. for chains we use the proxy
+        if length(bus_chain) <= 1
+            continue
+        end
+        bus = first(bus_chain)
+        proxy_bus = bus.proxy !== nothing ? bus.proxy : bus
+
+        # for principal busses in the chain, place their distribute step after that of the
+        # proxy bus. the order of the principals within themselves doesn't matter, but it
+        # should be deterministic for testing and debugging purposes, hence the sorting
+        for principal in sort(collect(bus_chain), by=c->c.uac)
+            place_one_lower!(
+                simulation_order,
+                (proxy_bus.uac, EnergySystems.s_distribute),
+                (principal.uac, EnergySystems.s_distribute)
+            )
         end
     end
 end
