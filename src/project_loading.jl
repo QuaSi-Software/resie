@@ -579,8 +579,9 @@ end
 Reorder components connected to a bus so they match the input priority defined on that bus.
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
+    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
     # for every bus...
-    for bus in values(components_by_function[3])
+    for bus in values(non_proxy_busses)
         # ...for each component in the bus' input priority...
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every component following after...
