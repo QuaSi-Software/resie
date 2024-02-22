@@ -5,6 +5,7 @@ This implementations acts as storage as it can produce and load energy.
 
 using JSON
 using Interpolations
+using Plots
 mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
@@ -37,6 +38,10 @@ mutable struct GeothermalProbes <: Component
     energy_in_out_per_probe_meter::Vector{Float64}
     energy_in_out_difference_per_probe_meter::Vector{Float64}
 
+    probe_field_geometry::String
+    number_of_probes_x::Int
+    number_of_probes_y::Int
+    probe_field_key_2::String
     probe_depth::Float64
     number_of_probes::Int
     borehole_spacing::Float64
@@ -63,20 +68,13 @@ mutable struct GeothermalProbes <: Component
 
     fluid_reynolds_number::Float64
 
+    do_create_plots::Bool
+
     function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
     
-        # Current solution to get g-function values.
-        # read g-function .txt file
-        file = open("C:/Users/steinacker/Lokal/git_Resie/src/energy_systems/heat_sources/g_ges_vector.txt", "r") # TODO
-            g_function = Vector{Float64}()
-            for line in eachline(file)
-                push!(g_function, parse(Float64, line))
-            end
-        close(file)
-
         return new(
             uac,                     # uac
             controller_for_strategy( # controller
@@ -95,37 +93,41 @@ mutable struct GeothermalProbes <: Component
             default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
             default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
             default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading, within one probe!
-            default(config, "max_output_power", 50),  # maximum output power in W/m probe
-            default(config, "max_input_power", 50),   # maximum input power in W/m probe
-            default(config, "regeneration", true),    # flag if regeneration should be taken into account
-            0.0,                                      # max_output_energy in every time step, calculated in control()
-            0.0,                                      # max_input_energy in every time step, calculated in control()
-            0.0,                                      # output temperature in current time step, calculated in control()
-            0.0,                                      # input temperature in current time step, calculated in control()
+            default(config, "max_output_power", 50),              # maximum output power in W/m probe
+            default(config, "max_input_power", 50),               # maximum input power in W/m probe
+            default(config, "regeneration", true),                # flag if regeneration should be taken into account
+            0.0,                                                  # max_output_energy in every time step, calculated in control()
+            0.0,                                                  # max_input_energy in every time step, calculated in control()
+            0.0,                                                  # output temperature in current time step, calculated in control()
+            0.0,                                                  # input temperature in current time step, calculated in control()
             default(config, "soil_undisturbed_ground_temperature", 11.0),    # Considered as constant
             default(config, "soil_heat_conductivity", 1.5),                  # Heat conductivity of surrounding soil, homogenous and constant, in [W/(m K)]
             default(config, "soil_density", 2000.0),                         # soil density in [kg/m^3]
             default(config, "soil_specific_heat_capacity", 2400.0),          # soil specific heat capacity in [J/(kg K)]
             default(config, "borehole_thermal_resistance", 0.10),            # thermal resistance in [(m K)/W]
-            g_function,                             # pre-calculated multiscale g-function. Calculated in pre-processing.
-            0,                                      # index of current time step to get access on time dependent g-function values
-            0.0,                                    # average fluid temperature
-            default(config, "boreholewall_start_temperature", 4.0),      # boreholewall starting temperature
+            [],                                                   # pre-calculated multiscale g-function. Calculated in pre-processing.
+            0,                                                    # index of current time step to get access on time dependent g-function values
+            0.0,                                                  # average fluid temperature
+            default(config, "boreholewall_start_temperature", 4.0),          # boreholewall starting temperature
             
-            [],                                     # vector to hold specific energy sum (in and out) per probe meter in each time step
-            [],                                     # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
+            [],                                                   # vector to hold specific energy sum (in and out) per probe meter in each time step
+            [],                                                   # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
 
-            default(config, "probe_depth", 150.0),  # depth (or length) of a single geothermal probe
-            default(config, "number_of_probes", 1), # number of geothermal probes in the borefield
-            default(config, "borehole_spacing", 5), # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
-            default(config, "probe_type", 2),       # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
+            default(config, "probe_field_geometry", "rectangle"), # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
+            default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
+            default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
+            default(config, "probe_field_key_2", "") ,            # key2 of g-fuction library. Can also be "" if non is needed. The value depends on the chosen library type.
+            default(config, "probe_depth", 150.0),                # depth (or length) of a single geothermal probe. Has to be between 24 m and 384 m.
+            0,                                                    # number of geothermal probes in the borefield, determined in inizialize from borehole configuration
+            default(config, "borehole_spacing", 5),               # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
+            default(config, "probe_type", 2),                     # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
 
-            default(config, "pipe_diameter_outer", 0.032),  # outer pipe diameter
-            default(config, "pipe_diameter_inner", 0.026),  # inner pipe diameter
-            0.0,                                            # radius_pipe_inner, will be calculated in initialization
-            0.0,                                            # radius_pipe_outer, will be calculated in initialization
-            0.0,                                            # radius_borehole, will be calculated in initialization
-            0.0,                                            # distance_pipe_center, will be calculated in initialization
+            default(config, "pipe_diameter_outer", 0.032),        # outer pipe diameter
+            default(config, "pipe_diameter_inner", 0.026),        # inner pipe diameter
+            0.0,                                                  # radius_pipe_inner, will be calculated in initialization
+            0.0,                                                  # radius_pipe_outer, will be calculated in initialization
+            0.0,                                                  # radius_borehole, will be calculated in initialization
+            0.0,                                                  # distance_pipe_center, will be calculated in initialization
                     
             default(config, "fluid_specific_heat_capacity", 3800.0), # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
             default(config, "fluid_density", 1045.0),                # density brine at 0 °C (25 % glycol 75 % water (interpolated))
@@ -139,8 +141,9 @@ mutable struct GeothermalProbes <: Component
             default(config, "borehole_diameter", 0.15),              # borehole diameter in m.
             default(config, "shank_spacing", 0.1),                   # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. required for calculation of thermal borehole resistance.
 
-            0.0        # Reynoldsnumber. To be calculated in function later.
-            )
+            0.0,                                                     # Reynoldsnumber. To be calculated in function later.
+            default(config, "do_create_plots", true)                 # flag if plots should be created during inizialisation   
+        )
     end
 end
 
@@ -167,21 +170,34 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.radius_borehole = unit.borehole_diameter / 2                # [m]
     unit.distance_pipe_center = unit.shank_spacing / 2               # [m]
 
-    unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
-    unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
-
     # calculate g-function
     # The long term g-functions will be read out from the library provided by
     # G-Function Library V1.0 by T. West, J. Cook and D. Spitler, 2021, Oklahoma State University
     # The missing short term g-function will be calculated using the infinite line source/sink theory by Kelvin
     #
     # set Parameters
-    # User Input: Set key_1 and key_2 for library geometrie properties. TODO: move to input
-    m = 10
-    n = 10
-    key1 = "$(m)_$(n)"      # Note that  m <= n!
-    key2 = "3"
-    libfile_path = "c:/Users/steinacker/Lokal/g-function_library_1.0/Open_configurations_5m_v1.0.json"
+    # User Input: Set key_1 and key_2 for library geometrie properties.
+    key1 = "$(unit.number_of_probes_x)_$(unit.number_of_probes_y)"      # Note that  x <= y!
+    key2 = unit.probe_field_key_2
+    probe_field_configurations = Dict("rectangle" => "rectangle_5m_v1.0.json",
+                                      "open_rectangle"=> "Open_configurations_5m_v1.0.json",
+                                      "zoned_rectangle" => "zoned_rectangle_5m_v1.0.json",
+                                      "U_configurations" => "U_configurations_5m_v1.0.json",
+                                      "lopsided_U_configuration" => "LopU_configurations_5m_v1.0.json",
+                                      "C_configuration" => "C_configurations_5m_v1.0.json",
+                                      "L_configuration" => "L_configurations_5m_v1.0.json"
+                                      )
+
+    if !haskey(probe_field_configurations, unit.probe_field_geometry)
+        @error "The entered probe field configuration could not be detected in \"$(unit.uac)\". It has to be one of: $(join(["$key" for key in keys(probe_field_configurations)], ", "))."
+        exit()
+    end    
+
+    libfile_path = "src/energy_systems/heat_sources/g-function_library_1.0/" * probe_field_configurations[unit.probe_field_geometry]
+    if !isfile(libfile_path)
+        @error "The library for the geothermal probe field \"$(unit.uac)\" could not be found at $libfile_path"
+        exit()
+    end
 
     # calculate g-functions
     soil_diffusivity = unit.soil_heat_conductivity / (unit.soil_density * unit.soil_specific_heat_capacity)    # [m^2/s]
@@ -194,7 +210,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
                                     -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,
                                      1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
 
-    g_values_long_term_library = get_library_g_values(unit, unit.probe_depth, unit.radius_borehole, unit.borehole_spacing, key1, key2, libfile_path)
+    g_values_long_term_library, unit.number_of_probes = get_library_g_values(unit, unit.probe_depth, unit.radius_borehole, unit.borehole_spacing, key1, key2, libfile_path)
 
     # Change normalized time values to absolut time and round to fit into simulation step width.
     library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized, steady_state_time), sim_params["time_step_seconds"])
@@ -203,6 +219,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
     simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
 
+    # linear interpolation. TODO: may change later to something else than linear interpolation between irregular grid points?
     itp = interpolate((vcat(0,library_time_grid_absolute),), vcat(0,g_values_long_term_library), Gridded(Linear()))
     unit.g_function = itp.(simulation_time_grid_precalculated)
 
@@ -210,15 +227,32 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # spl = Spline1D(vcat(0,library_time_grid_absolute), vcat(0,g_values_long_term_library))
     # unit.g_function = [spl(t) for t in simulation_time_grid_precalculated]
 
-    # # create and save plots using the package "Plots"
-    # plot!(1:length(unit.g_function), unit.g_function, label="merged g-function", linewidth=2)
-    # savefig("output/g_funcion.png")
+    # create and save plots 
+    if unit.do_create_plots
+        plot(1:length(unit.g_function),
+             unit.g_function,
+             title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
+             xlabel="time [time step]",
+             ylabel="g-function value [-]",
+             legend=false,
+             linewidth=6,
+             gridlinewidth=1,
+             size=(1800, 1200),
+             titlefontsize=30,
+             guidefontsize=24,
+             tickfontsize=24,
+             legendfontsize=24,
+             grid=true,
+             minorgrid=true,
+             margin=15Plots.mm)
+        savefig("output/probe_field_g_funcion_$(unit.uac).png")
+    end
 
-    # # Convert unit.g_function to a DataFrame and write to file (add using DataFrame)
-    # df = DataFrame(GValues = unit.g_function[1:sim_params["number_of_time_steps"]])
-    # CSV.write("g_function.csv", df)
+    @info "Successfully calculated g-function for geothermal probe field \"$(unit.uac)\" with $(unit.number_of_probes) probes."
 
-    @info "Successfully calculated g-function for geothermal probe field $(unit.uac)"
+    # calculate max energies
+    unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
+    unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
 
 end
 
@@ -295,6 +329,7 @@ Inputs:
     libfile_path::String         - file path to the library. Note that different probefield geometries are stored in different files.
 Outputs:
     g_values_library_corrected::Array{Float64}  - interpolated and corrected g-values read out of library for given key1 and key2
+    number_of_probes::Int        - number of probes in geothermal probe field, defined by key1 and key2
 
 """
 function get_library_g_values(unit::Component, borehole_depth::Float64, borehole_radius::Float64, borehole_spacing::Float64, key1::String, key2::String, libfile_path::String)
@@ -324,6 +359,9 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
 
         borehole_depth_library_upper = 384
         borehole_radius_library_upper = 0.0875
+    else
+        @error "In geothermal probe \"$(unit.uac)\", the borehole_depth needs to be between 24 m and 384 m, but is $(borehole_depth) m."
+        exit()
     end
 
     # Read in given library file
@@ -331,24 +369,29 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     try
         library = JSON.parsefile(libfile_path)
     catch e
-        @error "The library with precalculated g-values for the geothermal probe $(unit.uac) could not be read in. The following error occured: $e\n" *
+        @error "The library with precalculated g-values for the geothermal probe \"$(unit.uac)\" could not be read in. The following error occured: $e\n" *
                 "Check the file located at $libfile_path."
         exit()
     end
 
     # Get a specific configuration from the library
-    local gVals
+    local gVals, probe_coordinates
     try
         if key2 == ""
             gVals = library[key1]["g"]
+            probe_coordinates = library[key1]["bore_locations"]
         else
             gVals = library[key1][key2]["g"]
+            probe_coordinates = library[key1][key2]["bore_locations"]
         end
     catch e
-        @error "The probe field configuration for the geothermal probe  $(unit.uac) could not be detected from the given library. The following error occured: $e\n" *
+        @error "The probe field configuration for the geothermal probe  \"$(unit.uac)\" could not be detected from the given library. The following error occured: $e\n" *
         "Check the probe field configuration given as key1 = $key1 and key2 = $key2."
         exit()
     end
+
+    # calculate number of probes in probe field
+    number_of_probes = length(probe_coordinates)
 
     # Getting a specific G-Function for the default configuration
     borehole_spacing_library_default = 5   # Default borehole spacing for each configuration.
@@ -375,7 +418,28 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
 
     g_values_library_corrected = g_values_library_interpolated .- log(borehole_radius / (borehole_radius_interpolated))
 
-    return g_values_library_corrected
+    if unit.do_create_plots
+        scatter([v[1] for v in values(probe_coordinates)] * (borehole_spacing / borehole_spacing_library_default),
+                [v[2] for v in values(probe_coordinates)] * (borehole_spacing / borehole_spacing_library_default),
+                title="probe field configuration for \"$(unit.uac)\"",
+                xlabel = "distribution in x direction [m]",
+                ylabel = "distribution in y direction [m]",
+                aspect_ratio=:equal,
+                legend=false,
+                markersize=6,
+                gridlinewidth=1,
+                size=(1800, 1200),
+                titlefontsize=30,
+                guidefontsize=24,
+                tickfontsize=24,
+                legendfontsize=24,
+                grid=true,
+                minorgrid=true,
+                margin=10Plots.mm)
+        savefig("output/probe_field_geometry_$(unit.uac).png")
+    end
+
+    return g_values_library_corrected, number_of_probes
 end
 
 function control(
