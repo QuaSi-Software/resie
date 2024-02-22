@@ -10,6 +10,7 @@ Manifest.toml
 *.html
 info_dump.md
 *.log
+*.png
 
 # input files (test data and templates are added separately)
 *.json
