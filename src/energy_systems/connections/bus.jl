@@ -679,25 +679,49 @@ function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     ]
 end
 
-function input_bus_sum(proxy::Bus, left::Bus, right::Bus)::Float64
-    bus_sum = 0.0
+function inputs_recursive(unit::Bus)::Vector{Component}
+    inputs = []
+    for inface in unit.input_interfaces
+        if inface.source.sys_function == sf_bus
+            append!(inputs, inputs_recursive(inface.source))
+        else
+            push!(inputs, inface.source)
+        end
+    end
+    return inputs
+end
 
-    for input_uac in keys(left.balance_table_inputs)
-        input_row = proxy.balance_table_inputs[input_uac]
+function outputs_recursive(unit::Bus)::Vector{Component}
+    outputs = []
+    for outface in unit.output_interfaces
+        if outface.target.sys_function == sf_bus
+            append!(outputs, outputs_recursive(outface.target))
+        else
+            push!(outputs, outface.target)
+        end
+    end
+    return outputs
+end
+
+function bus_transfer_sum(proxy::Bus, left::Bus, right::Bus)::Float64
+    transfer_sum = 0.0
+
+    for input in inputs_recursive(left)
+        input_row = proxy.balance_table_inputs[input.uac]
         input_sum = 0.0
 
-        for output_uac in keys(right.balance_table_outputs)
-            output_row = proxy.balance_table_outputs[output_uac]
+        for output in outputs_recursive(right)
+            output_row = proxy.balance_table_outputs[output.uac]
             input_sum += proxy.balance_table[
                 input_row.input_index,
                 output_row.output_index*2-1
             ]
         end
 
-        bus_sum += input_sum
+        transfer_sum += input_sum
     end
 
-    return bus_sum
+    return transfer_sum
 end
 
 """
@@ -719,7 +743,7 @@ function distribute!(unit::Bus)
         # set energy between busses by requesting the value from the proxy. we do this for
         # outgoing busses only so the connections are not counted twice
         for outface in filter_outputs(unit, sf_bus, true)
-            val = input_bus_sum(unit.proxy, unit, outface.target)
+            val = bus_transfer_sum(unit.proxy, unit, outface.target)
             set!(outface, val)
         end
 
