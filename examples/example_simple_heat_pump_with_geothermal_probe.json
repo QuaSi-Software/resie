@@ -88,7 +88,7 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
-            "static_temperature": 12,
+            "constant_temperature": 7,
             "scale": 10
         },
         "TST_STH_01": {

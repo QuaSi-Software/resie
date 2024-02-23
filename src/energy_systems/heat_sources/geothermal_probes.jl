@@ -5,7 +5,8 @@ This implementations acts as storage as it can produce and load energy.
 
 using JSON
 using Interpolations
-using Plots
+using Plots: plot, scatter, savefig
+import Plots
 mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
@@ -333,36 +334,30 @@ Outputs:
 
 """
 function get_library_g_values(unit::Component, borehole_depth::Float64, borehole_radius::Float64, borehole_spacing::Float64, key1::String, key2::String, libfile_path::String)
-    # borehole_depth is set by user. 
     # Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
-    if borehole_depth >= 24 && borehole_depth <= 48
-        borehole_depth_library_lower = 24
-        borehole_radius_library_lower = 0.075
+    # Define the ranges and corresponding values in an array of tuples
+    borehole_ranges = [ (24, 0.075),
+                        (48, 0.075),
+                        (96, 0.075),
+                        (192, 0.08),
+                        (384, 0.0875)]  # defines the borehole depth [m] and corresponding borehole radius [m] of the library. 
+                                        # They are the same for all configurations.
 
-        borehole_depth_library_upper = 48
-        borehole_radius_library_upper = 0.075
-    elseif borehole_depth >= 48 && borehole_depth <= 96
-        borehole_depth_library_lower = 48
-        borehole_radius_library_lower = 0.075
-
-        borehole_depth_library_upper = 96
-        borehole_radius_library_upper = 075
-    elseif borehole_depth >= 96 && borehole_depth <= 192
-        borehole_depth_library_lower = 96
-        borehole_radius_library_lower = 0.075
-
-        borehole_depth_library_upper = 192
-        borehole_radius_library_upper = 0.08
-    elseif borehole_depth >= 192 && borehole_depth <= 384
-        borehole_depth_library_lower = 192
-        borehole_radius_library_lower = 0.08
-
-        borehole_depth_library_upper = 384
-        borehole_radius_library_upper = 0.0875
-    else
-        @error "In geothermal probe \"$(unit.uac)\", the borehole_depth needs to be between 24 m and 384 m, but is $(borehole_depth) m."
+    depths = first.(borehole_ranges)
+    upper_index = findfirst(x -> x > borehole_depth, depths)
+    lower_index = upper_index - 1
+    
+    # If borehole_depth is less than the first depth or beyond all known ranges
+    if upper_index === nothing || upper_index == 1
+        @error "In geothermal probe \"$(unit.uac)\", the borehole_depth needs to be between $(depths[1]) m and $(depths[end]) m, but is $(borehole_depth) m."
         exit()
     end
+    
+    # Extracting the lower and upper bounds details
+    borehole_depth_library_lower = borehole_ranges[lower_index][1]
+    borehole_depth_library_upper = borehole_ranges[upper_index][1]
+    borehole_radius_library_lower = borehole_ranges[lower_index][2]
+    borehole_radius_library_upper = borehole_ranges[upper_index][2]
 
     # Read in given library file
     local library
