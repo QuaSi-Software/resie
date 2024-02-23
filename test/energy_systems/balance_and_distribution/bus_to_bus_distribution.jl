@@ -97,10 +97,10 @@ function test_short_chain_distribution()
     EnergySystems.distribute!(components["TST_BUS_02"])
 
     bus_1 = components["TST_BUS_01"]
-    @test bus_1.output_interfaces[1].balance == 1500.0
+    @test bus_1.output_interfaces[1].sum_abs_change == 1500.0 * 2
 
     bus_2 = components["TST_BUS_02"]
-    @test bus_2.input_interfaces[1].balance == 1500.0
+    @test bus_2.input_interfaces[1].sum_abs_change == 1500.0 * 2
 end
 
 @testset "short_chain_distribution" begin
@@ -232,17 +232,17 @@ function test_long_chain_distribution()
     EnergySystems.distribute!(components["TST_BUS_04"])
 
     bus_1 = components["TST_BUS_01"]
-    @test bus_1.output_interfaces[1].balance == 1500.0
+    @test bus_1.output_interfaces[1].sum_abs_change == 1500.0 * 2
 
     bus_2 = components["TST_BUS_02"]
-    @test bus_2.output_interfaces[1].balance == 1000.0
-    @test bus_2.output_interfaces[2].balance == 500.0
+    @test bus_2.output_interfaces[1].sum_abs_change == 1000.0 * 2
+    @test bus_2.output_interfaces[2].sum_abs_change == 500.0 * 2
 
     bus_3 = components["TST_BUS_03"]
-    @test bus_3.input_interfaces[1].balance == 1000.0
+    @test bus_3.input_interfaces[1].sum_abs_change == 1000.0 * 2
 
     bus_4 = components["TST_BUS_04"]
-    @test bus_4.input_interfaces[1].balance == 500.0
+    @test bus_4.input_interfaces[1].sum_abs_change == 500.0 * 2
 end
 
 @testset "long_chain_distribution" begin

@@ -744,7 +744,10 @@ function distribute!(unit::Bus)
         # outgoing busses only so the connections are not counted twice
         for outface in filter_outputs(unit, sf_bus, true)
             val = bus_transfer_sum(unit.proxy, unit, outface.target)
+            # set the value, then set the interface (back to) zero, so the balance is
+            # upheld, but the transfer of energy is registered
             set!(outface, val)
+            set!(outface, 0.0)
         end
 
         return
