@@ -777,13 +777,32 @@ function distribute!(unit::Bus)
 end
 
 function output_values(unit::Bus)::Vector{String}
-    return ["Balance"]
+    # dynamic output channels
+    outputs = [
+        "Transfer->" * outface.target.uac
+        for outface in unit.output_interfaces
+        if outface.target.sys_function == sf_bus
+    ]
+
+    # add to static output channels
+    return append!([
+        "Balance"
+    ], outputs)
 end
 
 function output_value(unit::Bus, key::OutputKey)::Float64
     if key.value_key == "Balance"
         return balance(unit)
+
+    elseif startswith(key.value_key, "Transfer")
+        out_uac = last(split(key.value_key, "->"))
+        outface = first([
+            f for f in unit.output_interfaces
+            if f.target.uac == out_uac
+        ])
+        return calculate_energy_flow(outface)
     end
+
     throw(KeyError(key.value_key))
 end
 
