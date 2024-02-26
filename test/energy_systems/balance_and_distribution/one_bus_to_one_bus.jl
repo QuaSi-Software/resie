@@ -74,7 +74,7 @@ function test_one_bus_to_one_bus()
     EnergySystems.control(bus_2, components, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance ≈ 0.0
-    @test demand.input_interfaces[demand.medium].temperature === 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
     @test EnergySystems.balance(bus_1) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
@@ -84,27 +84,27 @@ function test_one_bus_to_one_bus()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
-    @test EnergySystems.temperature_first(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_max_highest(exchanges) === 55.0
 
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance ≈ -75.0
-    @test demand.input_interfaces[demand.medium].temperature === 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
     @test EnergySystems.balance(bus_1) ≈ -75.0
     @test EnergySystems.balance(bus_2) ≈ -75.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
@@ -116,24 +116,24 @@ function test_one_bus_to_one_bus()
     @test EnergySystems.balance(exchanges) ≈ -75.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ -75.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     # from the perspective of the interface between bus 1 and 2, bus 1 has a balance of
     # zero as the demand does not "backflow" from bus 2 to 1
     exchanges = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
-    @test EnergySystems.temperature_first(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ -75.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_max_highest(exchanges) === 55.0
 
     EnergySystems.process(bus_2, simulation_parameters)
     EnergySystems.process(bus_1, simulation_parameters)
@@ -144,25 +144,25 @@ function test_one_bus_to_one_bus()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_2.input_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ -75.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 75.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_max_highest(exchanges) === 55.0
 
     @test demand.input_interfaces[demand.medium].balance ≈ -75.0
-    @test demand.input_interfaces[demand.medium].temperature === 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
     @test EnergySystems.balance(bus_1) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test bus_1.remainder ≈ 0.0
@@ -173,7 +173,7 @@ function test_one_bus_to_one_bus()
     EnergySystems.distribute!(bus_1)
 
     @test demand.input_interfaces[demand.medium].balance ≈ 0.0
-    @test demand.input_interfaces[demand.medium].temperature === 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 150.0
     @test EnergySystems.balance(bus_1) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0

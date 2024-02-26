@@ -141,19 +141,19 @@ function test_one_bus_to_many_bus()
     @test EnergySystems.balance(exchanges) ≈ -100.0
     @test EnergySystems.storage_potential(exchanges) ≈ -500.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
     @test EnergySystems.balance(exchanges) ≈ -100.0
     @test EnergySystems.storage_potential(exchanges) ≈ -500.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_1.output_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ -100.0 # not -200 because we "call from" bus 2
     @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 100.0
-    @test EnergySystems.temperature_first(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) === nothing
 
     EnergySystems.process(bus_2, simulation_parameters)
     EnergySystems.process(bus_1, simulation_parameters)
@@ -165,13 +165,13 @@ function test_one_bus_to_many_bus()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ -600.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ -600.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     EnergySystems.load(storage_1, simulation_parameters)
     EnergySystems.load(storage_2, simulation_parameters)
@@ -186,13 +186,13 @@ function test_one_bus_to_many_bus()
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ -600.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_3.input_interfaces[1], bus_3)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.storage_potential(exchanges) ≈ -600.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temperature_first(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].sum_abs_change ≈ 100.0

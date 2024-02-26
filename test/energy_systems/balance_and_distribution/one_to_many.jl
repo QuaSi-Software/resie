@@ -88,18 +88,18 @@ function test_many_to_one()
     EnergySystems.process(demand_1, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance == -500.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature == 55.0
+    @test demand_1.input_interfaces[demand_1.medium].temperature_min == 55.0
 
     EnergySystems.process(demand_2, simulation_parameters)
 
     @test demand_2.input_interfaces[demand_2.medium].balance == -500.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature == 55.0
+    @test demand_2.input_interfaces[demand_2.medium].temperature_min == 55.0
 
     EnergySystems.process(bus, simulation_parameters)
     EnergySystems.process(source, simulation_parameters)
 
     @test source.output_interfaces[source.medium].balance == 1000.0
-    @test source.output_interfaces[source.medium].temperature == 55.0
+    @test source.output_interfaces[source.medium].temperature_max == 55.0
 
     blnc = EnergySystems.balance(bus)
     @test blnc == 0.0
@@ -107,13 +107,13 @@ function test_many_to_one()
     EnergySystems.distribute!(bus)
 
     @test demand_1.input_interfaces[demand_1.medium].balance == 0.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature === 55.0
+    @test demand_1.input_interfaces[demand_1.medium].temperature_min === 55.0
 
     @test demand_2.input_interfaces[demand_2.medium].balance == 0.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature === 55.0
+    @test demand_2.input_interfaces[demand_2.medium].temperature_min === 55.0
 
     @test source.output_interfaces[source.medium].balance == 0.0
-    @test source.output_interfaces[source.medium].temperature == 55.0
+    @test source.output_interfaces[source.medium].temperature_max == 55.0
 
 end
 
