@@ -442,13 +442,17 @@ function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min
     end
 end
 
-function find_interface_on_proxy(proxy::Bus, needle::SystemInterface)
+function find_interface_on_proxy(
+    proxy::Bus,
+    needle::SystemInterface
+)::Union{Nothing,SystemInterface}
     for inface in proxy.input_interfaces
         if inface.source == needle.source return inface end
     end
     for outface in proxy.output_interfaces
         if outface.target == needle.target return outface end
     end
+    return nothing
 end
 
 function balance_on(
@@ -456,7 +460,8 @@ function balance_on(
     unit::Bus
 )::Vector{EnergyExchange}
     if unit.proxy !== nothing
-        return balance_on(find_interface_on_proxy(unit.proxy, interface), unit.proxy)
+        proxy_interface = find_interface_on_proxy(unit.proxy, interface)
+        return proxy_interface === nothing ? [] : balance_on(proxy_interface, unit.proxy)
     end
 
     input_index = nothing
