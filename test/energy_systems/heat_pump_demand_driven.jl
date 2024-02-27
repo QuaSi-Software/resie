@@ -65,17 +65,16 @@ function test_heat_pump_demand_driven_correct_order()
         EnergySystems.reset(unit)
     end
 
+    demand.constant_demand = 900.0*4
+    demand.constant_temperature = 45.0
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.demand = 900
-    demand.temperature = 45
-    demand.input_interfaces[demand.medium].temperature_min = 45
-
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
+
+    source.constant_power = 5000.0
+    source.constant_temperature = 35
     EnergySystems.control(source, components, simulation_parameters)
 
-    source.max_energy = 5000/4
-    source.temperature = 35
     source.output_interfaces[source.medium].temperature_max = 35
     source.output_interfaces[source.medium].max_energy = 5000/4
 
@@ -89,11 +88,11 @@ function test_heat_pump_demand_driven_correct_order()
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 1800
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max == 45
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min == 45
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -70.7213578500708
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -829.2786421499292
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min == 35
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_max == 35
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].balance ≈ 0
@@ -111,17 +110,16 @@ function test_heat_pump_demand_driven_correct_order()
         EnergySystems.reset(unit)
     end
 
+    demand.constant_demand = 2100*4
+    demand.constant_temperature = 75.0
     EnergySystems.control(demand, components, simulation_parameters)
 
-    demand.demand = 2100
-    demand.temperature = 75
-    demand.input_interfaces[demand.medium].temperature_min = 75
-
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
+
+    source.constant_power = 500*4
+    source.constant_temperature = 35.0
     EnergySystems.control(source, components, simulation_parameters)
 
-    source.max_energy = 500
-    source.temperature = 35
     source.output_interfaces[source.medium].temperature_max = 35
     source.output_interfaces[source.medium].max_energy = 500
 
@@ -135,11 +133,11 @@ function test_heat_pump_demand_driven_correct_order()
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -2100 + 500*(3.4814999999999996/(3.4814999999999996-1))
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 2100 + 500*(3.4814999999999996/(3.4814999999999996-1))
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max == 75
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min == 75
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(500*(3.4814999999999996/(3.4814999999999996-1)) - 500)
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -500
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min == 35
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_max == 35
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].balance ≈ 0

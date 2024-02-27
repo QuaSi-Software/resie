@@ -134,13 +134,13 @@ function test_primary_producer_can_load_storage()
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[1], bus
     )
-    @test EnergySystems.balance(exchanges) == -5000.0
+    @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
     @test EnergySystems.storage_potential(exchanges) == -40000.0
 
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[3], bus
     )
-    @test EnergySystems.balance(exchanges) == -5000.0
+    @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
     @test EnergySystems.storage_potential(exchanges) == 0.0
 
     EnergySystems.process(boiler_1, simulation_parameters)
@@ -202,7 +202,7 @@ function test_primary_producer_can_load_storage()
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[1], bus
     )
-    @test EnergySystems.balance(exchanges) == -1500.0
+    @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
     @test EnergySystems.storage_potential(exchanges) == -40000.0
 
     EnergySystems.process(boiler_1, simulation_parameters)
