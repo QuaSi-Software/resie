@@ -41,33 +41,38 @@
                 "unit": "°C",
                 "scale_factor": 1
             },
-
             "6": {
+                "key": {"TST_GTP_01": ["current_output_temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "7": {
                 "key": {"TST_GTP_01": ["borehole_thermal_resistance"]},
                 "axis": "right",
                 "unit": "-",
                 "scale_factor": 1
             },
 
-            "7": {
+            "8": {
                 "key": {"TST_GTP_01": ["fluid_reynolds_number"]},
                 "axis": "left",
                 "unit": "-",
                 "scale_factor": 1
             },
-            "8": {
+            "9": {
                 "key": {"TST_GTP_01": ["m_h_w_ht1 IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001       
             },
-            "9": {
+            "10": {
                 "key": {"TST_STH_01": ["m_h_w_ht1 Supply"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "10": {
+            "11": {
                 "key": {"TST_DEM_01": ["m_h_w_lt1 Demand"]},
                 "axis": "left",
                 "unit": "kWh",
@@ -78,7 +83,7 @@
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 157680000,
+        "end": 31536000,
         "time_step_seconds": 3600
     },
     "components": {
@@ -88,7 +93,7 @@
             "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
-            "constant_temperature": 7,
+            "constant_temperature": 3,
             "scale": 10
         },
         "TST_STH_01": {
