@@ -410,6 +410,31 @@ function highest(
 end
 
 """
+    highest(temperature_vector::Vector{Temperature})::Temperature
+
+Returns the highest temperature of a vector of temperatures and handles nothing-values:
+- If all of the inputs are floats, the maximum will be returned.
+- If some of the inputs are nothing and the others are float, the highest float will be returned.
+- If all of the inputs are nothing, nothing will be returned.
+"""
+function highest(temperature_vector::Vector{Temperature})::Temperature
+    n_temperatures = length(temperature_vector)
+    if n_temperatures == 0
+        return nothing
+    elseif n_temperatures == 1
+        return temperature_vector[1]
+    else 
+        current_highest = highest(temperature_vector[1], temperature_vector[2])
+        if n_temperatures > 2
+            for idx in 3:n_temperatures
+                current_highest = highest(current_highest, temperature_vector[idx])
+            end
+        end
+        return current_highest
+    end
+end
+
+"""
     lowest(temperature_1, temperature_2)::Temperature
 
 Returns the lowest temperature of the two inputs and handles nothing-values:

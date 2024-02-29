@@ -7,7 +7,7 @@
         "csv_output_keys": {
             "TST_STH_01": ["m_h_w_ht1 OUT"],
             "TST_DEM_01": ["m_h_w_lt1 IN"],
-            "TST_GTP_01": ["borehole_temperature","borehole_thermal_resistance","fluid_temperature","fluid_reynolds_number"]
+            "TST_GTP_01": ["fluid_temperature","fluid_reynolds_number"]
         },
         "output_plot": {
             
@@ -29,12 +29,6 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "4": {
-                "key": {"TST_GTP_01": ["borehole_temperature"]},
-                "axis": "right",
-                "unit": "°C",
-                "scale_factor": 1
-            },
             "5": {
                 "key": {"TST_GTP_01": ["fluid_temperature"]},
                 "axis": "right",
@@ -47,13 +41,6 @@
                 "unit": "°C",
                 "scale_factor": 1
             },
-            "7": {
-                "key": {"TST_GTP_01": ["borehole_thermal_resistance"]},
-                "axis": "right",
-                "unit": "-",
-                "scale_factor": 1
-            },
-
             "8": {
                 "key": {"TST_GTP_01": ["fluid_reynolds_number"]},
                 "axis": "left",
@@ -119,10 +106,10 @@
             "soil_undisturbed_ground_temperature": 12.0,
             "soil_heat_conductivity": 1.6 ,
             "borehole_thermal_resistance": 0.1, 
-            "probe_field_geometry": "zoned_rectangle",
-            "number_of_probes_x": 5, 
-            "number_of_probes_y": 11,
-            "probe_field_key_2": "2_6",
+            "probe_field_geometry": "rectangle",
+            "number_of_probes_x": 2, 
+            "number_of_probes_y": 3,
+            "probe_field_key_2": "",
             "borehole_spacing": 1,
             "probe_type": 2,
             "probe_depth": 150,

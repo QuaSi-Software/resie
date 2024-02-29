@@ -7,6 +7,7 @@ using JSON
 using Interpolations
 using Plots: plot, scatter, savefig
 import Plots
+using Roots
 mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
@@ -23,7 +24,7 @@ mutable struct GeothermalProbes <: Component
     max_input_power::Float64
     regeneration::Bool
     max_output_energy::Float64
-    current_max_energy::Float64
+    current_max_output_energy::Float64
     max_input_energy::Float64
     current_output_temperature::Temperature
     current_input_temperature::Temperature  
@@ -34,8 +35,9 @@ mutable struct GeothermalProbes <: Component
     borehole_thermal_resistance::Float64
     g_function::Vector{Float64}
     time_index::Int
-    fluid_temperature::Vector{Temperature}
+    fluid_temperature::Temperature
     borehole_current_wall_temperature::Temperature
+    output_temperatures_last_timestep::Vector{Temperature}
 
     energy_in_out_per_probe_meter::Vector{Float64}
     energy_in_out_difference_per_probe_meter::Vector{Float64}
@@ -99,7 +101,7 @@ mutable struct GeothermalProbes <: Component
             default(config, "max_input_power", 50),               # maximum input power in W/m probe
             default(config, "regeneration", true),                # flag if regeneration should be taken into account
             0.0,                                                  # max_output_energy in every time step, calculated in control()
-            0.0,                                                  # current_max_energy
+            0.0,                                                  # current_max_output_energy
             0.0,                                                  # max_input_energy in every time step, calculated in control()
             0.0,                                                  # output temperature in current time step, calculated in control()
             0.0,                                                  # input temperature in current time step, calculated in control()
@@ -110,8 +112,9 @@ mutable struct GeothermalProbes <: Component
             default(config, "borehole_thermal_resistance", 0.10),            # thermal resistance in [(m K)/W]
             [],                                                   # pre-calculated multiscale g-function. Calculated in pre-processing.
             0,                                                    # index of current time step to get access on time dependent g-function values
-            [],                                                   # average fluid temperature
+            0.0,                                                  # average fluid temperature
             default(config, "boreholewall_start_temperature", 4.0),          # boreholewall starting temperature
+            [],                                                   # output_temperatures_last_timestep
             
             [],                                                   # vector to hold specific energy sum (in and out) per probe meter in each time step
             [],                                                   # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
@@ -167,8 +170,8 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # calculate and initialize constant variables
     unit.energy_in_out_per_probe_meter = zeros(sim_params["number_of_time_steps"])
     unit.energy_in_out_difference_per_probe_meter = zeros(sim_params["number_of_time_steps"])
-    unit.fluid_temperature = zeros(sim_params["number_of_time_steps"])
-    unit.fluid_temperature[1] = unit.borehole_current_wall_temperature
+    unit.fluid_temperature = unit.borehole_current_wall_temperature
+    unit.output_temperatures_last_timestep = [unit.borehole_current_wall_temperature]
 
     unit.radius_pipe_inner = unit.pipe_diameter_inner / 2            # [m]
     unit.radius_pipe_outer = unit.pipe_diameter_outer / 2            # [m]
@@ -450,53 +453,37 @@ function control(
     unit.time_index = unit.time_index + 1 
 
     # get output temperature for energy output and set temperature and max_energy to output interface
-    unit.current_output_temperature = unit.fluid_temperature[max(1,unit.time_index-1)] + unit.unloading_temperature_spread/2
+    unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread/2
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
                      nothing,
                      unit.current_output_temperature
                      )
 
-    # # Simple controller to adjust the max_energy in every time step using the output temperature as command variable.
-    # # Should avoid alternation if lower bound of fluid temperature is reached.
-    # # still needs some adjustments and should be expanded to probe field loading as well. Functionality is currently deactivated. 
-    # # set max_energy to output interface to provide information for connected components
-    # function scale_factor_down(temp_diff::Float64)
-    #     base_scale = 0.99  # Base scale factor for minor temperature differences
-    #     sensitivity = 0.05  # How sensitively the scale factor responds to temperature difference
-    #     return max(base_scale - sensitivity * temp_diff, 0.5)  # Ensure scale factor does not go below a reasonable minimum of 0.5
-    # end
-    
-    # function scale_factor_up(temp_diff::Float64)
-    #     base_scale = 1.01  # Base scale factor for minor temperature differences
-    #     sensitivity = 0.03  # How sensitively the scale factor responds to temperature difference
-    #     return min(base_scale + sensitivity * abs(temp_diff), 1.5)  # Ensure scale factor does not exceed a reasonable maximum off 1.5
-    # end
-    
-    # scale_fact_rough = 1.4
-    # if unit.time_index >= 4
-    #     temp_diff = unit.fluid_temperature[unit.time_index-1] - unit.fluid_temperature[unit.time_index-2]
-    #     if unit.energy_in_out_per_probe_meter[unit.time_index-1] == 0 &&    # had recent altrenations
-    #        unit.energy_in_out_per_probe_meter[unit.time_index-2] !== 0 &&
-    #        unit.energy_in_out_per_probe_meter[unit.time_index-3] == 0
-    #         unit.current_max_energy = unit.current_max_energy / scale_fact_rough
-    #     elseif unit.current_max_energy !== unit.max_output_energy && temp_diff < 0.0    # is cooling down
-    #         unit.current_max_energy = unit.current_max_energy * scale_factor_down(temp_diff)
-    #     elseif unit.current_max_energy !== unit.max_output_energy && temp_diff >= 0.0    # is heating up
-    #         unit.current_max_energy = min(unit.max_output_energy, unit.current_max_energy * scale_factor_up(temp_diff))
-    #     else
-    #         unit.current_max_energy = unit.max_output_energy
-    #     end
-    # else
-    #     unit.current_max_energy = unit.max_output_energy
-    # end
-    unit.current_max_energy = unit.max_output_energy
+    desired_output_temperature = highest(unit.output_temperatures_last_timestep) + 0.01  # TODO: adjust! Should this mind the priority or different temperature layer?
+                                                                                         # Or is there a way to gt the acutal temperatures in the current time step to 
+                                                                                         # avoid using them from the last timestep? 
+                                                                                         # adding 0.01 here to handle rough toleraces in find_zero()
 
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_energy)
+    local max_energy_in_out_per_probe_meter
+    try
+        max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_energy!(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
+                                                    -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
+                                                    Order0()
+                                                    )
+        
+    catch 
+        max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
+    end                                           
+
+    unit.current_max_output_energy = - max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
+    unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
+    unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0  # reset value as find_max_energy!() sets it to something
+
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
-    # TODO: add controller to avoid alternation in loading
     if unit.regeneration
-        unit.current_input_temperature = unit.fluid_temperature[max(1,unit.time_index-1)] - unit.loading_temperature_spread/2 # of geothermal probe field 
+        unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread/2 # of geothermal probe field 
         set_temperature!(unit.input_interfaces[unit.m_heat_in],
                          unit.current_input_temperature,
                          nothing
@@ -507,9 +494,15 @@ function control(
 
 end
 
-# function to calculate current new boreholewall temperature with g-functions
-function calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
+# hepler function to find max_energy that the fluid temperature of the probe field equals the desired_output_temperature.
+# Note that unit.energy_in_out_per_probe_meter[unit.time_index] has to be resetted at the end!
+function find_max_energy!(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
+   unit.energy_in_out_per_probe_meter[unit.time_index] = energy_in_out_per_probe_meter
+   return calculate_new_boreholewall_temperature(unit) + unit.unloading_temperature_spread/2 - desired_output_temperature
+end
 
+# function to calculate current new boreholewall temperature with g-functions
+function calculate_new_boreholewall_temperature(unit::GeothermalProbes)
     # R_B with Hellström (thermal borehole resistance)
     # calculate convective heat transfer coefficient alpha in pipie
     alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes)
@@ -525,7 +518,7 @@ function calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
                  ((1 + 2 * pi * unit.grout_heat_conductivity * beta) / (1 - 2 * pi * unit.grout_heat_conductivity * beta) +
                  unit.radius_pipe_outer^2 / (4 * unit.distance_pipe_center^2) * (1 + sigma * 16 * unit.radius_borehole^4 * unit.distance_pipe_center^4 / ((unit.radius_borehole^4 - unit.distance_pipe_center^4)^2))))
 
-    unit.borehole_thermal_resistance = R_1 / (2 * unit.probe_type)
+    borehole_thermal_resistance = R_1 / (2 * unit.probe_type)
 
     # calculate new average fluid temperature with g-function approach
     if unit.time_index == 1
@@ -536,9 +529,10 @@ function calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
 
     current_temperature_difference = sum(reverse(unit.energy_in_out_difference_per_probe_meter[1:unit.time_index]) .* unit.g_function[1:unit.time_index]) / (2 * pi * unit.soil_heat_conductivity)
 
-    unit.borehole_current_wall_temperature = unit.soil_undisturbed_ground_temperature + current_temperature_difference
-    unit.fluid_temperature[unit.time_index] = unit.borehole_current_wall_temperature + unit.energy_in_out_per_probe_meter[unit.time_index] * unit.borehole_thermal_resistance
+    borehole_current_wall_temperature = unit.soil_undisturbed_ground_temperature + current_temperature_difference
 
+    fluid_temperature = borehole_current_wall_temperature + unit.energy_in_out_per_probe_meter[unit.time_index] * borehole_thermal_resistance
+    return fluid_temperature
 end
 
 function calculate_alpha_pipe(unit::GeothermalProbes)
@@ -550,8 +544,8 @@ function calculate_alpha_pipe(unit::GeothermalProbes)
     use_dynamic_fluid_properties = false
     if use_dynamic_fluid_properties
         # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
-        fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature[unit.time_index]^2 - 0.0001579079*unit.fluid_temperature[unit.time_index]+0.0048830621
-        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature[unit.time_index] + 0.447
+        fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
         unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
         fluid_reynolds_number = (4 * mass_flow_per_pipe) / (fluid_dynamic_viscosity * unit.pipe_diameter_inner * pi)
     else 
@@ -602,13 +596,15 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     energy_demanded = balance(exchanges) +
                       energy_potential(exchanges) +
                       (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
-    energy_available = unit.current_max_energy  # is positive
+    energy_available = unit.current_max_output_energy  # is positive
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)    
         return
     end
+
+    unit.output_temperatures_last_timestep = temp_min_all_non_empty(exchanges)
 
     for exchange in exchanges
         demanded_on_interface = exchange.balance +
@@ -640,7 +636,7 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     end
 
     # write output heat flux into vector
-    energy_delivered = -(unit.current_max_energy - energy_available)
+    energy_delivered = -(unit.current_max_output_energy - energy_available)
     unit.energy_in_out_per_probe_meter[unit.time_index] = energy_delivered  / (unit.probe_depth * unit.number_of_probes) # from total energy to specific power of one single probe.
     
 end
@@ -657,7 +653,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     if ( energy_available <= sim_params["epsilon"] ||
          !unit.regeneration)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
+        unit.fluid_temperature = calculate_new_boreholewall_temperature(unit::GeothermalProbes)
         return
     end
 
@@ -695,7 +691,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
     
     # recalculate borehole temperature for next timestep
-    calculate_new_boreholewall_temperature!(unit::GeothermalProbes)
+    unit.fluid_temperature = calculate_new_boreholewall_temperature(unit::GeothermalProbes)
     
 end
 
@@ -722,10 +718,8 @@ function output_values(unit::GeothermalProbes)::Vector{String}
     return [string(unit.m_heat_in)*" IN",
             string(unit.m_heat_out)*" OUT",
             "TEMPERATURE_#NodeNum",
-            "borehole_temperature",
             "fluid_temperature",
             "current_output_temperature",
-            "borehole_thermal_resistance",
             "fluid_reynolds_number",
             "T_out",
             "Q_out",
@@ -746,14 +740,10 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         else
             return unit.temperature_field[idx]
         end
-    elseif key.value_key =="borehole_temperature"
-        return unit.borehole_current_wall_temperature
     elseif key.value_key =="fluid_temperature"
-        return unit.fluid_temperature[unit.time_index]
+        return unit.fluid_temperature
     elseif key.value_key == "current_output_temperature"
         return unit.current_output_temperature
-    elseif key.value_key =="borehole_thermal_resistance"
-        return unit.borehole_thermal_resistance
     elseif key.value_key =="fluid_reynolds_number"
         return unit.fluid_reynolds_number
     elseif key.value_key =="dT_monthly"
