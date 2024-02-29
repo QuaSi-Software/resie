@@ -577,7 +577,7 @@ function calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Flo
     k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
 
     # calculate Nu-Number
-    Nu_laminar = ((k_a / (1 - k_n) * (unit.fluid_prandtl_number * unit.pipe_diameter_inner * fluid_reynolds_number / unit.probe_depth)^k_n)^3 + 4.364^3)^(1 / 3)
+    Nu_laminar = ((k_a / (1 - k_n) * (unit.fluid_prandtl_number * unit.pipe_diameter_inner * fluid_reynolds_number / ((2 * unit.probe_type) * unit.probe_depth))^k_n)^3 + 4.364^3)^(1 / 3)
     return Nu_laminar
 end 
 
