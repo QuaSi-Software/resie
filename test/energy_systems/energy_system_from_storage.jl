@@ -102,7 +102,7 @@ function test_run_energy_system_from_storage()
     # input interfaces
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 30000
     @test EnergySystems.temp_max_highest(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
@@ -153,7 +153,7 @@ function test_run_energy_system_from_storage()
     # input interfaces
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 100
     @test EnergySystems.temp_max_highest(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
@@ -278,7 +278,7 @@ function test_run_energy_system_from_storage_denied()
     # input interfaces
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[lheat_bus.medium], lheat_bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 30000
     @test EnergySystems.temp_max_highest(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)

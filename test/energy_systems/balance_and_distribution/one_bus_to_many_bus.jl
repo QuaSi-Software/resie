@@ -143,12 +143,12 @@ function test_one_bus_to_many_bus()
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[3], bus_3)  # DEM_02
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.energy_potential(exchanges) ≈ 0.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 100.0  # limited by the actual demand
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)  # DEM_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.energy_potential(exchanges) ≈ 100.0
+    @test EnergySystems.energy_potential(exchanges) ≈ 100.0  # limited by the actual demand
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
     EnergySystems.process(demand_2, simulation_parameters)
