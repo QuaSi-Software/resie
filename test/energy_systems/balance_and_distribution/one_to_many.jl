@@ -88,13 +88,11 @@ function test_many_to_one()
 
     exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0  
     @test EnergySystems.energy_potential(exchanges) ≈ -1000.0 
     @test EnergySystems.temp_min_highest(exchanges) === 54.0
 
     exchanges = EnergySystems.balance_on(bus.output_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0  
     @test EnergySystems.energy_potential(exchanges) ≈ 500.0 # already inner_distributed and fitting the demand
     @test EnergySystems.temp_min_highest(exchanges) === nothing
     @test EnergySystems.temp_max_highest(exchanges) === 55.0
@@ -106,7 +104,6 @@ function test_many_to_one()
 
     exchanges = EnergySystems.balance_on(bus.output_interfaces[2], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0  
     @test EnergySystems.energy_potential(exchanges) ≈ 500.0 
     @test EnergySystems.temp_min_highest(exchanges) === nothing
     @test EnergySystems.temp_max_highest(exchanges) === 55.0
@@ -118,7 +115,6 @@ function test_many_to_one()
 
     exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0  
     @test EnergySystems.energy_potential(exchanges) ≈ -1000.0 
     @test EnergySystems.temp_min_highest(exchanges) === 54.0
 

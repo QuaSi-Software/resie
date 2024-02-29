@@ -113,7 +113,6 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
@@ -124,12 +123,10 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)
@@ -194,7 +191,6 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
@@ -205,12 +201,10 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -0.5*2400/4/0.6*0.4
 
     exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.5*2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)

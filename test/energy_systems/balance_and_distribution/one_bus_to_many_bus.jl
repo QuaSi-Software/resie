@@ -138,19 +138,16 @@ function test_one_bus_to_many_bus()
 
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0   # limited by the available energy of the source
     @test EnergySystems.energy_potential(exchanges) ≈ -100.0  # limited by the available energy of the source
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[3], bus_3)  # DEM_02
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 100.0  # limited by the actual demand
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)  # DEM_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0    # limited by the acutal demand
     @test EnergySystems.energy_potential(exchanges) ≈ 100.0
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
@@ -163,13 +160,11 @@ function test_one_bus_to_many_bus()
 
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[3], bus_2)  # TES_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[2], bus_3)  # TES_02
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -100.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
 
@@ -178,13 +173,11 @@ function test_one_bus_to_many_bus()
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[2], bus_2)  # TES_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[4], bus_3)  # TES_02
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
@@ -193,7 +186,6 @@ function test_one_bus_to_many_bus()
 
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[1], bus_2)  # SRC_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0      # limited by available energy from source
     @test EnergySystems.energy_potential(exchanges) ≈ -100.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
 

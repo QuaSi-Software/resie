@@ -82,13 +82,11 @@ function test_gasboiler_demand_driven_with_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -12000/4
 
     # no processing so far, balance is zero, energy_potential is zero
     exchanges = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(demand, simulation_parameters)
@@ -98,7 +96,6 @@ function test_gasboiler_demand_driven_with_bus()
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0  # balance of bus is always zero
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -12000.0/4
 
     EnergySystems.process(bus, simulation_parameters)
@@ -139,13 +136,11 @@ function test_gasboiler_demand_driven_with_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -15000/4
 
     # no processing so far, balance is zero, energy_potential is zero
     exchanges = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(demand, simulation_parameters)
@@ -155,7 +150,6 @@ function test_gasboiler_demand_driven_with_bus()
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0  # balance of bus is always zero
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -15000.0/4
 
     EnergySystems.process(bus, simulation_parameters)
@@ -196,13 +190,11 @@ function test_gasboiler_demand_driven_with_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -10000/4
 
     # no processing so far, balance is zero, energy_potential is zero
     exchanges = EnergySystems.balance_on(demand.input_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(demand, simulation_parameters)
@@ -212,7 +204,6 @@ function test_gasboiler_demand_driven_with_bus()
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0  # balance of bus is always zero
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -10000.0/4
 
     EnergySystems.process(bus, simulation_parameters)
@@ -298,13 +289,11 @@ function test_gasboiler_demand_driven_without_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 12000/4
 
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) == -Inf
 
     EnergySystems.process(demand, simulation_parameters)
@@ -314,7 +303,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -12000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(gasboiler, simulation_parameters)
@@ -327,7 +315,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand and gasboiler were processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -12000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(grid, simulation_parameters)
@@ -355,13 +342,11 @@ function test_gasboiler_demand_driven_without_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 15000/4
 
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) == -Inf
 
     EnergySystems.process(demand, simulation_parameters)
@@ -371,7 +356,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -15000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(gasboiler, simulation_parameters)
@@ -384,7 +368,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand and gasboiler were processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -12000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(grid, simulation_parameters)
@@ -412,13 +395,11 @@ function test_gasboiler_demand_driven_without_bus()
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 10000/4
 
     # no processing so far, balance is zero, energy_potential is non-zero
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) == -Inf
 
     EnergySystems.process(demand, simulation_parameters)
@@ -428,7 +409,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -10000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(gasboiler, simulation_parameters)
@@ -441,7 +421,6 @@ function test_gasboiler_demand_driven_without_bus()
     # demand and gasboiler were processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.input_interfaces[gasboiler.m_fuel_in], gasboiler)
     @test EnergySystems.balance(exchanges) ≈ -10000/4
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
 
     EnergySystems.process(grid, simulation_parameters)

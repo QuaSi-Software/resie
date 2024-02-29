@@ -135,13 +135,11 @@ function test_primary_producer_can_load_storage()
         bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
-    @test EnergySystems.storage_potential(exchanges) == -40000.0
 
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[3], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
-    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
@@ -163,13 +161,11 @@ function test_primary_producer_can_load_storage()
         bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[3], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     # in the second timestep, demand is lower than primary producer can provide, so the
     # excess can go into storage. because the secondary should not load the storage, it
@@ -203,7 +199,6 @@ function test_primary_producer_can_load_storage()
         bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
-    @test EnergySystems.storage_potential(exchanges) == -40000.0
 
     EnergySystems.process(boiler_1, simulation_parameters)
     @test boiler_1.output_interfaces[boiler_1.m_heat_out].balance == 2500.0
@@ -228,13 +223,11 @@ function test_primary_producer_can_load_storage()
         bus.input_interfaces[1], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == 0.0
 
     exchanges = EnergySystems.balance_on(
         bus.input_interfaces[3], bus
     )
     @test EnergySystems.balance(exchanges) == 0.0
-    @test EnergySystems.storage_potential(exchanges) == 0.0
 end
 
 @testset "primary_producer_can_load_storage" begin

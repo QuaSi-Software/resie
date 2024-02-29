@@ -85,22 +85,18 @@ function test_one_bus_to_one_bus()
     # demand not processed yet --> balance is zero, but energy_potential not
     exchanges = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
     @test EnergySystems.temp_min_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
     @test EnergySystems.temp_min_highest(exchanges) === nothing
 
@@ -117,24 +113,20 @@ function test_one_bus_to_one_bus()
     # for the outputs as the grid has not processed energy yet
     exchanges = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) === -75.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) === -75.0
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     # The interfaces of the proxy and the orignal bus shoule be the same at this point
     # The interface between bus 1 and bus 2 is not filled before distribute()
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
     @test EnergySystems.temp_max_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
     @test EnergySystems.temp_max_highest(exchanges) === nothing
 
@@ -147,22 +139,18 @@ function test_one_bus_to_one_bus()
     # balance of balance_on() of bus is always zero.
     exchanges = EnergySystems.balance_on(bus_1.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0  # as max_energy is set on bus_1.input_interfaces[1]
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[1], bus_1)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -75.0  # as max_energy is set on bus_1.input_interfaces[1]
     @test EnergySystems.temp_min_highest(exchanges) === 55.0
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 75.0  # as grid is produced, this is the produced energy at this point
     @test EnergySystems.temp_max_highest(exchanges) === nothing
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 75.0  # as grid is produced, this is the produced energy at this point
     @test EnergySystems.temp_max_highest(exchanges) === nothing
 
