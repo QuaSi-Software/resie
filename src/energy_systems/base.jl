@@ -316,20 +316,8 @@ function set_temperature!(
     temperature_min::Temperature=nothing,
     temperature_max::Temperature=nothing
 )
-    if interface.temperature_min !== nothing && temperature_min !== nothing
-        @warn ("Given temperature_min $temperature_min on interface $(interface.source.uac) " *
-        "-> $(interface.target.uac) doesn't match $(interface.temperature_min)")
-        interface.temperature_min = highest(interface.temperature_min, temperature_min)
-    else
-        interface.temperature_min = temperature_min
-    end
-    if interface.temperature_max !== nothing && temperature_max !== nothing
-        @warn ("Given temperature_max $temperature_max on interface $(interface.source.uac) " *
-        "-> $(interface.target.uac) doesn't match $(interface.temperature_max)")
-        interface.temperature_max = lowest(interface.temperature_max, temperature_max)
-    else
-        interface.temperature_max = temperature_max
-    end
+    interface.temperature_min = highest(interface.temperature_min, temperature_min)
+    interface.temperature_max = lowest(interface.temperature_max, temperature_max)
 
     if interface.source.sys_function == sf_bus
         set_temperatures!(
