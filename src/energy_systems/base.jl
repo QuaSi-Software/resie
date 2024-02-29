@@ -353,7 +353,6 @@ function set_max_energy!(
     interface::SystemInterface,
     value::Union{Nothing,Float64}
 )
-    
     if interface.max_energy === nothing
         interface.max_energy = value
     else
@@ -361,17 +360,9 @@ function set_max_energy!(
     end
 
     if interface.source.sys_function == sf_bus
-        if interface.target.sys_function == sf_storage
-            set_storage_potential!(interface.source, interface.target, false, value)
-        else
-            set_max_energy!(interface.source, interface.target, false, value)
-        end
+        set_max_energy!(interface.source, interface.target, false, value)
     elseif interface.target.sys_function == sf_bus
-        if interface.source.sys_function == sf_storage
-            set_storage_potential!(interface.target, interface.source, true, value)
-        else
-            set_max_energy!(interface.target, interface.source, true, value)
-        end
+        set_max_energy!(interface.target, interface.source, true, value)
     end
 end
 
@@ -447,7 +438,6 @@ Base.@kwdef mutable struct EnergyExchange
     balance::Float64
     uac::String
     energy_potential::Float64
-    storage_potential::Float64
     temperature_min::Temperature
     temperature_max::Temperature
     pressure::Union{Nothing,Float64}
@@ -485,20 +475,6 @@ Returns:
 """
 function energy_potential(entries::Vector{EnergyExchange})::Float64
     return sum(e.energy_potential for e in entries; init=0.0)
-end
-
-"""
-    storage_potential(exchanges)
-
-Sum of storage potentials over the given list of energy exchanges.
-
-Args:
-    `entries::Vector{EnergyExchange}`: The exchanges to sum over
-Returns:
-    `Float64`: Sum of storage potentials
-"""
-function storage_potential(entries::Vector{EnergyExchange})::Float64
-    return sum(e.storage_potential for e in entries; init=0.0)
 end
 
 """
@@ -608,8 +584,6 @@ without having to check if its connected to a Bus or directly to a component.
 # Returns NamedTuple with
 - "balance"::Float64:           The balance of the target component that can be considered a 
                                 demand on the source component
-- "storage_potential"::Float64: An additional demand that covers the free storage space 
-                                connected to the target component
 - "energy_potential"::Float64:  The maximum enery an interface can provide or consume
 - "temperature"::Temperature:   The temperature of the interface
 """
@@ -621,7 +595,6 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         balance=interface.balance,
         uac=unit.uac,
         energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
-        storage_potential=0.0,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,

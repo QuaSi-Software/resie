@@ -82,9 +82,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         outface = unit.output_interfaces[unit.medium]
         exchanges = balance_on(outface, outface.target)
-        blnc = balance(exchanges) +
-            energy_potential(exchanges) +
-            (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+        blnc = balance(exchanges) + energy_potential(exchanges)
         if blnc < 0.0
             unit.output_sum += blnc
             add!(outface, abs(blnc))
@@ -92,9 +90,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
     else
         inface = unit.input_interfaces[unit.medium]
         exchanges = balance_on(inface, inface.source)
-        blnc = balance(exchanges) +
-            energy_potential(exchanges) +
-            (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+        blnc = balance(exchanges) + energy_potential(exchanges)
         if blnc > 0.0
             unit.input_sum += blnc
             sub!(inface, abs(blnc))

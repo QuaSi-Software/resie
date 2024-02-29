@@ -66,7 +66,6 @@ function control(
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
-
 end
 
 function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
@@ -75,8 +74,7 @@ function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExc
     return [EnEx(
         balance=interface.balance,
         uac=unit.uac,
-        energy_potential=0.0,
-        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
@@ -87,9 +85,7 @@ end
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    energy_demand = balance(exchanges) +
-        energy_potential(exchanges) +
-        (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
@@ -108,9 +104,7 @@ end
 function load(unit::Storage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) +
-        energy_potential(exchanges) +
-        (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)

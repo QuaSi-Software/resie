@@ -134,25 +134,20 @@ function check_el_in(
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_el_in].max_energy === nothing
         )
-            return (Inf, Inf)
+            return (Inf)
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
             potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-            potential_storage_el = storage_potential(exchanges)
-            if (
-                unit.input_interfaces[unit.m_el_in].do_storage_transfer
-                ? potential_energy_el + potential_storage_el
-                : potential_energy_el
-            ) <= sim_params["epsilon"]
-                return (0.0, 0.0)
+            if potential_energy_el <= sim_params["epsilon"]
+                return (0.0)
             end
-            return (potential_energy_el, potential_storage_el)
+            return (potential_energy_el)
         end
     else
-        return (Inf, Inf)
+        return (Inf)
     end
 end
 
@@ -166,7 +161,6 @@ function check_heat_in(
             && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
         )
             return ([Inf], 
-                    [Inf], 
                     [unit.input_interfaces[unit.m_heat_in].temperature_min], 
                     [unit.input_interfaces[unit.m_heat_in].temperature_max]
                 )
@@ -177,14 +171,12 @@ function check_heat_in(
             )
             return (
                 [e.balance + e.energy_potential for e in exchanges],
-                [e.storage_potential for e in exchanges],
                 temp_min_all(exchanges),
                 temp_max_all(exchanges)
             )
         end
     else
-        return ([Inf], 
-                [Inf], 
+        return ([Inf],
                 [unit.input_interfaces[unit.m_heat_in].temperature_min], 
                 [unit.input_interfaces[unit.m_heat_in].temperature_max]
             )
@@ -201,18 +193,13 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out].target
         )
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_heat_out = storage_potential(exchanges)
         temperature = temp_min_highest(exchanges)
-        if (
-            unit.output_interfaces[unit.m_heat_out].do_storage_transfer
-            ? potential_energy_heat_out + potential_storage_heat_out
-            : potential_energy_heat_out
-        ) >= -sim_params["epsilon"]
-            return (0.0, 0.0, temperature)
+        if potential_energy_heat_out >= -sim_params["epsilon"]
+            return (0.0, temperature)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out, temperature)
+        return (potential_energy_heat_out, temperature)
     else
-        return (-Inf, -Inf, nothing)
+        return (-Inf, nothing)
     end
 end
 
@@ -240,22 +227,14 @@ function calculate_energies(
 
     # get potentials from inputs/outputs. only the heat input is calculated as vector,
     # the electricity input and heat output are calculated as scalars
-    potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
+    potential_energy_el = check_el_in(unit, sim_params)
     potentials_energy_heat_in,
-        potentials_storage_heat_in,
         in_temps_min,
         in_temps_max = check_heat_in(unit, sim_params)
-    potential_energy_heat_out,
-        potential_storage_heat_out,
-        out_temp = check_heat_out(unit, sim_params)
+    potential_energy_heat_out, out_temp = check_heat_out(unit, sim_params)
 
-    available_el_in = unit.input_interfaces[unit.m_el_in].do_storage_transfer ?
-                      potential_energy_el + potential_storage_el :
-                      potential_energy_el
-
-    available_heat_out = unit.output_interfaces[unit.m_heat_out].do_storage_transfer ?
-                         potential_energy_heat_out + potential_storage_heat_out :
-                         potential_energy_heat_out
+    available_el_in = potential_energy_el
+    available_heat_out = potential_energy_heat_out
 
     # in the following we want to work with positive values as it is easier
     available_heat_out = abs(available_heat_out)
@@ -290,11 +269,7 @@ function calculate_energies(
 
         # check if it is an "empty" layer, usually from other outputs on a bus, which are
         # included for balance calculations but cannot offer energy
-        if (
-            unit.input_interfaces[unit.m_heat_in].do_storage_transfer
-            ? pot_heat_in + potentials_storage_heat_in[idx_layer]
-            : pot_heat_in
-        ) <= sim_params["epsilon"]
+        if pot_heat_in <= sim_params["epsilon"]
             continue
         end
 
@@ -323,10 +298,8 @@ function calculate_energies(
             exit()
         end
 
-        # energies for current layer with potential (+storage) heat in as basis
-        used_heat_in = unit.input_interfaces[unit.m_heat_in].do_storage_transfer ?
-                       pot_heat_in + potentials_storage_heat_in[idx_layer] :
-                       pot_heat_in
+        # energies for current layer with potential heat in as basis
+        used_heat_in = pot_heat_in
         used_el_in = used_heat_in / (cop - 1.0)
         used_heat_out = used_heat_in + used_el_in
 
