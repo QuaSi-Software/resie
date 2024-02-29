@@ -456,36 +456,40 @@ function control(
                      unit.current_output_temperature
                      )
 
-    # set max_energy to output interface to provide information for connected components
-    function scale_factor_down(temp_diff::Float64)
-        base_scale = 0.99  # Base scale factor for minor temperature differences
-        sensitivity = 0.05  # How sensitively the scale factor responds to temperature difference
-        return max(base_scale - sensitivity * temp_diff, 0.5)  # Ensure scale factor does not go below a reasonable minimum of 0.5
-    end
+    # # Simple controller to adjust the max_energy in every time step using the output temperature as command variable.
+    # # Should avoid alternation if lower bound of fluid temperature is reached.
+    # # still needs some adjustments and should be expanded to probe field loading as well. Functionality is currently deactivated. 
+    # # set max_energy to output interface to provide information for connected components
+    # function scale_factor_down(temp_diff::Float64)
+    #     base_scale = 0.99  # Base scale factor for minor temperature differences
+    #     sensitivity = 0.05  # How sensitively the scale factor responds to temperature difference
+    #     return max(base_scale - sensitivity * temp_diff, 0.5)  # Ensure scale factor does not go below a reasonable minimum of 0.5
+    # end
     
-    function scale_factor_up(temp_diff::Float64)
-        base_scale = 1.01  # Base scale factor for minor temperature differences
-        sensitivity = 0.03  # How sensitively the scale factor responds to temperature difference
-        return min(base_scale + sensitivity * abs(temp_diff), 1.5)  # Ensure scale factor does not exceed a reasonable maximum off 1.5
-    end
+    # function scale_factor_up(temp_diff::Float64)
+    #     base_scale = 1.01  # Base scale factor for minor temperature differences
+    #     sensitivity = 0.03  # How sensitively the scale factor responds to temperature difference
+    #     return min(base_scale + sensitivity * abs(temp_diff), 1.5)  # Ensure scale factor does not exceed a reasonable maximum off 1.5
+    # end
     
-    scale_fact_rough = 1.4
-    if unit.time_index >= 4
-        temp_diff = unit.fluid_temperature[unit.time_index-1] - unit.fluid_temperature[unit.time_index-2]
-        if unit.energy_in_out_per_probe_meter[unit.time_index-1] == 0 &&    # had recent altrenations
-           unit.energy_in_out_per_probe_meter[unit.time_index-2] !== 0 &&
-           unit.energy_in_out_per_probe_meter[unit.time_index-3] == 0
-            unit.current_max_energy = unit.current_max_energy / scale_fact_rough
-        elseif unit.current_max_energy !== unit.max_output_energy && temp_diff < 0.0    # is cooling down
-            unit.current_max_energy = unit.current_max_energy * scale_factor_down(temp_diff)
-        elseif unit.current_max_energy !== unit.max_output_energy && temp_diff >= 0.0    # is heating up
-            unit.current_max_energy = min(unit.max_output_energy, unit.current_max_energy * scale_factor_up(temp_diff))
-        else
-            unit.current_max_energy = unit.max_output_energy
-        end
-    else
-        unit.current_max_energy = unit.max_output_energy
-    end
+    # scale_fact_rough = 1.4
+    # if unit.time_index >= 4
+    #     temp_diff = unit.fluid_temperature[unit.time_index-1] - unit.fluid_temperature[unit.time_index-2]
+    #     if unit.energy_in_out_per_probe_meter[unit.time_index-1] == 0 &&    # had recent altrenations
+    #        unit.energy_in_out_per_probe_meter[unit.time_index-2] !== 0 &&
+    #        unit.energy_in_out_per_probe_meter[unit.time_index-3] == 0
+    #         unit.current_max_energy = unit.current_max_energy / scale_fact_rough
+    #     elseif unit.current_max_energy !== unit.max_output_energy && temp_diff < 0.0    # is cooling down
+    #         unit.current_max_energy = unit.current_max_energy * scale_factor_down(temp_diff)
+    #     elseif unit.current_max_energy !== unit.max_output_energy && temp_diff >= 0.0    # is heating up
+    #         unit.current_max_energy = min(unit.max_output_energy, unit.current_max_energy * scale_factor_up(temp_diff))
+    #     else
+    #         unit.current_max_energy = unit.max_output_energy
+    #     end
+    # else
+    #     unit.current_max_energy = unit.max_output_energy
+    # end
+    unit.current_max_energy = unit.max_output_energy
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_energy)
 
