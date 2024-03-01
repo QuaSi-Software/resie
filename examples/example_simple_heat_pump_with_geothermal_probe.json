@@ -7,7 +7,7 @@
         "csv_output_keys": {
             "TST_STH_01": ["m_h_w_ht1 OUT"],
             "TST_DEM_01": ["m_h_w_lt1 IN"],
-            "TST_GTP_01": ["fluid_temperature","fluid_reynolds_number"]
+            "TST_GTP_01": ["new_fluid_temperature","fluid_reynolds_number"]
         },
         "output_plot": {
             
@@ -30,7 +30,7 @@
                 "scale_factor": 0.001
             },
             "5": {
-                "key": {"TST_GTP_01": ["fluid_temperature"]},
+                "key": {"TST_GTP_01": ["new_fluid_temperature"]},
                 "axis": "right",
                 "unit": "°C",
                 "scale_factor": 1
@@ -102,15 +102,15 @@
             ],
             "max_output_power": 50,
             "max_input_power": 50,
-            "regeneration": true,
+            "regeneration": false,
             "soil_undisturbed_ground_temperature": 12.0,
             "soil_heat_conductivity": 1.6 ,
             "borehole_thermal_resistance": 0.1, 
             "probe_field_geometry": "rectangle",
-            "number_of_probes_x": 2, 
-            "number_of_probes_y": 3,
+            "number_of_probes_x": 15, 
+            "number_of_probes_y": 20,
             "probe_field_key_2": "",
-            "borehole_spacing": 1,
+            "borehole_spacing": 10,
             "probe_type": 2,
             "probe_depth": 150,
             "pipe_diameter_outer": 0.032,

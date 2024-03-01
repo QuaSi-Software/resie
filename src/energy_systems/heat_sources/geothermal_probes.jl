@@ -321,11 +321,11 @@ See: https://doi.org/10.15121/1811518
 There are various sets of grid points refering to different borehole depths and borehole cofigurations.
 Two sets of grid points have to be read out of one .json library-file to do interpolation, 
 as they are refered to specific borehole depth.
-Check, which two sets of grid points (refered to borehole depth borehole_depth_library_lower 
-and borehole depth borehole_depth_library_upper) will be read out of json file later.
+This function checks, which two sets of grid points (refered to borehole depth borehole_depth_library_lower 
+and borehole depth borehole_depth_library_upper) are read out of json file.
 First, each set of grid points is refered to a default borehole radius 
-(borehole_radius_library_lower, borehole_radius_library_upper). 
-Later, the grid points will be corrected to the real borehole radius.
+(borehole_radius_library_lower, borehole_radius_library_upper). Later, the grid points are
+corrected to the real borehole radius.
 
 Inputs:
     unit::Component              - current unit
@@ -459,25 +459,32 @@ function control(
                      unit.current_output_temperature
                      )
 
-    desired_output_temperature = highest(unit.output_temperatures_last_timestep) + 0.01  # TODO: adjust! Should this mind the priority or different temperature layer?
-                                                                                         # Or is there a way to gt the acutal temperatures in the current time step to 
-                                                                                         # avoid using them from the last timestep? 
-                                                                                         # adding 0.01 here to handle rough toleraces in find_zero()
+    # get requested temperature of the probe output, if they are written and present, to set the desired output 
+    # temperature. If the output interface does not provide a temperature, the highest requested temperature of the last
+    # timestep will be used to calculate the new max_energy. The max_energy is limited to the user-input of the max_energy
+    # and has only an effect if the probe field reaches the lower limit temperature while unloading.
+    exchange_temperatures = temp_min_all_non_empty(balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target))
+    desired_output_temperature = highest(exchange_temperatures[exchange_temperatures .< unit.current_output_temperature])
+
+    if desired_output_temperature === nothing  # desired temperature not given in output interface, use temperature of last timestep
+        desired_output_temperature = highest(unit.output_temperatures_last_timestep)
+    end 
+    if desired_output_temperature !== nothing
+        desired_output_temperature += 0.001  # add small number to avoid problems with rough tolerances of find_zero()
+    end 
 
     local max_energy_in_out_per_probe_meter
     try
         max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_energy!(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
-                                                    -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
-                                                    Order0()
-                                                    )
-        
-    catch 
+                                                      -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
+                                                      Order0()
+                                                      )
+    catch # handles desired_output_temperature === nothing and non-converging results of find_zero()
         max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
     end                                           
 
     unit.current_max_output_energy = - max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
     unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
-    unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0  # reset value as find_max_energy!() sets it to something
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
 
@@ -494,17 +501,62 @@ function control(
 
 end
 
-# hepler function to find max_energy that the fluid temperature of the probe field equals the desired_output_temperature.
-# Note that unit.energy_in_out_per_probe_meter[unit.time_index] has to be resetted at the end!
+"""
+    find_max_energy!(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
+
+Helper function that calls calculate_new_fluid_temperature() with a given energy_in_out_per_probe_meter and
+returns the difference of the resulting fluid temperature after applying energy_in_out_per_probe_meter to the probe field
+compared to a given desired_output_temperature. 
+This function can be used to find the energy that can be put into or taken out of the probe field while not exceeding 
+the given desired_output_temperature using a find_zero() algorithm.
+
+Note that this function resets the unit.energy_in_out_per_probe_meter[unit.time_index] to zero.
+
+Args:
+    energy_in_out_per_probe_meter::Float64:   the energy input (positve) or output (negative) of the probe field (per probe meter!)        
+    unit::GeothermalProbes :                  the unit struct of the geothermal probe with all its parameters
+    desired_output_temperature::Float64       the desired temperature of the fluid temperature at the probe field output
+Returns:
+    temperature_difference::Float64:          the temperature difference between the new fluid output temperature of the
+                                              geothermal probe field after applying energy_in_out_per_probe_meter and the 
+                                              desired output temperature.
+"""
 function find_max_energy!(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
+   # set energy_in_out_per_probe_meter to given energy_in_out_per_probe_meter to as vehicle 
+   # to deliver the information to calculate_new_fluid_temperature(unit)
    unit.energy_in_out_per_probe_meter[unit.time_index] = energy_in_out_per_probe_meter
-   return calculate_new_boreholewall_temperature(unit) + unit.unloading_temperature_spread/2 - desired_output_temperature
+
+   new_fluid_temperature = calculate_new_fluid_temperature(unit)
+
+    # reset energy_in_out_per_probe_meter.
+   unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0 
+
+   return new_fluid_temperature + unit.unloading_temperature_spread/2 - desired_output_temperature
 end
 
-# function to calculate current new boreholewall temperature with g-functions
-function calculate_new_boreholewall_temperature(unit::GeothermalProbes)
+"""
+    calculate_new_fluid_temperature(unit::GeothermalProbes)::Temperature
+
+Calculates the current new boreholewall temperature using g-functions as step response functions in 
+response to a given change in energy input or output compared to the last time step.
+
+Uses parameters stored in unit::GeothermalProbes, specifically the energy_in_out_per_probe_meter that has to be 
+a global variable within the geothermal probe and that is set in load() as positive value and in process() as negative value.
+Note that this function has to be called at least once in every time step to retrieve the current fluid temperature.
+
+To calculate the fluid tempeature from the borehole wall temperature, an approach by Hellström 1991 is used to
+determine the effective thermal borehole resistance using the convective heat transfer coefficient within the pipe.:
+Hellström, G. Ground Heat Storage [online]. Thermal Analyses of Duct Storage Systems. Theorie, 1991.
+
+Args:
+    unit::GeothermalProbes:         the unit struct of the geothermal probe with all its parameters
+Returns:
+    fluid_temperature::Float64:     the new average temperature of the fluid in the geothermal probe after an energy in- or output 
+                                    stored in unit.energy_in_out_per_probe_meter
+"""
+function calculate_new_fluid_temperature(unit::GeothermalProbes)
     # R_B with Hellström (thermal borehole resistance)
-    # calculate convective heat transfer coefficient alpha in pipie
+    # calculate convective heat transfer coefficient alpha in pipe
     alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes)
 
     # calculate effective thermal borehole resistance by multipole method (Hellström 1991) depending on alpha
@@ -535,6 +587,19 @@ function calculate_new_boreholewall_temperature(unit::GeothermalProbes)
     return fluid_temperature
 end
 
+"""
+    calculate_alpha_pipe(unit::GeothermalProbes)
+
+Calculates the convective heat transfer coefficient alpha in the pipe of the probe.
+Uses parameters stored in unit::GeothermalProbes to calculate the mass flow in the pipe,
+the Reynolds number, the Nusselt number for laminar or turbulent flow and finally alpha. 
+
+Args:
+    unit::GeothermalProbes:         the unit struct of the geothermal probe with all its parameters
+Returns:
+    alpha::Float64:                 convective heat transfer coefficient in pipe in current time step
+    fluid_reynolds_number::Float64  the current Reynolds number of the fluid in the pipe
+"""
 function calculate_alpha_pipe(unit::GeothermalProbes)
     # calculate mass flow in pipe
     power_in_out_per_pipe = wh_to_watts(abs(unit.energy_in_out_per_probe_meter[unit.time_index])) * unit.probe_depth / unit.probe_type  # W/pipe
@@ -568,9 +633,21 @@ function calculate_alpha_pipe(unit::GeothermalProbes)
 
     return alpha, fluid_reynolds_number
 end
-    
+ 
+"""
+    calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Float64)::Float64
+
+Calculates the Nusselt number for laminar flow through the pipe of the geothermal probe.
+Uses an approach from Ramming 2007, described in:
+Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
+
+Args:
+    unit::GeothermalProbes:             the unit struct of the geothermal probe with all its parameters
+    fluid_reynolds_number::Float64:     the current reynolds number in the pipe of the geothermal probe
+Returns:
+    Nusselt_laminar::Float64:           Nusselt number in current pipe for given Reynolds number and pipe dimensions
+"""
 function calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Float64)
-    # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
     k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
     k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
 
@@ -579,8 +656,20 @@ function calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Flo
     return Nu_laminar
 end 
 
+"""
+calculate_Nu_turbulent(unit::GeothermalProbes, fluid_reynolds_number::Float64)::Float64
+
+Calculates the Nusselt number for turbulent flow through the pipe of the geothermal probe.
+Uses an approach from Gnielinski described in:
+V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240 - 248, 1995. 
+
+Args:
+    unit::GeothermalProbes:             the unit struct of the geothermal probe with all its parameters
+    fluid_reynolds_number::Float64:     the current reynolds number in the pipe of the geothermal probe
+Returns:
+    Nusselt_turbulent::Float64:         Nusselt number in current pipe for given Reynolds number and pipe dimensions
+"""
 function calculate_Nu_turbulent(unit::GeothermalProbes, fluid_reynolds_number::Float64)
-    # Approached used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240–248, 1995. 
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
     Nu_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
                    (1 + 12.7 * sqrt(zeta / 8) * (unit.fluid_prandtl_number^(2 / 3) - 1)) 
@@ -653,7 +742,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     if ( energy_available <= sim_params["epsilon"] ||
          !unit.regeneration)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        unit.fluid_temperature = calculate_new_boreholewall_temperature(unit::GeothermalProbes)
+        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
         return
     end
 
@@ -691,7 +780,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
     
     # recalculate borehole temperature for next timestep
-    unit.fluid_temperature = calculate_new_boreholewall_temperature(unit::GeothermalProbes)
+    unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
     
 end
 
@@ -718,7 +807,7 @@ function output_values(unit::GeothermalProbes)::Vector{String}
     return [string(unit.m_heat_in)*" IN",
             string(unit.m_heat_out)*" OUT",
             "TEMPERATURE_#NodeNum",
-            "fluid_temperature",
+            "new_fluid_temperature",
             "current_output_temperature",
             "fluid_reynolds_number",
             "T_out",
@@ -740,7 +829,7 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         else
             return unit.temperature_field[idx]
         end
-    elseif key.value_key =="fluid_temperature"
+    elseif key.value_key =="new_fluid_temperature"
         return unit.fluid_temperature
     elseif key.value_key == "current_output_temperature"
         return unit.current_output_temperature
