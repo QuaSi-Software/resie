@@ -242,6 +242,8 @@ end
     add!(interface, change, temperature)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function add!(
     interface::SystemInterface,
@@ -272,6 +274,8 @@ end
     sub!(interface, change, temperature)
 
 Subtract the given amount of energy (in Wh) from the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function sub!(
     interface::SystemInterface,
@@ -311,6 +315,14 @@ function set!(
     interface.balance = new_val
 end
 
+"""
+    set_temperature!(interface, temp_min, temp_max)
+
+Set the minimum and maximum temperature for the interface.
+
+If the source or target of the interface is a bus, also calls the set_temperature!
+function on that bus.
+"""
 function set_temperature!(
     interface::SystemInterface,
     temperature_min::Temperature=nothing,
@@ -336,6 +348,9 @@ end
     set_max_energy!(interface, value)
 
 Set the maximum power that can be delivered to the given value.
+
+If the source or target of the interface is a bus, also calls the set_max_energy! function
+on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
@@ -366,7 +381,6 @@ function reset!(interface::SystemInterface)
     interface.temperature_max = nothing
     interface.max_energy = nothing
 end
-
 
 """
     highest(temperature_1, temperature_2)::Temperature
@@ -569,11 +583,9 @@ without having to check if its connected to a Bus or directly to a component.
     also defines which component is the source.
 - `unit::Component`: The receiving component
 
-# Returns NamedTuple with
-- "balance"::Float64:           The balance of the target component that can be considered a 
-                                demand on the source component
-- "energy_potential"::Float64:  The maximum enery an interface can provide or consume
-- "temperature"::Temperature:   The temperature of the interface
+# Returns
+- `Vector{EnergyExchange}`: A list of energy exchange items, which contain the information
+    required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
@@ -871,12 +883,35 @@ function link_output_with(unit::Component, components::Grouping)
     end
 end
 
+"""
+    initialise_components(component, sim_params)
+
+Initialises the given components.
+
+# Arguments
+`components::Grouping`: The components
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
 function initialise_components(components::Grouping, sim_params::Dict{String,Any})
     for component in values(components)
         initialise!(component, sim_params)
     end
 end
 
+"""
+    merge_bus_chains(chains, components, sim_params)
+
+For each of the given bus chains, creates a proxy bus as a merger of all busses in the
+chain and sets the proxy.
+
+Each chain is a set of interconnected busses of the same medium. For an example
+@See EnergySystems.find_chains which can identify the chains to merge.
+
+# Arguments
+`chains::Vector{Set{Component}}`: A list of chains of busses
+`components::Grouping`: All components of the energy systems
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
 function merge_bus_chains(
     chains::Vector{Set{Component}},
     components::Grouping,
