@@ -8,6 +8,17 @@ Base.@kwdef mutable struct ConnectionMatrix
     energy_flow::Union{Nothing,Vector{Vector{Bool}}}
 end
 
+"""
+    ConnectionMatrix(config)
+
+Constructor for ConnectionMatrix from a config in the user-input project file.
+
+# Arguments
+`config::Dict{String,Any}`: The component config
+
+# Returns
+`ConnectionMatrix`: The constructed instance
+"""
 function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
     if !haskey(config, "connections")
         return ConnectionMatrix([], [], nothing)
@@ -32,6 +43,9 @@ function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
     )
 end
 
+"""
+Container struct for information on an input of a bus relevant to the balance table.
+"""
 Base.@kwdef mutable struct BTInputRow
     source::Component
     priority::Integer
@@ -43,6 +57,14 @@ Base.@kwdef mutable struct BTInputRow
     temperature_max::Temperature = nothing
 end
 
+"""
+    reset!(bt_input_row)
+
+Resets the volatile fields of the balance table input row back to zero/nothing.
+
+# Arguments
+`row::BTInputRow`: The row to reset
+"""
 function reset!(row::BTInputRow)
     row.energy_potential = nothing
     row.energy_pool = nothing
@@ -50,6 +72,9 @@ function reset!(row::BTInputRow)
     row.temperature_max = nothing
 end
 
+"""
+Container struct for information on an output of a bus relevant to the balance table.
+"""
 Base.@kwdef mutable struct BTOutputRow
     target::Component
     priority::Integer
@@ -61,6 +86,14 @@ Base.@kwdef mutable struct BTOutputRow
     temperature_max::Temperature = nothing
 end
 
+"""
+    reset!(bt_output_row)
+
+Resets the volatile fields of the balance table output row back to zero/nothing.
+
+# Arguments
+`row::BTOutputRow`: The row to reset
+"""
 function reset!(row::BTOutputRow)
     row.energy_potential = nothing
     row.energy_pool = nothing
@@ -68,7 +101,21 @@ function reset!(row::BTOutputRow)
     row.temperature_max = nothing
 end
 
-function is_empty(row::Union{BTInputRow, BTOutputRow})
+"""
+    is_empty(balance_table_row)
+
+Checks if the given input/output row is "empty".
+
+Empty in this regard means if an energy potential or pool (utilised energy) has been
+written.
+
+# Arguments
+`row::Union{BTInputRow, BTOutputRow}`: The row to check
+
+# Returns
+`Bool`: If the row is empty or not
+"""
+function is_empty(row::Union{BTInputRow, BTOutputRow})::Bool
     return (
         row.energy_potential === nothing
         && row.energy_pool === nothing
@@ -78,9 +125,9 @@ end
 """
 Imnplementation of a bus component for balancing multiple inputs and outputs.
 
-This component is both a possible real energy system component (mostly for electricity) as well as a
-necessary abstraction of the model. The basic idea is that one or more components feed
-energy of the same medium into a bus and one or more components draw that energy from
+This component is both a possible real energy system component (mostly for electricity) as
+well as a necessary abstraction of the model. The basic idea is that one or more components
+feed energy of the same medium into a bus and one or more components draw that energy from
 the bus. A bus with only one input and only one output can be replaced with a direct
 connection between both components.
 
@@ -106,6 +153,19 @@ Base.@kwdef mutable struct Bus <: Component
     epsilon::Float64
 end
 
+"""
+    Bus(uac, config, sim_params)
+
+Config-constructor for a Bus.
+
+# Arguments
+`uac::String`: The UAC of the new bus
+`config::Dict{String,Any}`: The config from the project file
+`sim_params::Dict{String,Any}`: Simulation parameters
+
+# Returns
+`Bus`: The constructed bus
+"""
 function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
     medium = Symbol(config["medium"])
     register_media([medium])
@@ -129,6 +189,20 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
     )
 end
 
+"""
+    Bus(uac, medium, epsilon)
+
+Contstructor for a Bus that creates a mostly empty bus with the minimal parameters.
+
+# Arguments
+`uac::String`: The UAC of the new bus
+`medium::Symbol`: The medium of the bus
+`epsilon::Float64`: Simulation parameter for epsilon. Can also just be a small number,
+    e.g. a value of 1e-9
+
+# Returns
+`Bus`: The constructed bus
+"""
 function Bus(
     uac::String,
     medium::Symbol,
@@ -193,7 +267,6 @@ function reset(unit::Bus)
     end
 
     reset_balance_table!(unit::Bus, false)
-    
 end
 
 """
@@ -305,6 +378,9 @@ function energy_flow_is_denied(unit::Bus, input_row::BTInputRow, output_row::BTO
     )
 end
 
+# The following functions are effectively arithmetic operations on floats where one or both
+# operands may be nothing. It is possible to overwrite the typical operators + and -,
+# however this was deemed too dangerous.
 function _sub(first::Float64, second::Float64) return first - second end
 function _sub(first::Nothing, second::Float64) return -second end
 function _sub(first::Float64, second::Nothing) return first end
@@ -323,6 +399,20 @@ function _sum(vector::Vector{Union{Float64, Nothing}})
     return sum
 end
 
+"""
+    set_max_energy!(bus, input, true, value)
+
+Communicates the max_energy of an input/output on a bus.
+
+This is required for the balance calculations on the bus chain and is typically called from
+the set_max_energy! function on an interface, if one side is a bus.
+
+# Arguments
+`unit::Bus`: The bus
+`comp::Component`: The component that is an input/output
+`is_input::Bool`: If the component is an input
+`value::Float64`: The value of max_energy
+"""
 function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     bus = unit.proxy === nothing ? unit : unit.proxy
 
@@ -340,6 +430,20 @@ function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Floa
     end
 end
 
+"""
+    add_balance!(bus, input, true, value)
+
+Communicates a balance addition of an input/output on a bus.
+
+This is required for the balance calculations on the bus chain and is typically called from
+the add! function on an interface, if one side is a bus.
+
+# Arguments
+`unit::Bus`: The bus
+`comp::Component`: The component that is an input/output
+`is_input::Bool`: If the component is an input
+`value::Float64`: The value to add to the balance
+"""
 function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
@@ -353,6 +457,20 @@ function add_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     end
 end
 
+"""
+    sub_balance!(bus, input, true, value)
+
+Communicates a balance subtraction of an input/output on a bus.
+
+This is required for the balance calculations on the bus chain and is typically called from
+the sub! function on an interface, if one side is a bus.
+
+# Arguments
+`unit::Bus`: The bus
+`comp::Component`: The component that is an input/output
+`is_input::Bool`: If the component is an input
+`value::Float64`: The value to add to the balance
+"""
 function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
@@ -366,6 +484,20 @@ function sub_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     end
 end
 
+"""
+    set_balance!(bus, input, true, value)
+
+Communicates setting the balance of an input/output on a bus.
+
+This is required for the balance calculations on the bus chain and is typically called from
+the set! function on an interface, if one side is a bus.
+
+# Arguments
+`unit::Bus`: The bus
+`comp::Component`: The component that is an input/output
+`is_input::Bool`: If the component is an input
+`value::Float64`: The value to set
+"""
 function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
@@ -377,7 +509,27 @@ function set_balance!(unit::Bus, comp::Component, is_input::Bool, value::Float64
     end
 end
 
-function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min::Temperature, value_max::Temperature)
+"""
+    set_temperatures!(bus, input, true, value_min, value_max)
+
+Communicates setting the temperatures of an input/output on a bus.
+
+This is required for the balance calculations on the bus chain and is typically called from
+the set_temperature! function on an interface, if one side is a bus.
+
+# Arguments
+`unit::Bus`: The bus
+`comp::Component`: The component that is an input/output
+`is_input::Bool`: If the component is an input
+`value_min::Temperature`: The minimum temperature
+`value_max::Temperature`: The maximum temperature
+"""
+function set_temperatures!(
+    unit::Bus, comp::Component,
+    is_input::Bool,
+    value_min::Temperature,
+    value_max::Temperature
+)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         bus.balance_table_inputs[comp.uac].temperature_min = value_min
@@ -388,6 +540,23 @@ function set_temperatures!(unit::Bus, comp::Component, is_input::Bool, value_min
     end
 end
 
+"""
+    find_interface_on_proxy(proxy, interface)
+
+Finds the interface on the given proxy bus that is the same as the given interface.
+
+Interfaces are considered to be the same if the source/target is the same and the proxy
+bus is on the corresponding other side. This mechanism is required because proxy busses
+create new interfaces that point to the non-bus components of the principal busses.
+
+# Arguments
+`proxy::Bus`: The proxy bus
+`needle::SystemInterface`: The interface to find
+
+# Returns
+`Union{Nothing,SystemInterface}`: The corresponding interface or nothing, if it can't be
+    found.
+"""
 function find_interface_on_proxy(
     proxy::Bus,
     needle::SystemInterface
@@ -401,6 +570,33 @@ function find_interface_on_proxy(
     return nothing
 end
 
+"""
+    balance_on(interface, bus)
+
+Returns the energy exchange information on the given interface.
+
+This is the same function as the generic balance_on for all components, but functions
+vastly differently due to busses having a special role in the energy system simulation. A
+bus keeps an internal store of how much energy is available and requested and updates this
+store every time balance_on is called. This makes this function expensive to call, but also
+very important for the correct energy flow calculations.
+
+Because components, on a bus, communicate via balance_on with other components, the internal
+balance calculation in some sense replaces the individual calculations of each component.
+
+If a chain of busses has been set up with a proxy, the prinicipal busses relay the call to
+balance_on to the proxy bus and return the results. From the perspective of the non-bus
+components this behaves the same, but allows for communication and energy flow across all
+busses of the chain.
+
+# Arguments
+`interface::SystemInterface`: The interface connecting the component and the bus
+`unit::Bus`: The bus
+
+# Returns
+`Vector{EnergyExchange}`: A list of energy exchanges, each of which encode one potential
+    source or target for the component requesting a balance calcultion.
+"""
 function balance_on(
     interface::SystemInterface,
     unit::Bus
@@ -510,6 +706,17 @@ function balance_on(
     return return_exchanges
 end
 
+"""
+    inner_distribute!(bus)
+
+Perform energy distribution calculation on a bus.
+
+This function should only be called within the balance_on function for a bus. It serves no
+other purpose.
+
+# Arguments
+`unit::Bus`: The bus for which to calculate energy distribution
+"""
 function inner_distribute!(unit::Bus)
     continue_iteration = true
 
@@ -561,6 +768,18 @@ function inner_distribute!(unit::Bus)
     end
 end
 
+"""
+    reset_balance_table(bus, true)
+
+Resets the balance table of the bus.
+
+This is typically called within inner_distribute! or when resetting a bus.
+
+# Arguments
+`unit::Bus`: The bus containing the balance table
+`call_inner_distribute::Bool`: If true, calls inner_distribute! after resetting the balance
+    table. Please note that this can lead to infinite recursion if used correctly.
+"""
 function reset_balance_table!(unit::Bus, call_inner_distribute::Bool)
     unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2*length(unit.balance_table_outputs)))
     for i in 1:length(unit.balance_table_inputs)
@@ -620,6 +839,20 @@ function filter_outputs(unit::Bus, condition::SystemFunction, inclusive::Bool)
     ]
 end
 
+"""
+    inputs_recursive(bus)
+
+List of all inputs to the given bus, including all inputs from incoming busses, recursively.
+
+The components are ordered according to the input priorities of each bus, where the list
+of any bus in inserted in place of the input priority of that bus in the succeeding bus.
+
+# Arguments
+`unit::Bus`: The bus from which to start the recursive ascent
+
+# Returns
+`Vector{Component}`: A list of input components that are "reachable" from the starting bus
+"""
 function inputs_recursive(unit::Bus)::Vector{Component}
     inputs = []
     for inface in unit.input_interfaces
@@ -632,6 +865,21 @@ function inputs_recursive(unit::Bus)::Vector{Component}
     return inputs
 end
 
+"""
+    outputs_recursive(bus)
+
+List of all outputs to the given bus, including all outputs from outgoing busses,
+recursively.
+
+The components are ordered according to the output priorities of each bus, where the list
+of any bus in inserted in place of the output priority of that bus in the preceeding bus.
+
+# Arguments
+`unit::Bus`: The bus from which to start the recursive descent
+
+# Returns
+`Vector{Component}`: A list of output components that are "reachable" from the starting bus
+"""
 function outputs_recursive(unit::Bus)::Vector{Component}
     outputs = []
     for outface in unit.output_interfaces
@@ -644,6 +892,19 @@ function outputs_recursive(unit::Bus)::Vector{Component}
     return outputs
 end
 
+"""
+    bus_transfer_sum(proxy, left_bus, right_bus)
+
+Sum of energy that was transfered from the left bus to the right bus.
+
+# Arguments
+`proxy::Bus`: The proxy bus to both busses
+`left::Bus`: The bus providing energy
+`right::Bus`: The bus receiving energy
+
+# Returns
+`Float64`: The sum of energy transfered
+"""
 function bus_transfer_sum(proxy::Bus, left::Bus, right::Bus)::Float64
     transfer_sum = 0.0
 
