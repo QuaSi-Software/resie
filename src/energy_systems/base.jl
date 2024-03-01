@@ -893,7 +893,12 @@ Initialises the given components.
 `sim_params::Dict{String,Any}`: Simulation parameters
 """
 function initialise_components(components::Grouping, sim_params::Dict{String,Any})
-    for component in values(components)
+    for component in [c for c in values(components) if c.sys_function !== sf_bus]
+        initialise!(component, sim_params)
+    end
+    # initialise non-bus components first, so they write do_storage_transfer flags on the
+    # interfaces before the busses are initialised, using these flags for their own input
+    for component in [c for c in values(components) if c.sys_function === sf_bus]
         initialise!(component, sim_params)
     end
 end
