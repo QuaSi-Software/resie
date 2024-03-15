@@ -68,6 +68,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
     do_create_plot = !(output_keys_lineplot === nothing)
     do_write_CSV = !(output_keys_to_csv === nothing)
+    csv_output_file_path = default(
+        project_config["io_settings"],
+        "csv_output_file",
+        "./output/out.csv"
+    )
 
     # Initialize the array for output plots
     if do_create_plot
@@ -75,7 +80,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     end
     # reset CSV file
     if do_write_CSV
-        reset_file(project_config["io_settings"]["output_file"], output_keys_to_csv)
+        reset_file(csv_output_file_path, output_keys_to_csv)
     end
    
     # check if sankey should be plotted
@@ -111,7 +116,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(project_config["io_settings"]["output_file"], output_keys_to_csv, sim_params["time"])
+            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params["time"])
         end
 
         # get the energy transported through each interface in every timestep for Sankey
@@ -141,7 +146,7 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     end
     
     if do_write_CSV
-        @info "CSV-file with outputs written to $(project_config["io_settings"]["output_file"])"
+        @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
 
 end

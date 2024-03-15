@@ -1,6 +1,6 @@
 {
     "io_settings": {
-        "output_file": "./output/out.csv",
+        "csv_output_file": "./output/out.csv",
         "dump_info": true,
         "dump_info_file": "./output/info_dump.md",
         "sankey_plot": "default",
