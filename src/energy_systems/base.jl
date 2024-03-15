@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest
+    highest, default
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
