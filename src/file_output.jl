@@ -403,10 +403,14 @@ function create_profile_line_plots(
         xaxis_title_text="Time [hour]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))
-
     p = plot(traces, layout)
-    savefig(p, "output/output_plot.html")
 
+    file_path = default(
+        project_config["io_settings"],
+        "output_plot_file",
+        "./output/output_plot.html"
+    )
+    savefig(p, file_path)
 end
 
 
@@ -554,6 +558,6 @@ function create_sankey(
     )
 
     # save plot
-    savefig(p, "output/output_sankey.html")
-
+    file_path = default(io_settings, "sankey_plot_file", "./output/output_sankey.html")
+    savefig(p, file_path)
 end
