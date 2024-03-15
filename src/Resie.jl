@@ -48,9 +48,10 @@ function run_simulation(project_config::Dict{AbstractString,Any})
     )
     EnergySystems.set_timestep(sim_params["time_step_seconds"])
 
-    # load weather data 
-    if haskey(project_config["io_settings"], "weather_file_path") && length(project_config["io_settings"]["weather_file_path"]) > 0
-        sim_params["weatherdata"] = WeatherData(project_config["io_settings"]["weather_file_path"], sim_params)
+    # load weather data
+    file_path = default(project_config["simulation_parameters"], "weather_file_path", nothing)
+    if file_path !== noting
+        sim_params["weatherdata"] = WeatherData(file_path, sim_params)
     end
 
     components = load_components(project_config["components"], sim_params)
