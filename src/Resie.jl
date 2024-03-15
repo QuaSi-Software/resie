@@ -50,8 +50,8 @@ function run_simulation(project_config::Dict{AbstractString,Any})
 
     # load weather data
     file_path = default(project_config["simulation_parameters"], "weather_file_path", nothing)
-    if file_path !== noting
-        sim_params["weatherdata"] = WeatherData(file_path, sim_params)
+    if file_path !== nothing
+        sim_params["weather_data"] = WeatherData(file_path, sim_params)
     end
 
     components = load_components(project_config["components"], sim_params)
