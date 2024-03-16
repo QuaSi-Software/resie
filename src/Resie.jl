@@ -92,12 +92,11 @@ function run_simulation(project_config::Dict{AbstractString,Any})
         output_interface_values = zeros(Float64, nr_of_steps, nr_of_interfaces)
     end 
 
-    # export order or operatin (OoO)
-    if project_config["io_settings"]["dump_info"]
-        dump_info(
-            project_config["io_settings"]["dump_info_file"],
-            components, step_order, sim_params
-        )
+    # export order of operation and other additional info
+    if project_config["io_settings"]["auxiliary_info"]
+        aux_info_file_path = project_config["io_settings"]["auxiliary_info_file"]
+        dump_auxiliary_info(aux_info_file_path, components, step_order, sim_params)
+        @info "Auxiliary info dumped to file $(aux_info_file_path)"
     end
 
     for steps = 1:nr_of_steps

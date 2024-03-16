@@ -285,14 +285,14 @@ function write_to_file(
 end
 
 """
-dump_info(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_info(file_path, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_info(
+function dump_auxiliary_info(
     file_path::String,
     components::Grouping,
     order_of_operations::StepInstructions,

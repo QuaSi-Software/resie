@@ -26,7 +26,7 @@ Resie is released under the MIT license. You can find a copy of the license in f
 
 1. Switch into project directory: `cd /path/to/resie`
 1. Run the simulation with `julia --project=. src/resie-cli.jl examples/example_two_sector.json`
-1. Outputs of the example projects can be found in `output/out.csv` and `output/info_dump.md`
+1. The outputs as well as log files can be found in the `output` folder
 
 ## Testing
 
