@@ -144,22 +144,34 @@ function handle_BalanceWarning_message(level, message)
 end
 
 """
-    start_logger()
+    start_logger(
+        log_to_console, log_to_file, general_logfile_path, balanceWarn_logfile_path,
+        min_log_level, input_file
+    )
 
-starts the logger and opens the file if the log should be written to a file.
-    log_to_console::Bool                bool if the log should be printed to the console
-    log_to_file::Bool                   bool if the log should be printed to a file
-    general_logfile_path::String        path to a the general log file, if log_to_file==false, this can be "" or nothing.
-    balanceWarn_logfile_path::String    path to a the balanceWarn log file, if log_to_file==false, this can be "" or nothing.
-    min_log_level::Logging.LogLevel     the minimal log level for the output. Can be one of Debug, Info, Warn, Error or
-                                        a custom LogLevel, like Logging.LogLevel(500) for BalanceWarning
-                                        
-""" 
-function start_logger(log_to_console::Bool,
-                      log_to_file::Bool,
-                      general_logfile_path::Union{String, Nothing},
-                      balanceWarn_logfile_path::Union{String, Nothing},
-                      min_log_level::Logging.LogLevel)
+Starts the general and balance warning loggers and opens the files if requested.
+
+# Arguments
+- `log_to_console::Bool`: If the log should be printed to the console
+- `log_to_file::Bool`: If the log should be printed to a file
+- `general_logfile_path::String`: Path to the general log file, if file logging is requested
+- `balanceWarn_logfile_path::String`: Path to the balance warning log file, if file logging
+    is requested
+- `min_log_level::Logging.LogLevel`: The minimal log level for the output. Can be one of
+    Debug, Info, Warn, Error or a custom LogLevel, like Logging.LogLevel(500) for
+    BalanceWarning
+# Returns
+- `Union{IO,Nothing}`: The general log file, if file logging is requested
+- `Union{IO,Nothing}`: The balance warning log file, if file logging is requested
+"""
+function start_logger(
+    log_to_console::Bool,
+    log_to_file::Bool,
+    general_logfile_path::Union{String,Nothing},
+    balanceWarn_logfile_path::Union{String,Nothing},
+    min_log_level::Logging.LogLevel,
+    input_file::Union{String,Nothing}=nothing
+)::Tuple{Union{IO,Nothing},Union{IO,Nothing}}
     if log_to_file
         log_file_general = open(general_logfile_path, "w")
         log_file_balanceWarn = open(balanceWarn_logfile_path, "w")
@@ -173,12 +185,16 @@ function start_logger(log_to_console::Bool,
     if log_to_file
         time_now = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
         println(log_file_general, "ReSiE general log file of simulation started at: $(time_now)")
-        println(log_file_general, "Input file: ", ARGS[1])
+        if input_file !== nothing
+            println(log_file_general, "Input file: ", input_file)
+        end
         println(log_file_general, "This log file contains general warnings, errors and information written by ReSiE")
         println(log_file_general, "---------------------------------")
 
         println(log_file_balanceWarn, "ReSiE balanceWarn log file of simulation started at: $(time_now)")
-        println(log_file_balanceWarn, "Input file: ", ARGS[1])
+        if input_file !== nothing
+            println(log_file_balanceWarn, "Input file: ", input_file)
+        end
         println(log_file_balanceWarn, "This log file contains only balance warnings written by ReSiE.")
         println(log_file_balanceWarn, "---------------------------------")
     end
