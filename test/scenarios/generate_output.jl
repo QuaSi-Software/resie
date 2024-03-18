@@ -13,6 +13,7 @@ take a while.
 
 include("../../src/resie_logger.jl")
 using .Resie_Logger
+using Resie
 
 """
     setup_logger(subdir)
@@ -73,13 +74,86 @@ function main()
         end
 
         println("Generating scenario $name in dir $subdir")
-        println("|Logr+|Logr-|")
+        println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|")
 
         log_file_general, log_file_balanceWarn = setup_logger(subdir)
-        print("|  x  ")
+        print("|  ✓  ")
+
+        project_config = nothing
+        try
+            project_config = Resie.read_JSON(joinpath(subdir, "inputs.json"))
+            print("|  ✓  ")
+        catch error
+            @error error
+            print("|  X  ")
+        end
+
+        sim_params = nothing
+        try
+            if project_config !== nothing
+                sim_params = Resie.get_simulation_params(project_config)
+                print("|  ✓  ")
+            else
+                print("|     ")
+            end
+        catch error
+            @error error
+            print("|  X  ")
+        end
+
+        components = nothing
+        try
+            if sim_params !== nothing && project_config !== nothing
+                components = Resie.load_components(
+                    project_config["components"],
+                    sim_params
+                )
+                print("|  ✓  ")
+            else
+                print("|     ")
+            end
+        catch error
+            @error error
+            print("|  X  ")
+        end
+
+        step_order = nothing
+        try
+            if project_config !== nothing && components !== nothing
+                if (
+                    haskey(project_config, "order_of_operation")
+                    && length(project_config["order_of_operation"]) > 0
+                )
+                    step_order = Resie.load_order_of_operations(
+                        project_config["order_of_operation"],
+                        components
+                    )
+                else
+                    step_order = Resie.calculate_order_of_operations(components)
+                end
+                print("|  ✓  ")
+            else
+                print("|     ")
+            end
+        catch error
+            @error error
+            print("|  X  ")
+        end
+
+        if (
+            project_config !== nothing
+            && sim_params !== nothing
+            && components !== nothing
+            && step_order !== nothing
+        )
+            Resie.run_simulation_loop(project_config, sim_params, components, step_order)
+            print("|  ✓  ")
+        else
+            print("|     ")
+        end
 
         Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
-        print("|  x  ")
+        print("|  ✓  ")
 
         println("|")
     end
