@@ -1,6 +1,33 @@
+"""
+Utility script generate the output from predefined scenarios for testing purposes. The
+script can be used like so:
+    `julia --project=. ./test/scenarios/generate_output.jl "multisector_district"`
+
+This generates the output for the scenario `multisector_district`. It is assumed that the
+script is called from the directory two levels above this script, which is the main
+directory of ReSiE.
+
+If no argument is given, generates the output for all scenarios. Be aware that this might
+take a while.
+"""
+
 include("../../src/resie_logger.jl")
 using .Resie_Logger
 
+"""
+    setup_logger(subdir)
+
+Setup the general and balance warning loggers for the given directory.
+
+The loggers are setup to log into files `general.log` and `balanceWarn.log` within the
+directory and to not output to the console.
+
+# Arguments
+- `subdir::String`: The directory in which to setup loggers
+# Returns
+-`IO`: The file stream for the general log
+-`IO`: The file stream for the balance warning log
+"""
 function setup_logger(subdir)
     log_to_console = false
     log_to_file = true
@@ -18,6 +45,13 @@ function setup_logger(subdir)
     return log_file_general, log_file_balanceWarn
 end
 
+"""
+    main()
+
+Entry point for the script.
+
+Parses arguments and performs the functions as described in the documentation above.
+"""
 function main()
     if length(ARGS) > 0 && ARGS[1] != ""
         scenario_name = strip(ARGS[1])
