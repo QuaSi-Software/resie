@@ -19,10 +19,20 @@ function setup_logger(subdir)
 end
 
 function main()
-    println("No argument given - generating outputs for all scenarios")
+    if length(ARGS) > 0 && ARGS[1] != ""
+        scenario_name = strip(ARGS[1])
+        println("Given scenario to generate: $scenario_name")
+    else
+        scenario_name = nothing
+        println("No argument given - generating outputs for all scenarios")
+    end
 
     scenarios_dir = joinpath(".", "test", "scenarios")
     for name in readdir(scenarios_dir)
+        if scenario_name !== nothing && scenario_name != name
+            continue
+        end
+
         subdir = joinpath(scenarios_dir, name)
         if !isdir(subdir)
             continue
@@ -35,7 +45,9 @@ function main()
         print("|  x  ")
 
         Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
-        print("|  x  |")
+        print("|  x  ")
+
+        println("|")
     end
 end
 
