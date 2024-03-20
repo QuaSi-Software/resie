@@ -255,6 +255,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         end
     else
         unit.used_energy = 0.0
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
     end
 end
 
