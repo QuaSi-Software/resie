@@ -36,13 +36,13 @@ mutable struct SolarthermalCollector <: Component
     sigma::Float64
 
     ambient_temperature_profile::Union{Profile,Nothing}
-    direct_solar_irradiance_profile::Union{Profile,Nothing}
+    beam_solar_irradiance_profile::Union{Profile,Nothing}
     diffuse_solar_irradiance_profile::Union{Profile,Nothing}
     long_wave_irradiance_profile::Union{Profile,Nothing}
     wind_speed_profile::Union{Profile,Nothing}
 
     ambient_temperature::Temperature
-    direct_solar_irradiance::Float32
+    beam_solar_irradiance::Float32
     diffuse_solar_irradiance::Float32
     reduced_wind_speed::Float32
     long_wave_irradiance::Float32
@@ -52,7 +52,7 @@ mutable struct SolarthermalCollector <: Component
     spec_vol_flow::Union{Float64,Nothing}
 
     spec_thermal_power::Float64
-    max_energy::Float64
+    max_energy::Union{Float64,Nothing}
     used_energy::Float64
     output_temperature::Temperature
     average_temperature::Temperature
@@ -63,9 +63,9 @@ mutable struct SolarthermalCollector <: Component
             "ambient_temperature_profile_file_path" in keys(config) ?
             Profile(config["ambient_temperature_profile_file_path"], sim_params) :
             nothing
-        direct_solar_irradiance_profile = 
-            "direct_solar_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["direct_solar_irradiance_profile_file_path"], sim_params) :
+        beam_solar_irradiance_profile = 
+            "beam_solar_irradiance_profile_file_path" in keys(config) ?
+            Profile(config["beam_solar_irradiance_profile_file_path"], sim_params) :
             nothing
         diffuse_solar_irradiance_profile = 
             "diffuse_solar_irradiance_profile_file_path" in keys(config) ?
@@ -110,13 +110,13 @@ mutable struct SolarthermalCollector <: Component
             5.670374419*10^-8, # Stefan Bolzmann Constant
         
             ambient_temperature_profile,
-            direct_solar_irradiance_profile,
+            beam_solar_irradiance_profile,
             diffuse_solar_irradiance_profile,
             long_wave_irradiance_profile,
             wind_speed_profile,
             
             0.0, # ambient temperature from profile
-            0.0, # direct_solar_irradiance from profile
+            0.0, # beam_solar_irradiance from profile
             0.0, # diffuse_solar_irradiance from profile
             0.0, # long_wave_irradiance from profile
             0.0, # wind_speed from profile
@@ -136,45 +136,16 @@ mutable struct SolarthermalCollector <: Component
     end
 end
 
-function output_values(unit::SolarthermalCollector)::Vector{String}
+function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.medium), true
+        )
+    )
 
-    return [string(unit.medium)*" OUT",
-            "Temperature", 
-            "Max_Energy",
-            "Average_Temperature",
-            "Ambient_Temperature",
-            "Used_Energy",
-            "direct_solar_irradiance",
-            "delta_T",
-            "spec_vol_flow"
-            ]
-end
+    unit.K_b = find_K_b!(unit.K_b_array, unit.tilt_angle, unit.azimut_angle)
 
-function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
-    if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Temperature"
-        return unit.output_temperature
-    elseif key.value_key == "Max_Energy"
-        return unit.max_energy
-    elseif key.value_key == "Average_Temperature"
-        return unit.average_temperature
-    elseif key.value_key == "Ambient_Temperature"
-        return unit.ambient_temperature
-    elseif key.value_key == "Used_Energy"
-        return unit.used_energy
-    elseif key.value_key == "direct_solar_irradiance"
-        return unit.direct_solar_irradiance
-    elseif key.value_key == "delta_T"
-        return (unit.output_temperature - unit.average_temperature) * 2
-    elseif key.value_key == "spec_vol_flow"
-        if unit.output_temperature == unit.average_temperature
-            return 0
-        else
-            return wh_to_watt(unit.used_energy) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * 4180 * 1000) 
-        end
-    end
-    throw(KeyError(key.value_key))
 end
 
 function control(
@@ -183,12 +154,10 @@ function control(
     sim_params::Dict{String,Any}
     )
     move_state(unit, components, sim_params)
-
-    unit.K_b = find_K_b!(unit.K_b_array, unit.tilt_angle, unit.azimut_angle)
     
     # get values from profiles
-    unit.direct_solar_irradiance = Profiles.value_at_time(
-        unit.direct_solar_irradiance_profile, sim_params["time"]
+    unit.beam_solar_irradiance = Profiles.value_at_time(
+        unit.beam_solar_irradiance_profile, sim_params["time"]
         )
     unit.diffuse_solar_irradiance = Profiles.value_at_time(
         unit.diffuse_solar_irradiance_profile, sim_params["time"]
@@ -210,11 +179,14 @@ function control(
     else
         error("Error in config file: Either delta_T or spec_vol_flow must have a value") #TODO throw correct error
     end
-
+    
     unit.max_energy = watt_to_wh(max(unit.spec_thermal_power * unit.collector_gross_area, 0))
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
-    unit.output_interfaces[unit.medium].temperature = unit.output_temperature
+    if unit.max_energy != 0
+        set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
+    end
+
+    set_temperature!(unit.output_interfaces[unit.medium], nothing, unit.output_temperature)
 
     unit.last_average_temperature = unit.average_temperature
 end
@@ -246,13 +218,13 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     unit.target_temperatures = []
     energy_demands = Dict()
     for exchange in exchanges
-        energy_demand_exchange = exchange.balance + exchange.storage_potential
+        energy_demand_exchange = exchange.balance + exchange.energy_potential
         if energy_demand_exchange < 0
-            push!(unit.target_temperatures, exchange.temperature + 1)
-            if haskey(energy_demands, exchange.temperature)
-                energy_demands[round(exchange.temperature; digits = 1)] += energy_demand_exchange
+            push!(unit.target_temperatures, exchange.temperature_min + 1)
+            if haskey(energy_demands, exchange.temperature_min)
+                energy_demands[round(exchange.temperature_min; digits = 1)] += energy_demand_exchange
             else
-                energy_demands[round(exchange.temperature; digits = 1)] = energy_demand_exchange
+                energy_demands[round(exchange.temperature_min; digits = 1)] = energy_demand_exchange
             end
         end
     end
@@ -308,7 +280,7 @@ function calc_thermal_power_fixed_delta_T!(unit, sim_params)
     for target_temperature in unit.target_temperatures
         t_avg = target_temperature - unit.delta_T / 2
         p_spec_th = spec_thermal_power_func(t_avg, target_temperature, 0, unit, sim_params)
-        spec_vol_flow = p_spec_th / (delta_T * 4180 * 1000) 
+        spec_vol_flow = p_spec_th / (unit.delta_T * 4180 * 1000) 
         if spec_vol_flow > spec_vol_flow_min
             energy_available = true
             unit.spec_thermal_power = p_spec_th
@@ -375,14 +347,14 @@ Function for calculating the thermal power output of a solarthermal collector.
 Can be used to solve after t_avg and find average_temperature for specific used energy
 """
 function spec_thermal_power_func(t_avg, t_target, spec_vol_flow, unit, sim_params)         
-    unit.eta_0_b * unit.K_b * unit.direct_solar_irradiance + 
+    unit.eta_0_b * unit.K_b * unit.beam_solar_irradiance + 
     unit.eta_0_b * unit.K_d * unit.diffuse_solar_irradiance -
     unit.a_params[1] * (t_avg - unit.ambient_temperature) -
     unit.a_params[2] * (t_avg - unit.ambient_temperature)^2 -
     unit.a_params[3] * unit.reduced_wind_speed * (t_avg - unit.ambient_temperature) +
     unit.a_params[4] * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
     unit.a_params[5] * ((t_avg-unit.last_average_temperature) / sim_params["time_step_seconds"]) -
-    unit.a_params[6] * unit.reduced_wind_speed * (unit.direct_solar_irradiance + unit.diffuse_solar_irradiance) -
+    unit.a_params[6] * unit.reduced_wind_speed * (unit.beam_solar_irradiance + unit.diffuse_solar_irradiance) -
     unit.a_params[7] * unit.reduced_wind_speed * (unit.long_wave_irradiance - unit.sigma * (unit.ambient_temperature + 273.15)^4) -
     unit.a_params[8] * (t_avg - unit.ambient_temperature)^4 -
     spec_vol_flow * 1000 * (t_target - t_avg) * 2 * 4180
@@ -398,6 +370,47 @@ function derivate_spec_thermal_power_func(t_avg, spec_vol_flow, unit, sim_params
     unit.a_params[5] * 1 / sim_params["time_step_seconds"] -
     unit.a_params[8] * 4 * (t_avg - unit.ambient_temperature)^3 +
     spec_vol_flow * 1000 * 2 * 4180
+end
+
+function output_values(unit::SolarthermalCollector)::Vector{String}
+
+    return [string(unit.medium)*" OUT",
+            "Temperature", 
+            "Max_Energy",
+            "Average_Temperature",
+            "Ambient_Temperature",
+            "Used_Energy",
+            "beam_solar_irradiance",
+            "delta_T",
+            "spec_vol_flow"
+            ]
+end
+
+function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
+    if key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
+    elseif key.value_key == "Temperature"
+        return unit.output_temperature
+    elseif key.value_key == "Max_Energy"
+        return unit.max_energy
+    elseif key.value_key == "Average_Temperature"
+        return unit.average_temperature
+    elseif key.value_key == "Ambient_Temperature"
+        return unit.ambient_temperature
+    elseif key.value_key == "Used_Energy"
+        return unit.used_energy
+    elseif key.value_key == "beam_solar_irradiance"
+        return unit.beam_solar_irradiance
+    elseif key.value_key == "delta_T"
+        return (unit.output_temperature - unit.average_temperature) * 2
+    elseif key.value_key == "spec_vol_flow"
+        if unit.output_temperature == unit.average_temperature
+            return 0
+        else
+            return wh_to_watt(unit.used_energy) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * 4180 * 1000) 
+        end
+    end
+    throw(KeyError(key.value_key))
 end
 
 export SolarthermalCollector

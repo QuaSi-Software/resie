@@ -80,8 +80,8 @@ function control(
     )
     set_temperature!(
         unit.input_interfaces[unit.medium],
-        unit.high_temperature,
-        unit.high_temperature
+        temperature_at_load(unit),
+        nothing
     )
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
@@ -176,9 +176,9 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 
         if (
             exchange.temperature_min !== nothing
-                && exchange.temperature_min > unit.high_temperature
+                && exchange.temperature_min > temperature_at_load(unit)
             || exchange.temperature_max !== nothing
-                && exchange.temperature_max < unit.high_temperature
+                && exchange.temperature_max < temperature_at_load(unit)
         )
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
