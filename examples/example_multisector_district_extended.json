@@ -227,6 +227,7 @@
                 "input_order": [
                     "TST_PVP_EL_01",
                     "TST_PVP_EL_02",
+                    "TST_PVP_EL_03",
                     "TST_BAT_01",
                     "TST_GRI_EL_02"
                 ],
