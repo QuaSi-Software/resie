@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest
+    highest, default
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -1050,12 +1050,12 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
     elseif haskey(config, "constant_temperature") && config["constant_temperature"] isa Number
         @info "For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set."
         return nothing
-    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
-        if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])"                
-            return getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
+            return getfield(sim_params["weather_data"], Symbol(config["temperature_from_global_file"]))
         else
-            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
             exit()
         end
     else            
@@ -1085,12 +1085,12 @@ function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, s
     if haskey(config, "ambient_temperature_profile_path")
         @info "For '$uac', the given ambient temperature profile is chosen."
         return Profile(config["ambient_temperature_profile_path"], sim_params)
-    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
-        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
-            return getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
+            return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
         else
-            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
             exit()
         end
     else

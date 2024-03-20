@@ -1,8 +1,8 @@
 {
     "io_settings": {
-        "output_file": "./output/out.csv",
-        "dump_info": true,
-        "dump_info_file": "./output/info_dump.md",
+        "csv_output_file": "./output/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
         "__heating_csv_output_keys": {
             "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
