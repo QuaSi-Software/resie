@@ -76,7 +76,7 @@ function Condition(
     prototype = CONDITION_PROTOTYPES[name]
     return Condition(
         prototype,
-        merge(prototype.cond_params, cond_params),
+        Base.merge(prototype.cond_params, cond_params),
         Grouping()
     )
 end
@@ -313,7 +313,6 @@ include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 include("strategies/demand_driven.jl")
 include("strategies/supply_driven.jl")
-include("strategies/extended_storage_control.jl")
 
 """
     controller_for_strategy(strategy, strategy_config, sim_params)
@@ -340,12 +339,17 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
 
     # check if parameters given in input file for strategy are valid parameters:
     for key in keys(strategy_config)
-        if !(key in keys(OP_STRATS[strategy].strategy_parameters)) && !(startswith(key, "_"))
+        if  (
+            !(key in keys(OP_STRATS[strategy].strategy_parameters)) &&
+            !(startswith(key, "load_storages")) && 
+            !(startswith(key, "unload_storages")) && 
+            !(startswith(key, "_"))
+            )
             throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
         end
     end
 
-    params = merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
+    params = Base.merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
 
     # load operation profile if path is given in input file
     if haskey(params, "operation_profile_path")
@@ -353,7 +357,7 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
             params["operation_profile"] = Profile(params["operation_profile_path"], sim_params)
         end
     end
-    
+
     machine = OP_STRATS[strategy].sm_constructor(params)
     return Controller(strategy, params, machine, Grouping())
 end

@@ -220,6 +220,13 @@ function test_find_chains()
                 "output_order" => [],
             )
         ),
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "output_refs" => ["TST_HTP_01"],
+            "is_source" => true,
+        ),
         "TST_HTP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => [],
@@ -255,7 +262,10 @@ function test_find_chains()
         components["TST_BUS_05"],
     ])
 
-    chains = Resie.find_chains([u for u in values(components)], EnergySystems.sf_bus)
+    chains = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_bus
+    )
 
     @test length(chains) == 2
     @test chains[1] == expected_1

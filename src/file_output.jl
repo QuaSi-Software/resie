@@ -99,7 +99,10 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 each_outputinterface = each_outputinterface[2]
             end
 
-            if isdefined(each_outputinterface, :target)
+            if (isdefined(each_outputinterface, :target) && 
+               !startswith(each_outputinterface.target.uac, "Proxy") &&
+               !startswith(each_outputinterface.source.uac, "Proxy"))
+
                 # count interface
                 nr_of_interfaces += 1
 
@@ -166,8 +169,11 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                 each_outputinterface = each_outputinterface[2]
             end
-            if isdefined(each_outputinterface, :target)
-                energies[n] = calculate_energy_flow(each_outputinterface) 
+            if (isdefined(each_outputinterface, :target) && 
+                !startswith(each_outputinterface.target.uac, "Proxy") &&
+                !startswith(each_outputinterface.source.uac, "Proxy"))
+
+                energies[n] = calculate_energy_flow(each_outputinterface)
                 n += 1
                 
                 # If source or target is fixed source or sink, gather also demand and supply
@@ -432,12 +438,16 @@ function create_sankey(
     # remove data that should not be plotted in Sankey
     interface_new = 1
     for _ in 1:nr_of_interfaces
-        if ( 
+        if (
             # remove oxygen from data as the energy of oxygen is considered to be zero
-            medium_of_interfaces[interface_new] == :m_c_g_o2 ||  
+            medium_of_interfaces[interface_new] == :m_c_g_o2
             # remove real sinks and sources if they match the delivered energy
-            # to enable this to work, the "real" demand/supply needs to be always one entry below the delivered/requested one in the array!
-             (medium_of_interfaces[interface_new] == "hide_medium" && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1])
+            # to enable this to work, the "real" demand/supply needs to be always one entry
+            # below the delivered/requested one in the array!
+            || (
+                medium_of_interfaces[interface_new] == "hide_medium"
+                && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
+            )
         )
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
@@ -486,6 +496,8 @@ function create_sankey(
         for medium in unique_medium_labels
             if medium in keys(color_map)
                 continue
+            elseif medium == "hide_medium"
+                color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
                 @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
                 exit()

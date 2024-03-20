@@ -28,6 +28,7 @@ function test_one_to_one()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
+        "epsilon" => 1e-9
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -49,12 +50,12 @@ function test_one_to_one()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature == 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
 
     EnergySystems.process(grid, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
-    @test demand.input_interfaces[demand.medium].temperature == 55.0
+    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
 end
 
 @testset "one_to_one" begin

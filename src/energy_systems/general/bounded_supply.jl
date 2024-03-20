@@ -58,6 +58,15 @@ mutable struct BoundedSupply <: Component
     end
 end
 
+function initialise!(unit::BoundedSupply, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::BoundedSupply,
     components::Grouping,
@@ -83,25 +92,17 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.output_interfaces[unit.medium].temperature = highest(
-        unit.temperature,
-        unit.output_interfaces[unit.medium].temperature
+    set_temperature!(
+        unit.output_interfaces[unit.medium],
+        nothing,
+        unit.temperature
     )
 end
 
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges)
-
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demand = blnc + storage_potential(exchanges)
-    else
-        energy_demand = blnc
-    end
+    energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand < 0.0
         add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)

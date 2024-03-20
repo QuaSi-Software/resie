@@ -162,6 +162,11 @@ Convenience alias for temperatures which can be a number or "nothing".
 const Temperature = Union{Nothing,Float64}
 
 """
+Convenience alias for a float that can also have a value of "nothing".
+"""
+const Floathing = Union{Nothing,Float64}
+
+"""
 Holds the options which output values should be recorded.
 
 This is a specific data structure intended to speed up recording output by avoiding the
@@ -209,17 +214,36 @@ Base.@kwdef mutable struct SystemInterface
     """The sum of absolute changes to the interface's balance"""
     sum_abs_change::Float64 = 0.0
 
-    """Current temperature of the medium on this interface"""
-    temperature::Temperature = nothing
+    """Minimum temperature of the medium on this interface"""
+    temperature_min::Temperature = nothing
+
+    """Maximum temperature of the medium on this interface"""
+    temperature_max::Temperature = nothing
 
     """Maximum energy the source can provide in the current timestep"""
     max_energy::Union{Nothing,Float64} = nothing
+
+    """Flag to decide if storage potentials are transferred over the interface."""
+    do_storage_transfer::Bool = true
+end
+
+"""
+    set_storage_transfer!(interface, value)
+
+Sets the flag to decide over storage potential transfer to the given boolean value. Note
+that if the flag is already set to false, no further changes will set it back to true. This
+is to prevent components overwriting the values of others.
+"""
+function set_storage_transfer!(interface::SystemInterface, flag::Bool)
+    interface.do_storage_transfer = interface.do_storage_transfer && flag
 end
 
 """
     add!(interface, change, temperature)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function add!(
     interface::SystemInterface,
@@ -230,14 +254,19 @@ function add!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature < temperature
-            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac) from $temperature to $(interface.temperature) °C")
-        elseif interface.temperature !== nothing && interface.temperature > temperature
-            @warn ("Temperature in interface is higher than delivered temperature on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac). Requested: $(interface.temperature) °C; Delivered: $temperature °C")
+        if interface.temperature_min !== nothing && temperature < interface.temperature_min
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
+        elseif interface.temperature_max !== nothing && temperature > interface.temperature_max
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
-        interface.temperature = temperature
+    end
+
+    if interface.source.sys_function == sf_bus
+        add_balance!(interface.source, interface.target, false, change)
+    elseif interface.target.sys_function == sf_bus
+        add_balance!(interface.target, interface.source, true, change)
     end
 end
 
@@ -245,6 +274,8 @@ end
     sub!(interface, change, temperature)
 
 Subtract the given amount of energy (in Wh) from the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function sub!(
     interface::SystemInterface,
@@ -255,14 +286,19 @@ function sub!(
     interface.sum_abs_change += abs(change)
 
     if temperature !== nothing
-        if interface.temperature !== nothing && interface.temperature < temperature
-            @warn ("Temperature in interface is lower than requested temperature on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac). Requested: $temperature °C; Delivered: $(interface.temperature) °C")
-        elseif interface.temperature !== nothing && interface.temperature > temperature
-            @warn ("Temperatures are chilled on interface $(interface.source.uac) " *
-                    "-> $(interface.target.uac) from $(interface.temperature) to $temperature °C")
+        if interface.temperature_min !== nothing && temperature < interface.temperature_min
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) lower than minimum $(interface.temperature_min)")
+        elseif interface.temperature_max !== nothing && temperature > interface.temperature_max
+            @warn ("Given temperature $temperature on interface $(interface.source.uac) " *
+                    "-> $(interface.target.uac) higher than maximum $(interface.temperature_max)")
         end
-        interface.temperature = temperature
+    end
+
+    if interface.source.sys_function == sf_bus
+        sub_balance!(interface.source, interface.target, false, change)
+    elseif interface.target.sys_function == sf_bus
+        sub_balance!(interface.target, interface.source, true, change)
     end
 end
 
@@ -273,24 +309,64 @@ Set the balance of the interface to the given new value.
 """
 function set!(
     interface::SystemInterface,
-    new_val::Float64,
-    temperature::Temperature=nothing
+    new_val::Float64
 )
     interface.sum_abs_change += abs(interface.balance - new_val)
     interface.balance = new_val
-    interface.temperature = temperature
+end
+
+"""
+    set_temperature!(interface, temp_min, temp_max)
+
+Set the minimum and maximum temperature for the interface.
+
+If the source or target of the interface is a bus, also calls the set_temperature!
+function on that bus.
+"""
+function set_temperature!(
+    interface::SystemInterface,
+    temperature_min::Temperature=nothing,
+    temperature_max::Temperature=nothing
+)
+    interface.temperature_min = highest(interface.temperature_min, temperature_min)
+    interface.temperature_max = lowest(interface.temperature_max, temperature_max)
+
+    if interface.source.sys_function == sf_bus
+        set_temperatures!(
+            interface.source, interface.target, false,
+            temperature_min, temperature_max
+        )
+    elseif interface.target.sys_function == sf_bus
+        set_temperatures!(
+            interface.target, interface.source, true,
+            temperature_min, temperature_max
+        )
+    end
 end
 
 """
     set_max_energy!(interface, value)
 
 Set the maximum power that can be delivered to the given value.
+
+If the source or target of the interface is a bus, also calls the set_max_energy! function
+on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
     value::Union{Nothing,Float64}
 )
-    interface.max_energy = value
+    if interface.max_energy === nothing
+        interface.max_energy = value
+    else
+        interface.max_energy = min(interface.max_energy, value)
+    end
+
+    if interface.source.sys_function == sf_bus
+        set_max_energy!(interface.source, interface.target, false, value)
+    elseif interface.target.sys_function == sf_bus
+        set_max_energy!(interface.target, interface.source, true, value)
+    end
 end
 
 """
@@ -301,10 +377,10 @@ Reset the interface back to zero.
 function reset!(interface::SystemInterface)
     interface.balance = 0.0
     interface.sum_abs_change = 0.0
-    interface.temperature = nothing
+    interface.temperature_min = nothing
+    interface.temperature_max = nothing
     interface.max_energy = nothing
 end
-
 
 """
     highest(temperature_1, temperature_2)::Temperature
@@ -328,6 +404,27 @@ function highest(
 end
 
 """
+    lowest(temperature_1, temperature_2)::Temperature
+
+Returns the lowest temperature of the two inputs and handles nothing-values:
+- If both of the inputs are floats, the minimum will be returned.
+- If one of the inputs is nothing and one a float, the float will be returned.
+- If both of the inputs are nothing, nothing will be returned.
+"""
+function lowest(
+    temperature_1::Temperature,
+    temperature_2::Temperature
+)::Temperature
+    if temperature_1 !== nothing && temperature_2 !== nothing
+        return min(temperature_1, temperature_2)
+    elseif temperature_1 === nothing && temperature_2 !== nothing
+        return temperature_2
+    elseif temperature_1 !== nothing && temperature_2 === nothing
+        return temperature_1
+    end
+end
+
+"""
 Convenience type used define the required system interfaces of a component.
 
 To simultaneously define what is required and then hold references to instances after the
@@ -343,8 +440,8 @@ Base.@kwdef mutable struct EnergyExchange
     balance::Float64
     uac::String
     energy_potential::Float64
-    storage_potential::Float64
-    temperature::Temperature
+    temperature_min::Temperature
+    temperature_max::Temperature
     pressure::Union{Nothing,Float64}
     voltage::Union{Nothing,Float64}
 end
@@ -383,21 +480,7 @@ function energy_potential(entries::Vector{EnergyExchange})::Float64
 end
 
 """
-    storage_potential(exchanges)
-
-Sum of storage potentials over the given list of energy exchanges.
-
-Args:
-    `entries::Vector{EnergyExchange}`: The exchanges to sum over
-Returns:
-    `Float64`: Sum of storage potentials
-"""
-function storage_potential(entries::Vector{EnergyExchange})::Float64
-    return sum(e.storage_potential for e in entries; init=0.0)
-end
-
-"""
-    temperature_first(exchanges)
+    temp_min_first(exchanges)
 
 First not-nothing temperature of the given list of energy exchanges. If no not-nothing
 temperature can be found, returns nothing.
@@ -407,52 +490,83 @@ Args:
 Returns:
     `Temperature`: First not-nothing temperature found or nothing if no such exists
 """
-function temperature_first(entries::Vector{EnergyExchange})::Temperature
-    temps = [e.temperature for e in entries if e.temperature !== nothing]
+function temp_min_first(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature_min for e in entries if e.temperature_min !== nothing]
     return length(temps) > 0 ? first(temps) : nothing
 end
 
 """
-    temperature_highest(exchanges)
+    temp_min_highest(exchanges)
 
-Highest not-nothing temperature of the given list of energy exchanges. If no not-nothing
-temperature can be found, returns nothing.
+Highest not-nothing minimum temperature of the given list of energy exchanges. If no
+not-nothing temperature can be found, returns nothing.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
 Returns:
-    `Temperature`: First not-nothing temperature found or nothing if no such exists
+    `Temperature`: First not-nothing minimum temperature found or nothing if no such exists
 """
-function temperature_highest(entries::Vector{EnergyExchange})::Temperature
-    return maximum(e.temperature for e in entries if e.temperature !== nothing)
+function temp_min_highest(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature_min for e in entries if e.temperature_min !== nothing]
+    return length(temps) > 0 ? maximum(temps) : nothing
 end
 
 """
-    temperature_all(exchanges)
+    temp_max_highest(exchanges)
 
-A list of all temperatures of the given list of energy exchanges.
+Highest not-nothing maximum temperature of the given list of energy exchanges. If no
+not-nothing temperature can be found, returns nothing.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to search for a temperature
+Returns:
+    `Temperature`: First not-nothing maximum temperature found or nothing if no such exists
+"""
+function temp_max_highest(entries::Vector{EnergyExchange})::Temperature
+    temps = [e.temperature_max for e in entries if e.temperature_max !== nothing]
+    return length(temps) > 0 ? maximum(temps) : nothing
+end
+
+"""
+    temp_min_all(exchanges)
+
+A list of all minimum temperatures of the given list of energy exchanges.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
 Returns:
-    `Vector{Temperature}`: A list of temperatures
+    `Vector{Temperature}`: A list of minimum temperatures
 """
-function temperature_all(entries::Vector{EnergyExchange})::Vector{Temperature}
-    return [e.temperature for e in entries]
+function temp_min_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_min for e in entries]
 end
 
 """
-    temperature_all_non_empty(exchanges)
+    temp_max_all(exchanges)
 
-A list of all not-nothing temperatures of the given list of energy exchanges.
+A list of all maximum temperatures of the given list of energy exchanges.
 
 Args:
     `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
 Returns:
-    `Vector{Temperature}`: A (possibly empty) list of not-nothing temperatures
+    `Vector{Temperature}`: A list of maximum temperatures
 """
-function temperature_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
-    return [e.temperature for e in entries if e.temperature !== nothing]
+function temp_max_all(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_max for e in entries]
+end
+
+"""
+    temp_min_all_non_empty(exchanges)
+
+A list of all not-nothing minimum temperatures of the given list of energy exchanges.
+
+Args:
+    `entries::Vector{EnergyExchange}`: The exchanges over which to list temperatures
+Returns:
+    `Vector{Temperature}`: A (possibly empty) list of not-nothing minimum temperatures
+"""
+function temp_min_all_non_empty(entries::Vector{EnergyExchange})::Vector{Temperature}
+    return [e.temperature_min for e in entries if e.temperature_min !== nothing]
 end
 
 """
@@ -469,13 +583,9 @@ without having to check if its connected to a Bus or directly to a component.
     also defines which component is the source.
 - `unit::Component`: The receiving component
 
-# Returns NamedTuple with
-- "balance"::Float64:           The balance of the target component that can be considered a 
-                                demand on the source component
-- "storage_potential"::Float64: An additional demand that covers the free storage space 
-                                connected to the target component
-- "energy_potential"::Float64:  The maximum enery an interface can provide or consume
-- "temperature"::Temperature:   The temperature of the interface
+# Returns
+- `Vector{EnergyExchange}`: A list of energy exchange items, which contain the information
+    required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
@@ -485,8 +595,8 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         balance=interface.balance,
         uac=unit.uac,
         energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
-        storage_potential=0.0,
-        temperature=interface.temperature,
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
         pressure=nothing,
         voltage=nothing,
     )]
@@ -518,6 +628,19 @@ function balance(unit::Component)::Float64
     end
 
     return balance    
+end
+
+"""
+    initialise!(unit)
+
+Perform steps to initialise the component in addition to the constructor.
+
+# Arguments
+- `unit::Component`: The component to initialise
+- `sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function initialise!(unit::Component, sim_params::Dict{String,Any})
+    # default implementation is to do nothing
 end
 
 """
@@ -643,17 +766,11 @@ end
     calculate_energy_flow(interface)
 
 Calculates the energy flow in an interface and returns the energy.
-If the balance in an interface was not zero, the requested amount of energy and not
-the acutal energy that has been provided is returned! 
-This is conformily of the output interfaces of busses to non-busses which are set
-to the requested energy, not regarding the energy that has been delivered!
+If the balance in an interface was not zero, the actual transferred energy is returned.
 
-Replacing the - below by a +, this can be changed, then the delivered energy and not
-the requested energy is returned. Comparing this to the bahaviour of busses, this can 
-be non-intuitive.
 """
 function calculate_energy_flow(interface::SystemInterface)::Float64
-    return (interface.sum_abs_change + interface.balance) / 2
+    return (interface.sum_abs_change - abs(interface.balance)) / 2
 end
 
 """
@@ -763,6 +880,59 @@ function link_output_with(unit::Component, components::Grouping)
                 end
             end
         end
+    end
+end
+
+"""
+    initialise_components(component, sim_params)
+
+Initialises the given components.
+
+# Arguments
+`components::Grouping`: The components
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function initialise_components(components::Grouping, sim_params::Dict{String,Any})
+    for component in [c for c in values(components) if c.sys_function !== sf_bus]
+        initialise!(component, sim_params)
+    end
+    # initialise non-bus components first, so they write do_storage_transfer flags on the
+    # interfaces before the busses are initialised, using these flags for their own input
+    for component in [c for c in values(components) if c.sys_function === sf_bus]
+        initialise!(component, sim_params)
+    end
+end
+
+"""
+    merge_bus_chains(chains, components, sim_params)
+
+For each of the given bus chains, creates a proxy bus as a merger of all busses in the
+chain and sets the proxy.
+
+Each chain is a set of interconnected busses of the same medium. For an example
+@See EnergySystems.find_chains which can identify the chains to merge.
+
+# Arguments
+`chains::Vector{Set{Component}}`: A list of chains of busses
+`components::Grouping`: All components of the energy systems
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function merge_bus_chains(
+    chains::Vector{Set{Component}},
+    components::Grouping,
+    sim_params::Dict{String,Any}
+)
+    for chain in chains
+        if length(chain) < 2
+            continue
+        end
+
+        comp_as_grouping = Grouping(comp.uac=>comp for comp in chain)
+        merged = merge_busses(comp_as_grouping, components)
+        for bus in chain
+            bus.proxy = merged
+        end
+        components[merged.uac] = merged
     end
 end
 

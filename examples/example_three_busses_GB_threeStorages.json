@@ -201,9 +201,10 @@
                 "ESS_BUS_TH_02"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
         },
@@ -214,9 +215,10 @@
                 "ESS_BUS_TH_03"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
         },
@@ -227,9 +229,10 @@
                 "ESS_BUS_TH_01"
             ],
             "strategy": {
-                "name": "extended_storage_control",
-                "load_any_storage" : false
+                "name": "default",
+                "load_storages m_h_w_ht1": false
             },
+            "medium": "m_h_w_ht1",
             "capacity": 15000,
             "load": 7000
         }
