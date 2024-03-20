@@ -64,6 +64,16 @@ function wh_to_watt(wh::Float64)
 end
 
 """
+Calculate power from energy by using the simulation time step.
+
+This function must be assigned a method after simulation parameters (such as the timestep)
+have been loaded.
+"""
+function wh_to_watt(wh::Float64)
+    return wh / HOURS_PER_TIME_STEP
+end
+
+"""
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
 considered the nominal range. For example, a heating component might circulate water anywhere
@@ -713,7 +723,7 @@ include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
 include("heat_sources/geothermal_heat_collectors.jl")
-include("heat_sources/solarthermal_collectors.jl")
+include("heat_sources/solarthermal_collector.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
 include("heat_producers/fuel_boiler.jl")
