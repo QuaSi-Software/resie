@@ -74,15 +74,31 @@ mutable struct FuelBoiler <: Component
     end
 end
 
+function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_fuel_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+end
+
 function control(
     unit::FuelBoiler,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest(
-        unit.output_temperature,
-        unit.output_interfaces[unit.m_heat_out].temperature
+    set_temperature!(
+        unit.output_interfaces[unit.m_heat_out],
+        nothing,
+        unit.output_temperature
     )
 end
 
@@ -104,25 +120,20 @@ function check_fuel_in(
             &&
             unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
         )
-            return (Inf, Inf)
+            return (Inf)
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_fuel_in],
                 unit.input_interfaces[unit.m_fuel_in].source
             )
             potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
-            potential_storage_fuel = storage_potential(exchanges)
-            if (
-                unit.controller.parameter["unload_storages"] ?
-                potential_energy_fuel + potential_storage_fuel :
-                potential_energy_fuel
-            ) <= sim_params["epsilon"]
-                return (nothing, nothing)
+            if potential_energy_fuel <= sim_params["epsilon"]
+                return (nothing)
             end
-            return (potential_energy_fuel, potential_storage_fuel)
+            return (potential_energy_fuel)
         end
     else
-        return (Inf, Inf)
+        return (Inf)
     end
 end
 
@@ -136,17 +147,12 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out].target
         )
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_heat_out = storage_potential(exchanges)
-        if (
-            unit.controller.parameter["load_storages"] ?
-            potential_energy_heat_out + potential_storage_heat_out :
-            potential_energy_heat_out
-        ) >= -sim_params["epsilon"]
-            return (nothing, nothing)
+        if potential_energy_heat_out >= -sim_params["epsilon"]
+            return (nothing)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out)
+        return (potential_energy_heat_out)
     else
-        return (-Inf, -Inf)
+        return (-Inf)
     end
 end
 
@@ -205,9 +211,7 @@ function calculate_energies(
     potentials::Vector{Float64}
 )
     potential_energy_fuel_in = potentials[1]
-    potential_storage_fuel_in = potentials[2]
-    potential_energy_heat_out = potentials[3]
-    potential_storage_heat_out = potentials[4]
+    potential_energy_heat_out = potentials[2]
 
     if unit.is_plr_dependant == false
         max_produce_heat = watt_to_wh(unit.power_th)
@@ -217,9 +221,7 @@ function calculate_energies(
             # max_produce_heat should equal rated power_th, else when using demand heat, which
             # can be inf, a non-physical state might occur
             max_produce_heat = watt_to_wh(unit.power_th)
-            demand_heat = -(unit.controller.parameter["load_storages"] ?
-                            potential_energy_heat_out + potential_storage_heat_out :
-                            potential_energy_heat_out)
+            demand_heat = -potential_energy_heat_out
             if demand_heat >= max_produce_heat
                 # set demand_heat to rated power_th -> prevent max_consume_fuel to equal inf
                 demand_heat = max_produce_heat
@@ -248,7 +250,7 @@ function calculate_energies(
         1.0 :
         value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     if usage_fraction_operation_profile <= 0.0
-        return # no operation allowed from external profile
+        return (false, nothing, nothing) # no operation allowed from external profile
     end
 
     # all three standard operating strategies behave the same, but it is better to be
@@ -257,31 +259,19 @@ function calculate_energies(
         unit.controller.strategy == "storage_driven" &&
         unit.controller.state_machine.state == 2
     )
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
-                                     potential_energy_heat_out + potential_storage_heat_out :
-                                     potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
-                                   potential_energy_fuel_in + potential_storage_fuel_in :
-                                   potential_energy_fuel_in) / max_consume_fuel)
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
 
     elseif unit.controller.strategy == "storage_driven"
-        return (false, nothing, nothing, nothing)
+        return (false, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
-                                     potential_energy_heat_out + potential_storage_heat_out :
-                                     potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
-                                   potential_energy_fuel_in + potential_storage_fuel_in :
-                                   potential_energy_fuel_in) / max_consume_fuel)
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ?
-                                     potential_energy_heat_out + potential_storage_heat_out :
-                                     potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_fuel_in = +((unit.controller.parameter["unload_storages"] ?
-                                   potential_energy_fuel_in + potential_storage_fuel_in :
-                                   potential_energy_fuel_in) / max_consume_fuel)
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
     end
 
     # limit actual usage by limits of inputs, outputs and profile
@@ -309,24 +299,20 @@ function potential(
     unit::FuelBoiler,
     sim_params::Dict{String,Any}
 )
-    potential_energy_fuel_in, potential_storage_fuel_in = check_fuel_in(unit, sim_params)
+    potential_energy_fuel_in = check_fuel_in(unit, sim_params)
     if potential_energy_fuel_in === nothing && potential_storage_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
+    potential_energy_heat_out = check_heat_out(unit, sim_params)
     if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
     energies = calculate_energies(
-        unit, sim_params,
-        [
-            potential_energy_fuel_in, potential_storage_fuel_in,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
+        unit, sim_params, [potential_energy_fuel_in, potential_energy_heat_out]
     )
 
     if !energies[1]
@@ -337,24 +323,20 @@ function potential(
 end
 
 function process(unit::FuelBoiler, sim_params::Dict{String,Any})
-    potential_energy_fuel_in, potential_storage_fuel_in = check_fuel_in(unit, sim_params)
-    if potential_energy_fuel_in === nothing && potential_storage_fuel_in === nothing
+    potential_energy_fuel_in = check_fuel_in(unit, sim_params)
+    if potential_energy_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+    potential_energy_heat_out = check_heat_out(unit, sim_params)
+    if potential_energy_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
     energies = calculate_energies(
-        unit, sim_params,
-        [
-            potential_energy_fuel_in, potential_storage_fuel_in,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
+        unit, sim_params, [potential_energy_fuel_in, potential_energy_heat_out]
     )
     if energies[1]
         sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])

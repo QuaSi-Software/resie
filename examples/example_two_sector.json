@@ -124,6 +124,11 @@
                 "output_order": [
                     "TST_01_HZG_01_DEM",
                     "TST_01_HZG_01_BFT"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 1],
+                    [1, 0]
                 ]
             }
         },
@@ -143,7 +148,14 @@
                     "TST_01_HZG_01_HTP",
                     "TST_01_ELT_01_BAT",
                     "TST_01_ELT_01_GRO"
+                ],
+                "energy_flow": [
+                    [1, 1, 1, 1],
+                    [1, 1, 1, 1],
+                    [1, 1, 0, 0],
+                    [1, 1, 0, 0]
                 ]
+
             }
         },
         "TST_01_HZG_01_CHP": {

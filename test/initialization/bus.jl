@@ -58,11 +58,20 @@ function test_load_no_connections()
         "epsilon" => 1e-9
     )
 
-    components = Resie.load_components(components_config, simulation_parameters)
-    bus = components["TST_BUS_01"]
-    @test length(bus.connectivity.input_order) == 0
-    @test length(bus.connectivity.output_order) == 0
-    @test bus.connectivity.energy_flow === nothing
+    exception_occured = false
+    try
+        components = Resie.load_components(components_config, simulation_parameters)
+        bus = components["TST_BUS_01"]
+        @test length(bus.connectivity.input_order) == 0
+        @test length(bus.connectivity.output_order) == 0
+        @test bus.connectivity.energy_flow === nothing
+    catch e
+        exception_occured = true
+        @test e isa MethodError
+        @test String(nameof(e.f)) == "set_storage_transfer!"
+    end
+
+    @test exception_occured
 end
 
 @testset "load_no_connections" begin
@@ -81,12 +90,20 @@ function test_load_given_lists_empty()
         "time" => 0,
         "epsilon" => 1e-9
     )
+    exception_occured = false
+    try
+        components = Resie.load_components(components_config, simulation_parameters)
+        bus = components["TST_BUS_01"]
+        @test length(bus.connectivity.input_order) == 0
+        @test length(bus.connectivity.output_order) == 0
+        @test bus.connectivity.energy_flow === nothing
+    catch e
+        exception_occured = true
+        @test e isa MethodError
+        @test String(nameof(e.f)) == "set_storage_transfer!"
+    end
 
-    components = Resie.load_components(components_config, simulation_parameters)
-    bus = components["TST_BUS_01"]
-    @test length(bus.connectivity.input_order) == 0
-    @test length(bus.connectivity.output_order) == 0
-    @test bus.connectivity.energy_flow === nothing
+    @test exception_occured
 end
 
 @testset "load_given_lists_empty" begin

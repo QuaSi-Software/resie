@@ -43,7 +43,7 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         default_dict = Dict{String,Any}(
             "strategy" => Dict{String,Any}("name" => "default")
         )
-        unit_config = merge(default_dict, entry)
+        unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
         unit_class = getproperty(EnergySystems, symbol)
@@ -85,9 +85,13 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
     # the input/output priorities
     components = reorder_interfaces_of_busses(components)
 
+    EnergySystems.initialise_components(components, sim_params)
+
+    chains = find_chains(values(components), EnergySystems.sf_bus)
+    EnergySystems.merge_bus_chains(chains, components, sim_params)
+
     return components
 end
-
 
 """
 reorder_interfaces_of_busses(components)
@@ -240,35 +244,6 @@ function base_order(components_by_function)
 end
 
 """
-    idx_of(order, uac, step)
-
-Helper function to find the index of a given combination of step and unit (by its UAC).
-"""
-function idx_of(order, uac, step)
-    for idx in eachindex(order)
-        if order[idx][2][1].uac == uac && order[idx][2][2] == step
-            return idx
-        end
-    end
-    return 0
-end
-
-"""
-    uac_is_bus(component, uac)
-
-Helper function to check if the given UAC corresponds to a bus in the outputs of the
-given component.
-"""
-function uac_is_bus(component, uac)
-    for output_interface in component.output_interfaces
-        if (output_interface.target.uac === uac && output_interface.target.sys_function === EnergySystems.sf_bus)
-            return true
-        end
-    end
-    return false
-end
-
-"""
     add_non_recursive!(node_set, unit, caller_uac)
 
 Add connected units of the same system function to the node set in a non-recursive manner.
@@ -302,7 +277,7 @@ A chain is a subgraph of the graph spanned by all connections of the given compo
 which is a directed graph. The subgraph is defined by all connected components of the given
 system function.
 """
-function find_chains(components, sys_function)
+function find_chains(components, sys_function)::Vector{Set{Component}}
     chains = []
 
     for unit in components
@@ -575,8 +550,9 @@ end
 Reorder components connected to a bus so they match the input priority defined on that bus.
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
-    # for every bus...
+    # for every bus except for those with proxies...
     for bus in values(components_by_function[3])
+        if bus.proxy !== nothing continue end
         # ...for each component in the bus' input priority...
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every component following after...
@@ -600,123 +576,30 @@ end
 """
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
 
-Reorder the distribution of busses so that any chain of busses connected to each other
-have the "sink" busses before the "source" busses while also considering the output
-priorities of two or more sink busses connected to the same source bus.
-
-In the following, assume energy flows from left to right:
-
-               ------------
-               |   Bus 2  |   ------------
-               ------------   |   Bus 5  |
-             /              / ------------
-------------   ------------
-|   Bus 1  |---|   Bus 3  |
-------------   -----------`
-             `              ` ------------
-               `-----------   |   Bus 6  |
-               |   Bus 4  |   ------------
-               ------------
-With input priorities (4,3,2) on bus 1 and (6,5) on bus 3 this would result in an order
-of: 4,6,5,3,2,1
+Reorder the distribution of busses so that for chains of busses larger than one the proxy
+bus for that chain is distributed first.
 """
 function reorder_distribution_of_busses(simulation_order, components, components_by_function)
-    # for every bus chain...
-    for bus_chain in find_chains(components_by_function[3], EnergySystems.sf_bus)
-        # ...by sources-first ordering...
-        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus, reverse=true)
-            output_order = length(bus.connectivity.output_order) > 0 ?
-                           bus.connectivity.output_order :
-                           [u.target.uac for u in bus.output_interfaces]
-            # ...make sure every successor bus...
-            for successor_uac in output_order
-                # ...has a higher priority in the order they are appear in the list
-                place_one_higher!(
-                    simulation_order,
-                    (bus.uac, EnergySystems.s_distribute),
-                    (successor_uac, EnergySystems.s_distribute)
-                )
-            end
+    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
+    for bus_chain in find_chains(non_proxy_busses, EnergySystems.sf_bus)
+        # for a single bus we don't need to do anything. for chains we use the proxy
+        if length(bus_chain) <= 1
+            continue
+        end
+        bus = first(bus_chain)
+        proxy_bus = bus.proxy !== nothing ? bus.proxy : bus
+
+        # for principal busses in the chain, place their distribute step after that of the
+        # proxy bus. the order of the principals within themselves doesn't matter, but it
+        # should be deterministic for testing and debugging purposes, hence the sorting
+        for principal in sort(collect(bus_chain), by=c->c.uac)
+            place_one_lower!(
+                simulation_order,
+                (proxy_bus.uac, EnergySystems.s_distribute),
+                (principal.uac, EnergySystems.s_distribute)
+            )
         end
     end
-end
-
-
-"""
-    check_energy_flow(bus, target, source)
-
-Checks if the energy is allowed to flow from the source to the target via the bus.
-
-# Arguments
--`bus::Component`: The bus that is in the middle of source and storage
--`target::Component`: The target component to check
--`source::Union{Component,Nothing}`: The source component to check. If the source is
-    nothing, the energy flow is allowed.
-"""
-function check_energy_flow(bus, target, source)::Bool
-    if bus.connectivity.energy_flow === nothing || source === nothing
-        # if no energy flow matrix or source is given, flow is assumed to be allowed
-        return true
-    end
-
-    output_idx = nothing
-    for (idx,output_uac) in pairs(bus.connectivity.output_order)
-        if output_uac == target.uac
-            output_idx = idx
-        end
-    end
-
-    input_idx = nothing
-    for (idx,input_uac) in pairs(bus.connectivity.input_order)
-        if input_uac == source.uac
-            input_idx = idx
-        end
-    end
-
-    if input_idx !== nothing && output_idx !== nothing
-        return bus.connectivity.energy_flow[input_idx][output_idx] == 1
-    else
-        return false
-    end
-end
-
-"""
-    find_storages_ordered(bus, components, source)
-
-Finds storage components in the given bus and all successor busses ordered by the output priorities.
-
-# Arguments
--`bus::Component`: The bus from which to start the search
--`components::Grouping`: All components in the energy system
--`source::Component`: The source from which bus was reached out. Can be nothing if bus is first bus.
--`reverse::Bool`: (Optional) If true, orders the storages in reverse order. Defaults to false.
-"""
-function find_storages_ordered(bus, components, source; reverse=false)
-    storages = []
-    limited = []
-    pushing = reverse ? pushfirst! : push!
-
-    for unit_uac in bus.connectivity.output_order
-        unit = components[unit_uac]
-        if unit.sys_function == EnergySystems.sf_storage
-            pushing(storages, unit)
-            if check_energy_flow(bus, unit, source)
-                pushing(limited, true)
-            else
-                pushing(limited, false)
-            end
-        elseif unit.sys_function == EnergySystems.sf_bus
-            storages_returned, limits = find_storages_ordered(unit, components, bus)
-            for storage in storages_returned
-                pushing(storages, storage)
-            end
-            for limit in limits
-                pushing(limited, limit)
-            end
-        end
-    end
-
-    return storages, limited
 end
 
 """
@@ -726,85 +609,74 @@ Reorder components such the loading (and unloading) of storages follows the prio
 busses, including communication across connected busses.
 """
 function reorder_storage_loading(simulation_order, components, components_by_function)
-    for bus_chain in find_chains(components_by_function[3], EnergySystems.sf_bus)
-        for bus in iterate_chain(bus_chain, EnergySystems.sf_bus)
-            storages, limitations = find_storages_ordered(bus, components, nothing, reverse=true)
-            if length(storages) < 2
-                continue
-            end
+    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
+    for bus_chain in find_chains(non_proxy_busses, EnergySystems.sf_bus)
+        # for a single bus we use the bus itself, for chains we use the proxy
+        bus = first(bus_chain)
+        if length(bus_chain) > 1 && bus.proxy !== nothing
+            bus = bus.proxy
+        end
 
-            # by continuosly placing lower than the last element, which has highest priority
-            # due to the reverse ordering, the correct order is preserved
-            for last_index in 1:length(storages)
-                last_element = storages[length(storages)+1-last_index]
-                for idx in 1:(length(storages)-last_index)
-                    place_one_lower!(
-                        simulation_order,
-                        (last_element.uac, EnergySystems.s_process),
-                        (storages[idx].uac, EnergySystems.s_process)
-                    )
-                    place_one_lower!(
-                        simulation_order,
-                        (last_element.uac, EnergySystems.s_load),
-                        (storages[idx].uac, EnergySystems.s_load)
-                    )
-                end
-            end
+        # identify first input and output storage
+        output_storages = [
+            i.target for i in bus.output_interfaces
+            if i.target.sys_function == EnergySystems.sf_storage
+        ]
+        first_output_storage = length(output_storages) < 1 ? nothing : output_storages[1]
 
-            # make sure that storages on the leaf-busses are loaded right after the processing of transformers on leaf-busses 
-            # (only if storage-loading is allowed by the connectivity matrix of the bus)
-            # to avoid that other storages in the system uses the not requested energy that was indented to load the storage, 
-            # which can otherwise happen in the trunk bus or in other leaf busses as well. 
-            for (_, storage) in pairs(storages)                                                         # iterate through all storages in the current bus_chain
-                for (_, storage_input_interface) in pairs(storage.input_interfaces)                     # and get input interface of storage. Usually ony one interface is present in storage, but for-loop is used here to identify the interface without the need of the medium name
-                    if storage_input_interface.source.sys_function == EnergySystems.sf_bus              # check if source of storage is a bus
-                        for bus_input_interface in storage_input_interface.source.input_interfaces      # iterate through input interfaces of this bus
-                            if bus_input_interface.source.sys_function == EnergySystems.sf_transformer  # and check if they are fed by transformers. 
-                                if (                                                                    # if yes, check if the transfomer is allowed to load the storage
-                                    check_energy_flow(storage_input_interface.source, storage_input_interface.target, bus_input_interface.source)
-                                    &&                                                                  # and
-                                    storage_input_interface.source !== bus                              # do not consider the trunk bus
-                                )
-                                    place_one_lower!(                                                   # and then make sure that the load step of the storage is right after the process step of the transformer
-                                        simulation_order,
-                                        (bus_input_interface.source.uac, EnergySystems.s_process),
-                                        (storage.uac, EnergySystems.s_load),
-                                        force=true
-                                    )
-                                end
-                            end
-                        end
-                    end
-                end
-            end
+        input_storages = [
+            i.source for i in bus.input_interfaces
+            if i.source.sys_function == EnergySystems.sf_storage
+        ]
+        first_input_storage = length(input_storages) < 1 ? nothing : input_storages[1]
+        last_input_storage = length(input_storages) < 1 ? nothing : input_storages[end]
 
-            # sort storages into two list (storages with limited and unlimited loading)
-            unimited_storages = []
-            limited_storages = []
-            for (idx, storage) in pairs(storages)
-                if limitations[idx]
-                    push!(unimited_storages, storage)
-                else
-                    push!(limited_storages, storage)
-                end
-            end 
+        # for the storage with the highest output priority, place its load step after the
+        # process step of the input storage with highest priority, so that the subsequent
+        # insertions maintain the order of process steps first, then load steps
+        if first_input_storage !== nothing && first_output_storage !== nothing
+            place_one_lower!(
+                simulation_order,
+                (last_input_storage.uac, EnergySystems.s_process),
+                (first_output_storage.uac, EnergySystems.s_load),
+            )
+        end
 
-            # make sure all limited storages are placed behind the unlimited ones
-            for limited_storage in limited_storages
-                for unimited_storage in unimited_storages
-                    place_one_lower!(
-                        simulation_order,
-                        (unimited_storage.uac, EnergySystems.s_process),
-                        (limited_storage.uac, EnergySystems.s_process)
-                    )
-                    place_one_lower!(
-                        simulation_order,
-                        (unimited_storage.uac, EnergySystems.s_load),
-                        (limited_storage.uac, EnergySystems.s_load)
-                    )
-                end
+        # for the storage with the highest output priority, place its load step after the
+        # process step of the transformer with the lowest input priority, so that the load
+        # of storages happen after the last input transformer had its process.
+        # storages act like a bounded source, they have already written a valid max_energy
+        # in their control.
+        input_transformer = [
+            i.source for i in bus.input_interfaces
+            if i.source.sys_function == EnergySystems.sf_transformer
+        ]
+        last_input_transformer = length(input_transformer) < 1 ? nothing : input_transformer[end]
+        if first_input_storage !== nothing && last_input_transformer !== nothing
+            place_one_lower!(
+                simulation_order,
+                (last_input_transformer.uac, EnergySystems.s_process),
+                (first_output_storage.uac, EnergySystems.s_load),
+            )
+        end
+
+        # reorder load for storages according to output priorities. this works by
+        # continuously placing lower than the first storage in reverse order, which results
+        # in the correct ordering
+        if first_output_storage !== nothing
+            for output_storage in reverse(output_storages)
+                if output_storage.uac == first_output_storage.uac continue end
+                place_one_lower!(
+                    simulation_order,
+                    (first_output_storage.uac, EnergySystems.s_load),
+                    (output_storage.uac, EnergySystems.s_load),
+                    force=true
+                )
             end
         end
+
+        # same as above, but for inputs and the process step
+        # this is done in reorder_for_input_priorities()
     end
 end
 

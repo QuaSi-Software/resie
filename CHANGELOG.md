@@ -4,6 +4,16 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.0
+* Standardise storage un-/loading control parameters for all components and make them customisable to the input/output media
+* Remove operational strategy "extended_storage_loading_control"
+* Update line plot & sankey outputs to better show missing demands
+* Rework internal energy distribution calculations on busses:
+  * If two or more busses are connected in a chain (necessarily of the same medium), a so-called proxy bus is created, which handles the calculations for any energy transfer from components on any of the principal/original busses
+  * Remove the distinction of maximum potential energy utilisation (`max_energy`) and storage un-/loading potential, as the calculation on a bus considers storages according to the energy flow matrix as well as storage loading flags and thus does not require a distinction anymore. Direct 1-to-1 connections do not require this either, hence the removal.
+  * Add automatically generated output channels for busses in a chain, where each bus tracks how much energy is transfered to other busses in the input->output direction
+  * Some slight changes the generated order of operations, as this now makes use of the input and output order on proxy busses. This should not have an impact on results, but might change the order of operations compared to versions before v0.8.0.
+
 ### Version 0.7.1
 * bugfix in sankey diagram if only one medium is present
 * added possibility to not plot the sankey by adding "sankey_plot" to "io_settings"

@@ -65,15 +65,44 @@ mutable struct Electrolyser <: Component
     end
 end
 
+function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_el_in],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_h2_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_o2_out],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
+        )
+    )
+end
+
 function control(
     unit::Electrolyser,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
-    if unit.output_interfaces[unit.m_heat_out].temperature === nothing
-        unit.output_interfaces[unit.m_heat_out].temperature = unit.output_temperature
-    end
+    set_temperature!(
+        unit.output_interfaces[unit.m_heat_out],
+        nothing,
+        unit.output_temperature
+    )
 end
 
 function set_max_energies!(
@@ -95,25 +124,20 @@ function check_el_in(
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_el_in].max_energy === nothing
         )
-            return (Inf, Inf)
+            return (Inf)
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_el_in],
                 unit.input_interfaces[unit.m_el_in].source
             )
             potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-            potential_storage_el = storage_potential(exchanges)
-            if (
-                unit.controller.parameter["unload_storages"]
-                ? potential_energy_el + potential_storage_el
-                : potential_energy_el
-            ) <= sim_params["epsilon"]
-                return (0.0, 0.0)
+            if potential_energy_el <= sim_params["epsilon"]
+                return (0.0)
             end
-            return (potential_energy_el, potential_storage_el)
+            return (potential_energy_el)
         end
     else
-        return (Inf, Inf)
+        return (Inf)
     end
 end
 
@@ -128,11 +152,10 @@ function check_heat_out(
         )
         return (
             [e.balance + e.energy_potential for e in exchanges],
-            [e.storage_potential for e in exchanges],
-            temperature_all(exchanges)
+            temp_min_all(exchanges)
         )
     else
-        return (-Inf, -Inf, unit.output_interfaces[unit.m_heat_out].temperature)
+        return ([-Inf], [nothing])
     end
 end
 
@@ -146,17 +169,12 @@ function check_h2_out(
             unit.output_interfaces[unit.m_h2_out].target
         )
         potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_h2 = storage_potential(exchanges)
-        if (
-            unit.controller.parameter["load_storages"]
-            ? potential_energy_h2 + potential_storage_h2
-            : potential_energy_h2
-        ) >= -sim_params["epsilon"]
-            return (0.0, 0.0)
+        if potential_energy_h2 >= -sim_params["epsilon"]
+            return (0.0)
         end
-        return (potential_energy_h2, potential_storage_h2)
+        return (potential_energy_h2)
     else
-        return (-Inf, -Inf)
+        return (-Inf)
     end
 end
 
@@ -170,17 +188,12 @@ function check_o2_out(
             unit.output_interfaces[unit.m_o2_out].target
         )
         potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_o2 = storage_potential(exchanges)
-        if (
-            unit.controller.parameter["load_storages"]
-            ? potential_energy_o2 + potential_storage_o2
-            : potential_energy_o2
-        ) >= -sim_params["epsilon"]
-            return (0.0, 0.0)
+        if potential_energy_o2 >= -sim_params["epsilon"]
+            return (0.0)
         end
-        return (potential_energy_o2, potential_storage_o2)
+        return (potential_energy_o2)
     else
-        return (-Inf, -Inf)
+        return (-Inf)
     end
 end
 
@@ -200,24 +213,14 @@ function calculate_energies(
 
     # get potentials from inputs/outputs. only the heat output is calculated as vector,
     # the electricity input and h2/o2 outputs are calculated as scalars
-    potential_energy_el, potential_storage_el = check_el_in(unit, sim_params)
-    potentials_energy_heat_out,
-        potentials_storage_heat_out,
-        out_temps = check_heat_out(unit, sim_params)
-    potential_energy_h2_out, potential_storage_h2_out = check_h2_out(unit, sim_params)
-    potential_energy_o2_out, potential_storage_o2_out = check_o2_out(unit, sim_params)
+    potential_energy_el = check_el_in(unit, sim_params)
+    potentials_energy_heat_out, out_temps_min = check_heat_out(unit, sim_params)
+    potential_energy_h2_out = check_h2_out(unit, sim_params)
+    potential_energy_o2_out = check_o2_out(unit, sim_params)
 
-    available_el_in = unit.controller.parameter["unload_storages"] ?
-                      potential_energy_el + potential_storage_el :
-                      potential_energy_el
-
-    available_h2_out = unit.controller.parameter["load_storages"] ?
-                         potential_energy_h2_out + potential_storage_h2_out :
-                         potential_energy_h2_out
-
-    available_o2_out = unit.controller.parameter["load_storages"] ?
-                        potential_energy_o2_out + potential_storage_o2_out :
-                        potential_energy_o2_out
+    available_el_in = potential_energy_el
+    available_h2_out = potential_energy_h2_out
+    available_o2_out = potential_energy_o2_out
 
     # in the following we want to work with positive values as it is easier
     available_h2_out = abs(available_h2_out)
@@ -255,23 +258,20 @@ function calculate_energies(
 
         # check if it is an "empty" layer, usually from other inputs on a bus, which are
         # included for balance calculations but cannot take in energy from the electorlyser
-        if (
-            unit.controller.parameter["load_storages"]
-            ? pot_heat_out + potentials_storage_heat_out[idx_layer]
-            : pot_heat_out
-        ) <= sim_params["epsilon"]
+        if pot_heat_out <= sim_params["epsilon"]
             continue
         end
 
-        # skip layer if requested temperature is higher than the output temperature
-        if out_temps[idx_layer] > unit.output_temperature
+        # skip layer if output temperature is lower than minimum temperature of layer
+        if (
+            out_temps_min[idx_layer] !== nothing
+            && out_temps_min[idx_layer] > unit.output_temperature
+        )
             continue
         end
 
         # energies for current layer with potential (+storage) heat out as basis
-        used_heat_out = unit.controller.parameter["load_storages"] ?
-            pot_heat_out + potentials_storage_heat_out[idx_layer] :
-            pot_heat_out
+        used_heat_out = pot_heat_out
         used_el_in = used_heat_out / unit.heat_fraction
         used_h2_out = used_el_in * (1.0 - unit.heat_fraction)
         used_o2_out = used_h2_out * 0.5
@@ -315,7 +315,7 @@ function calculate_energies(
         # finally all checks done, we add the layer and update remaining energies
         push!(layers_el_in, used_el_in)
         push!(layers_heat_out, used_heat_out)
-        push!(layers_heat_out_temperature, out_temps[idx_layer])
+        push!(layers_heat_out_temperature, out_temps_min[idx_layer])
         push!(layers_h2_out, used_h2_out)
         push!(layers_o2_out, used_o2_out)
         available_el_in -= used_el_in
@@ -377,15 +377,8 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
-    # calculate mixed temperature for heat output, as interfaces do not support vectorized
-    # energy balances (yet)
-    mixed_temperature = 0.0
-    for (layer_idx, layer_heat_out) in pairs(energies[3])
-        mixed_temperature += energies[4][layer_idx] * (layer_heat_out / heat_out)
-    end
-
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    add!(unit.output_interfaces[unit.m_heat_out], heat_out, mixed_temperature)
+    add!(unit.output_interfaces[unit.m_heat_out], heat_out)
     add!(unit.output_interfaces[unit.m_h2_out], h2_out)
     add!(unit.output_interfaces[unit.m_o2_out], o2_out)
 end

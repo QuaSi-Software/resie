@@ -5,20 +5,24 @@ using Resie.EnergySystems
 
 function setup_control_tests()
     components_config = Dict{String,Any}(
-        "TST_BT_01" => Dict{String,Any}(
-            "type" => "BufferTank",
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
             "control_refs" => [],
-            "output_refs" => [],
-            "capacity" => 40000,
-            "load" => 20000,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
+            "output_refs" => ["TST_HP_01"],
+            "is_source" => true,
+            "medium" => "m_h_w_lt1",
+        ),
+        "TST_GRI_02" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "control_refs" => [],
+            "output_refs" => ["TST_HP_01"],
+            "is_source" => true,
+            "medium" => "m_e_ac_230v",
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => ["TST_BT_01"],
-            "output_refs" => [],
+            "output_refs" => ["TST_BT_01"],
             "strategy" => Dict{String,Any}(
                 "name" => "storage_driven",
                 "high_threshold" => 0.9,
@@ -26,6 +30,25 @@ function setup_control_tests()
             ),
             "power_th" => 20000,
             "constant_cop" => 3.0
+        ),
+        "TST_BT_01" => Dict{String,Any}(
+            "type" => "BufferTank",
+            "control_refs" => [],
+            "output_refs" => ["TST_DEM_01"],
+            "medium" => "m_h_w_ht1",
+            "capacity" => 40000,
+            "load" => 20000,
+            "strategy" => Dict{String,Any}(
+                "name" => "Default"
+            )
+        ),
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "control_refs" => [],
+            "output_refs" => [],
+            "medium" => "m_h_w_ht1",
+            "constant_demand" => 5000,
+            "constant_temperature" => 60,
         ),
     )
 

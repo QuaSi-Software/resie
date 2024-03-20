@@ -91,10 +91,10 @@ function test_multiple_transformer_with_limitations()
     end
 
     # first time step: demand is met perfectly
+    demand_h2.constant_demand = 2400
+    demand_heat.constant_demand = 2240
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
-    demand_h2.demand = 2400/4
-    demand_heat.demand = 2240/4
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(electrolyser, components, simulation_parameters)
     EnergySystems.control(grid_el1, components, simulation_parameters)
@@ -113,7 +113,6 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
@@ -124,12 +123,10 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)
@@ -172,10 +169,10 @@ function test_multiple_transformer_with_limitations()
         EnergySystems.reset(unit)
     end
 
+    demand_h2.constant_demand = 0.5*2400  # reducing h2 demand by half
+    demand_heat.constant_demand = 2240  # same heat demand as bevore
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
-    demand_h2.demand = 0.5*2400/4  # reducing h2 demand by half
-    demand_heat.demand = 2240/4  # same heat demand as bevore
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(electrolyser, components, simulation_parameters)
     EnergySystems.control(grid_el1, components, simulation_parameters)
@@ -194,7 +191,6 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -2400/4/0.6*0.4
 
     EnergySystems.potential(electrolyser, simulation_parameters)
@@ -205,12 +201,10 @@ function test_multiple_transformer_with_limitations()
 
     exchanges = EnergySystems.balance_on(heat_pump.input_interfaces[heat_pump.m_heat_in], heat_pump)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ -0.5*2400/4/0.6*0.4
 
     exchanges = EnergySystems.balance_on(electrolyser.output_interfaces[electrolyser.m_heat_out], electrolyser)
     @test EnergySystems.balance(exchanges) ≈ 0.0
-    @test EnergySystems.storage_potential(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.5*2400/4/0.6*0.4
 
     EnergySystems.process(electrolyser, simulation_parameters)

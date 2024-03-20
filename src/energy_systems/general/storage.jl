@@ -42,12 +42,30 @@ mutable struct Storage <: Component
     end
 end
 
+function initialise!(unit::Storage, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+        )
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "load_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::Storage,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
     move_state(unit, components, sim_params)
+
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
 end
 
 function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
@@ -56,9 +74,9 @@ function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExc
     return [EnEx(
         balance=interface.balance,
         uac=unit.uac,
-        energy_potential=0.0,
-        storage_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        temperature=interface.temperature,
+        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        temperature_min=interface.temperature_min,
+        temperature_max=interface.temperature_max,
         pressure=nothing,
         voltage=nothing,
     )]
@@ -67,18 +85,10 @@ end
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges)
-
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demand = blnc + storage_potential(exchanges)
-    else
-        energy_demand = blnc
-    end
+    energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return # process is only concerned with moving energy to the target
     end
 
@@ -94,9 +104,10 @@ end
 function load(unit::Storage, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
 
     if energy_available <= 0.0
+        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return # load is only concerned with receiving energy from the source
     end
 

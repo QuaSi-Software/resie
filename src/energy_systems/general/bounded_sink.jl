@@ -58,6 +58,15 @@ mutable struct BoundedSink <: Component
     end
 end
 
+function initialise!(unit::BoundedSink, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        default(
+            unit.controller.parameter, "unload_storages " * String(unit.medium), true
+        )
+    )
+end
+
 function control(
     unit::BoundedSink,
     components::Grouping,
@@ -83,16 +92,17 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.input_interfaces[unit.medium].temperature = highest(
+    set_temperature!(
+        unit.input_interfaces[unit.medium],
         unit.temperature,
-        unit.input_interfaces[unit.medium].temperature
+        nothing
     )
 end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    blnc = balance(exchanges)
+    blnc = balance(exchanges) + energy_potential(exchanges)
     if blnc > 0.0
         sub!(
             inface,
