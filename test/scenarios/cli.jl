@@ -9,9 +9,10 @@ script is called from the directory two levels above this script, which is the m
 directory of ReSiE.
 
 Several commands exist for the script, which are:
-    * `generate_output`: Generate the output for a scenario by running the simulation
+    * `generate_output`: Generate the output for a scenario by running the simulation.
     * `set_reference`: Set the reference outputs for a scenario. Please note that this will
-        not automatically commit the changes to the repository
+        not automatically commit the changes to the repository.
+    * `compare_ooo`: Compare the order of operations between the reference and output.
 
 Each of the commands can be given, as second argument, the name of a scenario.
 
@@ -25,7 +26,8 @@ using Resie
 
 KNOWN_COMMANDS = Set([
     "generate_output",
-    "set_reference"
+    "set_reference",
+    "compare_ooo"
 ])
 
 """
@@ -57,6 +59,43 @@ function setup_logger(subdir)
     )
     @info "Logging set up"
     return log_file_general, log_file_balanceWarn
+end
+
+"""
+    compare_files(file_1, file_2)
+
+List of line-by-line differences between the two given files.
+
+If the number of lines differs between the files, adds a difference in line 0 noting the
+number of lines for each file. The files are only compared line by line up until the length
+of the shorter of the two files.
+
+# Arguments
+-`file_1::String`: Filepath to the first file
+-`file_2::String`: Filepath to the first file
+# Returns
+-`List{Tuple{Integer,String}}`: A list of differences with the line number and a
+    concatenation of the two lines, each surrounded by ' and seperated with |
+"""
+function compare_files(file_1, file_2)
+    lines_1 = split(read(file_1, String), "\n")
+    lines_2 = split(read(file_2, String), "\n")
+    differences = []
+
+    if length(lines_1) != length(lines_2)
+        push!(
+            differences,
+            (0, "Different number of lines: $(length(lines_1))|$(length(lines_2))")
+        )
+    end
+
+    for i in 1:min(length(lines_1), length(lines_2))
+        if lines_1[i] != lines_2[i]
+            push!(differences, (i, "'" * lines_1[i] * "' | '" * lines_2[i] * "'"))
+        end
+    end
+
+    return differences
 end
 
 """
@@ -185,6 +224,33 @@ function set_reference(name, subdir)
 end
 
 """
+    compare_ooo(name, subdir)
+
+Compare the order of operations between the reference and output files.
+
+# Arguments
+-`name::String`: The name of the scenario
+-`subdir::String`: Full path of the subdir for the scenario
+"""
+function compare_ooo(name, subdir)
+    print("Comparing order of operations for scenario $name: ")
+
+    differences = compare_files(
+        joinpath(subdir, "auxiliary_info.md"),
+        joinpath(subdir, "ref_auxiliary_info.md")
+    )
+
+    if length(differences) == 0
+        print("✓\n")
+    else
+        print("X\n")
+        for diff_line in differences
+            println("Line $(diff_line[1]): $(diff_line[2])")
+        end
+    end
+end
+
+"""
     main()
 
 Entry point for the script.
@@ -226,6 +292,8 @@ function main()
             generate_output(name, subdir)
         elseif command == "set_reference"
             set_reference(name, subdir)
+        elseif command == "compare_ooo"
+            compare_ooo(name, subdir)
         end
     end
 end
