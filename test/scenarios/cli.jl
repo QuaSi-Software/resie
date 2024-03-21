@@ -10,6 +10,8 @@ directory of ReSiE.
 
 Several commands exist for the script, which are:
     * `generate_output`: Generate the output for a scenario by running the simulation
+    * `set_reference`: Set the reference outputs for a scenario. Please note that this will
+        not automatically commit the changes to the repository
 
 Each of the commands can be given, as second argument, the name of a scenario.
 
@@ -22,7 +24,8 @@ using .Resie_Logger
 using Resie
 
 KNOWN_COMMANDS = Set([
-    "generate_output"
+    "generate_output",
+    "set_reference"
 ])
 
 """
@@ -152,6 +155,36 @@ function generate_output(name::String, subdir::String)
 end
 
 """
+    set_reference(name, subdir)
+
+Set the reference outputs by copying relevant output files.
+
+# Arguments
+-`name::String`: The name of the scenario
+-`subdir::String`: Full path of the subdir for the scenario
+"""
+function set_reference(name, subdir)
+    outputs_to_set = [
+        "auxiliary_info.md",
+        "balanceWarn.log",
+        "out.csv",
+        "output_plot.html",
+        "sankey_plot.html"
+    ]
+
+    println("Setting reference outputs for scenario $name")
+
+    for file_name in outputs_to_set
+        output_file_path = joinpath(subdir, file_name)
+        ref_file_path = joinpath(subdir, "ref_" * file_name)
+
+        if isfile(output_file_path)
+            cp(output_file_path, ref_file_path, force=true)
+        end
+    end
+end
+
+"""
     main()
 
 Entry point for the script.
@@ -191,6 +224,8 @@ function main()
 
         if command == "generate_output"
             generate_output(name, subdir)
+        elseif command == "set_reference"
+            set_reference(name, subdir)
         end
     end
 end
