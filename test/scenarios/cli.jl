@@ -13,6 +13,7 @@ Several commands exist for the script, which are:
     * `set_reference`: Set the reference outputs for a scenario. Please note that this will
         not automatically commit the changes to the repository.
     * `compare_ooo`: Compare the order of operations between the reference and output.
+    * `rebuild_overview`: Rebuild the overview page for scenario outputs
 
 Each of the commands can be given, as second argument, the name of a scenario.
 
@@ -27,7 +28,8 @@ using Resie
 KNOWN_COMMANDS = Set([
     "generate_output",
     "set_reference",
-    "compare_ooo"
+    "compare_ooo",
+    "rebuild_overview"
 ])
 
 """
@@ -251,6 +253,75 @@ function compare_ooo(name, subdir)
 end
 
 """
+    rebuild_overview(scenarios_dir)
+
+Rebuild the overview HTML page for the scenario outputs.
+
+# Arguments
+-`scenarios_dir::String`: Path to the scenarios directory, where the template can be found
+    and the generated page will be saved
+"""
+function rebuild_overview(scenarios_dir)
+    println("Rebuilding overview in dir $scenarios_dir")
+
+    main_outputs = [
+        "output_plot.html",
+        "sankey_plot.html"
+    ]
+    other_files = [
+        "auxiliary_info.md",
+        "balanceWarn.log",
+        "general.log",
+        "inputs.json",
+        "out.csv",
+        "ref_auxiliary_info.md",
+        "ref_balanceWarn.log",
+        "ref_out.csv",
+        "ref_output_plot.html",
+        "ref_sankey_plot.html"
+    ]
+
+    scenarios_list_html = ""
+    for name in readdir(scenarios_dir)
+        subdir = joinpath(scenarios_dir, name)
+        if !isdir(subdir)
+            continue
+        end
+
+        scenarios_list_html *= "<h3>$name</h3>\n<ul>\n"
+
+        for file_name in main_outputs
+            file_path = abspath(joinpath(subdir, file_name))
+            if isfile(file_path)
+                scenarios_list_html *= """<li><a target="iframe_content" class="link"
+                    href="file://$file_path">$file_name</a></li>\n"""
+            end
+        end
+
+        scenarios_list_html *= """<li>Others<ul class="small-list">\n"""
+        for file_name in other_files
+            file_path = abspath(joinpath(subdir, file_name))
+            if isfile(file_path)
+                scenarios_list_html *= """<li><a target="iframe_content" class="link"
+                    href="file://$file_path">$file_name</a></li>"""
+            end
+        end
+        scenarios_list_html *= "</ul></li>\n</ul>"
+    end
+
+    content = read(joinpath(scenarios_dir, "template_overview.html"), String)
+    content = replace(content, "<!-- %LIST_MARKER% -->" => scenarios_list_html)
+
+    overview_file_path = abspath(joinpath(scenarios_dir, "overview.html"))
+    overview_file_path = replace(overview_file_path, "\\" => "/")
+    overview_file = open(overview_file_path, "w")
+    write(overview_file, content)
+    close(overview_file)
+
+    println("Rebuilt overview at file://$overview_file_path")
+end
+
+"""
     main()
 
 Entry point for the script.
@@ -278,6 +349,12 @@ function main()
     end
 
     scenarios_dir = joinpath(".", "test", "scenarios")
+
+    if command == "rebuild_overview"
+        rebuild_overview(scenarios_dir)
+        return
+    end
+
     for name in readdir(scenarios_dir)
         if scenario_name !== nothing && scenario_name != name
             continue
