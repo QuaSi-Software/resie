@@ -246,6 +246,7 @@ function compare_ooo(name, subdir)
         print("✓\n")
     else
         print("X\n")
+        println("Left: Output | Right: Reference")
         for diff_line in differences
             println("Line $(diff_line[1]): $(diff_line[2])")
         end
