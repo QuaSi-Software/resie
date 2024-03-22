@@ -266,7 +266,9 @@ function rebuild_overview(scenarios_dir)
 
     main_outputs = [
         "output_plot.html",
-        "sankey_plot.html"
+        "ref_output_plot.html",
+        "sankey_plot.html",
+        "ref_sankey_plot.html",
     ]
     other_files = [
         "auxiliary_info.md",
@@ -277,8 +279,6 @@ function rebuild_overview(scenarios_dir)
         "ref_auxiliary_info.md",
         "ref_balanceWarn.log",
         "ref_out.csv",
-        "ref_output_plot.html",
-        "ref_sankey_plot.html"
     ]
 
     scenarios_list_html = ""
@@ -294,6 +294,7 @@ function rebuild_overview(scenarios_dir)
             file_path = abspath(joinpath(subdir, file_name))
             if isfile(file_path)
                 scenarios_list_html *= """<li><a target="iframe_content" class="link"
+                    data-filetitle="$name / $file_name"
                     href="file://$file_path">$file_name</a></li>\n"""
             end
         end
@@ -303,6 +304,7 @@ function rebuild_overview(scenarios_dir)
             file_path = abspath(joinpath(subdir, file_name))
             if isfile(file_path)
                 scenarios_list_html *= """<li><a target="iframe_content" class="link"
+                    data-filetitle="$name / $file_name"
                     href="file://$file_path">$file_name</a></li>"""
             end
         end
