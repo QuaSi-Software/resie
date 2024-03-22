@@ -550,9 +550,9 @@ end
 Reorder components connected to a bus so they match the input priority defined on that bus.
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
-    non_proxy_busses = [c for c in components_by_function[3] if !startswith(c.uac, "Proxy")]
-    # for every bus...
-    for bus in values(non_proxy_busses)
+    # for every bus except for those with proxies...
+    for bus in values(components_by_function[3])
+        if bus.proxy !== nothing continue end
         # ...for each component in the bus' input priority...
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every component following after...
@@ -629,6 +629,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
             if i.source.sys_function == EnergySystems.sf_storage
         ]
         first_input_storage = length(input_storages) < 1 ? nothing : input_storages[1]
+        last_input_storage = length(input_storages) < 1 ? nothing : input_storages[end]
 
         # for the storage with the highest output priority, place its load step after the
         # process step of the input storage with highest priority, so that the subsequent
@@ -636,7 +637,25 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         if first_input_storage !== nothing && first_output_storage !== nothing
             place_one_lower!(
                 simulation_order,
-                (first_input_storage.uac, EnergySystems.s_process),
+                (last_input_storage.uac, EnergySystems.s_process),
+                (first_output_storage.uac, EnergySystems.s_load),
+            )
+        end
+
+        # for the storage with the highest output priority, place its load step after the
+        # process step of the transformer with the lowest input priority, so that the load
+        # of storages happen after the last input transformer had its process.
+        # storages act like a bounded source, they have already written a valid max_energy
+        # in their control.
+        input_transformer = [
+            i.source for i in bus.input_interfaces
+            if i.source.sys_function == EnergySystems.sf_transformer
+        ]
+        last_input_transformer = length(input_transformer) < 1 ? nothing : input_transformer[end]
+        if first_input_storage !== nothing && last_input_transformer !== nothing
+            place_one_lower!(
+                simulation_order,
+                (last_input_transformer.uac, EnergySystems.s_process),
                 (first_output_storage.uac, EnergySystems.s_load),
             )
         end
@@ -657,17 +676,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         end
 
         # same as above, but for inputs and the process step
-        if first_input_storage !== nothing
-            for input_storage in reverse(input_storages)
-                if input_storage.uac == first_input_storage.uac continue end
-                place_one_lower!(
-                    simulation_order,
-                    (first_input_storage.uac, EnergySystems.s_process),
-                    (input_storage.uac, EnergySystems.s_process),
-                    force=true
-                )
-            end
-        end
+        # this is done in reorder_for_input_priorities()
     end
 end
 

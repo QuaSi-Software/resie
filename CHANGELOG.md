@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.1
+* Rename output parameters `dump_info` and `dump_info_file` to `auxiliary_info` and `auxiliary_info_file`
+* Rename output parameter `output_file` to `csv_output_file`
+* Add output parameters `sankey_plot_file` and `output_plot_file` to allow control of where the plots will be saved
+* Move input parameter `weather_file_path` from the `io_settings` section of the project config to the `simulation_parameters` section
+
 ### Version 0.8.0
 * Standardise storage un-/loading control parameters for all components and make them customisable to the input/output media
 * Remove operational strategy "extended_storage_loading_control"
