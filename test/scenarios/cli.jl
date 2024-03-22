@@ -80,8 +80,8 @@ of the shorter of the two files.
     concatenation of the two lines, each surrounded by ' and seperated with |
 """
 function compare_files(file_1, file_2)
-    lines_1 = split(read(file_1, String), "\n")
-    lines_2 = split(read(file_2, String), "\n")
+    lines_1 = split(replace(read(file_1, String), "\r" => ""), "\n")
+    lines_2 = split(replace(read(file_2, String), "\r" => ""), "\n")
     differences = []
 
     if length(lines_1) != length(lines_2)
