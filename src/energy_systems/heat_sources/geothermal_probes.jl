@@ -227,14 +227,25 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
     simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
 
-    # linear interpolation. TODO: may change later to something else than linear interpolation between irregular grid points?
+    # linear interpolation. 
+    # TODO: May change later to something else than linear interpolation between irregular grid points?
+    #   	Though spline interpolation from Dierckx does not really work here...
     itp = interpolate((vcat(0,library_time_grid_absolute),), vcat(0,g_values_long_term_library), Gridded(Linear()))
     unit.g_function = itp.(simulation_time_grid_precalculated)
 
-    # # spline interpolation using the package "Dierckx"
-    # spl = Spline1D(vcat(0,library_time_grid_absolute), vcat(0,g_values_long_term_library))
-    # unit.g_function = [spl(t) for t in simulation_time_grid_precalculated]
-
+    # change first time period of g-function to fitted log() function to better represent short term effects.
+    # This follows the method of an infitine line source that is widely used to calculate the short term g-functions
+    # of a single probe. As for short time perios the interferrence between the probes in the field is assumed to be
+    # very small, this is commonly assumed to be valid.
+    first_x = Int(library_time_grid_absolute[1] / sim_params["time_step_seconds"]) + 1  # in time step width
+    first_y = unit.g_function[first_x]
+    second_x = Int(library_time_grid_absolute[2] / sim_params["time_step_seconds"]) + 1  # in time step width
+    second_y = unit.g_function[second_x]
+    slope = (second_y - first_y) / (second_x - first_x)
+    for x in 1:first_x
+        unit.g_function[x] = slope * first_x * log(exp(first_y / (slope * first_x)) / first_x * x)
+    end
+    
     # create and save plots 
     if unit.do_create_plots
         plot(1:length(unit.g_function),
