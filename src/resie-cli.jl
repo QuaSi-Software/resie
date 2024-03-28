@@ -15,8 +15,8 @@ a path relative to the CWD of the caller.
 """
 function main()
     # set up Resie_Logger
-    log_to_console = true                                        # flag if logs should be printed to console
-    log_to_file = true                                           # flag if logs should be written to a file
+    log_to_console = false                                        # flag if logs should be printed to console
+    log_to_file = false                                           # flag if logs should be written to a file
     general_logfile_path = "output/logfile_general.log"          # general log file path for debug, info, warn, error
     balanceWarn_logfile_path = "output/logfile_balanceWarn.log"  # balanceWarn log file path, only for balanceWarning
     min_log_level = Resie_Logger.Logging.Info                    # the minimal log level for the output. Can be one of Debug, Info, Warn, Error or

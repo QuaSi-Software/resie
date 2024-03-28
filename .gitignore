@@ -16,3 +16,4 @@ info_dump.md
 profiles/district/230413_profiles_management.xlsx
 src/energy_systems/heat_sources/solarthermal_test.jl
 profiles/create_prf_from_csv.jl
+profiles/convert_polysun_logging.jl
