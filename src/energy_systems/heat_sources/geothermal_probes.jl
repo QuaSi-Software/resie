@@ -40,7 +40,7 @@ mutable struct GeothermalProbes <: Component
     output_temperatures_last_timestep::Vector{Temperature}
 
     energy_in_out_per_probe_meter::Vector{Float64}
-    energy_in_out_difference_per_probe_meter::Vector{Float64}
+    power_in_out_difference_per_probe_meter::Vector{Float64}
 
     probe_field_geometry::String
     number_of_probes_x::Int
@@ -169,7 +169,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # calculate and initialize constant variables
     unit.energy_in_out_per_probe_meter = zeros(sim_params["number_of_time_steps"])
-    unit.energy_in_out_difference_per_probe_meter = zeros(sim_params["number_of_time_steps"])
+    unit.power_in_out_difference_per_probe_meter = zeros(sim_params["number_of_time_steps"])
     unit.fluid_temperature = unit.borehole_current_wall_temperature
     unit.output_temperatures_last_timestep = [unit.borehole_current_wall_temperature]
 
@@ -225,6 +225,9 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # Interpolation between grid points of library, to get g-function values for eacht time-step.
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
+    if simulation_end_timestamp < library_time_grid_absolute[2]  # make sure that the log() function can be parameterised
+        simulation_end_timestamp = library_time_grid_absolute[2] + sim_params["time_step_seconds"]
+    end
     simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
 
     # linear interpolation. 
@@ -233,10 +236,12 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     itp = interpolate((vcat(0,library_time_grid_absolute),), vcat(0,g_values_long_term_library), Gridded(Linear()))
     unit.g_function = itp.(simulation_time_grid_precalculated)
 
-    # change first time period of g-function to fitted log() function to better represent short term effects.
+    # change first time period of g-function to fitted f(x)=a*log(b*x) function to better represent short term effects.
     # This follows the method of an infitine line source that is widely used to calculate the short term g-functions
-    # of a single probe. As for short time perios the interferrence between the probes in the field is assumed to be
-    # very small, this is commonly assumed to be valid.
+    # of a single probe. As for short time periods, the interferrence between the probes in the field is assumed to be
+    # very small, therefore this approach is commonly assumed to be valid.
+    # f(x) should go through the first node of the existing non-interpolated g-function with the same slope at this point.
+    # therefore: a = slope*first_x and b = exp(first_y/(slope*first_x))/first_x
     first_x = Int(library_time_grid_absolute[1] / sim_params["time_step_seconds"]) + 1  # in time step width
     first_y = unit.g_function[first_x]
     second_x = Int(library_time_grid_absolute[2] / sim_params["time_step_seconds"]) + 1  # in time step width
@@ -245,11 +250,11 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     for x in 1:first_x
         unit.g_function[x] = slope * first_x * log(exp(first_y / (slope * first_x)) / first_x * x)
     end
-    
+
     # create and save plots 
     if unit.do_create_plots
-        plot(1:length(unit.g_function),
-             unit.g_function,
+        plot(0:Int(sim_params["number_of_time_steps"]),
+             unit.g_function[1:Int(sim_params["number_of_time_steps"]+1)],
              title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
              xlabel="time [time step]",
              ylabel="g-function value [-]",
@@ -585,16 +590,16 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes)
 
     # calculate new average fluid temperature with g-function approach
     if unit.time_index == 1
-        unit.energy_in_out_difference_per_probe_meter[unit.time_index] = unit.energy_in_out_per_probe_meter[unit.time_index]
+        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index])
     else
-        unit.energy_in_out_difference_per_probe_meter[unit.time_index] = unit.energy_in_out_per_probe_meter[unit.time_index] - unit.energy_in_out_per_probe_meter[unit.time_index-1]
+        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index] - unit.energy_in_out_per_probe_meter[unit.time_index-1])
     end
 
-    current_temperature_difference = sum(reverse(unit.energy_in_out_difference_per_probe_meter[1:unit.time_index]) .* unit.g_function[1:unit.time_index]) / (2 * pi * unit.soil_heat_conductivity)
+    current_temperature_difference = sum(reverse(unit.power_in_out_difference_per_probe_meter[1:unit.time_index]) .* unit.g_function[1:unit.time_index]) / (2 * pi * unit.soil_heat_conductivity)
 
     borehole_current_wall_temperature = unit.soil_undisturbed_ground_temperature + current_temperature_difference
 
-    fluid_temperature = borehole_current_wall_temperature + unit.energy_in_out_per_probe_meter[unit.time_index] * borehole_thermal_resistance
+    fluid_temperature = borehole_current_wall_temperature + wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index]) * borehole_thermal_resistance
     return fluid_temperature
 end
 
