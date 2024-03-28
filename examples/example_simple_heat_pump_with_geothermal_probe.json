@@ -32,13 +32,13 @@
             "5": {
                 "key": {"TST_GTP_01": ["new_fluid_temperature"]},
                 "axis": "right",
-                "unit": "Â°C",
+                "unit": "°C",
                 "scale_factor": 1
             },
             "6": {
                 "key": {"TST_GTP_01": ["current_output_temperature"]},
                 "axis": "right",
-                "unit": "Â°C",
+                "unit": "°C",
                 "scale_factor": 1
             },
             "8": {
@@ -79,9 +79,9 @@
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
+            "energy_profile_file_path": "./profiles/district/240326_validation_probe_heat_output_GEW_2014_15min_Wh.prf",
             "constant_temperature": 3,
-            "scale": 10
+            "scale": 1
         },
         "TST_STH_01": {
             "type": "FixedSupply",
@@ -90,8 +90,8 @@
             "output_refs": [
                 "TST_GTP_01"
             ],
-            "energy_profile_file_path": "./profiles/district/Regeneration_GEW_25years.prf",
-            "scale": 5
+            "energy_profile_file_path": "./profiles/district/240326_validation_probe_heat_input_GEW_2014_15min_Wh.prf",
+            "scale": 1
         },
         "TST_GTP_01": {
             "type": "GeothermalProbes",
@@ -100,30 +100,35 @@
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "max_output_power": 50,
-            "max_input_power": 50,
-            "regeneration": false,
-            "soil_undisturbed_ground_temperature": 12.0,
-            "soil_heat_conductivity": 1.6 ,
+            "max_output_power": 150,
+            "max_input_power": 150,
+            "regeneration": true,
+            "soil_undisturbed_ground_temperature": 13,
+            "soil_heat_conductivity": 1.5 ,
+            "soil_density": 2000,
+            "soil_specific_heat_capacity": 2400,
             "borehole_thermal_resistance": 0.1, 
             "probe_field_geometry": "rectangle",
-            "number_of_probes_x": 15, 
-            "number_of_probes_y": 20,
+            "number_of_probes_x": 3, 
+            "number_of_probes_y": 12,
             "probe_field_key_2": "",
-            "borehole_spacing": 10,
+            "borehole_spacing": 9,
             "probe_type": 2,
             "probe_depth": 150,
+            "borehole_diameter": 0.16,
             "pipe_diameter_outer": 0.032,
             "pipe_diameter_inner": 0.026,
-            "fluid_heat_capacity":3780,
-            "fluid_density":1045,
-            "fluid_kinematic_viscosity":3.9e-6,
-            "fluid_heat_conductivity":0.494,
+            "fluid_heat_capacity": 3780,
+            "fluid_density": 1045,
+            "fluid_kinematic_viscosity": 3.9e-6,
+            "fluid_heat_conductivity": 0.494,
             "fluid_prandtl_number": 31.3,
             "grout_heat_conductivity": 2,
             "pipe_heat_conductivity": 0.42,
-            "borehole_diameter": 0.16
+            "boreholewall_start_temperature": 9,
+            "unloading_temperature_spread": 0.62,
+            "loading_temperature_spread": 4
         }
-                
+     
     }
 }
