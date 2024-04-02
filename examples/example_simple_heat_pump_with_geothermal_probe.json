@@ -104,7 +104,7 @@
             "max_input_power": 150,
             "regeneration": true,
             "soil_undisturbed_ground_temperature": 13,
-            "soil_heat_conductivity": 1.5 ,
+            "soil_heat_conductivity": 1.4 ,
             "soil_density": 2000,
             "soil_specific_heat_capacity": 2400,
             "borehole_thermal_resistance": 0.1, 
