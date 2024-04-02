@@ -822,15 +822,10 @@ end
 function output_values(unit::GeothermalProbes)::Vector{String}
     return [string(unit.m_heat_in)*" IN",
             string(unit.m_heat_out)*" OUT",
-            "TEMPERATURE_#NodeNum",
             "new_fluid_temperature",
             "current_output_temperature",
-            "fluid_reynolds_number",
-            "T_out",
-            "Q_out",
-            "Q_in",
-            "dT_monthly",
-            "dT_hourly" ]
+            "fluid_reynolds_number"
+			]
 end
 
 function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
@@ -838,23 +833,12 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif startswith(key.value_key, "Temperature_")
-        idx = parse(Int, split(key.value_key, "_")[2])
-        if !(1 <= idx <= length(unit.temperature_field)) 
-            throw(ArgumentError("Index \"$idx\" of requested temperature-output of geothermal probe field exeeds the number of available temperatur datapoints.")) 
-        else
-            return unit.temperature_field[idx]
-        end
     elseif key.value_key =="new_fluid_temperature"
         return unit.fluid_temperature
     elseif key.value_key == "current_output_temperature"
         return unit.current_output_temperature
     elseif key.value_key =="fluid_reynolds_number"
         return unit.fluid_reynolds_number
-    elseif key.value_key =="dT_monthly"
-        return unit.dT_monthly
-    elseif key.value_key =="dT_hourly"
-        return unit.dT_hourly
     end
     throw(KeyError(key.value_key))
 end
