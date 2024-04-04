@@ -17,6 +17,8 @@ mutable struct GeothermalProbes <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
+    model_type::String
+
     unloading_temperature_spread::Temperature
     loading_temperature::Temperature
     loading_temperature_spread::Temperature
@@ -94,6 +96,9 @@ mutable struct GeothermalProbes <: Component
             m_heat_in,                      # medium name of input interface
             m_heat_out,                     # medium name of output interface
 
+            default(config, "model_type", "simplified"),          # model type. currently "simplified" with constant thermal borehole resistance and 
+                                                                  # "detailed" with calculated thermal borehole resistance in every time step are available.
+
             default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
             default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
             default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading, within one probe!
@@ -109,7 +114,7 @@ mutable struct GeothermalProbes <: Component
             default(config, "soil_heat_conductivity", 1.5),                  # Heat conductivity of surrounding soil, homogenous and constant, in [W/(m K)]
             default(config, "soil_density", 2000.0),                         # soil density in [kg/m^3]
             default(config, "soil_specific_heat_capacity", 2400.0),          # soil specific heat capacity in [J/(kg K)]
-            default(config, "borehole_thermal_resistance", 0.10),            # thermal resistance in [(m K)/W]
+            default(config, "borehole_thermal_resistance", 0.1),             # thermal resistance in [(m K)/W]. If set, borehole_thermal_resistance is constant! (default: 0.1 (m K)/W)
             [],                                                   # pre-calculated multiscale g-function. Calculated in pre-processing.
             0,                                                    # index of current time step to get access on time dependent g-function values
             0.0,                                                  # average fluid temperature
@@ -571,22 +576,29 @@ Returns:
                                     stored in unit.energy_in_out_per_probe_meter
 """
 function calculate_new_fluid_temperature(unit::GeothermalProbes)
-    # R_B with Hellström (thermal borehole resistance)
-    # calculate convective heat transfer coefficient alpha in pipe
-    alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes)
+    if unit.model_type == "detailed"
+        # R_B with Hellström (thermal borehole resistance)
+        # calculate convective heat transfer coefficient alpha in pipe
+        alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes)
 
-    # calculate effective thermal borehole resistance by multipole method (Hellström 1991) depending on alpha
-    sigma = (unit.grout_heat_conductivity - unit.soil_heat_conductivity) / (unit.grout_heat_conductivity + unit.soil_heat_conductivity)   # dimensionless calculation factor
-    beta = 1 / (2 * pi * alpha_fluid * unit.radius_pipe_inner) + 1 / (2 * pi * unit.pipe_heat_conductivity) * log(unit.radius_pipe_outer / unit.radius_pipe_inner) # in (mK)/W
+        # calculate effective thermal borehole resistance by multipole method (Hellström 1991) depending on alpha
+        sigma = (unit.grout_heat_conductivity - unit.soil_heat_conductivity) / (unit.grout_heat_conductivity + unit.soil_heat_conductivity)   # dimensionless calculation factor
+        beta = 1 / (2 * pi * alpha_fluid * unit.radius_pipe_inner) + 1 / (2 * pi * unit.pipe_heat_conductivity) * log(unit.radius_pipe_outer / unit.radius_pipe_inner) # in (mK)/W
 
-    R_1 = beta + 1 / (2 * pi * unit.grout_heat_conductivity) *
-                 (log(unit.radius_borehole^2 / (2 * unit.radius_pipe_outer * unit.distance_pipe_center)) +
-                 sigma * log(unit.radius_borehole^4 / (unit.radius_borehole^4 - unit.distance_pipe_center^4)) -
-                 unit.radius_pipe_outer^2 / (4 * unit.distance_pipe_center^2) * (1 - sigma * 4 * unit.distance_pipe_center^4 / (unit.radius_borehole^4 - unit.distance_pipe_center^4))^2 /
-                 ((1 + 2 * pi * unit.grout_heat_conductivity * beta) / (1 - 2 * pi * unit.grout_heat_conductivity * beta) +
-                 unit.radius_pipe_outer^2 / (4 * unit.distance_pipe_center^2) * (1 + sigma * 16 * unit.radius_borehole^4 * unit.distance_pipe_center^4 / ((unit.radius_borehole^4 - unit.distance_pipe_center^4)^2))))
+        R_1 = beta + 1 / (2 * pi * unit.grout_heat_conductivity) *
+                    (log(unit.radius_borehole^2 / (2 * unit.radius_pipe_outer * unit.distance_pipe_center)) +
+                    sigma * log(unit.radius_borehole^4 / (unit.radius_borehole^4 - unit.distance_pipe_center^4)) -
+                    unit.radius_pipe_outer^2 / (4 * unit.distance_pipe_center^2) * (1 - sigma * 4 * unit.distance_pipe_center^4 / (unit.radius_borehole^4 - unit.distance_pipe_center^4))^2 /
+                    ((1 + 2 * pi * unit.grout_heat_conductivity * beta) / (1 - 2 * pi * unit.grout_heat_conductivity * beta) +
+                    unit.radius_pipe_outer^2 / (4 * unit.distance_pipe_center^2) * (1 + sigma * 16 * unit.radius_borehole^4 * unit.distance_pipe_center^4 / ((unit.radius_borehole^4 - unit.distance_pipe_center^4)^2))))
 
-    borehole_thermal_resistance = R_1 / (2 * unit.probe_type)
+        borehole_thermal_resistance = R_1 / (2 * unit.probe_type)
+    elseif unit.model_type == "simplified"
+        # constant borehole thermal resistance from user input
+        borehole_thermal_resistance = unit.borehole_thermal_resistance
+    else
+        @error "Undefined model type $(unit.model_type) of unit $(unit.uac). Has to be one of: 'simplified', 'detailed'."
+    end
 
     # calculate new average fluid temperature with g-function approach
     if unit.time_index == 1
