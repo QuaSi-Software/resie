@@ -598,6 +598,7 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes)
         borehole_thermal_resistance = unit.borehole_thermal_resistance
     else
         @error "Undefined model type $(unit.model_type) of unit $(unit.uac). Has to be one of: 'simplified', 'detailed'."
+        exit()
     end
 
     # calculate new average fluid temperature with g-function approach
