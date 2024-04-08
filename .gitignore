@@ -5,12 +5,10 @@
 deps/build.log
 Manifest.toml
 
-# output files
-*.csv
-*.html
-auxiliary_info.md
-*.log
+# output files (force-add new scenario inputs and references)
+output/*
+test/scenarios/*
 
-# input files (test data and templates are added separately)
-*.json
+# input files (force-add new examples)
+examples/*.json
 profiles/district/230413_profiles_management.xlsx

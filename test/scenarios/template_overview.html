@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overview of scenario outputs</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+    }
+    .container {
+        display: flex;
+        height: 100vh; /* full viewport height */
+    }
+    .links {
+        width: 15%;
+        padding-left: 20px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        border: 1px solid #ccc;
+    }
+    .small-list {
+        font-size: 10px;
+    }
+    .iframe-container {
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        border: 1px solid #ccc;
+    }
+    #iframe-title {
+        margin: 20px 0 0 20px;
+    }
+    iframe {
+        width: 100%;
+        height: 800px;
+        border: none;
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="links">
+        <h2>Scenarios</h2>
+        <!-- %LIST_MARKER% -->
+    </div>
+
+    <div class="iframe-container">
+        <h2 id="iframe-title">&nbsp;</h2>
+        <iframe name="iframe_content"></iframe>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const links = document.querySelectorAll(".link");
+        links.forEach(link => {
+            link.addEventListener("click", function(event) {
+                const title = document.querySelector("#iframe-title");
+                title.innerText = this.dataset.filetitle;
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
