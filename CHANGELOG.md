@@ -4,6 +4,11 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.2
+* Add testing and development feature "scenarios": Project files with certain expected outputs, which are used to test if the calculations have changed and thus produce different outputs than in the last verified version. This differs from unit tests in that the tests are not fully automated and require a certain expert knowledge to verify. The advantage over unit tests is that these outputs are less brittle and test cases can be added more easily.
+* Add CLI for generating the output of scenarios, set reference outputs, compare the generated order of operations against the reference and generate an overview page over the scenario outputs
+* Move most examples over to scenarios, as they were already used in such a manner. The remaining examples are intended to be developed as actual examples for new users of ReSiE.
+
 ### Version 0.8.1
 * Rename output parameters `dump_info` and `dump_info_file` to `auxiliary_info` and `auxiliary_info_file`
 * Rename output parameter `output_file` to `csv_output_file`
