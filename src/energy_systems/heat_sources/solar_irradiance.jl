@@ -1,9 +1,9 @@
 using Dates
 
-function sun_position(dt::DateTime, longitude::Float64, latitude::Float64, 
-                             pressure::Float64=1.0, temperature::Float64=20.0)
+function sun_position(dt::DateTime, longitude::Number, latitude::Number, 
+                             pressure::Number=1.0, temperature::Number=20.0)
 """
-calculate solar position in radians
+Calculate solar position in degrees
 Based on Roberto Grena (2012), Five new algorithms for the computation of sun position
 from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.01.024.
 """
@@ -36,7 +36,7 @@ from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.0
     return rad2deg(zenith), rad2deg(azimuth)
 end
 
-function alg5(t2060::Float64, tt::Float64, longitude::Float64)
+function alg5(t2060::Number, tt::Number, longitude::Number)
     wtt = tt * 0.0172019715
 
     s1 = sin(wtt)
@@ -78,9 +78,10 @@ function alg5(t2060::Float64, tt::Float64, longitude::Float64)
 end
 
 
-function beam_irr_in_plane(tilt_angle, azimuth_angle, solar_zenith, solar_azimuth, 
-                           global_solar_hor_irradiance, diffuse_solar_hor_irradiance)
+function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zenith, solar_azimuth, 
+                           global_solar_hor_irradiance, diffuse_solar_hor_irradiance, dni=nothing)
     """
+    Calculate beam irradiance in collector plane and direct_normal_irradiance
     All angles are in degrees and irradiances in W/m²
     """
     # calculate angle of incidence in degrees on the collector plane
@@ -89,16 +90,26 @@ function beam_irr_in_plane(tilt_angle, azimuth_angle, solar_zenith, solar_azimut
         cosd(solar_azimuth - azimuth_angle)
         )
 
+    # calculate longitudinal and transversal projections of the incidence angle
+    aoi_t = atand(sind(solar_zenith) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
+    aoi_t_iso = atand(sind(aoi) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
+    aoi_l = abs(tilt_angle - atand(tand(solar_zenith) * cosd(azimuth_angle - solar_azimuth)))
+    aoi_l_iso = atand(sind(aoi) * cosd(azimuth_angle - solar_azimuth) / cosd(aoi))
+
     # calculate direct normal irradiance from global horrizontal irradiance (GHI) and 
     # diffuse horrizontal irradiance (DHI)
-    direct_nomal_irradiance = max(
-        (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
-        )
+    if isnothing(dni)
+        direct_normal_irradiance = max(
+            (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
+            )
+    else
+        direct_normal_irradiance = dni
+    end
 
     # calculate the beam irradiance on the collector plane
-    beam_solar_irradiance_in_plane = max(direct_nomal_irradiance * cosd(aoi), 0)
+    beam_solar_irradiance_in_plane = max(direct_normal_irradiance * cosd(aoi), 0)
 
-    return beam_solar_irradiance_in_plane, direct_nomal_irradiance
+    return beam_solar_irradiance_in_plane, direct_normal_irradiance, aoi, aoi_l, aoi_t
 end
 
 export sun_position, beam_irr_in_plane
