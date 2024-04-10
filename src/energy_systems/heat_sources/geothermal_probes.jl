@@ -245,15 +245,17 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # This follows the method of an infitine line source that is widely used to calculate the short term g-functions
     # of a single probe. As for short time periods, the interferrence between the probes in the field is assumed to be
     # very small, therefore this approach is commonly assumed to be valid.
-    # f(x) should go through the first node of the existing non-interpolated g-function with the same slope at this point.
-    # therefore: a = slope*first_x and b = exp(first_y/(slope*first_x))/first_x
-    first_x = Int(library_time_grid_absolute[1] / sim_params["time_step_seconds"]) + 1  # in time step width
-    first_y = unit.g_function[first_x]
-    second_x = Int(library_time_grid_absolute[2] / sim_params["time_step_seconds"]) + 1  # in time step width
-    second_y = unit.g_function[second_x]
-    slope = (second_y - first_y) / (second_x - first_x)
-    for x in 1:first_x
-        unit.g_function[x] = slope * first_x * log(exp(first_y / (slope * first_x)) / first_x * x)
+    # f(x) is fitted in a way that the function goes through the first and second node of the existing non-interpolated g-function.
+    # therefore: a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2))) and b = exp(log(x1^y2/x2^y1)/(y1 - y2))
+    x1 = Int(library_time_grid_absolute[1] / sim_params["time_step_seconds"]) + 1  # in time step width
+    y1 = unit.g_function[x1]
+    x2 = Int(library_time_grid_absolute[2] / sim_params["time_step_seconds"]) + 1  # in time step width
+    y2 = unit.g_function[x2]
+    a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2)))
+    b = exp(log(x1^y2/x2^y1)/(y1 - y2))
+
+    for x in 1:x1
+        unit.g_function[x] = a * log(b * x)
     end
 
     # create and save plots 
@@ -495,14 +497,24 @@ function control(
     end 
 
     local max_energy_in_out_per_probe_meter
-    try
-        max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_energy!(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
-                                                      -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
-                                                      Order0()
-                                                      )
-    catch # handles desired_output_temperature === nothing and non-converging results of find_zero()
+
+    # calculate the minimal temperature in the probe field that could occur in the current time step.
+    unit.energy_in_out_per_probe_meter[unit.time_index] = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
+    current_min_temperature = calculate_new_fluid_temperature(unit)
+    unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0 
+
+    if desired_output_temperature !== nothing && current_min_temperature < desired_output_temperature
+        try
+            max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_energy!(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
+                                                        -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
+                                                        Order0()
+                                                        )
+        catch # handles desired_output_temperature === nothing and non-converging results of find_zero()
+            max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
+        end     
+    else
         max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
-    end                                           
+    end                                   
 
     unit.current_max_output_energy = - max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
     unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
