@@ -254,8 +254,8 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2)))
     b = exp(log(x1^y2/x2^y1)/(y1 - y2))
 
-    for x in 1:x1
-        unit.g_function[x] = a * log(b * x)
+    for x in 1:(x1-1)
+        unit.g_function[x] = max(0, a * log(b * (x+1)))
     end
 
     # create and save plots 
@@ -500,18 +500,19 @@ function control(
 
     # calculate the minimal temperature in the probe field that could occur in the current time step.
     unit.energy_in_out_per_probe_meter[unit.time_index] = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
-    current_min_temperature = calculate_new_fluid_temperature(unit)
+    current_min_fluid_temperature = calculate_new_fluid_temperature(unit)
     unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0 
 
-    if desired_output_temperature !== nothing && current_min_temperature < desired_output_temperature
+    if desired_output_temperature !== nothing && (current_min_fluid_temperature + unit.unloading_temperature_spread/2) < desired_output_temperature
         try
-            max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_energy!(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
+            max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_output_energy(energy_in_out_per_probe_meter, unit, desired_output_temperature)),
                                                         -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes), 
-                                                        Order0()
+                                                        Order0();
+                                                        atol = 0.001
                                                         )
         catch # handles desired_output_temperature === nothing and non-converging results of find_zero()
             max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
-        end     
+        end
     else
         max_energy_in_out_per_probe_meter = -unit.max_output_energy /(unit.probe_depth * unit.number_of_probes)
     end                                   
@@ -535,12 +536,12 @@ function control(
 end
 
 """
-    find_max_energy!(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
+    find_max_output_energy(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
 
 Helper function that calls calculate_new_fluid_temperature() with a given energy_in_out_per_probe_meter and
 returns the difference of the resulting fluid temperature after applying energy_in_out_per_probe_meter to the probe field
 compared to a given desired_output_temperature. 
-This function can be used to find the energy that can be put into or taken out of the probe field while not exceeding 
+This function can be used to find the energy that can be taken out of the probe field while not exceeding 
 the given desired_output_temperature using a find_zero() algorithm.
 
 Note that this function resets the unit.energy_in_out_per_probe_meter[unit.time_index] to zero.
@@ -554,7 +555,7 @@ Returns:
                                               geothermal probe field after applying energy_in_out_per_probe_meter and the 
                                               desired output temperature.
 """
-function find_max_energy!(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
+function find_max_output_energy(energy_in_out_per_probe_meter::Float64, unit::GeothermalProbes, desired_output_temperature::Float64)
    # set energy_in_out_per_probe_meter to given energy_in_out_per_probe_meter to as vehicle 
    # to deliver the information to calculate_new_fluid_temperature(unit)
    unit.energy_in_out_per_probe_meter[unit.time_index] = energy_in_out_per_probe_meter
