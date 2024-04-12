@@ -32,13 +32,13 @@
             "5": {
                 "key": {"TST_GTP_01": ["new_fluid_temperature"]},
                 "axis": "right",
-                "unit": "�C",
+                "unit": "°C",
                 "scale_factor": 1
             },
             "6": {
                 "key": {"TST_GTP_01": ["current_output_temperature"]},
                 "axis": "right",
-                "unit": "�C",
+                "unit": "°C",
                 "scale_factor": 1
             },
             "8": {
