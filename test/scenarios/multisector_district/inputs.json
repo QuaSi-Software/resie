@@ -118,7 +118,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "constant_temperature": 60,
             "scale": 16000
         },
@@ -127,7 +127,7 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
             "constant_temperature": 60,
             "scale": 19000
         },
@@ -136,7 +136,7 @@
             "medium": "m_e_ac_230v",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
             "scale": 13000
         },   
         "TST_DEM_EL_02": {
@@ -144,7 +144,7 @@
             "medium": "m_e_ac_230v",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
             "scale": 15000
         }, 
         "TST_GRI_EL_01": {
@@ -189,7 +189,7 @@
             "output_refs": [
                 "TST_BUS_EL_01"
             ],
-            "energy_profile_file_path": "./profiles/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
             "scale": 3500
         },
         "TST_BUS_EL_01": {
@@ -299,7 +299,7 @@
             ],
             "strategy": {
                 "name": "demand_driven",
-                "operation_profile_path": "./profiles/district/4000hours_with_least_CO2_2022.prf"
+                "operation_profile_path": "./profiles/examples/district/4000hours_with_least_CO2_2022.prf"
             },
             "power_el": 600000,
             "output_temperature": 50.0
