@@ -8,25 +8,26 @@ Resie is released under the MIT license. You can find a copy of the license in f
 
 ### **Requirements**
 
-* Julia v1.8.5 or later
+* Julia, minimum v1.8.5 and tested up to v1.10.2. You can find installation instructions [here](https://julialang.org/downloads/).
 
 ### Instructions
 
-1. Get a copy: `git clone git@resie.example.com`
-1. Switch into project directory: `cd /path/to/repo`
+1. Get a copy: `git clone git@github.com:QuaSi-Software/resie.git`
+1. Switch into the ReSiE root directory: `cd /path/to/resie`
 1. Start the julia REPL with `julia`
 1. Switch to the package REPL with `]` (no enter necessary)
 1. Activate the project environment: `activate .`
-1. Add required packages: `add ColorSchemes Colors Dates Interpolations JSON Logging PlotlyJS`
-1. (Optional) For development of ReSiE, some additional packages are necessary: `add Debugger Test`
+1. Install and precompile required packages: `instantiate`. This should create a file `Manifest.toml` in the ReSiE root directory
 1. Exit out of the package REPL with shortcut `Ctrl+c`
-1. Exit out of the julia REPL with `exit()`
+1. Exit out of the julia REPL with `exit()` or shortcut `Ctrl+d`
 
 ## Usage
 
+A full description of how to use ReSiE on the examples it ships with can be found [in this chapter](https://quasi-software.readthedocs.io/en/latest/resie_exemplary_energy_systems/). In the following an abbreviated version:
+
 1. Switch into project directory: `cd /path/to/resie`
-1. Run the simulation with `julia --project=. src/resie-cli.jl examples/example_two_sector.json`
-1. The outputs as well as log files can be found in the `output` folder
+1. Run the simulation with `julia --project=. src/resie-cli.jl examples/simple_heat_pump.json`
+1. The outputs as well as log files can be found in the `output` folder. The simulation should run without errors and produce a file called `output/output_plot.html` which, when opened in a browser, shows an interactive plot of simulation results.
 
 ## Testing
 
