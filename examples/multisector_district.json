@@ -3,7 +3,15 @@
         "csv_output_file": "./output/out.csv",
         "auxiliary_info": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
-        "sankey_plot": "default",
+        "sankey_plot": {
+            "m_h_w_lt1": "red",
+            "m_h_w_ht1": "darkred",
+            "m_e_ac_230v": "darkgoldenrod1",
+            "m_c_g_natgas": "purple3",
+            "m_c_g_h2": "lime",
+            "m_c_g_o2": "firebrick1",
+            "Losses": "black"
+        },
         "csv_output_keys": {
 			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"],
             "TST_BFT_TH_01": ["Load"],
