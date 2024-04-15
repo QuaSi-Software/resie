@@ -61,7 +61,7 @@
     },
     "simulation_parameters": {
         "start": 0,
-        "end": 86400,
+        "end": 603900,
         "time_step_seconds": 900
     },
     "components": {
@@ -70,8 +70,8 @@
             "medium": "m_h_w_ht1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
-            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "temperature_profile_file_path": "./profiles/examples/general/dem_heat_temp_var_avg55.prf",
             "scale": 1500
         },
         "TST_SRC_01": {
@@ -81,8 +81,8 @@
             "output_refs": [
                 "TST_HP_01"
             ],
-            "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
-            "temperature_profile_file_path": "./profiles/tests/source_heat_temperature.prf",
+            "max_power_profile_file_path": "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
+            "temperature_profile_file_path": "./profiles/examples/general/src_heat_temp_var_avg25.prf",
             "scale": 6000
         },
         "TST_GRI_01": {
