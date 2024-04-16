@@ -198,7 +198,7 @@ function base_order(components_by_function)
     end
 
     # place steps potential and process for transformers in order by "chains"
-    chains = find_chains(components_by_function[4], EnergySystems.sf_transformer)
+    chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)
     for chain in chains
         nr_of_remaining_units_in_chain = length(chain)
         if nr_of_remaining_units_in_chain > 1
@@ -269,15 +269,71 @@ function add_non_recursive!(node_set, unit, caller_uac)
 end
 
 """
-    find_chains(components, sys_function)
+    add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function)
+
+Add connected units of the same system function to the node set in a non-recursive manner.
+Here, "connected" does not necessarily mean that the components have to be connected directy 
+to each other, they can also be connected via busses or other components within the directed graph.
+This function only searches in the outputs of each component.
+"""
+function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function)
+    if unit.sys_function === sys_function
+        push!(node_set, unit)
+    end
+
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing
+            if outface in checked_interfaces
+                continue
+            else
+                push!(checked_interfaces, outface)
+                add_non_recursive_indirect_outputs!(node_set, outface.target, checked_interfaces, sys_function)
+            end
+        end
+    end
+end
+
+"""
+    add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function)
+
+Add connected units of the same system function to the node set in a non-recursive manner.
+Here, "connected" does not necessarily mean that the components have to be connected directy 
+to each other, they can also be connected via busses or other components within the directed graph.
+This function only searches in the inputs of each component.
+"""
+function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function)
+    if unit.sys_function === sys_function
+        push!(node_set, unit)
+    end
+
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing
+            if inface in checked_interfaces
+                continue
+            else
+                push!(checked_interfaces, inface)
+                add_non_recursive_indirect_inputs!(node_set, inface.source, checked_interfaces, sys_function)
+            end
+        end
+    end
+end
+
+
+"""
+    find_chains(components, sys_function; direct_connection_only=true)
 
 Find all chains of the given system function in the given collection of components.
 
 A chain is a subgraph of the graph spanned by all connections of the given components,
 which is a directed graph. The subgraph is defined by all connected components of the given
 system function.
+The optional flag direct_connection_only specifies if the chain should also be found
+across busses and other component types. If the flag is set to false, the unique chains
+that interconnect the components of sys_function are found. Components are only defined as
+interconnected if they can be seen EITHER in the outputs or the inputs, but not via mixed 
+input/output paths! 
 """
-function find_chains(components, sys_function)::Vector{Set{Component}}
+function find_chains(components, sys_function; direct_connection_only=true)::Vector{Set{Component}}
     chains = []
 
     for unit in components
@@ -285,50 +341,100 @@ function find_chains(components, sys_function)::Vector{Set{Component}}
             continue
         end
 
-        already_recorded = false
-        for chain in chains
-            if unit in chain
-                already_recorded = true
+        if direct_connection_only
+            already_recorded = false
+            for chain in chains
+                if unit in chain
+                    already_recorded = true
+                end
             end
-        end
 
-        if !already_recorded
+            if !already_recorded
+                chain = Set()
+                add_non_recursive!(chain, unit, "")
+                push!(chains, chain)
+            end
+        else
             chain = Set()
-            add_non_recursive!(chain, unit, "")
+            add_non_recursive_indirect_outputs!(chain, unit, [], sys_function)
+            add_non_recursive_indirect_inputs!(chain, unit, [], sys_function)
             push!(chains, chain)
         end
     end
 
+    # find unique chains for chains that has been found with direct_connection_only = false
+    if !direct_connection_only
+        chains_unique = []
+        for chain in chains 
+            if chains_unique == []
+                push!(chains_unique, chain)
+            else
+                for chain_unique in chains_unique
+                    already_set = false
+                    for unit_chain in chain 
+                        for unit_chain_unique in chain_unique
+                            if unit_chain == unit_chain_unique
+                                already_set = true
+                            end
+                        end
+                    end
+                    if already_set && (length(chain) > length(chain_unique))
+                        replace!(chains_unique, chain_unique => chain)
+                    elseif !already_set
+                        push!(chains_unique, chain)
+                    end
+                end
+            end
+        end
+        chains = chains_unique
+    end 
     return chains
 end
 
 """
-    distance_to_sink(node, sys_function)
+    distance_to_sink(node, sys_function, checked_interfaces)
 
 Calculate the distance of the given node to the sinks of the chain.
 
 A sink is defined as a node with no successors of the same system function. For the sinks
-this distance is 0. For all other nodes it is the maximum over the distances of its
+this distance is 0.  For all other nodes it is the maximum over the distances of its
 successors plus one.
 """
-function distance_to_sink(node, sys_function)
-    is_leaf = function(node)
-        for outface in values(node.output_interfaces)
-            if outface.target.sys_function === sys_function
-                return false
+function distance_to_sink(node, sys_function, checked_interfaces)
+    is_leaf = function(current_node, checked_interfaces_leaf; is_leafe_result=true)
+        for outface in values(current_node.output_interfaces)
+            if outface !== nothing
+                if outface in checked_interfaces_leaf || outface.target == node
+                    continue
+                else
+                    push!(checked_interfaces_leaf, outface)
+                    if outface.target.sys_function === sys_function
+                        return false
+                    else
+                        is_leafe_result = is_leafe_result && 
+                                          is_leaf(outface.target, checked_interfaces_leaf, is_leafe_result=is_leafe_result)
+                    end
+                end
             end
         end
-        return true
+        return is_leafe_result
     end
 
-    if is_leaf(node)
+    if is_leaf(node, [])
         return 0
     else
         max_distance = 0
         for outface in values(node.output_interfaces)
-            if outface.target.sys_function == sys_function
-                distance = distance_to_sink(outface.target, sys_function)
-                max_distance = distance > max_distance ? distance : max_distance
+            if outface !== nothing
+                if outface in checked_interfaces
+                    continue
+                else
+                    push!(checked_interfaces, outface)
+                    if outface.target.sys_function === sys_function || !is_leaf(outface.target, [])
+                        distance = distance_to_sink(outface.target, sys_function, checked_interfaces)
+                        max_distance = distance > max_distance ? distance : max_distance
+                    end
+                end
             end
         end
         return max_distance + 1
@@ -352,7 +458,7 @@ ordering over the distances of nodes.
 function iterate_chain(chain, sys_function; reverse=false)
     distances = []
     for node in chain
-        push!(distances, (distance_to_sink(node, sys_function), node))
+        push!(distances, (distance_to_sink(node, sys_function, []), node))
     end
     fn_first = function (entry)
         return entry[1]
