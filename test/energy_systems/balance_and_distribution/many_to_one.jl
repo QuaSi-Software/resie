@@ -64,7 +64,7 @@ function test_many_to_one()
     demand = components["TST_DEM_01"]
     bus = components["TST_BUS_TH_01"]
 
-
+    # first timestep, everything works out
     EnergySystems.reset(demand)
     EnergySystems.reset(source_1)
     EnergySystems.reset(source_2)
@@ -110,6 +110,38 @@ function test_many_to_one()
 
     @test source_2.output_interfaces[source_2.medium].balance == 0.0
     @test source_2.output_interfaces[source_2.medium].temperature_max == 55.0
+
+    # second timestep, source 1 is too cold to supply demand, source 2 can't fully
+    # supply demand
+    EnergySystems.reset(demand)
+    EnergySystems.reset(source_1)
+    EnergySystems.reset(source_2)
+    EnergySystems.reset(bus)
+
+    source_1.constant_temperature = 50.0
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source_1, components, simulation_parameters)
+    EnergySystems.control(source_2, components, simulation_parameters)
+    EnergySystems.control(bus, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(bus, simulation_parameters)
+
+    EnergySystems.process(source_1, simulation_parameters)
+
+    @test source_1.output_interfaces[source_1.medium].balance == 0.0
+    @test source_1.output_interfaces[source_1.medium].temperature_max == 50.0
+
+    EnergySystems.process(source_2, simulation_parameters)
+
+    @test source_2.output_interfaces[source_2.medium].balance == 500.0
+    @test source_2.output_interfaces[source_2.medium].temperature_max == 55.0
+
+    blnc = EnergySystems.balance(bus)
+    @test blnc == -500.0
+
+    EnergySystems.distribute!(bus)
 end
 
 @testset "many_to_one" begin
