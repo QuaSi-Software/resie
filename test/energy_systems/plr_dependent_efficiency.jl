@@ -6,7 +6,7 @@ using Resie.Profiles
 
 EnergySystems.set_timestep(900)
 
-function test_gas_boiler_demand_driven_plr()
+function test_gas_boiler_demand_driven_plrd()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -99,7 +99,11 @@ function test_gas_boiler_demand_driven_plr()
     @test grid.output_interfaces[grid.medium].balance ≈ 0
 end
 
-function test_gas_boiler_supply_driven_plr()
+@testset "test_gas_boiler_demand_driven_plrd" begin
+    test_gas_boiler_demand_driven_plrd()
+end
+
+function test_gas_boiler_supply_driven_plrd()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "BoundedSink",
@@ -204,7 +208,6 @@ function test_gas_boiler_supply_driven_plr()
     @test demand.input_interfaces[demand.medium].balance ≈ 0
 end
 
-@testset "test_gas_boiler_demand_driven_plr" begin
-    test_gas_boiler_demand_driven_plr()
-    test_gas_boiler_supply_driven_plr()
+@testset "test_gas_boiler_demand_driven_plrd" begin
+    test_gas_boiler_supply_driven_plrd()
 end
