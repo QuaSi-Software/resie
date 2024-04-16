@@ -19,9 +19,11 @@ mutable struct FuelBoiler <: Component
     power_th::Float64
     is_plr_dependant::Bool
     max_consumable_fuel::Float64
+    # lookup table for conversion of part load ratio to expended energy
     plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
-    min_power_fraction::Float64 # Minimum amount of power so that the component can be
-    min_run_time::UInt          # operated
+
+    min_power_fraction::Float64
+    min_run_time::UInt
     output_temperature::Temperature
 
     losses::Float64
@@ -33,20 +35,6 @@ mutable struct FuelBoiler <: Component
 
         max_consumable_fuel = watt_to_wh(float(config["power_th"])) /
                              default(config, "max_thermal_efficiency", 1.0)
-        # lookup table for conversion of part load ratio to expended energy
-        plr_to_expended_energy = []
-        # fill up plr_to_expended_energy lookup table
-        start_value = 0.0
-        end_value = 1.0
-        step_size = 0.1 # set the discretization
-        for plr in collect(start_value:step_size:end_value)
-            # Create a tuple: (part load ratio value, expended energy); hard coded function
-            # for expended energy = useful_energy / thermal_efficiency
-            plr_expended_energy_pair = (plr,
-                (plr / (-0.9117 * plr^2 + 1.8795 * plr + 0.0322)) * 1000)
-            # Append the tuple to the lookup table
-            push!(plr_to_expended_energy, plr_expended_energy_pair)
-        end
 
         return new(
             uac, # uac
@@ -65,7 +53,7 @@ mutable struct FuelBoiler <: Component
             config["power_th"], # power_th
             default(config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
             max_consumable_fuel,
-            plr_to_expended_energy,
+            [], # plr_to_expended_energy
             default(config, "min_power_fraction", 0.1),
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
@@ -87,6 +75,18 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
             unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
         )
     )
+
+    # fill plr_to_expended_energy lookup table
+    start_value = 0.0
+    end_value = 1.0
+    step_size = 0.1
+    for plr in collect(start_value:step_size:end_value)
+        # append tuple (part load ratio value, expended energy) to the lookup table
+        push!(unit.plr_to_expended_energy, (
+            plr,
+            (plr / efficiency(unit, plr)) * watt_to_wh(unit.power_th)
+        ))
+    end
 end
 
 function control(
@@ -161,9 +161,7 @@ This function, with set magic-numbers, serves as a temporary implementation of a
 efficiency/PLR curve until a more generalised framework for such calculations is
 implemented.
 """
-function calculate_thermal_efficiency(
-    plr::Float64, # part load ratio
-)
+function efficiency(unit::FuelBoiler, plr::Float64)
     return -0.9117 * plr^2 + 1.8795 * plr + 0.0322
 end
 
@@ -230,16 +228,14 @@ function calculate_energies(
                 demand_heat = 0
             end
             part_load_ratio = demand_heat / watt_to_wh(unit.power_th)
-            thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
-            max_consume_fuel = max_produce_heat / thermal_efficiency
+            max_consume_fuel = max_produce_heat / efficiency(unit, part_load_ratio)
         elseif unit.controller.strategy == "supply_driven"
             intake_fuel = unit.input_interfaces[unit.m_fuel_in].max_energy
             max_consume_fuel = unit.max_consumable_fuel
             part_load_ratio = calculate_plr_through_inversed_expended_energy(
                 intake_fuel, unit
             )
-            thermal_efficiency = calculate_thermal_efficiency(part_load_ratio)
-            max_produce_heat = thermal_efficiency * max_consume_fuel
+            max_produce_heat = efficiency(unit, part_load_ratio) * max_consume_fuel
         end
     end
 
