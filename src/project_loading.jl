@@ -200,19 +200,15 @@ function base_order(components_by_function)
     # place steps potential and process for transformers in order by "chains"
     chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)
     for chain in chains
-        nr_of_remaining_units_in_chain = length(chain)
-        if nr_of_remaining_units_in_chain > 1
-            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-                if nr_of_remaining_units_in_chain > 1  # skip potential of last transformer in the chain
+        if length(chain) > 1
+            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
                     push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
                     initial_nr -= 1
-                    nr_of_remaining_units_in_chain -= 1
-                end
             end
-        end
-        for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-            initial_nr -= 1
+            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+                initial_nr -= 1
+            end
         end
     end
 
@@ -491,6 +487,10 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     components_by_function = categorize_by_function(components)
     simulation_order = base_order(components_by_function)
 
+    # Note that the input order at a bus has a higher priority compared to the output order! 
+    # If there are contradictions, the input order applies. Currently, there is no warning 
+    # message if this is leads to missalignement with the output order.
+    reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
     reorder_storage_loading(simulation_order, components, components_by_function)
@@ -654,8 +654,27 @@ end
     reorder_for_input_priorities(simulation_order, components, components_by_function)
 
 Reorder components connected to a bus so they match the input priority defined on that bus.
+This does not apply, if there is a grid output from the bus and the connection is allowed from 
+the inputs. This does not take into account any attributs like temperatures that deny the 
+energy flow. But, the energy flow matrix of the bus is taken into account.
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
+    has_grid_output = function(bus, input_interface_uac)
+        for outface in values(bus.output_interfaces)
+            if outface !== nothing
+                if nameof(typeof(outface.target)) == :GridConnection
+                    input_idx = bus.balance_table_inputs[input_interface_uac].input_index
+                    output_idx = bus.balance_table_outputs[outface.target.uac].output_index
+                    if (bus.connectivity.energy_flow === nothing ||
+                        bus.connectivity.energy_flow[input_idx][output_idx])
+                        return true
+                    end
+                end
+            end
+        end
+        return false
+    end
+
     # for every bus except for those with proxies...
     for bus in values(components_by_function[3])
         if bus.proxy !== nothing continue end
@@ -663,6 +682,12 @@ function reorder_for_input_priorities(simulation_order, components, components_b
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every component following after...
             for other_idx = own_idx+1:length(bus.connectivity.input_order)
+                #(...if there is no connected grid with an allowed connection to both components...)
+                #(...then the order doesn't matter as the components can deliver their energy anyway)
+                if has_grid_output(bus, bus.connectivity.input_order[own_idx]) &&
+                   has_grid_output(bus, bus.connectivity.input_order[other_idx]) 
+                   continue 
+                end
                 # ...is of a lower priority in potential and process
                 place_one_lower!(
                     simulation_order,
@@ -673,6 +698,64 @@ function reorder_for_input_priorities(simulation_order, components, components_b
                     simulation_order,
                     (bus.connectivity.input_order[own_idx], EnergySystems.s_process),
                     (bus.connectivity.input_order[other_idx], EnergySystems.s_process)
+                )
+            end
+        end
+    end
+end
+
+"""
+    reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
+
+Reorder transformers connected to a bus so they match the output priority defined on that bus.
+This does not apply, if there is a grid input to the bus and the connection is allowed to 
+the output transformers. This does not take into account any attributs like temperatures that deny the 
+energy flow. But, the energy flow matrix of the bus is taken into account.
+"""
+function reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
+    has_grid_input = function(bus, output_interface_uac)
+        for inface in values(bus.input_interfaces)
+            if inface !== nothing
+                if nameof(typeof(inface.source)) == :GridConnection
+                    input_idx = bus.balance_table_inputs[inface.source.uac].input_index
+                    output_idx = bus.balance_table_outputs[output_interface_uac].output_index
+                    if (bus.connectivity.energy_flow === nothing ||
+                        bus.connectivity.energy_flow[input_idx][output_idx])
+                        return true
+                    end
+                end
+            end
+        end
+        return false
+    end
+
+    # for every bus except for those with proxies...
+    for bus in values(components_by_function[3])
+        if bus.proxy !== nothing continue end
+        # ...for each transformer in the bus' output priority...
+        for own_idx = 1:length(bus.connectivity.output_order)
+            own_uac = bus.connectivity.output_order[own_idx]
+            if bus.balance_table_outputs[own_uac].target.sys_function !== EnergySystems.sf_transformer continue end
+            # ...make sure every transformer following after...
+            for other_idx = own_idx+1:length(bus.connectivity.output_order)
+                other_uac = bus.connectivity.output_order[other_idx]
+                if bus.balance_table_outputs[other_uac].target.sys_function !== EnergySystems.sf_transformer continue end
+                #(...if there is no connected grid with an allowed connection to both transformers...)
+                #(...then the order doesn't matter as the transformers can get their required energy anyway)
+                if has_grid_input(bus, own_uac) &&
+                   has_grid_input(bus, other_uac) 
+                   continue 
+                end
+                # ...is of a lower priority in potential and process
+                place_one_lower!(
+                    simulation_order,
+                    (own_uac, EnergySystems.s_potential),
+                    (other_uac, EnergySystems.s_potential)
+                )
+                place_one_lower!(
+                    simulation_order,
+                    (own_uac, EnergySystems.s_process),
+                    (other_uac, EnergySystems.s_process)
                 )
             end
         end
