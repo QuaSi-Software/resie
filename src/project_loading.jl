@@ -425,14 +425,6 @@ function find_chains(components, sys_function; direct_connection_only=true)::Vec
 
         chains = check_chain_merging(merge_chains(chains))
     end 
-
-    for chain in chains
-        for entry in chain
-            println("$(entry.uac) ")
-        end
-        println("\n next \n")
-    end
-
     return chains
 end
 
