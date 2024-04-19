@@ -272,7 +272,7 @@ Here, "connected" does not necessarily mean that the components have to be conne
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the outputs of each component.
 """
-function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function)
+function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
         push!(node_set, unit)
     end
@@ -282,8 +282,10 @@ function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces,
             if outface in checked_interfaces
                 continue
             else
-                push!(checked_interfaces, outface)
-                add_non_recursive_indirect_outputs!(node_set, outface.target, checked_interfaces, sys_function)
+                if last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
+                    push!(checked_interfaces, outface)
+                    add_non_recursive_indirect_outputs!(node_set, outface.target, checked_interfaces, sys_function, unit.uac)
+                end
             end
         end
     end
@@ -297,7 +299,7 @@ Here, "connected" does not necessarily mean that the components have to be conne
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the inputs of each component.
 """
-function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function)
+function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
         push!(node_set, unit)
     end
@@ -307,8 +309,10 @@ function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, 
             if inface in checked_interfaces
                 continue
             else
-                push!(checked_interfaces, inface)
-                add_non_recursive_indirect_inputs!(node_set, inface.source, checked_interfaces, sys_function)
+                if last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
+                    push!(checked_interfaces, inface)
+                    add_non_recursive_indirect_inputs!(node_set, inface.source, checked_interfaces, sys_function, unit.uac)
+                end
             end
         end
     end
@@ -330,6 +334,55 @@ interconnected if they can be seen EITHER in the outputs or the inputs, but not 
 input/output paths! 
 """
 function find_chains(components, sys_function; direct_connection_only=true)::Vector{Set{Component}}
+    function merge_chains(original_chains)
+        chains_unique = []
+        for chain in original_chains 
+            if chains_unique == []
+                push!(chains_unique, chain)
+            else
+                chain_written = false
+                for chain_unique in chains_unique
+                    chain_uacs = [entry.uac for entry in chain]
+                    chain_unique_uacs = [entry.uac for entry in chain_unique]
+
+                    length_diff_chain = length(setdiff(chain_uacs, chain_unique_uacs))
+                    elements_in_chain_but_not_in_unique = (length_diff_chain > 0 && length_diff_chain < length(chain_uacs) ) ? true : false
+
+                    length_diff_unique = length(setdiff(chain_unique_uacs, chain_uacs))
+                    elements_in_unique_but_not_in_chain = (length_diff_unique > 0 && length_diff_unique < length(chain_unique_uacs) ) ? true : false
+
+                    if elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
+                        # chain is subset of chain_unique and vica versa 
+                        # --> replace with union of chain and chains_unique
+                        new_chain = union(chain, chain_unique)
+                        replace!(chains_unique, chain_unique => new_chain)
+                        chain_written = true
+                        break
+                    elseif !elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
+                        # chain is complete subset of chain_unique --> skip
+                        chain_written = true
+                        break
+                    elseif elements_in_chain_but_not_in_unique && !elements_in_unique_but_not_in_chain
+                        # chain_unique is complete subset of chain --> replace with chain
+                        replace!(chains_unique, chain_unique => chain)
+                        chain_written = true
+                        break
+                    elseif Set(chain_uacs) == Set(chain_unique_uacs)
+                        # they are the same
+                        chain_written = true
+                        break
+                    end
+
+                end
+                if !chain_written
+                    # chain and all chains in chain_unique are completely different
+                    push!(chains_unique, chain)
+                end
+            end
+        end
+        return chains_unique
+    end
+
     chains = []
 
     for unit in components
@@ -352,38 +405,34 @@ function find_chains(components, sys_function; direct_connection_only=true)::Vec
             end
         else
             chain = Set()
-            add_non_recursive_indirect_outputs!(chain, unit, [], sys_function)
-            add_non_recursive_indirect_inputs!(chain, unit, [], sys_function)
+            add_non_recursive_indirect_outputs!(chain, unit, [], sys_function, "")
+            add_non_recursive_indirect_inputs!(chain, unit, [], sys_function, "")
             push!(chains, chain)
         end
     end
 
     # find unique chains for chains that has been found with direct_connection_only = false
     if !direct_connection_only
-        chains_unique = []
-        for chain in chains 
-            if chains_unique == []
-                push!(chains_unique, chain)
-            else
-                for chain_unique in chains_unique
-                    already_set = false
-                    for unit_chain in chain 
-                        for unit_chain_unique in chain_unique
-                            if unit_chain == unit_chain_unique
-                                already_set = true
-                            end
-                        end
-                    end
-                    if already_set && (length(chain) > length(chain_unique))
-                        replace!(chains_unique, chain_unique => chain)
-                    elseif !already_set
-                        push!(chains_unique, chain)
-                    end
-                end
+        check_chain_merging = function(merged_chains)
+            # check if two chains are connected later through a third chain which is 
+            # not recognized by merge_chains()
+            merged_chains_again = merge_chains(merged_chains)
+            if length(merged_chains_again) != length(merged_chains)
+                merged_chains_again = check_chain_merging(merged_chains_again)
             end
+            return merged_chains_again
         end
-        chains = chains_unique
+
+        chains = check_chain_merging(merge_chains(chains))
     end 
+
+    for chain in chains
+        for entry in chain
+            println("$(entry.uac) ")
+        end
+        println("\n next \n")
+    end
+
     return chains
 end
 

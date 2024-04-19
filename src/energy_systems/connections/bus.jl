@@ -661,6 +661,13 @@ function balance_on(
                 energy_pot = -Inf
             end
 
+            # target is transformer that has not been calculated its potential or process
+            if (output_row.target.sys_function === EnergySystems.sf_transformer
+                && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].max_energy === nothing
+            )
+                energy_pot = -Inf
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=output_row.target.uac,
@@ -688,6 +695,13 @@ function balance_on(
             end
 
             if input_row.energy_pool == Inf || input_row.energy_potential == Inf
+                energy_pot = Inf
+            end
+
+            # source is transformer that has not been calculated its potential or process
+            if (input_row.source.sys_function === EnergySystems.sf_transformer
+                && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].max_energy === nothing
+            )
                 energy_pot = Inf
             end
 
