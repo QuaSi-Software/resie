@@ -81,10 +81,9 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     end_value = 1.0
     step_size = 0.1
     for plr in collect(start_value:step_size:end_value)
-        # append tuple (part load ratio value, expended energy) to the lookup table
+        # append tuple (expended energy, part load ratio value) to the lookup table
         push!(unit.plr_to_expended_energy, (
-            plr,
-            (plr / efficiency(unit, plr)) * watt_to_wh(unit.power_th)
+            watt_to_wh(unit.power_th) * plr / efficiency(unit, plr), plr
         ))
     end
 end
@@ -161,46 +160,50 @@ This function, with set magic-numbers, serves as a temporary implementation of a
 efficiency/PLR curve until a more generalised framework for such calculations is
 implemented.
 """
-function efficiency(unit::FuelBoiler, plr::Float64)
+function efficiency(unit::FuelBoiler, plr::Float64)::Float64
     return -0.9117 * plr^2 + 1.8795 * plr + 0.0322
 end
 
-function calculate_plr_through_inversed_expended_energy(
-    intake_fuel::Float64,
-    unit::FuelBoiler
-)
-    # Variables to define interval where provided value falls in
-    lower_x = nothing
-    lower_y = nothing
-    upper_x = nothing
-    upper_y = nothing
+function plr_from_expended_energy(
+    unit::FuelBoiler,
+    intake_fuel::Float64
+)::Float64
+    energy_at_max = last(unit.plr_to_expended_energy)[1]
 
-    # Iterate through the lookup table to identify values of interval
-    for (x, y) in unit.plr_to_expended_energy
-        if y <= intake_fuel
-            lower_x = x
-            lower_y = y
-        else
-            upper_x = x
-            upper_y = y
-            break  # Once we exceed the target value, exit the loop
-        end
-    end
-
-    # If intake_fuel equals max_consumable_fuel, then fuel boiler is working at full mode
-    if isnothing(upper_x) && unit.plr_to_expended_energy[end][2] == intake_fuel
+    if intake_fuel <= 0.0
+        return 0.0
+    elseif intake_fuel >= energy_at_max
         return 1.0
     end
 
-    try  # Check if intake_fuel is within the range of the lookup table
-        if lower_x !== nothing && upper_x !== nothing
-            # perform linear interpolation
-            return lower_x + (intake_fuel - lower_y) *
-                             (upper_x - lower_x) / (upper_y - lower_y)
+    nr_iter = 0
+    candidate_idx = floor(
+        Int64,
+        length(unit.plr_to_expended_energy) * intake_fuel / energy_at_max
+    )
+
+    while (
+        nr_iter < length(unit.plr_to_expended_energy)
+        && candidate_idx < length(unit.plr_to_expended_energy)
+        && candidate_idx >= 1
+    )
+        (energy_lb, plr_lb) = unit.plr_to_expended_energy[candidate_idx]
+        (energy_ub, plr_ub) = unit.plr_to_expended_energy[candidate_idx+1]
+        if energy_lb <= intake_fuel && intake_fuel < energy_ub
+            return plr_lb + (plr_ub - plr_lb) *
+                (intake_fuel - energy_lb) / (energy_ub - energy_lb)
+        elseif intake_fuel < energy_lb
+            candidate_idx -= 1
+        elseif intake_fuel >= energy_ub
+            candidate_idx += 1
         end
-    catch
-        @warn "The intake_fuel value in component $(unit.uac) is not within the range of the lookup table."
+
+        nr_iter += 1
     end
+
+    @warn "The intake_fuel value in component $(unit.uac) is not within the range of the "
+        "lookup table."
+    return 0.0
 end
 
 function calculate_energies(
@@ -232,9 +235,7 @@ function calculate_energies(
         elseif unit.controller.strategy == "supply_driven"
             intake_fuel = unit.input_interfaces[unit.m_fuel_in].max_energy
             max_consume_fuel = unit.max_consumable_fuel
-            part_load_ratio = calculate_plr_through_inversed_expended_energy(
-                intake_fuel, unit
-            )
+            part_load_ratio = plr_from_expended_energy(unit, intake_fuel)
             max_produce_heat = efficiency(unit, part_load_ratio) * max_consume_fuel
         end
     end
@@ -360,4 +361,4 @@ function output_value(unit::FuelBoiler, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export FuelBoiler
+export FuelBoiler, plr_from_expended_energy

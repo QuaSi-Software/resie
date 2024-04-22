@@ -6,8 +6,8 @@ using Resie.Profiles
 
 EnergySystems.set_timestep(900)
 
-function test_gas_boiler_demand_driven_plrd()
-    components_config = Dict{String,Any}(
+function get_demand_energy_system_config()
+    return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -36,7 +36,32 @@ function test_gas_boiler_demand_driven_plrd()
             "max_thermal_efficiency" => 1.0,
         ),
     )
+end
 
+function test_inverse_efficiency()
+    components_config = get_demand_energy_system_config()
+    eps = 1e-9
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => eps
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    boiler = components["TST_GB_01"]
+
+    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
+    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
+    plr = plr_from_expended_energy(boiler, 450.0)
+    @test plr > 0.09496485 - eps && plr < 0.09496485 + eps
+end
+
+@testset "test_inverse_efficiency" begin
+    test_inverse_efficiency()
+end
+
+function test_gas_boiler_demand_driven_plrd()
+    components_config = get_demand_energy_system_config()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
