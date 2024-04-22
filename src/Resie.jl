@@ -46,7 +46,8 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "time" => start_timestamp,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
 
     file_path = default(
@@ -183,6 +184,10 @@ function run_simulation_loop(
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
+
+        if steps == 1
+            sim_params["is_first_timestep"] = false
+        end
     end
 
     ### create profile line plot
