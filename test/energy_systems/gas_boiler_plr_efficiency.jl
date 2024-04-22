@@ -40,7 +40,8 @@ function test_gas_boiler_demand_driven_plr()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -136,7 +137,8 @@ function test_gas_boiler_supply_driven_plr()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
     
     components = Resie.load_components(components_config, simulation_parameters)

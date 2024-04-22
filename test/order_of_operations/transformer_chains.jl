@@ -69,12 +69,12 @@ function test_distance_from_sink()
 
     components = Resie.load_components(components_config, simulation_parameters)
 
-    @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus) == 3
-    @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus) == 2
-    @test Resie.distance_to_sink(components["TST_BUS_03"], EnergySystems.sf_bus) == 0
-    @test Resie.distance_to_sink(components["TST_BUS_04"], EnergySystems.sf_bus) == 0
-    @test Resie.distance_to_sink(components["TST_BUS_05"], EnergySystems.sf_bus) == 1
-    @test Resie.distance_to_sink(components["TST_BUS_06"], EnergySystems.sf_bus) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus, []) == 3
+    @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus, []) == 2
+    @test Resie.distance_to_sink(components["TST_BUS_03"], EnergySystems.sf_bus, []) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_04"], EnergySystems.sf_bus, []) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_05"], EnergySystems.sf_bus, []) == 1
+    @test Resie.distance_to_sink(components["TST_BUS_06"], EnergySystems.sf_bus, []) == 0
 end
 
 @testset "distance_from_sink" begin
