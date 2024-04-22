@@ -163,7 +163,7 @@ function check_heat_out(
         if (unit.output_interfaces[unit.m_heat_out].target.sys_function === EnergySystems.sf_transformer   # Ely has direct connection to a transfomer...
             && unit.output_interfaces[unit.m_heat_out].max_energy === nothing                              # ...and none of them have had their potential step
             )
-            return ([-Inf], [nothing])
+            return ([-Inf], [unit.output_interfaces[unit.m_heat_out].temperature_min])
         else
             exchanges = balance_on(
                 unit.output_interfaces[unit.m_heat_out],
