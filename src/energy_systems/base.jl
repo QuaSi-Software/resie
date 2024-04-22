@@ -1112,7 +1112,7 @@ The function search through the whole energy system.
                  be handeled as an input or an output interface.
 
 # Returns
-Returns either "true" if an transformer in the following or previous chain was found or 
+Returns either "true" if a transformer was found in the following or previous chain or 
 "false" if no transformer has been found.
 """
 function check_interface_for_transformer(interface::SystemInterface, type::String)
@@ -1185,7 +1185,7 @@ end
 Checks a given connection defined by `input_uac` and `output_uac` is allowed. The `component`
 is the commponent between the two other components. If `component` is not a bus, this function
 will return true. If component is a bus, then the connection matrix of the bus is checked 
-to determin if the connection from input_uac to output_uac is allowed. 
+to determine if the connection from input_uac to output_uac is allowed. 
 
 # Arguments
 -`component::Component`: A component beween input_uac and output_uac
@@ -1194,8 +1194,8 @@ to determin if the connection from input_uac to output_uac is allowed.
 
 
 # Returns
-Returns either "true" if `component` is a non-bus or if the connection is allowed, or false if 
-`component` is a bus and the energy flow is denied by the energy flow matrix.
+Returns either "true" if `component` is a non-bus or if the connection is allowed, or "false" 
+if `component` is a bus and the energy flow is denied by the energy flow matrix.
 """
 function connection_allowed(component::Component, input_uac::String, output_uac::String)
     if component.sys_function === EnergySystems.sf_bus

@@ -274,7 +274,16 @@ end
 Add connected units of the same system function to the node set in a non-recursive manner.
 Here, "connected" does not necessarily mean that the components have to be connected directy 
 to each other, they can also be connected via busses or other components within the directed graph.
-This function only searches in the outputs of each component.
+This function only searches in the outputs of each component, starting with "unit".
+
+# Arguments
+-`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
+-`unit`: The unit to start the search with
+-`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
+                                               interfaces. Can be [] when calling externally.
+-`sys_function`: The system function of the chain that should be found
+-`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
+                          Can be an empty string ("") at the first external call.
 """
 function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
@@ -301,7 +310,16 @@ end
 Add connected units of the same system function to the node set in a non-recursive manner.
 Here, "connected" does not necessarily mean that the components have to be connected directy 
 to each other, they can also be connected via busses or other components within the directed graph.
-This function only searches in the inputs of each component.
+This function only searches in the inputs of each component, starting with "unit".
+
+# Arguments
+-`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
+-`unit`: The unit to start the search with
+-`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
+                                               interfaces. Can be [] when calling externally.
+-`sys_function`: The system function of the chain that should be found
+-`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
+                          Can be an empty string ("") at the first external call.
 """
 function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
@@ -336,6 +354,19 @@ across busses and other component types. If the flag is set to false, the unique
 that interconnect the components of sys_function are found. Components are only defined as
 interconnected if they can be seen EITHER in the outputs or the inputs, but not via mixed 
 input/output paths! 
+
+Chains found with direct_connection_only=false are filtered to find unique chains. They are
+merged to represent the longest possible chain and to avoid doublings or multible subset of
+a bigger chain. Completely independent chains are returned as array of chains.
+
+# Arguments
+-`components`: All components of the current energy system
+-`sys_function`: The system function for that the chains should be determined in components
+-`direct_connection_only::Bool}`: Flag if direct (true) or indirect chains across other
+                                  componets should be determined (false)
+
+# Returns
+-`chain::Array{Set()}`: An array holding an unique collection of chains, each as Set() type
 """
 function find_chains(components, sys_function; direct_connection_only=true)::Vector{Set{Component}}
     function merge_chains(original_chains)
@@ -438,8 +469,20 @@ end
 Calculate the distance of the given node to the sinks of the chain.
 
 A sink is defined as a node with no successors of the same system function. For the sinks
-this distance is 0.  For all other nodes it is the maximum over the distances of its
+this distance is 0. For all other nodes it is the maximum over the distances of its
 successors plus one.
+The parameter "checked_interfaces" is used to avoid loops when recursively calling the 
+function. When calling distance_to_sink() from outside, the parameter checked_interfaces 
+can be set as empty array ([]).
+
+# Arguments
+-`node`: A specific component (unit) for which the distance to the sink should be determined
+-`sys_function`: The system function of the components in the chain
+-`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
+                                               interfaces. Can be [] when calling externally.
+
+# Returns
+The maximum distance to the farest sink as Int.
 """
 function distance_to_sink(node, sys_function, checked_interfaces)
     is_leaf = function(current_node, checked_interfaces_leaf; is_leafe_result=true)
@@ -703,6 +746,12 @@ This does not apply, if there is a grid output from the bus and the connection i
 the inputs. This does not take into account any attributs like temperatures that deny the 
 energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
 But, the energy flow matrix of the bus is taken into account.
+
+# Arguments
+-`simulation_order`: A global parameter holding the simulation order
+-`components`: All components of the current energy system
+-`components_by_function`: The mapping of component functions
+
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
     has_grid_output = function(bus, input_interface_uac)
@@ -756,6 +805,11 @@ This does not apply, if there is a grid input to the bus and the connection is a
 the output transformers. This does not take into account any attributs like temperatures that deny the 
 energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
 But, the energy flow matrix of the bus is taken into account.
+
+# Arguments
+-`simulation_order`: A global parameter holding the simulation order
+-`components`: All components of the current energy system
+-`components_by_function`: The mapping of component functions
 """
 function reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     has_grid_input = function(bus, output_interface_uac)
