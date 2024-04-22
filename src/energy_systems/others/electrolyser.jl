@@ -29,6 +29,10 @@ mutable struct Electrolyser <: Component
     losses_heat::Float32
     losses_hydrogen::Float64
 
+    has_connected_transfomer_m_el_in::Bool
+    has_connected_transfomer_m_h2_out::Bool
+    has_connected_transfomer_m_o2_out::Bool
+
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -59,8 +63,12 @@ mutable struct Electrolyser <: Component
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 3600),
             default(config, "output_temperature", 55.0),
-            0.0, # Losses heat
-            0.0  # Losses hydrogen
+            0.0,   # Losses heat
+            0.0,   # Losses hydrogen
+            false, # has_connected_transfomer_m_el_in
+            false, # has_connected_transfomer_m_h2_out
+            false, # has_connected_transfomer_m_o2_out
+        
         )
     end
 end
@@ -103,6 +111,13 @@ function control(
         nothing,
         unit.output_temperature
     )
+
+    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
+    if sim_params["is_first_timestep"]
+        unit.has_connected_transfomer_m_el_in    = check_interface_for_transformer(unit.input_interfaces[unit.m_el_in], "input")
+        unit.has_connected_transfomer_m_h2_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_h2_out], "output")
+        unit.has_connected_transfomer_m_o2_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_o2_out], "output")
+    end
 end
 
 function set_max_energies!(
@@ -120,9 +135,8 @@ function check_el_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
-        if (
-            unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing
+        if (unit.has_connected_transfomer_m_el_in                           # Ely has a transformer in the input chain...
+            && unit.input_interfaces[unit.m_el_in].max_energy === nothing   # ...and has not performed potential step yet
         )
             return (Inf)
         else
@@ -146,14 +160,20 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        return (
-            [e.balance + e.energy_potential for e in exchanges],
-            temp_min_all(exchanges)
-        )
+        if (unit.output_interfaces[unit.m_heat_out].target.sys_function === EnergySystems.sf_transformer   # Ely has direct connection to a transfomer...
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing                              # ...and none of them have had their potential step
+            )
+            return ([-Inf], [nothing])
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_heat_out],
+                unit.output_interfaces[unit.m_heat_out].target
+            )
+            return (
+                [e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges)
+            )
+        end
     else
         return ([-Inf], [nothing])
     end
@@ -164,15 +184,20 @@ function check_h2_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_h2_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_h2_out],
-            unit.output_interfaces[unit.m_h2_out].target
-        )
-        potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_h2 >= -sim_params["epsilon"]
-            return (0.0)
+        if (unit.has_connected_transfomer_m_h2_out                            # Ely has a transformer in the output chain...
+            && unit.output_interfaces[unit.m_h2_out].max_energy === nothing)  # ...and has not performed potential step yet
+            return (-Inf)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_h2_out],
+                unit.output_interfaces[unit.m_h2_out].target
+            )
+            potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_h2 >= -sim_params["epsilon"]
+                return (0.0)
+            end
+            return (potential_energy_h2)
         end
-        return (potential_energy_h2)
     else
         return (-Inf)
     end
@@ -183,15 +208,21 @@ function check_o2_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_o2_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_o2_out],
-            unit.output_interfaces[unit.m_o2_out].target
+        if (unit.has_connected_transfomer_m_o2_out                            # Ely has a transformer in the output chain...
+            && unit.output_interfaces[unit.m_o2_out].max_energy === nothing    # ...and has not performed potential step yet
         )
-        potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_o2 >= -sim_params["epsilon"]
-            return (0.0)
+            return (-Inf)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_o2_out],
+                unit.output_interfaces[unit.m_o2_out].target
+            )
+            potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_o2 >= -sim_params["epsilon"]
+                return (0.0)
+            end
+            return (potential_energy_o2)
         end
-        return (potential_energy_o2)
     else
         return (-Inf)
     end

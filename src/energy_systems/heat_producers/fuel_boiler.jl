@@ -26,6 +26,9 @@ mutable struct FuelBoiler <: Component
 
     losses::Float64
 
+    has_connected_transfomer_m_fuel_in::Bool
+    has_connected_transfomer_m_heat_out::Bool
+
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_fuel_in = Symbol(config["m_fuel_in"])
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -70,6 +73,8 @@ mutable struct FuelBoiler <: Component
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
             0.0, # losses
+            false,  # has_connected_transfomer_m_fuel_in
+            false,  # has_connected_transfomer_m_heat_out
         )
     end
 end
@@ -100,6 +105,13 @@ function control(
         nothing,
         unit.output_temperature
     )
+
+    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
+    if sim_params["is_first_timestep"]
+        unit.has_connected_transfomer_m_fuel_in  = check_interface_for_transformer(unit.input_interfaces[unit.m_fuel_in], "input")
+        unit.has_connected_transfomer_m_heat_out = check_interface_for_transformer(unit.output_interfaces[unit.m_heat_out], "output")
+    end
+
 end
 
 """
@@ -115,10 +127,8 @@ function check_fuel_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_fuel_in"] == true
-        if (
-            unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
-            &&
-            unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
+        if (unit.has_connected_transfomer_m_fuel_in                          # FB has a transformer in the input chain...
+            && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing  # ...and has not performed potential step yet
         )
             return (Inf)
         else
@@ -142,15 +152,21 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
+        if (unit.has_connected_transfomer_m_heat_out                           # FB has a transformer in the output chain...
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing  # ...and has not performed potential step yet
         )
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_heat_out >= -sim_params["epsilon"]
-            return (nothing)
+            return (-Inf)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_heat_out],
+                unit.output_interfaces[unit.m_heat_out].target
+            )
+            potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_heat_out >= -sim_params["epsilon"]
+                return (nothing)
+            end
+            return (potential_energy_heat_out)
         end
-        return (potential_energy_heat_out)
     else
         return (-Inf)
     end

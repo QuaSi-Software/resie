@@ -31,6 +31,10 @@ mutable struct CHPP <: Component
 
     losses::Float64
 
+    has_connected_transfomer_m_gas_in::Bool
+    has_connected_transfomer_m_heat_out::Bool
+    has_connected_transfomer_m_el_out::Bool
+
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -59,6 +63,9 @@ mutable struct CHPP <: Component
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
             0.0, # losses
+            false, # has_connected_transfomer_m_gas_in                   
+            false, # has_connected_transfomer_m_heat_out            
+            false, # has_connected_transfomer_m_el_out            
         )
     end
 end
@@ -95,6 +102,13 @@ function control(
         nothing,
         unit.output_temperature,
     )
+
+    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
+    if sim_params["is_first_timestep"]
+        unit.has_connected_transfomer_m_gas_in   = check_interface_for_transformer(unit.input_interfaces[unit.m_gas_in], "input")
+        unit.has_connected_transfomer_m_heat_out = check_interface_for_transformer(unit.output_interfaces[unit.m_heat_out], "output")
+        unit.has_connected_transfomer_m_el_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_el_out], "output")
+    end
 end
 
 function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
@@ -108,10 +122,8 @@ function check_gas_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_gas_in"] == true
-        if (
-            unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
-            &&
-            unit.input_interfaces[unit.m_gas_in].max_energy === nothing
+        if (unit.has_connected_transfomer_m_gas_in                          # CHP has a transformer in the input chain...
+            && unit.input_interfaces[unit.m_gas_in].max_energy === nothing  # ...and has not performed potential step yet
         )
             return (Inf)
         else
@@ -135,15 +147,21 @@ function check_el_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_el_out],
-            unit.output_interfaces[unit.m_el_out].target
+        if (unit.has_connected_transfomer_m_el_out                           # CHP has a transformer in the output chain...
+            && unit.output_interfaces[unit.m_el_out].max_energy === nothing  # ...and has not performed potential step yet
         )
-        potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_el >= -sim_params["epsilon"]
-            return (nothing)
+            return (-Inf)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_el_out],
+                unit.output_interfaces[unit.m_el_out].target
+            )
+            potential_energy_el = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_el >= -sim_params["epsilon"]
+                return (nothing)
+            end
+            return (potential_energy_el)
         end
-        return (potential_energy_el)
     else
         return (-Inf)
     end
@@ -154,15 +172,21 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
+        if (unit.has_connected_transfomer_m_heat_out                           # CHP has a transformer in the output chain...
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing  # ...and has not performed potential step yet
         )
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_heat_out >= -sim_params["epsilon"]
-            return (nothing)
+            return (-Inf)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_heat_out],
+                unit.output_interfaces[unit.m_heat_out].target
+            )
+            potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_heat_out >= -sim_params["epsilon"]
+                return (nothing)
+            end
+            return (potential_energy_heat_out)
         end
-        return (potential_energy_heat_out)
     else
         return (-Inf)
     end
