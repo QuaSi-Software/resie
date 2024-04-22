@@ -662,7 +662,8 @@ function balance_on(
             end
 
             # target is transformer that has not been calculated its potential or process
-            if (output_row.target.sys_function === EnergySystems.sf_transformer
+            if (input_row.source.sys_function === EnergySystems.sf_transformer
+                && output_row.target.sys_function === EnergySystems.sf_transformer
                 && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].max_energy === nothing
                 && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].sum_abs_change == 0.0
             )
@@ -700,7 +701,8 @@ function balance_on(
             end
 
             # source is transformer that has not been calculated its potential or process
-            if (input_row.source.sys_function === EnergySystems.sf_transformer
+            if (output_row.target.sys_function === EnergySystems.sf_transformer
+                && input_row.source.sys_function === EnergySystems.sf_transformer
                 && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].max_energy === nothing
                 && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].sum_abs_change == 0.0
             )
