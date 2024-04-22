@@ -179,7 +179,6 @@ function base_order(components_by_function)
         end
     end
 
-
     # calculate control of all components. the order corresponds to the general order of
     # system functions
     for sf_order = 1:7
@@ -205,6 +204,11 @@ function base_order(components_by_function)
                     push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
                     initial_nr -= 1
             end
+            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+                initial_nr -= 1
+            end
+        else
             for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
                 push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
                 initial_nr -= 1
