@@ -534,7 +534,7 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
 
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
-    # message if this is leads to missalignement with the output order.
+    # message if this leads to missalignement with the output order.
     reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
@@ -701,19 +701,18 @@ end
 Reorder components connected to a bus so they match the input priority defined on that bus.
 This does not apply, if there is a grid output from the bus and the connection is allowed from 
 the inputs. This does not take into account any attributs like temperatures that deny the 
-energy flow. But, the energy flow matrix of the bus is taken into account.
+energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
+But, the energy flow matrix of the bus is taken into account.
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
     has_grid_output = function(bus, input_interface_uac)
         for outface in values(bus.output_interfaces)
-            if outface !== nothing
-                if nameof(typeof(outface.target)) == :GridConnection
-                    input_idx = bus.balance_table_inputs[input_interface_uac].input_index
-                    output_idx = bus.balance_table_outputs[outface.target.uac].output_index
-                    if (bus.connectivity.energy_flow === nothing ||
-                        bus.connectivity.energy_flow[input_idx][output_idx])
-                        return true
-                    end
+            if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
+                input_idx = bus.balance_table_inputs[input_interface_uac].input_index
+                output_idx = bus.balance_table_outputs[outface.target.uac].output_index
+                if (bus.connectivity.energy_flow === nothing ||
+                    bus.connectivity.energy_flow[input_idx][output_idx])
+                    return true
                 end
             end
         end
@@ -727,7 +726,7 @@ function reorder_for_input_priorities(simulation_order, components, components_b
         for own_idx = 1:length(bus.connectivity.input_order)
             # ...make sure every component following after...
             for other_idx = own_idx+1:length(bus.connectivity.input_order)
-                #(...if there is no connected grid with an allowed connection to both components...)
+                #(...if there is a connected grid with an allowed connection to both components...)
                 #(...then the order doesn't matter as the components can deliver their energy anyway)
                 if has_grid_output(bus, bus.connectivity.input_order[own_idx]) &&
                    has_grid_output(bus, bus.connectivity.input_order[other_idx]) 
@@ -755,19 +754,18 @@ end
 Reorder transformers connected to a bus so they match the output priority defined on that bus.
 This does not apply, if there is a grid input to the bus and the connection is allowed to 
 the output transformers. This does not take into account any attributs like temperatures that deny the 
-energy flow. But, the energy flow matrix of the bus is taken into account.
+energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
+But, the energy flow matrix of the bus is taken into account.
 """
 function reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     has_grid_input = function(bus, output_interface_uac)
         for inface in values(bus.input_interfaces)
-            if inface !== nothing
-                if nameof(typeof(inface.source)) == :GridConnection
-                    input_idx = bus.balance_table_inputs[inface.source.uac].input_index
-                    output_idx = bus.balance_table_outputs[output_interface_uac].output_index
-                    if (bus.connectivity.energy_flow === nothing ||
-                        bus.connectivity.energy_flow[input_idx][output_idx])
-                        return true
-                    end
+            if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
+                input_idx = bus.balance_table_inputs[inface.source.uac].input_index
+                output_idx = bus.balance_table_outputs[output_interface_uac].output_index
+                if (bus.connectivity.energy_flow === nothing ||
+                    bus.connectivity.energy_flow[input_idx][output_idx])
+                    return true
                 end
             end
         end
@@ -785,7 +783,7 @@ function reorder_transformer_for_output_priorities(simulation_order, components,
             for other_idx = own_idx+1:length(bus.connectivity.output_order)
                 other_uac = bus.connectivity.output_order[other_idx]
                 if bus.balance_table_outputs[other_uac].target.sys_function !== EnergySystems.sf_transformer continue end
-                #(...if there is no connected grid with an allowed connection to both transformers...)
+                #(...if there is a connected grid with an allowed connection to both transformers...)
                 #(...then the order doesn't matter as the transformers can get their required energy anyway)
                 if has_grid_input(bus, own_uac) &&
                    has_grid_input(bus, other_uac) 
