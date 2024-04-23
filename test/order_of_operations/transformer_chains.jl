@@ -64,7 +64,8 @@ function test_distance_from_sink()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -142,7 +143,8 @@ function test_iteration_order()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -247,7 +249,8 @@ function test_find_chains()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -272,8 +275,858 @@ function test_find_chains()
     @test chains[2] == expected_2
 end
 
+function test_find_indirect_chains()
+    components_config = Dict{String,Any}(
+            "TST_DEM_01" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 70,
+                "scale" => 500
+            ),
+            "TST_DEM_02" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 90,
+                "scale" => 500
+            ),
+            "TST_DEM_03" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 95,
+                "scale" => 500
+            ),
+            "TST_GRI_H2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_h2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_GRI_O2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_o2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_SRC_01" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00"
+                ],
+                "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
+                "temperature_profile_file_path" => "./profiles/examples/general/src_heat_temp_var_avg25.prf",
+                "scale" => 1000
+            ),
+            "TST_GRI_00" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_01" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_SRC_1b" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "is_source" => true,
+                "constant_power" => 400
+            ),
+            "TST_GRI_02" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_02"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_03" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_03"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_04" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_04"
+                ],
+                "is_source" => true
+            ),
+    
+            "TST_HP_01" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 1200,
+                "output_temperature" => 60,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_01b" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_02" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_03" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_02"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_04" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_03"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+    
+            "TST_01_ELY_01" => Dict{String,Any}(
+                "type" => "Electrolyser",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00",
+                    "TST_GRI_H2",
+                    "TST_GRI_O2"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_el" => 40000,
+                "min_power_fraction" => 0.0,
+                "output_temperature" => 45
+            ),
+            "TST_BUS_00" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_01_ELY_01", "TST_SRC_01"],
+                    "output_order" => ["TST_HP_02", "TST_HP_01"],
+                    "energy_flow" => [[1, 1],
+                                      [1, 0]]
+                    )
+            ),
+            "TST_BUS_01" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_HP_01b", "TST_HP_02"],
+                    "output_order" => ["TST_HP_03", "TST_HP_04", "TST_DEM_01" ],
+                    "energy_flow" => [[1, 1, 1],
+                                      [1, 1, 1]]
+                )
+            )
+    )
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+
+    expected_bus1 = Set([
+        components["TST_BUS_00"],
+    ])
+    expected_bus2 = Set([
+        components["TST_BUS_01"],
+    ])
+    expected_transformer = Set([
+        components["TST_HP_01"],
+        components["TST_HP_01b"],
+        components["TST_HP_02"],
+        components["TST_HP_03"],
+        components["TST_HP_04"],
+        components["TST_01_ELY_01"],
+    ])
+
+    chains_bus = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_bus
+    )
+
+    chains_transformer = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_transformer,
+        direct_connection_only=false
+    )
+
+    @test length(chains_bus) == 2
+    @test chains_bus[1] == expected_bus1
+    @test chains_bus[2] == expected_bus2
+    @test length(chains_transformer) == 1
+    @test chains_transformer[1] == expected_transformer
+
+    # test distance to sink, does not consider energ flow matrix of bus currently
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+
+    # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
+end
+
+function test_find_indirect_chains_denied()
+    # This is the same energy system as in test_find_indirect_chains(), but the connection matrix
+    # of the two busses denies the connection from to and from HP1/HP1b to other transformers. 
+    # Therefore, here two independent transformer chains are detected instead of one.
+    components_config = Dict{String,Any}(
+            "TST_DEM_01" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 70,
+                "scale" => 500
+            ),
+            "TST_DEM_02" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 90,
+                "scale" => 500
+            ),
+            "TST_DEM_03" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 95,
+                "scale" => 500
+            ),
+            "TST_GRI_H2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_h2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_GRI_O2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_o2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_SRC_01" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00"
+                ],
+                "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
+                "temperature_profile_file_path" => "./profiles/examples/general/src_heat_temp_var_avg25.prf",
+                "scale" => 1000
+            ),
+            "TST_GRI_00" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_01" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_SRC_1b" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "is_source" => true,
+                "constant_power" => 400
+            ),
+            "TST_GRI_02" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_02"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_03" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_03"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_04" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_04"
+                ],
+                "is_source" => true
+            ),
+    
+            "TST_HP_01" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 1200,
+                "output_temperature" => 60,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_01b" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_02" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_03" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_02"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_04" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_03"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+    
+            "TST_01_ELY_01" => Dict{String,Any}(
+                "type" => "Electrolyser",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00",
+                    "TST_GRI_H2",
+                    "TST_GRI_O2"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_el" => 40000,
+                "min_power_fraction" => 0.0,
+                "output_temperature" => 45
+            ),
+            "TST_BUS_00" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_01_ELY_01", "TST_SRC_01"],
+                    "output_order" => ["TST_HP_02", "TST_HP_01"],
+                    "energy_flow" => [[1, 0],
+                                      [1, 1]]
+                    )
+            ),
+            "TST_BUS_01" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_HP_01b", "TST_HP_02"],
+                    "output_order" => ["TST_HP_03", "TST_HP_04", "TST_DEM_01" ],
+                    "energy_flow" => [[0, 0, 1],
+                                      [1, 1, 1]]
+                )
+            )
+    )
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+
+    expected_bus1 = Set([
+        components["TST_BUS_00"],
+    ])
+    expected_bus2 = Set([
+        components["TST_BUS_01"],
+    ])
+    expected_transformer1 = Set([
+        components["TST_HP_02"],
+        components["TST_HP_03"],
+        components["TST_HP_04"],
+        components["TST_01_ELY_01"],
+    ])
+    expected_transformer2 = Set([
+        components["TST_HP_01"],
+        components["TST_HP_01b"],
+    ])
+
+    chains_bus = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_bus
+    )
+
+    chains_transformer = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_transformer,
+        direct_connection_only=false
+    )
+
+    @test length(chains_bus) == 2
+    @test chains_bus[1] == expected_bus1
+    @test chains_bus[2] == expected_bus2
+    @test length(chains_transformer) == 2
+    @test chains_transformer[1] == expected_transformer2
+    @test chains_transformer[2] == expected_transformer1
+
+    # currently, distance_to_sink does not take into account the energy matrix of the bus
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+
+    # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == false
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
+
+end
+
+function test_find_indirect_chains_denied2()
+    # This is the same energy system as in test_find_indirect_chains(), but the connection matrix
+    # of the two busses denies the connection to HP4 from other transformers. 
+    # Therefore, here two independent transformer chains are detected instead of one. One chain
+    # is only HP4.
+    components_config = Dict{String,Any}(
+            "TST_DEM_01" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 70,
+                "scale" => 500
+            ),
+            "TST_DEM_02" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 90,
+                "scale" => 500
+            ),
+            "TST_DEM_03" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "output_refs" => [],
+                "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+                "constant_temperature" => 95,
+                "scale" => 500
+            ),
+            "TST_GRI_H2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_h2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_GRI_O2" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_c_g_o2",
+                "control_refs" => [],
+                "input_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => false
+            ),
+            "TST_SRC_01" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00"
+                ],
+                "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
+                "temperature_profile_file_path" => "./profiles/examples/general/src_heat_temp_var_avg25.prf",
+                "scale" => 1000
+            ),
+            "TST_GRI_00" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_01_ELY_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_01" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01"
+                ],
+                "is_source" => true
+            ),
+            "TST_SRC_1b" => Dict{String,Any}(
+                "type" => "BoundedSupply",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "is_source" => true,
+                "constant_power" => 400
+            ),
+            "TST_GRI_02" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_02"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_03" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_03"
+                ],
+                "is_source" => true
+            ),
+            "TST_GRI_04" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_e_ac_230v",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_04"
+                ],
+                "is_source" => true
+            ),
+    
+            "TST_HP_01" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_HP_01b"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 1200,
+                "output_temperature" => 60,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_01b" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_02" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_01"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_03" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_02"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+            "TST_HP_04" => Dict{String,Any}(
+                "type" => "HeatPump",
+                "control_refs" => [],
+                "m_heat_in" => "m_h_w_ht1",
+                "output_refs" => [
+                    "TST_DEM_03"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_th" => 9000,
+                "min_power_fraction" => 0.0
+            ),
+    
+            "TST_01_ELY_01" => Dict{String,Any}(
+                "type" => "Electrolyser",
+                "control_refs" => [],
+                "output_refs" => [
+                    "TST_BUS_00",
+                    "TST_GRI_H2",
+                    "TST_GRI_O2"
+                ],
+                "strategy" => Dict{String,Any}(
+                    "name" => "demand_driven"
+                ),
+                "power_el" => 40000,
+                "min_power_fraction" => 0.0,
+                "output_temperature" => 45
+            ),
+            "TST_BUS_00" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_lt1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_01_ELY_01", "TST_SRC_01"],
+                    "output_order" => ["TST_HP_02", "TST_HP_01"],
+                    "energy_flow" => [[1, 1],
+                                      [1, 1]]
+                    )
+            ),
+            "TST_BUS_01" => Dict{String,Any}(
+                "type" => "Bus",
+                "medium" => "m_h_w_ht1",
+                "control_refs" => [],
+                "connections" => Dict{String,Any}(
+                    "input_order" => ["TST_HP_01b", "TST_HP_02"],
+                    "output_order" => ["TST_HP_03", "TST_HP_04", "TST_DEM_01" ],
+                    "energy_flow" => [[1, 0, 1],
+                                      [1, 0, 1]]
+                )
+            )
+    )
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+
+    expected_bus1 = Set([
+        components["TST_BUS_00"],
+    ])
+    expected_bus2 = Set([
+        components["TST_BUS_01"],
+    ])
+    expected_transformer1 = Set([
+        components["TST_HP_01"],
+        components["TST_HP_01b"],
+        components["TST_HP_02"],
+        components["TST_HP_03"],
+        components["TST_01_ELY_01"],
+    ])
+    expected_transformer2 = Set([
+        components["TST_HP_04"],
+
+    ])
+
+    chains_bus = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_bus
+    )
+
+    chains_transformer = Resie.find_chains(
+        [u for u in values(components) if !startswith(u.uac, "Proxy")],
+        EnergySystems.sf_transformer,
+        direct_connection_only=false
+    )
+
+    @test length(chains_bus) == 2
+    @test chains_bus[1] == expected_bus1
+    @test chains_bus[2] == expected_bus2
+    @test length(chains_transformer) == 2
+    @test chains_transformer[1] == expected_transformer1
+    @test chains_transformer[2] == expected_transformer2
+
+    # currently, distance_to_sink does not take into account the energy matrix of the bus
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+    
+    # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == false
+
+end
+
 @testset "find_chains" begin
     test_find_chains()
+    test_find_indirect_chains()
+    test_find_indirect_chains_denied()
+    test_find_indirect_chains_denied2()
 end
 
 function test_find_indexes()
