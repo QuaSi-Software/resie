@@ -17,15 +17,13 @@ mutable struct FuelBoiler <: Component
     m_heat_out::Symbol
 
     power_th::Float64
-    is_plr_dependant::Bool
-    max_consumable_fuel::Float64
+    min_power_fraction::Float64
+    efficiency::Function
     # lookup table for conversion of part load ratio to expended energy
     plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
 
-    min_power_fraction::Float64
     min_run_time::UInt
     output_temperature::Temperature
-
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -33,28 +31,24 @@ mutable struct FuelBoiler <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_fuel_in, m_heat_out])
 
-        max_consumable_fuel = watt_to_wh(float(config["power_th"])) /
-                             default(config, "max_thermal_efficiency", 1.0)
-
         return new(
-            uac, # uac
-            controller_for_strategy( # controller
+            uac,
+            controller_for_strategy(
                 config["strategy"]["name"], config["strategy"], sim_params
             ),
-            sf_transformer, # sys_function
-            InterfaceMap( # input_interfaces
+            sf_transformer,
+            InterfaceMap(
                 m_fuel_in => nothing
             ),
-            InterfaceMap( # output_interfaces
+            InterfaceMap(
                 m_heat_out => nothing
             ),
             m_fuel_in,
             m_heat_out,
-            config["power_th"], # power_th
-            default(config, "is_plr_dependant", false), # toggles PLR-dependant efficiency
-            max_consumable_fuel,
-            [], # plr_to_expended_energy
+            config["power_th"],
             default(config, "min_power_fraction", 0.1),
+            parse_efficiency_function(default(config, "efficiency", "const:0.9")),
+            [], # plr_to_expended_energy
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
             0.0, # losses
@@ -83,7 +77,7 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     for plr in collect(start_value:step_size:end_value)
         # append tuple (expended energy, part load ratio value) to the lookup table
         push!(unit.plr_to_expended_energy, (
-            watt_to_wh(unit.power_th) * plr / efficiency(unit, plr), plr
+            watt_to_wh(unit.power_th) * plr / unit.efficiency(plr), plr
         ))
     end
 end
@@ -173,15 +167,6 @@ function check_heat_out(
     return potential_energy_heat_out
 end
 
-"""
-This function, with set magic-numbers, serves as a temporary implementation of an
-efficiency/PLR curve until a more generalised framework for such calculations is
-implemented.
-"""
-function efficiency(unit::FuelBoiler, plr::Float64)::Float64
-    return -0.9117 * plr^2 + 1.8795 * plr + 0.0322
-end
-
 function plr_from_expended_energy(
     unit::FuelBoiler,
     intake_fuel::Float64
@@ -256,7 +241,7 @@ function calculate_energies(
     # limit input/output to design power
     available_fuel_in = min(
         available_fuel_in,
-        watt_to_wh(unit.power_th) / efficiency(unit, 1.0)
+        watt_to_wh(unit.power_th) / unit.efficiency(1.0)
     )
     available_heat_out = min(available_heat_out, watt_to_wh(unit.power_th))
 
@@ -271,7 +256,7 @@ function calculate_energies(
 
     return (
         true,
-        used_plr * watt_to_wh(unit.power_th) / efficiency(unit, used_plr),
+        used_plr * watt_to_wh(unit.power_th) / unit.efficiency(used_plr),
         used_plr * watt_to_wh(unit.power_th),
     )
 end

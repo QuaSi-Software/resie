@@ -800,6 +800,32 @@ function output_value(unit::Component, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
+function parse_efficiency_function(eff_def::String)::Function
+    efficiency = plr -> plr
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        if method == "const"
+            c = parse(Float64, data)
+            efficiency = plr -> c
+
+        elseif method == "poly"
+            params = map(x -> parse(Float64,x), split(data, ","))
+            efficiency = let params = params
+                x -> sum(p * x^(length(params)-i) for (i, p) in enumerate(params))
+            end
+        end
+
+        return efficiency
+    end
+
+    @warn "Cannot parse efficiency function from: $eff_def"
+    return efficiency
+end
+
 # for the moment control must be an include as it contains circular dependencies
 # of definitions
 include("control.jl")

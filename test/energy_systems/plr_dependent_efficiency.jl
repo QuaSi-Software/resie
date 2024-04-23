@@ -32,10 +32,30 @@ function get_demand_energy_system_config()
                 "name" => "demand_driven",
             ),
             "power_th" => 4000,
-            "is_plr_dependant" => true,
-            "max_thermal_efficiency" => 1.0,
+            "efficiency" => "poly:-0.9117,1.8795,0.0322",
         ),
     )
+end
+
+function test_efficiency_parsing()
+    efficiency = EnergySystems.parse_efficiency_function("const:0.314")
+    @test efficiency(0.0) ≈ 0.314
+    @test efficiency(0.5) ≈ 0.314
+    @test efficiency(1.0) ≈ 0.314
+
+    efficiency = EnergySystems.parse_efficiency_function("poly:0.5,0.314")
+    @test efficiency(0.0) ≈ 0.314
+    @test efficiency(0.5) ≈ 0.564
+    @test efficiency(1.0) ≈ 0.814
+
+    efficiency = EnergySystems.parse_efficiency_function("poly:-0.9117,1.8795,0.0322")
+    @test efficiency(0.0) ≈ 0.0322
+    @test efficiency(0.5) ≈ 0.744025
+    @test efficiency(1.0) ≈ 1.0
+end
+
+@testset "test_efficiency_parsing" begin
+    test_efficiency_parsing()
 end
 
 function test_inverse_efficiency()
@@ -157,8 +177,7 @@ function test_gas_boiler_supply_driven_plrd()
                 "name" => "supply_driven",
             ),
             "power_th" => 4000,
-            "is_plr_dependant" => true,
-            "max_thermal_efficiency" => 1.0,
+            "efficiency" => "poly:-0.9117,1.8795,0.0322",
         ),
     )
 
