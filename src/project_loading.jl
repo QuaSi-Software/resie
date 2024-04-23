@@ -584,7 +584,11 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     fn_first = function (entry)
         return entry[1]
     end
-    return [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+
+    step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+    step_order = remove_double_potental_produce(step_order)
+
+    return step_order
 end
 
 """
@@ -962,6 +966,40 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         # same as above, but for inputs and the process step
         # this is done in reorder_for_input_priorities()
     end
+end
+
+"""
+    remove_double_potental_produce(step_order)
+
+Checks the simulation step order for directly consecutive transformers potential and produce step and 
+removes the potential step.
+"""
+function remove_double_potental_produce(step_order)
+    last_unit = ""
+    last_step = ""
+    to_remove = Int[]
+    for (idx, entry) in enumerate(step_order)
+        unit = entry[1]
+        step = entry[2]
+        
+        if unit == last_unit 
+            if (step == EnergySystems.s_process
+                && last_step == EnergySystems.s_potential)
+                push!(to_remove, idx-1)
+            elseif (step == EnergySystems.s_potential
+                    && last_step == EnergySystems.s_process)
+                push!(to_remove, idx)
+            end
+        end
+        last_unit = unit
+        last_step = step
+    end
+
+    for index in sort(to_remove, rev=true)
+        deleteat!(step_order, index)
+    end
+
+    return step_order
 end
 
 """
