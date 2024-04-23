@@ -70,12 +70,12 @@ function test_distance_from_sink()
 
     components = Resie.load_components(components_config, simulation_parameters)
 
-    @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus, []) == 3
-    @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus, []) == 2
-    @test Resie.distance_to_sink(components["TST_BUS_03"], EnergySystems.sf_bus, []) == 0
-    @test Resie.distance_to_sink(components["TST_BUS_04"], EnergySystems.sf_bus, []) == 0
-    @test Resie.distance_to_sink(components["TST_BUS_05"], EnergySystems.sf_bus, []) == 1
-    @test Resie.distance_to_sink(components["TST_BUS_06"], EnergySystems.sf_bus, []) == 0
+    @test Resie.distance_to_sink(components["TST_BUS_01"], EnergySystems.sf_bus, [], "") == 3
+    @test Resie.distance_to_sink(components["TST_BUS_02"], EnergySystems.sf_bus, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_BUS_03"], EnergySystems.sf_bus, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_BUS_04"], EnergySystems.sf_bus, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_BUS_05"], EnergySystems.sf_bus, [], "") == 1
+    @test Resie.distance_to_sink(components["TST_BUS_06"], EnergySystems.sf_bus, [], "") == 0
 end
 
 @testset "distance_from_sink" begin
@@ -534,13 +534,13 @@ function test_find_indirect_chains()
     @test length(chains_transformer) == 1
     @test chains_transformer[1] == expected_transformer
 
-    # test distance to sink, does not consider energ flow matrix of bus currently
-    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
-    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+    # test distance to sink, considers energy flow matrix of bus
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, [], "") == 3
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 5
 
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
     @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
@@ -554,7 +554,7 @@ end
 
 function test_find_indirect_chains_denied()
     # This is the same energy system as in test_find_indirect_chains(), but the connection matrix
-    # of the two busses denies the connection from to and from HP1/HP1b to other transformers. 
+    # of the two busses denies the connection to and from HP1/HP1b to other transformers. 
     # Therefore, here two independent transformer chains are detected instead of one.
     components_config = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
@@ -817,13 +817,13 @@ function test_find_indirect_chains_denied()
     @test chains_transformer[1] == expected_transformer2
     @test chains_transformer[2] == expected_transformer1
 
-    # currently, distance_to_sink does not take into account the energy matrix of the bus
-    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
-    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+    # test distance to sink, considers energy flow matrix of bus
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, [], "") == 1
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 4
 
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
     @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
@@ -1103,13 +1103,13 @@ function test_find_indirect_chains_denied2()
     @test chains_transformer[1] == expected_transformer1
     @test chains_transformer[2] == expected_transformer2
 
-    # currently, distance_to_sink does not take into account the energy matrix of the bus
-    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, []) == 3
-    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, []) == 2
-    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, []) == 0
-    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, []) == 5
+    # test distance to sink, considers energy flow matrix of bus
+    @test Resie.distance_to_sink(components["TST_HP_01"], EnergySystems.sf_transformer, [], "") == 3
+    @test Resie.distance_to_sink(components["TST_HP_01b"], EnergySystems.sf_transformer, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_HP_02"], EnergySystems.sf_transformer, [], "") == 2
+    @test Resie.distance_to_sink(components["TST_HP_03"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_HP_04"], EnergySystems.sf_transformer, [], "") == 0
+    @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 5
     
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
     @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true

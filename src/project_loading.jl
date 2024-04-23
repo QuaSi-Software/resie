@@ -280,10 +280,10 @@ This function only searches in the outputs of each component, starting with "uni
 -`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
 -`unit`: The unit to start the search with
 -`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
-                                               interfaces. Can be [] when calling externally.
+                                               interfaces. Should be [] when calling externally.
 -`sys_function`: The system function of the chain that should be found
 -`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
-                          Can be an empty string ("") at the first external call.
+                          Should be an empty string ("") at the first external call.
 """
 function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
@@ -294,11 +294,9 @@ function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces,
         if outface !== nothing
             if outface in checked_interfaces
                 continue
-            else
-                if last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
-                    push!(checked_interfaces, outface)
-                    add_non_recursive_indirect_outputs!(node_set, outface.target, checked_interfaces, sys_function, unit.uac)
-                end
+            elseif last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
+                push!(checked_interfaces, outface)
+                add_non_recursive_indirect_outputs!(node_set, outface.target, checked_interfaces, sys_function, unit.uac)
             end
         end
     end
@@ -316,10 +314,10 @@ This function only searches in the inputs of each component, starting with "unit
 -`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
 -`unit`: The unit to start the search with
 -`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
-                                               interfaces. Can be [] when calling externally.
+                                               interfaces. Should be [] when calling externally.
 -`sys_function`: The system function of the chain that should be found
 -`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
-                          Can be an empty string ("") at the first external call.
+                          Should be an empty string ("") at the first external call.
 """
 function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
     if unit.sys_function === sys_function
@@ -330,11 +328,9 @@ function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, 
         if inface !== nothing
             if inface in checked_interfaces
                 continue
-            else
-                if last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
-                    push!(checked_interfaces, inface)
-                    add_non_recursive_indirect_inputs!(node_set, inface.source, checked_interfaces, sys_function, unit.uac)
-                end
+            elseif last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
+                push!(checked_interfaces, inface)
+                add_non_recursive_indirect_inputs!(node_set, inface.source, checked_interfaces, sys_function, unit.uac)
             end
         end
     end
@@ -470,33 +466,35 @@ Calculate the distance of the given node to the sinks of the chain.
 
 A sink is defined as a node with no successors of the same system function. For the sinks
 this distance is 0. For all other nodes it is the maximum over the distances of its
-successors plus one.
+successors plus one. Only allowed connections are considered specified by the eneryg matrix 
+of busses.
 The parameter "checked_interfaces" is used to avoid loops when recursively calling the 
 function. When calling distance_to_sink() from outside, the parameter checked_interfaces 
-can be set as empty array ([]).
+should be set as empty array ([]).
 
 # Arguments
 -`node`: A specific component (unit) for which the distance to the sink should be determined
 -`sys_function`: The system function of the components in the chain
 -`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
-                                               interfaces. Can be [] when calling externally.
+                                               interfaces. Should be [] when calling externally.
+-`last_unit_uac::String`: string of the uac of the last unit. Should be "" when calling externally.                                               
 
 # Returns
 The maximum distance to the farest sink as Int.
 """
-function distance_to_sink(node, sys_function, checked_interfaces)
-    is_leaf = function(current_node, checked_interfaces_leaf; is_leafe_result=true)
+function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
+    is_leaf = function(current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
         for outface in values(current_node.output_interfaces)
             if outface !== nothing
                 if outface in checked_interfaces_leaf || outface.target == node
                     continue
-                else
+                elseif last_uac == "" || connection_allowed(current_node, last_uac, outface.target.uac)
                     push!(checked_interfaces_leaf, outface)
                     if outface.target.sys_function === sys_function
                         return false
                     else
                         is_leafe_result = is_leafe_result && 
-                                          is_leaf(outface.target, checked_interfaces_leaf, is_leafe_result=is_leafe_result)
+                                          is_leaf(outface.target, checked_interfaces_leaf, is_leafe_result=is_leafe_result, last_uac=current_node.uac)
                     end
                 end
             end
@@ -512,10 +510,10 @@ function distance_to_sink(node, sys_function, checked_interfaces)
             if outface !== nothing
                 if outface in checked_interfaces
                     continue
-                else
+                elseif last_unit_uac == "" || connection_allowed(node, last_unit_uac, outface.target.uac)
                     push!(checked_interfaces, outface)
                     if outface.target.sys_function === sys_function || !is_leaf(outface.target, [])
-                        distance = distance_to_sink(outface.target, sys_function, checked_interfaces)
+                        distance = distance_to_sink(outface.target, sys_function, checked_interfaces, node.uac)
                         max_distance = distance > max_distance ? distance : max_distance
                     end
                 end
@@ -542,7 +540,7 @@ ordering over the distances of nodes.
 function iterate_chain(chain, sys_function; reverse=false)
     distances = []
     for node in chain
-        push!(distances, (distance_to_sink(node, sys_function, []), node))
+        push!(distances, (distance_to_sink(node, sys_function, [], ""), node))
     end
     fn_first = function (entry)
         return entry[1]
