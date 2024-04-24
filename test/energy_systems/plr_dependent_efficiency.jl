@@ -52,6 +52,13 @@ function test_efficiency_parsing()
     @test efficiency(0.0) ≈ 0.0322
     @test efficiency(0.5) ≈ 0.744025
     @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("pwlin:0.5,0.9,1.0")
+    @test efficiency(0.0) ≈ 0.5
+    @test efficiency(0.25) ≈ 0.7
+    @test efficiency(0.5) ≈ 0.9
+    @test efficiency(0.8) ≈ 0.96
+    @test efficiency(1.0) ≈ 1.0
 end
 
 @testset "test_efficiency_parsing" begin

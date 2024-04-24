@@ -801,7 +801,6 @@ function output_value(unit::Component, key::OutputKey)::Float64
 end
 
 function parse_efficiency_function(eff_def::String)::Function
-    efficiency = plr -> plr
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
@@ -810,20 +809,28 @@ function parse_efficiency_function(eff_def::String)::Function
 
         if method == "const"
             c = parse(Float64, data)
-            efficiency = plr -> c
+            return plr -> c
 
         elseif method == "poly"
             params = map(x -> parse(Float64,x), split(data, ","))
-            efficiency = let params = params
-                x -> sum(p * x^(length(params)-i) for (i, p) in enumerate(params))
+            return function(plr)
+                return sum(p * plr^(length(params)-i) for (i, p) in enumerate(params))
+            end
+
+        elseif method == "pwlin"
+            params = map(x -> parse(Float64,x), split(data, ","))
+            step = 1.0 / (length(params)-1)
+            return function(plr)
+                bracket_nr = floor(Int64, plr / step) + 1
+                lower_bound = params[bracket_nr]
+                upper_bound = params[min(bracket_nr+1,length(params))]
+                return lower_bound + (upper_bound-lower_bound)*(plr%step) / step
             end
         end
-
-        return efficiency
     end
 
     @warn "Cannot parse efficiency function from: $eff_def"
-    return efficiency
+    return plr -> plr
 end
 
 # for the moment control must be an include as it contains circular dependencies
