@@ -174,12 +174,12 @@ number_of_datapoints_to_aggregate = 1
 time_stamp_aggregation = :begin
 
 # set figure title and axis labels
-title = "Average fluid temperature of geothermal probe field\nhourly resolution, GEW Gelsenkirchen, 2014"
+title = "Example\nTitle"
 x_label = "date"
-y_label = "average fluid temperature [°C]"
+y_label = "temperature [°C]"
 # set name and file formats to save figure
 file_formats = ["png", "svg"]
-filename = "helper_create_plots/comparison_plot"   # without file format ending!
+filename = "helper_functions/create_profile_plots/comparison_plot"   # without file format ending!
 # set if plot should be shown. Attention: Task has to be closed by pressing Enter if set to true.
 showplots = false
 
