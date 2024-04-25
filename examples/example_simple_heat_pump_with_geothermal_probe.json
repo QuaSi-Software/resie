@@ -79,9 +79,9 @@
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [],
-            "energy_profile_file_path": "./profiles/district/Demand_GEW_25years.prf",
+            "energy_profile_file_path": "./profiles/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "constant_temperature": 3,
-            "scale": 1
+            "scale": 1600
         },
         "TST_STH_01": {
             "type": "FixedSupply",
@@ -90,8 +90,8 @@
             "output_refs": [
                 "TST_GTP_01"
             ],
-            "energy_profile_file_path": "./profiles/district/Regeneration_GEW_25years.prf",
-            "scale": 1
+            "energy_profile_file_path": "./profiles/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 350
         },
         "TST_GTP_01": {
             "type": "GeothermalProbes",
