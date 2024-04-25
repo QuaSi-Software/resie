@@ -1,0 +1,17 @@
+# Simulation step order
+"TST_STH_01 s_reset",
+"TST_DEM_01 s_reset",
+"TST_HP_01 s_reset",
+"TST_GTP_01 s_reset",
+"TST_GRI_01 s_reset",
+"TST_STH_01 s_control",
+"TST_DEM_01 s_control",
+"TST_HP_01 s_control",
+"TST_GTP_01 s_control",
+"TST_GRI_01 s_control",
+"TST_STH_01 s_process",
+"TST_DEM_01 s_process",
+"TST_HP_01 s_process",
+"TST_GTP_01 s_process",
+"TST_GTP_01 s_load",
+"TST_GRI_01 s_process"
