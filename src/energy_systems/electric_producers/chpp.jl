@@ -113,25 +113,20 @@ function check_gas_in(
             &&
             unit.input_interfaces[unit.m_gas_in].max_energy === nothing
         )
-            return (Inf, Inf)
+            return (Inf)
         else
             exchanges = balance_on(
                 unit.input_interfaces[unit.m_gas_in],
                 unit.input_interfaces[unit.m_gas_in].source
             )
             potential_energy_gas = balance(exchanges) + energy_potential(exchanges)
-            potential_storage_gas = storage_potential(exchanges)
-            if (
-                unit.input_interfaces[unit.m_gas_in].do_storage_transfer
-                ? potential_energy_gas + potential_storage_gas
-                : potential_energy_gas
-            ) <= sim_params["epsilon"]
-                return (nothing, nothing)
+            if potential_energy_gas <= sim_params["epsilon"]
+                return (nothing)
             end
-            return (potential_energy_gas, potential_storage_gas)
+            return (potential_energy_gas)
         end
     else
-        return (Inf, Inf)
+        return (Inf)
     end
 end
 
@@ -145,17 +140,12 @@ function check_el_out(
             unit.output_interfaces[unit.m_el_out].target
         )
         potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_el = storage_potential(exchanges)
-        if (
-            unit.output_interfaces[unit.m_el_out].do_storage_transfer
-            ? potential_energy_el + potential_storage_el
-            : potential_energy_el
-        ) >= -sim_params["epsilon"]
-            return (nothing, nothing)
+        if potential_energy_el >= -sim_params["epsilon"]
+            return (nothing)
         end
-        return (potential_energy_el, potential_storage_el)
+        return (potential_energy_el)
     else
-        return (-Inf, -Inf)
+        return (-Inf)
     end
 end
 
@@ -169,17 +159,12 @@ function check_heat_out(
             unit.output_interfaces[unit.m_heat_out].target
         )
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_heat_out = storage_potential(exchanges)
-        if (
-            unit.output_interfaces[unit.m_heat_out].do_storage_transfer
-            ? potential_energy_heat_out + potential_storage_heat_out
-            : potential_energy_heat_out
-        ) >= -sim_params["epsilon"]
-            return (nothing, nothing)
+        if potential_energy_heat_out >= -sim_params["epsilon"]
+            return (nothing)
         end
-        return (potential_energy_heat_out, potential_storage_heat_out)
+        return (potential_energy_heat_out)
     else
-        return (-Inf, -Inf)
+        return (-Inf)
     end
 end
 
@@ -189,11 +174,8 @@ function calculate_energies(
     potentials::Vector{Float64}
 )
     potential_energy_gas_in = potentials[1]
-    potential_storage_gas_in = potentials[2]
-    potential_energy_el_out = potentials[3]
-    potential_storage_el_out = potentials[4]
-    potential_energy_heat_out = potentials[5]
-    potential_storage_heat_out = potentials[6]
+    potential_energy_el_out = potentials[2]
+    potential_energy_heat_out = potentials[3]
 
     max_produce_heat = watt_to_wh(unit.power_gas * (1.0 - unit.electricity_fraction))
     max_produce_el = watt_to_wh(unit.power_gas * unit.electricity_fraction)
@@ -208,23 +190,22 @@ function calculate_energies(
     # all three standard operating strategies behave the same, but it is better to be
     # explicit about the behaviour rather than grouping all together
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
+        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
 
     elseif unit.controller.strategy == "storage_driven"
         return (false, nothing, nothing, nothing)
 
     elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
+        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
 
     elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.output_interfaces[unit.m_heat_out].do_storage_transfer ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.output_interfaces[unit.m_el_out].do_storage_transfer ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.input_interfaces[unit.m_gas_in].do_storage_transfer ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-
+        usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
+        usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
+        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
     end
 
     # limit actual usage by limits of inputs, outputs and profile
@@ -252,20 +233,20 @@ function potential(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+    potential_energy_gas_in = check_gas_in(unit, sim_params)
+    if potential_energy_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_el_out, potential_storage_el_out = check_el_out(unit, sim_params)
-    if potential_energy_el_out === nothing && potential_storage_el_out === nothing
+    potential_energy_el_out = check_el_out(unit, sim_params)
+    if potential_energy_el_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+    potential_energy_heat_out = check_heat_out(unit, sim_params)
+    if potential_energy_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
@@ -273,9 +254,9 @@ function potential(
     energies = calculate_energies(
         unit, sim_params,
         [
-            potential_energy_gas_in, potential_storage_gas_in,
-            potential_energy_el_out, potential_storage_el_out,
-            potential_energy_heat_out, potential_storage_heat_out
+            potential_energy_gas_in,
+            potential_energy_el_out,
+            potential_energy_heat_out,
         ]
     )
 
@@ -287,20 +268,20 @@ function potential(
 end
 
 function process(unit::CHPP, sim_params::Dict{String,Any})
-    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+    potential_energy_gas_in = check_gas_in(unit, sim_params)
+    if potential_energy_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_el_out, potential_storage_el_out = check_el_out(unit, sim_params)
-    if potential_energy_el_out === nothing && potential_storage_el_out === nothing
+    potential_energy_el_out = check_el_out(unit, sim_params)
+    if potential_energy_el_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+    potential_energy_heat_out = check_heat_out(unit, sim_params)
+    if potential_energy_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
@@ -308,9 +289,9 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     energies = calculate_energies(
         unit, sim_params,
         [
-            potential_energy_gas_in, potential_storage_gas_in,
-            potential_energy_el_out, potential_storage_el_out,
-            potential_energy_heat_out, potential_storage_heat_out
+            potential_energy_gas_in,
+            potential_energy_el_out,
+            potential_energy_heat_out,
         ]
     )
 

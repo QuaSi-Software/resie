@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest
+    highest, default
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -253,6 +253,8 @@ end
     add!(interface, change, temperature)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function add!(
     interface::SystemInterface,
@@ -283,6 +285,8 @@ end
     sub!(interface, change, temperature)
 
 Subtract the given amount of energy (in Wh) from the balance of the interface.
+
+If the source or target of the interface is a bus, communicates the change to the bus.
 """
 function sub!(
     interface::SystemInterface,
@@ -322,6 +326,14 @@ function set!(
     interface.balance = new_val
 end
 
+"""
+    set_temperature!(interface, temp_min, temp_max)
+
+Set the minimum and maximum temperature for the interface.
+
+If the source or target of the interface is a bus, also calls the set_temperature!
+function on that bus.
+"""
 function set_temperature!(
     interface::SystemInterface,
     temperature_min::Temperature=nothing,
@@ -347,12 +359,14 @@ end
     set_max_energy!(interface, value)
 
 Set the maximum power that can be delivered to the given value.
+
+If the source or target of the interface is a bus, also calls the set_max_energy! function
+on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
     value::Union{Nothing,Float64}
 )
-    
     if interface.max_energy === nothing
         interface.max_energy = value
     else
@@ -360,17 +374,9 @@ function set_max_energy!(
     end
 
     if interface.source.sys_function == sf_bus
-        if interface.target.sys_function == sf_storage
-            set_storage_potential!(interface.source, interface.target, false, value)
-        else
-            set_max_energy!(interface.source, interface.target, false, value)
-        end
+        set_max_energy!(interface.source, interface.target, false, value)
     elseif interface.target.sys_function == sf_bus
-        if interface.source.sys_function == sf_storage
-            set_storage_potential!(interface.target, interface.source, true, value)
-        else
-            set_max_energy!(interface.target, interface.source, true, value)
-        end
+        set_max_energy!(interface.target, interface.source, true, value)
     end
 end
 
@@ -386,7 +392,6 @@ function reset!(interface::SystemInterface)
     interface.temperature_max = nothing
     interface.max_energy = nothing
 end
-
 
 """
     highest(temperature_1, temperature_2)::Temperature
@@ -471,7 +476,6 @@ Base.@kwdef mutable struct EnergyExchange
     balance::Float64
     uac::String
     energy_potential::Float64
-    storage_potential::Float64
     temperature_min::Temperature
     temperature_max::Temperature
     pressure::Union{Nothing,Float64}
@@ -509,20 +513,6 @@ Returns:
 """
 function energy_potential(entries::Vector{EnergyExchange})::Float64
     return sum(e.energy_potential for e in entries; init=0.0)
-end
-
-"""
-    storage_potential(exchanges)
-
-Sum of storage potentials over the given list of energy exchanges.
-
-Args:
-    `entries::Vector{EnergyExchange}`: The exchanges to sum over
-Returns:
-    `Float64`: Sum of storage potentials
-"""
-function storage_potential(entries::Vector{EnergyExchange})::Float64
-    return sum(e.storage_potential for e in entries; init=0.0)
 end
 
 """
@@ -629,13 +619,9 @@ without having to check if its connected to a Bus or directly to a component.
     also defines which component is the source.
 - `unit::Component`: The receiving component
 
-# Returns NamedTuple with
-- "balance"::Float64:           The balance of the target component that can be considered a 
-                                demand on the source component
-- "storage_potential"::Float64: An additional demand that covers the free storage space 
-                                connected to the target component
-- "energy_potential"::Float64:  The maximum enery an interface can provide or consume
-- "temperature"::Temperature:   The temperature of the interface
+# Returns
+- `Vector{EnergyExchange}`: A list of energy exchange items, which contain the information
+    required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
@@ -645,7 +631,6 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         balance=interface.balance,
         uac=unit.uac,
         energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
-        storage_potential=0.0,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
@@ -934,12 +919,40 @@ function link_output_with(unit::Component, components::Grouping)
     end
 end
 
+"""
+    initialise_components(component, sim_params)
+
+Initialises the given components.
+
+# Arguments
+`components::Grouping`: The components
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
 function initialise_components(components::Grouping, sim_params::Dict{String,Any})
-    for component in values(components)
+    for component in [c for c in values(components) if c.sys_function !== sf_bus]
+        initialise!(component, sim_params)
+    end
+    # initialise non-bus components first, so they write do_storage_transfer flags on the
+    # interfaces before the busses are initialised, using these flags for their own input
+    for component in [c for c in values(components) if c.sys_function === sf_bus]
         initialise!(component, sim_params)
     end
 end
 
+"""
+    merge_bus_chains(chains, components, sim_params)
+
+For each of the given bus chains, creates a proxy bus as a merger of all busses in the
+chain and sets the proxy.
+
+Each chain is a set of interconnected busses of the same medium. For an example
+@See EnergySystems.find_chains which can identify the chains to merge.
+
+# Arguments
+`chains::Vector{Set{Component}}`: A list of chains of busses
+`components::Grouping`: All components of the energy systems
+`sim_params::Dict{String,Any}`: Simulation parameters
+"""
 function merge_bus_chains(
     chains::Vector{Set{Component}},
     components::Grouping,
@@ -1073,12 +1086,12 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
     elseif haskey(config, "constant_temperature") && config["constant_temperature"] isa Number
         @info "For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set."
         return nothing
-    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weatherdata")
-        if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])"                
-            return getfield(sim_params["weatherdata"], Symbol(config["temperature_from_global_file"]))
+            return getfield(sim_params["weather_data"], Symbol(config["temperature_from_global_file"]))
         else
-            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
             exit()
         end
     else            
@@ -1108,12 +1121,12 @@ function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, s
     if haskey(config, "ambient_temperature_profile_path")
         @info "For '$uac', the given ambient temperature profile is chosen."
         return Profile(config["ambient_temperature_profile_path"], sim_params)
-    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weatherdata")
-        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weatherdata"])))
+    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name)) for field_name in fieldnames(typeof(sim_params["weather_data"])))
             @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
-            return getfield(sim_params["weatherdata"], Symbol(config["ambient_temperature_from_global_file"]))
+            return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
         else
-            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weatherdata"]))), ", "))."
+            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
             exit()
         end
     else

@@ -102,9 +102,7 @@ end
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    energy_demand = balance(exchanges) +
-        energy_potential(exchanges) +
-        (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand < 0.0
         add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
