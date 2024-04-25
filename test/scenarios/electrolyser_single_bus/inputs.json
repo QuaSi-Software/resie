@@ -278,7 +278,8 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.1
             },
-            "power_th": 40000
+            "power_th": 40000,
+            "efficiency": "const:1.0"
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",

@@ -342,7 +342,8 @@
             },
             "power_th": 400000,
             "output_temperature": 60,
-            "min_power_fraction": 0.0
+            "min_power_fraction": 0.0,
+            "efficiency": "const:1.0"
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",
