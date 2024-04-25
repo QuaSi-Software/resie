@@ -33,6 +33,7 @@ function get_demand_energy_system_config()
             ),
             "power_th" => 4000,
             "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "nr_discretization_steps" => 20,
         ),
     )
 end
@@ -67,6 +68,7 @@ end
 
 function test_inverse_efficiency()
     components_config = get_demand_energy_system_config()
+    components_config["TST_GB_01"]["nr_discretization_steps"] = 10
     eps = 1e-9
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
@@ -81,6 +83,15 @@ function test_inverse_efficiency()
     @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
     plr = plr_from_expended_energy(boiler, 450.0)
     @test plr > 0.09496485 - eps && plr < 0.09496485 + eps
+
+    boiler.discretization_step = 1.0 / 20
+    boiler.plr_to_expended_energy = []
+    EnergySystems.initialise!(boiler, simulation_parameters)
+
+    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
+    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
+    plr = plr_from_expended_energy(boiler, 450.0)
+    @test plr > 0.08302885902274304 - eps && plr < 0.08302885902274304 + eps
 end
 
 @testset "test_inverse_efficiency" begin
@@ -185,6 +196,7 @@ function test_gas_boiler_supply_driven_plrd()
             ),
             "power_th" => 4000,
             "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "nr_discretization_steps" => 20,
         ),
     )
 

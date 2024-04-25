@@ -19,6 +19,7 @@ mutable struct FuelBoiler <: Component
     power_th::Float64
     min_power_fraction::Float64
     efficiency::Function
+    discretization_step::Float64
     # lookup table for conversion of part load ratio to expended energy
     plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
 
@@ -48,6 +49,7 @@ mutable struct FuelBoiler <: Component
             config["power_th"],
             default(config, "min_power_fraction", 0.1),
             parse_efficiency_function(default(config, "efficiency", "const:0.9")),
+            1.0 / default(config, "nr_discretization_steps", 30),
             [], # plr_to_expended_energy
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
@@ -71,10 +73,7 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     )
 
     # fill plr_to_expended_energy lookup table
-    start_value = 0.0
-    end_value = 1.0
-    step_size = 0.1
-    for plr in collect(start_value:step_size:end_value)
+    for plr in collect(0.0:unit.discretization_step:1.0)
         # append tuple (expended energy, part load ratio value) to the lookup table
         push!(unit.plr_to_expended_energy, (
             watt_to_wh(unit.power_th) * plr / unit.efficiency(plr), plr
