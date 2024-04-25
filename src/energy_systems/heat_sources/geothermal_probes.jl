@@ -724,9 +724,7 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
-    energy_demanded = balance(exchanges) +
-                      energy_potential(exchanges) +
-                      (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demanded = balance(exchanges) + energy_potential(exchanges)
     energy_available = unit.current_max_output_energy  # is positive
 
     # shortcut if there is no energy demanded
@@ -738,10 +736,7 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.output_temperatures_last_timestep = temp_min_all_non_empty(exchanges)
 
     for exchange in exchanges
-        demanded_on_interface = exchange.balance +
-                                exchange.energy_potential +
-                                (outface.do_storage_transfer ? exchange.storage_potential : 0.0)
-
+        demanded_on_interface = exchange.balance + exchange.energy_potential
         if demanded_on_interface >= -sim_params["epsilon"]
             continue
         end
@@ -775,9 +770,7 @@ end
 function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) +
-                       energy_potential(exchanges) +
-                       (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
     energy_demand = unit.max_input_energy  # is positive
 
     # shortcut if there is no energy to be used
@@ -789,10 +782,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        exchange_energy_available = exchange.balance +
-                                    exchange.energy_potential +
-                                    (inface.do_storage_transfer ? exchange.storage_potential : 0.0)
-
+        exchange_energy_available = exchange.balance + exchange.energy_potential
         if exchange_energy_available < sim_params["epsilon"]
             continue
         end
@@ -836,8 +826,7 @@ caller_is_input = unit.uac == interface.target.uac
     return [EnEx(
         balance=interface.balance,
         uac=unit.uac,
-        energy_potential=0.0,
-        storage_potential=caller_is_input ? - unit.max_input_energy : unit.max_output_energy,  # TODO is this to be assuemd as storage_potential?
+        energy_potential=caller_is_input ? - unit.max_input_energy : unit.max_output_energy,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
