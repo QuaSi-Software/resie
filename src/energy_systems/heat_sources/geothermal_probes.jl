@@ -81,6 +81,27 @@ mutable struct GeothermalProbes <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
     
+        model_type = default(config, "model_type", "simplified")
+        model_type_allowed_values = ["simplified", "detailed"]
+        if !(model_type in model_type_allowed_values)
+            @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
+            exit()
+        end
+
+        probe_field_geometry = default(config, "probe_field_geometry", "rectangle")
+        probe_field_geometry_allowed_values = ["rectangle",
+                                               "open_rectangle",
+                                               "zoned_rectangle",
+                                               "U_configurations",
+                                               "lopsided_U_configuration",
+                                               "C_configuration",
+                                               "L_configuration"]
+        if !(probe_field_geometry in probe_field_geometry_allowed_values)
+            @error "Undefined probe field configuration \"$(probe_field_geometry)\" of unit \"$(uac)\". Has to be one of: $(probe_field_geometry_allowed_values)."
+            exit()
+        end    
+    
+
         return new(
             uac,                     # uac
             controller_for_strategy( # controller
@@ -96,7 +117,7 @@ mutable struct GeothermalProbes <: Component
             m_heat_in,                      # medium name of input interface
             m_heat_out,                     # medium name of output interface
 
-            default(config, "model_type", "simplified"),          # model type. currently "simplified" with constant thermal borehole resistance and 
+            model_type,                                           # model type. currently "simplified" with constant thermal borehole resistance and 
                                                                   # "detailed" with calculated thermal borehole resistance in every time step are available.
 
             default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
@@ -124,7 +145,7 @@ mutable struct GeothermalProbes <: Component
             [],                                                   # vector to hold specific energy sum (in and out) per probe meter in each time step
             [],                                                   # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
 
-            default(config, "probe_field_geometry", "rectangle"), # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
+            probe_field_geometry,                                 # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
             default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
             default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
             default(config, "probe_field_key_2", "") ,            # key2 of g-fuction library. Can also be "" if non is needed. The value depends on the chosen library type.
@@ -200,11 +221,6 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
                                       "C_configuration" => "C_configurations_5m_v1.0.json",
                                       "L_configuration" => "L_configurations_5m_v1.0.json"
                                       )
-
-    if !haskey(probe_field_configurations, unit.probe_field_geometry)
-        @error "The entered probe field configuration could not be detected in \"$(unit.uac)\". It has to be one of: $(join(["$key" for key in keys(probe_field_configurations)], ", "))."
-        exit()
-    end    
 
     libfile_path = "src/energy_systems/heat_sources/g-function_library_1.0/" * probe_field_configurations[unit.probe_field_geometry]
     if !isfile(libfile_path)
@@ -609,9 +625,6 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes)
     elseif unit.model_type == "simplified"
         # constant borehole thermal resistance from user input
         borehole_thermal_resistance = unit.borehole_thermal_resistance
-    else
-        @error "Undefined model type $(unit.model_type) of unit $(unit.uac). Has to be one of: 'simplified', 'detailed'."
-        exit()
     end
 
     # calculate new average fluid temperature with g-function approach
