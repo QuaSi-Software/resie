@@ -239,6 +239,12 @@ Base.@kwdef mutable struct SystemInterface
 end
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
     set_storage_transfer!(interface, value)
 
 Sets the flag to decide over storage potential transfer to the given boolean value. Note
@@ -1092,7 +1098,7 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
             return getfield(sim_params["weather_data"], Symbol(config["temperature_from_global_file"]))
         else
             @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            exit()
+            throw(InputError)
         end
     else            
         @info "For '$uac', no temperature is set."
@@ -1127,11 +1133,11 @@ function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, s
             return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
         else
             @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            exit()
+            throw(InputError)
         end
     else
         @error "No ambient temperature profile is given for '$uac'"
-        exit()
+        throw(InputError)
     end
 end
 

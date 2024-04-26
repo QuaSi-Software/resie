@@ -494,7 +494,7 @@ function create_sankey(
             catch e
                 @error "The color for the sankey '$color' of medium '$medium' could not be detected. The following error occured: $e\n" *
                         "Color has to be one of: $(collect(keys(Colors.color_names)))"
-                exit()
+                throw(InputError)
             end
         end
         for medium in unique_medium_labels
@@ -504,7 +504,7 @@ function create_sankey(
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
                 @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
-                exit()
+                throw(InputError)
             end
         end
     end

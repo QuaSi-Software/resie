@@ -85,7 +85,7 @@ mutable struct GeothermalProbes <: Component
         model_type_allowed_values = ["simplified", "detailed"]
         if !(model_type in model_type_allowed_values)
             @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
-            exit()
+            throw(InputError)
         end
 
         probe_field_geometry = default(config, "probe_field_geometry", "rectangle")
@@ -98,7 +98,7 @@ mutable struct GeothermalProbes <: Component
                                                "L_configuration"]
         if !(probe_field_geometry in probe_field_geometry_allowed_values)
             @error "Undefined probe field configuration \"$(probe_field_geometry)\" of unit \"$(uac)\". Has to be one of: $(probe_field_geometry_allowed_values)."
-            exit()
+            throw(InputError)
         end    
     
 
@@ -225,7 +225,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     libfile_path = "src/energy_systems/heat_sources/g-function_library_1.0/" * probe_field_configurations[unit.probe_field_geometry]
     if !isfile(libfile_path)
         @error "The library for the geothermal probe field \"$(unit.uac)\" could not be found at $libfile_path"
-        exit()
+        throw(InputError)
     end
 
     # calculate g-functions
@@ -396,7 +396,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     # If borehole_depth is less than the first depth or beyond all known ranges
     if upper_index === nothing || upper_index == 1
         @error "In geothermal probe \"$(unit.uac)\", the borehole_depth needs to be between $(depths[1]) m and $(depths[end]) m, but is $(borehole_depth) m."
-        exit()
+        throw(InputError)
     end
     
     # Extracting the lower and upper bounds details
@@ -412,7 +412,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     catch e
         @error "The library with precalculated g-values for the geothermal probe \"$(unit.uac)\" could not be read in. The following error occured: $e\n" *
                 "Check the file located at $libfile_path."
-        exit()
+        throw(InputError)
     end
 
     # Get a specific configuration from the library
@@ -428,7 +428,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     catch e
         @error "The probe field configuration for the geothermal probe  \"$(unit.uac)\" could not be detected from the given library. The following error occured: $e\n" *
         "Check the probe field configuration given as key1 = $key1 and key2 = $key2."
-        exit()
+        throw(InputError)
     end
 
     # calculate number of probes in probe field
