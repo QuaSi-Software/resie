@@ -204,13 +204,32 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.radius_borehole = unit.borehole_diameter / 2                # [m]
     unit.distance_pipe_center = unit.shank_spacing / 2               # [m]
 
-    # calculate g-function
-    # The long term g-functions will be read out from the library provided by
-    # G-Function Library V1.0 by T. West, J. Cook and D. Spitler, 2021, Oklahoma State University
-    # The missing short term g-function will be calculated using the infinite line source/sink theory by Kelvin
-    #
-    # set Parameters
-    # User Input: Set key_1 and key_2 for library geometrie properties.
+    # calculate g-function and get number of probes in the probe field
+    unit.g_function, unit.number_of_probes = calculate_g_function(unit, sim_params)
+
+    # calculate max energies
+    unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
+    unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
+
+end
+
+"""
+    calculate_g_function(unit::Component, sim_params::Dict{String,Any})
+
+Calculates the g-function values.
+The long term g-functions will be read out from the library provided by G-Function Library V1.0 
+by T. West, J. Cook and D. Spitler, 2021, Oklahoma State University with linear interpolation.
+The missing short term g-function will be calculated using the infinite line source/sink 
+theory by Kelvin.
+
+Returns:
+    `g_function::Vector{Float64}`: The g-function values in the simulation time step and duration
+    `number_of_probes::Int`: The total number of probes in the geothermal probe field as defined
+                             through the input parameters.
+
+"""
+function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
+    # set Parameters (user input): Set key_1 and key_2 for library geometrie properties.
     key1 = "$(unit.number_of_probes_x)_$(unit.number_of_probes_y)"      # Note that  x <= y!
     key2 = unit.probe_field_key_2
     probe_field_configurations = Dict("rectangle" => "rectangle_5m_v1.0.json",
@@ -239,7 +258,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
                                     -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,
                                      1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
 
-    g_values_long_term_library, unit.number_of_probes = get_library_g_values(unit, unit.probe_depth, unit.radius_borehole, unit.borehole_spacing, key1, key2, libfile_path)
+    g_values_long_term_library, number_of_probes = get_library_g_values(unit, unit.probe_depth, unit.radius_borehole, unit.borehole_spacing, key1, key2, libfile_path)
 
     # Change normalized time values to absolut time and round to fit into simulation step width.
     library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized, steady_state_time), sim_params["time_step_seconds"])
@@ -252,10 +271,10 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
 
     # linear interpolation. 
-    # TODO: May change later to something else than linear interpolation between irregular grid points?
-    #   	Though spline interpolation from Dierckx does not really work here...
+    # May change later to something else than linear interpolation between irregular grid points?
+    # Though spline interpolation from Dierckx does not really work here...
     itp = interpolate((vcat(0,library_time_grid_absolute),), vcat(0,g_values_long_term_library), Gridded(Linear()))
-    unit.g_function = itp.(simulation_time_grid_precalculated)
+    g_function = itp.(simulation_time_grid_precalculated)
 
     # change first time period of g-function to fitted f(x)=a*log(b*x) function to better represent short term effects.
     # This follows the method of an infitine line source that is widely used to calculate the short term g-functions
@@ -264,20 +283,20 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # f(x) is fitted in a way that the function goes through the first and second node of the existing non-interpolated g-function.
     # therefore: a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2))) and b = exp(log(x1^y2/x2^y1)/(y1 - y2))
     x1 = Int(library_time_grid_absolute[1] / sim_params["time_step_seconds"]) + 1  # in time step width
-    y1 = unit.g_function[x1]
+    y1 = g_function[x1]
     x2 = Int(library_time_grid_absolute[2] / sim_params["time_step_seconds"]) + 1  # in time step width
-    y2 = unit.g_function[x2]
+    y2 = g_function[x2]
     a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2)))
     b = exp(log(x1^y2/x2^y1)/(y1 - y2))
 
     for x in 1:(x1-1)
-        unit.g_function[x] = max(0, a * log(b * (x+1)))
+        g_function[x] = max(0, a * log(b * (x+1)))
     end
 
     # create and save plots 
     if unit.do_create_plots
         plot(0:Int(sim_params["number_of_time_steps"]),
-             unit.g_function[1:Int(sim_params["number_of_time_steps"]+1)],
+             g_function[1:Int(sim_params["number_of_time_steps"]+1)],
              title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
              xlabel="time [time step]",
              ylabel="g-function value [-]",
@@ -295,13 +314,12 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
         savefig("output/probe_field_g_funcion_$(unit.uac).png")
     end
 
-    @info "Successfully calculated g-function for geothermal probe field \"$(unit.uac)\" with $(unit.number_of_probes) probes."
+    @info "Successfully calculated g-function for geothermal probe field \"$(unit.uac)\" with $(number_of_probes) probes."
 
-    # calculate max energies
-    unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
-    unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
-
+    return g_function, number_of_probes
 end
+
+
 
 """
     ln_to_normal()
