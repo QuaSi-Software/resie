@@ -661,17 +661,17 @@ function calculate_alpha_pipe(unit::GeothermalProbes)
     temperature_spread = unit.energy_in_out_per_probe_meter[unit.time_index] > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     mass_flow_per_pipe = power_in_out_per_pipe / (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
 
-    use_dynamic_fluid_properties = false
-    if use_dynamic_fluid_properties
-        # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
-        fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
-        unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
-        unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
-        fluid_reynolds_number = (4 * mass_flow_per_pipe) / (fluid_dynamic_viscosity * unit.pipe_diameter_inner * pi)
-    else 
-        # calculate reynolds-number based on kinematic viscosity with constant fluid properties.
-        fluid_reynolds_number = (4 * mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_diameter_inner * pi)
-    end
+    # calculate reynolds-number based on kinematic viscosity with constant fluid properties.
+    fluid_reynolds_number = (4 * mass_flow_per_pipe) / (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_diameter_inner * pi)
+
+    # # In case that someone wants to implement temperature-dependend fluid properties in a later version, this already
+    # # existing code can be used to start with. The equations are not checked and it is not known for which fluid the 
+    # # parameters are valid. The reynolds-number is calculated based on dynamic viscosity using dynamic temperature-dependend 
+    # # fluid properties. The method is adapted from TRNSYS Type 710:
+    # fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
+    # unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
+    # unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity / unit.fluid_heat_conductivity 
+    # fluid_reynolds_number = (4 * mass_flow_per_pipe) / (fluid_dynamic_viscosity * unit.pipe_diameter_inner * pi)
     
     if fluid_reynolds_number <= 2300  # laminar
         Nu = calculate_Nu_laminar(unit, fluid_reynolds_number)
