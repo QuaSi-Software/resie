@@ -74,13 +74,14 @@ mutable struct GeothermalProbes <: Component
 
     fluid_reynolds_number::Float64
 
-    do_create_plots::Bool
+    probe_coordinates::Union{Nothing, Vector{Vector{Float64}}}
 
     function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
     
+        # get model type from input file
         model_type = default(config, "model_type", "simplified")
         model_type_allowed_values = ["simplified", "detailed"]
         if !(model_type in model_type_allowed_values)
@@ -88,6 +89,7 @@ mutable struct GeothermalProbes <: Component
             throw(InputError)
         end
 
+        # get probe field geometry from input file
         probe_field_geometry = default(config, "probe_field_geometry", "rectangle")
         probe_field_geometry_allowed_values = ["rectangle",
                                                "open_rectangle",
@@ -101,7 +103,6 @@ mutable struct GeothermalProbes <: Component
             throw(InputError)
         end    
     
-
         return new(
             uac,                     # uac
             controller_for_strategy( # controller
@@ -174,7 +175,7 @@ mutable struct GeothermalProbes <: Component
             default(config, "shank_spacing", 0.1),                   # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. required for calculation of thermal borehole resistance.
 
             0.0,                                                     # Reynoldsnumber. To be calculated in function later.
-            default(config, "do_create_plots", true)                 # flag if plots should be created during inizialisation   
+            nothing                                                  # probe_coordinates to save them for plotting
         )
     end
 end
@@ -205,7 +206,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.distance_pipe_center = unit.shank_spacing / 2               # [m]
 
     # calculate g-function and get number of probes in the probe field
-    unit.g_function, unit.number_of_probes = calculate_g_function(unit, sim_params)
+    unit.g_function, unit.number_of_probes, unit.probe_coordinates = calculate_g_function(unit, sim_params)
 
     # calculate max energies
     unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
@@ -226,7 +227,8 @@ Returns:
     `g_function::Vector{Float64}`: The g-function values in the simulation time step and duration
     `number_of_probes::Int`: The total number of probes in the geothermal probe field as defined
                              through the input parameters.
-
+    `probe_coordinates::Vector{Vector{Float64}}`: The coordinates of all probes in the probe field in m.
+                         
 """
 function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     # set Parameters (user input): Set key_1 and key_2 for library geometrie properties.
@@ -258,10 +260,17 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                                     -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,
                                      1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
 
-    g_values_long_term_library, number_of_probes = get_library_g_values(unit, unit.probe_depth, unit.radius_borehole, unit.borehole_spacing, key1, key2, libfile_path)
+    g_values_long_term_library, number_of_probes, probe_coordinates = get_library_g_values(unit, 
+                                                                                           unit.probe_depth,
+                                                                                           unit.radius_borehole,
+                                                                                           unit.borehole_spacing,
+                                                                                           key1,
+                                                                                           key2,
+                                                                                           libfile_path)
 
     # Change normalized time values to absolut time and round to fit into simulation step width.
-    library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized, steady_state_time), sim_params["time_step_seconds"])
+    library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized, steady_state_time), 
+                                                                sim_params["time_step_seconds"])
 
     # Interpolation between grid points of library, to get g-function values for eacht time-step.
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
@@ -293,33 +302,60 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
         g_function[x] = max(0, a * log(b * (x+1)))
     end
 
-    # create and save plots 
-    if unit.do_create_plots
-        plot(0:Int(sim_params["number_of_time_steps"]),
-             g_function[1:Int(sim_params["number_of_time_steps"]+1)],
-             title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
-             xlabel="time [time step]",
-             ylabel="g-function value [-]",
-             legend=false,
-             linewidth=6,
-             gridlinewidth=1,
-             size=(1800, 1200),
-             titlefontsize=30,
-             guidefontsize=24,
-             tickfontsize=24,
-             legendfontsize=24,
-             grid=true,
-             minorgrid=true,
-             margin=15Plots.mm)
-        savefig("output/probe_field_g_funcion_$(unit.uac).png")
-    end
-
     @info "Successfully calculated g-function for geothermal probe field \"$(unit.uac)\" with $(number_of_probes) probes."
 
-    return g_function, number_of_probes
+    return g_function, number_of_probes, probe_coordinates
 end
 
+function plot_optional_figures(unit::GeothermalProbes, output_path::String, output_formats::Vector{Any}, sim_params::Dict{String,Any})
+    # plot g-function values during simulation time
+    plot(0:Int(sim_params["number_of_time_steps"]),
+         unit.g_function[1:Int(sim_params["number_of_time_steps"]+1)],
+         title="g-fuction values for geothermal probe field \"$(unit.uac)\"",
+         xlabel="time [time step]",
+         ylabel="g-function value [-]",
+         legend=false,
+         linewidth=6,
+         gridlinewidth=1,
+         size=(1800, 1200),
+         titlefontsize=30,
+         guidefontsize=24,
+         tickfontsize=24,
+         legendfontsize=24,
+         grid=true,
+         minorgrid=true,
+         margin=15Plots.mm)
+    fig_name = "probe_field_g_funcion_$(unit.uac)"
+    for output_format in output_formats
+        savefig(output_path * "/" *  fig_name * "." *  output_format)
+    end
 
+    # plot probe field configuration
+    borehole_spacing_library_default = 5
+    scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / borehole_spacing_library_default),
+            [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / borehole_spacing_library_default),
+            title="probe field configuration for \"$(unit.uac)\"",
+            xlabel = "distribution in x direction [m]",
+            ylabel = "distribution in y direction [m]",
+            aspect_ratio=:equal,
+            legend=false,
+            markersize=6,
+            gridlinewidth=1,
+            size=(1800, 1200),
+            titlefontsize=30,
+            guidefontsize=24,
+            tickfontsize=24,
+            legendfontsize=24,
+            grid=true,
+            minorgrid=true,
+            margin=10Plots.mm)
+    fig_name = "probe_field_geometry_$(unit.uac)"
+    for output_format in output_formats
+        savefig(output_path * "/" *  fig_name * "." *  output_format)
+    end
+    # throw not needed values away
+    unit.probe_coordinates = nothing
+end
 
 """
     ln_to_normal()
@@ -330,7 +366,7 @@ Inputs:
     library_time_grid_normalized::Array{Float64}    - array of normalized time from West/Cook/Spitler library, 
                                                       given as ln(absolute_time/steady_state_time) 
     steady_state_time::Float64                      - steady state time = unit.probe_depth^2/(9* soil_diffusivity) in [s]
-Outputs:
+Returns:
     time::Array{Float64}                            - array of absolute time calculated from the normlized time as
                                                       exp(library_time_grid_normalized)*steady_state_time
 """
@@ -353,7 +389,7 @@ rounds given time steps (from West/Cook/Spitler library) to nearest multiple of 
 Inputs:
     grid_points_time::Vector{Fl at64}             - vector of absolute time steps as given in the West/Cook/Spitler library in [s]
     simulation_time_step_width::UInt64            - desired simulation time step in [s]
-Outputs:
+Returns:
     grid_points_time_rounded:: Vector{Float64}    - vector of time steps of grid_points_time, rounded to the nearest time that
                                                     is a multiple of the simulation_time_step_width 
 
@@ -392,9 +428,10 @@ Inputs:
     key1::String                 - parameter of West/Cook/Spitler library, normaly the number of probes in each direction: "m_n" while n >= m! See dokumentation of library for details.
     key2::String                 - parameter of West/Cook/Spitler library, meaning depends of type of probefield geometry, can also be "" if none is needed. See dokumentation of library for details.
     libfile_path::String         - file path to the library. Note that different probefield geometries are stored in different files.
-Outputs:
-    g_values_library_corrected::Array{Float64}  - interpolated and corrected g-values read out of library for given key1 and key2
-    number_of_probes::Int        - number of probes in geothermal probe field, defined by key1 and key2
+Returns:
+    g_values_library_corrected::Array{Float64} - interpolated and corrected g-values read out of library for given key1 and key2
+    number_of_probes::Int                      - number of probes in geothermal probe field, defined by key1 and key2
+    probe_coordinates::Vector{Vector{Float64}} - The coordinates of all probes in the probe field in m.
 
 """
 function get_library_g_values(unit::Component, borehole_depth::Float64, borehole_radius::Float64, borehole_spacing::Float64, key1::String, key2::String, libfile_path::String)
@@ -434,7 +471,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     end
 
     # Get a specific configuration from the library
-    local gVals, probe_coordinates
+    local gVals, probe_coordinates::Vector{Vector{Float64}}
     try
         if key2 == ""
             gVals = library[key1]["g"]
@@ -453,7 +490,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
     number_of_probes = length(probe_coordinates)
 
     # Getting a specific G-Function for the default configuration
-    borehole_spacing_library_default = 5   # Default borehole spacing for each configuration.
+    borehole_spacing_library_default = 5   # Default borehole spacing for each configuration. Attention: Also change in plot_optional_figures!
     g_values_library_lower = gVals["$borehole_spacing_library_default._$borehole_depth_library_lower._$borehole_radius_library_lower"]
     g_values_library_upper = gVals["$borehole_spacing_library_default._$borehole_depth_library_upper._$borehole_radius_library_upper"]
 
@@ -477,28 +514,7 @@ function get_library_g_values(unit::Component, borehole_depth::Float64, borehole
 
     g_values_library_corrected = g_values_library_interpolated .- log(borehole_radius / (borehole_radius_interpolated))
 
-    if unit.do_create_plots
-        scatter([v[1] for v in values(probe_coordinates)] * (borehole_spacing / borehole_spacing_library_default),
-                [v[2] for v in values(probe_coordinates)] * (borehole_spacing / borehole_spacing_library_default),
-                title="probe field configuration for \"$(unit.uac)\"",
-                xlabel = "distribution in x direction [m]",
-                ylabel = "distribution in y direction [m]",
-                aspect_ratio=:equal,
-                legend=false,
-                markersize=6,
-                gridlinewidth=1,
-                size=(1800, 1200),
-                titlefontsize=30,
-                guidefontsize=24,
-                tickfontsize=24,
-                legendfontsize=24,
-                grid=true,
-                minorgrid=true,
-                margin=10Plots.mm)
-        savefig("output/probe_field_geometry_$(unit.uac).png")
-    end
-
-    return g_values_library_corrected, number_of_probes
+    return g_values_library_corrected, number_of_probes, probe_coordinates
 end
 
 function control(
