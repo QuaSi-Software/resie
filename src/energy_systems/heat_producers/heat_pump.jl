@@ -295,7 +295,7 @@ function calculate_energies(
               unit.constant_cop
         if cop === nothing
             @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
-            exit()
+            throw(InputError)
         end
 
         # energies for current layer with potential heat in as basis
