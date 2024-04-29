@@ -355,6 +355,8 @@ function plot_optional_figures(unit::GeothermalProbes, output_path::String, outp
     end
     # throw not needed values away
     unit.probe_coordinates = nothing
+
+    return true
 end
 
 """

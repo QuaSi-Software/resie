@@ -285,32 +285,53 @@ function write_to_file(
 end
 
 """
-    dump_auxiliary_info(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_info(
-    file_path::String,
+function dump_auxiliary_outputs(
+    project_config::Dict{AbstractString,Any},
     components::Grouping,
     order_of_operations::StepInstructions,
     sim_params::Dict{String,Any}
 )
-    open(abspath(file_path), "w") do file_handle
-        write(file_handle, "# Simulation step order\n")
+    # export order of operation
+    if default(project_config["io_settings"], "auxiliary_info", false)
+        aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
+        open(abspath(aux_info_file_path), "w") do file_handle
+            write(file_handle, "# Simulation step order\n")
 
-        for entry in order_of_operations
-            for step in entry[2:lastindex(entry)]
-                if entry == last(order_of_operations)
-                    write(file_handle, "\"$(entry[1]) $(entry[2])\"\n")
-                else
-                    write(file_handle, "\"$(entry[1]) $(entry[2])\",\n")
+            for entry in order_of_operations
+                for step in entry[2:lastindex(entry)]
+                    if entry == last(order_of_operations)
+                        write(file_handle, "\"$(entry[1]) $(entry[2])\"\n")
+                    else
+                        write(file_handle, "\"$(entry[1]) $(entry[2])\",\n")
+                    end
                 end
             end
         end
+        @info "Auxiliary info dumped to file $(aux_info_file_path)"
     end
+
+    # plot additional figures potentially available from components after initialisation
+    if default(project_config["io_settings"], "auxiliary_plots", false)
+        aux_plots_output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+        component_list = []
+        for component in components
+            if plot_optional_figures(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
+                push!(component_list, component[2].uac)
+            end
+        end
+        if length(component_list) > 0
+            @info "Auxiliary plots are saved to folder $(aux_plots_output_path) for the following components: $(join(component_list, ", "))"
+        end
+    end
+    
 end
 
 

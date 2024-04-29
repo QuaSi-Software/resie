@@ -147,12 +147,8 @@ function run_simulation_loop(
         output_interface_values = zeros(Float64, sim_params["number_of_time_steps"], nr_of_interfaces)
     end 
 
-    # export order of operation and other additional info
-    if project_config["io_settings"]["auxiliary_info"]
-        aux_info_file_path = project_config["io_settings"]["auxiliary_info_file"]
-        dump_auxiliary_info(aux_info_file_path, components, step_order, sim_params)
-        @info "Auxiliary info dumped to file $(aux_info_file_path)"
-    end
+    # export order of operation and other additional info like optional plots
+    dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
     for steps = 1:sim_params["number_of_time_steps"]
         # perform the simulation

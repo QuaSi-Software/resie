@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest, default
+    highest, default, plot_optional_figures
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -787,6 +787,35 @@ For non-bus components this function does nothing.
 """
 function distribute!(unit::Component)
     # default implementation is to do nothing
+end
+
+"""
+    plot_optional_figures(unit, output_path, output_formats, sim_params)
+
+Plot otpional figures that are potentially created after initialisation of each 
+component. Saves all figures to "output_path" for each specified "output_formats".
+Possible output formats are:
+    - html
+    - pdf
+    - png
+    - ps
+    - svg
+
+# Arguments
+- `unit::Component`: The unit that plots additional figures
+- `output_path::String`: The output folder as string (absolute/relative) for the additional plots
+- `output_formats::Vector{Any}`: A Vector of output file formats, each as string without dot
+- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+ 
+# Returns:
+- Bool: true if a figure was created, false if no figure was created.
+"""
+function plot_optional_figures(unit::Component, 
+                               output_path::String,
+                               output_formats::Vector{Any},
+                               sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return false
 end
 
 """
