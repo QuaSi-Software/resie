@@ -10,6 +10,8 @@ As per the definition of semantic versioning and the reality of early developmen
 * Add geothermal collector files. This component is not finished yet and needs some rework.
 * Add standalone julia code to create figures from profile data
 * Add julia packages Roots and Plots
+* Add function plot_optional_figures(), available to include in every component, that is called after initialize!() to create additional plots if the component offers them. Added optional flags in input file to control the auxiliary plots: auxiliary_plots, auxiliary_plots_path, auxiliary_plots_formats
+* Bugfix in Resie.jl to call set_time_step ahead of the initialize!() of each component
 
 ### Version 0.8.3
 * Tweak examples to match the description in the documentation
