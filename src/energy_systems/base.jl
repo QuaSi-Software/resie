@@ -34,7 +34,7 @@ default(config::Dict{String,Any}, name::String, default_val::Any)::Any =
 """
 The number of hours per time step, used by various utility functions.
 """
-HOURS_PER_TIME_STEP::Float64 = 0.25
+HOURS_PER_TIME_STEP::Float64 = 0.0
 
 """
 Update the time step, in seconds.
