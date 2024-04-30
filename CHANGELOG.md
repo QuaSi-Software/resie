@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.5
+* Fix a problem with general bounded supply and sink implementations not considering temperatures correctly. This was mostly an issue with direct 1-to-1 connections between components as busses do consider this already.
+
 ### Version 0.8.4
 * Add geothermal probe as new component. It acts like a storage and there are many precalculated input parameters for a variety of probe field configurations. Both the simplified and the extended version were successfully validated.
 * Add new szenario with geothermal probe and heat pump.
