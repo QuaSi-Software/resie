@@ -129,6 +129,7 @@ function generate_output(name::String, subdir::String)
     try
         if project_config !== nothing
             sim_params = Resie.get_simulation_params(project_config)
+            Resie.EnergySystems.set_timestep(sim_params["time_step_seconds"])
             print("|  ✓  ")
         else
             print("|     ")
