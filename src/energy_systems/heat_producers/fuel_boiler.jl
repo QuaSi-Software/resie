@@ -273,7 +273,7 @@ function calculate_energies(
 
     plr_from_demand = plr_from_produced_energy(unit, available_heat_out)
     plr_from_supply = plr_from_expended_energy(unit, available_fuel_in)
-    used_plr = min(plr_from_demand, plr_from_supply, 1.0)
+    used_plr = min(plr_from_demand, plr_from_supply, max_plr, 1.0)
 
     # check minimum power fraction limit
     if used_plr < unit.min_power_fraction
