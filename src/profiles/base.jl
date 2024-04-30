@@ -88,7 +88,7 @@ mutable struct Profile
         if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0) 
             @error ("The timestep of the profile " * file_path * ", which is " * string(profile_time_step) * " s,\n" *
                     "is not a multiple or a divisor of the requested simulation timestep of " * string(simulation_time_step) * " s!")
-            exit()
+            throw(InputError)
         end
 
         if is_power # meaning intensive values (e.g., temperature, power)
