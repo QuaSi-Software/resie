@@ -896,6 +896,12 @@ Three different function models are implemented:
         the values for a PLR of 0.0 and 1.0 respectively. E.g. `pwlin:0.6,0.8,0.9` means
         two sections of step size 0.5 with a value of e(0.0)==0.6, e(0.5)==0.8, e(1.0)=0.9
         and linear interpolation inbetween.
+
+# Arguments
+- `eff_def::String`: The efficiency definition as described above
+# Returns
+- `Function`: A callable function which returns an efficiency value when given a part load
+    ratio value (from 0.0 to 1.0) as argument
 """
 function parse_efficiency_function(eff_def::String)::Function
     splitted = split(eff_def, ":")

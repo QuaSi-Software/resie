@@ -166,6 +166,24 @@ function check_heat_out(
     return potential_energy_heat_out
 end
 
+"""
+    plr_from_expended_energy(unit, intake_fuel)
+
+Calculate part load ratio as inverse function from the intake fuel energy.
+
+As the efficiency function can be a variety of functions and is not necessarily (easily)
+invertable, the inverse is calculated numerically at initialisation as a piece-wise linear
+function from a customizable number of support values from an even distribution of a PLR
+from 0.0 to 1.0. When calling plr_from_expended_energy this approximated function is
+evaluated for the given energy value and a linear interpolation between the two surrounding
+support values is performed to calculate the corresponding PLR.
+
+# Arguments
+- `unit::FuelBoiler`: The boiler
+- `intake_fuel::Float64`: The amount of fuel energy taken in
+# Returns
+- `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the fuel intake
+"""
 function plr_from_expended_energy(
     unit::FuelBoiler,
     intake_fuel::Float64
