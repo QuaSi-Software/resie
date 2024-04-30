@@ -4,6 +4,18 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.5
+* Fix a problem with general bounded supply and sink implementations not considering temperatures correctly. This was mostly an issue with direct 1-to-1 connections between components as busses do consider this already.
+
+### Version 0.8.4
+* Add geothermal probe as new component. It acts like a storage and there are many precalculated input parameters for a variety of probe field configurations. Both the simplified and the extended version were successfully validated.
+* Add new szenario with geothermal probe and heat pump.
+* Add geothermal collector files. This component is not finished yet and needs some rework.
+* Add standalone julia code to create figures from profile data
+* Add julia packages Roots and Plots
+* Add function plot_optional_figures(), available to include in every component, that is called after initialize!() to create additional plots if the component offers them. Added optional flags in input file to control the auxiliary plots: auxiliary_plots, auxiliary_plots_path, auxiliary_plots_formats
+* Bugfix in Resie.jl to call set_time_step ahead of the initialize!() of each component
+
 ### Version 0.8.3
 * Tweak examples to match the description in the documentation
 * Update profiles used in examples and move the files into subfolders

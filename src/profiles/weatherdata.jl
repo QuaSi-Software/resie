@@ -33,7 +33,7 @@ The returned values are of type WeaterData containing profiles of type Profile.
     function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
         if !isfile(weather_file_path)
             @error "The DWD weather file could not be found in: \n $weather_file_path"
-            exit()
+            throw(InputError)
         end
     
         if endswith(lowercase(weather_file_path), ".dat")
@@ -121,7 +121,7 @@ function read_dat_file(weather_file_path::String)
     catch e
         @error "Error reading the DWD .dat file in $weather_file_path\n" *
                "Please check the file. The following error occurred: $e"
-        exit()
+        throw(InputError)
     end
 
     # Read header 
@@ -147,7 +147,7 @@ function read_dat_file(weather_file_path::String)
         catch e
             @error "Error reading the header of the DWD .dat file in $weather_file_path\n" *
                    "Check if the header meets the requirements. The following error occurred: $e"
-            exit()
+            throw(InputError)
         end
         if row[1] == "***"
             break
@@ -190,7 +190,7 @@ function read_dat_file(weather_file_path::String)
         @warn "Error reading the .dat weather dataset from $weather_file_path:\n" *
               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
               "Check the file and make sure the data block starts with ***."
-        exit()
+        throw(InputError)
     end
 
     @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
@@ -212,7 +212,7 @@ function read_epw_file(weather_file_path::String)
     catch e
         @error "Error reading the DWD .dat file in $weather_file_path. Please check the file.\n" *
                "The following error occurred: $e"
-        exit()
+        throw(InputError)
     end
 
     # Read fist line with metadata
@@ -277,7 +277,7 @@ function read_epw_file(weather_file_path::String)
         @error "Error reading the EPW weather dataset from $weather_file_path\n" *
                "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
                "Check the file for corruption."
-        exit()
+        throw(InputError)
     end
 
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
