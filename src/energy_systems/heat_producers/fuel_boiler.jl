@@ -74,10 +74,19 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
 
     # fill plr_to_expended_energy lookup table
     for plr in collect(0.0:unit.discretization_step:1.0)
-        # append tuple (expended energy, part load ratio value) to the lookup table
         push!(unit.plr_to_expended_energy, (
             watt_to_wh(unit.power_th) * plr / unit.efficiency(plr), plr
         ))
+    end
+
+    # check if inverse function (as lookup table) is monotonically increasing
+    last_energy = 0.0
+    for (energy, plr) in unit.plr_to_expended_energy
+        if energy > sim_params["epsilon"] && energy <= last_energy
+            @warn "PLR-from-intake-energy function of component $(unit.uac) at PLR $plr " *
+                "is not monotonic"
+        end
+        last_energy = energy
     end
 end
 
