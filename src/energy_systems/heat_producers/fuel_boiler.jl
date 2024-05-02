@@ -26,9 +26,6 @@ mutable struct FuelBoiler <: Component
 
     losses::Float64
 
-    has_connected_transfomer_m_fuel_in::Bool
-    has_connected_transfomer_m_heat_out::Bool
-
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_fuel_in = Symbol(config["m_fuel_in"])
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -73,8 +70,6 @@ mutable struct FuelBoiler <: Component
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
             0.0, # losses
-            false,  # has_connected_transfomer_m_fuel_in
-            false,  # has_connected_transfomer_m_heat_out
         )
     end
 end
@@ -105,19 +100,12 @@ function control(
         nothing,
         unit.output_temperature
     )
-
-    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
-    if sim_params["is_first_timestep"]
-        unit.has_connected_transfomer_m_fuel_in  = check_interface_for_transformer(unit.input_interfaces[unit.m_fuel_in], "input")
-        unit.has_connected_transfomer_m_heat_out = check_interface_for_transformer(unit.output_interfaces[unit.m_heat_out], "output")
-    end
-
 end
 
 """
 Set maximum energies that can be taken in and put out by the unit
 """
-function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
+function set_max_energies!(unit::FuelBoiler, fuel_in::Floathing, heat_out::Floathing)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
@@ -127,8 +115,8 @@ function check_fuel_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_fuel_in"] == true
-        if (unit.has_connected_transfomer_m_fuel_in                          # FB has a transformer in the input chain...
-            && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing  # ...and has not performed potential step yet
+        if (unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer  # FB has direct connection to a transfomer..
+            && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (Inf)
         else
@@ -152,8 +140,8 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        if (unit.has_connected_transfomer_m_heat_out                           # FB has a transformer in the output chain...
-            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing  # ...and has not performed potential step yet
+        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer  # FB has direct connection to a transfomer..
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (-Inf)
         else

@@ -27,8 +27,6 @@ mutable struct HeatPump <: Component
 
     losses::Float64
 
-    has_connected_transfomer_m_el_in::Bool
-
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -59,7 +57,6 @@ mutable struct HeatPump <: Component
             default(config, "input_temperature", nothing),
             0.0,   # cop
             0.0,   # losses
-            false  # has_connected_transfomer_m_el_in
         )
     end
 end
@@ -108,17 +105,11 @@ function control(
             unit.input_temperature
         )
     end
-
-    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
-    if sim_params["is_first_timestep"]
-        unit.has_connected_transfomer_m_el_in = check_interface_for_transformer(unit.input_interfaces[unit.m_el_in], "input")
-    end
-    
 end
 
 function set_max_energies!(
-    unit::HeatPump, el_in::Float64,
-    heat_in::Float64, heat_out::Float64
+    unit::HeatPump, el_in::Floathing,
+    heat_in::Floathing, heat_out::Floathing
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in)
@@ -139,8 +130,8 @@ function check_el_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
-        if (unit.has_connected_transfomer_m_el_in                           # HP has a transformer in the input chain...
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing   # ...and has not performed potential step yet
+        if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
+            && unit.input_interfaces[unit.m_el_in].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (Inf)
         else

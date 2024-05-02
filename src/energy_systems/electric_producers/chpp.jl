@@ -31,10 +31,6 @@ mutable struct CHPP <: Component
 
     losses::Float64
 
-    has_connected_transfomer_m_gas_in::Bool
-    has_connected_transfomer_m_heat_out::Bool
-    has_connected_transfomer_m_el_out::Bool
-
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -63,9 +59,6 @@ mutable struct CHPP <: Component
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
             0.0, # losses
-            false, # has_connected_transfomer_m_gas_in                   
-            false, # has_connected_transfomer_m_heat_out            
-            false, # has_connected_transfomer_m_el_out            
         )
     end
 end
@@ -102,16 +95,9 @@ function control(
         nothing,
         unit.output_temperature,
     )
-
-    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
-    if sim_params["is_first_timestep"]
-        unit.has_connected_transfomer_m_gas_in   = check_interface_for_transformer(unit.input_interfaces[unit.m_gas_in], "input")
-        unit.has_connected_transfomer_m_heat_out = check_interface_for_transformer(unit.output_interfaces[unit.m_heat_out], "output")
-        unit.has_connected_transfomer_m_el_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_el_out], "output")
-    end
 end
 
-function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
+function set_max_energies!(unit::CHPP, gas_in::Floathing, el_out::Floathing, heat_out::Floathing)
     set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
@@ -122,8 +108,8 @@ function check_gas_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_gas_in"] == true
-        if (unit.has_connected_transfomer_m_gas_in                          # CHP has a transformer in the input chain...
-            && unit.input_interfaces[unit.m_gas_in].max_energy === nothing  # ...and has not performed potential step yet
+        if (unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer  # CHP has direct connection to a transfomer..
+            && unit.input_interfaces[unit.m_gas_in].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (Inf)
         else
@@ -147,8 +133,8 @@ function check_el_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_out"] == true
-        if (unit.has_connected_transfomer_m_el_out                           # CHP has a transformer in the output chain...
-            && unit.output_interfaces[unit.m_el_out].max_energy === nothing  # ...and has not performed potential step yet
+        if (unit.output_interfaces[unit.m_el_out].target.sys_function == sf_transformer  # CHP has direct connection to a transfomer..
+            && unit.output_interfaces[unit.m_el_out].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (-Inf)
         else
@@ -172,8 +158,8 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        if (unit.has_connected_transfomer_m_heat_out                           # CHP has a transformer in the output chain...
-            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing  # ...and has not performed potential step yet
+        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer  # CHP has direct connection to a transfomer..
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (-Inf)
         else

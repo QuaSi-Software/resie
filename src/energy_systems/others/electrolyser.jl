@@ -29,10 +29,6 @@ mutable struct Electrolyser <: Component
     losses_heat::Float32
     losses_hydrogen::Float64
 
-    has_connected_transfomer_m_el_in::Bool
-    has_connected_transfomer_m_h2_out::Bool
-    has_connected_transfomer_m_o2_out::Bool
-
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -64,11 +60,7 @@ mutable struct Electrolyser <: Component
             default(config, "min_run_time", 3600),
             default(config, "output_temperature", 55.0),
             0.0,   # Losses heat
-            0.0,   # Losses hydrogen
-            false, # has_connected_transfomer_m_el_in
-            false, # has_connected_transfomer_m_h2_out
-            false, # has_connected_transfomer_m_o2_out
-        
+            0.0,   # Losses hydrogen        
         )
     end
 end
@@ -111,18 +103,11 @@ function control(
         nothing,
         unit.output_temperature
     )
-
-    # these functions have to be called here as in initialize(), the bus has not yet built its connection matrix
-    if sim_params["is_first_timestep"]
-        unit.has_connected_transfomer_m_el_in    = check_interface_for_transformer(unit.input_interfaces[unit.m_el_in], "input")
-        unit.has_connected_transfomer_m_h2_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_h2_out], "output")
-        unit.has_connected_transfomer_m_o2_out   = check_interface_for_transformer(unit.output_interfaces[unit.m_o2_out], "output")
-    end
 end
 
 function set_max_energies!(
-    unit::Electrolyser, el_in::Float64, heat_out::Float64,
-    h2_out::Float64, o2_out::Float64
+    unit::Electrolyser, el_in::Floathing, heat_out::Floathing,
+    h2_out::Floathing, o2_out::Floathing
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
@@ -135,8 +120,8 @@ function check_el_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
-        if (unit.has_connected_transfomer_m_el_in                           # Ely has a transformer in the input chain...
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing   # ...and has not performed potential step yet
+        if (unit.input_interfaces[unit.m_el_in].source.sys_function === EnergySystems.sf_transformer    # Ely has direct connection to a transfomer...
+            && unit.input_interfaces[unit.m_el_in].max_energy === nothing                               # ...and none of them have had their potential step
         )
             return (Inf)
         else
@@ -184,8 +169,8 @@ function check_h2_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_h2_out"] == true
-        if (unit.has_connected_transfomer_m_h2_out                            # Ely has a transformer in the output chain...
-            && unit.output_interfaces[unit.m_h2_out].max_energy === nothing)  # ...and has not performed potential step yet
+        if (unit.output_interfaces[unit.m_h2_out].target.sys_function === EnergySystems.sf_transformer  # Ely has direct connection to a transfomer...
+            && unit.output_interfaces[unit.m_h2_out].max_energy === nothing)                            # ...and none of them have had their potential step
             return (-Inf)
         else
             exchanges = balance_on(
@@ -208,8 +193,8 @@ function check_o2_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_o2_out"] == true
-        if (unit.has_connected_transfomer_m_o2_out                            # Ely has a transformer in the output chain...
-            && unit.output_interfaces[unit.m_o2_out].max_energy === nothing    # ...and has not performed potential step yet
+        if (unit.output_interfaces[unit.m_o2_out].target.sys_function === EnergySystems.sf_transformer  # Ely has direct connection to a transfomer...
+            && unit.output_interfaces[unit.m_o2_out].max_energy === nothing                             # ...and none of them have had their potential step
         )
             return (-Inf)
         else
