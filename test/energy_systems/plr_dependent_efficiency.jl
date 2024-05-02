@@ -6,8 +6,8 @@ using Resie.Profiles
 
 EnergySystems.set_timestep(900)
 
-function test_gas_boiler_demand_driven_plr()
-    components_config = Dict{String,Any}(
+function get_demand_energy_system_config()
+    return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -32,11 +32,74 @@ function test_gas_boiler_demand_driven_plr()
                 "name" => "demand_driven",
             ),
             "power_th" => 4000,
-            "is_plr_dependant" => true,
-            "max_thermal_efficiency" => 1.0,
+            "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "nr_discretization_steps" => 20,
         ),
     )
+end
 
+function test_efficiency_parsing()
+    efficiency = EnergySystems.parse_efficiency_function("const:0.314")
+    @test efficiency(0.0) ≈ 0.314
+    @test efficiency(0.5) ≈ 0.314
+    @test efficiency(1.0) ≈ 0.314
+
+    efficiency = EnergySystems.parse_efficiency_function("poly:0.5,0.314")
+    @test efficiency(0.0) ≈ 0.314
+    @test efficiency(0.5) ≈ 0.564
+    @test efficiency(1.0) ≈ 0.814
+
+    efficiency = EnergySystems.parse_efficiency_function("poly:-0.9117,1.8795,0.0322")
+    @test efficiency(0.0) ≈ 0.0322
+    @test efficiency(0.5) ≈ 0.744025
+    @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("pwlin:0.5,0.9,1.0")
+    @test efficiency(0.0) ≈ 0.5
+    @test efficiency(0.25) ≈ 0.7
+    @test efficiency(0.5) ≈ 0.9
+    @test efficiency(0.8) ≈ 0.96
+    @test efficiency(1.0) ≈ 1.0
+end
+
+@testset "test_efficiency_parsing" begin
+    test_efficiency_parsing()
+end
+
+function test_inverse_efficiency()
+    components_config = get_demand_energy_system_config()
+    components_config["TST_GB_01"]["nr_discretization_steps"] = 10
+    eps = 1e-9
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => eps
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    boiler = components["TST_GB_01"]
+
+    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
+    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
+    plr = plr_from_expended_energy(boiler, 450.0)
+    @test plr > 0.09496485 - eps && plr < 0.09496485 + eps
+
+    boiler.discretization_step = 1.0 / 20
+    boiler.plr_to_expended_energy = []
+    EnergySystems.initialise!(boiler, simulation_parameters)
+
+    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
+    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
+    plr = plr_from_expended_energy(boiler, 450.0)
+    @test plr > 0.08302885902274304 - eps && plr < 0.08302885902274304 + eps
+end
+
+@testset "test_inverse_efficiency" begin
+    test_inverse_efficiency()
+end
+
+function test_gas_boiler_demand_driven_plrd()
+    components_config = get_demand_energy_system_config()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
@@ -99,7 +162,11 @@ function test_gas_boiler_demand_driven_plr()
     @test grid.output_interfaces[grid.medium].balance ≈ 0
 end
 
-function test_gas_boiler_supply_driven_plr()
+@testset "test_gas_boiler_demand_driven_plrd" begin
+    test_gas_boiler_demand_driven_plrd()
+end
+
+function test_gas_boiler_supply_driven_plrd()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "BoundedSink",
@@ -128,8 +195,8 @@ function test_gas_boiler_supply_driven_plr()
                 "name" => "supply_driven",
             ),
             "power_th" => 4000,
-            "is_plr_dependant" => true,
-            "max_thermal_efficiency" => 1.0,
+            "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "nr_discretization_steps" => 20,
         ),
     )
 
@@ -204,7 +271,6 @@ function test_gas_boiler_supply_driven_plr()
     @test demand.input_interfaces[demand.medium].balance ≈ 0
 end
 
-@testset "test_gas_boiler_demand_driven_plr" begin
-    test_gas_boiler_demand_driven_plr()
-    test_gas_boiler_supply_driven_plr()
+@testset "test_gas_boiler_demand_driven_plrd" begin
+    test_gas_boiler_supply_driven_plrd()
 end
