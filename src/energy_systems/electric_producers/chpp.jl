@@ -19,11 +19,11 @@ mutable struct CHPP <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    m_gas_in::Symbol
+    m_fuel_in::Symbol
     m_heat_out::Symbol
     m_el_out::Symbol
 
-    power_gas::Float64
+    power_fuel::Float64
     electricity_fraction::Float64
     min_power_fraction::Float64
     min_run_time::UInt
@@ -32,10 +32,10 @@ mutable struct CHPP <: Component
     losses::Float64
 
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
+        m_fuel_in = Symbol(default(config, "m_fuel_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
-        register_media([m_gas_in, m_heat_out, m_el_out])
+        register_media([m_fuel_in, m_heat_out, m_el_out])
 
         return new(
             uac, # uac
@@ -44,16 +44,16 @@ mutable struct CHPP <: Component
             ),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_gas_in => nothing
+                m_fuel_in => nothing
             ),
             InterfaceMap( # output_interfaces
                 m_heat_out => nothing,
                 m_el_out => nothing
             ),
-            m_gas_in,
+            m_fuel_in,
             m_heat_out,
             m_el_out,
-            config["power_gas"], # power_gas
+            config["power_fuel"], # power_fuel
             default(config, "electricity_fraction", 0.4),
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 1800),
@@ -65,9 +65,9 @@ end
 
 function initialise!(unit::CHPP, sim_params::Dict{String,Any})
     set_storage_transfer!(
-        unit.input_interfaces[unit.m_gas_in],
+        unit.input_interfaces[unit.m_fuel_in],
         default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_gas_in), true
+            unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
         )
     )
     set_storage_transfer!(
@@ -97,33 +97,33 @@ function control(
     )
 end
 
-function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
+function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
 
-function check_gas_in(
+function check_fuel_in(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_gas_in"] == true
+    if unit.controller.parameter["consider_m_fuel_in"] == true
         if (
-            unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
+            unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
             &&
-            unit.input_interfaces[unit.m_gas_in].max_energy === nothing
+            unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
         )
             return (Inf)
         else
             exchanges = balance_on(
-                unit.input_interfaces[unit.m_gas_in],
-                unit.input_interfaces[unit.m_gas_in].source
+                unit.input_interfaces[unit.m_fuel_in],
+                unit.input_interfaces[unit.m_fuel_in].source
             )
-            potential_energy_gas = balance(exchanges) + energy_potential(exchanges)
-            if potential_energy_gas <= sim_params["epsilon"]
+            potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
+            if potential_energy_fuel <= sim_params["epsilon"]
                 return (nothing)
             end
-            return (potential_energy_gas)
+            return (potential_energy_fuel)
         end
     else
         return (Inf)
@@ -173,13 +173,13 @@ function calculate_energies(
     sim_params::Dict{String,Any},
     potentials::Vector{Float64}
 )
-    potential_energy_gas_in = potentials[1]
+    potential_energy_fuel_in = potentials[1]
     potential_energy_el_out = potentials[2]
     potential_energy_heat_out = potentials[3]
 
-    max_produce_heat = watt_to_wh(unit.power_gas * (1.0 - unit.electricity_fraction))
-    max_produce_el = watt_to_wh(unit.power_gas * unit.electricity_fraction)
-    max_consume_gas = max_produce_heat + max_produce_el
+    max_produce_heat = watt_to_wh(unit.power_fuel * (1.0 - unit.electricity_fraction))
+    max_produce_el = watt_to_wh(unit.power_fuel * unit.electricity_fraction)
+    max_consume_fuel = max_produce_heat + max_produce_el
 
     # get usage fraction of external profile (normalized from 0 to 1)
     usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
@@ -192,7 +192,7 @@ function calculate_energies(
     if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
         usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
         usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
-        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
 
     elseif unit.controller.strategy == "storage_driven"
         return (false, nothing, nothing, nothing)
@@ -200,12 +200,12 @@ function calculate_energies(
     elseif unit.controller.strategy == "supply_driven"
         usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
         usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
-        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
 
     elseif unit.controller.strategy == "demand_driven"
         usage_fraction_heat_out = -(potential_energy_heat_out / max_produce_heat)
         usage_fraction_el_out = -(potential_energy_el_out / max_produce_el)
-        usage_fraction_gas_in = +(potential_energy_gas_in / max_consume_gas)
+        usage_fraction_fuel_in = +(potential_energy_fuel_in / max_consume_fuel)
     end
 
     # limit actual usage by limits of inputs, outputs and profile
@@ -213,7 +213,7 @@ function calculate_energies(
         1.0,
         usage_fraction_heat_out,
         usage_fraction_el_out,
-        usage_fraction_gas_in,
+        usage_fraction_fuel_in,
         usage_fraction_operation_profile
     )
 
@@ -223,7 +223,7 @@ function calculate_energies(
 
     return (
         true,
-        max_consume_gas * usage_fraction,
+        max_consume_fuel * usage_fraction,
         max_produce_el * usage_fraction,
         max_produce_heat * usage_fraction
     )
@@ -233,8 +233,8 @@ function potential(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    potential_energy_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing
+    potential_energy_fuel_in = check_fuel_in(unit, sim_params)
+    if potential_energy_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
@@ -254,7 +254,7 @@ function potential(
     energies = calculate_energies(
         unit, sim_params,
         [
-            potential_energy_gas_in,
+            potential_energy_fuel_in,
             potential_energy_el_out,
             potential_energy_heat_out,
         ]
@@ -268,8 +268,8 @@ function potential(
 end
 
 function process(unit::CHPP, sim_params::Dict{String,Any})
-    potential_energy_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing
+    potential_energy_fuel_in = check_fuel_in(unit, sim_params)
+    if potential_energy_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
@@ -289,14 +289,14 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     energies = calculate_energies(
         unit, sim_params,
         [
-            potential_energy_gas_in,
+            potential_energy_fuel_in,
             potential_energy_el_out,
             potential_energy_heat_out,
         ]
     )
 
     if energies[1]
-        sub!(unit.input_interfaces[unit.m_gas_in], energies[2])
+        sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])
         add!(unit.output_interfaces[unit.m_el_out], energies[3])
         add!(unit.output_interfaces[unit.m_heat_out], energies[4])
     else
@@ -305,7 +305,7 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::CHPP)::Vector{String}
-    return [string(unit.m_gas_in)*" IN", 
+    return [string(unit.m_fuel_in)*" IN",
             string(unit.m_el_out)*" OUT",
             string(unit.m_heat_out)*" OUT",
             "Losses"]
