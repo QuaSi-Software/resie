@@ -65,9 +65,15 @@ mutable struct CHPP <: Component
             config["power"],
             Symbol(default(config, "design_power_medium", m_el_out)),
             default(config, "min_power_fraction", 0.2),
-            parse_efficiency_function(default(config, "efficiency_fuel_in", "const:0.3")),
-            parse_efficiency_function(default(config, "efficiency_el_out", "const:1.0")),
-            parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.333333")),
+            parse_efficiency_function(default(config,
+                "efficiency_fuel_in",
+                "pwlin:100,5.89,4,3.23,2.86,2.70,2.63,2.63,2.63"
+            )),
+            parse_efficiency_function(default(config,"efficiency_el_out", "const:1.0")),
+            parse_efficiency_function(default(config,
+                "efficiency_heat_out",
+                "pwlin:80,4.06,2.52,1.87,1.57,1.41,1.32,1.29,1.29"
+            )),
             [], # fuel_in_to_plr
             [], # el_out_to_plr
             [], # heat_out_to_plr
