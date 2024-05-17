@@ -107,18 +107,14 @@ function initialise!(unit::CHPP, sim_params::Dict{String,Any})
 
     # fill energy_to_plr lookup tables
     media_def = (
-        (true, unit.efficiency_fuel_in, unit.fuel_in_to_plr),
-        (false, unit.efficiency_el_out, unit.el_out_to_plr),
-        (false, unit.efficiency_heat_out, unit.heat_out_to_plr)
+        (unit.efficiency_fuel_in, unit.fuel_in_to_plr),
+        (unit.efficiency_el_out, unit.el_out_to_plr),
+        (unit.efficiency_heat_out, unit.heat_out_to_plr)
     )
 
-    for (is_input, eff_func, lookup_table) in media_def
+    for (eff_func, lookup_table) in media_def
         for plr in collect(0.0:unit.discretization_step:1.0)
-            if is_input
-                push!(lookup_table, (watt_to_wh(unit.power) * plr / eff_func(plr), plr))
-            else
-                push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
-            end
+            push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
         end
 
         # check if inverse function (as lookup table) is monotonically increasing
@@ -344,7 +340,7 @@ function calculate_energies(
     energy_at_max = watt_to_wh(unit.power)
     available_fuel_in = min(
         available_fuel_in,
-        energy_at_max / unit.efficiency_fuel_in(1.0)
+        energy_at_max * unit.efficiency_fuel_in(1.0)
     )
     available_el_out = min(
         available_el_out,
@@ -367,7 +363,7 @@ function calculate_energies(
 
     return (
         true,
-        used_plr * energy_at_max / unit.efficiency_fuel_in(used_plr),
+        used_plr * energy_at_max * unit.efficiency_fuel_in(used_plr),
         used_plr * energy_at_max * unit.efficiency_el_out(used_plr),
         used_plr * energy_at_max * unit.efficiency_heat_out(used_plr),
     )

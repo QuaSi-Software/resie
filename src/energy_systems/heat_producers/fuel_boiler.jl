@@ -52,7 +52,7 @@ mutable struct FuelBoiler <: Component
             config["power"],
             Symbol(default(config, "design_power_medium", m_heat_out)),
             default(config, "min_power_fraction", 0.1),
-            parse_efficiency_function(default(config, "efficiency_fuel_in", "const:0.9")),
+            parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.11")),
             parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
             [], # fuel_in_to_plr
             [], # heat_out_to_plr
@@ -80,17 +80,13 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
 
     # fill energy_to_plr lookup tables
     media_def = (
-        (true, unit.efficiency_fuel_in, unit.fuel_in_to_plr),
-        (false, unit.efficiency_heat_out, unit.heat_out_to_plr)
+        (unit.efficiency_fuel_in, unit.fuel_in_to_plr),
+        (unit.efficiency_heat_out, unit.heat_out_to_plr)
     )
 
-    for (is_input, eff_func, lookup_table) in media_def
+    for (eff_func, lookup_table) in media_def
         for plr in collect(0.0:unit.discretization_step:1.0)
-            if is_input
-                push!(lookup_table, (watt_to_wh(unit.power) * plr / eff_func(plr), plr))
-            else
-                push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
-            end
+            push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
         end
 
         # check if inverse function (as lookup table) is monotonically increasing
@@ -290,7 +286,7 @@ function calculate_energies(
     energy_at_max = watt_to_wh(unit.power)
     available_fuel_in = min(
         available_fuel_in,
-        energy_at_max / unit.efficiency_fuel_in(1.0)
+        energy_at_max * unit.efficiency_fuel_in(1.0)
     )
     available_heat_out = min(
         available_heat_out,
@@ -308,7 +304,7 @@ function calculate_energies(
 
     return (
         true,
-        used_plr * energy_at_max / unit.efficiency_fuel_in(used_plr),
+        used_plr * energy_at_max * unit.efficiency_fuel_in(used_plr),
         used_plr * energy_at_max * unit.efficiency_heat_out(used_plr),
     )
 end

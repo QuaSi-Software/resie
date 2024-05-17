@@ -32,7 +32,9 @@ function get_demand_energy_system_config()
                 "name" => "demand_driven",
             ),
             "power" => 4000,
-            "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
+            "design_power_medium" => "m_c_g_natgas",
+            "efficiency_fuel_in" => "const:1.0",
+            "efficiency_heat_out" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
         ),
     )
@@ -82,17 +84,22 @@ function test_inverse_efficiency()
     @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 0.0)) < eps
     @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 1000.0) - 1.0) < eps
     plr = plr_from_energy(boiler, boiler.m_fuel_in, 450.0)
-    @test plr > 0.09496485 - eps && plr < 0.09496485 + eps
+    @test plr > 0.45 - eps && plr < 0.45 + eps
+
+    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 0.0)) < eps
+    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, boiler.m_heat_out, 450.0)
+    @test plr > 0.5614073352582631 - eps && plr < 0.5614073352582631 + eps
 
     boiler.discretization_step = 1.0 / 20
     boiler.fuel_in_to_plr = []
     boiler.heat_out_to_plr = []
     EnergySystems.initialise!(boiler, simulation_parameters)
 
-    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 0.0)) < eps
-    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, boiler.m_fuel_in, 450.0)
-    @test plr > 0.08302885902274304 - eps && plr < 0.08302885902274304 + eps
+    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 0.0)) < eps
+    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, boiler.m_heat_out, 450.0)
+    @test plr > 0.561969105640274 - eps && plr < 0.561969105640274 + eps
 end
 
 @testset "test_inverse_efficiency" begin
@@ -145,7 +152,7 @@ function test_gas_boiler_demand_driven_plrd()
     end
 
     demand.constant_demand = 2000
-    expected_efficiency = 0.7440249999999999
+    expected_efficiency = 0.832290069922532027
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(gasboiler, components, simulation_parameters)
@@ -155,9 +162,9 @@ function test_gas_boiler_demand_driven_plrd()
     @test demand.input_interfaces[demand.medium].balance ≈ -500
 
     EnergySystems.process(gasboiler, simulation_parameters)
-    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
+    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ -0.0071177438881591115
     @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -500 / expected_efficiency
-    @test demand.input_interfaces[demand.medium].balance ≈ 0
+    @test demand.input_interfaces[demand.medium].balance ≈ -0.0071177438881591115
 
     EnergySystems.process(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
@@ -248,7 +255,7 @@ function test_gas_boiler_supply_driven_plrd()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 0.744025
+    expected_efficiency = 0.68375260628542269248721
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 500 / expected_efficiency
@@ -263,9 +270,9 @@ function test_gas_boiler_supply_driven_plrd()
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
 
     EnergySystems.process(gasboiler, simulation_parameters)
-    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 500
-    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ 0
-    @test demand.input_interfaces[demand.medium].balance ≈ 500
+    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 776.5061852364258
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -0.15043676852451426
+    @test demand.input_interfaces[demand.medium].balance ≈ 776.5061852364258
 
     EnergySystems.process(demand, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
@@ -314,7 +321,7 @@ function test_CHPP_el_eff_plrd()
             "power" => 5000,
             "design_power_medium" => "m_e_ac_230v",
             "min_power_fraction" => 0.1,
-            "efficiency_fuel_in" => "const:0.4",
+            "efficiency_fuel_in" => "const:2.5",
             "efficiency_heat_out" => "pwlin:0.8,0.9,1.0,0.8",
             "efficiency_el_out" => "const:1.0",
             "nr_discretization_steps" => 25
