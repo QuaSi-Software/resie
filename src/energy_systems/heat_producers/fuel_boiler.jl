@@ -16,12 +16,15 @@ mutable struct FuelBoiler <: Component
     m_fuel_in::Symbol
     m_heat_out::Symbol
 
-    power_th::Float64
+    power::Float64
+    design_power_medium::Symbol
     min_power_fraction::Float64
-    efficiency::Function
+    efficiency_fuel_in::Function
+    efficiency_heat_out::Function
+    # lookup tables for conversion of energy values to PLR
+    fuel_in_to_plr::Vector{Tuple{Float64,Float64}}
+    heat_out_to_plr::Vector{Tuple{Float64,Float64}}
     discretization_step::Float64
-    # lookup table for conversion of part load ratio to expended energy
-    plr_to_expended_energy::Vector{Tuple{Float64,Float64}}
 
     min_run_time::UInt
     output_temperature::Temperature
@@ -46,11 +49,14 @@ mutable struct FuelBoiler <: Component
             ),
             m_fuel_in,
             m_heat_out,
-            config["power_th"],
+            config["power"],
+            Symbol(default(config, "design_power_medium", m_heat_out)),
             default(config, "min_power_fraction", 0.1),
-            parse_efficiency_function(default(config, "efficiency", "const:0.9")),
+            parse_efficiency_function(default(config, "efficiency_fuel_in", "const:0.9")),
+            parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
+            [], # fuel_in_to_plr
+            [], # heat_out_to_plr
             1.0 / default(config, "nr_discretization_steps", 30),
-            [], # plr_to_expended_energy
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
             0.0, # losses
@@ -72,21 +78,30 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
         )
     )
 
-    # fill plr_to_expended_energy lookup table
-    for plr in collect(0.0:unit.discretization_step:1.0)
-        push!(unit.plr_to_expended_energy, (
-            watt_to_wh(unit.power_th) * plr / unit.efficiency(plr), plr
-        ))
-    end
+    # fill energy_to_plr lookup tables
+    media_def = (
+        (true, unit.efficiency_fuel_in, unit.fuel_in_to_plr),
+        (false, unit.efficiency_heat_out, unit.heat_out_to_plr)
+    )
 
-    # check if inverse function (as lookup table) is monotonically increasing
-    last_energy = 0.0
-    for (energy, plr) in unit.plr_to_expended_energy
-        if energy > sim_params["epsilon"] && energy <= last_energy
-            @warn "PLR-from-intake-energy function of component $(unit.uac) at PLR $plr " *
-                "is not monotonic"
+    for (is_input, eff_func, lookup_table) in media_def
+        for plr in collect(0.0:unit.discretization_step:1.0)
+            if is_input
+                push!(lookup_table, (watt_to_wh(unit.power) * plr / eff_func(plr), plr))
+            else
+                push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
+            end
         end
-        last_energy = energy
+
+        # check if inverse function (as lookup table) is monotonically increasing
+        last_energy = 0.0
+        for (energy, plr) in lookup_table
+            if energy > sim_params["epsilon"] && energy <= last_energy
+                @warn "PLR-from-energy function of component $(unit.uac) at PLR $plr " *
+                    "is not monotonic"
+            end
+            last_energy = energy
+        end
     end
 end
 
@@ -176,67 +191,72 @@ function check_heat_out(
 end
 
 """
-    plr_from_expended_energy(unit, intake_fuel)
+    plr_from_energy(unit, energy_value)
 
-Calculate part load ratio as inverse function from the intake fuel energy.
+Calculate part load ratio as inverse function from the given energy value.
+
+The efficiency for the FuelBoiler is defined as relative to one input or output being linear
+in respect to the PLR, while the other energy values must be calculated as the inverse of
+the efficiency.
 
 As the efficiency function can be a variety of functions and is not necessarily (easily)
 invertable, the inverse is calculated numerically at initialisation as a piece-wise linear
 function from a customizable number of support values from an even distribution of a PLR
-from 0.0 to 1.0. When calling plr_from_expended_energy this approximated function is
-evaluated for the given energy value and a linear interpolation between the two surrounding
-support values is performed to calculate the corresponding PLR.
+from 0.0 to 1.0. When calling plr_from_energy this approximated function is evaluated for
+the given energy value and a linear interpolation between the two surrounding support values
+is performed to calculate the corresponding PLR.
 
 # Arguments
-- `unit::FuelBoiler`: The boiler
-- `intake_fuel::Float64`: The amount of fuel energy taken in
+- `unit::FuelBoiler`: The fuel boiler
+- `medium::Symbol`: The medium to which the energy value corresponds. Should be one of the
+    media defined in the input of the fuel boiler.
+- `energy_value::Float64`: The energy value
 # Returns
-- `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the fuel intake
+- `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
 """
-function plr_from_expended_energy(
-    unit::FuelBoiler,
-    intake_fuel::Float64
-)::Float64
-    energy_at_max = last(unit.plr_to_expended_energy)[1]
+function plr_from_energy(unit::FuelBoiler, medium::Symbol, energy_value::Float64)::Float64
+    # shortcut if the given medium is the design power medium as it is linear to PLR
+    if medium === unit.design_power_medium
+        return energy_value / watt_to_wh(unit.power)
+    end
 
-    if intake_fuel <= 0.0
+    lookup_table = unit.heat_out_to_plr
+    if medium == unit.m_fuel_in
+        lookup_table = unit.fuel_in_to_plr
+    end
+    energy_at_max = last(lookup_table)[1]
+
+    if energy_value <= 0.0
         return 0.0
-    elseif intake_fuel >= energy_at_max
+    elseif energy_value >= energy_at_max
         return 1.0
     end
 
     nr_iter = 0
-    candidate_idx = floor(
-        Int64,
-        length(unit.plr_to_expended_energy) * intake_fuel / energy_at_max
-    )
+    candidate_idx = floor(Int64, length(lookup_table) * energy_value / energy_at_max)
 
     while (
-        nr_iter < length(unit.plr_to_expended_energy)
-        && candidate_idx < length(unit.plr_to_expended_energy)
+        nr_iter < length(lookup_table)
+        && candidate_idx < length(lookup_table)
         && candidate_idx >= 1
     )
-        (energy_lb, plr_lb) = unit.plr_to_expended_energy[candidate_idx]
-        (energy_ub, plr_ub) = unit.plr_to_expended_energy[candidate_idx+1]
-        if energy_lb <= intake_fuel && intake_fuel < energy_ub
+        (energy_lb, plr_lb) = lookup_table[candidate_idx]
+        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
+        if energy_lb <= energy_value && energy_value < energy_ub
             return plr_lb + (plr_ub - plr_lb) *
-                (intake_fuel - energy_lb) / (energy_ub - energy_lb)
-        elseif intake_fuel < energy_lb
+                (energy_value - energy_lb) / (energy_ub - energy_lb)
+        elseif energy_value < energy_lb
             candidate_idx -= 1
-        elseif intake_fuel >= energy_ub
+        elseif energy_value >= energy_ub
             candidate_idx += 1
         end
 
         nr_iter += 1
     end
 
-    @warn "The intake_fuel value in component $(unit.uac) is not within the range of the "
-        "lookup table."
+    @warn "The energy_value of medium $(medium) in component $(unit.uac) is not within " *
+        "the range of the lookup table."
     return 0.0
-end
-
-function plr_from_produced_energy(unit::FuelBoiler, produced_heat::Float64)::Float64
-    return produced_heat / watt_to_wh(unit.power_th)
 end
 
 function calculate_energies(
@@ -264,16 +284,22 @@ function calculate_energies(
     # in the following we want to work with positive values as it is easier
     available_heat_out = abs(available_heat_out)
 
-    # limit input/output to design power
+    # limit input/output to design power. for the medium designated as the design power
+    # medium the efficiency at PLR of 1.0 is 1.0 while the others take efficiency into
+    # account
+    energy_at_max = watt_to_wh(unit.power)
     available_fuel_in = min(
         available_fuel_in,
-        watt_to_wh(unit.power_th) / unit.efficiency(1.0)
+        energy_at_max / unit.efficiency_fuel_in(1.0)
     )
-    available_heat_out = min(available_heat_out, watt_to_wh(unit.power_th))
+    available_heat_out = min(
+        available_heat_out,
+        energy_at_max * unit.efficiency_heat_out(1.0)
+    )
 
-    plr_from_demand = plr_from_produced_energy(unit, available_heat_out)
-    plr_from_supply = plr_from_expended_energy(unit, available_fuel_in)
-    used_plr = min(plr_from_demand, plr_from_supply, max_plr, 1.0)
+    plr_from_fuel_in = plr_from_energy(unit, unit.m_fuel_in, available_fuel_in)
+    plr_from_heat_out = plr_from_energy(unit, unit.m_heat_out, available_heat_out)
+    used_plr = min(plr_from_fuel_in, plr_from_heat_out, max_plr, 1.0)
 
     # check minimum power fraction limit
     if used_plr < unit.min_power_fraction
@@ -282,8 +308,8 @@ function calculate_energies(
 
     return (
         true,
-        used_plr * watt_to_wh(unit.power_th) / unit.efficiency(used_plr),
-        used_plr * watt_to_wh(unit.power_th),
+        used_plr * energy_at_max / unit.efficiency_fuel_in(used_plr),
+        used_plr * energy_at_max * unit.efficiency_heat_out(used_plr),
     )
 end
 
@@ -331,4 +357,4 @@ function output_value(unit::FuelBoiler, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export FuelBoiler, plr_from_expended_energy
+export FuelBoiler, plr_from_energy
