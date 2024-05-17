@@ -172,7 +172,11 @@
                 "high_threshold": 0.9,
                 "low_threshold": 0.2
             },
-            "power_gas": 12500
+            "power": 12500,
+            "design_power_medium": "m_c_g_natgas",
+            "efficiency_fuel_in": "const:1.0",
+            "efficiency_el_out": "const:0.4",
+            "efficiency_heat_out": "const:0.6"
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",

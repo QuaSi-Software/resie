@@ -34,8 +34,8 @@ function test_primary_producer_can_load_storage()
                 "high_threshold" => 0.5,
                 "low_threshold" => 0.1
             ),
-            "power_th" => 10000,
-            "efficiency" => "const:1.0",
+            "power" => 10000,
+            "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_GBO_02" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -47,8 +47,8 @@ function test_primary_producer_can_load_storage()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_th" => 40000,
-            "efficiency" => "const:1.0",
+            "power" => 40000,
+            "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",

@@ -31,8 +31,8 @@ function get_demand_energy_system_config()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power_th" => 4000,
-            "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "power" => 4000,
+            "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
         ),
     )
@@ -79,18 +79,19 @@ function test_inverse_efficiency()
     components = Resie.load_components(components_config, simulation_parameters)
     boiler = components["TST_GB_01"]
 
-    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
-    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
-    plr = plr_from_expended_energy(boiler, 450.0)
+    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 0.0)) < eps
+    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, boiler.m_fuel_in, 450.0)
     @test plr > 0.09496485 - eps && plr < 0.09496485 + eps
 
     boiler.discretization_step = 1.0 / 20
-    boiler.plr_to_expended_energy = []
+    boiler.fuel_in_to_plr = []
+    boiler.heat_out_to_plr = []
     EnergySystems.initialise!(boiler, simulation_parameters)
 
-    @test abs(plr_from_expended_energy(boiler, 0.0)) < eps
-    @test abs(plr_from_expended_energy(boiler, 1000.0) - 1.0) < eps
-    plr = plr_from_expended_energy(boiler, 450.0)
+    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 0.0)) < eps
+    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, boiler.m_fuel_in, 450.0)
     @test plr > 0.08302885902274304 - eps && plr < 0.08302885902274304 + eps
 end
 
@@ -194,8 +195,8 @@ function test_gas_boiler_supply_driven_plrd()
             "strategy" => Dict{String,Any}(
                 "name" => "supply_driven",
             ),
-            "power_th" => 4000,
-            "efficiency" => "poly:-0.9117,1.8795,0.0322",
+            "power" => 4000,
+            "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
         ),
     )

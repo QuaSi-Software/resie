@@ -41,8 +41,8 @@ function test_gasboiler_demand_driven_with_bus()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power_th" => 12000,
-            "efficiency" => "const:1.0",
+            "power" => 12000,
+            "efficiency_fuel_in" => "const:1.0",
         ),
     )
 
@@ -251,8 +251,8 @@ function test_gasboiler_demand_driven_without_bus()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power_th" => 12000,
-            "efficiency" => "const:1.0",
+            "power" => 12000,
+            "efficiency_fuel_in" => "const:1.0",
         ),
     )
 
