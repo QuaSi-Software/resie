@@ -319,7 +319,7 @@ function test_CHPP_el_eff_plrd()
                 "TST_GRO_01",
             ],
             "power" => 5000,
-            "design_power_medium" => "m_e_ac_230v",
+            "design_power_medium" => "el_out",
             "min_power_fraction" => 0.1,
             "efficiency_fuel_in" => "const:2.5",
             "efficiency_heat_out" => "pwlin:0.8,0.9,1.0,0.8",

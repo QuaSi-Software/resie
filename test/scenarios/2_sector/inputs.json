@@ -173,7 +173,7 @@
                 "low_threshold": 0.2
             },
             "power": 12500,
-            "design_power_medium": "m_c_g_natgas",
+            "design_power_medium": "fuel_in",
             "efficiency_fuel_in": "const:1.0",
             "efficiency_el_out": "const:0.4",
             "efficiency_heat_out": "const:0.6"

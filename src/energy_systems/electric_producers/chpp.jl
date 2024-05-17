@@ -26,13 +26,12 @@ mutable struct CHPP <: Component
     power::Float64
     design_power_medium::Symbol
     min_power_fraction::Float64
-    efficiency_fuel_in::Function
-    efficiency_el_out::Function
-    efficiency_heat_out::Function
+    # efficiency functions by input/output
+    efficiencies::Dict{Symbol,Function}
+    # list of names of input and output interfaces, used internally only
+    interface_list::Tuple{Symbol,Symbol,Symbol}
     # lookup tables for conversion of energy values to PLR
-    fuel_in_to_plr::Vector{Tuple{Float64,Float64}}
-    el_out_to_plr::Vector{Tuple{Float64,Float64}}
-    heat_out_to_plr::Vector{Tuple{Float64,Float64}}
+    energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
     min_run_time::UInt
@@ -45,6 +44,34 @@ mutable struct CHPP <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
         register_media([m_fuel_in, m_heat_out, m_el_out])
+        interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
+
+        design_power_medium = Symbol(
+            replace(
+                default(config, "design_power_medium", "el_out"),
+                "m_" => ""
+            )
+        )
+
+        efficiencies = Dict{Symbol,Function}(
+            Symbol("fuel_in") => parse_efficiency_function(default(config,
+                "efficiency_fuel_in",
+                "pwlin:100,5.89,4,3.23,2.86,2.70,2.63,2.63,2.63"
+            )),
+            Symbol("el_out") => parse_efficiency_function(default(config,
+                "efficiency_el_out", "const:1.0"
+            )),
+            Symbol("heat_out") => parse_efficiency_function(default(config,
+                "efficiency_heat_out",
+                "pwlin:80,4.06,2.52,1.87,1.57,1.41,1.32,1.29,1.29"
+            )),
+        )
+
+        energy_to_plr = Dict{Symbol,Vector{Tuple{Float64,Float64}}}(
+            Symbol("fuel_in") => [],
+            Symbol("el_out") => [],
+            Symbol("heat_out") => []
+        )
 
         return new(
             uac, # uac
@@ -63,20 +90,11 @@ mutable struct CHPP <: Component
             m_heat_out,
             m_el_out,
             config["power"],
-            Symbol(default(config, "design_power_medium", m_el_out)),
+            design_power_medium,
             default(config, "min_power_fraction", 0.2),
-            parse_efficiency_function(default(config,
-                "efficiency_fuel_in",
-                "pwlin:100,5.89,4,3.23,2.86,2.70,2.63,2.63,2.63"
-            )),
-            parse_efficiency_function(default(config,"efficiency_el_out", "const:1.0")),
-            parse_efficiency_function(default(config,
-                "efficiency_heat_out",
-                "pwlin:80,4.06,2.52,1.87,1.57,1.41,1.32,1.29,1.29"
-            )),
-            [], # fuel_in_to_plr
-            [], # el_out_to_plr
-            [], # heat_out_to_plr
+            efficiencies,
+            interface_list,
+            energy_to_plr,
             1.0 / default(config, "nr_discretization_steps", 30),
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
@@ -105,16 +123,13 @@ function initialise!(unit::CHPP, sim_params::Dict{String,Any})
         )
     )
 
-    # fill energy_to_plr lookup tables
-    media_def = (
-        (unit.efficiency_fuel_in, unit.fuel_in_to_plr),
-        (unit.efficiency_el_out, unit.el_out_to_plr),
-        (unit.efficiency_heat_out, unit.heat_out_to_plr)
-    )
-
-    for (eff_func, lookup_table) in media_def
+    for interface in unit.interface_list
+        lookup_table = unit.energy_to_plr[interface]
         for plr in collect(0.0:unit.discretization_step:1.0)
-            push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
+            push!(lookup_table, (
+                watt_to_wh(unit.power) * plr * unit.efficiencies[interface](plr),
+                plr
+            ))
         end
 
         # check if inverse function (as lookup table) is monotonically increasing
@@ -262,12 +277,7 @@ function plr_from_energy(unit::CHPP, medium::Symbol, energy_value::Float64)::Flo
         return energy_value / watt_to_wh(unit.power)
     end
 
-    lookup_table = unit.el_out_to_plr
-    if medium == unit.m_fuel_in
-        lookup_table = unit.fuel_in_to_plr
-    elseif medium == unit.m_heat_out
-        lookup_table = unit.heat_out_to_plr
-    end
+    lookup_table = unit.energy_to_plr[medium]
     energy_at_max = last(lookup_table)[1]
 
     if energy_value <= 0.0
@@ -307,6 +317,10 @@ function calculate_energies(
     unit::CHPP,
     sim_params::Dict{String,Any},
 )::Tuple{Bool, Floathing, Floathing, Floathing}
+    i_fuel_in = Symbol("fuel_in")
+    i_el_out = Symbol("el_out")
+    i_heat_out = Symbol("heat_out")
+
     # get max PLR of external profile, if any
     max_plr = (
         unit.controller.parameter["operation_profile_path"] === nothing
@@ -340,20 +354,20 @@ function calculate_energies(
     energy_at_max = watt_to_wh(unit.power)
     available_fuel_in = min(
         available_fuel_in,
-        energy_at_max * unit.efficiency_fuel_in(1.0)
+        energy_at_max * unit.efficiencies[i_fuel_in](1.0)
     )
     available_el_out = min(
         available_el_out,
-        energy_at_max * unit.efficiency_el_out(1.0)
+        energy_at_max * unit.efficiencies[i_el_out](1.0)
     )
     available_heat_out = min(
         available_heat_out,
-        energy_at_max * unit.efficiency_heat_out(1.0)
+        energy_at_max * unit.efficiencies[i_heat_out](1.0)
     )
 
-    plr_from_fuel_in = plr_from_energy(unit, unit.m_fuel_in, available_fuel_in)
-    plr_from_el_out = plr_from_energy(unit, unit.m_el_out, available_el_out)
-    plr_from_heat_out = plr_from_energy(unit, unit.m_heat_out, available_heat_out)
+    plr_from_fuel_in = plr_from_energy(unit, i_fuel_in, available_fuel_in)
+    plr_from_el_out = plr_from_energy(unit, i_el_out, available_el_out)
+    plr_from_heat_out = plr_from_energy(unit, i_heat_out, available_heat_out)
     used_plr = min(plr_from_fuel_in, plr_from_el_out, plr_from_heat_out, max_plr, 1.0)
 
     # check minimum power fraction limit
@@ -363,9 +377,9 @@ function calculate_energies(
 
     return (
         true,
-        used_plr * energy_at_max * unit.efficiency_fuel_in(used_plr),
-        used_plr * energy_at_max * unit.efficiency_el_out(used_plr),
-        used_plr * energy_at_max * unit.efficiency_heat_out(used_plr),
+        used_plr * energy_at_max * unit.efficiencies[i_fuel_in](used_plr),
+        used_plr * energy_at_max * unit.efficiencies[i_el_out](used_plr),
+        used_plr * energy_at_max * unit.efficiencies[i_heat_out](used_plr),
     )
 end
 
