@@ -118,3 +118,74 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
 
     return tables
 end
+
+
+"""
+    plr_from_energy(unit, energy_value)
+
+Calculate the part load ratio as inverse function from the given energy value.
+
+The PLRDE is defined such that one input or output is linear in respect to the PLR, while
+the other inputs and outputs need to be calculated as the inverse of their efficiency
+function, where that efficiency is relative to the linear input/output.
+
+As the efficiency function can be a variety of functions and is not necessarily (easily)
+invertable, the inverse is calculated numerically at initialisation as a piece-wise linear
+function from a customizable number of support values from an even distribution of a PLR
+from 0.0 to 1.0. When calling plr_from_energy this approximated function is evaluated for
+the given energy value and a linear interpolation between the two surrounding support values
+is performed to calculate the corresponding PLR.
+
+# Arguments
+- `unit::PLRDEComponent`: The component
+- `medium::Symbol`: The medium to which the energy value corresponds. This should be one of
+    the names defined in field `interface_list` of the component.
+- `energy_value::Float64`: The energy value
+# Returns
+- `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
+"""
+function plr_from_energy(
+    unit::PLRDEComponent,
+    medium::Symbol,
+    energy_value::Float64
+)::Float64
+    # shortcut if the given medium is the design power medium as it is linear to PLR
+    if medium === unit.design_power_medium
+        return energy_value / watt_to_wh(unit.power)
+    end
+
+    lookup_table = unit.energy_to_plr[medium]
+    energy_at_max = last(lookup_table)[1]
+
+    if energy_value <= 0.0
+        return 0.0
+    elseif energy_value >= energy_at_max
+        return 1.0
+    end
+
+    nr_iter = 0
+    candidate_idx = floor(Int64, length(lookup_table) * energy_value / energy_at_max)
+
+    while (
+        nr_iter < length(lookup_table)
+        && candidate_idx < length(lookup_table)
+        && candidate_idx >= 1
+    )
+        (energy_lb, plr_lb) = lookup_table[candidate_idx]
+        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
+        if energy_lb <= energy_value && energy_value < energy_ub
+            return plr_lb + (plr_ub - plr_lb) *
+                (energy_value - energy_lb) / (energy_ub - energy_lb)
+        elseif energy_value < energy_lb
+            candidate_idx -= 1
+        elseif energy_value >= energy_ub
+            candidate_idx += 1
+        end
+
+        nr_iter += 1
+    end
+
+    @warn "The energy_value of medium $(medium) in component $(unit.uac) is not within " *
+        "the range of the lookup table."
+    return 0.0
+end
