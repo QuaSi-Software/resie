@@ -120,7 +120,7 @@ function initialise!(unit::CHPP, sim_params::Dict{String,Any})
         )
     )
 
-    unit.energy_to_plr = create_plr_lookup_tables(unit)
+    unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
 function control(

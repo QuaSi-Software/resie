@@ -87,11 +87,12 @@ multiple solutions exist.
 
 # Arguments
 -`unit::PLRDEComponent`: The component for which to calculate the inverse
+-`sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 -`Dict{Symbol,Vector{Tuple{Float64,Float64}}}`: The created lookup tables as dictionary with
     keys taken from the field `interface_list` of the component.
 """
-function create_plr_lookup_tables(unit::PLRDEComponent)
+function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,Any})
     tables = Dict{Symbol,Vector{Tuple{Float64,Float64}}}()
 
     for name in unit.interface_list
