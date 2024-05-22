@@ -189,3 +189,73 @@ function plr_from_energy(
         "the range of the lookup table."
     return 0.0
 end
+
+"""
+    calculate_energies_for_plrde(unit, sim_params, min_plr, max_plr)
+
+Calculates the energy values for inputs and outputs at the determined operation point.
+
+The operation point takes the available energy on the inputs and outputs into consideration
+and chooses the part load ratio such that it fulfills the constraints through available
+energies. It also considers additional given constraints and the design power of the
+component.
+
+# Arguments
+- `unit::PLRDEComponent`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+- `min_plr::Float64`: Minimum PLR constraint
+- `max_plr::Float64`: Maximum PLR contsraint
+# Returns
+- `Bool`: If the calculation was a success or if a constraint was not fulfilled
+- `Vector{Floathing}`: The energy values in the same order as the field `interface_list` of
+    the component
+"""
+function calculate_energies_for_plrde(
+    unit::PLRDEComponent,
+    sim_params::Dict{String,Any},
+    min_plr::Float64,
+    max_plr::Float64
+)::Tuple{Bool, Vector{Floathing}}
+    # calculate available energy and PLR as inverse from that for each input/output
+    available_energy = []
+    plr_from_nrg = []
+
+    for name in unit.interface_list
+        availability = getproperty(EnergySystems, Symbol("check_" * String(name)))
+        energy = availability(unit, sim_params)
+
+        # shortcut if we're limited by zero input/output
+        if energy === nothing
+            return (false, [])
+        end
+
+        # in the following we want to work with positive values as it is easier
+        energy = abs(energy)
+
+        # limit to design power
+        energy = min(
+            watt_to_wh(unit.power) * unit.efficiencies[name](1.0),
+            energy
+        )
+
+        push!(available_energy, energy)
+        push!(plr_from_nrg, plr_from_energy(unit, name, energy))
+    end
+
+    # the operation point of the component is the minimum of the PLR from all inputs/outputs
+    # plus additional constraints and the design power (if all available energy is infinite)
+    used_plr = min(minimum(x->x, plr_from_nrg), max_plr, 1.0)
+
+    if used_plr < min_plr
+        return (false, [])
+    end
+
+    energies = []
+    for name in unit.interface_list
+        push!(
+            energies,
+            used_plr * watt_to_wh(unit.power) * unit.efficiencies[name](used_plr)
+        )
+    end
+    return (true, energies)
+end

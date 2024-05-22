@@ -229,11 +229,7 @@ end
 function calculate_energies(
     unit::CHPP,
     sim_params::Dict{String,Any},
-)::Tuple{Bool, Floathing, Floathing, Floathing}
-    i_fuel_in = Symbol("fuel_in")
-    i_el_out = Symbol("el_out")
-    i_heat_out = Symbol("heat_out")
-
+)::Tuple{Bool, Vector{Floathing}}
     # get max PLR of external profile, if any
     max_plr = (
         unit.controller.parameter["operation_profile_path"] === nothing
@@ -241,58 +237,11 @@ function calculate_energies(
         : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     )
     if max_plr <= 0.0
-        return (false, nothing, nothing, nothing)
+        return (false, [])
     end
 
-    available_fuel_in = check_fuel_in(unit, sim_params)
-    available_el_out = check_el_out(unit, sim_params)
-    available_heat_out = check_heat_out(unit, sim_params)
-
-    # shortcut if we're limited by zero input/output
-    if (
-        available_fuel_in === nothing
-        || available_el_out === nothing
-        || available_heat_out === nothing
-    )
-        return (false, nothing, nothing, nothing)
-    end
-
-    # in the following we want to work with positive values as it is easier
-    available_el_out = abs(available_el_out)
-    available_heat_out = abs(available_heat_out)
-
-    # limit input/output to design power. for the medium designated as the design power
-    # medium the efficiency at PLR of 1.0 is 1.0 while the others take efficiency into
-    # account
-    energy_at_max = watt_to_wh(unit.power)
-    available_fuel_in = min(
-        available_fuel_in,
-        energy_at_max * unit.efficiencies[i_fuel_in](1.0)
-    )
-    available_el_out = min(
-        available_el_out,
-        energy_at_max * unit.efficiencies[i_el_out](1.0)
-    )
-    available_heat_out = min(
-        available_heat_out,
-        energy_at_max * unit.efficiencies[i_heat_out](1.0)
-    )
-
-    plr_from_fuel_in = plr_from_energy(unit, i_fuel_in, available_fuel_in)
-    plr_from_el_out = plr_from_energy(unit, i_el_out, available_el_out)
-    plr_from_heat_out = plr_from_energy(unit, i_heat_out, available_heat_out)
-    used_plr = min(plr_from_fuel_in, plr_from_el_out, plr_from_heat_out, max_plr, 1.0)
-
-    # check minimum power fraction limit
-    if used_plr < unit.min_power_fraction
-        return (false, nothing, nothing, nothing)
-    end
-
-    return (
-        true,
-        used_plr * energy_at_max * unit.efficiencies[i_fuel_in](used_plr),
-        used_plr * energy_at_max * unit.efficiencies[i_el_out](used_plr),
-        used_plr * energy_at_max * unit.efficiencies[i_heat_out](used_plr),
+    return calculate_energies_for_plrde(
+        unit, sim_params, unit.min_power_fraction, max_plr
     )
 end
 
@@ -300,28 +249,28 @@ function potential(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[2], energies[3], energies[4])
+        set_max_energies!(unit, energies[1], energies[2], energies[3])
     end
 end
 
 function process(unit::CHPP, sim_params::Dict{String,Any})
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])
-    add!(unit.output_interfaces[unit.m_el_out], energies[3])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[4])
+    sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
+    add!(unit.output_interfaces[unit.m_el_out], energies[2])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[3])
 
-    unit.losses = energies[2] - energies[3] - energies[4]
+    unit.losses = energies[1] - energies[2] - energies[3]
 end
 
 function output_values(unit::CHPP)::Vector{String}
