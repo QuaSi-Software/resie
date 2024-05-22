@@ -259,3 +259,131 @@ function calculate_energies_for_plrde(
     end
     return (true, energies)
 end
+
+"""
+    check_fuel_in(unit, sim_params)
+
+Checks the available energy on the input fuel interface.
+
+# Arguments
+- `unit::CHPP`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_fuel_in(
+    unit::CHPP,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_fuel_in"]
+        return Inf
+    end
+
+    if (
+        unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
+        && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
+    )
+        return Inf
+    else
+        exchanges = balance_on(
+            unit.input_interfaces[unit.m_fuel_in],
+            unit.input_interfaces[unit.m_fuel_in].source
+        )
+        potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
+        if potential_energy_fuel <= sim_params["epsilon"]
+            return nothing
+        end
+        return potential_energy_fuel
+    end
+end
+
+"""
+check_el_out(unit, sim_params)
+
+Checks the available energy on the electricity output interface.
+
+# Arguments
+- `unit::CHPP`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `-Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_el_out(
+    unit::CHPP,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_el_out"]
+        return -Inf
+    end
+
+    exchanges = balance_on(
+        unit.output_interfaces[unit.m_el_out],
+        unit.output_interfaces[unit.m_el_out].target
+    )
+    potential_energy_el = balance(exchanges) + energy_potential(exchanges)
+    if potential_energy_el >= -sim_params["epsilon"]
+        return nothing
+    end
+
+    return potential_energy_el
+end
+
+"""
+check_heat_out(unit, sim_params)
+
+Checks the available energy on the heat output interface.
+
+This also checks the temperatures of the exchanges that are returned from a balance_on call,
+which can be more than one exchange in the case of a bus, and checks if the output
+temperature of the component falls into the minimum and maximum temperature range of the
+exchange, if any is given at all.
+
+# Arguments
+- `unit::CHPP`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `-Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_heat_out(
+    unit::CHPP,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_heat_out"]
+        return -Inf
+    end
+
+    exchanges = balance_on(
+        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_out].target
+    )
+
+    # if we get multiple exchanges from balance_on, a bus is involved, which means the
+    # temperature check has already been performed. we only need to check the case for
+    # a single input which can happen for direct 1-to-1 connections or if the bus has
+    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
+    if length(exchanges) > 1
+        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+    else
+        e = first(exchanges)
+        if (
+            unit.output_temperature === nothing
+            || (e.temperature_min === nothing || e.temperature_min <= unit.output_temperature)
+            && (e.temperature_max === nothing || e.temperature_max >= unit.output_temperature)
+        )
+            potential_energy_heat_out = e.balance + e.energy_potential
+        else
+            potential_energy_heat_out = 0.0
+        end
+    end
+
+    if potential_energy_heat_out >= -sim_params["epsilon"]
+        return nothing
+    end
+    return potential_energy_heat_out
+end
