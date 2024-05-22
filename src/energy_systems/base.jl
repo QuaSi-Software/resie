@@ -871,10 +871,6 @@ function output_value(unit::Component, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-# additional functionality applicable to multiple component types, that belongs in the
-# base module and has been moved into seperate files for less clutter
-include("efficiency.jl")
-
 # for the moment control must be an include as it contains circular dependencies
 # of definitions
 include("control.jl")
@@ -902,6 +898,10 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 load_condition_prototypes()
+
+# additional functionality applicable to multiple component types, that belongs in the
+# base module and has been moved into seperate files for less clutter
+include("efficiency.jl")
 
 """
     link_output_with(unit, components)
