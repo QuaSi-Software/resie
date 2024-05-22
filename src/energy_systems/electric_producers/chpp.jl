@@ -52,6 +52,9 @@ mutable struct CHPP <: Component
                 "m_" => ""
             )
         )
+        if !(design_power_medium in interface_list)
+            @error "Given unknown design power medium $design_power_medium for $uac"
+        end
 
         efficiencies = Dict{Symbol,Function}(
             Symbol("fuel_in") => parse_efficiency_function(default(config,
