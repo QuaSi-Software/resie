@@ -70,12 +70,6 @@ mutable struct CHPP <: Component
             )),
         )
 
-        energy_to_plr = Dict{Symbol,Vector{Tuple{Float64,Float64}}}(
-            Symbol("fuel_in") => [],
-            Symbol("el_out") => [],
-            Symbol("heat_out") => []
-        )
-
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -97,8 +91,8 @@ mutable struct CHPP <: Component
             default(config, "min_power_fraction", 0.2),
             efficiencies,
             interface_list,
-            energy_to_plr,
-            1.0 / default(config, "nr_discretization_steps", 30),
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
             0.0, # losses
@@ -126,25 +120,7 @@ function initialise!(unit::CHPP, sim_params::Dict{String,Any})
         )
     )
 
-    for interface in unit.interface_list
-        lookup_table = unit.energy_to_plr[interface]
-        for plr in collect(0.0:unit.discretization_step:1.0)
-            push!(lookup_table, (
-                watt_to_wh(unit.power) * plr * unit.efficiencies[interface](plr),
-                plr
-            ))
-        end
-
-        # check if inverse function (as lookup table) is monotonically increasing
-        last_energy = 0.0
-        for (energy, plr) in lookup_table
-            if energy > sim_params["epsilon"] && energy <= last_energy
-                @warn "PLR-from-energy function of component $(unit.uac) at PLR $plr " *
-                    "is not monotonic"
-            end
-            last_energy = energy
-        end
-    end
+    unit.energy_to_plr = create_plr_lookup_tables(unit)
 end
 
 function control(

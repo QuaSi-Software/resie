@@ -1,4 +1,10 @@
 """
+Trait-like type of components that implement the load ratio dependent efficiency (PLRDE)
+functionality.
+"""
+const PLRDEComponent = Union{CHPP, FuelBoiler}
+
+"""
     parse_efficiency_function(eff_def)
 
 Parse the given definition of an efficiency function and return it as a callable function.
@@ -61,4 +67,53 @@ function parse_efficiency_function(eff_def::String)::Function
 
     @warn "Cannot parse efficiency function from: $eff_def"
     return plr -> plr
+end
+
+"""
+    create_plr_lookup_tables(unit)
+
+Approximates the inverse of the PLRDE from energy values as lookup table.
+
+This is required to calculate the part load ratio of a component from an energy value of
+consumed or produced energy. Because the inverse is not always analytically known, it is
+numerically approximated at fixed intervals of the PLR. The lookup table can then be
+searched for the bounds around a known energy value and linear interpolation between these
+bounds results in the approximation of the inverse function.
+
+A warning is logged if the calculated inverse, as a piece-wise linear function, is not
+monotonically increasing. This can happen if the efficiency function is not linear and has
+strong gradients. Simulation can continue, but may result in inconsistent behaviour as
+multiple solutions exist.
+
+# Arguments
+-`unit::PLRDEComponent`: The component for which to calculate the inverse
+# Returns
+-`Dict{Symbol,Vector{Tuple{Float64,Float64}}}`: The created lookup tables as dictionary with
+    keys taken from the field `interface_list` of the component.
+"""
+function create_plr_lookup_tables(unit::PLRDEComponent)
+    tables = Dict{Symbol,Vector{Tuple{Float64,Float64}}}()
+
+    for name in unit.interface_list
+        lookup_table = []
+        for plr in collect(0.0:unit.discretization_step:1.0)
+            push!(lookup_table, (
+                watt_to_wh(unit.power) * plr * unit.efficiencies[name](plr),
+                plr
+            ))
+        end
+        tables[name] = lookup_table
+
+        # check if inverse function (as lookup table) is monotonically increasing
+        last_energy = 0.0
+        for (energy, plr) in lookup_table
+            if energy > sim_params["epsilon"] && energy <= last_energy
+                @warn "PLR-from-energy function of component $(unit.uac) at PLR $plr " *
+                    "is not monotonic"
+            end
+            last_energy = energy
+        end
+    end
+
+    return tables
 end
