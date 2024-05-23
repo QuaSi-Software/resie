@@ -164,7 +164,10 @@ function plr_from_energy(
     end
 
     nr_iter = 0
-    candidate_idx = floor(Int64, length(lookup_table) * energy_value / energy_at_max)
+    candidate_idx = max(
+        1,
+        floor(Int64, length(lookup_table) * energy_value / energy_at_max)
+    )
 
     while (
         nr_iter < length(lookup_table)
