@@ -194,6 +194,67 @@ function plr_from_energy(
 end
 
 """
+    energy_from_plr(unit, interface, plr)
+
+Calculates the energy value for the given interface from the given PLR.
+
+# Arguments
+- `unit::PLRDEComponent`: The component
+- `interface::Symbol`: The interface to which the energy value corresponds. This should be
+    one of the names defined in field `interface_list` of the component.
+- `plr::Float64`: The part load ratio, should be between 0.0 and 1.0
+# Returns
+- `Float64`: The energy value
+"""
+function energy_from_plr(
+    unit::PLRDEComponent,
+    interface::Symbol,
+    plr::Float64
+)::Float64
+    # the intuitive solution would be to multiply the power with the part load ratio and the
+    # the efficiency at that PLR, but for unknown reasons this introduces an error in the
+    # linear interpolation that appears to be quadratic in the distance to the support
+    # values
+    # @TODO: Investigate this further for improved performance
+    # return plr * watt_to_wh(unit.power) * unit.efficiencies[interface](plr)
+
+    # shortcut if the given interface is designated as linear in respect to PLR
+    if interface === unit.linear_interface
+        return plr * watt_to_wh(unit.power)
+    end
+
+    lookup_table = unit.energy_to_plr[interface]
+    if plr >= 1.0
+        return last(lookup_table)[1]
+    end
+
+    nr_iter = 0
+    candidate_idx = max(1, floor(Int64, length(lookup_table) * plr))
+
+    while (
+        nr_iter < length(lookup_table)
+        && candidate_idx < length(lookup_table)
+        && candidate_idx >= 1
+    )
+        (energy_lb, plr_lb) = lookup_table[candidate_idx]
+        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
+        if plr_lb <= plr && plr < plr_ub
+            return energy_lb + (energy_ub - energy_lb) * (plr - plr_lb) / (plr_ub - plr_lb)
+        elseif plr < plr_lb
+            candidate_idx -= 1
+        elseif plr >= plr_ub
+            candidate_idx += 1
+        end
+
+        nr_iter += 1
+    end
+
+    @warn "The PLR on interface $(interface) in component $(unit.uac) is not " *
+        "within the range of the lookup table."
+    return 0.0
+end
+
+"""
     calculate_energies_for_plrde(unit, sim_params, min_plr, max_plr)
 
 Calculates the energy values for inputs and outputs at the determined operation point.
@@ -255,10 +316,7 @@ function calculate_energies_for_plrde(
 
     energies = []
     for name in unit.interface_list
-        push!(
-            energies,
-            used_plr * watt_to_wh(unit.power) * unit.efficiencies[name](used_plr)
-        )
+        push!(energies, energy_from_plr(unit, name, used_plr))
     end
     return (true, energies)
 end
