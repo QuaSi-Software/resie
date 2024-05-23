@@ -48,7 +48,7 @@ mutable struct CHPP <: Component
 
         design_power_medium = Symbol(
             replace(
-                default(config, "design_power_medium", "el_out"),
+                default(config, "design_power_medium", "fuel_in"),
                 "m_" => ""
             )
         )
@@ -58,15 +58,15 @@ mutable struct CHPP <: Component
 
         efficiencies = Dict{Symbol,Function}(
             Symbol("fuel_in") => parse_efficiency_function(default(config,
-                "efficiency_fuel_in",
-                "pwlin:100,5.89,4,3.23,2.86,2.70,2.63,2.63,2.63"
+                "efficiency_fuel_in", "const:1.0"
             )),
             Symbol("el_out") => parse_efficiency_function(default(config,
-                "efficiency_el_out", "const:1.0"
+                "efficiency_el_out",
+                "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38"
             )),
             Symbol("heat_out") => parse_efficiency_function(default(config,
                 "efficiency_heat_out",
-                "pwlin:80,4.06,2.52,1.87,1.57,1.41,1.32,1.29,1.29"
+                "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49"
             )),
         )
 
@@ -92,7 +92,7 @@ mutable struct CHPP <: Component
             efficiencies,
             interface_list,
             Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
-            1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
+            1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
             0.0, # losses
