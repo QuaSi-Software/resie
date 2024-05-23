@@ -24,7 +24,7 @@ mutable struct CHPP <: Component
     m_el_out::Symbol
 
     power::Float64
-    design_power_medium::Symbol
+    linear_interface::Symbol
     min_power_fraction::Float64
     # efficiency functions by input/output
     efficiencies::Dict{Symbol,Function}
@@ -46,14 +46,15 @@ mutable struct CHPP <: Component
         register_media([m_fuel_in, m_heat_out, m_el_out])
         interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
 
-        design_power_medium = Symbol(
+        linear_interface = Symbol(
             replace(
-                default(config, "design_power_medium", "fuel_in"),
+                default(config, "linear_interface", "fuel_in"),
                 "m_" => ""
             )
         )
-        if !(design_power_medium in interface_list)
-            @error "Given unknown design power medium $design_power_medium for $uac"
+        if !(linear_interface in interface_list)
+            @error "Given unknown interface name $linear_interface designated as linear " *
+                "for component $uac"
         end
 
         efficiencies = Dict{Symbol,Function}(
@@ -87,7 +88,7 @@ mutable struct CHPP <: Component
             m_heat_out,
             m_el_out,
             config["power_el"] / efficiencies[Symbol("el_out")](1.0),
-            design_power_medium,
+            linear_interface,
             default(config, "min_power_fraction", 0.2),
             efficiencies,
             interface_list,

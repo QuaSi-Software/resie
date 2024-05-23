@@ -138,23 +138,23 @@ is performed to calculate the corresponding PLR.
 
 # Arguments
 - `unit::PLRDEComponent`: The component
-- `medium::Symbol`: The medium to which the energy value corresponds. This should be one of
-    the names defined in field `interface_list` of the component.
+- `interface::Symbol`: The interface to which the energy value corresponds. This should be
+    one of the names defined in field `interface_list` of the component.
 - `energy_value::Float64`: The energy value
 # Returns
 - `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
 """
 function plr_from_energy(
     unit::PLRDEComponent,
-    medium::Symbol,
+    interface::Symbol,
     energy_value::Float64
 )::Float64
-    # shortcut if the given medium is the design power medium as it is linear to PLR
-    if medium === unit.design_power_medium
+    # shortcut if the given interface is designated as linear in respect to PLR
+    if interface === unit.linear_interface
         return energy_value / watt_to_wh(unit.power)
     end
 
-    lookup_table = unit.energy_to_plr[medium]
+    lookup_table = unit.energy_to_plr[interface]
     energy_at_max = last(lookup_table)[1]
 
     if energy_value <= 0.0
@@ -185,8 +185,8 @@ function plr_from_energy(
         nr_iter += 1
     end
 
-    @warn "The energy_value of medium $(medium) in component $(unit.uac) is not within " *
-        "the range of the lookup table."
+    @warn "The energy_value on interface $(interface) in component $(unit.uac) is not " *
+        "within the range of the lookup table."
     return 0.0
 end
 

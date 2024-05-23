@@ -17,7 +17,7 @@ mutable struct FuelBoiler <: Component
     m_heat_out::Symbol
 
     power::Float64
-    design_power_medium::Symbol
+    linear_interface::Symbol
     min_power_fraction::Float64
     efficiency_fuel_in::Function
     efficiency_heat_out::Function
@@ -50,7 +50,7 @@ mutable struct FuelBoiler <: Component
             m_fuel_in,
             m_heat_out,
             config["power"],
-            Symbol(default(config, "design_power_medium", m_heat_out)),
+            Symbol(default(config, "linear_interface", m_heat_out)),
             default(config, "min_power_fraction", 0.1),
             parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.11")),
             parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
@@ -212,7 +212,7 @@ is performed to calculate the corresponding PLR.
 """
 function plr_from_energy(unit::FuelBoiler, medium::Symbol, energy_value::Float64)::Float64
     # shortcut if the given medium is the design power medium as it is linear to PLR
-    if medium === unit.design_power_medium
+    if medium === unit.linear_interface
         return energy_value / watt_to_wh(unit.power)
     end
 
