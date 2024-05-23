@@ -1,15 +1,16 @@
 """
-Implementation of a combined-heat-power-plant (CHPP) component.
+Implementation of a combined-heat-and-power plant (CHPP) component.
 
-For the moment this remains a simple implementation that converts natural gas into
-electricity and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.4:0.6. Has a minimum
-run time of 1800s taken into consideration in its control behaviour and a minimum power
-fraction of 20%. The power_gas is considered the maximum amount of both heat and electricity
-that the CHPP can produce.
+The implementation is flexible enough to cover any type of CHPP that takes in chemical fuel
+and produces electricity and heat. The archetypical CHPP chosen uses natural gas in a
+reprocating internal combustion engine and utilises heat extraction via jacketing and
+exhaust cooling. Heat extraction via engine oil cooling is possible, but typically not done
+with plants of less than around 500 kW electrical output power.
 
-The only currently implemented operation strategy involves checking the load of a linked
-buffer tank and en-/disabling the CHPP when a threshold is reached, in addition to an
-overfill shutoff condition.
+The heat is typically extracted at temperatures higher than those common in heating and
+cooling systems and thus has been chosen as not having an upper limit to the temperatures.
+
+Implements traits: PLRDEComponent
 """
 mutable struct CHPP <: Component
     uac::String
