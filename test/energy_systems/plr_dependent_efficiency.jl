@@ -318,7 +318,7 @@ function test_CHPP_el_eff_plrd()
                 "TST_DEM_01",
                 "TST_GRO_01",
             ],
-            "power" => 5000,
+            "power_el" => 5000,
             "design_power_medium" => "el_out",
             "min_power_fraction" => 0.1,
             "efficiency_fuel_in" => "const:2.5",

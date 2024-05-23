@@ -86,7 +86,7 @@ mutable struct CHPP <: Component
             m_fuel_in,
             m_heat_out,
             m_el_out,
-            config["power"],
+            config["power_el"] / efficiencies[Symbol("el_out")](1.0),
             design_power_medium,
             default(config, "min_power_fraction", 0.2),
             efficiencies,

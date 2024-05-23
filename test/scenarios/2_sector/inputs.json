@@ -172,7 +172,7 @@
                 "high_threshold": 0.9,
                 "low_threshold": 0.2
             },
-            "power": 12500,
+            "power_el": 12500,
             "design_power_medium": "fuel_in",
             "efficiency_fuel_in": "const:1.0",
             "efficiency_el_out": "const:0.4",

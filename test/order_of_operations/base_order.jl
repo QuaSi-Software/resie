@@ -80,7 +80,7 @@ function test_base_order()
                 "high_threshold" => 0.9,
                 "low_threshold" => 0.2
             ),
-            "power" => 12500
+            "power_el" => 12500
         ),
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
