@@ -148,6 +148,14 @@ function calculate_energies(
     unit::CHPP,
     sim_params::Dict{String,Any},
 )::Tuple{Bool, Vector{Floathing}}
+    # check operational state for strategy storage_driven
+    if (
+        unit.controller.strategy == "storage_driven"
+        && unit.controller.state_machine.state != 2
+    )
+        return (false, [])
+    end
+
     # get max PLR of external profile, if any
     max_plr = (
         unit.controller.parameter["operation_profile_path"] === nothing
