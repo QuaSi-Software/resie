@@ -327,7 +327,7 @@ end
 Checks the available energy on the input fuel interface.
 
 # Arguments
-- `unit::CHPP`: The component
+- `unit::Union{CHPP,FuelBoiler}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
@@ -335,7 +335,7 @@ Checks the available energy on the input fuel interface.
     floating point value signifying an infinite value
 """
 function check_fuel_in(
-    unit::CHPP,
+    unit::Union{CHPP,FuelBoiler},
     sim_params::Dict{String,Any}
 )
     if !unit.controller.parameter["consider_m_fuel_in"]
@@ -404,7 +404,7 @@ temperature of the component falls into the minimum and maximum temperature rang
 exchange, if any is given at all.
 
 # Arguments
-- `unit::CHPP`: The component
+- `unit::Union{CHPP,FuelBoiler}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
@@ -412,7 +412,7 @@ exchange, if any is given at all.
     floating point value signifying an infinite value
 """
 function check_heat_out(
-    unit::CHPP,
+    unit::Union{CHPP,FuelBoiler},
     sim_params::Dict{String,Any}
 )
     if !unit.controller.parameter["consider_m_heat_out"]

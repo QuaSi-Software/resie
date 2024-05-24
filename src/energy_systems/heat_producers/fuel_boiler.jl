@@ -4,6 +4,13 @@ Implementation of a boiler producing heat (as hot water) from the chemical energ
 While not technically correct, this implementation can also be used to model an electric
 boiler, as the input medium can be freely chosen and therefore can be chosen to be
 electricity instead of a chemical fuel.
+
+Concerning the efficiency of fuel boilers special care should be taken in regards to which
+fuel value the efficiencies correlate. There is a lot of difference between a condensing
+gas boiler supplying a 45 °C heating demand and a wood boiler supplying a 80 °C DHW demand.
+You can find more information on this topic in the online documentation.
+
+Implements traits: PLRDEComponent
 """
 mutable struct FuelBoiler <: Component
     uac::String
@@ -19,21 +26,44 @@ mutable struct FuelBoiler <: Component
     power::Float64
     linear_interface::Symbol
     min_power_fraction::Float64
-    efficiency_fuel_in::Function
-    efficiency_heat_out::Function
+    # efficiency functions by input/output
+    efficiencies::Dict{Symbol,Function}
+    # list of names of input and output interfaces, used internally only
+    interface_list::Tuple{Symbol,Symbol}
     # lookup tables for conversion of energy values to PLR
-    fuel_in_to_plr::Vector{Tuple{Float64,Float64}}
-    heat_out_to_plr::Vector{Tuple{Float64,Float64}}
+    energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
     min_run_time::UInt
     output_temperature::Temperature
+
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_fuel_in = Symbol(config["m_fuel_in"])
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_fuel_in, m_heat_out])
+        interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
+
+        linear_interface = Symbol(
+            replace(
+                default(config, "linear_interface", "heat_out"),
+                "m_" => ""
+            )
+        )
+        if !(linear_interface in interface_list)
+            @error "Given unknown interface name $linear_interface designated as linear " *
+                "for component $uac"
+        end
+
+        efficiencies = Dict{Symbol,Function}(
+            Symbol("fuel_in") => parse_efficiency_function(default(config,
+                "efficiency_fuel_in", "const:1.1"
+            )),
+            Symbol("heat_out") => parse_efficiency_function(default(config,
+                "efficiency_heat_out", "const:1.0"
+            )),
+        )
 
         return new(
             uac,
@@ -49,14 +79,13 @@ mutable struct FuelBoiler <: Component
             ),
             m_fuel_in,
             m_heat_out,
-            config["power"],
-            Symbol(default(config, "linear_interface", m_heat_out)),
+            config["power_th"] / efficiencies[Symbol("heat_out")](1.0),
+            linear_interface,
             default(config, "min_power_fraction", 0.1),
-            parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.11")),
-            parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
-            [], # fuel_in_to_plr
-            [], # heat_out_to_plr
-            1.0 / default(config, "nr_discretization_steps", 30),
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
             default(config, "min_run_time", 0),
             default(config, "output_temperature", nothing),
             0.0, # losses
@@ -78,27 +107,7 @@ function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
         )
     )
 
-    # fill energy_to_plr lookup tables
-    media_def = (
-        (unit.efficiency_fuel_in, unit.fuel_in_to_plr),
-        (unit.efficiency_heat_out, unit.heat_out_to_plr)
-    )
-
-    for (eff_func, lookup_table) in media_def
-        for plr in collect(0.0:unit.discretization_step:1.0)
-            push!(lookup_table, (watt_to_wh(unit.power) * plr * eff_func(plr), plr))
-        end
-
-        # check if inverse function (as lookup table) is monotonically increasing
-        last_energy = 0.0
-        for (energy, plr) in lookup_table
-            if energy > sim_params["epsilon"] && energy <= last_energy
-                @warn "PLR-from-energy function of component $(unit.uac) at PLR $plr " *
-                    "is not monotonic"
-            end
-            last_energy = energy
-        end
-    end
+    unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
 function control(
@@ -122,143 +131,10 @@ function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
 
-function check_fuel_in(
-    unit::FuelBoiler,
-    sim_params::Dict{String,Any}
-)::Floathing
-    if !unit.controller.parameter["consider_m_fuel_in"]
-        return Inf
-    end
-
-    if (
-        unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
-        && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
-    )
-        return Inf
-    else
-        exchanges = balance_on(
-            unit.input_interfaces[unit.m_fuel_in],
-            unit.input_interfaces[unit.m_fuel_in].source
-        )
-        potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_fuel <= sim_params["epsilon"]
-            return nothing
-        end
-        return potential_energy_fuel
-    end
-end
-
-function check_heat_out(
-    unit::FuelBoiler,
-    sim_params::Dict{String,Any}
-)::Floathing
-    if !unit.controller.parameter["consider_m_heat_out"]
-        return -Inf
-    end
-
-    exchanges = balance_on(
-        unit.output_interfaces[unit.m_heat_out],
-        unit.output_interfaces[unit.m_heat_out].target
-    )
-
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single input which can happen for direct 1-to-1 connections or if the bus has
-    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-    else
-        e = first(exchanges)
-        if (
-            unit.output_temperature === nothing
-            || (e.temperature_min === nothing || e.temperature_min <= unit.output_temperature)
-            && (e.temperature_max === nothing || e.temperature_max >= unit.output_temperature)
-        )
-            potential_energy_heat_out = e.balance + e.energy_potential
-        else
-            potential_energy_heat_out = 0.0
-        end
-    end
-
-    if potential_energy_heat_out >= -sim_params["epsilon"]
-        return nothing
-    end
-    return potential_energy_heat_out
-end
-
-"""
-    plr_from_energy(unit, energy_value)
-
-Calculate part load ratio as inverse function from the given energy value.
-
-The efficiency for the FuelBoiler is defined as relative to one input or output being linear
-in respect to the PLR, while the other energy values must be calculated as the inverse of
-the efficiency.
-
-As the efficiency function can be a variety of functions and is not necessarily (easily)
-invertable, the inverse is calculated numerically at initialisation as a piece-wise linear
-function from a customizable number of support values from an even distribution of a PLR
-from 0.0 to 1.0. When calling plr_from_energy this approximated function is evaluated for
-the given energy value and a linear interpolation between the two surrounding support values
-is performed to calculate the corresponding PLR.
-
-# Arguments
-- `unit::FuelBoiler`: The fuel boiler
-- `medium::Symbol`: The medium to which the energy value corresponds. Should be one of the
-    media defined in the input of the fuel boiler.
-- `energy_value::Float64`: The energy value
-# Returns
-- `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
-"""
-function plr_from_energy(unit::FuelBoiler, medium::Symbol, energy_value::Float64)::Float64
-    # shortcut if the given medium is the design power medium as it is linear to PLR
-    if medium === unit.linear_interface
-        return energy_value / watt_to_wh(unit.power)
-    end
-
-    lookup_table = unit.heat_out_to_plr
-    if medium == unit.m_fuel_in
-        lookup_table = unit.fuel_in_to_plr
-    end
-    energy_at_max = last(lookup_table)[1]
-
-    if energy_value <= 0.0
-        return 0.0
-    elseif energy_value >= energy_at_max
-        return 1.0
-    end
-
-    nr_iter = 0
-    candidate_idx = floor(Int64, length(lookup_table) * energy_value / energy_at_max)
-
-    while (
-        nr_iter < length(lookup_table)
-        && candidate_idx < length(lookup_table)
-        && candidate_idx >= 1
-    )
-        (energy_lb, plr_lb) = lookup_table[candidate_idx]
-        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
-        if energy_lb <= energy_value && energy_value < energy_ub
-            return plr_lb + (plr_ub - plr_lb) *
-                (energy_value - energy_lb) / (energy_ub - energy_lb)
-        elseif energy_value < energy_lb
-            candidate_idx -= 1
-        elseif energy_value >= energy_ub
-            candidate_idx += 1
-        end
-
-        nr_iter += 1
-    end
-
-    @warn "The energy_value of medium $(medium) in component $(unit.uac) is not within " *
-        "the range of the lookup table."
-    return 0.0
-end
-
 function calculate_energies(
     unit::FuelBoiler,
-    sim_params::Dict{String,Any}
-)::Tuple{Bool, Floathing, Floathing}
+    sim_params::Dict{String,Any},
+)::Tuple{Bool, Vector{Floathing}}
     # get max PLR of external profile, if any
     max_plr = (
         unit.controller.parameter["operation_profile_path"] === nothing
@@ -266,46 +142,11 @@ function calculate_energies(
         : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     )
     if max_plr <= 0.0
-        return (false, nothing, nothing)
+        return (false, [])
     end
 
-    available_fuel_in = check_fuel_in(unit, sim_params)
-    available_heat_out = check_heat_out(unit, sim_params)
-
-    # shortcut if we're limited by zero input/output
-    if available_fuel_in === nothing || available_heat_out === nothing
-        return (false, nothing, nothing)
-    end
-
-    # in the following we want to work with positive values as it is easier
-    available_heat_out = abs(available_heat_out)
-
-    # limit input/output to design power. for the medium designated as the design power
-    # medium the efficiency at PLR of 1.0 is 1.0 while the others take efficiency into
-    # account
-    energy_at_max = watt_to_wh(unit.power)
-    available_fuel_in = min(
-        available_fuel_in,
-        energy_at_max * unit.efficiency_fuel_in(1.0)
-    )
-    available_heat_out = min(
-        available_heat_out,
-        energy_at_max * unit.efficiency_heat_out(1.0)
-    )
-
-    plr_from_fuel_in = plr_from_energy(unit, unit.m_fuel_in, available_fuel_in)
-    plr_from_heat_out = plr_from_energy(unit, unit.m_heat_out, available_heat_out)
-    used_plr = min(plr_from_fuel_in, plr_from_heat_out, max_plr, 1.0)
-
-    # check minimum power fraction limit
-    if used_plr < unit.min_power_fraction
-        return (false, nothing, nothing)
-    end
-
-    return (
-        true,
-        used_plr * energy_at_max * unit.efficiency_fuel_in(used_plr),
-        used_plr * energy_at_max * unit.efficiency_heat_out(used_plr),
+    return calculate_energies_for_plrde(
+        unit, sim_params, unit.min_power_fraction, max_plr
     )
 end
 
@@ -313,27 +154,27 @@ function potential(
     unit::FuelBoiler,
     sim_params::Dict{String,Any}
 )
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[2], energies[3])
+        set_max_energies!(unit, energies[1], energies[2])
     end
 end
 
 function process(unit::FuelBoiler, sim_params::Dict{String,Any})
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
-    sub!(unit.input_interfaces[unit.m_fuel_in], energies[2])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+    sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[2])
 
-    unit.losses = energies[2] - energies[3]
+    unit.losses = energies[1] - energies[2]
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}
