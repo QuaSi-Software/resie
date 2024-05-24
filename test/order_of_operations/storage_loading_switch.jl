@@ -31,7 +31,7 @@ function test_ooo_storage_loading_switch()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 40000,
+            "power_th" => 40000,
             "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_GBO_02" => Dict{String,Any}(
@@ -44,7 +44,7 @@ function test_ooo_storage_loading_switch()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power" => 40000,
+            "power_th" => 40000,
             "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_BUS_01" => Dict{String,Any}(

@@ -324,7 +324,7 @@
             },
             "m_heat_out": "m_h_w_ht1",
             "m_el_out": "m_e_ac_230v",
-            "power_el": 150000,
+            "power_el": 60000,
             "linear_interface": "fuel_in",
             "efficiency_fuel_in": "const:1.0",
             "efficiency_el_out": "const:0.4",
@@ -344,7 +344,7 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.5          
             },
-            "power": 400000,
+            "power_th": 400000,
             "output_temperature": 60,
             "min_power_fraction": 0.0,
             "efficiency_fuel_in": "const:1.0"

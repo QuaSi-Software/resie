@@ -31,7 +31,7 @@ function get_demand_energy_system_config()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven",
             ),
-            "power" => 4000,
+            "power_th" => 4000,
             "linear_interface" => "fuel_in",
             "efficiency_fuel_in" => "const:1.0",
             "efficiency_heat_out" => "poly:-0.9117,1.8795,0.0322",
@@ -81,24 +81,22 @@ function test_inverse_efficiency()
     components = Resie.load_components(components_config, simulation_parameters)
     boiler = components["TST_GB_01"]
 
-    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 0.0)) < eps
-    @test abs(plr_from_energy(boiler, boiler.m_fuel_in, 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, boiler.m_fuel_in, 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 0.0)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("fuel_in"), 450.0)
     @test plr > 0.45 - eps && plr < 0.45 + eps
 
-    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 0.0)) < eps
-    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, boiler.m_heat_out, 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
     @test plr > 0.5614073352582631 - eps && plr < 0.5614073352582631 + eps
 
     boiler.discretization_step = 1.0 / 20
-    boiler.fuel_in_to_plr = []
-    boiler.heat_out_to_plr = []
     EnergySystems.initialise!(boiler, simulation_parameters)
 
-    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 0.0)) < eps
-    @test abs(plr_from_energy(boiler, boiler.m_heat_out, 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, boiler.m_heat_out, 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
     @test plr > 0.561969105640274 - eps && plr < 0.561969105640274 + eps
 end
 
@@ -162,9 +160,9 @@ function test_gas_boiler_demand_driven_plrd()
     @test demand.input_interfaces[demand.medium].balance ≈ -500
 
     EnergySystems.process(gasboiler, simulation_parameters)
-    @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ -0.0071177438881591115
+    @test isapprox(gasboiler.output_interfaces[gasboiler.m_heat_out].balance, 0.0, atol=1e-9)
     @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -500 / expected_efficiency
-    @test demand.input_interfaces[demand.medium].balance ≈ -0.0071177438881591115
+    @test isapprox(demand.input_interfaces[demand.medium].balance, 0.0, atol=1e-9)
 
     EnergySystems.process(grid, simulation_parameters)
     @test grid.output_interfaces[grid.medium].balance ≈ 0
@@ -202,7 +200,7 @@ function test_gas_boiler_supply_driven_plrd()
             "strategy" => Dict{String,Any}(
                 "name" => "supply_driven",
             ),
-            "power" => 4000,
+            "power_th" => 4000,
             "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
         ),
@@ -271,7 +269,7 @@ function test_gas_boiler_supply_driven_plrd()
 
     EnergySystems.process(gasboiler, simulation_parameters)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 776.5061852364258
-    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ -0.15043676852451426
+    @test gasboiler.input_interfaces[gasboiler.m_fuel_in].balance ≈ 0.0
     @test demand.input_interfaces[demand.medium].balance ≈ 776.5061852364258
 
     EnergySystems.process(demand, simulation_parameters)

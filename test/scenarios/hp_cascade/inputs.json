@@ -124,7 +124,7 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power": 40000,
+            "power_th": 40000,
             "min_power_fraction": 0.0,
             "efficiency_fuel_in": "const:1.0"
         },

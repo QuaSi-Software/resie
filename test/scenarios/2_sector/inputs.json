@@ -172,7 +172,7 @@
                 "high_threshold": 0.9,
                 "low_threshold": 0.2
             },
-            "power_el": 12500,
+            "power_el": 5000,
             "linear_interface": "fuel_in",
             "efficiency_fuel_in": "const:1.0",
             "efficiency_el_out": "const:0.4",
