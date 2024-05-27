@@ -20,13 +20,22 @@ mutable struct Electrolyser <: Component
     m_h2_out::Symbol
     m_o2_out::Symbol
 
-    power_el::Float64
-    heat_fraction::Float64
+    power::Float64
+    linear_interface::Symbol
     min_power_fraction::Float64
+    # efficiency functions by input/output
+    efficiencies::Dict{Symbol,Function}
+    # list of names of input and output interfaces, used internally only
+    interface_list::Tuple{Symbol,Symbol,Symbol,Symbol}
+    # lookup tables for conversion of energy values to PLR
+    energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
+    discretization_step::Float64
+
     min_run_time::UInt
     output_temperature::Temperature
 
-    losses_heat::Float32
+    losses::Float64
+    losses_heat::Float64
     losses_hydrogen::Float64
 
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -35,6 +44,35 @@ mutable struct Electrolyser <: Component
         m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
         m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
         register_media([m_el_in, m_heat_out, m_h2_out, m_o2_out])
+        interface_list = (
+            Symbol("el_in"), Symbol("heat_out"), Symbol("h2_out"), Symbol("o2_out")
+        )
+
+        linear_interface = Symbol(
+            replace(
+                default(config, "linear_interface", "el_in"),
+                "m_" => ""
+            )
+        )
+        if !(linear_interface in interface_list)
+            @error "Given unknown interface name $linear_interface designated as linear " *
+                "for component $uac"
+        end
+
+        efficiencies = Dict{Symbol,Function}(
+            Symbol("el_in") => parse_efficiency_function(default(config,
+                "efficiency_el_in", "const:1.0"
+            )),
+            Symbol("heat_out") => parse_efficiency_function(default(config,
+                "efficiency_el_out", "const:0.2"
+            )),
+            Symbol("h2_out") => parse_efficiency_function(default(config,
+                "efficiency_h2_out", "const:0.6"
+            )),
+            Symbol("o2_out") => parse_efficiency_function(default(config,
+                "efficiency_o2_out", "const:0.6"
+            )),
+        )
 
         return new(
             uac, # uac
@@ -54,13 +92,18 @@ mutable struct Electrolyser <: Component
             m_heat_out,
             m_h2_out,
             m_o2_out,
-            config["power_el"], # power_el
-            default(config, "heat_fraction", 0.4),
+            config["power_el"] / efficiencies[Symbol("el_in")](1.0),
+            linear_interface,
             default(config, "min_power_fraction", 0.2),
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
             default(config, "min_run_time", 3600),
             default(config, "output_temperature", 55.0),
-            0.0, # Losses heat
-            0.0  # Losses hydrogen
+            0.0, # losses
+            0.0, # losses_heat
+            0.0  # losses_hydrogen
         )
     end
 end
@@ -90,6 +133,8 @@ function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
             unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
         )
     )
+
+    unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
 function control(
@@ -115,228 +160,30 @@ function set_max_energies!(
     set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
 end
 
-function check_el_in(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_el_in"] == true
-        if (
-            unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing
-        )
-            return (Inf)
-        else
-            exchanges = balance_on(
-                unit.input_interfaces[unit.m_el_in],
-                unit.input_interfaces[unit.m_el_in].source
-            )
-            potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-            if potential_energy_el <= sim_params["epsilon"]
-                return (0.0)
-            end
-            return (potential_energy_el)
-        end
-    else
-        return (Inf)
-    end
-end
-
-function check_heat_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        return (
-            [e.balance + e.energy_potential for e in exchanges],
-            temp_min_all(exchanges)
-        )
-    else
-        return ([-Inf], [nothing])
-    end
-end
-
-function check_h2_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_h2_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_h2_out],
-            unit.output_interfaces[unit.m_h2_out].target
-        )
-        potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_h2 >= -sim_params["epsilon"]
-            return (0.0)
-        end
-        return (potential_energy_h2)
-    else
-        return (-Inf)
-    end
-end
-
-function check_o2_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_o2_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_o2_out],
-            unit.output_interfaces[unit.m_o2_out].target
-        )
-        potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
-        if potential_energy_o2 >= -sim_params["epsilon"]
-            return (0.0)
-        end
-        return (potential_energy_o2)
-    else
-        return (-Inf)
-    end
-end
-
 function calculate_energies(
     unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    # get usage fraction of external profile (normalized from 0 to 1)
-    max_usage_fraction = (
+    sim_params::Dict{String,Any},
+)::Tuple{Bool, Vector{Floathing}}
+    # check operational state for strategy storage_driven
+    if (
+        unit.controller.strategy == "storage_driven"
+        && unit.controller.state_machine.state != 2
+    )
+        return (false, [])
+    end
+
+    # get max PLR of external profile, if any
+    max_plr = (
         unit.controller.parameter["operation_profile_path"] === nothing
         ? 1.0
         : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     )
-    if max_usage_fraction <= 0.0
-        return (false, nothing, nothing, nothing, nothing, nothing)
+    if max_plr <= 0.0
+        return (false, [])
     end
 
-    # get potentials from inputs/outputs. only the heat output is calculated as vector,
-    # the electricity input and h2/o2 outputs are calculated as scalars
-    potential_energy_el = check_el_in(unit, sim_params)
-    potentials_energy_heat_out, out_temps_min = check_heat_out(unit, sim_params)
-    potential_energy_h2_out = check_h2_out(unit, sim_params)
-    potential_energy_o2_out = check_o2_out(unit, sim_params)
-
-    available_el_in = potential_energy_el
-    available_h2_out = potential_energy_h2_out
-    available_o2_out = potential_energy_o2_out
-
-    # in the following we want to work with positive values as it is easier
-    available_h2_out = abs(available_h2_out)
-    available_o2_out = abs(available_o2_out)
-    potentials_energy_heat_out = map(abs, potentials_energy_heat_out)
-
-    # limit electricity input to design power
-    available_el_in = min(available_el_in, watt_to_wh(unit.power_el))
-
-    # shortcut if we're limited by electricity input or h2/o2 output
-    if (
-        available_el_in <= sim_params["epsilon"]
-        || available_h2_out <= sim_params["epsilon"]
-        || available_o2_out <= sim_params["epsilon"]
-    )
-        return (false, nothing, nothing, nothing, nothing, nothing)
-    end
-
-    layers_el_in = []
-    layers_heat_out = []
-    layers_heat_out_temperature = []
-    layers_h2_out = []
-    layers_o2_out = []
-
-    for (idx_layer, pot_heat_out) in pairs(potentials_energy_heat_out)
-        # if the entire amount of one of the limiting inputs/outputs was used up, skip
-        # through the rest of the heat output layers
-        if (
-            available_el_in <= sim_params["epsilon"]
-            || available_h2_out <= sim_params["epsilon"]
-            || available_o2_out <= sim_params["epsilon"]
-        )
-            continue
-        end
-
-        # check if it is an "empty" layer, usually from other inputs on a bus, which are
-        # included for balance calculations but cannot take in energy from the electorlyser
-        if pot_heat_out <= sim_params["epsilon"]
-            continue
-        end
-
-        # skip layer if output temperature is lower than minimum temperature of layer
-        if (
-            out_temps_min[idx_layer] !== nothing
-            && out_temps_min[idx_layer] > unit.output_temperature
-        )
-            continue
-        end
-
-        # energies for current layer with potential (+storage) heat out as basis
-        used_heat_out = pot_heat_out
-        used_el_in = used_heat_out / unit.heat_fraction
-        used_h2_out = used_el_in * (1.0 - unit.heat_fraction)
-        used_o2_out = used_h2_out * 0.5
-
-        # check electricity in as limiter
-        if used_el_in > available_el_in
-            used_el_in = available_el_in
-            used_heat_out = used_el_in * unit.heat_fraction
-            used_h2_out = used_el_in * (1.0 - unit.heat_fraction)
-            used_o2_out = used_h2_out * 0.5
-        end
-
-        # check h2 out as limiter
-        if used_h2_out > available_h2_out
-            used_h2_out = available_h2_out
-            used_o2_out = used_h2_out * 0.5
-            used_el_in = used_h2_out / (1.0 - unit.heat_fraction)
-            used_heat_out = used_el_in * unit.heat_fraction
-        end
-
-        # check o2 out as limiter
-        if used_o2_out > available_o2_out
-            used_o2_out = available_o2_out
-            used_h2_out = used_ho_out * 2.0
-            used_el_in = used_h2_out / (1.0 - unit.heat_fraction)
-            used_heat_out = used_el_in * unit.heat_fraction
-        end
-
-        # check if usage fraction went over the maximum, in which case the last layer added
-        # can't be fully utilised and is added with the remaining fraction to the max
-        old_usage_fraction = (sum(layers_el_in; init=0.0)) / watt_to_wh(unit.power_el)
-        new_usage_fraction = (sum(layers_el_in; init=0.0) + used_el_in) /
-                             watt_to_wh(unit.power_el)
-        if new_usage_fraction > max_usage_fraction
-            used_el_in *= (max_usage_fraction - old_usage_fraction)
-            used_heat_out = used_el_in * unit.heat_fraction
-            used_h2_out = used_el_in * (1.0 - unit.heat_fraction)
-            used_o2_out = used_h2_out * 0.5
-        end
-
-        # finally all checks done, we add the layer and update remaining energies
-        push!(layers_el_in, used_el_in)
-        push!(layers_heat_out, used_heat_out)
-        push!(layers_heat_out_temperature, out_temps_min[idx_layer])
-        push!(layers_h2_out, used_h2_out)
-        push!(layers_o2_out, used_o2_out)
-        available_el_in -= used_el_in
-        available_h2_out -= used_h2_out
-        available_o2_out -= used_o2_out
-    end
-
-    # if all chosen heat layers combined are not enough to induce enough electricity demand
-    # to meet minimum power fraction, the electorlyser doesn't run at all
-    usage_fraction = (sum(layers_el_in; init=0.0)) / watt_to_wh(unit.power_el)
-    if usage_fraction < unit.min_power_fraction
-        return (false, nothing, nothing, nothing, nothing, nothing)
-    end
-
-    return (
-        true,
-        layers_el_in,
-        layers_heat_out,
-        layers_heat_out_temperature,
-        layers_h2_out,
-        layers_o2_out
+    return calculate_energies_for_plrde(
+        unit, sim_params, unit.min_power_fraction, max_plr
     )
 end
 
@@ -344,43 +191,31 @@ function potential(
     unit::Electrolyser,
     sim_params::Dict{String,Any}
 )
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(
-            unit,
-            sum(energies[2]; init=0.0),
-            sum(energies[3]; init=0.0),
-            sum(energies[5]; init=0.0),
-            sum(energies[6]; init=0.0)
-        )
+        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4])
     end
 end
 
 function process(unit::Electrolyser, sim_params::Dict{String,Any})
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
-    el_in = sum(energies[2]; init=0.0)
-    heat_out = sum(energies[3]; init=0.0)
-    h2_out = sum(energies[5]; init=0.0)
-    o2_out = sum(energies[6]; init=0.0)
+    sub!(unit.input_interfaces[unit.m_el_in], energies[1])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[2])
+    add!(unit.output_interfaces[unit.m_h2_out], energies[3])
+    add!(unit.output_interfaces[unit.m_o2_out], energies[4])
 
-    if el_in < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
-        return
-    end
-
-    sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    add!(unit.output_interfaces[unit.m_heat_out], heat_out)
-    add!(unit.output_interfaces[unit.m_h2_out], h2_out)
-    add!(unit.output_interfaces[unit.m_o2_out], o2_out)
+    unit.losses_heat = energies[1] - energies[2] - energies[3]
+    unit.losses_hydrogen = 0.0
+    unit.losses = unit.losses_heat + unit.losses_hydrogen
 end
 
 # has its own reset function as here more losses are present that need to be reset in every timestep
@@ -397,6 +232,7 @@ function reset(unit::Electrolyser)
     end
 
     # reset losses
+    unit.losses = 0.0
     unit.losses_hydrogen = 0.0
     unit.losses_heat = 0.0
 end

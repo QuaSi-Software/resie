@@ -2,7 +2,7 @@
 Trait-like type of components that implement the load ratio dependent efficiency (PLRDE)
 functionality.
 """
-const PLRDEComponent = Union{CHPP, FuelBoiler}
+const PLRDEComponent = Union{CHPP, Electrolyser, FuelBoiler}
 
 """
     parse_efficiency_function(eff_def)
@@ -361,7 +361,46 @@ function check_fuel_in(
 end
 
 """
-check_el_out(unit, sim_params)
+    check_el_in(unit, sim_params)
+
+Checks the available energy on the input electricity interface.
+
+# Arguments
+- `unit::Electrolyser`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_el_in(
+    unit::Electrolyser,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_el_in"]
+        return Inf
+    end
+
+    if (
+        unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
+        && unit.input_interfaces[unit.m_el_in].max_energy === nothing
+    )
+        return Inf
+    else
+        exchanges = balance_on(
+            unit.input_interfaces[unit.m_el_in],
+            unit.input_interfaces[unit.m_el_in].source
+        )
+        potential_energy_el = balance(exchanges) + energy_potential(exchanges)
+        if potential_energy_el <= sim_params["epsilon"]
+            return nothing
+        end
+        return potential_energy_el
+    end
+end
+
+"""
+    check_el_out(unit, sim_params)
 
 Checks the available energy on the electricity output interface.
 
@@ -394,6 +433,72 @@ function check_el_out(
 end
 
 """
+    check_h2_out(unit, sim_params)
+
+Checks the available energy on the hydrogen output interface.
+
+# Arguments
+- `unit::Electrolyser`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `-Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_h2_out(
+    unit::Electrolyser,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_h2_out"]
+        return -Inf
+    end
+
+    exchanges = balance_on(
+        unit.output_interfaces[unit.m_h2_out],
+        unit.output_interfaces[unit.m_h2_out].target
+    )
+    potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
+    if potential_energy_h2 >= -sim_params["epsilon"]
+        return nothing
+    end
+
+    return potential_energy_h2
+end
+
+"""
+    check_o2_out(unit, sim_params)
+
+Checks the available energy on the oxygen output interface.
+
+# Arguments
+- `unit::Electrolyser`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `-Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_o2_out(
+    unit::Electrolyser,
+    sim_params::Dict{String,Any}
+)
+    if !unit.controller.parameter["consider_m_o2_out"]
+        return -Inf
+    end
+
+    exchanges = balance_on(
+        unit.output_interfaces[unit.m_o2_out],
+        unit.output_interfaces[unit.m_o2_out].target
+    )
+    potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
+    if potential_energy_o2 >= -sim_params["epsilon"]
+        return nothing
+    end
+
+    return potential_energy_o2
+end
+
+"""
 check_heat_out(unit, sim_params)
 
 Checks the available energy on the heat output interface.
@@ -404,7 +509,7 @@ temperature of the component falls into the minimum and maximum temperature rang
 exchange, if any is given at all.
 
 # Arguments
-- `unit::Union{CHPP,FuelBoiler}`: The component
+- `unit::Union{CHPP,Electrolyser,FuelBoiler}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
@@ -412,7 +517,7 @@ exchange, if any is given at all.
     floating point value signifying an infinite value
 """
 function check_heat_out(
-    unit::Union{CHPP,FuelBoiler},
+    unit::Union{CHPP,Electrolyser,FuelBoiler},
     sim_params::Dict{String,Any}
 )
     if !unit.controller.parameter["consider_m_heat_out"]
