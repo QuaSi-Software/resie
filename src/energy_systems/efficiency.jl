@@ -499,9 +499,14 @@ function check_o2_out(
 end
 
 """
-check_heat_out(unit, sim_params)
+    check_heat_out_impl(unit, sim_params)
 
-Checks the available energy on the heat output interface.
+Checks the available energy on a heat output interface.
+
+Please note that this method is intended to be used by various internal aliases to heat
+outputs of different temperature regimes. The methods actually called are named after the
+interfaces in the corresponding components. For example a CHPP would call check_heat_out,
+which uses check_heat_out_impl internally.
 
 This also checks the temperatures of the exchanges that are returned from a balance_on call,
 which can be more than one exchange in the case of a bus, and checks if the output
@@ -516,17 +521,20 @@ exchange, if any is given at all.
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_heat_out(
+function check_heat_out_impl(
     unit::Union{CHPP,Electrolyser,FuelBoiler},
+    interface_name::String,
+    medium::Symbol,
+    output_temperature::Floathing,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.parameter["consider_m_heat_out"]
+    if !unit.controller.parameter["consider_m_"*interface_name]
         return -Inf
     end
 
     exchanges = balance_on(
-        unit.output_interfaces[unit.m_heat_out],
-        unit.output_interfaces[unit.m_heat_out].target
+        unit.output_interfaces[medium],
+        unit.output_interfaces[medium].target
     )
 
     # if we get multiple exchanges from balance_on, a bus is involved, which means the
@@ -538,9 +546,9 @@ function check_heat_out(
     else
         e = first(exchanges)
         if (
-            unit.output_temperature === nothing
-            || (e.temperature_min === nothing || e.temperature_min <= unit.output_temperature)
-            && (e.temperature_max === nothing || e.temperature_max >= unit.output_temperature)
+            output_temperature === nothing
+            || (e.temperature_min === nothing || e.temperature_min <= output_temperature)
+            && (e.temperature_max === nothing || e.temperature_max >= output_temperature)
         )
             potential_energy_heat_out = e.balance + e.energy_potential
         else
@@ -552,4 +560,52 @@ function check_heat_out(
         return nothing
     end
     return potential_energy_heat_out
+end
+
+"""
+Alias to check_heat_out_impl for a heat output interface called heat_out.
+"""
+function check_heat_out(
+    unit::Union{CHPP,FuelBoiler},
+    sim_params::Dict{String,Any}
+)
+    return check_heat_out_impl(
+        unit,
+        "heat_out",
+        unit.m_heat_out,
+        unit.output_temperature,
+        sim_params
+    )
+end
+
+"""
+Alias to check_heat_out_impl for a heat output interface called heat_ht_out.
+"""
+function check_heat_ht_out(
+    unit::Electrolyser,
+    sim_params::Dict{String,Any}
+)
+    return check_heat_out_impl(
+        unit,
+        "heat_ht_out",
+        unit.m_heat_ht_out,
+        unit.output_temperature_ht,
+        sim_params
+    )
+end
+
+"""
+Alias to check_heat_out_impl for a heat output interface called heat_lt_out.
+"""
+function check_heat_lt_out(
+    unit::Electrolyser,
+    sim_params::Dict{String,Any}
+)
+    return check_heat_out_impl(
+        unit,
+        "heat_lt_out",
+        unit.m_heat_lt_out,
+        unit.output_temperature_lt,
+        sim_params
+    )
 end
