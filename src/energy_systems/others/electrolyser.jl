@@ -78,7 +78,10 @@ mutable struct Electrolyser <: Component
                 "efficiency_heat_lt_out", "const:0.07"
             )),
             Symbol("h2_out") => parse_efficiency_function(default(config,
-                "efficiency_h2_out", "const:0.6"
+                "efficiency_h2_out", "const:0.57"
+            )),
+            Symbol("h2_out_lossless") => parse_efficiency_function(default(config,
+                "efficiency_h2_out_lossless", "const:0.6"
             )),
             Symbol("o2_out") => parse_efficiency_function(default(config,
                 "efficiency_o2_out", "const:0.6"
@@ -255,6 +258,14 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
+    plr = energies[1] / watt_to_wh(unit.power * unit.efficiencies[Symbol("el_in")](1.0))
+    h2_out_lossless = energies[1] * unit.efficiencies[Symbol("h2_out_lossless")](plr)
+    unit.losses_hydrogen = h2_out_lossless - energies[4]
+    unit.losses_heat = energies[1] - energies[2] +
+        (unit.heat_lt_is_usable ? -1 : 0) * energies[3] -
+        h2_out_lossless
+    unit.losses = unit.losses_heat + unit.losses_hydrogen
+
     sub!(unit.input_interfaces[unit.m_el_in], energies[1])
     add!(unit.output_interfaces[unit.m_heat_ht_out], energies[2])
     if unit.heat_lt_is_usable
@@ -262,11 +273,6 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     end
     add!(unit.output_interfaces[unit.m_h2_out], energies[4])
     add!(unit.output_interfaces[unit.m_o2_out], energies[5])
-
-    unit.losses_heat = energies[1] - energies[2] - energies[4] +
-        (unit.heat_lt_is_usable ? -1 : 0) * energies[3]
-    unit.losses_hydrogen = 0.0
-    unit.losses = unit.losses_heat + unit.losses_hydrogen
 end
 
 # has its own reset function as here more losses are present that need to be reset in every timestep
