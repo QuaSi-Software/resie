@@ -16,7 +16,8 @@ mutable struct Electrolyser <: Component
     output_interfaces::InterfaceMap
 
     m_el_in::Symbol
-    m_heat_out::Symbol
+    m_heat_ht_out::Symbol
+    m_heat_lt_out::Symbol
     m_h2_out::Symbol
     m_o2_out::Symbol
 
@@ -26,26 +27,33 @@ mutable struct Electrolyser <: Component
     # efficiency functions by input/output
     efficiencies::Dict{Symbol,Function}
     # list of names of input and output interfaces, used internally only
-    interface_list::Tuple{Symbol,Symbol,Symbol,Symbol}
+    interface_list::Tuple{Symbol,Symbol,Symbol,Symbol,Symbol}
     # lookup tables for conversion of energy values to PLR
     energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
     min_run_time::UInt
-    output_temperature::Temperature
+
+    heat_lt_is_usable::Bool
+    output_temperature_ht::Temperature
+    output_temperature_lt::Temperature
 
     losses::Float64
     losses_heat::Float64
     losses_hydrogen::Float64
 
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+        heat_lt_is_usable = default(config, "heat_lt_is_usable", false)
+
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
+        m_heat_ht_out = Symbol(default(config, "m_heat_ht_out", "m_h_w_ht1"))
+        m_heat_lt_out = Symbol(default(config, "m_heat_lt_out", "m_h_w_lt1"))
         m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
         m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
-        register_media([m_el_in, m_heat_out, m_h2_out, m_o2_out])
+        register_media([m_el_in, m_heat_ht_out, m_heat_lt_out, m_h2_out, m_o2_out])
         interface_list = (
-            Symbol("el_in"), Symbol("heat_out"), Symbol("h2_out"), Symbol("o2_out")
+            Symbol("el_in"), Symbol("heat_ht_out"), Symbol("heat_lt_out"),
+            Symbol("h2_out"), Symbol("o2_out")
         )
 
         linear_interface = Symbol(
@@ -63,8 +71,11 @@ mutable struct Electrolyser <: Component
             Symbol("el_in") => parse_efficiency_function(default(config,
                 "efficiency_el_in", "const:1.0"
             )),
-            Symbol("heat_out") => parse_efficiency_function(default(config,
-                "efficiency_el_out", "const:0.2"
+            Symbol("heat_ht_out") => parse_efficiency_function(default(config,
+                "efficiency_heat_ht_out", "const:0.15"
+            )),
+            Symbol("heat_lt_out") => parse_efficiency_function(default(config,
+                "efficiency_heat_lt_out", "const:0.07"
             )),
             Symbol("h2_out") => parse_efficiency_function(default(config,
                 "efficiency_h2_out", "const:0.6"
@@ -73,6 +84,15 @@ mutable struct Electrolyser <: Component
                 "efficiency_o2_out", "const:0.6"
             )),
         )
+
+        output_interfaces = InterfaceMap(
+            m_heat_ht_out => nothing,
+            m_h2_out => nothing,
+            m_o2_out => nothing,
+        )
+        if heat_lt_is_usable
+            output_interfaces[m_heat_lt_out] = nothing
+        end
 
         return new(
             uac, # uac
@@ -83,13 +103,10 @@ mutable struct Electrolyser <: Component
             InterfaceMap( # input_interfaces
                 m_el_in => nothing
             ),
-            InterfaceMap( # output_interfaces
-                m_heat_out => nothing,
-                m_h2_out => nothing,
-                m_o2_out => nothing,
-            ),
+            output_interfaces,
             m_el_in,
-            m_heat_out,
+            m_heat_ht_out,
+            m_heat_lt_out,
             m_h2_out,
             m_o2_out,
             config["power_el"] / efficiencies[Symbol("el_in")](1.0),
@@ -100,7 +117,9 @@ mutable struct Electrolyser <: Component
             Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
             1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
             default(config, "min_run_time", 3600),
-            default(config, "output_temperature", 55.0),
+            heat_lt_is_usable,
+            default(config, "output_temperature_ht", 55.0),
+            default(config, "output_temperature_lt", 25.0),
             0.0, # losses
             0.0, # losses_heat
             0.0  # losses_hydrogen
@@ -115,18 +134,34 @@ function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
             unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
         )
     )
+
     set_storage_transfer!(
-        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_ht_out],
         default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
+            unit.controller.parameter, "load_storages " * String(unit.m_heat_ht_out), true
         )
     )
+
+    if unit.heat_lt_is_usable
+        set_storage_transfer!(
+            unit.output_interfaces[unit.m_heat_lt_out],
+            default(
+                unit.controller.parameter,
+                "load_storages " * String(unit.m_heat_lt_out),
+                true
+            )
+        )
+    else
+        unit.controller.parameter["consider_m_heat_lt_out"] = false
+    end
+
     set_storage_transfer!(
         unit.output_interfaces[unit.m_h2_out],
         default(
             unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
         )
     )
+
     set_storage_transfer!(
         unit.output_interfaces[unit.m_o2_out],
         default(
@@ -144,18 +179,28 @@ function control(
 )
     move_state(unit, components, sim_params)
     set_temperature!(
-        unit.output_interfaces[unit.m_heat_out],
+        unit.output_interfaces[unit.m_heat_ht_out],
         nothing,
-        unit.output_temperature
+        unit.output_temperature_ht
     )
+    if unit.heat_lt_is_usable
+        set_temperature!(
+            unit.output_interfaces[unit.m_heat_lt_out],
+            nothing,
+            unit.output_temperature_lt
+        )
+    end
 end
 
 function set_max_energies!(
-    unit::Electrolyser, el_in::Float64, heat_out::Float64,
+    unit::Electrolyser, el_in::Float64, heat_ht_out::Float64, heat_lt_out::Float64,
     h2_out::Float64, o2_out::Float64
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out)
+    if unit.heat_lt_is_usable
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out)
+    end
     set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
     set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
 end
@@ -194,9 +239,11 @@ function potential(
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4])
+        set_max_energies!(
+            unit, energies[1], energies[2], energies[3], energies[4], energies[5]
+        )
     end
 end
 
@@ -204,16 +251,20 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
         return
     end
 
     sub!(unit.input_interfaces[unit.m_el_in], energies[1])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[2])
-    add!(unit.output_interfaces[unit.m_h2_out], energies[3])
-    add!(unit.output_interfaces[unit.m_o2_out], energies[4])
+    add!(unit.output_interfaces[unit.m_heat_ht_out], energies[2])
+    if unit.heat_lt_is_usable
+        add!(unit.output_interfaces[unit.m_heat_lt_out], energies[3])
+    end
+    add!(unit.output_interfaces[unit.m_h2_out], energies[4])
+    add!(unit.output_interfaces[unit.m_o2_out], energies[5])
 
-    unit.losses_heat = energies[1] - energies[2] - energies[3]
+    unit.losses_heat = energies[1] - energies[2] - energies[4] +
+        (unit.heat_lt_is_usable ? -1 : 0) * energies[3]
     unit.losses_hydrogen = 0.0
     unit.losses = unit.losses_heat + unit.losses_hydrogen
 end
@@ -238,13 +289,22 @@ function reset(unit::Electrolyser)
 end
 
 function output_values(unit::Electrolyser)::Vector{String}
-    return [string(unit.m_el_in)*" IN", 
-            string(unit.m_h2_out)*" OUT",
-            string(unit.m_o2_out)*" OUT",
-            string(unit.m_heat_out)*" OUT",
-            "Losses",
-            "Losses_heat",
-            "Losses_hydrogen"]
+    channels = [
+        string(unit.m_el_in)*" IN",
+        string(unit.m_h2_out)*" OUT",
+        string(unit.m_o2_out)*" OUT",
+        string(unit.m_heat_ht_out)*" OUT",
+        "Losses",
+        "Losses_heat",
+        "Losses_hydrogen"
+    ]
+
+    if unit.heat_lt_is_usable
+        append!(channels, [string(unit.m_heat_lt_out)*" OUT"])
+        return channels
+    else
+        return channels
+    end
 end
 
 function output_value(unit::Electrolyser, key::OutputKey)::Float64
