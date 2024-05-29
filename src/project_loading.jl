@@ -167,7 +167,7 @@ Calculate the base order for the simulation steps.
 This is determined by the system functions having a certain "natural" order as well as the
 simulation steps having a natural order as well.
 """
-function base_order(components_by_function)
+function base_order(components_by_function, components)
     simulation_order = []
     initial_nr = sum([length(bucket) for bucket in components_by_function]) * 100
 
@@ -197,24 +197,28 @@ function base_order(components_by_function)
     end
 
     # place steps potential and process for transformers in order by "chains"
-    chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)
-    for chain in chains
-        if length(chain) > 1
-            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
-                    push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
-                    initial_nr -= 1
-            end
-            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-                initial_nr -= 1
-            end
-        else
-            for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-                initial_nr -= 1
-            end
-        end
-    end
+    transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
+    simulation_order, initial_nr = add_transformer_potentials(simulation_order, initial_nr, transformers_and_busses)
+    # TODO: Currentyl a completely separate energy system would not be detected!
+
+    # chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)    
+    # for chain in chains
+    #     if length(chain) > 1
+    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+    #             initial_nr -= 1
+    #         end
+    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
+    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+    #             initial_nr -= 1
+    #         end
+    #     else
+    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
+    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+    #             initial_nr -= 1
+    #         end
+    #     end
+    # end
 
     # process, then load storages
     for unit in values(components_by_function[5])
@@ -241,6 +245,574 @@ function base_order(components_by_function)
     end
 
     return simulation_order
+end
+
+function add_transformer_potentials(simulation_order, initial_nr, current_components; reverse=nothing, connecting_component=nothing, checked_components=[])
+
+    # detect parallel paths in the energy system
+    parallel_branches = find_parallels(current_components)
+
+    # detect the first "middle transformers" that has either at more than one input interface 
+    # or at more than one output interface at least each one transformer. 
+    # "First" means it has no other middle transformer in it's inputs.
+    # inface_branches_with_transformers and outface_branches_with_transformers holds the branches 
+    # of the input/output interfaces of first_middle_transformer that contain other transformers.
+    # Considers only current components, but also possible connected upstream transformers in an 
+    # output and the other way around.
+    first_middle_transformer, 
+            inface_branches_with_transformers,
+            outface_branches_with_transformers = detect_first_middle_transformer(current_components)
+
+    # Note: No parallels containing middle transformers are currently considered!
+
+    # iterate through all branches of the middle transformer, if it exists, starting with the branch 
+    # with the least amount of other transformers.
+    if first_middle_transformer !== nothing
+        # sort the branches by the amount of "seen" transformers and classify them as input or output interface
+        combined_branches_with_transformers = vcat(
+            [(inface, length([x for x in inface if x.sys_function === EnergySystems.sf_transformer]), true) for inface in inface_branches_with_transformers],
+            [(outface, length([x for x in outface if x.sys_function === EnergySystems.sf_transformer]), false) for outface in outface_branches_with_transformers]
+        )
+        sorted_combined_branches_with_transformers = sort(combined_branches_with_transformers, by=x -> x[2])
+        
+        middle_transformer_branches = [x[1] for x in sorted_combined_branches_with_transformers]
+        is_input = [x[3] for x in sorted_combined_branches_with_transformers]
+        
+        # move connecting branch to the end of the calculation
+        is_connecting_branch = fill(false, length(is_input))
+        if connecting_component !== nothing
+            for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
+                for component in middle_transformer_branch
+                    if component == connecting_component
+                        is_connecting_branch[idx] = true
+                        # should be only one.
+                        break
+                    end
+                end
+            end
+        end
+        if any(is_connecting_branch)
+            push!(middle_transformer_branches, popat!(middle_transformer_branches, findfirst(is_connecting_branch)))
+            push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
+            push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
+        end
+
+        for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
+            # change direction after the first branch while accounting for possible changes 
+            # from input to output or vica versa.
+            #
+            # Should do the following:
+            # Input --> Input --> Input: false --> true --> true
+            # Input --> Input --> Output: false --> true --> false
+            # Input --> Output --> Input: false --> false --> true
+            # Input --> Output --> Output: false --> false --> false
+            # Output --> Input --> Input: true --> true --> true
+            # Output --> Input --> Output: true --> true --> false
+            # Output --> Output --> Input: true --> false --> true
+            # Output --> Output --> Output: true --> false --> false
+            if idx == 1
+                reverse = !is_input[1]
+            else
+                reverse = is_input[idx]
+            end
+
+            if is_input[idx]
+                connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][end]
+            else
+                connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][1]
+            end
+
+            checked_components = 
+
+            simulation_order, initial_nr = add_transformer_potentials(simulation_order, 
+                                                                      initial_nr,
+                                                                      middle_transformer_branch,
+                                                                      reverse=reverse,
+                                                                      connecting_component=connecting_component)
+
+            if length(middle_transformer_branches) > 2 && idx > 1
+                simulation_order, initial_nr = add_transformer_potentials(simulation_order, 
+                                                                          initial_nr,
+                                                                          middle_transformer_branch,
+                                                                          reverse=!reverse,
+                                                                          connecting_component=connecting_component)
+            end
+
+            # add potentials of middle_transformer in between of the single branches
+            push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+            initial_nr -= 1
+        end
+    else
+        # no middle transformer is present in the current components
+        # search for middle_busses: busses with more than one input and/or output 
+        # interface with as least one transformer each.
+        # returns the first/last middle bus that has no other middle bus in its inputs/outputs,
+        # depending if reverse is true (last) or false/nothing (first). 
+        # Branches should be in the correct ascending input/output order of the bus,
+        # starting with the highest priority.
+        # Considers only current components, 
+        # but also possible connected upstream transformers in an output and the other way around.
+        first_middle_bus, 
+            inface_branches_with_transformers,
+            outface_branches_with_transformers = detect_middle_bus(current_components, reverse)
+
+        if first_middle_bus !== nothing
+            # Currently input busses are calculated first
+            # TODO: How to handle parallel branches between two busses?
+            # TODO: How to handle loops in nested busses?
+            combined_branches_with_transformers = vcat(
+                [(inface, true) for inface in inface_branches_with_transformers],
+                [(outface, false) for outface in outface_branches_with_transformers]
+            )
+            
+            middle_bus_branches = [x[1] for x in combined_branches_with_transformers]
+            is_input = [x[2] for x in combined_branches_with_transformers]
+    
+            # move connecting branch to the end of the calculation
+            is_connecting_branch = fill(false, length(is_input))
+            if connecting_component !== nothing
+                for (idx, middle_bus_branch) in enumerate(middle_bus_branches)
+                    for component in middle_bus_branch
+                        if component == connecting_component
+                            is_connecting_branch[idx] = true
+                            # should be only one.
+                            break
+                        end
+                    end
+                end
+            end
+            if any(is_connecting_branch)
+                push!(middle_bus_branches, popat!(middle_bus_branches, findfirst(is_connecting_branch)))
+                push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
+                push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
+            end
+
+            # detect parallel branches
+            parallel_branch_idx = fill(0, length(is_input))
+            for (idx_middle_bus_branch, middle_bus_branch) in enumerate(middle_bus_branches)
+                for component in middle_bus_branch
+                    for (idx_parallel_branch, parallel_branch) in enumerate(parallel_branches)
+                        for branch in parallel_branch[2]
+                            if component in branch
+                                parallel_branch_idx[idx_middle_bus_branch] = idx_parallel_branch
+                            end
+                        end
+                    end
+                end
+            end
+            merged_branches_dict = Dict{Int, Vector{Any}}()
+            order_dict = Dict{Int, Int}()
+            # Iterate over the parallel_branch_idx and corresponding middle_bus_branches
+            for (i, idx) in enumerate(parallel_branch_idx)
+                if idx == 0
+                    # Use the index i as key for branches that should be copied as is
+                    merged_branches_dict[-i] = middle_bus_branches[i]
+                    order_dict[-i] = i
+                else
+                    # If the index is not 0, merge the branches
+                    if haskey(merged_branches_dict, idx)
+                        append!(merged_branches_dict[idx], middle_bus_branches[i])
+                        # TODO: The order is not correct here!
+                    else
+                        merged_branches_dict[idx] = copy(middle_bus_branches[i])
+                        order_dict[idx] = i  # Record the first occurrence for ordering
+                    end
+                end
+            end
+            # Sort keys by their first occurrence
+            sorted_keys = sort(collect(keys(order_dict)), by=k -> order_dict[k])
+            # Collect the results based on the sorted keys
+            merged_branches = [merged_branches_dict[k] for k in sorted_keys]
+            for (idx,branch) in enumerate(merged_branches)
+                merged_branches[idx] = unique(merged_branches[idx])
+            end
+
+
+            for (idx, middle_bus_branch) in enumerate(merged_branches)
+                if reverse === nothing
+                    reverse = !is_input[idx]
+                    if is_connecting_branch[idx]
+                        reverse = !reverse
+                    end
+                end
+                if is_input[idx]
+                    connecting_component = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer][end]
+                else
+                    connecting_component = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer][1]
+                end
+                simulation_order, initial_nr = add_transformer_potentials(simulation_order,
+                                                                          initial_nr,
+                                                                          middle_bus_branch,
+                                                                          reverse=reverse,
+                                                                          connecting_component=connecting_component)
+                # if is_parallel[idx]
+                #     simulation_order, initial_nr = add_transformer_potentials(simulation_order, 
+                #                                                               initial_nr,
+                #                                                               middle_bus_branch,
+                #                                                               reverse=!reverse,
+                #                                                               connecting_component=connecting_component)
+                # end
+            end
+
+        else
+            # no middle busses found
+            # write steps according default or predefined order if given
+            if reverse === nothing
+                reverse = true
+            end
+            for unit in iterate_chain(current_components, EnergySystems.sf_transformer, reverse=reverse)
+                if unit.sys_function === EnergySystems.sf_transformer
+                    push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                end
+            end
+        end
+    end
+
+    return simulation_order, initial_nr
+end
+
+
+function detect_middle_bus(current_components, reverse)
+    middle_busses = Any[]
+    transformers_in_infaces = Any[]
+    transformers_in_outfaces = Any[]
+    transformers_in_infaces_arr = Vector{Vector{Any}}()
+    transformers_in_outfaces_arr = Vector{Vector{Any}}()
+
+    for component in current_components
+        outfaces_with_transformers = Any[]
+        infaces_with_transformers = Any[]
+        transformer_in_output_interface = Any[]
+        transformer_in_input_interface = Any[]
+        if component.sys_function === EnergySystems.sf_bus
+            for inface in values(component.input_interfaces)
+                if check_interface_for_transformer(inface, "input")
+                    push!(infaces_with_transformers, inface)
+                    other_infaces = [x for x in values(component.input_interfaces) if x !== inface]
+                    inface_transformers = Any[]
+                    add_non_recursive_indirect_inputs!(inface_transformers,
+                                                       component,
+                                                       other_infaces,
+                                                       [EnergySystems.sf_transformer, EnergySystems.sf_bus],
+                                                       "")
+                    push!(transformer_in_input_interface, inface_transformers)
+                end
+            end
+            for outface in values(component.output_interfaces)
+                if check_interface_for_transformer(outface, "output")
+                    push!(outfaces_with_transformers, outface)
+                    other_outfaces = [x for x in values(component.output_interfaces) if x !== outface]
+                    outface_transformers = Any[]
+                    add_non_recursive_indirect_outputs!(outface_transformers,
+                                                        component,
+                                                        other_outfaces,
+                                                        [EnergySystems.sf_transformer, EnergySystems.sf_bus],
+                                                        "")
+                    push!(transformer_in_output_interface, outface_transformers)
+                end
+            end 
+        end
+        if length(outfaces_with_transformers) > 1 || length(infaces_with_transformers) > 1
+            push!(middle_busses, component)
+            push!(transformers_in_infaces, transformer_in_input_interface)
+            push!(transformers_in_outfaces, transformer_in_output_interface)
+        end
+    end
+
+    # detect which middle bus is the first or the last, depending on reverse
+    # default starts with the first bus
+    has_middle_bus_in_interfaces = Any[]
+    for (idx, middle_bus) in enumerate(middle_busses)
+        bus_chain = Set()
+        has_middle_bus_in_interfaces_temp = false
+
+        if reverse === nothing || reverse == false
+            add_non_recursive_indirect_inputs!(bus_chain, middle_bus, [], [EnergySystems.sf_bus], "")
+        else
+            add_non_recursive_indirect_outputs!(bus_chain, middle_bus, [], [EnergySystems.sf_bus], "")
+        end
+        for other_middle_bus in middle_busses
+            if middle_bus == other_middle_bus
+                continue
+            elseif other_middle_bus in bus_chain
+                has_middle_bus_in_interfaces_temp = true
+            end
+        end
+        push!(has_middle_bus_in_interfaces, has_middle_bus_in_interfaces_temp)
+
+        # deleat middle_bus from transformer sets and convert Set to array
+        temp = []
+        for interface in transformers_in_infaces[idx]
+            temp_transformers = []
+            for component in interface
+                if component !== middle_bus
+                    push!(temp_transformers, component)
+                end
+            end
+            push!(temp, temp_transformers)
+        end
+        push!(transformers_in_infaces_arr, temp)
+
+        temp = []
+        for interface in transformers_in_outfaces[idx]
+            temp_transformers = []
+            for component in interface
+                if component !== middle_bus
+                    push!(temp_transformers, component)
+                end
+            end
+            push!(temp, temp_transformers)
+        end
+        push!(transformers_in_outfaces_arr, temp)
+    
+    end
+
+    false_indices = findall(x -> !x, has_middle_bus_in_interfaces)
+
+    if length(false_indices) == 1
+        return  middle_busses[false_indices[1]], 
+                transformers_in_infaces_arr[false_indices[1]],
+                transformers_in_outfaces_arr[false_indices[1]]
+            
+    elseif length(false_indices) > 1
+        # don't know what to do then - just return the first one? TODO
+        return  middle_busses[false_indices[1]], 
+                transformers_in_infaces_arr[false_indices[1]],
+                transformers_in_outfaces_arr[false_indices[1]]
+    elseif length(false_indices) == 0
+        return nothing, nothing, nothing
+    end
+end
+
+
+function detect_first_middle_transformer(current_components)
+    middle_transformers = Any[]
+    transformers_in_infaces = Any[]
+    transformers_in_outfaces = Any[]
+    transformers_in_infaces_arr = Vector{Vector{Any}}()
+    transformers_in_outfaces_arr = Vector{Vector{Any}}()
+
+    for component in current_components
+        outfaces_with_transformers = Any[]
+        infaces_with_transformers = Any[]
+        transformer_in_output_interface = Any[]
+        transformer_in_input_interface = Any[]
+        if component.sys_function === EnergySystems.sf_transformer
+            for inface in values(component.input_interfaces)
+                if check_interface_for_transformer(inface, "input")
+                    push!(infaces_with_transformers, inface)
+                    other_infaces = [x for x in values(component.input_interfaces) if x !== inface]
+                    inface_transformers = Any[]
+                    add_non_recursive_indirect_inputs!(inface_transformers,
+                                                       component,
+                                                       other_infaces,
+                                                       [EnergySystems.sf_transformer, EnergySystems.sf_bus],
+                                                       "")
+                    push!(transformer_in_input_interface, inface_transformers)
+                end
+            end 
+            for outface in values(component.output_interfaces)
+                if check_interface_for_transformer(outface, "output")
+                    push!(outfaces_with_transformers, outface)
+                    other_outfaces = [x for x in values(component.output_interfaces) if x !== outface]
+                    outface_transformers = Any[]
+                    add_non_recursive_indirect_outputs!(outface_transformers,
+                                                        component,
+                                                        other_outfaces,
+                                                        [EnergySystems.sf_transformer, EnergySystems.sf_bus],
+                                                        "")
+                    push!(transformer_in_output_interface, outface_transformers)
+                end
+            end 
+        end
+        if length(outfaces_with_transformers) > 1 || length(infaces_with_transformers) > 1
+            push!(middle_transformers, component)
+            push!(transformers_in_infaces, transformer_in_input_interface)
+            push!(transformers_in_outfaces, transformer_in_output_interface)
+        end
+    end
+
+    has_middle_transformer_in_inputs = Any[]
+    for (idx, middle_transformer) in enumerate(middle_transformers)
+        transformer_input_chain = Set()
+        has_middle_transformer_in_inputs_temp = false
+
+        add_non_recursive_indirect_inputs!(transformer_input_chain, middle_transformer, [], [EnergySystems.sf_transformer], "")
+        for other_middle_transformer in middle_transformers
+            if middle_transformer == other_middle_transformer
+                continue
+            elseif other_middle_transformer in transformer_input_chain
+                has_middle_transformer_in_inputs_temp = true
+            end
+        end
+        push!(has_middle_transformer_in_inputs, has_middle_transformer_in_inputs_temp)
+
+        # deleat middle_transformer from transformer sets and convert Set to array
+        temp = []
+        for interface in transformers_in_infaces[idx]
+            temp_transformers = []
+            for transformer in interface
+                if transformer !== middle_transformer
+                    push!(temp_transformers, transformer)
+                end
+            end
+            push!(temp, temp_transformers)
+        end
+        push!(transformers_in_infaces_arr, temp)
+
+        temp = []
+        for interface in transformers_in_outfaces[idx]
+            temp_transformers = []
+            for transformer in interface
+                if transformer !== middle_transformer
+                    push!(temp_transformers, transformer)
+                end
+            end
+            push!(temp, temp_transformers)
+        end
+        push!(transformers_in_outfaces_arr, temp)
+    
+    end
+
+    false_indices = findall(x -> !x, has_middle_transformer_in_inputs)
+
+    if length(false_indices) == 1
+        return  middle_transformers[false_indices[1]], 
+                transformers_in_infaces_arr[false_indices[1]],
+                transformers_in_outfaces_arr[false_indices[1]]
+            
+    elseif length(false_indices) > 1
+        # don't know what to do then - just return the first one? TODO
+        return  middle_transformers[false_indices[1]], 
+                transformers_in_infaces_arr[false_indices[1]],
+                transformers_in_outfaces_arr[false_indices[1]]
+    elseif length(false_indices) == 0
+        return nothing, nothing, nothing
+    end
+end
+
+
+function find_parallels(components)
+    function find_paths(unit, path, all_paths, old_uac)
+        push!(path, unit)
+        for outface in values(unit.output_interfaces)
+            if (  outface === nothing 
+               || outface.target in path 
+               || outface.target.sys_function === EnergySystems.sf_storage
+               || (unit.sys_function === EnergySystems.sf_bus 
+                   && has_grid_input(unit, outface.target.uac)
+                   && !(old_uac !== "" && !has_grid_output(unit, old_uac)) )
+               || (old_uac !== "" && !connection_allowed(unit, old_uac, outface.target.uac))
+               || (outface.target === EnergySystems.sf_transformer && !(outface.target in components) )
+            )
+                continue
+            end
+            new_path = copy(path)
+            if outface.target.sys_function === EnergySystems.sf_bus && outface.target.proxy !== nothing
+                find_paths(outface.target.proxy, new_path, all_paths, outface.source.uac)
+            else
+                find_paths(outface.target, new_path, all_paths, outface.source.uac)
+            end
+        end 
+        push!(all_paths, copy(path))
+        pop!(path)
+    end
+    
+    all_paths = Vector{Vector}()
+    paths_dict = Dict{Tuple, Vector{Vector}}()
+
+    # find all possible paths between all components in current energy system
+    # Paths are split by storages and by grid inputs and outputs. 
+    # Connection matrixes of busses are taken into account.
+    for unit in components
+        if !(unit.sys_function === EnergySystems.sf_bus && unit.proxy !== nothing)
+            find_paths(unit, [], all_paths, "")
+        end
+    end
+
+    for path in all_paths
+        start_unit = path[1]
+        end_unit = path[end]
+        # filter paths for...
+        if (
+            # starting with either a bus or transformer
+            start_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
+            # ending with either a bus or transformer
+            && end_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
+            # has a length > 2
+            && length(path) > 2
+            # path contains at least one transformer in between
+            && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:end-1]]
+        )
+            # remove all non-transformers and non-busses from path
+            path_reduced = Any[path[1]]
+            for component in path[2:end-1]
+                if component.sys_function in [EnergySystems.sf_transformer, EnergySystems.sf_bus]
+                    push!(path_reduced, component)
+                end
+            end
+            push!(path_reduced, path[end])
+
+             # save path to paths_dict if it's not already included
+             key = (start_unit.uac, end_unit.uac)
+             if !haskey(paths_dict, key)
+                 paths_dict[key] = Vector{Vector}()
+             end
+             if !any(path_reduced == p for p in paths_dict[key])
+                 push!(paths_dict[key], path_reduced)
+             end
+        end
+    end
+
+    # filter for parallel paths that contain more than one variant from A to B
+    parallel_paths = Dict(collect(filter(paths -> length(paths[2]) > 1, paths_dict)))
+
+    # remove elements that are all the same for each path in each parallel path
+    function values_are_identical(vectors, index)
+        first_name = vectors[1][index]
+        return all(v -> v[index] == first_name, vectors)
+    end
+
+    function last_are_identical(vectors)
+        last_name = vectors[1][end]
+        return all(v -> v[end] == last_name, vectors)
+    end
+
+    function second_last_are_identical(vectors)
+        last_name = vectors[1][end-1]
+        return all(v -> v[end-1] == last_name, vectors)
+    end
+
+    for (keys, paths) in parallel_paths
+        while values_are_identical(paths, 1) && values_are_identical(paths, 2)
+            for v in paths
+                popfirst!(v)
+            end
+        end
+        
+        while last_are_identical(paths) && second_last_are_identical(paths)
+            for v in paths
+                pop!(v)
+            end
+        end
+    end
+
+    # build new dict with the updated unique paths
+    final_paths = Dict()
+    for paths in values(parallel_paths)
+        for path in paths
+            key = (path[1].uac, path[end].uac)
+            if !haskey(final_paths, key)
+                final_paths[key] = Vector{Vector}()
+            end
+            if !any(path == p for p in final_paths[key])
+                push!(final_paths[key], path)
+            end
+        end
+    end
+
+    return final_paths
 end
 
 """
@@ -275,24 +847,27 @@ Add connected units of the same system function to the node set in a non-recursi
 Here, "connected" does not necessarily mean that the components have to be connected directy 
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the outputs of each component, starting with "unit".
+Note: Storages are defined to interrupt chains!
 
 # Arguments
 -`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
 -`unit`: The unit to start the search with
 -`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
                                                interfaces. Should be [] when calling externally.
--`sys_function`: The system function of the chain that should be found
+-`sys_function`: The system function of the chain that should be found, as Vector to find multiple sys_function
 -`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
                           Should be an empty string ("") at the first external call.
 """
-function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
-    if unit.sys_function === sys_function
+function add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac, skip_storages=true)
+    if unit.sys_function in sys_function && !(unit in node_set)
         push!(node_set, unit)
     end
 
     for outface in values(unit.output_interfaces)
         if outface !== nothing
             if outface in checked_interfaces
+                continue
+            elseif skip_storages && outface.target.sys_function === EnergySystems.sf_storage
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
                 push!(checked_interfaces, outface)
@@ -309,24 +884,27 @@ Add connected units of the same system function to the node set in a non-recursi
 Here, "connected" does not necessarily mean that the components have to be connected directy 
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the inputs of each component, starting with "unit".
+Note: Storages are defined to interrupt chains!
 
 # Arguments
 -`node_set`: A globally defined Set() containing an (empty) chain of interconnected components (units)
 -`unit`: The unit to start the search with
 -`checked_interfaces::Array{SystemInterface}`: An array holding the already checked system 
                                                interfaces. Should be [] when calling externally.
--`sys_function`: The system function of the chain that should be found
+-`sys_function`: The system function of the chain that should be found, as Vector to find multiple sys_function
 -`last_unit_uac::String`: String to pass the uac of the last checked unit to the recursive call.
                           Should be an empty string ("") at the first external call.
 """
-function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac)
-    if unit.sys_function === sys_function
+function add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function, last_unit_uac, skip_storages=true)
+    if unit.sys_function in sys_function && !(unit in node_set)
         push!(node_set, unit)
     end
 
     for inface in values(unit.input_interfaces)
         if inface !== nothing
             if inface in checked_interfaces
+                continue
+            elseif skip_storages && inface.source.sys_function === EnergySystems.sf_storage
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
                 push!(checked_interfaces, inface)
@@ -436,8 +1014,8 @@ function find_chains(components, sys_function; direct_connection_only=true)::Vec
             end
         else
             chain = Set()
-            add_non_recursive_indirect_outputs!(chain, unit, [], sys_function, "")
-            add_non_recursive_indirect_inputs!(chain, unit, [], sys_function, "")
+            add_non_recursive_indirect_outputs!(chain, unit, [], [sys_function], "")
+            add_non_recursive_indirect_inputs!(chain, unit, [], [sys_function], "")
             push!(chains, chain)
         end
     end
@@ -571,7 +1149,7 @@ not trivial and might not work for each possible grouping of components.
 """
 function calculate_order_of_operations(components::Grouping)::StepInstructions
     components_by_function = categorize_by_function(components)
-    simulation_order = base_order(components_by_function)
+    simulation_order = base_order(components_by_function, components)
 
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
@@ -756,20 +1334,6 @@ But, the energy flow matrix of the bus is taken into account.
 
 """
 function reorder_for_input_priorities(simulation_order, components, components_by_function)
-    has_grid_output = function(bus, input_interface_uac)
-        for outface in values(bus.output_interfaces)
-            if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
-                input_idx = bus.balance_table_inputs[input_interface_uac].input_index
-                output_idx = bus.balance_table_outputs[outface.target.uac].output_index
-                if (bus.connectivity.energy_flow === nothing ||
-                    bus.connectivity.energy_flow[input_idx][output_idx])
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
     # for every bus except for those with proxies...
     for bus in values(components_by_function[3])
         if bus.proxy !== nothing continue end
@@ -799,6 +1363,34 @@ function reorder_for_input_priorities(simulation_order, components, components_b
     end
 end
 
+function has_grid_input(bus, output_interface_uac)
+    for inface in values(bus.input_interfaces)
+        if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
+            input_idx = bus.balance_table_inputs[inface.source.uac].input_index
+            output_idx = bus.balance_table_outputs[output_interface_uac].output_index
+            if (bus.connectivity.energy_flow === nothing ||
+                bus.connectivity.energy_flow[input_idx][output_idx])
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function has_grid_output(bus, input_interface_uac)
+    for outface in values(bus.output_interfaces)
+        if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
+            input_idx = bus.balance_table_inputs[input_interface_uac].input_index
+            output_idx = bus.balance_table_outputs[outface.target.uac].output_index
+            if (bus.connectivity.energy_flow === nothing ||
+                bus.connectivity.energy_flow[input_idx][output_idx])
+                return true
+            end
+        end
+    end
+    return false
+end
+
 """
     reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
 
@@ -814,20 +1406,6 @@ But, the energy flow matrix of the bus is taken into account.
 -`components_by_function`: The mapping of component functions
 """
 function reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
-    has_grid_input = function(bus, output_interface_uac)
-        for inface in values(bus.input_interfaces)
-            if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
-                input_idx = bus.balance_table_inputs[inface.source.uac].input_index
-                output_idx = bus.balance_table_outputs[output_interface_uac].output_index
-                if (bus.connectivity.energy_flow === nothing ||
-                    bus.connectivity.energy_flow[input_idx][output_idx])
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
     # for every bus except for those with proxies...
     for bus in values(components_by_function[3])
         if bus.proxy !== nothing continue end
