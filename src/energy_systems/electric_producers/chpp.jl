@@ -278,6 +278,8 @@ function potential(
 end
 
 function process(unit::CHPP, sim_params::Dict{String,Any})
+    set_max_energies!(unit, nothing, nothing, nothing)
+
     potential_energy_gas_in = check_gas_in(unit, sim_params)
     if potential_energy_gas_in === nothing
         set_max_energies!(unit, 0.0, 0.0, 0.0)

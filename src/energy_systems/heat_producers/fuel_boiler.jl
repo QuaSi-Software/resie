@@ -327,6 +327,8 @@ function potential(
 end
 
 function process(unit::FuelBoiler, sim_params::Dict{String,Any})
+    set_max_energies!(unit, nothing, nothing)
+
     potential_energy_fuel_in = check_fuel_in(unit, sim_params)
     if potential_energy_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0)

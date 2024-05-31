@@ -413,13 +413,21 @@ the set_max_energy! function on an interface, if one side is a bus.
 `is_input::Bool`: If the component is an input
 `value::Float64`: The value of max_energy
 """
-function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
+function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Floathing)
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
+        if value === nothing
+            bus.balance_table_inputs[comp.uac].energy_potential = value
+        else
+            bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
+        end
     else
-        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
+        if value === nothing
+            bus.balance_table_outputs[comp.uac].energy_potential = value
+        else
+            bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
+        end
     end
 
     if unit.proxy !== nothing
@@ -736,6 +744,7 @@ other purpose.
 `unit::Bus`: The bus for which to calculate energy distribution
 """
 function inner_distribute!(unit::Bus)
+    reset_balance_table!(unit::Bus, false)
     continue_iteration = true
 
     for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
