@@ -22,8 +22,13 @@ mutable struct Electrolyser <: Component
     m_o2_out::Symbol
 
     power::Float64
+    power_total::Float64
+    nr_units::Integer
+    dispatch_strategy::String
+
     linear_interface::Symbol
     min_power_fraction::Float64
+    min_power_fraction_total::Float64
     # efficiency functions by input/output
     efficiencies::Dict{Symbol,Function}
     # list of names of input and output interfaces, used internally only
@@ -97,6 +102,15 @@ mutable struct Electrolyser <: Component
             output_interfaces[m_heat_lt_out] = nothing
         end
 
+        nr_units = default(config, "nr_switchable_units", 1)
+        power_total = config["power_el"] / efficiencies[Symbol("el_in")](1.0)
+        power = power_total / nr_units
+
+        dispatch_strategy = default(config, "dispatch_strategy", "all_equal")
+        if !(dispatch_strategy in ("all_equal", "try_optimal"))
+            @error "Unknown dispatch strategy $dispatch_strategy for electrolyser $uac"
+        end
+
         return new(
             uac, # uac
             controller_for_strategy( # controller
@@ -112,13 +126,17 @@ mutable struct Electrolyser <: Component
             m_heat_lt_out,
             m_h2_out,
             m_o2_out,
-            config["power_el"] / efficiencies[Symbol("el_in")](1.0),
+            power,
+            power_total,
+            nr_units,
+            dispatch_strategy,
             linear_interface,
-            default(config, "min_power_fraction", 0.2),
+            default(config, "min_power_fraction", 0.4),
+            default(config, "min_power_fraction_total", 0.2),
             efficiencies,
             interface_list,
             Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
-            1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
+            1.0 / default(config, "nr_discretization_steps", 1), # discretization_step
             default(config, "min_run_time", 3600),
             heat_lt_is_usable,
             default(config, "output_temperature_ht", 55.0),
@@ -208,6 +226,49 @@ function set_max_energies!(
     set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
 end
 
+"""
+    dispatch_units(ely::Electrolyser, plr::Float64, limit_name::Symbol, limit_value)
+
+Calculate the number of active units and the PLR for each in order to meet the given limit.
+
+# Arguments
+- `ely::Electrolyser`: The electrolyser
+- `plr::Float64`: The total PLR over the whole electrolyser assembly
+- `limit_name::Symbol`: The name of the interface that is limiting. Should be on of the
+    values in the `interface_list` field.
+- `limit_value::Float64`: The limiting value to meet. Can be larger than the total power of
+    the electroylser, in which case all units are utilised to their full extent.
+# Returns
+- `Integer`: Number of active units
+- `Float64`: PLR of each active unit
+"""
+function dispatch_units(
+    ely::Electrolyser,
+    plr::Float64,
+    limit_name::Symbol,
+    limit_value::Float64
+)::Tuple{Integer,Float64}
+    if limit_value == Inf
+        return ely.nr_units, 1.0
+    end
+
+    if ely.dispatch_strategy == "try_optimal"
+        optimal_val_per_unit = 0.66 * watt_to_wh(ely.power) *
+            ely.efficiencies[limit_name](0.66)
+        nr_units = max(1, min(
+            ceil(limit_value / optimal_val_per_unit - 0.5),
+            ely.nr_units
+        ))
+        plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+
+    elseif ely.dispatch_strategy == "all_equal"
+        nr_units = ely.nr_units
+        plr_per_unit = plr
+    end
+
+    return nr_units, plr_per_unit
+end
+
 function calculate_energies(
     unit::Electrolyser,
     sim_params::Dict{String,Any},
@@ -230,9 +291,71 @@ function calculate_energies(
         return (false, [])
     end
 
-    return calculate_energies_for_plrde(
-        unit, sim_params, unit.min_power_fraction, max_plr
+    # calculate limiting interfaces and the total PLR that meets the limit
+    limiting_plr = 1.0
+    limiting_energy = Inf
+    limiting_interface = Symbol("h2_out")
+    plr_from_nrg = []
+
+    for name in unit.interface_list
+        availability = getproperty(EnergySystems, Symbol("check_" * String(name)))
+        energy = availability(unit, sim_params)
+
+        # shortcut if we're limited by zero input/output
+        if energy === nothing
+            return (false, [])
+        end
+
+        # in the following we want to work with positive values as it is easier
+        energy = abs(energy)
+
+        # limit to total design power
+        energy = min(
+            watt_to_wh(unit.power_total) * unit.efficiencies[name](1.0),
+            energy
+        )
+
+        # we can get the total PLR by assuming all units are activated equally, even if
+        # dispatch happens differently later
+        plr = plr_from_energy(unit, name, energy / unit.nr_units)
+        push!(plr_from_nrg, plr)
+
+        # keep track which was the limiting interface and how much energy is on that
+        # interface. if all interfaces are infinite, we're limited by the design power or
+        # some external condition, in which case hydrogen will be the limiting interface
+        if plr < limiting_plr
+            limiting_plr = plr
+            limiting_energy = energy
+            limiting_interface = name
+        end
+    end
+
+    # the operation point of the electrolyser is the minimum of the PLR from all inputs or
+    # outputs plus additional constraints and full load
+    used_plr = min(minimum(x->x, plr_from_nrg), max_plr, 1.0)
+
+    # check total minimum PLR before dispatching units, which might have their own minimum
+    # PLR which is typically different from the total
+    if used_plr < unit.min_power_fraction_total
+        return (false, [])
+    end
+
+    # we now have the PLR of the entire assembly and the limiting energy (which might be
+    # the design power) and need to decide how to dispatch the units to meet the target
+    # limiting energy
+    nr_active, plr_of_unit = dispatch_units(
+        unit, used_plr, limiting_interface, limiting_energy
     )
+
+    # now the total energies can be calculated from the number and PLR of utilised units
+    energies = []
+    for name in unit.interface_list
+        push!(
+            energies,
+            nr_active * energy_from_plr(unit, name, plr_of_unit)
+        )
+    end
+    return (true, energies)
 end
 
 function potential(
@@ -258,7 +381,9 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
-    plr = energies[1] / watt_to_wh(unit.power * unit.efficiencies[Symbol("el_in")](1.0))
+    plr = energies[1] / watt_to_wh(
+        unit.power_total * unit.efficiencies[Symbol("el_in")](1.0)
+    )
     h2_out_lossless = energies[1] * unit.efficiencies[Symbol("h2_out_lossless")](plr)
     unit.losses_hydrogen = h2_out_lossless - energies[4]
     unit.losses_heat = energies[1] - energies[2] +
