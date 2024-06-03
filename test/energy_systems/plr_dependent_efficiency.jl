@@ -410,3 +410,88 @@ end
 @testset "test_CHPP_el_eff_plrd" begin
     test_CHPP_el_eff_plrd()
 end
+
+function test_electrolyser_dispatch_units()
+    components_config = Dict{String,Any}(
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [],
+            "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
+            "scale" => 500.0,
+        ),
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "output_refs" => ["TST_ELY_01"],
+            "is_source" => true,
+        ),
+        "TST_GRO_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_c_g_h2",
+            "control_refs" => [],
+            "output_refs" => [],
+            "is_source" => false,
+        ),
+        "TST_GRO_02" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_c_g_o2",
+            "control_refs" => [],
+            "output_refs" => [],
+            "is_source" => false,
+        ),
+        "TST_ELY_01" => Dict{String,Any}(
+            "type" => "Electrolyser",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_DEM_01",
+                "TST_GRO_01",
+                "TST_GRO_02"
+            ],
+            "power_el" => 4000,
+            "heat_lt_is_usable" => false,
+            "nr_switchable_units" => 4,
+            "dispatch_strategy" => "equal_with_mpf",
+            "min_power_fraction_total" => 0.3,
+            "min_power_fraction" => 0.4
+        ),
+    )
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    electrolyser = components["TST_ELY_01"]
+
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    @test nr_units == 4
+    @test isapprox(plr, 0.5, atol=1e-9)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.31, Symbol("el_in"), 310.0)
+    @test nr_units == 3
+    @test isapprox(plr, 0.41333333333, atol=1e-9)
+
+    electrolyser.dispatch_strategy = "all_equal"
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    @test nr_units == 4
+    @test isapprox(plr, 0.5, atol=1e-9)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    @test nr_units == 4
+    @test isapprox(plr, 0.3, atol=1e-9)
+
+    electrolyser.dispatch_strategy = "try_optimal"
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    @test nr_units == 3
+    @test isapprox(plr, 0.66666666666, atol=1e-9)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    @test nr_units == 2
+    @test isapprox(plr, 0.6, atol=1e-9)
+end
+
+@testset "test_electrolyser_dispatch_units" begin
+    test_electrolyser_dispatch_units()
+end

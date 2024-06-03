@@ -107,8 +107,8 @@ mutable struct Electrolyser <: Component
         power_total = config["power_el"] / efficiencies[Symbol("el_in")](1.0)
         power = power_total / nr_units
 
-        dispatch_strategy = default(config, "dispatch_strategy", "all_equal")
-        if !(dispatch_strategy in ("all_equal", "try_optimal"))
+        dispatch_strategy = default(config, "dispatch_strategy", "equal_with_mpf")
+        if !(dispatch_strategy in ("all_equal", "try_optimal", "equal_with_mpf"))
             @error "Unknown dispatch strategy $dispatch_strategy for electrolyser $uac"
         end
 
@@ -262,6 +262,20 @@ function dispatch_units(
             ely.nr_units
         ))
         plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+
+    elseif ely.dispatch_strategy == "equal_with_mpf"
+        if plr >= ely.min_power_fraction
+            nr_units = ely.nr_units
+            plr_per_unit = plr
+        else
+            min_val_per_unit = ely.min_power_fraction * watt_to_wh(ely.power) *
+                ely.efficiencies[limit_name](ely.min_power_fraction)
+            nr_units = max(1, min(
+                floor(limit_value / min_val_per_unit),
+                ely.nr_units
+            ))
+            plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+        end
 
     elseif ely.dispatch_strategy == "all_equal"
         nr_units = ely.nr_units
