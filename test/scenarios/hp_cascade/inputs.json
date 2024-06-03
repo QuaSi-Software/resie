@@ -83,9 +83,20 @@
                 "name": "demand_driven"
             },
             "power_el": 20000,
-            "m_heat_out": "m_h_w_lt1",
-            "output_temperature": 25.0,
-            "min_power_fraction": 0.0
+            "output_temperature_ht": 25.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.0,
+            "min_power_fraction_total": 0.0,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
