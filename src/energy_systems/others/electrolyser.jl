@@ -25,6 +25,7 @@ mutable struct Electrolyser <: Component
     power_total::Float64
     nr_units::Integer
     dispatch_strategy::String
+    optimal_unit_plr::Float64
 
     linear_interface::Symbol
     min_power_fraction::Float64
@@ -130,6 +131,7 @@ mutable struct Electrolyser <: Component
             power_total,
             nr_units,
             dispatch_strategy,
+            default(config, "optimal_unit_plr", 0.65),
             linear_interface,
             default(config, "min_power_fraction", 0.4),
             default(config, "min_power_fraction_total", 0.2),
@@ -253,8 +255,8 @@ function dispatch_units(
     end
 
     if ely.dispatch_strategy == "try_optimal"
-        optimal_val_per_unit = 0.66 * watt_to_wh(ely.power) *
-            ely.efficiencies[limit_name](0.66)
+        optimal_val_per_unit = ely.optimal_unit_plr * watt_to_wh(ely.power) *
+            ely.efficiencies[limit_name](ely.optimal_unit_plr)
         nr_units = max(1, min(
             ceil(limit_value / optimal_val_per_unit - 0.5),
             ely.nr_units
