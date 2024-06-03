@@ -101,6 +101,11 @@ mutable struct Electrolyser <: Component
         )
         if heat_lt_is_usable
             output_interfaces[m_heat_lt_out] = nothing
+        else
+            # if low temperature heat output is not used, make sure it is not limiting
+            efficiencies[Symbol("heat_lt_out")] => parse_efficiency_function(
+                "const:1.0"
+            )
         end
 
         nr_units = default(config, "nr_switchable_units", 1)
