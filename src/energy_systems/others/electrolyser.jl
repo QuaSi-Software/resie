@@ -1,11 +1,19 @@
 """
-Implementation of an electrolyser, turning electricity and water into H2, O2 and heat.
+Implementation of an electrolyser, turning electricity and pure water into H2, O2 and heat.
 
-For the moment this remains a simple implementation that converts electricity into
-the gases and heat (as medium m_h_w_ht1) at a defined ratio (default 1:0.6:0.4). Has a
-minimum run time taken into consideration in its control behaviour and a minimum power
-fraction in its processing. The power_el is considered the maximum amount of electricity
-that the electrolyser can consume.
+At time of writing only pure water hydrolysis electrolysers are supported as they are the
+most relevant technology at time of writing. The produced heat has a high temperature output
+(depending on technology 50-65 °C) and an optional low temperature output (25-35 °C), which
+is more difficult to utilise in reality as this is waste heat from cooling power electronics
+and the heat the stacks lose to the equipment housing. If the low temperature heat is not
+used, the output is counted towards the heat losses.
+
+The electrolyser consists of a customizable number of subunits (which can just be one),
+each of which has its own power equipment. The efficiencies are considered to apply for each
+unit. As the minimum PLR for the units is typically higher than the total minimum PLR of the
+electrolyser there is a dispatch mechanism for the units taking this into account.
+
+Implements traits: PLRDEComponent
 """
 mutable struct Electrolyser <: Component
     uac::String

@@ -5,10 +5,11 @@ The implementation is flexible enough to cover any type of CHPP that takes in ch
 and produces electricity and heat. The archetypical CHPP chosen uses natural gas in a
 reprocating internal combustion engine and utilises heat extraction via jacketing and
 exhaust cooling. Heat extraction via engine oil cooling is possible, but typically not done
-with plants of less than around 500 kW electrical output power.
+with plants of less than around 1 MW electrical output power.
 
 The heat is typically extracted at temperatures higher than those common in heating and
-cooling systems and thus has been chosen as not having an upper limit to the temperatures.
+cooling systems and thus has been chosen as not having an upper limit to the temperatures
+by default, but this is customizable.
 
 Implements traits: PLRDEComponent
 """
