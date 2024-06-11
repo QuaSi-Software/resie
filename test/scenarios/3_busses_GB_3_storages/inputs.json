@@ -137,7 +137,7 @@
             },
             "min_power_fraction": 0,
             "power_th": 1500,
-            "efficiency": "const:1.0"
+            "efficiency_fuel_in": "const:1.0"
         },
         "ESS_BUS_TH_01": {
             "type": "Bus",

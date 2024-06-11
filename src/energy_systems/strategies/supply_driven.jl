@@ -27,6 +27,8 @@ OP_STRATS["supply_driven"] = OperationalStrategyType(
         "consider_m_h2_out" => true,
         "consider_m_o2_out" => true,
         "consider_m_heat_out" => true,
+        "consider_m_heat_ht_out" => true,
+        "consider_m_heat_lt_out" => true,
         "consider_m_heat_in" => true
     ),
     required_components=EnSysRequirements(

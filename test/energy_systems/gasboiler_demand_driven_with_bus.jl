@@ -42,7 +42,7 @@ function test_gasboiler_demand_driven_with_bus()
                 "name" => "demand_driven",
             ),
             "power_th" => 12000,
-            "efficiency" => "const:1.0",
+            "efficiency_fuel_in" => "const:1.0",
         ),
     )
 
@@ -252,7 +252,7 @@ function test_gasboiler_demand_driven_without_bus()
                 "name" => "demand_driven",
             ),
             "power_th" => 12000,
-            "efficiency" => "const:1.0",
+            "efficiency_fuel_in" => "const:1.0",
         ),
     )
 

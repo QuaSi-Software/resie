@@ -93,9 +93,10 @@ function test_load_custom_medium_categories()
             ],
             "power_el" => 1000,
             "m_el_in" => "m_e_dc_1000v",
-            "m_heat_out" => "m_h_w_55c",
+            "m_heat_ht_out" => "m_h_w_55c",
             "m_h2_out" => "m_c_g_h2-pure",
             "m_o2_out" => "m_c_g_o2-impure",
+            "heat_lt_is_usable" => false,
             "strategy" => Dict{String,Any}(
                 "name" => "Default"
             )
@@ -145,7 +146,7 @@ function test_load_custom_medium_categories()
     heat_pump = components["TST_HP_01"]
 
     @test electrolyser.m_el_in == Symbol("m_e_dc_1000v")
-    @test electrolyser.m_heat_out == Symbol("m_h_w_55c")
+    @test electrolyser.m_heat_ht_out == Symbol("m_h_w_55c")
     @test electrolyser.m_h2_out == Symbol("m_c_g_h2-pure")
     @test electrolyser.m_o2_out == Symbol("m_c_g_o2-impure")
 
@@ -160,7 +161,7 @@ function test_load_custom_medium_categories()
     @test Symbol("m_c_g_o2-impure") in EnergySystems.medium_categories
 
     # check if iterface of user-defined medium is built up correctly
-    @test electrolyser.output_interfaces[electrolyser.m_heat_out].target.uac == "TST_HP_01"
+    @test electrolyser.output_interfaces[electrolyser.m_heat_ht_out].target.uac == "TST_HP_01"
 end
 
 @testset "load_custom_medium_categories" begin
