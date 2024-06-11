@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.7
+* Add example and scenario that highlights how both heating and cooling can be handled at the same time by modelling the cooling demand as a fixed supply heat source
+
 ### Version 0.8.6
 * Refactor fuel boiler to use a customisable part-load ratio dependent efficiency function. This functionality will likely also be used by other components in future releases.
 
