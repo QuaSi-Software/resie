@@ -167,7 +167,7 @@ Calculate the base order for the simulation steps.
 This is determined by the system functions having a certain "natural" order as well as the
 simulation steps having a natural order as well.
 """
-function base_order(components_by_function, components)
+function base_order(components_by_function)
     simulation_order = []
     initial_nr = sum([length(bucket) for bucket in components_by_function]) * 100
 
@@ -1365,7 +1365,7 @@ not trivial and might not work for each possible grouping of components.
 """
 function calculate_order_of_operations(components::Grouping)::StepInstructions
     components_by_function = categorize_by_function(components)
-    simulation_order = base_order(components_by_function, components)
+    simulation_order = base_order(components_by_function)
 
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
