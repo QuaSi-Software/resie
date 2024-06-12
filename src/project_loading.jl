@@ -199,8 +199,34 @@ function base_order(components_by_function, components)
     # place steps potential and process for transformers in order by "chains"
     transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
     parallel_branches = find_parallels(transformers_and_busses)
-    simulation_order, initial_nr = add_transformer_potentials(simulation_order, initial_nr, transformers_and_busses, parallel_branches)
-    # TODO: Currently a completely separate energy system would not be detected!
+    complete = false
+    checked_components_pot = []
+    checked_components_pro = []
+    count = 0
+    while !complete
+        simulation_order, initial_nr, checked_components_pot = add_transformer_steps(simulation_order,
+                                                                                 initial_nr,
+                                                                                 transformers_and_busses,
+                                                                                 parallel_branches,
+                                                                                 "potential",
+                                                                                 checked_components=checked_components_pot)
+        simulation_order, initial_nr, checked_components_pro = add_transformer_steps(simulation_order,
+                                                                                 initial_nr,
+                                                                                 transformers_and_busses,
+                                                                                 parallel_branches,
+                                                                                 "process",
+                                                                                 checked_components=checked_components_pro)
+
+        complete, transformers_and_busses = check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
+        count += 1
+        if count == 10
+            @warn "The order of operation is potentially wrong as the process of some components are missig in the OoO. 
+                   Check the input and the order in the aux_info file."
+            break
+        end
+    end
+
+    # TODO: detect and remove unnecessary potentials
 
     # chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)    
     # for chain in chains
@@ -248,7 +274,27 @@ function base_order(components_by_function, components)
     return simulation_order
 end
 
-function add_transformer_potentials(simulation_order, initial_nr, current_components, parallel_branches; reverse=nothing, connecting_component=nothing, checked_components=[])
+function check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
+    not_included_components = []
+    complete = true
+    for component in transformers_and_busses
+        if component.sys_function === EnergySystems.sf_transformer
+            step_name = (component.uac, EnergySystems.s_process)
+            if step_name in [pair[2] for pair in simulation_order] 
+                continue
+            else
+                push!(not_included_components, component)
+                complete = false
+            end
+        else
+            push!(not_included_components, component)
+        end
+    end
+
+    return complete, not_included_components
+end
+
+function add_transformer_steps(simulation_order, initial_nr, current_components, parallel_branches, step_category; reverse=nothing, connecting_component=nothing, checked_components=[])
 
     function add_component_to_checked_components(checked_components, branches)
         if branches !== nothing
@@ -261,6 +307,11 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
             end
         end
         return checked_components
+    end
+
+    # for debugging, may remove later
+    if step_category !== "potential" && step_category !== "process"
+        @error "step_category has to be either potential or process!"
     end
 
     # detect the first "middle transformers" that has either at more than one input interface 
@@ -333,6 +384,12 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
             push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
         end
 
+        if step_category == "process"
+            reverse!(middle_transformer_branches)
+            reverse!(is_input)
+            reverse!(is_connecting_branch)
+        end
+
         for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
             # change direction after the first branch while accounting for possible changes 
             # from input to output or vica versa.
@@ -360,27 +417,34 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
 
             current_checked_components = setdiff(checked_components, middle_transformer_branch)
 
-            simulation_order, initial_nr = add_transformer_potentials(simulation_order, 
-                                                                      initial_nr,
-                                                                      middle_transformer_branch,
-                                                                      parallel_branches,
-                                                                      reverse=reverse,
-                                                                      connecting_component=connecting_component,
-                                                                      checked_components=current_checked_components)
+            simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
+                                                                 initial_nr,
+                                                                 middle_transformer_branch,
+                                                                 parallel_branches,
+                                                                 step_category,
+                                                                 reverse=reverse,
+                                                                 connecting_component=connecting_component,
+                                                                 checked_components=current_checked_components)
 
             if length(middle_transformer_branches) > 2 && idx > 1
-                simulation_order, initial_nr = add_transformer_potentials(simulation_order, 
-                                                                          initial_nr,
-                                                                          middle_transformer_branch,
-                                                                          parallel_branches,
-                                                                          reverse=!reverse,
-                                                                          connecting_component=connecting_component,
-                                                                          checked_components=current_checked_components)
+                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
+                                                                     initial_nr,
+                                                                     middle_transformer_branch,
+                                                                     parallel_branches,
+                                                                     step_category,
+                                                                     reverse=!reverse,
+                                                                     connecting_component=connecting_component,
+                                                                     checked_components=current_checked_components)
             end
 
             # add potentials of middle_transformer in between of the single branches except for the last one
+            # and process bevore the last branch, if in process category            
             if idx !== length(middle_transformer_branches)
-                push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                if step_category == "process" && idx == length(middle_transformer_branches) - 1
+                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
+                else
+                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                end
                 initial_nr -= 1
             end
         end
@@ -504,9 +568,14 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
                     continue
                 end
                 if reverse === nothing
-                    current_reverse = !is_input[idx]
-                    if is_connecting_branch[idx]
-                        current_reverse = !current_reverse
+                    if step_category == "potential"
+                        current_reverse = !is_input[idx]
+                        if is_connecting_branch[idx]
+                            current_reverse = !current_reverse
+                        end
+                    end
+                    if step_category == "process"
+                        current_reverse = is_input[idx]
                     end
                 else
                     current_reverse = reverse
@@ -520,20 +589,21 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
 
                 current_checked_components = setdiff(checked_components, middle_bus_branch)
 
-                simulation_order, initial_nr = add_transformer_potentials(simulation_order,
-                                                                          initial_nr,
-                                                                          middle_bus_branch,
-                                                                          parallel_branches,
-                                                                          reverse=current_reverse,
-                                                                          connecting_component=connecting_component,
-                                                                          checked_components=current_checked_components)
+                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order,
+                                                                     initial_nr,
+                                                                     middle_bus_branch,
+                                                                     parallel_branches,
+                                                                     step_category,
+                                                                     reverse=current_reverse,
+                                                                     connecting_component=connecting_component,
+                                                                     checked_components=current_checked_components)
             end
 
         else
             # no middle busses found
             # write steps according default or predefined order if given
             if reverse === nothing
-                reverse = false
+                reverse = step_category == "process"
             end
             branch_finished = false
             if reverse
@@ -560,13 +630,18 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
                     if is_parallel
                         nr_parallel_branches = length(current_parallel_branches)
                         for (branch_idx, current_branch) in enumerate(current_parallel_branches)
+                            # TODO call add_transformer_steps() recursively here to handle middle busses within parallels?
                             current_branch = reverse ? collect(Iterators.reverse(current_branch)) : current_branch
                             current_branch_transformers = [x for x in current_branch if x.sys_function === EnergySystems.sf_transformer]
                             for component in current_branch_transformers
-                                push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_potential)])
+                                if step_category == "potential"
+                                    push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_potential)])
+                                else
+                                    push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_process)])
+                                end
                                 initial_nr -= 1
                             end
-                            if branch_idx !== nr_parallel_branches
+                            if branch_idx !== nr_parallel_branches && step_category == "potential"
                                 for component_rev in Iterators.reverse(current_branch_transformers[1:end-1])
                                     push!(simulation_order, [initial_nr, (component_rev.uac, EnergySystems.s_potential)])
                                     initial_nr -= 1
@@ -575,7 +650,11 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
                         end
                         branch_finished = true
                     else
-                        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                        if step_category == "potential"
+                            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                        else
+                            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+                        end
                         initial_nr -= 1
                     end
                 end
@@ -583,7 +662,7 @@ function add_transformer_potentials(simulation_order, initial_nr, current_compon
         end
     end
 
-    return simulation_order, initial_nr
+    return simulation_order, initial_nr, checked_components
 end
 
 
@@ -600,6 +679,7 @@ function detect_middle_bus(current_components, reverse, checked_components)
         transformer_in_output_interface = Any[]
         transformer_in_input_interface = Any[]
         if component.sys_function === EnergySystems.sf_bus
+            component = component.proxy === nothing ? component : component.proxy
             for inface in values(component.input_interfaces)
                 if has_grid_output(component, inface.source.uac)
                     continue # skip all interfaces with connection to a grid
@@ -1073,7 +1153,7 @@ a bigger chain. Completely independent chains are returned as array of chains.
 -`components`: All components of the current energy system
 -`sys_function`: The system function for that the chains should be determined in components
 -`direct_connection_only::Bool}`: Flag if direct (true) or indirect chains across other
-                                  componets should be determined (false)
+                                  components should be determined (false)
 
 # Returns
 -`chain::Array{Set()}`: An array holding an unique collection of chains, each as Set() type
@@ -1290,6 +1370,7 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
     # message if this leads to missalignement with the output order.
+    # TODO: Make sure that reorderings are not moving transformers but the other components!
     reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
