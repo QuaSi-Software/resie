@@ -393,7 +393,6 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
-    set_max_energies!(unit, nothing, nothing, nothing)
     energies = calculate_energies(unit, sim_params)
 
     if !energies[1]

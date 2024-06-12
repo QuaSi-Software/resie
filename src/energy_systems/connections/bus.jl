@@ -413,21 +413,13 @@ the set_max_energy! function on an interface, if one side is a bus.
 `is_input::Bool`: If the component is an input
 `value::Float64`: The value of max_energy
 """
-function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Floathing)
+function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Float64)
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        if value === nothing
-            bus.balance_table_inputs[comp.uac].energy_potential = value
-        else
-            bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
-        end
+        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)	
     else
-        if value === nothing
-            bus.balance_table_outputs[comp.uac].energy_potential = value
-        else
-            bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
-        end
+        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)	
     end
 
     if unit.proxy !== nothing

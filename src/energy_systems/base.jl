@@ -223,9 +223,6 @@ Base.@kwdef mutable struct SystemInterface
     """Maximum energy the source can provide in the current timestep"""
     max_energy::Union{Nothing,Float64} = nothing
 
-    """Previous maximum energy in the case of overwriting, to restore the old value"""
-    max_energy_previously::Union{Nothing,Float64} = nothing
-
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
 end
@@ -360,16 +357,9 @@ function set_max_energy!(
     value::Union{Nothing,Float64}
 )
     if interface.max_energy === nothing
-        interface.max_energy_previously = interface.max_energy
         interface.max_energy = value
-    elseif value !== nothing
-        interface.max_energy_previously = interface.max_energy
+    else
         interface.max_energy = min(interface.max_energy, value)
-    elseif value === nothing && (interface.source.sys_function == sf_bus || interface.target.sys_function == sf_bus)
-        interface.max_energy_previously = interface.max_energy
-        interface.max_energy = nothing
-    elseif value === nothing && interface.max_energy_previously !== nothing   # reset to last value 
-        interface.max_energy = interface.max_energy_previously
     end
 
     if interface.source.sys_function == sf_bus

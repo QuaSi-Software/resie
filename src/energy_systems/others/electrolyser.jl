@@ -376,8 +376,6 @@ function potential(
 end
 
 function process(unit::Electrolyser, sim_params::Dict{String,Any})
-    set_max_energies!(unit, nothing, nothing, nothing, nothing)
-
     energies = calculate_energies(unit, sim_params)
 
     if !energies[1]
