@@ -88,10 +88,10 @@ function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
         && unit.temperature_profile !== nothing
     )
         if unit.min_source_in_temperature === nothing
-            unit.min_source_in_temperature = minimum(unit.temperature_profile)
+            unit.min_source_in_temperature = Profiles.minimum(unit.temperature_profile)
         end
         if unit.max_source_in_temperature === nothing
-            unit.max_source_in_temperature = maximum(unit.temperature_profile)
+            unit.max_source_in_temperature = Profiles.maximum(unit.temperature_profile)
         end
     end
 end

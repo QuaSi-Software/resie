@@ -161,7 +161,7 @@ The smallest value of the profile.
 - `Float64`: The smallest value
 """
 function minimum(profile::Profile)::Float64
-    return minimum(profile.data)
+    return Base.minimum(profile.data)
 end
 
 """
@@ -175,7 +175,7 @@ The largest value of the profile.
 - `Float64`: The largest value
 """
 function maximum(profile::Profile)::Float64
-    return maximum(profile.data)
+    return Base.maximum(profile.data)
 end
 
 # Function to handle extensive profiles to the simulation time step  (e.g., energy demand)
