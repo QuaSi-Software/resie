@@ -150,6 +150,33 @@ function value_at_time(profile::Profile, time::Int)
     return profile.data[step_nr]
 end
 
+"""
+    minimum(profile)
+
+The smallest value of the profile.
+
+# Arguments
+- `profile::Profile`: The profile
+# Returns
+- `Float64`: The smallest value
+"""
+function minimum(profile::Profile)::Float64
+    return minimum(profile.data)
+end
+
+"""
+    maximum(profile)
+
+The largest value of the profile.
+
+# Arguments
+- `profile::Profile`: The profile
+# Returns
+- `Float64`: The largest value
+"""
+function maximum(profile::Profile)::Float64
+    return maximum(profile.data)
+end
 
 # Function to handle extensive profiles to the simulation time step  (e.g., energy demand)
  function convert_extensive_profile(values, timestamps, original_time_step, new_time_step)
