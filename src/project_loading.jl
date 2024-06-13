@@ -227,6 +227,7 @@ function base_order(components_by_function)
     end
 
     # TODO: detect and remove unnecessary potentials in future versions?
+    # TODO: integrate properly in previous calc_ooo
 
     # chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)    
     # for chain in chains
@@ -1380,7 +1381,10 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     end
 
     step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
-    step_order = remove_double_potental_produce(step_order)
+    
+    while contains_double_potental_produce(step_order)
+        step_order = remove_double_potental_produce(step_order)
+    end
 
     return step_order
 end
@@ -1753,6 +1757,26 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
 end
 
 """
+    contains_double_potental_produce(step_order)
+
+Checks the simulation step order for directly consecutive transformers potential and produce step and 
+removes the potential step.
+"""
+function contains_double_potental_produce(step_order)
+    last_unit = ""
+    last_step = ""
+    for entry in step_order
+        if entry[1] == last_unit && entry[2] == last_step
+            return true
+        else
+            last_unit = entry[1]
+            last_step = entry[2]
+        end
+    end
+    return false
+end
+
+"""
     remove_double_potental_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
@@ -1772,6 +1796,8 @@ function remove_double_potental_produce(step_order)
                 push!(to_remove, idx-1)
             elseif (step == EnergySystems.s_potential
                     && last_step == EnergySystems.s_process)
+                push!(to_remove, idx)
+            elseif (step == last_step)
                 push!(to_remove, idx)
             end
         end
