@@ -185,7 +185,7 @@ end
     end
 
     # handle segmentation and aggregation at once
-    new_max_timestep = ceil(Int, maximum(timestamps) / new_time_step) * new_time_step
+    new_max_timestep = ceil(Int, Base.maximum(timestamps) / new_time_step) * new_time_step
     if original_time_step > new_time_step
         new_length = ceil(Int, new_max_timestep / new_time_step + original_time_step / new_time_step)
     else
@@ -218,7 +218,7 @@ function convert_intensive_profile(values, timestamps, original_time_step, new_t
         return values
     elseif new_time_step < original_time_step  # segmentation
         interp = interpolate((timestamps,), values, Gridded(Linear()))
-        new_timestamps = minimum(timestamps):new_time_step:maximum(timestamps)
+        new_timestamps = Base.minimum(timestamps):new_time_step:Base.maximum(timestamps)
         converted_profile = [interp(t) for t in new_timestamps]
         # add missing entries by coping the last entry
         for _ in 1:ceil(Int,(original_time_step-new_time_step)/new_time_step)
