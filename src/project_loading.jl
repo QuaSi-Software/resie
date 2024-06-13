@@ -226,7 +226,7 @@ function base_order(components_by_function)
         end
     end
 
-    # TODO: detect and remove unnecessary potentials
+    # TODO: detect and remove unnecessary potentials in future versions?
 
     # chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)    
     # for chain in chains
@@ -533,8 +533,8 @@ function add_transformer_steps(simulation_order, initial_nr, current_components,
                             @warn "The order of operation may be wrong..."
                         end
                         is_input_dict[idx] = copy(is_input[i])
-                        is_connecting_branch_dict[idx] = copy(is_connecting_branch[i])
-                        if reverse === nothing
+                        is_connecting_branch_dict[idx] = is_connecting_branch_dict[idx] || is_connecting_branch[i]
+                        if reverse === nothing 
                             temp_reverse = !is_input_dict[idx]
                             if is_connecting_branch_dict[idx]
                                 temp_reverse = !temp_reverse
@@ -567,7 +567,7 @@ function add_transformer_steps(simulation_order, initial_nr, current_components,
                 if isempty(middle_bus_branch)
                     continue
                 end
-                if reverse === nothing
+                if reverse === nothing || !is_connecting_branch[idx]
                     if step_category == "potential"
                         current_reverse = !is_input[idx]
                         if is_connecting_branch[idx]
@@ -1370,7 +1370,6 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
     # message if this leads to missalignement with the output order.
-    # TODO: Make sure that reorderings are not moving transformers but the other components!
     reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
@@ -1564,12 +1563,7 @@ function reorder_for_input_priorities(simulation_order, components, components_b
                    has_grid_output(bus, bus.connectivity.input_order[other_idx]) 
                    continue 
                 end
-                # ...is of a lower priority in potential and process
-                place_one_lower!(
-                    simulation_order,
-                    (bus.connectivity.input_order[own_idx], EnergySystems.s_potential),
-                    (bus.connectivity.input_order[other_idx], EnergySystems.s_potential)
-                )
+                # ...is of a lower priority in process
                 place_one_lower!(
                     simulation_order,
                     (bus.connectivity.input_order[own_idx], EnergySystems.s_process),
@@ -1640,12 +1634,7 @@ function reorder_transformer_for_output_priorities(simulation_order, components,
                    has_grid_input(bus, other_uac) 
                    continue 
                 end
-                # ...is of a lower priority in potential and process
-                place_one_lower!(
-                    simulation_order,
-                    (own_uac, EnergySystems.s_potential),
-                    (other_uac, EnergySystems.s_potential)
-                )
+                # ...is of a lower priority in process
                 place_one_lower!(
                     simulation_order,
                     (own_uac, EnergySystems.s_process),
