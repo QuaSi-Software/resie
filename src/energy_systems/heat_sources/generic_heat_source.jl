@@ -176,8 +176,8 @@ function output_values(unit::GenericHeatSource)::Vector{String}
     else
         return [string(unit.medium)*" OUT",
                 "Max_Energy",
-                "Temperature SRC IN",
-                "Temperature SNK OUT"]
+                "Temperature_src_in",
+                "Temperature_snk_out"]
     end
 end
 
@@ -186,9 +186,9 @@ function output_value(unit::GenericHeatSource, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
-    elseif key.value_key == "Temperature SRC IN"
+    elseif key.value_key == "Temperature_src_in"
         return unit.temperature_src_in
-    elseif key.value_key == "Temperature SNK OUT"
+    elseif key.value_key == "Temperature_snk_out"
         return unit.temperature_snk_out
     end
     throw(KeyError(key.value_key))
