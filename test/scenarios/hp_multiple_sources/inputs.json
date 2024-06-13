@@ -90,6 +90,18 @@
                 "axis": "right",
                 "unit": "-",
                 "scale_factor": 1.0
+            },
+            "14": {
+                "key": {"TST_SRC_02": ["Temperature_src_in"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1.0
+            },
+            "15": {
+                "key": {"TST_SRC_02": ["Temperature_snk_out"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1.0
             }
         }
     },
@@ -118,7 +130,7 @@
             "scale": 1500
         },
         "TST_SRC_01": {
-            "type": "BoundedSupply",
+            "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "strategy": {
@@ -130,17 +142,21 @@
             ],
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
             "constant_temperature": 40,
+            "use_exchange_loss": false,
             "scale": 1000
         },
         "TST_SRC_02": {
-            "type": "BoundedSupply",
+            "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
             "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
             "max_power_profile_file_path": "./profiles/tests/source_heat_max_power.prf",
-            "constant_temperature": 20,
+            "temperature_profile_file_path": "./profiles/examples/general/src_heat_temp_var_avg25.prf",
+            "use_exchange_loss": true,
+            "min_source_in_temperature": 12,
+            "max_source_in_temperature": 30,
             "scale": 2000
         },
         "TST_BFT_TH_01": {
