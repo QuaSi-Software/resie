@@ -218,8 +218,11 @@ function test_base_order()
     @test pwc_steps_astr(expected, steps) == ""
 end
 
+@testset "base_order" begin
+    test_base_order()
+end
 
-function test_base_order_middle_bus()
+function test_ooo_middle_bus()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -505,7 +508,7 @@ function test_base_order_middle_bus()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_middle_bus_different_order()
+function test_ooo_middle_bus_different_order()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -791,7 +794,7 @@ function test_base_order_middle_bus_different_order()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_middle_transformer()
+function test_ooo_middle_transformer()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -1005,7 +1008,7 @@ function test_base_order_middle_transformer()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_parallels()
+function test_ooo_parallels()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -1227,7 +1230,7 @@ function test_base_order_parallels()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_parallels_different_order()
+function test_ooo_parallels_different_order()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -1448,7 +1451,7 @@ function test_base_order_parallels_different_order()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_parallels_in_chain()
+function test_ooo_parallels_in_chain()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -1772,7 +1775,7 @@ function test_base_order_parallels_in_chain()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-function test_base_order_parallels_in_a_row()
+function test_ooo_parallels_in_a_row()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -2077,7 +2080,7 @@ function test_base_order_parallels_in_a_row()
 end
 
 
-function test_base_order_connected_middle_busses()
+function test_ooo_connected_middle_busses()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -2475,14 +2478,13 @@ function test_base_order_connected_middle_busses()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
-@testset "base_order" begin
-    test_base_order()
-    test_base_order_middle_bus()
-    test_base_order_middle_bus_different_order()
-    test_base_order_middle_transformer()
-    test_base_order_parallels()
-    test_base_order_parallels_different_order()
-    test_base_order_parallels_in_chain()
-    test_base_order_parallels_in_a_row()
-    test_base_order_connected_middle_busses()
+@testset "transformer_chains_ooo" begin
+    test_ooo_middle_bus()
+    test_ooo_middle_bus_different_order()
+    test_ooo_middle_transformer()
+    test_ooo_parallels()
+    test_ooo_parallels_different_order()
+    test_ooo_parallels_in_chain()
+    test_ooo_parallels_in_a_row()
+    test_ooo_connected_middle_busses()
 end
