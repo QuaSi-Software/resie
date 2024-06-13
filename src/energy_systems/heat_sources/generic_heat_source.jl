@@ -126,8 +126,8 @@ function control(
         unit.temperature_snk_out = unit.temperature_src_in -
             (unit.temperature_src_in - unit.min_source_in_temperature) /
             (unit.max_source_in_temperature - unit.min_source_in_temperature) *
-            (unit.delta_loss_upper - unit.delta_loss_lower) +
-            unit.delta_loss_lower
+            (unit.delta_loss_lower - unit.delta_loss_upper) -
+            unit.delta_loss_upper
     else
         unit.temperature_snk_out = unit.temperature_src_in
     end
