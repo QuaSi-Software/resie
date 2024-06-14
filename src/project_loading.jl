@@ -197,33 +197,50 @@ function base_order(components_by_function)
     end
 
     # place steps potential and process for transformers in order by "chains"
-    transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
-    parallel_branches = find_parallels(transformers_and_busses)
-    complete = false
-    checked_components_pot = []
-    checked_components_pro = []
-    count = 0
-    while !complete
-        simulation_order, initial_nr, checked_components_pot = add_transformer_steps(simulation_order,
-                                                                                 initial_nr,
-                                                                                 transformers_and_busses,
-                                                                                 parallel_branches,
-                                                                                 "potential",
-                                                                                 checked_components=checked_components_pot)
-        simulation_order, initial_nr, checked_components_pro = add_transformer_steps(simulation_order,
-                                                                                 initial_nr,
-                                                                                 transformers_and_busses,
-                                                                                 parallel_branches,
-                                                                                 "process",
-                                                                                 checked_components=checked_components_pro)
+    transformers = components_by_function[4]
+    if length(transformers) > 1
+        transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
+        parallel_branches = find_parallels(transformers_and_busses)
+        complete = false
+        checked_components_pot = []
+        checked_components_pro = []
+        count = 0
+        reverse = nothing
+        while !complete
+            simulation_order, initial_nr, checked_components_pot = add_transformer_steps(simulation_order,
+                                                                                    initial_nr,
+                                                                                    transformers_and_busses,
+                                                                                    parallel_branches,
+                                                                                    "potential",
+                                                                                    reverse=reverse,
+                                                                                    checked_components=checked_components_pot)
+            simulation_order, initial_nr, checked_components_pro = add_transformer_steps(simulation_order,
+                                                                                    initial_nr,
+                                                                                    transformers_and_busses,
+                                                                                    parallel_branches,
+                                                                                    "process",
+                                                                                    reverse=reverse,
+                                                                                    checked_components=checked_components_pro)
 
-        complete, transformers_and_busses = check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
-        count += 1
-        if count == 10
-            @warn "The order of operation is potentially wrong as the process of some components are missig in the OoO. 
-                   Check the input and the order in the aux_info file."
-            break
+            complete, transformers_and_busses = check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
+            
+            # check success. If not all components can be found, try to preset a reverse as this might give a solution 
+            # in case of multiple middle busses connected in circles.
+            count += 1
+            if count == 10
+                reverse = false
+            elseif count == 15
+                reverse = true
+            elseif count == 20
+                @warn "The order of operation is potentially wrong as the process-step of one or more transformers is missig in the OoO. 
+                Check the input and the order in the aux_info file. May specify a custom OoO!"
+                break
+            end
         end
+    elseif length(transformers) == 1
+        # if only one transformer is present in the current energy system, we only need the process step
+        push!(simulation_order, [initial_nr, (transformers[1].uac, EnergySystems.s_process)])
+        initial_nr -= 1
     end
 
     # TODO: detect and remove unnecessary potentials in future versions?
