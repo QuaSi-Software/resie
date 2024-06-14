@@ -21,11 +21,11 @@ mutable struct GenericHeatSource <: Component
     constant_power::Union{Nothing,Float64}
     constant_temperature::Temperature
 
-    use_exchange_loss::Bool
+    temperature_reduction_model::String
     min_source_in_temperature::Temperature
     max_source_in_temperature::Temperature
-    delta_loss_lower::Float64
-    delta_loss_upper::Float64
+    avg_source_in_temperature::Temperature
+    lmtd_min::Float64
 
     max_energy::Float64
     temperature_src_in::Temperature
@@ -63,11 +63,11 @@ mutable struct GenericHeatSource <: Component
             default(config, "scale", 1.0), # scaling_factor
             default(config, "constant_power", nothing),
             default(config, "constant_temperature", nothing),
-            default(config, "use_exchange_loss", false),
+            default(config, "temperature_reduction_model", "none"),
             default(config, "min_source_in_temperature", nothing),
             default(config, "max_source_in_temperature", nothing),
-            default(config, "delta_loss_lower", 2.5),
-            default(config, "delta_loss_upper", 1.0),
+            nothing, # avg_source_in_temperature
+            default(config, "minimal_reduction", 2.0), # lmtd_min
             0.0, # max_energy
             nothing, # temperature_src_in
             nothing, # temperature_snk_out
@@ -83,16 +83,16 @@ function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
         )
     )
 
-    if (
-        unit.use_exchange_loss
-        && unit.temperature_profile !== nothing
-    )
-        if unit.min_source_in_temperature === nothing
+    if unit.temperature_reduction_model == "lmtd"
+        if unit.min_source_in_temperature === nothing && unit.temperature_profile !== nothing
             unit.min_source_in_temperature = Profiles.minimum(unit.temperature_profile)
         end
-        if unit.max_source_in_temperature === nothing
+        if unit.max_source_in_temperature === nothing && unit.temperature_profile !== nothing
             unit.max_source_in_temperature = Profiles.maximum(unit.temperature_profile)
         end
+        unit.avg_source_in_temperature = 0.5 * (
+            unit.min_source_in_temperature + unit.max_source_in_temperature
+        )
     end
 end
 
@@ -122,12 +122,18 @@ function control(
         )
     end
 
-    if unit.use_exchange_loss && unit.temperature_src_in !== nothing
+    if unit.temperature_reduction_model == "constant" && unit.temperature_src_in !== nothing
+        unit.temperature_snk_out = unit.temperature_src_in - unit.lmtd_min
+
+    elseif unit.temperature_reduction_model == "lmtd" && unit.temperature_src_in !== nothing
+        alpha = min(
+            0.95, # alpha_max
+            1 - abs(unit.avg_source_in_temperature - unit.temperature_src_in)
+                / (unit.max_source_in_temperature - unit.min_source_in_temperature)
+        )
         unit.temperature_snk_out = unit.temperature_src_in -
-            (unit.temperature_src_in - unit.min_source_in_temperature) /
-            (unit.max_source_in_temperature - unit.min_source_in_temperature) *
-            (unit.delta_loss_lower - unit.delta_loss_upper) -
-            unit.delta_loss_upper
+            unit.lmtd_min * log(1 / alpha) / (1 - alpha)
+
     else
         unit.temperature_snk_out = unit.temperature_src_in
     end
@@ -149,7 +155,6 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
     # filtered outputs down to a single entry, which works the same as the 1-to-1 case
     if length(exchanges) > 1
         energy_demand = balance(exchanges) + energy_potential(exchanges)
-        temp_out = temp_min_highest(exchanges)
     else
         e = first(exchanges)
         if (
@@ -158,14 +163,13 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
             (e.temperature_max === nothing || e.temperature_max >= unit.temperature_snk_out)
         )
             energy_demand = e.balance + e.energy_potential
-            temp_out = lowest(e.temperature_min, unit.temperature_snk_out)
         else
             energy_demand = 0.0
         end
     end
 
     if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), temp_out)
+        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature_snk_out)
     end
 end
 
