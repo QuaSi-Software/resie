@@ -4,6 +4,10 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.9
+* Add implementation for generic heat sources such as river water, lake water, waste water, atmosphere, industrial processes or one-way connections to a heat network. The main difference to a generic bounded supply is an option to include a temperature reduction caused by heat exchangers.
+* Add scenario reversive_heat_pump to highlight open issues with the operation of a single heat pump for both heating and cooling with a seasonal heat storage
+
 ### Version 0.8.8
 * Refactor part load ratio dependent efficiency (PLRDE) functionality to have its own submodule (of sorts)
 * Refactor CHPP to use PLRDE functionality
