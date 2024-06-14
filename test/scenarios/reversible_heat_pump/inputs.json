@@ -1,0 +1,145 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/reversible_heat_pump/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/reversible_heat_pump/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/reversible_heat_pump/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": {},
+        "output_plot_file": "./test/scenarios/reversible_heat_pump/output_plot.html",
+        "output_plot": "all"
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 604800,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_TH_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "temperature_profile_file_path": "./profiles/examples/general/dem_heat_temp_var_avg55.prf",
+            "scale": 2000.0
+        },
+        "TST_TH_DEM_02": {
+            "type": "FixedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": ["TST_TH_BUS_02"],
+            "energy_profile_file_path": "./profiles/examples/general/src_heat_maxpow_dailyvar_lo-amp.prf",
+            "temperature_profile_file_path": "./profiles/examples/general/src_heat_temp_dailyvar_avg30.prf",
+            "scale": 3000.0
+        },
+        "TST_TH_BUS_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_TH_HP_01"
+                ],
+                "output_order": [
+                    "TST_TH_DEM_01",
+                    "TST_TH_GTP_01"
+                ],
+                "energy_flow": [
+                    [1, 1]
+                ]
+            }
+        },
+        "TST_TH_BUS_02": {
+            "type": "Bus",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_TH_DEM_02",
+                    "TST_TH_GTP_01"
+                ],
+                "output_order": [
+                    "TST_TH_HP_01"
+                ]
+            }
+        },
+        "TST_EL_BUS_01": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_EL_GRI_01"
+                ],
+                "output_order": [
+                    "TST_TH_HP_01"
+                ]
+            }
+        },
+        "TST_TH_GTP_01": {
+            "type": "GeothermalProbes",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_TH_BUS_02"
+            ],
+            "model_type": "detailed",
+            "___GENERAL PARAMETER___": "",
+            "max_output_power": 150,
+            "max_input_power": 150,
+            "regeneration": true,
+            "soil_undisturbed_ground_temperature": 13,
+            "soil_heat_conductivity": 1.6 ,
+            "soil_density": 1800,
+            "soil_specific_heat_capacity": 2400,
+            "probe_field_geometry": "rectangle",
+            "number_of_probes_x": 1, 
+            "number_of_probes_y": 1,
+            "probe_field_key_2": "",
+            "borehole_spacing": 8,
+            "probe_depth": 150,
+            "borehole_diameter": 0.16,
+            "boreholewall_start_temperature": 13,
+            "unloading_temperature_spread": 1.5,
+            "loading_temperature_spread": 4,
+            "___SIMPLIFIED MODEL___": "",
+            "borehole_thermal_resistance": 0.1,
+            "___DETAILED MODEL___": "",
+            "probe_type": 2,
+            "pipe_diameter_outer": 0.032,
+            "pipe_diameter_inner": 0.0262,
+            "pipe_heat_conductivity": 0.42,
+            "shank_spacing": 0.1,
+            "fluid_specific_heat_capacity": 3795,
+            "fluid_density": 1052,
+            "fluid_kinematic_viscosity": 3.9e-6,
+            "fluid_heat_conductivity": 0.48,
+            "fluid_prandtl_number": 31.3,
+            "grout_heat_conductivity": 2
+        },
+        "TST_TH_HP_01": {
+            "type": "HeatPump",
+            "control_refs": [],
+            "output_refs": [
+                "TST_TH_BUS_01"
+            ],
+            "m_heat_out": "m_h_w_ht1",
+            "strategy": {
+                "name": "supply_driven"
+            },
+            "power_th": 4500,
+            "min_power_fraction": 0.0
+        },
+        "TST_EL_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [
+                "TST_EL_BUS_01"
+            ],
+            "is_source": true
+        }
+    }
+}
