@@ -197,6 +197,52 @@ function base_order(components_by_function)
     end
 
     # determine and place potential and process steps for transformers
+    simulation_order, initial_nr = wrapper_add_transformer_steps(components_by_function, simulation_order, initial_nr)
+    # TODO: detect and remove unnecessary potentials in future versions?
+
+    # process, then load storages
+    for unit in values(components_by_function[5])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+        initial_nr -= 1
+    end
+    for unit in values(components_by_function[5])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_load)])
+        initial_nr -= 1
+    end
+
+    # process bounded sources/sinks
+    for sf_order = 6:7
+        for unit in values(components_by_function[sf_order])
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+            initial_nr -= 1
+        end
+    end
+
+    # distribute busses
+    for unit in values(components_by_function[3])
+        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_distribute)])
+        initial_nr -= 1
+    end
+
+    return simulation_order
+end
+
+"""
+    wrapper_add_transformer_steps(components_by_function, simulation_order, initial_nr)
+
+This is a wrapper for add_transformer_steps().
+
+# Arguments
+-`components_by_function`: All components of the current energy system sorted by their function
+-`simulation_order`: The simulation order
+-`initial_nr`: The current number of steps
+
+# Returns simulation_order, initial_nr, checked_components
+-`simulation_order`: The simulation order
+-`initial_nr`: The current number of steps
+
+"""
+function wrapper_add_transformer_steps(components_by_function, simulation_order, initial_nr)
     transformers = components_by_function[4]
     if length(transformers) > 1
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
@@ -242,36 +288,25 @@ function base_order(components_by_function)
         push!(simulation_order, [initial_nr, (transformers[1].uac, EnergySystems.s_process)])
         initial_nr -= 1
     end
-
-    # TODO: detect and remove unnecessary potentials in future versions?
-
-    # process, then load storages
-    for unit in values(components_by_function[5])
-        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-        initial_nr -= 1
-    end
-    for unit in values(components_by_function[5])
-        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_load)])
-        initial_nr -= 1
-    end
-
-    # process bounded sources/sinks
-    for sf_order = 6:7
-        for unit in values(components_by_function[sf_order])
-            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-            initial_nr -= 1
-        end
-    end
-
-    # distribute busses
-    for unit in values(components_by_function[3])
-        push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_distribute)])
-        initial_nr -= 1
-    end
-
-    return simulation_order
+    
+    return simulation_order, initial_nr
 end
 
+"""
+    check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
+
+Checks if a process step for all transformers_and_busses is included in the simulation_order.
+
+# Arguments
+-`simulation_order`: The simulation order
+-`transformers_and_busses::Array{Grouping}`: All transformers and busses of the current energy system
+
+# Returns
+-`complete::Bool`: False if there are process steps of transformers or busses are missing in the simulation_order, 
+                   and true if they are all contained in the simulation_order.
+-`not_included_components::Array{SystemComponets}`: List of all transformers and busses that are not part of the simulation_order
+             
+"""
 function check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
     not_included_components = []
     complete = true
@@ -292,7 +327,87 @@ function check_simulation_order_for_completeness(simulation_order, transformers_
     return complete, not_included_components
 end
 
-function add_transformer_steps(simulation_order, initial_nr, current_components, parallel_branches, step_category; reverse=nothing, connecting_component=nothing, checked_components=[])
+"""
+    add_transformer_steps(simulation_order,
+                          initial_nr,
+                          current_components,
+                          parallel_branches,
+                          step_category;
+                          reverse=nothing,
+                          connecting_component=nothing,
+                          checked_components=[])
+
+This function determines the order of the potential and process calculation steps for transformers in a given EnergySystem.
+Note that the developed algorithm might fail to determine the correct order!
+The following logic is used:
+- At first, "middle transformers" (MT) are searched within the current_components. An MT is defined as a transformer with 
+  at least one other transformer in each of at least two inputs and/or at least one transformer in each of at least 
+  two outputs. If there is more than one MT in the current_components, the "first" MT is chosen to start with, 
+  where "first" means that there are no other MTs in its input branches. 
+- Of the chosen MT, the shorter branch is taken and the add_transformer_steps is called recursively with the 
+  transformer of the current branch handed over as new current_components. The order within the branch is crucial,
+  as the MT has to always be calculated between its branches. So the first branch starts towards the MT (reverse=false 
+  for inputs and reverse=true for outputs), while the second branch is calculated away from the MT (reverse=true 
+  for inputs and reverse=false for outputs).
+- If there is no MT in the current_components, then "middle busses" (MB) are searched within the given components.
+  MBs are defined as busses with at least three interfaces with each having at least one other connected transformer. 
+  If there are several MBs in the current_components, the first MB is chosen, that has no other MBs in its inputs 
+  (reverse === nothing || reverse == false) or in its outputs (reverse == true).
+- If the current reverse is false or nothing, first the input branches and then the output branches are given recursively 
+  to add_transformer_steps(). If reverse is true, the output branches come first.
+- If the current_components are part of a parallel_branch (PB), then they are merged together into one branch. PBs are 
+  defined as branches that offer more than one way between two components with each of the ways containing at least one 
+  other transformer (while considering the direction of energy flow). The starting or endpoint of a PB can be an MB or an MT.
+  Note that MBs within the parallel branches cannot be considered correctly at the moment!
+- If no MB or MT can be found in the current_components, the process or potential of them are determined by reverse,
+  which defaults to true (process step) or false (potential step). If one of the components is part of a parallel branch,
+  this is detected and the parallels are handled separately: Depending on the output order (Input order is not considered 
+  here, but logically they should be the same!) of the MB, each of the parallel branches perform its potentials in both ways
+  to ensure that possible limitations reach both ends before continuing with the next branch of the parallel branches.
+- Generally: Connections between components are interconnected if:
+    - there is a storage (no bypass directly through a storage)
+    - the connection matrix of a bus denies the connection
+    - if the input component into a bus is connected to an output grid out of the bus (considering the energy matrix)
+    - if an output component out of a bus is connected to an input grid in the bus (considering the energy matrix)
+- To avoid double-counting components, all considered components are tracked in checked_components that is updated 
+  before each recursive function call. Note that in some cases components can be considered multiple times if they are part
+  of multiple branches at one MB or MT! Therefore, after the order has been determined, only the first appearance of 
+  the process is considered and all other process steps of the same component are deleted from the order of operation. For
+  potential steps, this is not done as in some cases, components have to have multiple potential steps, e.g., MTs.
+- If a MB is connected to another MB, the first MB holds the second MB in one of its output branches. When determining
+  the correct calculation order of the components to the rear MB, the connection branch has to perform its potentials
+  after all of the other ones of the rear MB. To detect this, branches can get a connecting_component, defining the component
+  that is connected to another MB (or MT) and implicitly also the direction. With this information, the order of the 
+  calculation of the single branches and their reverse can be determined.
+
+
+# Arguments
+-`simulation_order::Array[]`: The simulation order that should be extended by transformers potentials and processes
+-`initial_nr::Int`: The current number of steps in the order of operation
+-`current_components::Array{Grouping}`: the currently considered components. Should be transformer and busses at initial call
+-`parallel_branches::Dict{Tuple, Vector{Vector}}`: A dict holding all parallels in the current energy system. 
+                                                   Key is starting-point-uac_end-point-uac
+-`step_category::String`: Can be either "potential" or "process", depenting on the simulation step to find for current_components
+  Optional:
+-`reverse::Bool`: Indicates if the current_components should be considered in reverse or not. Can also be nothing at the initial call
+-`connecting_component::Component`: Can be either nothing or a connecting components, indicates it the current_components are a 
+                                    connecting branch.
+-`checked_components::Array{Grouping}`: A vector holding all checked components 
+
+# Returns
+-`simulation_order::Array[]`:`: The simulation order extended by transformer step_category
+-`initial_nr::Int`: The current number of steps in the order of operation
+-`checked_components::Array{Grouping}`: The components that have already beed checked
+             
+"""
+function add_transformer_steps(simulation_order,
+                               initial_nr,
+                               current_components,
+                               parallel_branches,
+                               step_category;
+                               reverse=nothing,
+                               connecting_component=nothing,
+                               checked_components=[])
 
     function add_component_to_checked_components(checked_components, branches)
         if branches !== nothing
