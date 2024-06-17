@@ -196,7 +196,7 @@ function base_order(components_by_function)
         end
     end
 
-    # place steps potential and process for transformers in order by "chains"
+    # determine and place potential and process steps for transformers
     transformers = components_by_function[4]
     if length(transformers) > 1
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
@@ -204,7 +204,7 @@ function base_order(components_by_function)
         complete = false
         checked_components_pot = []
         checked_components_pro = []
-        count = 0
+        count = 1
         reverse = nothing
         while !complete
             simulation_order, initial_nr, checked_components_pot = add_transformer_steps(simulation_order,
@@ -214,6 +214,7 @@ function base_order(components_by_function)
                                                                                     "potential",
                                                                                     reverse=reverse,
                                                                                     checked_components=checked_components_pot)
+                                                                                    
             simulation_order, initial_nr, checked_components_pro = add_transformer_steps(simulation_order,
                                                                                     initial_nr,
                                                                                     transformers_and_busses,
@@ -221,12 +222,10 @@ function base_order(components_by_function)
                                                                                     "process",
                                                                                     reverse=reverse,
                                                                                     checked_components=checked_components_pro)
-
-            complete, transformers_and_busses = check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
             
             # check success. If not all components can be found, try to preset a reverse as this might give a solution 
             # in case of multiple middle busses connected in circles.
-            count += 1
+            complete, transformers_and_busses = check_simulation_order_for_completeness(simulation_order, transformers_and_busses)
             if count == 10
                 reverse = false
             elseif count == 15
@@ -236,6 +235,7 @@ function base_order(components_by_function)
                 Check the input and the order in the aux_info file. May specify a custom OoO!"
                 break
             end
+            count += 1
         end
     elseif length(transformers) == 1
         # if only one transformer is present in the current energy system, we only need the process step
@@ -244,26 +244,6 @@ function base_order(components_by_function)
     end
 
     # TODO: detect and remove unnecessary potentials in future versions?
-    # TODO: integrate properly in previous calc_ooo
-
-    # chains = find_chains(components_by_function[4], EnergySystems.sf_transformer, direct_connection_only=false)    
-    # for chain in chains
-    #     if length(chain) > 1
-    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
-    #             initial_nr -= 1
-    #         end
-    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=true)
-    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-    #             initial_nr -= 1
-    #         end
-    #     else
-    #         for unit in iterate_chain(chain, EnergySystems.sf_transformer, reverse=false)
-    #             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
-    #             initial_nr -= 1
-    #         end
-    #     end
-    # end
 
     # process, then load storages
     for unit in values(components_by_function[5])
@@ -325,11 +305,6 @@ function add_transformer_steps(simulation_order, initial_nr, current_components,
             end
         end
         return checked_components
-    end
-
-    # for debugging, may remove later
-    if step_category !== "potential" && step_category !== "process"
-        @error "step_category has to be either potential or process!"
     end
 
     # detect the first "middle transformers" that has either at more than one input interface 
@@ -548,6 +523,7 @@ function add_transformer_steps(simulation_order, initial_nr, current_components,
                     # If the index is not 0, merge the branches
                     if haskey(merged_branches_dict, idx)
                         if is_input_dict[idx] !== is_input[i]
+                            # should actually not happen
                             @warn "The order of operation may be wrong..."
                         end
                         is_input_dict[idx] = copy(is_input[i])
@@ -1384,6 +1360,7 @@ not trivial and might not work for each possible grouping of components.
 function calculate_order_of_operations(components::Grouping)::StepInstructions
     components_by_function = categorize_by_function(components)
     simulation_order = base_order(components_by_function)
+    simulation_order = remove_double_transformer_process_steps(simulation_order, components)
 
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
@@ -1399,6 +1376,7 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
 
     step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
     
+    # remove transformers potential step if process is directly consecutive to a potential step
     while contains_double_potental_produce(step_order)
         step_order = remove_double_potental_produce(step_order)
     end
@@ -1791,6 +1769,26 @@ function contains_double_potental_produce(step_order)
         end
     end
     return false
+end
+
+"""
+    remove_double_transformer_process_steps(simulation_order)
+
+Checks the simulation order for multiple process steps of one transformer.
+If there are multiple process steps for one tranformer, only the first one will be kept.
+"""
+function remove_double_transformer_process_steps(simulation_order, components)
+    detected_transformer_processes = []
+    for (idx,(step_nr, step)) in enumerate(simulation_order)
+        if step[2] == EnergySystems.s_process && components[step[1]].sys_function === EnergySystems.sf_transformer
+            if step in detected_transformer_processes
+                deleteat!(simulation_order, idx)
+            else
+                push!(detected_transformer_processes, step)
+            end
+        end
+    end
+    return simulation_order
 end
 
 """
