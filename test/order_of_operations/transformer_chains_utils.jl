@@ -543,13 +543,13 @@ function test_find_indirect_chains()
     @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 5
 
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
 end
 
 function test_find_indirect_chains_denied()
@@ -826,13 +826,13 @@ function test_find_indirect_chains_denied()
     @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 4
 
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == false
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == false
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
 
 end
 
@@ -1112,13 +1112,13 @@ function test_find_indirect_chains_denied2()
     @test Resie.distance_to_sink(components["TST_01_ELY_01"], EnergySystems.sf_transformer, [], "") == 5
     
     # test function to determine if transformers are at interfaces, considers energy flow matrix of bus
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
-    @test Resie.EnergySystems.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == false
+    @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
+    @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
+    @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == false
 
 end
 

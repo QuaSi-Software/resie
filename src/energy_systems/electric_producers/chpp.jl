@@ -97,7 +97,7 @@ function control(
     )
 end
 
-function set_max_energies!(unit::CHPP, gas_in::Floathing, el_out::Floathing, heat_out::Floathing)
+function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)

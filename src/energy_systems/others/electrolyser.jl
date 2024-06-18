@@ -59,8 +59,8 @@ mutable struct Electrolyser <: Component
             default(config, "min_power_fraction", 0.2),
             default(config, "min_run_time", 3600),
             default(config, "output_temperature", 55.0),
-            0.0,   # Losses heat
-            0.0,   # Losses hydrogen        
+            0.0, # Losses heat
+            0.0  # Losses hydrogen        
         )
     end
 end
@@ -106,8 +106,8 @@ function control(
 end
 
 function set_max_energies!(
-    unit::Electrolyser, el_in::Floathing, heat_out::Floathing,
-    h2_out::Floathing, o2_out::Floathing
+    unit::Electrolyser, el_in::Float64, heat_out::Float64,
+    h2_out::Float64, o2_out::Float64
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)

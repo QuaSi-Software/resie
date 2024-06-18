@@ -55,8 +55,8 @@ mutable struct HeatPump <: Component
             default(config, "constant_cop", nothing),
             default(config, "output_temperature", nothing),
             default(config, "input_temperature", nothing),
-            0.0,   # cop
-            0.0,   # losses
+            0.0, # cop
+            0.0, # losses
         )
     end
 end
@@ -108,8 +108,8 @@ function control(
 end
 
 function set_max_energies!(
-    unit::HeatPump, el_in::Floathing,
-    heat_in::Floathing, heat_out::Floathing
+    unit::HeatPump, el_in::Float64,
+    heat_in::Float64, heat_out::Float64
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in)

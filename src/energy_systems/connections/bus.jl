@@ -417,9 +417,9 @@ function set_max_energy!(unit::Bus, comp::Component, is_input::Bool, value::Floa
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)	
+        bus.balance_table_inputs[comp.uac].energy_potential = abs(value)
     else
-        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)	
+        bus.balance_table_outputs[comp.uac].energy_potential = abs(value)
     end
 
     if unit.proxy !== nothing

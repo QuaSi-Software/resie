@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest, default, connection_allowed, check_interface_for_transformer
+    highest, default
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -1098,119 +1098,5 @@ function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, s
         exit()
     end
 end
-
-
-"""
-    check_interface_for_transformer(interface::SystemInterface, type::String)
-
-Checks a given interface if there is a transformer in the following or previous chain.
-The function search through the whole energy system.
-
-# Arguments
--`interface::SystemInterface`: The interface that should be checked
--`type::String`: Can be either "input" or "output". Defines if the "interface" should 
-                 be handeled as an input or an output interface.
-
-# Returns
-Returns either "true" if a transformer was found in the following or previous chain or 
-"false" if no transformer has been found.
-"""
-function check_interface_for_transformer(interface::SystemInterface, type::String)
-    if type =="input"
-        has_transformer_in_input = function(current_node, last_node_uac, checked_interfaces)
-            if current_node.sys_function === EnergySystems.sf_transformer
-                return true
-            end
-            for inface in values(current_node.input_interfaces)
-                if inface !== nothing
-                    if inface in checked_interfaces || inface.source == current_node
-                        continue
-                    elseif !connection_allowed(current_node, inface.source.uac, last_node_uac)
-                        continue
-                    else
-                        push!(checked_interfaces, inface)
-                        if inface.source.sys_function === EnergySystems.sf_transformer
-                            return true
-                        else
-                            if has_transformer_in_input(inface.source, current_node.uac, checked_interfaces)
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-            return false
-        end
-
-        return has_transformer_in_input(interface.source, interface.target.uac, [])
-
-    elseif type == "output"
-        has_transformer_in_output = function(current_node, last_node_uac, checked_interfaces)
-            if current_node.sys_function === EnergySystems.sf_transformer
-                return true
-            end
-            for outface in values(current_node.output_interfaces)
-                if outface !== nothing
-                    if outface in checked_interfaces || outface.target == current_node
-                        continue
-                    elseif !connection_allowed(current_node, last_node_uac, outface.target.uac)
-                        continue
-                    else
-                        push!(checked_interfaces, outface)
-                        if outface.target.sys_function === EnergySystems.sf_transformer
-                            return true
-                        else
-                            if has_transformer_in_output(outface.target, current_node.uac, checked_interfaces)
-                                return true
-                            end
-                        end
-                    end
-                end
-            end
-            return false
-        end
-        
-        return has_transformer_in_output(interface.target, interface.source.uac, [])
-    
-    else
-        @error "The function check_interface_for_transformer() was not able to detect if it is an output or an input interface. Check the function call."
-        exit()
-    end
-end
-
-
-"""
-    connection_allowed(component::Component, input_uac::String, output_uac::String)
-
-Checks a given connection defined by `input_uac` and `output_uac` is allowed. The `component`
-is the commponent between the two other components. If `component` is not a bus, this function
-will return true. If component is a bus, then the connection matrix of the bus is checked 
-to determine if the connection from input_uac to output_uac is allowed. 
-
-# Arguments
--`component::Component`: A component beween input_uac and output_uac
--`input_uac::String`: The uac of the input component
--`output_uac::String`: The uac of the output component
-
-
-# Returns
-Returns either "true" if `component` is a non-bus or if the connection is allowed, or "false" 
-if `component` is a bus and the energy flow is denied by the energy flow matrix.
-"""
-function connection_allowed(component::Component, input_uac::String, output_uac::String)
-    if component.sys_function === EnergySystems.sf_bus
-        input_idx = component.balance_table_inputs[input_uac].input_index
-        output_idx = component.balance_table_outputs[output_uac].output_index
-        if (component.connectivity.energy_flow === nothing ||
-            component.connectivity.energy_flow[input_idx][output_idx])
-            return true
-        else
-            return false
-        end
-    else
-        return true
-    end
-end
-
 
 end

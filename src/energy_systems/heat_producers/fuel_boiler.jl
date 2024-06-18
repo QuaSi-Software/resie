@@ -105,7 +105,7 @@ end
 """
 Set maximum energies that can be taken in and put out by the unit
 """
-function set_max_energies!(unit::FuelBoiler, fuel_in::Floathing, heat_out::Floathing)
+function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
@@ -304,13 +304,13 @@ function potential(
     sim_params::Dict{String,Any}
 )
     potential_energy_fuel_in = check_fuel_in(unit, sim_params)
-    if potential_energy_fuel_in === nothing && potential_storage_fuel_in === nothing
+    if potential_energy_fuel_in === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
     potential_energy_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
+    if potential_energy_heat_out === nothing
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
