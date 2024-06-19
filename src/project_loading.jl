@@ -358,11 +358,11 @@ The following logic is used:
   at least one other transformer in each of at least two inputs and/or at least one transformer in each of at least 
   two outputs. If there is more than one MT in the current_components, the "first" MT is chosen to start with, 
   where "first" means that there are no other MTs in its input branches. 
-- Of the chosen MT, the shorter branch is taken and the add_transformer_steps is called recursively with the 
-  transformer of the current branch handed over as new current_components. The order within the branch is crucial,
-  as the MT has to always be calculated between its branches. So the first branch starts towards the MT (reverse=false 
-  for inputs and reverse=true for outputs), while the second branch is calculated away from the MT (reverse=true 
-  for inputs and reverse=false for outputs).
+- Of the chosen MT, the longer branch is taken and the add_transformer_steps is called recursively with the 
+  transformer of the current branch handed over as new current_components. The branches are starting to potential
+  from "outside", meaning each branch starts at the point that is away from the MT. Then the MT does its potential, 
+  after all branches have finished. During process, the MT does its process first, then the branches do their process 
+  starting from the "inside" with the components near the MT.
 - If there is no MT in the current_components, then "middle busses" (MB) are searched within the current_components.
   MBs are defined as busses with at least three interfaces, each containing at least one other transformer. 
   If there are several MBs in the current_components, the first MB is chosen that has no other MBs in its inputs 
@@ -425,6 +425,7 @@ function add_transformer_steps(simulation_order,
                                connecting_component=nothing,
                                checked_components=[])
 
+    # Here are some helper functions that are used by MBs and MTs
     function add_component_to_checked_components(checked_components, branches)
         if branches !== nothing
             for branch in branches
@@ -436,6 +437,52 @@ function add_transformer_steps(simulation_order,
             end
         end
         return checked_components
+    end
+
+    function remove_branches_without_transformer(branches)
+        indices_to_remove = []
+        for (idx,branch) in enumerate(branches)
+            if isempty([x for x in branch if x.sys_function === EnergySystems.sf_transformer])
+                push!(indices_to_remove, idx)
+            end
+        end
+        for idx in Iterators.reverse(sort(indices_to_remove))
+            popat!(branches, idx)
+        end
+        return branches
+    end
+
+    function detect_connecting_branch(connecting_component, branches)
+        is_connecting_branch = fill(false, length(branches))
+        if connecting_component !== nothing
+            for (idx, branch) in enumerate(branches)
+                for component in branch
+                    if component == connecting_component
+                        is_connecting_branch[idx] = true
+                        # should be only one.
+                        break
+                    end
+                end
+            end
+        end
+        return is_connecting_branch
+    end
+
+    function determine_reverse(rev, is_conn_branch, idx)
+        if rev === nothing || !is_conn_branch[idx]
+            if step_category == "potential"
+                current_reverse = !is_input[idx]
+                if is_conn_branch[idx]
+                    current_reverse = !current_reverse
+                end
+            end
+            if step_category == "process"
+                current_reverse = is_input[idx]
+            end
+        else
+            current_reverse = rev
+        end
+        return current_reverse
     end
 
     # detect the first "middle transformers" that has either at more than one input interface 
@@ -458,30 +505,14 @@ function add_transformer_steps(simulation_order,
     # Note: No parallels containing middle transformers are currently considered!
 
     # iterate through all branches of the middle transformer, if it exists, starting with the branch 
-    # with the least amount of other transformers.
+    # with the most amount of other transformers.
     if first_middle_transformer !== nothing
-        # remove branches without transformers
-        indices_to_remove = []
-        for (idx,branch) in enumerate(inface_branches_with_transformers)
-            if isempty([x for x in branch if x.sys_function === EnergySystems.sf_transformer])
-                push!(indices_to_remove, idx)
-            end
-        end
-        for idx in Iterators.reverse(sort(indices_to_remove))
-            popat!(inface_branches_with_transformers, idx)
-        end
-        indices_to_remove = []
-        for (idx,branch) in enumerate(outface_branches_with_transformers)
-            if isempty([x for x in branch if x.sys_function === EnergySystems.sf_transformer])
-                push!(indices_to_remove, idx)
-            end
-        end
-        for idx in Iterators.reverse(sort(indices_to_remove))
-            popat!(outface_branches_with_transformers, idx)
-        end
-        
+
+        inface_branches_with_transformers = remove_branches_without_transformer(inface_branches_with_transformers)
+        outface_branches_with_transformers = remove_branches_without_transformer(outface_branches_with_transformers)
+
         # sort the branches by the amount of "seen" transformers and classify them as input or output interface
-        # Also reverse the order of the input branches so that they start with the first (nearest to source) element.
+        # Also, reverse the order of the input branches so that they start with the first (nearest to source) element.
         combined_branches_with_transformers = vcat(
             [(collect(Iterators.reverse(inface)),
               length([x for x in inface if x.sys_function === EnergySystems.sf_transformer]),
@@ -492,92 +523,64 @@ function add_transformer_steps(simulation_order,
               false)
               for outface in outface_branches_with_transformers]
         )
-        sorted_combined_branches_with_transformers = sort(combined_branches_with_transformers, by=x -> x[2])
+        sorted_combined_branches_with_transformers = Iterators.reverse(sort(combined_branches_with_transformers, by=x -> x[2]))
         
         middle_transformer_branches = [x[1] for x in sorted_combined_branches_with_transformers]
         is_input = [x[3] for x in sorted_combined_branches_with_transformers]
         
         # move connecting branch to the end of the calculation
-        is_connecting_branch = fill(false, length(is_input))
-        if connecting_component !== nothing
-            for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
-                for component in middle_transformer_branch
-                    if component == connecting_component
-                        is_connecting_branch[idx] = true
-                        # should be only one.
-                        break
-                    end
-                end
-            end
-        end
+        is_connecting_branch = detect_connecting_branch(connecting_component, middle_transformer_branches)
         if any(is_connecting_branch)
             push!(middle_transformer_branches, popat!(middle_transformer_branches, findfirst(is_connecting_branch)))
             push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
             push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
         end
 
-        if step_category == "process"
-            reverse!(middle_transformer_branches)
-            reverse!(is_input)
-            reverse!(is_connecting_branch)
-        end
+        # remove transformers that appear in multiple branches (leave only the first one)
+        # input branches are not reversed at this point! (meaning the first component is the source here)
+        middle_transformer_branches = remove_double_transformer_across_branches(middle_transformer_branches, is_input)
 
-        for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
-            # change direction after the first branch while accounting for possible changes 
-            # from input to output or vica versa.
-            #
-            # Should do the following:
-            # Input --> Input --> Input: false --> true --> true
-            # Input --> Input --> Output: false --> true --> false
-            # Input --> Output --> Input: false --> false --> true
-            # Input --> Output --> Output: false --> false --> false
-            # Output --> Input --> Input: true --> true --> true
-            # Output --> Input --> Output: true --> true --> false
-            # Output --> Output --> Input: true --> false --> true
-            # Output --> Output --> Output: true --> false --> false
-            if idx == 1
-                reverse = !is_input[1]
+        if isempty(middle_transformer_branches)
+            # This can happen with multiple interconnected middle transformer. Then only process/potential the MT 
+            if step_category == "process"
+                push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
             else
-                reverse = is_input[idx]
+                push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
             end
+            initial_nr -= 1
+        else
+            for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
 
-            if is_input[idx]
-                connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][end]
-            else
-                connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][1]
-            end
+                current_reverse = determine_reverse(reverse, is_connecting_branch, idx)
 
-            current_checked_components = setdiff(checked_components, middle_transformer_branch)
-
-            simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
-                                                                 initial_nr,
-                                                                 middle_transformer_branch,
-                                                                 parallel_branches,
-                                                                 step_category,
-                                                                 reverse=reverse,
-                                                                 connecting_component=connecting_component,
-                                                                 checked_components=current_checked_components)
-
-            if length(middle_transformer_branches) > 2 && idx > 1
-                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
-                                                                     initial_nr,
-                                                                     middle_transformer_branch,
-                                                                     parallel_branches,
-                                                                     step_category,
-                                                                     reverse=!reverse,
-                                                                     connecting_component=connecting_component,
-                                                                     checked_components=current_checked_components)
-            end
-
-            # add potentials of middle_transformer in between of the single branches except for the last one
-            # and process bevore the last branch, if in process category            
-            if idx !== length(middle_transformer_branches)
-                if step_category == "process" && idx == length(middle_transformer_branches) - 1
+                # add process of middle_transformer bevor the first branch makes its process
+                if idx == 1 && step_category == "process"
                     push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
-                else
-                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
                 end
-                initial_nr -= 1
+
+                if is_input[idx]
+                    connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][end]
+                else
+                    connecting_component = [x for x in middle_transformer_branch if x.sys_function === EnergySystems.sf_transformer][1]
+                end
+
+                current_checked_components = setdiff(checked_components, middle_transformer_branch)
+
+                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
+                                                                    initial_nr,
+                                                                    middle_transformer_branch,
+                                                                    parallel_branches,
+                                                                    step_category,
+                                                                    reverse=current_reverse,
+                                                                    connecting_component=connecting_component,
+                                                                    checked_components=current_checked_components)
+
+                # add potentials of middle_transformer after the last branch has made its potential
+                if idx == length(middle_transformer_branches) && step_category == "potential"
+                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                end
             end
         end
     else
@@ -617,18 +620,7 @@ function add_transformer_steps(simulation_order,
             is_input = [x[2] for x in combined_branches_with_transformers]
     
             # detect connecting branch and move it to the end of the calculation if reverse == true
-            is_connecting_branch = fill(false, length(is_input))
-            if connecting_component !== nothing
-                for (idx, middle_bus_branch) in enumerate(middle_bus_branches)
-                    for component in middle_bus_branch
-                        if component == connecting_component
-                            is_connecting_branch[idx] = true
-                            # should be only one.
-                            break
-                        end
-                    end
-                end
-            end
+            is_connecting_branch = detect_connecting_branch(connecting_component, middle_bus_branches)
             if any(is_connecting_branch) && (reverse === nothing ? false : reverse)
                 push!(middle_bus_branches, popat!(middle_bus_branches, findfirst(is_connecting_branch)))
                 push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
@@ -636,88 +628,28 @@ function add_transformer_steps(simulation_order,
             end
 
             # detect parallel branches and merge them together
-            parallel_branch_idx = fill(0, length(is_input))
-            for (idx_middle_bus_branch, middle_bus_branch) in enumerate(middle_bus_branches)
-                for component in middle_bus_branch
-                    for (idx_parallel_branch, parallel_branch) in enumerate(parallel_branches)
-                        for branch in parallel_branch[2]
-                            if component in branch
-                                parallel_branch_idx[idx_middle_bus_branch] = idx_parallel_branch
-                            end
-                        end
-                    end
-                end
-            end
-            merged_branches_dict = Dict{Int, Vector{Any}}()
-            is_input_dict = Dict()
-            is_connecting_branch_dict = Dict()
-            order_dict = Dict{Int, Int}()
-            # Iterate over the parallel_branch_idx and corresponding middle_bus_branches
-            for (i, idx) in enumerate(parallel_branch_idx)
-                if idx == 0
-                    # Use the index i as key for branches that should be copied as is
-                    merged_branches_dict[-i] = middle_bus_branches[i]
-                    is_input_dict[-i] = is_input[i]
-                    is_connecting_branch_dict[-i] = is_connecting_branch[i]
-                    order_dict[-i] = i
-                else
-                    # If the index is not 0, merge the branches
-                    if haskey(merged_branches_dict, idx)
-                        if is_input_dict[idx] !== is_input[i]
-                            # should actually not happen
-                            @warn "The order of operation may be wrong..."
-                        end
-                        is_input_dict[idx] = copy(is_input[i])
-                        is_connecting_branch_dict[idx] = is_connecting_branch_dict[idx] || is_connecting_branch[i]
-                        if reverse === nothing 
-                            temp_reverse = !is_input_dict[idx]
-                            if is_connecting_branch_dict[idx]
-                                temp_reverse = !temp_reverse
-                            end
-                        else
-                            temp_reverse = reverse
-                        end
-                        merged_branches_dict[idx] = iterate_chain(vcat(merged_branches_dict[idx],
-                                                                       middle_bus_branches[i]),
-                                                                       EnergySystems.sf_transformer,
-                                                                       reverse=temp_reverse)
-                    else
-                        merged_branches_dict[idx] = copy(middle_bus_branches[i])
-                        is_input_dict[idx] = copy(is_input[i])
-                        is_connecting_branch_dict[idx] = copy(is_connecting_branch[i])
-                        order_dict[idx] = i  # Record the first occurrence for ordering
-                    end
-                end
-            end
-            # Sort keys by their first occurrence
-            sorted_keys = sort(collect(keys(order_dict)), by=k -> order_dict[k])
-            # Collect the results based on the sorted keys
-            middle_bus_branches = [merged_branches_dict[k] for k in sorted_keys]
-            is_input = [is_input_dict[k] for k in sorted_keys]
-            is_connecting_branch = [is_connecting_branch_dict[k] for k in sorted_keys]
+            middle_bus_branches, is_input, is_connecting_branch = merge_parallel_branches(middle_bus_branches, 
+                                                                                          is_input, 
+                                                                                          is_connecting_branch,
+                                                                                          parallel_branches,
+                                                                                          reverse)
 
-            for (idx,branch) in enumerate(middle_bus_branches)
+            # remove double entries in each branch
+            for idx in eachindex(middle_bus_branches)
                 middle_bus_branches[idx] = unique(middle_bus_branches[idx])
             end
+
+            # remove transformer that appear in multiple branches (happens if there are "circles")
+            # input branches are not reversed at this point! (meaning the first component is the source here)
+            middle_bus_branches = remove_double_transformer_across_branches(middle_bus_branches, is_input)
 
             # iterate over middle bus branches
             for (idx, middle_bus_branch) in enumerate(middle_bus_branches)
                 if isempty(middle_bus_branch)
                     continue
                 end
-                if reverse === nothing || !is_connecting_branch[idx]
-                    if step_category == "potential"
-                        current_reverse = !is_input[idx]
-                        if is_connecting_branch[idx]
-                            current_reverse = !current_reverse
-                        end
-                    end
-                    if step_category == "process"
-                        current_reverse = is_input[idx]
-                    end
-                else
-                    current_reverse = reverse
-                end
+
+                current_reverse = determine_reverse(reverse, is_connecting_branch, idx)
 
                 if is_input[idx]
                     connecting_component = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer][end]
@@ -736,7 +668,6 @@ function add_transformer_steps(simulation_order,
                                                                      connecting_component=connecting_component,
                                                                      checked_components=current_checked_components)
             end
-
         else
             # no middle busses found
             # write steps according default or predefined order if given
@@ -803,6 +734,147 @@ function add_transformer_steps(simulation_order,
 
     return simulation_order, initial_nr, checked_components
 end
+
+"""
+    merge_parallel_branches(branches, is_input, is_connecting_branch, parallel_branches)
+    
+This function merges branches that are part of a parallel branch together to one branch and returns the new branches.
+
+# Arguments
+- `branches::Array{Array{Grouping}}`: An array containing branches with components
+- `is_input::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
+- `is_connecting_branch::Array{Bool}`: An array with bools indicating if a branch in branches is a connecting branch
+- `parallel_branches::Array{Bool}`: An array holding the parallel branches
+- `reverse::Bool`: Specify if the current branches should be handeled in reverse or not
+
+# Returns
+- `branches_new::Array{Array{Grouping}}`: An array containing branches with components with merged parallels
+- `is_input_new::Array{Bool}`: An array with bools indicating if a branch in branches_new is an input branch
+- `is_connecting_branch_new::Array{Bool}`: An array with bools indicating if a branch in branches_new is a connecting branch
+
+"""
+function merge_parallel_branches(branches, is_input, is_connecting_branch, parallel_branches, reverse)
+    parallel_branch_idx = fill(0, length(is_input))
+    for (idx_branch, branch) in enumerate(branches)
+        for component in branch
+            for (idx_parallel_branch, parallel_branch) in enumerate(parallel_branches)
+                for branch in parallel_branch[2]
+                    if component in branch
+                        parallel_branch_idx[idx_branch] = idx_parallel_branch
+                    end
+                end
+            end
+        end
+    end
+    merged_branches_dict = Dict{Int, Vector{Any}}()
+    is_input_dict = Dict()
+    is_connecting_branch_dict = Dict()
+    order_dict = Dict{Int, Int}()
+    # Iterate over the parallel_branch_idx and corresponding branches
+    for (i, idx) in enumerate(parallel_branch_idx)
+        if idx == 0
+            # Use the index i as key for branches that should be copied as is
+            merged_branches_dict[-i] = branches[i]
+            is_input_dict[-i] = is_input[i]
+            is_connecting_branch_dict[-i] = is_connecting_branch[i]
+            order_dict[-i] = i
+        else
+            # If the index is not 0, merge the branches
+            if haskey(merged_branches_dict, idx)
+                if is_input_dict[idx] !== is_input[i]
+                    # should actually not happen
+                    @warn "The order of operation may be wrong..."
+                end
+                is_input_dict[idx] = copy(is_input[i])
+                is_connecting_branch_dict[idx] = is_connecting_branch_dict[idx] || is_connecting_branch[i]
+                if reverse === nothing 
+                    temp_reverse = !is_input_dict[idx]
+                    if is_connecting_branch_dict[idx]
+                        temp_reverse = !temp_reverse
+                    end
+                else
+                    temp_reverse = reverse
+                end
+                merged_branches_dict[idx] = iterate_chain(vcat(merged_branches_dict[idx],
+                                                          branches[i]),
+                                                          EnergySystems.sf_transformer,
+                                                          reverse=temp_reverse)
+            else
+                merged_branches_dict[idx] = copy(branches[i])
+                is_input_dict[idx] = copy(is_input[i])
+                is_connecting_branch_dict[idx] = copy(is_connecting_branch[i])
+                order_dict[idx] = i  # Record the first occurrence for ordering
+            end
+        end
+    end
+    # Sort keys by their first occurrence
+    sorted_keys = sort(collect(keys(order_dict)), by=k -> order_dict[k])
+    # Collect the results based on the sorted keys
+    branches_new = [merged_branches_dict[k] for k in sorted_keys]
+    is_input_new = [is_input_dict[k] for k in sorted_keys]
+    is_connecting_branch_new = [is_connecting_branch_dict[k] for k in sorted_keys]
+
+    return branches_new, is_input_new, is_connecting_branch_new
+end
+
+"""
+    remove_double_transformer_across_branches(branches, is_input_branch)
+    
+This function removes transformer in branches that are in more than one branch. 
+Removes them in the branch where they appear later.
+Note that the components in the branches should be sorted strictly in the direction of energy flow 
+beginning with the source!
+
+# Arguments
+- `branches::Array{Array{Grouping}}`: An array containing branches with components
+- `is_input_branch::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
+
+# Returns
+- `branches::Array{Array{Grouping}}`: An array containing branches with components with removed double transformers
+
+"""
+function remove_double_transformer_across_branches(branches, is_input_branch)
+    function reverse_inputs(branches, is_input_branch)
+        for branch_idx in eachindex(branches)
+            if is_input_branch[branch_idx]
+                reverse!(branches[branch_idx])
+            end
+        end
+        return branches
+    end
+
+    component_idx_max = maximum([length(branch) for branch in branches])
+    component_included = []
+    idx_to_delete = []  # branch_idx, component_idx
+
+    # reverse order within the input branches to ensure that the first component in each 
+    # branch is the closest to the middle bus
+    branches = reverse_inputs(branches, is_input_branch)
+
+    for component_idx in 1:component_idx_max
+        for (branch_idx, branch) in enumerate(branches)
+            if length(branch) < component_idx || branch[component_idx].sys_function !== EnergySystems.sf_transformer
+                continue
+            else
+                current_component = branch[component_idx]
+                if current_component in component_included
+                    push!(idx_to_delete, [branch_idx, component_idx])
+                else
+                    push!(component_included, current_component)
+                end
+            end
+        end
+    end
+    for idx_pair in Iterators.reverse(idx_to_delete)
+        deleteat!(branches[idx_pair[1]], idx_pair[2])
+    end
+
+    # reverse the reverse
+    branches = reverse_inputs(branches, is_input_branch)
+
+    return branches
+end
+
 
 """
     detect_middle_bus(current_components, reverse, checked_components)
@@ -1131,55 +1203,58 @@ function find_parallels(components)
         push!(all_paths, copy(path))
         pop!(path)
     end
-    
-    all_paths = Vector{Vector}()
-    paths_dict = Dict{Tuple, Vector{Vector}}()
 
+    function filter_paths(paths)
+        paths_dict = Dict{Tuple, Vector{Vector}}()
+        for path in paths
+            start_unit = path[1]
+            end_unit = path[end]
+            # filter paths for...
+            if (
+                # starting with either a bus or transformer
+                start_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
+                # ending with either a bus or transformer
+                && end_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
+                # has a length > 2
+                && length(path) > 2
+                # path contains at least one transformer in between
+                && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:end-1]]
+            )
+                # remove all non-transformers and non-busses from path
+                path_reduced = Any[path[1]]
+                for component in path[2:end-1]
+                    if component.sys_function in [EnergySystems.sf_transformer, EnergySystems.sf_bus]
+                        push!(path_reduced, component)
+                    end
+                end
+                push!(path_reduced, path[end])
+
+                # save path to paths_dict if it's not already included
+                key = (start_unit.uac, end_unit.uac)
+                if !haskey(paths_dict, key)
+                    paths_dict[key] = Vector{Vector}()
+                end
+                if !any(path_reduced == p for p in paths_dict[key])
+                    push!(paths_dict[key], path_reduced)
+                end
+            end
+        end
+
+        # filter for parallel paths that contain more than one variant from A to B
+        return Dict(collect(filter(paths -> length(paths[2]) > 1, paths_dict)))
+    end
+    
     # find all possible paths between all components in current energy system
     # Paths are split by storages and by grid inputs and outputs. 
     # Connection matrixes of busses are taken into account.
+    all_paths = Vector{Vector}()
     for unit in components
         if !(unit.sys_function === EnergySystems.sf_bus && unit.proxy !== nothing)
             find_paths(unit, [], all_paths, "")
         end
     end
 
-    for path in all_paths
-        start_unit = path[1]
-        end_unit = path[end]
-        # filter paths for...
-        if (
-            # starting with either a bus or transformer
-            start_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
-            # ending with either a bus or transformer
-            && end_unit.sys_function in [EnergySystems.sf_bus, EnergySystems.sf_transformer]
-            # has a length > 2
-            && length(path) > 2
-            # path contains at least one transformer in between
-            && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:end-1]]
-        )
-            # remove all non-transformers and non-busses from path
-            path_reduced = Any[path[1]]
-            for component in path[2:end-1]
-                if component.sys_function in [EnergySystems.sf_transformer, EnergySystems.sf_bus]
-                    push!(path_reduced, component)
-                end
-            end
-            push!(path_reduced, path[end])
-
-             # save path to paths_dict if it's not already included
-             key = (start_unit.uac, end_unit.uac)
-             if !haskey(paths_dict, key)
-                 paths_dict[key] = Vector{Vector}()
-             end
-             if !any(path_reduced == p for p in paths_dict[key])
-                 push!(paths_dict[key], path_reduced)
-             end
-        end
-    end
-
-    # filter for parallel paths that contain more than one variant from A to B
-    parallel_paths = Dict(collect(filter(paths -> length(paths[2]) > 1, paths_dict)))
+    parallel_paths = filter_paths(all_paths)
 
     # remove elements that are all the same for each path in each parallel path
     function values_are_identical(vectors, index)
@@ -1224,6 +1299,13 @@ function find_parallels(components)
             end
         end
     end
+
+    # gather and filter paths again
+    all_current_paths = []
+    for path in collect(values(final_paths))
+        append!(all_current_paths, path)
+    end
+    final_paths = filter_paths(all_current_paths)
 
     return final_paths
 end
@@ -1989,14 +2071,18 @@ end
 """
     contains_double_potental_produce(step_order)
 
-Checks the simulation step order for directly consecutive transformers potential and produce step and 
-removes the potential step.
+Checks the simulation step order for directly consecutive transformers potential and produce step to later 
+remove the potential step. Also checks for identical consecutive steps.
 """
 function contains_double_potental_produce(step_order)
     last_unit = ""
     last_step = ""
     for entry in step_order
         if entry[1] == last_unit && entry[2] == last_step
+            # detect completely identical entries
+            return true
+        elseif entry[1] == last_unit && last_step === EnergySystems.s_potential && entry[2] === EnergySystems.s_process
+            # detect consecutive potential - process of the same unit
             return true
         else
             last_unit = entry[1]
@@ -2014,23 +2100,25 @@ If there are multiple process steps for one tranformer, only the first one will 
 """
 function remove_double_transformer_process_steps(simulation_order, components)
     detected_transformer_processes = []
+    simulation_order_new = []
     for (idx,(_, step)) in enumerate(simulation_order)
         if step[2] == EnergySystems.s_process && components[step[1]].sys_function === EnergySystems.sf_transformer
-            if step in detected_transformer_processes
-                deleteat!(simulation_order, idx)
-            else
+            if !(step in detected_transformer_processes)
                 push!(detected_transformer_processes, step)
+                push!(simulation_order_new, simulation_order[idx])
             end
+        else
+            push!(simulation_order_new, simulation_order[idx])
         end
     end
-    return simulation_order
+    return simulation_order_new
 end
 
 """
     remove_double_potental_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
-removes the potential step.
+removes the potential step. Also removes consecutive identical steps.
 """
 function remove_double_potental_produce(step_order)
     last_unit = ""
@@ -2044,9 +2132,6 @@ function remove_double_potental_produce(step_order)
             if (step == EnergySystems.s_process
                 && last_step == EnergySystems.s_potential)
                 push!(to_remove, idx-1)
-            elseif (step == EnergySystems.s_potential
-                    && last_step == EnergySystems.s_process)
-                push!(to_remove, idx)
             elseif (step == last_step)
                 push!(to_remove, idx)
             end
@@ -2055,7 +2140,7 @@ function remove_double_potental_produce(step_order)
         last_step = step
     end
 
-    for index in sort(to_remove, rev=true)
+    for index in sort(unique(to_remove), rev=true)
         deleteat!(step_order, index)
     end
 
