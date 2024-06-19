@@ -1,11 +1,13 @@
 function load_condition_prototypes()
+    StorageComponent = Union{BufferTank,Storage,Battery,SeasonalThermalStorage}
+
     CONDITION_PROTOTYPES["Buffer < X%"] = ConditionPrototype(
         "Buffer < X%", # name
         Dict{String,Any}( # parameters
             "percentage" => 0.5
         ),
         EnSysRequirements( # required_components
-            "buffer" => (BufferTank, nothing)
+            "buffer" => (StorageComponent, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
             return rel(condition, "buffer").load <
@@ -19,7 +21,7 @@ function load_condition_prototypes()
             "percentage" => 0.5
         ),
         EnSysRequirements( # required_components
-            "buffer" => (BufferTank, nothing)
+            "buffer" => (StorageComponent, nothing)
         ),
         function (condition, unit, simulation_parameters) # check_function
             return rel(condition, "buffer").load >=
