@@ -2,8 +2,10 @@
 Implementation of a battery component holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
-parameters (its capacity). However the default operation strategy is more complex and
-toggles the processing of the battery dependant on available PV power and its own charge.
+parameters (its capacity).
+
+Implements a strategy that toggles the unloading of the battery dependent on available PV
+power and its own charge.
 """
 Base.@kwdef mutable struct Battery <: Component
     uac::String
@@ -88,7 +90,10 @@ function balance_on(
 end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
-    if unit.controller.state_machine.state != 2
+    if (
+        unit.controller.strategy == "economical_discharge"
+        && unit.controller.state_machine.state != 2
+    )
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return
     end
@@ -112,7 +117,10 @@ function process(unit::Battery, sim_params::Dict{String,Any})
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
-    if unit.controller.state_machine.state != 1
+    if (
+        unit.controller.strategy == "economical_discharge"
+        && unit.controller.state_machine.state != 1
+    )
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
     end
@@ -123,7 +131,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
-        return # load is only concerned with receiving energy from the target
+        return # load is only concerned with receiving energy from the source
     end
 
     diff = unit.capacity - unit.load
