@@ -298,7 +298,7 @@
                 "TST_HTP_02"
             ],
             "strategy": {
-                "name": "demand_driven",
+                "name": "default",
                 "operation_profile_path": "./profiles/examples/district/4000hours_with_least_CO2_2022.prf"
             },
             "power_el": 600000,
@@ -325,7 +325,7 @@
                 "TST_BUS_EL_01"
             ],
             "strategy": {
-                "name": "demand_driven",
+                "name": "default",
                 "load_storages m_h_w_ht1": true,
                 "load_storages m_e_ac_230v": true
             },
@@ -393,7 +393,7 @@
                 "TST_BUS_TH_00"
             ],
             "strategy": {
-                "name": "demand_driven",
+                "name": "default",
                 "load_storages m_h_w_ht1": false
             },
             "m_heat_out": "m_h_w_ht1",
@@ -407,9 +407,6 @@
             "output_refs": [
                 "TST_BUS_TH_00"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 300000,
             "constant_cop": 3.5
         }

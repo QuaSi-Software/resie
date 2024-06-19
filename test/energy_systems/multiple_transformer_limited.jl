@@ -50,9 +50,6 @@ function test_multiple_transformer_with_limitations()
             "type" => "Electrolyser",
             "control_refs" => [],
             "output_refs" => ["TST_HP_01", "TST_DEM_H2_01", "TST_GRI_O2_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_el" => 4000,
             "output_temperature_ht" => 55.0,
             "m_heat_ht_out" => "m_h_w_lt1",
@@ -74,9 +71,6 @@ function test_multiple_transformer_with_limitations()
             "type" => "HeatPump",
             "control_refs" => [],
             "output_refs" => ["TST_DEM_heat_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 2240,
             "constant_cop" => 3.5,
             "min_power_fraction" => 0.0

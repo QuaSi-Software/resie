@@ -194,9 +194,6 @@
                 "TST_TH_GRO_01"
             ],
             "m_heat_out": "m_h_w_lt2",
-            "strategy": {
-                "name": "supply_driven"
-            },
             "power_th": 3500,
             "min_power_fraction": 0.2,
             "output_temperature": 40.0

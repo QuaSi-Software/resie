@@ -37,9 +37,6 @@ function test_heat_pump_demand_driven_correct_order()
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 12000
         ),
     )

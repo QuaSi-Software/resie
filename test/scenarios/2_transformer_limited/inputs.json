@@ -105,9 +105,6 @@
             "type": "HeatPump",
             "control_refs": [  ],
             "output_refs": ["TST_DEM_ht_01" ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 5000,
             "constant_cop": 3.0,
             "min_power_fraction": 0
@@ -120,9 +117,6 @@
                 "TST_DEM_H2_01",
                 "TST_01_ELT_01_GRO"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_el": 4000,
             "output_temperature_ht": 55.0,
             "m_heat_ht_out": "m_h_w_lt1",

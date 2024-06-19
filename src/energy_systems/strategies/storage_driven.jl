@@ -63,17 +63,6 @@ OP_STRATS["storage_driven"] = OperationalStrategyType(
         "low_threshold" => 0.2,
         "high_threshold" => 0.95,
         "name" => "storage_driven",
-        "operation_profile_path" => nothing,
-        "consider_m_el_in" => true,
-        "consider_m_el_out" => true,
-        "consider_m_gas_in" => true,
-        "consider_m_fuel_in" => true,
-        "consider_m_h2_out" => true,
-        "consider_m_o2_out" => true,
-        "consider_m_heat_out" => true,
-        "consider_m_heat_ht_out" => true,
-        "consider_m_heat_lt_out" => true,
-        "consider_m_heat_in" => true,
     ),
     required_components=EnSysRequirements()
 )

@@ -28,9 +28,6 @@ function test_ooo_storage_loading_switch()
             "output_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 40000,
             "efficiency_fuel_in" => "const:1.0",
         ),
@@ -41,9 +38,6 @@ function test_ooo_storage_loading_switch()
             "output_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 40000,
             "efficiency_fuel_in" => "const:1.0",
         ),

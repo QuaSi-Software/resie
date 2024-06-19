@@ -216,9 +216,6 @@
             "output_refs": [
                 "TST_01_HZG_00_BUS"
             ],
-            "strategy": {
-                "name": "supply_driven"
-            },
             "power_th": 20000,
             "constant_cop": 3.0
         },
@@ -230,9 +227,6 @@
             "output_refs": [
                 "TST_01_HZG_00_BUS"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 20000,
             "constant_cop": 3.0
         },
@@ -291,9 +285,6 @@
                 "TST_01_H2_02_DEM",
                 "TST_01_ELT_01_GRO"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_el": 40000,
             "output_temperature_ht": 55.0,
             "m_heat_ht_out": "m_h_w_lt1",

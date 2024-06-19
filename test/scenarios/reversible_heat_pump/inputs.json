@@ -126,9 +126,6 @@
                 "TST_TH_BUS_01"
             ],
             "m_heat_out": "m_h_w_ht1",
-            "strategy": {
-                "name": "supply_driven"
-            },
             "power_th": 4500,
             "min_power_fraction": 0.0
         },

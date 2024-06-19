@@ -36,9 +36,6 @@ function test_ooo_for_heat_pumps_wrong()
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 12000,
             "constant_cop" => 3.0
         ),

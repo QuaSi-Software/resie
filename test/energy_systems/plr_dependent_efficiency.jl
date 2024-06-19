@@ -28,9 +28,6 @@ function get_demand_energy_system_config()
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 4000,
             "linear_interface" => "fuel_in",
             "efficiency_fuel_in" => "const:1.0",
@@ -197,9 +194,6 @@ function test_gas_boiler_supply_driven_plrd()
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "supply_driven",
-            ),
             "power_th" => 4000,
             "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
@@ -309,9 +303,6 @@ function test_CHPP_el_eff_plrd()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => [],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "output_refs" => [
                 "TST_DEM_01",
                 "TST_GRO_01",

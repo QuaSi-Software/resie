@@ -119,9 +119,6 @@
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 225000,
             "min_power_fraction": 0.0
         },

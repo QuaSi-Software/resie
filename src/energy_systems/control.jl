@@ -309,10 +309,9 @@ end
 
 OP_STRATS = Dict{String,OperationalStrategyType}()
 
+include("strategies/default.jl")
 include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
-include("strategies/demand_driven.jl")
-include("strategies/supply_driven.jl")
 
 """
     controller_for_strategy(strategy, strategy_config, sim_params)
@@ -329,10 +328,6 @@ Construct the controller for the strategy of the given name using the given para
 - `Controller`: The constructed controller for the given strategy.
 """
 function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, sim_params::Dict{String,Any})::Controller
-    if lowercase(strategy) == "default"
-        return Controller("default", strategy_config, StateMachine(), Grouping())
-    end
-
     if !(strategy in keys(OP_STRATS))
         throw(ArgumentError("Unknown strategy $strategy"))
     end
@@ -349,7 +344,11 @@ function controller_for_strategy(strategy::String, strategy_config::Dict{String,
         end
     end
 
-    params = Base.merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
+    params = Base.merge(
+        OP_STRATS["default"].strategy_parameters,
+        OP_STRATS[strategy].strategy_parameters
+    )
+    params = Base.merge(params, strategy_config)
 
     # load operation profile if path is given in input file
     if haskey(params, "operation_profile_path")

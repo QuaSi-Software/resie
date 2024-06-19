@@ -19,9 +19,6 @@ function test_ooo_bus_output_priorities()
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BUS_01"],
             "output_refs" => ["TST_BUS_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 10000,
             "efficiency_fuel_in" => "const:1.0",
         ),

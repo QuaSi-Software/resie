@@ -38,9 +38,6 @@ function setup_control_tests()
             "medium" => "m_h_w_ht1",
             "capacity" => 40000,
             "load" => 20000,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

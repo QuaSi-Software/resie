@@ -38,9 +38,6 @@ function test_load_from_dict()
             "medium" => "m_h_w_ht1",
             "capacity" => 40000,
             "load" => 20000,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -97,17 +94,11 @@ function test_load_custom_medium_categories()
             "m_h2_out" => "m_c_g_h2-pure",
             "m_o2_out" => "m_c_g_o2-impure",
             "heat_lt_is_usable" => false,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "control_refs" => [],
             "output_refs" => ["TST_GRO_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",

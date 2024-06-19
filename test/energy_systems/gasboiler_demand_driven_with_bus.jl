@@ -38,9 +38,6 @@ function test_gasboiler_demand_driven_with_bus()
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_BUS_01"],
             "output_refs" => ["TST_BUS_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 12000,
             "efficiency_fuel_in" => "const:1.0",
         ),
@@ -248,9 +245,6 @@ function test_gasboiler_demand_driven_without_bus()
             "m_fuel_in" => "m_c_g_natgas",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 12000,
             "efficiency_fuel_in" => "const:1.0",
         ),
