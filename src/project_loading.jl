@@ -263,19 +263,21 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
         checked_components_pro = []
         count = 1
         reverse = nothing
+        parallel_branches_pot = copy(parallel_branches)
+        parallel_branches_pro = copy(parallel_branches)
         while !complete
-            simulation_order, initial_nr, checked_components_pot = add_transformer_steps(simulation_order,
+            simulation_order, initial_nr, checked_components_pot, parallel_branches_pot = add_transformer_steps(simulation_order,
                                                                             initial_nr,
                                                                             transformers_and_busses,
-                                                                            parallel_branches,
+                                                                            parallel_branches_pot,
                                                                             "potential",
                                                                             reverse=reverse,
                                                                             checked_components=checked_components_pot)
                                                                                     
-            simulation_order, initial_nr, checked_components_pro = add_transformer_steps(simulation_order,
+            simulation_order, initial_nr, checked_components_pro, parallel_branches_pro = add_transformer_steps(simulation_order,
                                                                             initial_nr,
                                                                             transformers_and_busses,
-                                                                            parallel_branches,
+                                                                            parallel_branches_pro,
                                                                             "process",
                                                                             reverse=reverse,
                                                                             checked_components=checked_components_pro)
@@ -359,14 +361,16 @@ The following logic is used:
   two outputs. If there is more than one MT in the current_components, the "first" MT is chosen to start with, 
   where "first" means that there are no other MTs in its input branches. 
 - Of the chosen MT, the longer branch is taken and the add_transformer_steps is called recursively with the 
-  transformer of the current branch handed over as new current_components. The branches are starting to potential
-  from "outside", meaning each branch starts at the point that is away from the MT. Then the MT does its potential, 
-  after all branches have finished. During process, the MT does its process first, then the branches do their process 
-  starting from the "inside" with the components near the MT.
+  transformer of the current branch handed over as new current_components. If branches have interdependencies, the 
+  order of the branches is adjusted accordingly to calculate the dependencies first. With the components of each branch, 
+  the function add_transformer_steps is called recursivly. The branches are starting to potential from "outside", 
+  meaning each branch starts at the point that is away from the MT. Then the MT does its potential, after all branches
+  have finished. During process, the MT does its process first, then the branches do their process starting from the
+  "inside" with the components near the MT.
 - If there is no MT in the current_components, then "middle busses" (MB) are searched within the current_components.
-  MBs are defined as busses with at least three interfaces, each containing at least one other transformer. 
-  If there are several MBs in the current_components, the first MB is chosen that has no other MBs in its inputs 
-  (reverse === nothing || reverse == false) or in its outputs (reverse == true).
+  MBs are defined as busses with more than one input and/or more than one output interface with each containing at least
+  one other transformer. If there are several MBs in the current_components, the first MB is chosen that has no other
+  MBs in its inputs (reverse === nothing || reverse == false) or in its outputs (reverse == true).
 - If the current reverse is false or nothing, first the input branches and then the output branches are given recursively 
   to add_transformer_steps(). If reverse is true, the output branches come first.
 - If the current_components are part of a parallel_branch (PB), then they are merged together into one branch. PBs are 
@@ -389,7 +393,7 @@ The following logic is used:
   before each recursive function call. Note that in some cases, components can be considered multiple times if they are 
   part of multiple branches at one MB or MT! Therefore, after the order has been determined, only the first appearance of 
   the process is considered and all other process steps of the same component are deleted from the order of operation. 
-  For potential steps, this is not done as in some cases, components have to have multiple potential steps, e.g., MTs.
+  For potential steps, this is not done as in some cases, components have to have multiple potential steps.
 - If an MB is connected to another MB, the first MB holds the second MB in one of its output branches. When determining
   the correct calculation order of the components to the rear MB, the connection branch has to perform its potentials
   after all of the other branches of the rear MB. To detect this, branches can get a connecting_component, defining the
@@ -511,23 +515,15 @@ function add_transformer_steps(simulation_order,
         inface_branches_with_transformers = remove_branches_without_transformer(inface_branches_with_transformers)
         outface_branches_with_transformers = remove_branches_without_transformer(outface_branches_with_transformers)
 
-        # sort the branches by the amount of "seen" transformers and classify them as input or output interface
-        # Also, reverse the order of the input branches so that they start with the first (nearest to source) element.
-        combined_branches_with_transformers = vcat(
-            [(collect(Iterators.reverse(inface)),
-              length([x for x in inface if x.sys_function === EnergySystems.sf_transformer]),
-              true) 
-              for inface in inface_branches_with_transformers],
-            [(outface,
-              length([x for x in outface if x.sys_function === EnergySystems.sf_transformer]),
-              false)
-              for outface in outface_branches_with_transformers]
-        )
-        sorted_combined_branches_with_transformers = Iterators.reverse(sort(combined_branches_with_transformers, by=x -> x[2]))
-        
-        middle_transformer_branches = [x[1] for x in sorted_combined_branches_with_transformers]
-        is_input = [x[3] for x in sorted_combined_branches_with_transformers]
-        
+        # Detect order of the branches under consideration of interdependencies between the branches.
+        # If a component in one branch has a component of another branch in its inputs (while not 
+        # considering the path through the middle transformer), the other branch has to be calculated first.
+        # Also, reverse the order of the input branches so that they start with the first (nearest to source) element
+        middle_transformer_branches, is_input = detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
+                                                                                          outface_branches_with_transformers,
+                                                                                          first_middle_transformer,
+                                                                                          step_category)
+
         # move connecting branch to the end of the calculation
         is_connecting_branch = detect_connecting_branch(connecting_component, middle_transformer_branches)
         if any(is_connecting_branch)
@@ -539,6 +535,7 @@ function add_transformer_steps(simulation_order,
         # remove transformers that appear in multiple branches (leave only the first one)
         # input branches are not reversed at this point! (meaning the first component is the source here)
         middle_transformer_branches = remove_double_transformer_across_branches(middle_transformer_branches, is_input)
+        middle_transformer_branches = remove_branches_without_transformer(middle_transformer_branches)
 
         if isempty(middle_transformer_branches)
             # This can happen with multiple interconnected middle transformer. Then only process/potential the MT 
@@ -567,7 +564,7 @@ function add_transformer_steps(simulation_order,
 
                 current_checked_components = setdiff(checked_components, middle_transformer_branch)
 
-                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order, 
+                simulation_order, initial_nr, _, parallel_branches = add_transformer_steps(simulation_order, 
                                                                     initial_nr,
                                                                     middle_transformer_branch,
                                                                     parallel_branches,
@@ -645,21 +642,22 @@ function add_transformer_steps(simulation_order,
 
             # iterate over middle bus branches
             for (idx, middle_bus_branch) in enumerate(middle_bus_branches)
-                if isempty(middle_bus_branch)
+                middle_bus_branch_transformer = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer]
+                if isempty(middle_bus_branch_transformer)
                     continue
                 end
 
                 current_reverse = determine_reverse(reverse, is_connecting_branch, idx)
 
                 if is_input[idx]
-                    connecting_component = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer][end]
+                    connecting_component = middle_bus_branch_transformer[end]
                 else
-                    connecting_component = [x for x in middle_bus_branch if x.sys_function === EnergySystems.sf_transformer][1]
+                    connecting_component = middle_bus_branch_transformer[1]
                 end
 
                 current_checked_components = setdiff(checked_components, middle_bus_branch)
 
-                simulation_order, initial_nr, _ = add_transformer_steps(simulation_order,
+                simulation_order, initial_nr, _, parallel_branches = add_transformer_steps(simulation_order,
                                                                      initial_nr,
                                                                      middle_bus_branch,
                                                                      parallel_branches,
@@ -686,11 +684,13 @@ function add_transformer_steps(simulation_order,
                     # in this parallel! May change this later...
                     is_parallel = false
                     current_parallel_branches = []
-                    for parallel_branches in parallel_branches
-                        for branch in parallel_branches[2]
+                    parallel_branch_key_to_delete = 0
+                    for (parallel_branch_key, parallel_branch) in parallel_branches
+                        for branch in parallel_branch
                             if unit in branch
                                 is_parallel = true
-                                current_parallel_branches = parallel_branches[2]
+                                current_parallel_branches = parallel_branch
+                                parallel_branch_key_to_delete = parallel_branch_key
                                 break
                             end
                         end
@@ -702,7 +702,16 @@ function add_transformer_steps(simulation_order,
                             # TODO call add_transformer_steps() recursively here to handle middle busses within parallels?
                             #      may do this in future versions as this is not straightforward...
                             current_branch = reverse ? collect(Iterators.reverse(current_branch)) : current_branch
-                            current_branch_transformers = [x for x in current_branch if x.sys_function === EnergySystems.sf_transformer]
+
+                            current_middle_transformers = []
+                            if current_branch[1].sys_function === EnergySystems.sf_transformer
+                                push!(current_middle_transformers, current_branch[1])
+                            end
+                            if current_branch[end].sys_function === EnergySystems.sf_transformer
+                                push!(current_middle_transformers, current_branch[end])
+                            end
+
+                            current_branch_transformers = [x for x in current_branch[2:end-1] if x.sys_function === EnergySystems.sf_transformer]
                             for component in current_branch_transformers
                                 if step_category == "potential"
                                     push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_potential)])
@@ -717,8 +726,27 @@ function add_transformer_steps(simulation_order,
                                     initial_nr -= 1
                                 end
                             end
+                            # if there is a transformer that is starting and/or endpoint of the parallel paths, then
+                            # perform also on the last step a "reverse" of potential and afterwards potential the transformer
+                            if length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches && step_category == "potential"
+                                for component_rev in Iterators.reverse(current_branch_transformers[1:end-1])
+                                    push!(simulation_order, [initial_nr, (component_rev.uac, EnergySystems.s_potential)])
+                                    initial_nr -= 1
+                                end
+                                for current_middle_transformer in current_middle_transformers
+                                    push!(simulation_order, [initial_nr, (current_middle_transformer.uac, EnergySystems.s_potential)])
+                                    initial_nr -= 1
+                                end
+                            elseif length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches && step_category == "process"
+                                for current_middle_transformer in current_middle_transformers
+                                    push!(simulation_order, [initial_nr, (current_middle_transformer.uac, EnergySystems.s_process)])
+                                    initial_nr -= 1
+                                end
+                            end
                         end
                         branch_finished = true
+                        # delete parallel branch from parallel_branches to avoid double counting!
+                        pop!(parallel_branches, parallel_branch_key_to_delete)
                     else
                         if step_category == "potential"
                             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
@@ -732,8 +760,182 @@ function add_transformer_steps(simulation_order,
         end
     end
 
-    return simulation_order, initial_nr, checked_components
+    return simulation_order, initial_nr, checked_components, parallel_branches
 end
+
+
+
+"""
+    detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
+                                              outface_branches_with_transformers,
+                                              first_middle_transformer,
+                                              step_category)
+    
+This function detects the order of the branches under consideration of interdependencies between the branches.
+If a component in one branch has a component of another branch in its inputs (while not 
+considering the path through the middle transformer), the other branch has to be calculated first (potential) or 
+last (process).
+As base order, the number of transformers within each branch is used, starting with the longest.
+Also, reverse the order of the input branches so that they start with the first (nearest to source) element.
+
+# Arguments
+- `inface_branches_with_transformers::Array{Array{Grouping}}`: An array containing the input branches with components
+- `outface_branches_with_transformers::Array{Array{Grouping}}`: An array containing the output branches with components
+- `first_middle_transformer::Component`: The middle transformer component
+- `step_category::String`: Can be either "potential" or "process", depending on the simulation step to find for 
+                           current_components.
+
+# Returns 
+- `middle_transformer_branches::Array{Array{Grouping}}`: An array containing the ordered branches
+- `is_input::Array{Bool}`: An array with bools indicating if a branch in middle_transformer_branches is an input branch
+
+"""
+function detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
+                                                   outface_branches_with_transformers,
+                                                   first_middle_transformer,
+                                                   step_category)
+
+    # helper function to generate order from given constraints with topological sorting
+    # branch_ordering is a vector or tuples [(first_idx, second_idx)] where each first_idx
+    # should come ahead of second_idx.
+    function order_indexes(branch_ordering)
+        # Collect all unique nodes
+        nodes = unique([x for t in branch_ordering for x in t])
+
+        # Initialize adjacency list and in-degree dictionary
+        adj_list = Dict(node => Int[] for node in nodes)
+        in_degree = Dict(node => 0 for node in nodes)
+
+        # Populate adjacency list and in-degree dictionary
+        for (first_branch_idx, second_branch_idx) in branch_ordering
+            push!(adj_list[first_branch_idx], second_branch_idx)
+            in_degree[second_branch_idx] += 1
+        end
+
+        # Initialize the queue with nodes that have no incoming edges (in-degree 0)
+        queue = [node for node in nodes if in_degree[node] == 0]
+
+        # Kahn's algorithm for topological sorting
+        sorted_list = []
+        while !isempty(queue)
+            current = popfirst!(queue)
+            push!(sorted_list, current)
+
+            for neighbor in adj_list[current]
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0
+                    push!(queue, neighbor)
+                end
+            end
+        end
+
+        # Check if topological sort was possible (i.e., no cycles)
+        success = true
+        if length(sorted_list) != length(nodes)
+            success = false
+        end
+        return success, sorted_list
+    end
+
+    # reverse the order of the input branches so that they start with the first (nearest to source) element
+    # and classify them as input or output interface
+    combined_branches_with_transformers = vcat(
+        [(collect(Iterators.reverse(inface)), true) for inface in inface_branches_with_transformers],
+        [(outface, false) for outface in outface_branches_with_transformers]
+    )
+    # sort them by starting with the longest to get a base order
+    sort!(combined_branches_with_transformers,
+          by=x -> length([t for t in x[1] if t.sys_function === EnergySystems.sf_transformer]),
+          rev=true)
+
+    branch_ordering = []  # (other_branch_idx, own_branch_idx) --> other_branch has to come ahead of own_branch!
+    for (branch_idx, (branch, is_input_branch)) in enumerate(combined_branches_with_transformers)
+        for (component_idx, component) in enumerate(branch)
+            if is_input_branch
+                # check all input interface
+                exclude_interfaces = []
+            else
+                # skip the interface towards the first_middle_transformer
+                if component_idx == 1
+                    component_towards_first_middle_transformer = first_middle_transformer
+                else
+                    component_towards_first_middle_transformer = branch[component_idx-1]
+                end
+                exclude_interfaces = [x for x in values(component.input_interfaces) if x.source == component_towards_first_middle_transformer]
+            end
+            inface_transformers = Any[]
+            add_non_recursive_indirect_inputs!(inface_transformers,
+                                               component,
+                                               [],
+                                               [EnergySystems.sf_transformer],
+                                               "",
+                                               true,
+                                               true,
+                                               first_middle_transformer)
+
+            # check if one of inface_transformers in in other branches
+            for (other_branch_idx, (other_branch, is_input_other_branch)) in enumerate(combined_branches_with_transformers)
+                if other_branch_idx == branch_idx
+                    # skip own branch
+                    continue
+                end
+                for other_component in other_branch
+                    for input_component in inface_transformers
+                        if other_component == input_component
+                            push!(branch_ordering, (other_branch_idx, branch_idx))
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    branch_ordering = unique(branch_ordering)
+    success, sorted_list = order_indexes(branch_ordering)
+
+    if !success
+        # If there are loops, remove the reversed dublicates
+        standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
+        seen = Set{Tuple{Int, Int}}()
+        unique_tuples = []
+
+        # Iterate over the vector of tuples
+        for t in branch_ordering
+            standardized = standardize_tuple(t)
+            if !(standardized in seen)
+                push!(unique_tuples, t)
+                push!(seen, standardized)
+            end
+        end
+
+        success, sorted_list = order_indexes(unique_tuples)
+    end
+
+    if !success
+        @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
+    end
+
+    if step_category == "process"
+        reverse!(sorted_list)
+    end
+
+    # place the sorted branches first, then the others
+    middle_transformer_branches = []
+    is_input = []
+    for idx in sorted_list
+        push!(middle_transformer_branches, combined_branches_with_transformers[idx][1])
+        push!(is_input, combined_branches_with_transformers[idx][2])
+    end
+    for idx in eachindex(combined_branches_with_transformers)
+        if !(idx in sorted_list)
+            push!(middle_transformer_branches, combined_branches_with_transformers[idx][1])
+            push!(is_input, combined_branches_with_transformers[idx][2])
+        end
+    end
+
+    return middle_transformer_branches, is_input
+end
+
 
 """
     merge_parallel_branches(branches, is_input, is_connecting_branch, parallel_branches)
@@ -843,6 +1045,10 @@ function remove_double_transformer_across_branches(branches, is_input_branch)
         return branches
     end
 
+    if isempty(branches)
+        return branches
+    end
+
     component_idx_max = maximum([length(branch) for branch in branches])
     component_included = []
     idx_to_delete = []  # branch_idx, component_idx
@@ -880,7 +1086,7 @@ end
     detect_middle_bus(current_components, reverse, checked_components)
 
 This function searches for middle_busses in the current_components.
-Middle_busses are busses with more than two interfaces, each with at least one transformer.
+Middle_busses are busses with more than one input and/or more than one output interfaces, each with at least one transformer.
 Returns the first/last middle bus that has no other middle bus in its inputs/outputs, depending on whether reverse is 
 true (last) or false/nothing (first). 
 Branches are returned in ascending input/output order of the bus, starting with the highest priority.
@@ -1045,6 +1251,24 @@ is reversed and for output branches, the order of energy flow is kept.
                                                                   of each output branch of the first_middle_transformer.
 """
 function detect_first_middle_transformer(current_components, checked_components)
+    # helper function to remove transformer that have already been detected in transformer_in_interface
+    function remove_double_transformer(transformer_in_interface, transformers, current_component)
+        transformer_to_remove = []
+        for other_interface in transformer_in_interface
+            for other_transformer in other_interface
+                for (own_idx, own_transformer) in enumerate(transformers)
+                    if other_transformer == own_transformer && own_transformer !== current_component
+                        push!(transformer_to_remove, own_idx)
+                    end
+                end
+            end
+        end
+        for transformer_to_remove_idx in Iterators.reverse(sort(transformer_to_remove))
+            popat!(transformers, transformer_to_remove_idx)
+        end
+        return transformers
+    end
+
     middle_transformers = Any[]
     transformers_in_infaces = Any[]
     transformers_in_outfaces = Any[]
@@ -1068,6 +1292,12 @@ function detect_first_middle_transformer(current_components, checked_components)
                                                        "", 
                                                        true, 
                                                        true)
+
+                    inface_transformers = remove_double_transformer(transformer_in_input_interface,
+                                                                    inface_transformers,
+                                                                    component)
+                    # TODO: Does this do anything?
+
                     if length([x for x in inface_transformers if x.sys_function === EnergySystems.sf_transformer]) > 1
                         push!(transformer_in_input_interface, inface_transformers)
                         push!(infaces_with_transformers, inface)
@@ -1085,6 +1315,12 @@ function detect_first_middle_transformer(current_components, checked_components)
                                                         "",
                                                         true,
                                                         true)
+
+                    outface_transformers = remove_double_transformer(transformer_in_output_interface,
+                                                                     outface_transformers,
+                                                                     component)
+                    # TODO: Does this do anything?
+
                     if length([x for x in outface_transformers if x.sys_function === EnergySystems.sf_transformer]) > 1
                         push!(transformer_in_output_interface, outface_transformers)
                         push!(outfaces_with_transformers, outface)
@@ -1307,6 +1543,64 @@ function find_parallels(components)
     end
     final_paths = filter_paths(all_current_paths)
 
+    function remove_branches_without_transformers_in_between(branches)
+        indices_to_remove = []
+        for (idx,branch) in enumerate(branches)
+            if length(branch) < 3
+                push!(indices_to_remove, idx)
+            elseif isempty([x for x in branch[2:end-1] if x.sys_function === EnergySystems.sf_transformer])
+                push!(indices_to_remove, idx)
+            end
+        end
+        for idx in Iterators.reverse(sort(indices_to_remove))
+            popat!(branches, idx)
+        end
+        return branches
+    end
+    function remove_double_transformer_in_between(branches)    
+        component_idx_max = maximum([length(branch) for branch in branches])
+        component_included = []
+        idx_to_delete = []  # branch_idx, component_idx
+    
+        for component_idx in 1:component_idx_max
+            for (branch_idx, branch) in enumerate(branches)
+                # skip the first and the last element of each branch
+                if component_idx == 1 || component_idx == length(branch)
+                    continue
+                end
+                if length(branch) < component_idx || branch[component_idx].sys_function !== EnergySystems.sf_transformer
+                    continue
+                else
+                    current_component = branch[component_idx]
+                    if current_component in component_included
+                        push!(idx_to_delete, [branch_idx, component_idx])
+                    else
+                        push!(component_included, current_component)
+                    end
+                end
+            end
+        end
+        for idx_pair in Iterators.reverse(idx_to_delete)
+            deleteat!(branches[idx_pair[1]], idx_pair[2])
+        end
+        
+        return branches
+    end
+
+    for parallel_branch_key in keys(final_paths)
+        parallel_branch = final_paths[parallel_branch_key]
+        parallel_branch = remove_double_transformer_in_between(parallel_branch)
+        parallel_branch = remove_branches_without_transformers_in_between(parallel_branch)
+        final_paths[parallel_branch_key] = parallel_branch
+    end
+
+    # gather and filter paths again
+    all_current_paths = []
+    for path in collect(values(final_paths))
+        append!(all_current_paths, path)
+    end
+    final_paths = filter_paths(all_current_paths)
+
     return final_paths
 end
 
@@ -1410,7 +1704,12 @@ function add_non_recursive_indirect_inputs!(node_set,
                                             sys_function,
                                             last_unit_uac,
                                             skip_storages=true,
-                                            interrupt_at_grids=false)
+                                            interrupt_at_grids=false,
+                                            interrupt_at_component=nothing)
+    if interrupt_at_component == unit
+        return
+    end
+
     if unit.sys_function in sys_function && !(unit in node_set)
         push!(node_set, unit)
     end
@@ -1431,7 +1730,8 @@ function add_non_recursive_indirect_inputs!(node_set,
                                                    sys_function,
                                                    unit.uac,
                                                    skip_storages,
-                                                   interrupt_at_grids)
+                                                   interrupt_at_grids,
+                                                   interrupt_at_component)
             end
         end
     end

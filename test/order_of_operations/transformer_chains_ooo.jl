@@ -977,13 +977,13 @@ function test_ooo_middle_transformer()
         "TST_BUS_TH s_process",
         "TST_BUS_H2 s_process",
         "TST_BUS_EL s_process",
+        "ESS_FBH2_01 s_potential",
         "TST_HP_01 s_potential",
         "TST_HP_02 s_potential",
-        "ESS_FBH2_01 s_potential",
         "TST_01_ELY_01 s_process",
+        "ESS_FBH2_01 s_process",
         "TST_HP_02 s_process",
         "TST_HP_01 s_process",
-        "ESS_FBH2_01 s_process",
         "TST_SRC_01 s_process",
         "TST_GRI_01 s_process",
         "TST_GRI_O2 s_process",
@@ -2730,6 +2730,309 @@ function test_ooo_connected_middle_transformer()
     @test pwc_ooo_astr(expected, ooo) == ""
 end
 
+function test_ooo_connected_middle_transformer_variant()
+    components_config = Dict{String,Any}(
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [],
+            "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "constant_temperature" => 85,
+            "scale" => 500
+        ),
+        "TST_DEM_02" => Dict{String,Any}(
+            "type" => "Demand",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [],
+            "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "constant_temperature" => 90,
+            "scale" => 500
+        ),
+        "TST_GRI_O2" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_c_g_o2",
+            "control_refs" => [],
+            "input_refs" => [
+                "TST_01_ELY_01"
+            ],
+            "is_source" => false
+        ),
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_BUS_EL"
+            ],
+            "is_source" => true
+        ),
+        "TST_GRI_02" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "input_refs" => [
+                "TST_BUS_EL"
+            ],
+            "is_source" => false
+        ),
+        "TST_SRC_01" => Dict{String,Any}(
+        "type" => "BoundedSupply",
+        "medium" => "m_h_w_lt1",
+        "control_refs"  => [],
+        "output_refs" => ["TST_HP_03"],
+        "constant_temperature" => 20,
+        "constant_power" => 100000
+        ),
+        "TST_GRI_NG" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_c_g_h2",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_CHP_01"
+            ],
+            "is_source" => true
+        ),
+        "TST_HP_01" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "m_heat_in" => "m_h_w_lt1",
+            "m_heat_out" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_HP_02"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven"
+            ),
+            "power_th" => 1200,
+            "output_temperature" => 50,
+            "min_power_fraction" => 0.0
+        ),
+        "TST_HP_02" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "m_heat_in" => "m_h_w_ht1",
+            "m_heat_out" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_BUS_TH"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven"
+            ),
+            "power_th" => 9000,
+            "min_power_fraction" => 0.0
+        ),
+        "TST_HP_03" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "m_heat_in" => "m_h_w_lt1",
+            "m_heat_out" => "m_h_w_ht1",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_BUS_TH2"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven"
+            ),
+            "power_th" => 9000,
+            "min_power_fraction" => 0.0
+        ),
+        "TST_01_ELY_01" => Dict{String,Any}(
+            "type" => "Electrolyser",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_HP_01",
+                "TST_BUS_H2",
+                "TST_GRI_O2"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven"
+            ),
+            "power_el" => 40000,
+            "min_power_fraction" => 0.0,
+            "output_temperature" => 45
+        ),
+        "ESS_FBH2_01" => Dict{String,Any}(
+            "type" => "FuelBoiler",
+            "m_fuel_in" => "m_c_g_h2",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_BUS_TH2"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven"
+            ),
+            "min_power_fraction" => 0,
+            "power_th" => 1500
+        ),
+        "TST_CHP_01" => Dict{String,Any}(
+            "type" => "CHPP",
+            "m_gas_in" => "m_c_g_h2",
+            "control_refs" => [],
+            "output_refs" => [
+                "TST_BUS_TH",
+                "TST_BUS_EL"
+            ],
+            "strategy" => Dict{String,Any}(
+                "name" => "demand_driven",
+                "load_storages" => false
+            ),
+            "power_gas" => 250000,
+            "min_power_fraction" => 0.0
+        ),
+        "TST_BUS_EL" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_e_ac_230v",
+            "control_refs" => [],
+            "connections" => Dict{String,Any}(
+                "input_order" => [
+                    "TST_CHP_01",
+                    "TST_GRI_01"
+                ],
+                "output_order" => [
+                    "TST_HP_01",
+                    "TST_HP_02",
+                    "TST_HP_03",
+                    "TST_01_ELY_01",
+                    "TST_GRI_02"
+                ],
+                "energy_flow" => [
+                    [1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 0]
+                ]
+            )
+        ),
+        "TST_BUS_TH" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "connections" => Dict{String,Any}(
+                "input_order" => [
+                    "TST_HP_02",
+                    "TST_CHP_01"
+                ],
+                "output_order" => [
+                    "TST_DEM_01"
+                ],
+                "energy_flow" => [
+                    [1],
+                    [1]
+                ]
+            )
+        ),
+        "TST_BUS_TH2" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "control_refs" => [],
+            "connections" => Dict{String,Any}(
+                "input_order" => [
+                    "ESS_FBH2_01",
+                    "TST_HP_03"
+                ],
+                "output_order" => [
+                    "TST_DEM_02"
+                ],
+                "energy_flow" => [
+                    [1],
+                    [1]
+                ]
+            )
+        ),
+        "TST_BUS_H2" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_c_g_h2",
+            "control_refs" => [],
+            "connections" => Dict{String,Any}(
+                "input_order" => [
+                    "TST_01_ELY_01"
+                ],
+                "output_order" => [
+                    "ESS_FBH2_01"
+                ],
+                "energy_flow" => [
+                    [1]
+                ]
+            )
+        )
+    )
+    expected = [
+        "TST_DEM_01 s_reset",
+        "TST_DEM_02 s_reset",
+        "TST_BUS_TH2 s_reset",
+        "TST_BUS_TH s_reset",
+        "TST_BUS_H2 s_reset",
+        "TST_BUS_EL s_reset",
+        "TST_HP_01 s_reset",
+        "TST_HP_03 s_reset",
+        "TST_CHP_01 s_reset",
+        "TST_01_ELY_01 s_reset",
+        "TST_HP_02 s_reset",
+        "ESS_FBH2_01 s_reset",
+        "TST_SRC_01 s_reset",
+        "TST_GRI_NG s_reset",
+        "TST_GRI_01 s_reset",
+        "TST_GRI_02 s_reset",
+        "TST_GRI_O2 s_reset",
+        "TST_DEM_01 s_control",
+        "TST_DEM_02 s_control",
+        "TST_BUS_TH2 s_control",
+        "TST_BUS_TH s_control",
+        "TST_BUS_H2 s_control",
+        "TST_BUS_EL s_control",
+        "TST_HP_01 s_control",
+        "TST_HP_03 s_control",
+        "TST_CHP_01 s_control",
+        "TST_01_ELY_01 s_control",
+        "TST_HP_02 s_control",
+        "ESS_FBH2_01 s_control",
+        "TST_SRC_01 s_control",
+        "TST_GRI_NG s_control",
+        "TST_GRI_01 s_control",
+        "TST_GRI_02 s_control",
+        "TST_GRI_O2 s_control",
+        "TST_DEM_01 s_process",
+        "TST_DEM_02 s_process",
+        "TST_BUS_TH2 s_process",
+        "TST_BUS_TH s_process",
+        "TST_BUS_H2 s_process",
+        "TST_BUS_EL s_process",
+        "TST_CHP_01 s_potential",
+        "TST_HP_02 s_potential",
+        "TST_HP_01 s_potential",
+        "TST_HP_03 s_potential",
+        "ESS_FBH2_01 s_potential",
+        "TST_01_ELY_01 s_process",
+        "TST_HP_01 s_process",
+        "TST_HP_02 s_process",
+        "TST_CHP_01 s_process",
+        "ESS_FBH2_01 s_process",
+        "TST_HP_03 s_process",
+        "TST_SRC_01 s_process",
+        "TST_GRI_NG s_process",
+        "TST_GRI_01 s_process",
+        "TST_GRI_02 s_process",
+        "TST_GRI_O2 s_process",
+        "TST_BUS_TH2 s_distribute",
+        "TST_BUS_TH s_distribute",
+        "TST_BUS_H2 s_distribute",
+        "TST_BUS_EL s_distribute"
+    ]
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9
+    )
+    
+    components = Resie.load_components(components_config, simulation_parameters)
+    steps = Resie.calculate_order_of_operations(components)
+    ooo = []
+    for step in steps
+        push!(ooo, "$(step[1]) $(step[2])")
+    end
+    @test pwc_ooo_astr(expected, ooo) == ""
+end
+
 function test_ooo_circle_grid_input_denied()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
@@ -3219,8 +3522,8 @@ function test_ooo_circle_middle_transformer_input()
         "TST_DEM_01 s_process",
         "TST_BUS_TH s_process",
         "TST_BUS_EL s_process",
-        "TST_HP_01 s_potential",
         "TST_CHP_01 s_potential",
+        "TST_HP_01 s_potential",
         "TST_HP_02 s_process",
         "TST_HP_01 s_process",
         "TST_CHP_01 s_process",
@@ -3458,9 +3761,9 @@ end
     test_ooo_parallels_in_a_row()
     test_ooo_connected_middle_busses()
     test_ooo_connected_middle_transformer()
+    test_ooo_connected_middle_transformer_variant()
     test_ooo_circle_grid_input_allowed()
     test_ooo_circle_grid_input_denied()
     test_ooo_circle_middle_transformer_input()
     test_ooo_circle_variant()
-
 end
