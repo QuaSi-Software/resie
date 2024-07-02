@@ -27,9 +27,7 @@ Base.@kwdef mutable struct Battery <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 medium => nothing
@@ -48,15 +46,11 @@ end
 function initialise!(unit::Battery, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
-        )
+        unload_storages(unit.controller, unit.medium)
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
+        load_storages(unit.controller, unit.medium)
     )
 end
 

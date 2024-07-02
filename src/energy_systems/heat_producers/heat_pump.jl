@@ -35,9 +35,7 @@ mutable struct HeatPump <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_heat_in => nothing,
@@ -64,21 +62,15 @@ end
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_heat_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
-        )
+        unload_storages(unit.controller, unit.m_heat_in)
     )
     set_storage_transfer!(
         unit.input_interfaces[unit.m_el_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
-        )
+        unload_storages(unit.controller, unit.m_el_in)
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
-        )
+        load_storages(unit.controller, unit.m_heat_out)
     )
 end
 

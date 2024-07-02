@@ -898,8 +898,6 @@ include("heat_producers/fuel_boiler.jl")
 include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
-load_condition_prototypes()
-
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into seperate files for less clutter
 include("efficiency.jl")

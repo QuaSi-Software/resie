@@ -240,13 +240,33 @@ StateMachine() = StateMachine(
 )
 
 """
+Base type for control modules.
+"""
+abstract type ControlModule end
+
+"""
 Wraps around the mechanism of control for the operation strategy of a Component.
 """
-Base.@kwdef mutable struct Controller
-    strategy::String
-    parameter::Dict{String,Any}
-    state_machine::StateMachine
-    linked_components::Grouping
+mutable struct Controller
+    base_module::Union{Nothing,ControlModule}
+    modules::Vector{ControlModule}
+end
+
+"""
+Default constructor with empty fields.
+"""
+Controller() = Controller(nothing, [])
+
+function load_storages(controller::Controller, medium::Symbol)::Bool
+    return default(
+        controller.base_module.parameters, "load_storages " * String(medium), true
+    )
+end
+
+function unload_storages(controller::Controller, medium::Symbol)::Bool
+    return default(
+        controller.base_module.parameters, "unload_storages " * String(medium), true
+    )
 end
 
 """
@@ -259,26 +279,26 @@ function move_state(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    machine = unit.controller.state_machine
-    old_state = machine.state
-    table = machine.transitions[machine.state]
+    # machine = unit.controller.state_machine
+    # old_state = machine.state
+    # table = machine.transitions[machine.state]
 
-    if length(table.conditions) > 0
-        evaluations = Tuple(
-            condition.prototype.check_function(condition, unit, sim_params)
-            for condition in table.conditions
-        )
-        new_state = table.table_data[evaluations]
-        machine.state = new_state
-    else
-        new_state = old_state
-    end
+    # if length(table.conditions) > 0
+    #     evaluations = Tuple(
+    #         condition.prototype.check_function(condition, unit, sim_params)
+    #         for condition in table.conditions
+    #     )
+    #     new_state = table.table_data[evaluations]
+    #     machine.state = new_state
+    # else
+    #     new_state = old_state
+    # end
 
-    if old_state == new_state
-        machine.time_in_state += 1
-    else
-        machine.time_in_state = 1
-    end
+    # if old_state == new_state
+    #     machine.time_in_state += 1
+    # else
+    #     machine.time_in_state = 1
+    # end
 end
 
 """
@@ -313,52 +333,4 @@ include("strategies/default.jl")
 include("strategies/economical_discharge.jl")
 include("strategies/storage_driven.jl")
 
-"""
-    controller_for_strategy(strategy, strategy_config, sim_params)
-
-Construct the controller for the strategy of the given name using the given parameters.
-
-# Arguments
-- `strategy::String`: Must be an exact match to the name defined in the strategy's code file.
-- `strategy_config::Dict{String, Any}`: Parameters for the configuration of the strategy. The
-    names must match those in the default parameter values dictionary defined in the
-    strategy's code file. Given values override default values.
-- `sim_params::Dict{String,Any}`: General simulation sim_params
-# Returns
-- `Controller`: The constructed controller for the given strategy.
-"""
-function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, sim_params::Dict{String,Any})::Controller
-    if !(strategy in keys(OP_STRATS))
-        throw(ArgumentError("Unknown strategy $strategy"))
-    end
-
-    # check if parameters given in input file for strategy are valid parameters:
-    for key in keys(strategy_config)
-        if  (
-            !(key in keys(OP_STRATS[strategy].strategy_parameters)) &&
-            !(startswith(key, "load_storages")) && 
-            !(startswith(key, "unload_storages")) && 
-            !(startswith(key, "_"))
-            )
-            throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
-        end
-    end
-
-    params = Base.merge(
-        OP_STRATS["default"].strategy_parameters,
-        OP_STRATS[strategy].strategy_parameters
-    )
-    params = Base.merge(params, strategy_config)
-
-    # load operation profile if path is given in input file
-    if haskey(params, "operation_profile_path")
-        if params["operation_profile_path"]  !== nothing
-            params["operation_profile"] = Profile(params["operation_profile_path"], sim_params)
-        end
-    end
-
-    machine = OP_STRATS[strategy].sm_constructor(params)
-    return Controller(strategy, params, machine, Grouping())
-end
-
-export Condition, TruthTable, StateMachine, link_control_with, controller_for_strategy
+export Condition, TruthTable, StateMachine, link_control_with

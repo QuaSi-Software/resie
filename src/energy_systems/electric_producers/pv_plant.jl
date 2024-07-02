@@ -31,9 +31,7 @@ mutable struct PVPlant <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces
@@ -50,9 +48,7 @@ end
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.m_el_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
-        )
+        load_storages(unit.controller, unit.m_el_out)
     )
 end
 

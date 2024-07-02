@@ -172,9 +172,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
 
     return Bus(
         uac, # uac
-        controller_for_strategy( # controller
-            config["strategy"]["name"], config["strategy"], sim_params
-        ),
+        Controller(),
         sf_bus, # sys_function
         medium, # medium
         [], # input_interfaces
@@ -210,7 +208,7 @@ function Bus(
 )
     return Bus(
         uac,
-        controller_for_strategy("default", Dict{String,Any}(), Dict{String,Any}()),
+        Controller(),
         sf_bus,
         medium,
         [], # input_interfaces

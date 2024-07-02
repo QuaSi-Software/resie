@@ -39,9 +39,7 @@ mutable struct FixedSupply <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_fixed_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -64,9 +62,7 @@ end
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
+        load_storages(unit.controller, unit.medium)
     )
 end
 

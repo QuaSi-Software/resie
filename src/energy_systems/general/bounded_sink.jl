@@ -36,9 +36,7 @@ mutable struct BoundedSink <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_bounded_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -61,9 +59,7 @@ end
 function initialise!(unit::BoundedSink, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
-        )
+        unload_storages(unit.controller, unit.medium)
     )
 end
 

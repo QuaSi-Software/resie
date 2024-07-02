@@ -127,9 +127,7 @@ mutable struct Electrolyser <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_el_in => nothing
@@ -166,26 +164,18 @@ end
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_el_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
-        )
+        unload_storages(unit.controller, unit.m_el_in)
     )
 
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_ht_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_ht_out), true
-        )
+        load_storages(unit.controller, unit.m_heat_ht_out)
     )
 
     if unit.heat_lt_is_usable
         set_storage_transfer!(
             unit.output_interfaces[unit.m_heat_lt_out],
-            default(
-                unit.controller.parameter,
-                "load_storages " * String(unit.m_heat_lt_out),
-                true
-            )
+            load_storages(unit.controller, unit.m_heat_lt_out)
         )
     else
         unit.controller.parameter["consider_m_heat_lt_out"] = false
@@ -193,16 +183,12 @@ function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
 
     set_storage_transfer!(
         unit.output_interfaces[unit.m_h2_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
-        )
+        load_storages(unit.controller, unit.m_h2_out)
     )
 
     set_storage_transfer!(
         unit.output_interfaces[unit.m_o2_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
-        )
+        load_storages(unit.controller, unit.m_o2_out)
     )
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
