@@ -57,7 +57,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 

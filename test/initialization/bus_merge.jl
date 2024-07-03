@@ -831,10 +831,10 @@ function test_merge_preserves_storage_transfer()
         "capacity" => 4000,
         "load" => 2000,
     )
-    components_config["TST_SRC_01"]["strategy"] = Dict{String,Any}(
+    components_config["TST_SRC_01"]["control_modules"] = [Dict{String,Any}(
         "name" => "default",
         "load_storages m_h_w_ht1" => false
-    )
+    )]
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,

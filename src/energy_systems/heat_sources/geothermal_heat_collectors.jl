@@ -190,6 +190,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
+    update(unit.controller)
 
     unit.timestep_index += 1
 

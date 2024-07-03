@@ -199,7 +199,8 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
+
     set_temperature!(
         unit.output_interfaces[unit.m_heat_ht_out],
         nothing,

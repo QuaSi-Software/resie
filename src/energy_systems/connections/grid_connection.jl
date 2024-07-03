@@ -64,7 +64,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
     if unit.sys_function === sf_bounded_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf)
     else

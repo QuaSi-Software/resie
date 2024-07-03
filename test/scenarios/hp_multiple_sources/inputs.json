@@ -133,10 +133,12 @@
             "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
             "control_refs": [],
-            "strategy": {
-                "name": "default",
-                "load_storages m_h_w_lt1": false
-            },
+            "control_modules": [
+                {
+                    "name": "default",
+                    "load_storages m_h_w_lt1": false
+                }
+            ],
             "output_refs": [
                 "TST_BUS_TH_01"
             ],

@@ -53,10 +53,12 @@ function test_run_energy_system_from_storage()
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "default",
-                "unload_storages m_e_ac_230v" => true
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "default",
+                    "unload_storages m_e_ac_230v" => true
+                )
+            ],
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,
@@ -228,10 +230,12 @@ function test_run_energy_system_from_storage_denied()
             "type" => "HeatPump",
             "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "default",
-                "unload_storages m_h_w_lt1" => false
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "default",
+                    "unload_storages m_h_w_lt1" => false
+                )
+            ],
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,

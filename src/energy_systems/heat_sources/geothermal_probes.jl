@@ -518,6 +518,8 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
+    update(unit.controller)
+
     # time index, necessary for g-function approach
     unit.time_index = unit.time_index + 1 
 

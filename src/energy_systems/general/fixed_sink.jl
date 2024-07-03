@@ -71,7 +71,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_demand !== nothing
         unit.demand = watt_to_wh(unit.constant_demand)

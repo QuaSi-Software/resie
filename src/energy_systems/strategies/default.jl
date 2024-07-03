@@ -10,10 +10,12 @@ of controlling operation, including:
 mutable struct CM_Default <: ControlModule
     name::String
     parameters::Dict{String,Any}
-    linked_components::Dict{String,Component}
-    required_components::Dict{String,Type}
 
-    function CM_Default(parameters::Dict{String,Any}, components::Grouping)
+    function CM_Default(
+        parameters::Dict{String,Any},
+        components::Grouping,
+        sim_params::Dict{String,Any}
+    )
         default_parameters=Dict{String,Any}(
             "name" => "default",
             "consider_m_el_in" => true,
@@ -31,11 +33,13 @@ mutable struct CM_Default <: ControlModule
         return new(
             "default", # name
             Base.merge(default_parameters, parameters), # parameters
-            Dict{String,Component}(), # linked_components
-            Dict{String,Type}() # required_components
         )
     end
 end
 
 # default constructor with no input
-CM_Default() = CM_Default(Dict{String,Any}(), Grouping())
+CM_Default() = CM_Default(Dict{String,Any}(), Grouping(), Dict{String,Any}())
+
+function update(mod::CM_Default)
+    # nothing to do for the default module
+end

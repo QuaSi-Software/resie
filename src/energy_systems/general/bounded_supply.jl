@@ -68,7 +68,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)

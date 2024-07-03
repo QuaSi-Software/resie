@@ -330,11 +330,13 @@
                 "TST_BUS_TH_00",
                 "TST_BUS_EL_01"
             ],
-            "strategy": {
-                "name": "default",
-                "load_storages m_h_w_ht1": true,
-                "load_storages m_e_ac_230v": true
-            },
+            "control_modules": [
+                {
+                    "name": "default",
+                    "load_storages m_h_w_ht1": true,
+                    "load_storages m_e_ac_230v": true
+                }
+            ],
             "m_heat_out": "m_h_w_ht1",
             "m_el_out": "m_e_ac_230v",
             "power_el": 60000,
@@ -398,10 +400,12 @@
             "output_refs": [
                 "TST_BUS_TH_00"
             ],
-            "strategy": {
-                "name": "default",
-                "load_storages m_h_w_ht1": false
-            },
+            "control_modules": [
+                {
+                    "name": "default",
+                    "load_storages m_h_w_ht1": false
+                }
+            ],
             "m_heat_out": "m_h_w_ht1",
             "power_th": 550000,
             "constant_cop": 3.0,

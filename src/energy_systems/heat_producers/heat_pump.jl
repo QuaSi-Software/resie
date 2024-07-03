@@ -79,7 +79,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
