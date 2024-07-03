@@ -656,8 +656,8 @@ function add_transformer_steps(simulation_order,
                                                                                                         first_middle_bus)
             end
 
-            # If there is any connection branch, move it to the end of the calculation if reverse == true
-            if any(is_connecting_branch) && (reverse === nothing ? false : reverse)
+            # If there is any connection branch, move it to the end of the calculation if reverse == true & is_input == true
+            if any(is_connecting_branch) && (reverse === nothing ? false : reverse) && is_input[findfirst(is_connecting_branch)]
                 push!(middle_bus_branches, popat!(middle_bus_branches, findfirst(is_connecting_branch)))
                 push!(is_input, popat!(is_input, findfirst(is_connecting_branch)))
                 push!(is_connecting_branch, popat!(is_connecting_branch, findfirst(is_connecting_branch)))
