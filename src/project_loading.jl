@@ -42,9 +42,7 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
 
     # create instances
     for (unit_key, entry) in pairs(config)
-        default_dict = Dict{String,Any}(
-            "strategy" => Dict{String,Any}("name" => "default")
-        )
+        default_dict = Dict{String,Any}()
         unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
