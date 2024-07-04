@@ -114,6 +114,25 @@ function update(controller::Controller)
     end
 end
 
+function upper_plr_limit(
+    controller::Controller,
+    sim_params::Dict{String,Any}
+)::Float64
+    if length(controller.modules) > 0
+        return Base.maximum(upper_plr_limit(mod, sim_params) for mod in controller.modules)
+    else
+        return 1.0
+    end
+end
+
+function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})
+    return all(charge_is_allowed(mod, sim_params) for mod in controller.modules)
+end
+
+function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})
+    return all(discharge_is_allowed(mod, sim_params) for mod in controller.modules)
+end
+
 """
     move_state(unit, components, sim_params)
 """
@@ -137,9 +156,3 @@ function move_state(
         machine.time_in_state = 1
     end
 end
-
-include("strategies/default.jl")
-include("strategies/economical_discharge.jl")
-include("strategies/storage_driven.jl")
-
-export Condition, TruthTable, StateMachine

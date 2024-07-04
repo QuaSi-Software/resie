@@ -78,15 +78,34 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         end
     end
 
-    # link control
+    # add control modules to components
     for (unit_key, entry) in pairs(config)
         unit = components[unit_key]
 
-        for module_config in default(config, "control_modules", [])
+        # TODO: rewrite this for automatic selection of modules so they don't need to be
+        # registered here, compare automatic selection of component class
+        for module_config in default(entry, "control_modules", [])
             if lowercase(module_config["name"]) === "default"
-                unit.controller.base_module = EnergySystems.CM_Default(module_config, components)
-            # elseif lowercase(module_config["name"]) === "storage_driven"
-            #     push!(unit.controller.modules, CM_StorageDriven(module_config))
+                unit.controller.base_module = EnergySystems.CM_Default(
+                    module_config, components, sim_params
+                )
+            elseif lowercase(module_config["name"]) === "economical_discharge"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_EconomicalDischarge(
+                        module_config, components, sim_params
+                    )
+                )
+            elseif lowercase(module_config["name"]) === "profile_limited"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_ProfileLimited(module_config, components, sim_params)
+                )
+            elseif lowercase(module_config["name"]) === "storage_driven"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_StorageDriven(module_config, components, sim_params)
+                )
             end
         end
 

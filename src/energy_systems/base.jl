@@ -24,6 +24,8 @@ export check_balances, Component, each, Grouping, link_output_with, perform_step
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
     highest, default, plot_optional_figures
 
+using ..Profiles
+
 """
 Convenience function to get the value of a key from a config dict using a default value.
 """
@@ -871,11 +873,10 @@ function output_value(unit::Component, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-# for the moment control must be an include as it contains circular dependencies
-# of definitions
+# the control functionality cannot be its own module as it depends on definitions of
+# components and other members of the EnergySystems module. this file contains the general
+# definitions, the modules are loaded later
 include("control.jl")
-
-using ..Profiles
 
 # the order of includes of the individual components matters here as some components
 # require the definition of certain basic components such as a bus or a grid connection
@@ -901,6 +902,16 @@ include("electric_producers/pv_plant.jl")
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into seperate files for less clutter
 include("efficiency.jl")
+
+# now that the components are defined we can load the control modules, which depend on their
+# definitions
+const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
+
+include("strategies/default.jl")
+include("strategies/economical_discharge.jl")
+include("strategies/profile_limited.jl")
+include("strategies/storage_driven.jl")
+
 
 """
     link_output_with(unit, components)

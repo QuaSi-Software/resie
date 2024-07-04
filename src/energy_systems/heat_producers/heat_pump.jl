@@ -121,7 +121,7 @@ function check_el_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_el_in"] == true
+    if unit.controller.base_module.parameters["consider_m_el_in"] == true
         if (
             unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_el_in].max_energy === nothing
@@ -147,7 +147,7 @@ function check_heat_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_heat_in"] == true
+    if unit.controller.base_module.parameters["consider_m_heat_in"] == true
         if (
             unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
             && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
@@ -179,7 +179,7 @@ function check_heat_out(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_heat_out"] == true
+    if unit.controller.base_module.parameters["consider_m_heat_out"] == true
         exchanges = balance_on(
             unit.output_interfaces[unit.m_heat_out],
             unit.output_interfaces[unit.m_heat_out].target
@@ -199,20 +199,8 @@ function calculate_energies(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    # check operational strategy, specifically storage_driven
-    if (
-        unit.controller.strategy == "storage_driven"
-        && unit.controller.state_machine.state != 2
-    )
-        return (false, nothing, nothing, nothing)
-    end
-
-    # get usage fraction of external profile (normalized from 0 to 1)
-    max_usage_fraction = (
-        unit.controller.parameter["operation_profile_path"] === nothing
-        ? 1.0
-        : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    )
+    # get usage fraction from control modules
+    max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
     if max_usage_fraction <= 0.0
         return (false, nothing, nothing, nothing)
     end

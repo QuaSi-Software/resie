@@ -84,11 +84,8 @@ function balance_on(
 end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
-    if (
-        unit.controller.strategy == "economical_discharge"
-        && unit.controller.state_machine.state != 2
-    )
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+    if !discharge_is_allowed(unit.controller, sim_params)
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return
     end
 
@@ -111,11 +108,8 @@ function process(unit::Battery, sim_params::Dict{String,Any})
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
-    if (
-        unit.controller.strategy == "economical_discharge"
-        && unit.controller.state_machine.state != 1
-    )
-        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+    if !charge_is_allowed(unit.controller, sim_params)
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return
     end
 

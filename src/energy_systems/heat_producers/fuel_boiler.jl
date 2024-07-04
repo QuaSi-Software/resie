@@ -129,20 +129,8 @@ function calculate_energies(
     unit::FuelBoiler,
     sim_params::Dict{String,Any},
 )::Tuple{Bool, Vector{Floathing}}
-    # check operational state for strategy storage_driven
-    if (
-        unit.controller.strategy == "storage_driven"
-        && unit.controller.state_machine.state != 2
-    )
-        return (false, [])
-    end
-
-    # get max PLR of external profile, if any
-    max_plr = (
-        unit.controller.parameter["operation_profile_path"] === nothing
-        ? 1.0
-        : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    )
+    # get maximum PLR from control modules
+    max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
         return (false, [])
     end
