@@ -529,8 +529,7 @@ function add_transformer_steps(simulation_order,
         # Also, reverse the order of the input branches so that they start with the first (nearest to source) element
         middle_transformer_branches, is_input = detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
                                                                                           outface_branches_with_transformers,
-                                                                                          first_middle_transformer,
-                                                                                          step_category)
+                                                                                          first_middle_transformer)
 
         # move connecting branch to the end of the calculation
         is_connecting_branch = detect_connecting_branch(connecting_component, middle_transformer_branches)
@@ -787,41 +786,35 @@ function add_transformer_steps(simulation_order,
 end
 
 """
-    detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_connecting_branch)
+        order_indexes(constraints)
     
-This function detects the order of the branches under consideration of interdependencies between the branches.
-If a component in one branch has a component of another branch in its inputs (while not considering the path through 
-the middle bus), the other branch has to be calculated first and vice versa. For busses, this applies only in the 
-potnetial step!
-As base order, the the input/output order of the bus is used as handed over to this function.
+This function takes a vector of tuples with integers like [(first_int_1, second_int_1), (first_int_2, second_int_2)]. 
+The integers can be indexes for example. For each tuple, the first_int should come ahead of second_int in the resulting 
+list. This fuction determines the order in a way that all given constraints are met, if possible, using topological 
+sorting. If the sorting was not successful, like if there were loops or contradictions in the given constraints, the
+function tries to solve the conflicts by removing the reversed dublicates in constraints and by starting the topological 
+sorting with the filtered list again.
 
 # Arguments
-- `middle_bus_branches::Array{Array{Grouping}}`: An array containing branches with components
-- `is_input::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
-- `is_connecting_branch::Array{Bool}`: An array with bools indicating if a branch in branches is a connecting branch
-- `first_middle_bus::Component`: The middle bus component
+- `constraints::Array{Tuple{Int}}`: An array containing tuples with integers where each first_int should come ahead 
+                                    of the second_int
 
 # Returns 
-- `middle_bus_branches::Array{Array{Grouping}}`: An array containing the ordered branches
-- `is_input::Array{Bool}`: An array containing the ordered is_input
-- `is_connecting_branch::Array{Bool}`: An array containing the ordered is_connecting_branch
+- `success::Bool`: A bool indicating if the topological sorting was successful
+- `sorted_list::Array{Int}`: An array with the resulting correct order determined by constraints
 
 """
-function detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_connecting_branch, first_middle_bus)
-
-    # helper function to generate order from given constraints with topological sorting
-    # branch_ordering is a vector or tuples [(first_idx, second_idx)] where each first_idx
-    # should come ahead of second_idx.
-    function order_indexes(branch_ordering)
+function order_indexes(constraints)
+    function topological_sorting(constraints)
         # Collect all unique nodes
-        nodes = unique([x for t in branch_ordering for x in t])
+        nodes = unique([x for t in constraints for x in t])
 
         # Initialize adjacency list and in-degree dictionary
         adj_list = Dict(node => Int[] for node in nodes)
         in_degree = Dict(node => 0 for node in nodes)
 
         # Populate adjacency list and in-degree dictionary
-        for (first_branch_idx, second_branch_idx) in branch_ordering
+        for (first_branch_idx, second_branch_idx) in constraints
             push!(adj_list[first_branch_idx], second_branch_idx)
             in_degree[second_branch_idx] += 1
         end
@@ -851,6 +844,59 @@ function detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_con
         return success, sorted_list
     end
 
+    constraints = unique(constraints)
+    success, sorted_list = topological_sorting(constraints)
+
+    if !success
+
+        @warn "The order operation may be wrong, logical loops have beed detected. Trying to solve them by removing contradictions."
+        
+        # If there are loops, remove the reversed dublicates
+        standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
+        seen = Set{Tuple{Int, Int}}()
+        unique_tuples = []
+
+        for t in constraints
+            standardized = standardize_tuple(t)
+            if !(standardized in seen)
+                push!(unique_tuples, t)
+                push!(seen, standardized)
+            end
+        end
+
+        success, sorted_list = topological_sorting(unique_tuples)
+    end
+
+    if !success
+        @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
+    end
+
+    return sorted_list
+end
+
+
+"""
+    detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_connecting_branch)
+    
+This function detects the order of the branches under consideration of interdependencies between the branches.
+If a component in one branch has a component of another branch in its inputs (while not considering the path through 
+the middle bus), the other branch has to be calculated first and vice versa. For busses, this applies only in the 
+potnetial step!
+As base order, the the input/output order of the bus is used as handed over to this function.
+
+# Arguments
+- `middle_bus_branches::Array{Array{Grouping}}`: An array containing branches with components
+- `is_input::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
+- `is_connecting_branch::Array{Bool}`: An array with bools indicating if a branch in branches is a connecting branch
+- `first_middle_bus::Component`: The middle bus component
+
+# Returns 
+- `middle_bus_branches::Array{Array{Grouping}}`: An array containing the ordered branches
+- `is_input::Array{Bool}`: An array containing the ordered is_input
+- `is_connecting_branch::Array{Bool}`: An array containing the ordered is_connecting_branch
+
+"""
+function detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_connecting_branch, first_middle_bus)
 
     branch_ordering = []  # (other_branch_idx, own_branch_idx) --> other_branch has to come ahead of own_branch!
     # check for input interdependencies
@@ -933,30 +979,8 @@ function detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_con
         end
     end
 
-    branch_ordering = unique(branch_ordering)
-    success, sorted_list = order_indexes(branch_ordering)
-
-    if !success
-        # If there are loops, remove the reversed dublicates
-        standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
-        seen = Set{Tuple{Int, Int}}()
-        unique_tuples = []
-
-        # Iterate over the vector of tuples
-        for t in branch_ordering
-            standardized = standardize_tuple(t)
-            if !(standardized in seen)
-                push!(unique_tuples, t)
-                push!(seen, standardized)
-            end
-        end
-
-        success, sorted_list = order_indexes(unique_tuples)
-    end
-
-    if !success
-        @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
-    end
+    # order the constraints to a monotonic list of indexes using topological sorting
+    sorted_list = order_indexes(branch_ordering)
 
     # reverse sorted list to make sure that the components that are inputs of other components comes ahead of the
     # once they are input of
@@ -987,8 +1011,7 @@ end
 """
     detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
                                               outface_branches_with_transformers,
-                                              first_middle_transformer,
-                                              step_category)
+                                              first_middle_transformer)
     
 This function detects the order of the branches under consideration of interdependencies between the branches.
 If a component in one branch has a component of another branch in its inputs (while not 
@@ -1001,8 +1024,6 @@ Also, reverse the order of the input branches so that they start with the first 
 - `inface_branches_with_transformers::Array{Array{Grouping}}`: An array containing the input branches with components
 - `outface_branches_with_transformers::Array{Array{Grouping}}`: An array containing the output branches with components
 - `first_middle_transformer::Component`: The middle transformer component
-- `step_category::String`: Can be either "potential" or "process", depending on the simulation step to find for 
-                           current_components.
 
 # Returns 
 - `middle_transformer_branches::Array{Array{Grouping}}`: An array containing the ordered branches
@@ -1011,50 +1032,7 @@ Also, reverse the order of the input branches so that they start with the first 
 """
 function detect_branch_order_of_middle_transformer(inface_branches_with_transformers,
                                                    outface_branches_with_transformers,
-                                                   first_middle_transformer,
-                                                   step_category)
-
-    # helper function to generate order from given constraints with topological sorting
-    # branch_ordering is a vector or tuples [(first_idx, second_idx)] where each first_idx
-    # should come ahead of second_idx.
-    function order_indexes(branch_ordering)
-        # Collect all unique nodes
-        nodes = unique([x for t in branch_ordering for x in t])
-
-        # Initialize adjacency list and in-degree dictionary
-        adj_list = Dict(node => Int[] for node in nodes)
-        in_degree = Dict(node => 0 for node in nodes)
-
-        # Populate adjacency list and in-degree dictionary
-        for (first_branch_idx, second_branch_idx) in branch_ordering
-            push!(adj_list[first_branch_idx], second_branch_idx)
-            in_degree[second_branch_idx] += 1
-        end
-
-        # Initialize the queue with nodes that have no incoming edges (in-degree 0)
-        queue = [node for node in nodes if in_degree[node] == 0]
-
-        # Kahn's algorithm for topological sorting
-        sorted_list = []
-        while !isempty(queue)
-            current = popfirst!(queue)
-            push!(sorted_list, current)
-
-            for neighbor in adj_list[current]
-                in_degree[neighbor] -= 1
-                if in_degree[neighbor] == 0
-                    push!(queue, neighbor)
-                end
-            end
-        end
-
-        # Check if topological sort was possible (i.e., no cycles)
-        success = true
-        if length(sorted_list) != length(nodes)
-            success = false
-        end
-        return success, sorted_list
-    end
+                                                   first_middle_transformer)
 
     # reverse the order of the input branches so that they start with the first (nearest to source) element
     # and classify them as input or output interface
@@ -1110,30 +1088,8 @@ function detect_branch_order_of_middle_transformer(inface_branches_with_transfor
         end
     end
 
-    branch_ordering = unique(branch_ordering)
-    success, sorted_list = order_indexes(branch_ordering)
-
-    if !success
-        # If there are loops, remove the reversed dublicates
-        standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
-        seen = Set{Tuple{Int, Int}}()
-        unique_tuples = []
-
-        # Iterate over the vector of tuples
-        for t in branch_ordering
-            standardized = standardize_tuple(t)
-            if !(standardized in seen)
-                push!(unique_tuples, t)
-                push!(seen, standardized)
-            end
-        end
-
-        success, sorted_list = order_indexes(unique_tuples)
-    end
-
-    if !success
-        @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
-    end
+    # order the constraints to a monotonic list of indexes using topological sorting
+    sorted_list = order_indexes(branch_ordering)
 
     # reverse sorted list to make sure that the components that are inputs of other components comes ahead of the
     # once they are input of
@@ -1519,7 +1475,6 @@ function detect_first_middle_transformer(current_components, checked_components)
                     inface_transformers = remove_double_transformer(transformer_in_input_interface,
                                                                     inface_transformers,
                                                                     component)
-                    # TODO: Does this do anything?
 
                     if length([x for x in inface_transformers if x.sys_function === EnergySystems.sf_transformer]) > 1
                         push!(transformer_in_input_interface, inface_transformers)
@@ -1543,7 +1498,6 @@ function detect_first_middle_transformer(current_components, checked_components)
                     outface_transformers = remove_double_transformer(transformer_in_output_interface,
                                                                      outface_transformers,
                                                                      component)
-                    # TODO: Does this do anything?
 
                     if length([x for x in outface_transformers if x.sys_function === EnergySystems.sf_transformer]) > 1
                         push!(transformer_in_output_interface, outface_transformers)
@@ -2821,7 +2775,6 @@ to determine if the connection from input_uac to output_uac is allowed.
 -`component::Component`: A component beween input_uac and output_uac
 -`input_uac::String`: The uac of the input component
 -`output_uac::String`: The uac of the output component
-
 
 # Returns
 Returns either "true" if `component` is a non-bus or if the connection is allowed, or "false" 
