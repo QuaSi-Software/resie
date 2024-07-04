@@ -1,77 +1,103 @@
-function strt_sm_economical_discharge(cond_params::Dict{String,Any})::StateMachine
-    return StateMachine(
-        UInt(1), # state
-        Dict{UInt,String}( # state_names
-            1 => "Load",
-            2 => "Discharge",
-        ),
-        Dict{UInt,TruthTable}( # transitions
-            1 => TruthTable( # State: Load
-                conditions=[
-                    Condition(
-                        "Little PV power",
-                        Dict{String,Any}(
-                            "threshold" => cond_params["pv_threshold"]
-                        )
-                    ),
-                    Condition(
-                        "Sufficient charge",
-                        Dict{String,Any}(
-                            "threshold" => cond_params["min_charge"]
-                        )
-                    )
-                ],
-                table_data=Dict{Tuple,UInt}(
-                    (false, false) => 1,
-                    (false, true) => 1,
-                    (true, false) => 1,
-                    (true, true) => 2,
-                )
-            ), 2 => TruthTable( # State: Discharge
-                conditions=[
-                    Condition(
-                        "Little PV power",
-                        Dict{String,Any}(
-                            "threshold" => cond_params["pv_threshold"]
-                        )
-                    ),
-                    Condition(
-                        "Sufficient charge",
-                        Dict{String,Any}(
-                            "threshold" => cond_params["discharge_limit"]
-                        )
-                    )
-                ],
-                table_data=Dict{Tuple,UInt}(
-                    (false, false) => 1,
-                    (false, true) => 1,
-                    (true, false) => 1,
-                    (true, true) => 2,
-                )
-            ),
-        )
+"""
+# strt_desc_economical_discharge = Economical discharge
+# ------------------------
+# Discharges a battery when a linked PV plant produces little power and the battery has
+# sufficient charge to provide substantial amounts of energy.
+# 
+"""
+mutable struct CM_EconomicalDischarge <: ControlModule
+    name::String
+    parameters::Dict{String,Any}
+    state_machine::StateMachine
+
+    function CM_EconomicalDischarge(
+        parameters::Dict{String,Any},
+        components::Grouping,
+        sim_params::Dict{String,Any}
     )
+        default_parameters=Dict{String,Any}(
+            "name" => "storage_driven",
+            "pv_threshold" => 1.0, # [Wh], a value of 1.0 essentially requires that the PV
+            "min_charge" => 0.2,   # plant produces (almost) no power at all
+            "discharge_limit" => 0.05,
+            "pv_plant_uac" => nothing,
+            "battery_uac" => nothing
+        )
+        params = Base.merge(default_parameters, parameters)
+
+        if !(
+            params["pv_plant_uac"] !== nothing
+            && params["pv_plant_uac"] in keys(components)
+            && components[params["pv_plant_uac"]] isa PVPlant
+        )
+            @error "Required PV plant component for control module economical discharge not given"
+        end
+        params["pv_plant"] = components[params["pv_plant_uac"]]
+
+        if !(
+            params["battery_uac"] !== nothing
+            && params["battery_uac"] in keys(components)
+            && components[params["battery_uac"]] isa Battery
+        )
+            @error "Required battery component for control module economical discharge not given"
+        end
+        params["battery"] = components[params["battery_uac"]]
+
+        state_machine = StateMachine(
+            UInt(1), # state
+            Dict{UInt,String}( # state_names
+                1 => "Load",
+                2 => "Discharge",
+            ),
+            Dict{UInt,TruthTable}( # transitions
+                1 => TruthTable( # State: Load
+                    conditions=[
+                        function(state_machine)
+                            return params["pv_plant"].supply < params["pv_threshold"]
+                        end,
+                        function(state_machine)
+                            return params["battery"].load >=
+                                params["battery"].capacity * params["min_charge"]
+                        end
+                    ],
+                    table_data=Dict{Tuple,UInt}(
+                        (false, false) => 1,
+                        (false, true) => 1,
+                        (true, false) => 1,
+                        (true, true) => 2,
+                    )
+                ), 2 => TruthTable( # State: Discharge
+                    conditions=[
+                        function(state_machine)
+                            return params["pv_plant"].supply < params["pv_threshold"]
+                        end,
+                        function(state_machine)
+                            return params["battery"].load >=
+                                params["battery"].capacity * params["discharge_limit"]
+                        end
+                    ],
+                    table_data=Dict{Tuple,UInt}(
+                        (false, false) => 1,
+                        (false, true) => 1,
+                        (true, false) => 1,
+                        (true, true) => 2,
+                    )
+                ),
+            )
+        )
+
+        return new("economical_discharge", params, state_machine)
+    end
 end
 
-strt_desc_economical_discharge = """Economical discharge
-------------------------
-Discharges a battery when a linked PV plant produces little power and the battery has
-sufficient charge to provide substantial amounts of energy.
-"""
+function update(mod::CM_EconomicalDischarge)
+    move_state(mod.state_machine)
+end
 
-OP_STRATS["economical_discharge"] = OperationalStrategyType(
-    name="economical_discharge",
-    description=strt_desc_economical_discharge,
-    sm_constructor=strt_sm_economical_discharge,
-    conditions=[
-        "Little PV power",
-        "Sufficient charge"
-    ],
-    strategy_parameters=Dict{String,Any}(
-        "name" => "economical_discharge",
-        "pv_threshold" => 0.15,
-        "min_charge" => 0.2,
-        "discharge_limit" => 0.05,
-    ),
-    required_components=EnSysRequirements()
-)
+function charge_is_allowed(mod::CM_EconomicalDischarge, sim_params::Dict{String,Any})
+    return mod.state_machine.state == 1
+end
+
+function discharge_is_allowed(mod::CM_EconomicalDischarge, sim_params::Dict{String,Any})
+    return mod.state_machine.state == 2
+end
