@@ -8,7 +8,6 @@ function test_distance_from_sink()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [],
                 "output_order" => ["TST_BUS_02", "TST_BUS_03"]
@@ -17,7 +16,6 @@ function test_distance_from_sink()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => ["TST_BUS_04", "TST_BUS_05"]
@@ -26,7 +24,6 @@ function test_distance_from_sink()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => [],
@@ -35,7 +32,6 @@ function test_distance_from_sink()
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_02"],
                 "output_order" => [],
@@ -44,7 +40,6 @@ function test_distance_from_sink()
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_BUS_02"],
                 "output_order" => ["TST_BUS_06"]
@@ -53,7 +48,6 @@ function test_distance_from_sink()
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_05"],
                 "output_order" => [],
@@ -86,7 +80,6 @@ function test_iteration_order()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [],
                 "output_order" => ["TST_BUS_02", "TST_BUS_03"]
@@ -95,7 +88,6 @@ function test_iteration_order()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => ["TST_BUS_04", "TST_BUS_05"]
@@ -104,7 +96,6 @@ function test_iteration_order()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => [],
@@ -113,7 +104,6 @@ function test_iteration_order()
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_02"],
                 "output_order" => [],
@@ -122,7 +112,6 @@ function test_iteration_order()
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_BUS_02"],
                 "output_order" => ["TST_BUS_06"]
@@ -131,7 +120,6 @@ function test_iteration_order()
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_06"],
                 "output_order" => [],
@@ -178,7 +166,6 @@ function test_find_chains()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [],
                 "output_order" => ["TST_BUS_02"]
@@ -187,7 +174,6 @@ function test_find_chains()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => ["TST_HTP_01", "TST_DEM_01"]
@@ -196,7 +182,6 @@ function test_find_chains()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => ["TST_HTP_01"],
                 "output_order" => ["TST_BUS_04", "TST_BUS_05"]
@@ -205,7 +190,6 @@ function test_find_chains()
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_03"],
                 "output_order" => [],
@@ -214,7 +198,6 @@ function test_find_chains()
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_03"],
                 "output_order" => [],
@@ -223,13 +206,11 @@ function test_find_chains()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_HTP_01"],
             "is_source" => true,
         ),
         "TST_HTP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
             "power_th" => 12000,
             "constant_cop" => 3.0
@@ -237,7 +218,6 @@ function test_find_chains()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1000

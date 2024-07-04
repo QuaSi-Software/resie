@@ -28,7 +28,6 @@
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -37,7 +36,6 @@
         "TST_01_HZG_02_DEM": {
             "type": "Demand",
             "medium": "m_c_g_h2",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
             "scale": 2000.0
@@ -45,7 +43,6 @@
         "TST_01_ELT_01_BUS": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
@@ -60,7 +57,6 @@
         "TST_01_HZG_01_BUS": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_01_HZG_02_HTP",
@@ -73,7 +69,6 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "control_refs": ["TST_01_HZG_01_HTP", "TST_01_HZG_02_HTP"],
             "output_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_DEM",
@@ -97,7 +92,6 @@
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_02_HTP"
             ],
@@ -108,7 +102,6 @@
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
@@ -119,7 +112,6 @@
         "TST_01_HZG_01_GBO": {
             "type": "FuelBoiler",
             "m_fuel_in": "m_c_g_natgas",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
@@ -130,7 +122,6 @@
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_GBO"
             ],
@@ -139,7 +130,6 @@
         "TST_01_ELT_01_GRI": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
@@ -148,7 +138,6 @@
         "TST_01_ELT_01_GRO": {
             "type": "GridConnection",
             "medium": "m_c_g_o2",
-            "control_refs": [],
             "output_refs": [],
             "is_source": false
         }

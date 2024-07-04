@@ -11,28 +11,24 @@ function test_short_chain_distribution()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 8000,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
         ),
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -45,7 +41,6 @@ function test_short_chain_distribution()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_BUS_01"
@@ -112,28 +107,24 @@ function test_long_chain_distribution()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 8000,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
         ),
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -146,7 +137,6 @@ function test_long_chain_distribution()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_BUS_01"
@@ -160,7 +150,6 @@ function test_long_chain_distribution()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_BUS_02"
@@ -173,7 +162,6 @@ function test_long_chain_distribution()
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_BUS_02"

@@ -10,7 +10,6 @@ function load_order_of_operation()
         "TST_DEM_01" => Dict{String,Any}(
             "type"=> "Demand",
             "medium"=> "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs"=> [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
@@ -19,7 +18,6 @@ function load_order_of_operation()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -30,7 +28,6 @@ function load_order_of_operation()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -38,9 +35,6 @@ function load_order_of_operation()
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [
-                "TST_DEM_01"
-            ],
             "output_refs" => [
                 "TST_DEM_01"
             ],

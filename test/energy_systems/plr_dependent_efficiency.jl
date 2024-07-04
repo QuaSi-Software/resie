@@ -11,7 +11,6 @@ function get_demand_energy_system_config()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "scale" => 1,
@@ -19,14 +18,12 @@ function get_demand_energy_system_config()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GB_01"],
             "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 4000,
             "linear_interface" => "fuel_in",
@@ -174,7 +171,6 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "BoundedSink",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
             "scale" => 1.0,
@@ -182,7 +178,6 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "FixedSupply",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GB_01"],
             "is_source" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
@@ -192,7 +187,6 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 4000,
             "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
@@ -280,7 +274,6 @@ function test_CHPP_el_eff_plrd()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 1000.0,
@@ -288,21 +281,18 @@ function test_CHPP_el_eff_plrd()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_CHP_01"],
             "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01",
                 "TST_GRO_01",
@@ -407,7 +397,6 @@ function test_electrolyser_dispatch_units()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 500.0,
@@ -415,27 +404,23 @@ function test_electrolyser_dispatch_units()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_ELY_01"],
             "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_GRO_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01",
                 "TST_GRO_01",

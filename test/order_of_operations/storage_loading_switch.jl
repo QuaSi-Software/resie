@@ -10,21 +10,18 @@ function test_ooo_storage_loading_switch()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GBO_01"],
             "is_source" => true,
         ),
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GBO_02"],
             "is_source" => true,
         ),
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"
             ],
@@ -34,7 +31,6 @@ function test_ooo_storage_loading_switch()
         "TST_GBO_02" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_BFT_01"],
             "output_refs" => [
                 "TST_BUS_01"
             ],
@@ -44,7 +40,6 @@ function test_ooo_storage_loading_switch()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_GBO_01",
@@ -64,7 +59,6 @@ function test_ooo_storage_loading_switch()
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
             ],
@@ -74,7 +68,6 @@ function test_ooo_storage_loading_switch()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",

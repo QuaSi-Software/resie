@@ -11,7 +11,6 @@ function test_many_to_one()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "constant_power" => 4000,
             "constant_temperature" => 55,
@@ -19,7 +18,6 @@ function test_many_to_one()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
             "constant_temperature" => 54,
@@ -27,7 +25,6 @@ function test_many_to_one()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
             "constant_temperature" => 53,
@@ -35,7 +32,6 @@ function test_many_to_one()
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01",

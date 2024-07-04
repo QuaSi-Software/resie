@@ -114,7 +114,6 @@
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature": 40,
@@ -123,7 +122,6 @@
         "TST_DEM_02": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature": 85,
@@ -132,7 +130,6 @@
         "TST_SRC_01": {
             "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "control_modules": [
                 {
                     "name": "default",
@@ -151,7 +148,6 @@
         "TST_SRC_02": {
             "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
@@ -165,7 +161,6 @@
         "TST_BFT_TH_01": {
             "type": "BufferTank",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
@@ -178,7 +173,6 @@
         "TST_BFT_TH_02": {
             "type": "BufferTank",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH_02"
             ],
@@ -191,7 +185,6 @@
         "TST_BUS_TH_01": {
             "type": "Bus",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_SRC_01",
@@ -213,7 +206,6 @@
         "TST_BUS_TH_02": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_HP_01",
@@ -232,7 +224,6 @@
         "TST_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -240,9 +231,6 @@
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [
-                "TST_DEM_02"
-            ],
             "output_refs": [
                 "TST_BUS_TH_02"
             ],

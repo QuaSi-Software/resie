@@ -11,7 +11,6 @@ function test_multiple_transformer_with_limitations()
         "TST_DEM_heat_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
@@ -20,7 +19,6 @@ function test_multiple_transformer_with_limitations()
         "TST_DEM_H2_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_h2.prf",
             "scale" => 3000
@@ -28,27 +26,23 @@ function test_multiple_transformer_with_limitations()
         "TST_GRI_O2_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false
         ),
         "TST_GRI_el_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_ELY_01"],
             "is_source" => true
         ),
         "TST_GRI_el_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01", "TST_DEM_H2_01", "TST_GRI_O2_01"],
             "power_el" => 4000,
             "output_temperature_ht" => 55.0,
@@ -69,7 +63,6 @@ function test_multiple_transformer_with_limitations()
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => ["TST_DEM_heat_01"],
             "power_th" => 2240,
             "constant_cop" => 3.5,

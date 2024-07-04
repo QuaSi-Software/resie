@@ -11,14 +11,12 @@ function test_one_to_one_grid()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_DEM_01"],
             "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "constant_temperature" => 55,
@@ -68,7 +66,6 @@ function test_one_to_one_bounded_source()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_DEM_01"],
             "constant_temperature" => 50,
             "constant_power" => 4000
@@ -76,7 +73,6 @@ function test_one_to_one_bounded_source()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "constant_temperature" => 55,
