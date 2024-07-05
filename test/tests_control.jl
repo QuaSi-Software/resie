@@ -55,17 +55,7 @@ function setup_control_tests()
 
     components = Resie.load_components(components_config, simulation_params)
 
-
     return components, simulation_params
-end
-
-function test_move_state_default_strategy()
-    components, simulation_params = setup_control_tests()
-    buffer_tank = components["TST_BT_01"]
-
-    @test buffer_tank.controller.state_machine.state == 1
-    EnergySystems.move_state(buffer_tank, components, simulation_params)
-    @test buffer_tank.controller.state_machine.state == 1
 end
 
 function test_move_state_storage_driven_hp()
@@ -74,19 +64,14 @@ function test_move_state_storage_driven_hp()
     heat_pump = components["TST_HP_01"]
 
     buffer_tank.load = 20000
-    heat_pump.controller.state_machine.state = 1
-    EnergySystems.move_state(heat_pump, components, simulation_params)
-    @test heat_pump.controller.state_machine.state == 1
+    EnergySystems.update(heat_pump.controller)
+    @test heat_pump.controller.modules[1].state_machine.state == 1
     buffer_tank.load = 0
-    EnergySystems.move_state(heat_pump, components, simulation_params)
-    @test heat_pump.controller.state_machine.state == 2
+    EnergySystems.update(heat_pump.controller)
+    @test heat_pump.controller.modules[1].state_machine.state == 2
 end
 
 @testset "control_tests" begin
-    @testset "move_state_default_strategy" begin
-        test_move_state_default_strategy()
-    end
-
     @testset "move_state_storage_driven_hp" begin
         test_move_state_storage_driven_hp()
     end

@@ -74,8 +74,6 @@ function test_run_energy_system_from_storage()
     lheat_storage = components["TST_BFT_01"]
     lheat_bus = components["TST_BUS_01"]
 
-    @test heat_pump.controller.state_machine.state == 1
-
     # first time step: storage is full to power heatpump
 
     for unit in values(components)
@@ -245,8 +243,6 @@ function test_run_energy_system_from_storage_denied()
     power_grid = components["TST_GRI_01"]
     lheat_storage = components["TST_BFT_01"]
     lheat_bus = components["TST_BUS_01"]
-
-    @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump, but heatpump unloading storages is test_run_energy_system_from_storage_denied
     # not energy should be transferred at all.

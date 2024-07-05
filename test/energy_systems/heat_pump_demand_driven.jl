@@ -49,8 +49,6 @@ function test_heat_pump_demand_driven_correct_order()
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
 
-    @test heat_pump.controller.state_machine.state == 1
-
     # first time step: demand is below max power of source (adjusted for additional input
     # of electricity), small delta T leads to high COP = 12.725999999999999
 

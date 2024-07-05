@@ -120,8 +120,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.control(grid_1, components, simulation_parameters)
     EnergySystems.control(grid_2, components, simulation_parameters)
 
-    @test boiler_1.controller.state_machine.state == 2
-    @test boiler_2.controller.state_machine.state == 1
+    @test boiler_1.controller.modules[1].state_machine.state == 2
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
@@ -184,8 +183,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.control(grid_1, components, simulation_parameters)
     EnergySystems.control(grid_2, components, simulation_parameters)
 
-    @test boiler_1.controller.state_machine.state == 2
-    @test boiler_2.controller.state_machine.state == 1
+    @test boiler_1.controller.modules[1].state_machine.state == 2
 
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
