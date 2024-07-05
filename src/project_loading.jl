@@ -480,7 +480,7 @@ function add_transformer_steps(simulation_order,
         return is_connecting_branch
     end
 
-    function determine_reverse(rev, is_conn_branch, idx)
+    function determine_reverse(rev, is_conn_branch, idx, step_category)
         if rev === nothing || !is_conn_branch[idx]
             if step_category == "potential"
                 current_reverse = !is_input[idx]
@@ -555,7 +555,7 @@ function add_transformer_steps(simulation_order,
         else
             for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
 
-                current_reverse = determine_reverse(reverse, is_connecting_branch, idx)
+                current_reverse = determine_reverse(reverse, is_connecting_branch, idx, step_category)
 
                 # add process of middle_transformer bevor the first branch makes its process
                 if idx == 1 && step_category == "process"
@@ -669,7 +669,7 @@ function add_transformer_steps(simulation_order,
                     continue
                 end
 
-                current_reverse = determine_reverse(reverse, is_connecting_branch, idx)
+                current_reverse = determine_reverse(reverse, is_connecting_branch, idx, step_category)
 
                 if is_input[idx]
                     connecting_component = middle_bus_branch_transformer[end]
