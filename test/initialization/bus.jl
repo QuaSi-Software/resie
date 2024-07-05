@@ -27,7 +27,7 @@ function energy_system()::Dict{String,Any}
             "control_modules" => [
                 Dict{String,Any}(
                     "name" => "economical_discharge",
-                    "pv_threshold" => 0.15,
+                    "pv_threshold" => 750.0,
                     "min_charge" => 0.2,
                     "discharge_limit" => 0.05,
                     "pv_plant_uac" => "TST_PVP_01",

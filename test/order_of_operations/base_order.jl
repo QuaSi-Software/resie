@@ -111,7 +111,7 @@ function test_base_order()
             "control_modules" => [
                 Dict{String,Any}(
                     "name" => "economical_discharge",
-                    "pv_threshold" => 0.15,
+                    "pv_threshold" => 750.0,
                     "min_charge" => 0.2,
                     "discharge_limit" => 0.05,
                     "battery_uac" => "TST_01_ELT_01_BAT",
