@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
     output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-    highest, default
+    highest, default, plot_optional_figures
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -34,7 +34,7 @@ default(config::Dict{String,Any}, name::String, default_val::Any)::Any =
 """
 The number of hours per time step, used by various utility functions.
 """
-HOURS_PER_TIME_STEP::Float64 = 0.25
+HOURS_PER_TIME_STEP::Float64 = 0.0
 
 """
 Update the time step, in seconds.
@@ -52,6 +52,17 @@ have been loaded.
 function watt_to_wh(watts::Float64)
     return watts * HOURS_PER_TIME_STEP
 end
+
+"""
+Calculate power from energy by using the simulation time step.
+
+This function must be assigned a method after simulation parameters (such as the timestep)
+have been loaded.
+"""
+function wh_to_watts(wh::Float64)
+    return wh / HOURS_PER_TIME_STEP
+end
+
 
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
@@ -228,6 +239,12 @@ Base.@kwdef mutable struct SystemInterface
 end
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
     set_storage_transfer!(interface, value)
 
 Sets the flag to decide over storage potential transfer to the given boolean value. Note
@@ -400,6 +417,31 @@ function highest(
         return temperature_2
     elseif temperature_1 !== nothing && temperature_2 === nothing
         return temperature_1
+    end
+end
+
+"""
+    highest(temperature_vector::Vector{Temperature})::Temperature
+
+Returns the highest temperature of a vector of temperatures and handles nothing-values:
+- If all of the inputs are floats, the maximum will be returned.
+- If some of the inputs are nothing and the others are float, the highest float will be returned.
+- If all of the inputs are nothing, nothing will be returned.
+"""
+function highest(temperature_vector::Vector{Temperature})::Temperature
+    n_temperatures = length(temperature_vector)
+    if n_temperatures == 0
+        return nothing
+    elseif n_temperatures == 1
+        return temperature_vector[1]
+    else 
+        current_highest = highest(temperature_vector[1], temperature_vector[2])
+        if n_temperatures > 2
+            for idx in 3:n_temperatures
+                current_highest = highest(current_highest, temperature_vector[idx])
+            end
+        end
+        return current_highest
     end
 end
 
@@ -748,6 +790,35 @@ function distribute!(unit::Component)
 end
 
 """
+    plot_optional_figures(unit, output_path, output_formats, sim_params)
+
+Plot otpional figures that are potentially created after initialisation of each 
+component. Saves all figures to "output_path" for each specified "output_formats".
+Possible output formats are:
+    - html
+    - pdf
+    - png
+    - ps
+    - svg
+
+# Arguments
+- `unit::Component`: The unit that plots additional figures
+- `output_path::String`: The output folder as string (absolute/relative) for the additional plots
+- `output_formats::Vector{Any}`: A Vector of output file formats, each as string without dot
+- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+ 
+# Returns:
+- Bool: true if a figure was created, false if no figure was created.
+"""
+function plot_optional_figures(unit::Component, 
+                               output_path::String,
+                               output_formats::Vector{Any},
+                               sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return false
+end
+
+"""
     output_values(unit)
 
 Specify which data outputs a component can provide, including the medium of each output.
@@ -819,7 +890,8 @@ include("storage/battery.jl")
 include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
-include("heat_sources/geothermal_heat_collectors.jl")
+# include("heat_sources/geothermal_heat_collectors.jl")
+include("heat_sources/generic_heat_source.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
 include("heat_producers/fuel_boiler.jl")
@@ -827,6 +899,10 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 load_condition_prototypes()
+
+# additional functionality applicable to multiple component types, that belongs in the
+# base module and has been moved into seperate files for less clutter
+include("efficiency.jl")
 
 """
     link_output_with(unit, components)
@@ -1056,7 +1132,7 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
             return getfield(sim_params["weather_data"], Symbol(config["temperature_from_global_file"]))
         else
             @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            exit()
+            throw(InputError)
         end
     else            
         @info "For '$uac', no temperature is set."
@@ -1091,11 +1167,11 @@ function get_ambient_temperature_profile_from_config(config::Dict{String,Any}, s
             return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
         else
             @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            exit()
+            throw(InputError)
         end
     else
         @error "No ambient temperature profile is given for '$uac'"
-        exit()
+        throw(InputError)
     end
 end
 

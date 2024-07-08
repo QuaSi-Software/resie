@@ -278,7 +278,8 @@
                 "high_threshold": 0.5,
                 "low_threshold": 0.1
             },
-            "power_th": 40000
+            "power_th": 40000,
+            "efficiency_fuel_in": "const:1.0"
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
@@ -293,7 +294,21 @@
             "strategy": {
                 "name": "demand_driven"
             },
-            "power_el": 40000
+            "power_el": 40000,
+            "output_temperature_ht": 55.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.2,
+            "min_power_fraction_total": 0.2,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
         },
         "TST_01_HZG_01_STS": {
             "type": "SeasonalThermalStorage",

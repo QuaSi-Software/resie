@@ -302,7 +302,20 @@
                 "operation_profile_path": "./profiles/examples/district/4000hours_with_least_CO2_2022.prf"
             },
             "power_el": 600000,
-            "output_temperature": 50.0
+            "output_temperature_ht": 50.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.2,
+            "min_power_fraction_total": 0.2,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
         },
         "TST_CHP_01": {
             "type": "CHPP",
@@ -318,7 +331,11 @@
             },
             "m_heat_out": "m_h_w_ht1",
             "m_el_out": "m_e_ac_230v",
-            "power_gas": 150000,
+            "power_el": 60000,
+            "linear_interface": "fuel_in",
+            "efficiency_fuel_in": "const:1.0",
+            "efficiency_el_out": "const:0.4",
+            "efficiency_heat_out": "const:0.6",
             "output_temperature": 60,
             "min_power_fraction": 1.0
         },
@@ -336,7 +353,8 @@
             },
             "power_th": 400000,
             "output_temperature": 60,
-            "min_power_fraction": 0.0
+            "min_power_fraction": 0.0,
+            "efficiency_fuel_in": "const:1.0"
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",

@@ -25,6 +25,8 @@ using PlotlyJS
 using ColorSchemes
 using Colors
 using Interpolations
+using JSON
+
 
 """
     get_simulation_params(project_config)
@@ -77,6 +79,10 @@ Construct and prepare parameters, energy system components and the order of oper
 function prepare_inputs(project_config::Dict{AbstractString,Any})
     sim_params = get_simulation_params(project_config)
 
+    # this sets a global variable in the EnergySystems module, which is required for a
+    # utility function to work properly
+    EnergySystems.set_timestep(sim_params["time_step_seconds"])
+
     components = load_components(project_config["components"], sim_params)
 
     if (
@@ -114,10 +120,6 @@ function run_simulation_loop(
     components::Grouping,
     step_order::StepInstructions
 )
-    # this sets a global variable in the EnergySystems module, which is required for a
-    # utility function to work properly
-    EnergySystems.set_timestep(sim_params["time_step_seconds"])
-
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
     do_create_plot = !(output_keys_lineplot === nothing)
@@ -146,12 +148,8 @@ function run_simulation_loop(
         output_interface_values = zeros(Float64, sim_params["number_of_time_steps"], nr_of_interfaces)
     end 
 
-    # export order of operation and other additional info
-    if project_config["io_settings"]["auxiliary_info"]
-        aux_info_file_path = project_config["io_settings"]["auxiliary_info_file"]
-        dump_auxiliary_info(aux_info_file_path, components, step_order, sim_params)
-        @info "Auxiliary info dumped to file $(aux_info_file_path)"
-    end
+    # export order of operation and other additional info like optional plots
+    dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
     for steps = 1:sim_params["number_of_time_steps"]
         # perform the simulation
