@@ -80,7 +80,7 @@ function test_base_order()
                 "high_threshold" => 0.9,
                 "low_threshold" => 0.2
             ),
-            "power_gas" => 12500
+            "power_el" => 12500
         ),
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -877,9 +877,14 @@ function test_ooo_middle_transformer()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
+            "m_heat_ht_out" => "m_h_w_lt1",
+            "output_temperature" => 45,
             "power_el" => 40000,
-            "min_power_fraction" => 0.0,
-            "output_temperature" => 45
+            "heat_lt_is_usable" => false,
+            "nr_switchable_units" => 4,
+            "dispatch_strategy" => "equal_with_mpf",
+            "min_power_fraction_total" => 0.0,
+            "min_power_fraction" => 0.0
         ),
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -1642,9 +1647,14 @@ function test_ooo_parallels_in_chain()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
+            "m_heat_ht_out" => "m_h_w_lt1",
+            "output_temperature" => 45,
             "power_el" => 40000,
-            "min_power_fraction" => 0.0,
-            "output_temperature" => 45
+            "heat_lt_is_usable" => false,
+            "nr_switchable_units" => 4,
+            "dispatch_strategy" => "equal_with_mpf",
+            "min_power_fraction_total" => 0.0,
+            "min_power_fraction" => 0.0
         ),
         "TST_BUS_00" => Dict{String,Any}(
             "type" => "Bus",
@@ -2574,9 +2584,14 @@ function test_ooo_connected_middle_transformer()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
+            "m_heat_ht_out" => "m_h_w_lt1",
+            "output_temperature" => 45,
             "power_el" => 40000,
-            "min_power_fraction" => 0.0,
-            "output_temperature" => 45
+            "heat_lt_is_usable" => false,
+            "nr_switchable_units" => 4,
+            "dispatch_strategy" => "equal_with_mpf",
+            "min_power_fraction_total" => 0.0,
+            "min_power_fraction" => 0.0
         ),
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -2593,7 +2608,7 @@ function test_ooo_connected_middle_transformer()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_g_h2",
+            "m_fuel_in" => "m_c_g_h2",
             "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
@@ -2603,7 +2618,7 @@ function test_ooo_connected_middle_transformer()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -2848,9 +2863,14 @@ function test_ooo_connected_middle_transformer_variant()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
+            "m_heat_ht_out" => "m_h_w_lt1",
+            "output_temperature" => 45,
             "power_el" => 40000,
-            "min_power_fraction" => 0.0,
-            "output_temperature" => 45
+            "heat_lt_is_usable" => false,
+            "nr_switchable_units" => 4,
+            "dispatch_strategy" => "equal_with_mpf",
+            "min_power_fraction_total" => 0.0,
+            "min_power_fraction" => 0.0
         ),
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
@@ -2867,7 +2887,7 @@ function test_ooo_connected_middle_transformer_variant()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_g_h2",
+            "m_fuel_in" => "m_c_g_h2",
             "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
@@ -2877,7 +2897,7 @@ function test_ooo_connected_middle_transformer_variant()
                 "name" => "demand_driven",
                 "load_storages" => false
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -3097,7 +3117,7 @@ function test_ooo_circle_grid_input_denied()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3107,7 +3127,7 @@ function test_ooo_circle_grid_input_denied()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -3262,7 +3282,7 @@ function test_ooo_circle_grid_input_allowed()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3272,7 +3292,7 @@ function test_ooo_circle_grid_input_allowed()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -3445,7 +3465,7 @@ function test_ooo_circle_middle_transformer_input()
 
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3455,7 +3475,7 @@ function test_ooo_circle_middle_transformer_input()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -3623,7 +3643,7 @@ function test_ooo_circle_variant()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3633,12 +3653,12 @@ function test_ooo_circle_variant()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 500,
+            "power_el" => 500,
             "min_power_fraction" => 0.0
         ),
         "TST_CHP_02" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3648,7 +3668,7 @@ function test_ooo_circle_variant()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 120000,
+            "power_el" => 120000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
@@ -3852,7 +3872,7 @@ function test_ooo_circle_middle_transformer_interconnections()
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
-            "m_gas_in" => "m_c_natgas",
+            "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
             "control_refs" => [],
             "output_refs" => [
@@ -3862,7 +3882,7 @@ function test_ooo_circle_middle_transformer_interconnections()
             "strategy" => Dict{String,Any}(
                 "name" => "demand_driven"
             ),
-            "power_gas" => 250000,
+            "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(

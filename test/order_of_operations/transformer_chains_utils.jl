@@ -465,9 +465,14 @@ function test_find_indirect_chains()
                 "strategy" => Dict{String,Any}(
                     "name" => "demand_driven"
                 ),
+                "m_heat_ht_out" => "m_h_w_lt1",
+                "output_temperature" => 45,
                 "power_el" => 40000,
-                "min_power_fraction" => 0.0,
-                "output_temperature" => 45
+                "heat_lt_is_usable" => false,
+                "nr_switchable_units" => 4,
+                "dispatch_strategy" => "equal_with_mpf",
+                "min_power_fraction_total" => 0.0,
+                "min_power_fraction" => 0.0
             ),
             "TST_BUS_00" => Dict{String,Any}(
                 "type" => "Bus",
@@ -546,7 +551,7 @@ function test_find_indirect_chains()
     @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_ht_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
@@ -745,9 +750,14 @@ function test_find_indirect_chains_denied()
                 "strategy" => Dict{String,Any}(
                     "name" => "demand_driven"
                 ),
+                "m_heat_ht_out" => "m_h_w_lt1",
+                "output_temperature" => 45,
                 "power_el" => 40000,
-                "min_power_fraction" => 0.0,
-                "output_temperature" => 45
+                "heat_lt_is_usable" => false,
+                "nr_switchable_units" => 4,
+                "dispatch_strategy" => "equal_with_mpf",
+                "min_power_fraction_total" => 0.0,
+                "min_power_fraction" => 0.0
             ),
             "TST_BUS_00" => Dict{String,Any}(
                 "type" => "Bus",
@@ -829,7 +839,7 @@ function test_find_indirect_chains_denied()
     @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == false
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_ht_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == true
@@ -1030,9 +1040,14 @@ function test_find_indirect_chains_denied2()
                 "strategy" => Dict{String,Any}(
                     "name" => "demand_driven"
                 ),
+                "m_heat_ht_out" => "m_h_w_lt1",
+                "output_temperature" => 45,
                 "power_el" => 40000,
-                "min_power_fraction" => 0.0,
-                "output_temperature" => 45
+                "heat_lt_is_usable" => false,
+                "nr_switchable_units" => 4,
+                "dispatch_strategy" => "equal_with_mpf",
+                "min_power_fraction_total" => 0.0,
+                "min_power_fraction" => 0.0
             ),
             "TST_BUS_00" => Dict{String,Any}(
                 "type" => "Bus",
@@ -1115,7 +1130,7 @@ function test_find_indirect_chains_denied2()
     @test Resie.check_interface_for_transformer(components["TST_HP_02"].output_interfaces[components["TST_HP_02"].m_heat_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].output_interfaces[components["TST_HP_01b"].m_heat_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_01b"].input_interfaces[components["TST_HP_01b"].m_heat_in], "input") == true
-    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_out], "output") == true
+    @test Resie.check_interface_for_transformer(components["TST_01_ELY_01"].output_interfaces[components["TST_01_ELY_01"].m_heat_ht_out], "output") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].output_interfaces[components["TST_HP_03"].m_heat_out], "output") == false
     @test Resie.check_interface_for_transformer(components["TST_HP_03"].input_interfaces[components["TST_HP_03"].m_heat_in], "input") == true
     @test Resie.check_interface_for_transformer(components["TST_HP_04"].input_interfaces[components["TST_HP_04"].m_heat_in], "input") == false
