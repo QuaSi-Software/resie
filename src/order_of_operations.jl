@@ -1,4 +1,246 @@
-export check_interface_for_transformer
+# this file contains functions for determining the order of operations, typically during
+# the initialisation of a simulation. the algorithms behind it are fairly complex and not
+# not easily explained. check the online documentation for more information
+
+
+# ------------------------------------------------------------------------------------------
+# Interface functions, which are used by other parts of ReSiE.
+# ------------------------------------------------------------------------------------------
+
+"""
+load_order_of_operations(order_of_operation_input, components)
+
+Reads in the order of operation given in the input file.
+The Vektor that is passed has to have one entry for each operation. All operations have to 
+be in the following syntax:
+[
+    "UAC_Key s_step",
+    ...
+]
+"UAC_Key s_step" can be "TST_01_HZG_02_DEM s_reset" for example.
+
+# Args
+- `order_of_operation_input::Vector{String}`: A Vektor of strings containing the operations 
+                                              given in the input file 
+- `components::Grouping`: All components of the input file
+# Returns
+- `step_instructions`: The order of opertaions given in the input file in the structure:
+```
+[
+    ["UAC Key", s_step],
+    ...
+]
+```
+"""
+function load_order_of_operations(order_of_operation_input, components::Grouping)::StepInstructions
+    step_instructions = []
+    all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
+
+    for entry in order_of_operation_input 
+        uac = string(split(entry)[1])
+        s_step = split(entry)[2]
+
+        if s_step == "s_reset"
+           s_step_component = EnergySystems.s_reset
+        elseif s_step == "s_control"
+            s_step_component = EnergySystems.s_control
+        elseif s_step == "s_process"
+            s_step_component = EnergySystems.s_process
+        elseif s_step == "s_potential"
+            s_step_component = EnergySystems.s_potential
+        elseif s_step == "s_load"
+            s_step_component = EnergySystems.s_load
+        elseif s_step == "s_distribute"
+            s_step_component = EnergySystems.s_distribute
+        else 
+            throw(ArgumentError("Unknown operation step \"$s_step\" in \"order_of_operation\" in input file. Must be one of: s_reset, s_control, s_process, s_potential, s_load, s_distribute"))
+        end
+
+        if !(uac in all_components_uac)
+            throw(ArgumentError("Unknown component UAC \"$uac\" in \"order_of_operation\" given in input file. Each UAC must match the name of a component given in the input file."))
+        end
+
+        push!(step_instructions, [uac, s_step_component] )
+    end
+    return [(u[1], u[2]) for u in step_instructions]
+end
+
+"""
+calculate_order_of_operations(components)
+
+Calculate the order of steps that need to be performed to simulate the given components.
+
+This function works by an algorithm described in more detail in the accompanying
+documentation. The result of this are step-by-step instructions telling the simulation
+engine in which order the system functions are performed for each unit. This algorithm is
+not trivial and might not work for each possible grouping of components.
+
+# Args
+- `components::Grouping`: The components for which an order is required
+# Returns
+- `StepInstructions`: The order in the structure:
+```
+[
+    ["UAC Key", s_step],
+    ...
+]
+```
+"""
+function calculate_order_of_operations(components::Grouping)::StepInstructions
+    components_by_function = categorize_by_function(components)
+    simulation_order = base_order(components_by_function)
+    simulation_order = remove_double_transformer_process_steps(simulation_order, components)
+    # TODO: detect and remove unnecessary potentials in future versions?
+
+    # Note that the input order at a bus has a higher priority compared to the output order! 
+    # If there are contradictions, the input order applies. Currently, there is no warning 
+    # message if this leads to missalignement with the output order.
+    # Reorderings for input and output priorities only applies for process and not for potential steps!
+    reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
+    reorder_for_input_priorities(simulation_order, components, components_by_function)
+    reorder_distribution_of_busses(simulation_order, components, components_by_function)
+    reorder_storage_loading(simulation_order, components, components_by_function)
+
+    fn_first = function (entry)
+        return entry[1]
+    end
+
+    step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
+    
+    # remove transformers potential step if process is directly consecutive to a potential step
+    while contains_double_potental_produce(step_order)
+        step_order = remove_double_potental_produce(step_order)
+    end
+
+    return step_order
+end
+
+"""
+    find_chains(components, sys_function; direct_connection_only=true)
+
+Find all chains of the given system function in the given collection of components.
+
+A chain is a subgraph of the graph spanned by all connections of the given components,
+which is a directed graph. The subgraph is defined by all connected components of the given
+system function.
+The optional flag direct_connection_only specifies if the chain should also be found
+across busses and other component types. If the flag is set to false, the unique chains
+that interconnect the components of sys_function are found. Components are only defined as
+interconnected if they can be seen EITHER in the outputs or the inputs, but not via mixed 
+input/output paths! 
+
+Chains found with direct_connection_only=false are filtered to find unique chains. They are
+merged to represent the longest possible chain and to avoid doublings or multible subset of
+a bigger chain. Completely independent chains are returned as array of chains.
+
+# Arguments
+-`components`: All components of the current energy system
+-`sys_function`: The system function for that the chains should be determined in components
+-`direct_connection_only::Bool}`: Flag if direct (true) or indirect chains across other
+                                  components should be determined (false)
+
+# Returns
+-`chain::Array{Set()}`: An array holding an unique collection of chains, each as Set() type
+"""
+function find_chains(components, sys_function; direct_connection_only=true)::Vector{Set{Component}}
+    function merge_chains(original_chains)
+        chains_unique = []
+        for chain in original_chains 
+            if chains_unique == []
+                push!(chains_unique, chain)
+            else
+                chain_written = false
+                for chain_unique in chains_unique
+                    chain_uacs = [entry.uac for entry in chain]
+                    chain_unique_uacs = [entry.uac for entry in chain_unique]
+
+                    length_diff_chain = length(setdiff(chain_uacs, chain_unique_uacs))
+                    elements_in_chain_but_not_in_unique = (length_diff_chain > 0 && length_diff_chain < length(chain_uacs) ) ? true : false
+
+                    length_diff_unique = length(setdiff(chain_unique_uacs, chain_uacs))
+                    elements_in_unique_but_not_in_chain = (length_diff_unique > 0 && length_diff_unique < length(chain_unique_uacs) ) ? true : false
+
+                    if elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
+                        # chain is subset of chain_unique and vica versa 
+                        # --> replace with union of chain and chains_unique
+                        new_chain = union(chain, chain_unique)
+                        replace!(chains_unique, chain_unique => new_chain)
+                        chain_written = true
+                        break
+                    elseif !elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
+                        # chain is complete subset of chain_unique --> skip
+                        chain_written = true
+                        break
+                    elseif elements_in_chain_but_not_in_unique && !elements_in_unique_but_not_in_chain
+                        # chain_unique is complete subset of chain --> replace with chain
+                        replace!(chains_unique, chain_unique => chain)
+                        chain_written = true
+                        break
+                    elseif Set(chain_uacs) == Set(chain_unique_uacs)
+                        # they are the same
+                        chain_written = true
+                        break
+                    end
+
+                end
+                if !chain_written
+                    # chain and all chains in chain_unique are completely different
+                    push!(chains_unique, chain)
+                end
+            end
+        end
+        return chains_unique
+    end
+
+    chains = []
+
+    for unit in components
+        if unit.sys_function !== sys_function
+            continue
+        end
+
+        if direct_connection_only
+            already_recorded = false
+            for chain in chains
+                if unit in chain
+                    already_recorded = true
+                end
+            end
+
+            if !already_recorded
+                chain = Set()
+                add_non_recursive!(chain, unit, "")
+                push!(chains, chain)
+            end
+        else
+            chain = Set()
+            add_non_recursive_indirect_outputs!(chain, unit, [], [sys_function], "")
+            add_non_recursive_indirect_inputs!(chain, unit, [], [sys_function], "")
+            push!(chains, chain)
+        end
+    end
+
+    # find unique chains for chains that has been found with direct_connection_only = false
+    if !direct_connection_only
+        check_chain_merging = function(merged_chains)
+            # check if two chains are connected later through a third chain which is 
+            # not recognized by merge_chains()
+            merged_chains_again = merge_chains(merged_chains)
+            if length(merged_chains_again) != length(merged_chains)
+                merged_chains_again = check_chain_merging(merged_chains_again)
+            end
+            return merged_chains_again
+        end
+
+        chains = check_chain_merging(merge_chains(chains))
+    end 
+    return chains
+end
+
+# ------------------------------------------------------------------------------------------
+# Various utility functions, which are used in the process of determining the order
+# of operations.
+# ------------------------------------------------------------------------------------------
 
 """
     categorize_by_function(components)
@@ -1809,129 +2051,6 @@ function add_non_recursive_indirect_inputs!(node_set,
     end
 end
 
-
-"""
-    find_chains(components, sys_function; direct_connection_only=true)
-
-Find all chains of the given system function in the given collection of components.
-
-A chain is a subgraph of the graph spanned by all connections of the given components,
-which is a directed graph. The subgraph is defined by all connected components of the given
-system function.
-The optional flag direct_connection_only specifies if the chain should also be found
-across busses and other component types. If the flag is set to false, the unique chains
-that interconnect the components of sys_function are found. Components are only defined as
-interconnected if they can be seen EITHER in the outputs or the inputs, but not via mixed 
-input/output paths! 
-
-Chains found with direct_connection_only=false are filtered to find unique chains. They are
-merged to represent the longest possible chain and to avoid doublings or multible subset of
-a bigger chain. Completely independent chains are returned as array of chains.
-
-# Arguments
--`components`: All components of the current energy system
--`sys_function`: The system function for that the chains should be determined in components
--`direct_connection_only::Bool}`: Flag if direct (true) or indirect chains across other
-                                  components should be determined (false)
-
-# Returns
--`chain::Array{Set()}`: An array holding an unique collection of chains, each as Set() type
-"""
-function find_chains(components, sys_function; direct_connection_only=true)::Vector{Set{Component}}
-    function merge_chains(original_chains)
-        chains_unique = []
-        for chain in original_chains 
-            if chains_unique == []
-                push!(chains_unique, chain)
-            else
-                chain_written = false
-                for chain_unique in chains_unique
-                    chain_uacs = [entry.uac for entry in chain]
-                    chain_unique_uacs = [entry.uac for entry in chain_unique]
-
-                    length_diff_chain = length(setdiff(chain_uacs, chain_unique_uacs))
-                    elements_in_chain_but_not_in_unique = (length_diff_chain > 0 && length_diff_chain < length(chain_uacs) ) ? true : false
-
-                    length_diff_unique = length(setdiff(chain_unique_uacs, chain_uacs))
-                    elements_in_unique_but_not_in_chain = (length_diff_unique > 0 && length_diff_unique < length(chain_unique_uacs) ) ? true : false
-
-                    if elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
-                        # chain is subset of chain_unique and vica versa 
-                        # --> replace with union of chain and chains_unique
-                        new_chain = union(chain, chain_unique)
-                        replace!(chains_unique, chain_unique => new_chain)
-                        chain_written = true
-                        break
-                    elseif !elements_in_chain_but_not_in_unique && elements_in_unique_but_not_in_chain
-                        # chain is complete subset of chain_unique --> skip
-                        chain_written = true
-                        break
-                    elseif elements_in_chain_but_not_in_unique && !elements_in_unique_but_not_in_chain
-                        # chain_unique is complete subset of chain --> replace with chain
-                        replace!(chains_unique, chain_unique => chain)
-                        chain_written = true
-                        break
-                    elseif Set(chain_uacs) == Set(chain_unique_uacs)
-                        # they are the same
-                        chain_written = true
-                        break
-                    end
-
-                end
-                if !chain_written
-                    # chain and all chains in chain_unique are completely different
-                    push!(chains_unique, chain)
-                end
-            end
-        end
-        return chains_unique
-    end
-
-    chains = []
-
-    for unit in components
-        if unit.sys_function !== sys_function
-            continue
-        end
-
-        if direct_connection_only
-            already_recorded = false
-            for chain in chains
-                if unit in chain
-                    already_recorded = true
-                end
-            end
-
-            if !already_recorded
-                chain = Set()
-                add_non_recursive!(chain, unit, "")
-                push!(chains, chain)
-            end
-        else
-            chain = Set()
-            add_non_recursive_indirect_outputs!(chain, unit, [], [sys_function], "")
-            add_non_recursive_indirect_inputs!(chain, unit, [], [sys_function], "")
-            push!(chains, chain)
-        end
-    end
-
-    # find unique chains for chains that has been found with direct_connection_only = false
-    if !direct_connection_only
-        check_chain_merging = function(merged_chains)
-            # check if two chains are connected later through a third chain which is 
-            # not recognized by merge_chains()
-            merged_chains_again = merge_chains(merged_chains)
-            if length(merged_chains_again) != length(merged_chains)
-                merged_chains_again = check_chain_merging(merged_chains_again)
-            end
-            return merged_chains_again
-        end
-
-        chains = check_chain_merging(merge_chains(chains))
-    end 
-    return chains
-end
-
 """
     distance_to_sink(node, sys_function, checked_interfaces)
 
@@ -2023,115 +2142,6 @@ function iterate_chain(chain, sys_function; reverse=false)
     end
     return [u[2] for u in sort(distances, by=fn_first, rev=reverse)]
 end
-
-"""
-load_order_of_operations(order_of_operation_input, components)
-
-Reads in the order of operation given in the input file.
-The Vektor that is passed has to have one entry for each operation. All operations have to 
-be in the following syntax:
-[
-    "UAC_Key s_step",
-    ...
-]
-"UAC_Key s_step" can be "TST_01_HZG_02_DEM s_reset" for example.
-
-# Args
-- `order_of_operation_input::Vector{String}`: A Vektor of strings containing the operations 
-                                              given in the input file 
-- `components::Grouping`: All components of the input file
-# Returns
-- `step_instructions`: The order of opertaions given in the input file in the structure:
-```
-[
-    ["UAC Key", s_step],
-    ...
-]
-```
-"""
-function load_order_of_operations(order_of_operation_input, components::Grouping)::StepInstructions
-    step_instructions = []
-    all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
-
-    for entry in order_of_operation_input 
-        uac = string(split(entry)[1])
-        s_step = split(entry)[2]
-
-        if s_step == "s_reset"
-           s_step_component = EnergySystems.s_reset
-        elseif s_step == "s_control"
-            s_step_component = EnergySystems.s_control
-        elseif s_step == "s_process"
-            s_step_component = EnergySystems.s_process
-        elseif s_step == "s_potential"
-            s_step_component = EnergySystems.s_potential
-        elseif s_step == "s_load"
-            s_step_component = EnergySystems.s_load
-        elseif s_step == "s_distribute"
-            s_step_component = EnergySystems.s_distribute
-        else 
-            throw(ArgumentError("Unknown operation step \"$s_step\" in \"order_of_operation\" in input file. Must be one of: s_reset, s_control, s_process, s_potential, s_load, s_distribute"))
-        end
-
-        if !(uac in all_components_uac)
-            throw(ArgumentError("Unknown component UAC \"$uac\" in \"order_of_operation\" given in input file. Each UAC must match the name of a component given in the input file."))
-        end
-
-        push!(step_instructions, [uac, s_step_component] )
-    end
-    return [(u[1], u[2]) for u in step_instructions]
-end
-
-"""
-calculate_order_of_operations(components)
-
-Calculate the order of steps that need to be performed to simulate the given components.
-
-This function works by an algorithm described in more detail in the accompanying
-documentation. The result of this are step-by-step instructions telling the simulation
-engine in which order the system functions are performed for each unit. This algorithm is
-not trivial and might not work for each possible grouping of components.
-
-# Args
-- `components::Grouping`: The components for which an order is required
-# Returns
-- `StepInstructions`: The order in the structure:
-```
-[
-    ["UAC Key", s_step],
-    ...
-]
-```
-"""
-function calculate_order_of_operations(components::Grouping)::StepInstructions
-    components_by_function = categorize_by_function(components)
-    simulation_order = base_order(components_by_function)
-    simulation_order = remove_double_transformer_process_steps(simulation_order, components)
-    # TODO: detect and remove unnecessary potentials in future versions?
-
-    # Note that the input order at a bus has a higher priority compared to the output order! 
-    # If there are contradictions, the input order applies. Currently, there is no warning 
-    # message if this leads to missalignement with the output order.
-    # Reorderings for input and output priorities only applies for process and not for potential steps!
-    reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
-    reorder_for_input_priorities(simulation_order, components, components_by_function)
-    reorder_distribution_of_busses(simulation_order, components, components_by_function)
-    reorder_storage_loading(simulation_order, components, components_by_function)
-
-    fn_first = function (entry)
-        return entry[1]
-    end
-
-    step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order, by=fn_first, rev=true)]
-    
-    # remove transformers potential step if process is directly consecutive to a potential step
-    while contains_double_potental_produce(step_order)
-        step_order = remove_double_potental_produce(step_order)
-    end
-
-    return step_order
-end
-
 
 """
     find_indexes(steps, own, target)
