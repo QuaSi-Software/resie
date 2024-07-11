@@ -121,10 +121,9 @@ function check_el_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_el_in"] == true
-        if (
-            unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing
+    if unit.controller.base_module.parameter["consider_m_el_in"] == true
+        if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
+            && unit.input_interfaces[unit.m_el_in].max_energy === nothing              # ...and none of them have had their potential step
         )
             return (Inf)
         else
@@ -147,12 +146,11 @@ function check_heat_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_heat_in"] == true
-        if (
-            unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
+    if unit.controller.base_module.parameter["consider_m_heat_in"] == true
+        if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
+             && unit.input_interfaces[unit.m_heat_in].max_energy === nothing             # ...and none of them have had their potential step
         )
-            return ([Inf], 
+            return ([Inf],
                     [unit.input_interfaces[unit.m_heat_in].temperature_min], 
                     [unit.input_interfaces[unit.m_heat_in].temperature_max]
                 )
@@ -179,17 +177,23 @@ function check_heat_out(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
+    if unit.controller.base_module.parameter["consider_m_heat_out"] == true
+        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
+            && unit.output_interfaces[unit.m_heat_out].max_energy === nothing               # ...and none of them have had their potential step
         )
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        temperature = temp_min_highest(exchanges)
-        if potential_energy_heat_out >= -sim_params["epsilon"]
-            return (0.0, temperature)
+            return (-Inf, unit.output_interfaces[unit.m_heat_out].temperature_min)
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_heat_out],
+                unit.output_interfaces[unit.m_heat_out].target
+            )
+            potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+            temperature = temp_min_highest(exchanges)  # as long as we dont have temperature layer in the output...
+            if potential_energy_heat_out >= -sim_params["epsilon"]
+                return (0.0, temperature)
+            end
+            return (potential_energy_heat_out, temperature)
         end
-        return (potential_energy_heat_out, temperature)
     else
         return (-Inf, nothing)
     end
@@ -212,6 +216,14 @@ function calculate_energies(
         in_temps_min,
         in_temps_max = check_heat_in(unit, sim_params)
     potential_energy_heat_out, out_temp = check_heat_out(unit, sim_params)
+
+    if unit.constant_cop === nothing && out_temp === nothing 
+        if unit.output_temperature === nothing
+            @error "Error: The output temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'output_temperature'."
+            exit()
+        end
+        out_temp = unit.output_temperature
+    end
 
     available_el_in = potential_energy_el
     available_heat_out = potential_energy_heat_out
@@ -346,6 +358,17 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
             sum(energies[3]; init=0.0),
             sum(energies[5]; init=0.0)
         )
+        set_temperature!(
+            unit.output_interfaces[unit.m_heat_out],
+            nothing,
+            energies[6]
+        )
+        # TODO
+        # set_temperature!(
+        #     unit.input_interfaces[unit.m_heat_in],
+        #     min(energies[4]),
+        #     nothing
+        # )
     end
 end
 

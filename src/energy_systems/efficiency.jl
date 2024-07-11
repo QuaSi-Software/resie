@@ -420,6 +420,13 @@ function check_el_out(
         return -Inf
     end
 
+    if (
+        unit.output_interfaces[unit.m_el_out].target.sys_function == sf_transformer
+        && unit.output_interfaces[unit.m_el_out].max_energy === nothing
+    )
+        return -Inf
+    end
+
     exchanges = balance_on(
         unit.output_interfaces[unit.m_el_out],
         unit.output_interfaces[unit.m_el_out].target
@@ -453,6 +460,13 @@ function check_h2_out(
         return -Inf
     end
 
+    if (
+        unit.output_interfaces[unit.m_h2_out].target.sys_function == sf_transformer
+        && unit.output_interfaces[unit.m_h2_out].max_energy === nothing
+    )
+        return -Inf
+    end
+
     exchanges = balance_on(
         unit.output_interfaces[unit.m_h2_out],
         unit.output_interfaces[unit.m_h2_out].target
@@ -483,6 +497,13 @@ function check_o2_out(
     sim_params::Dict{String,Any}
 )
     if !unit.controller.base_module.parameters["consider_m_o2_out"]
+        return -Inf
+    end
+
+    if (
+        unit.output_interfaces[unit.m_o2_out].target.sys_function == sf_transformer
+        && unit.output_interfaces[unit.m_o2_out].max_energy === nothing
+    )
         return -Inf
     end
 
@@ -529,6 +550,13 @@ function check_heat_out_impl(
     sim_params::Dict{String,Any}
 )
     if !unit.controller.base_module.parameters["consider_m_"*interface_name]
+        return -Inf
+    end
+
+    if (
+        unit.output_interfaces[medium].target.sys_function == sf_transformer
+        && unit.output_interfaces[medium].max_energy === nothing
+    )
         return -Inf
     end
 

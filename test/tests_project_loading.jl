@@ -8,8 +8,6 @@ using Resie.EnergySystems
     include("initialization/bus.jl")
     include("initialization/bus_merge.jl")
     include("initialization/profiles.jl")
-
-    include("order_of_operations/base_order.jl")
     include("order_of_operations/load_order_of_operation.jl")
     include("order_of_operations/bus_output_priorities.jl")
     include("order_of_operations/bus_to_bus.jl")
@@ -17,5 +15,6 @@ using Resie.EnergySystems
     include("order_of_operations/heat_pumps_wrong.jl")
     include("order_of_operations/reorderings.jl")
     include("order_of_operations/storage_loading_switch.jl")
-    include("order_of_operations/transformer_chains.jl")
+    include("order_of_operations/transformer_chains_ooo.jl")
+    include("order_of_operations/transformer_chains_utils.jl")
 end
