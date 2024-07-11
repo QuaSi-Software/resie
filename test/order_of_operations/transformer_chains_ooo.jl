@@ -9,7 +9,6 @@ function test_base_order()
     components_config = Dict{String,Any}(
         "TST_01_ELT_01_PVP" => Dict{String,Any}(
             "type" => "PVPlant",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
@@ -19,7 +18,6 @@ function test_base_order()
         "TST_01_HZG_01_DEM" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
@@ -28,7 +26,6 @@ function test_base_order()
         "TST_01_ELT_01_DEM" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 15000
@@ -36,7 +33,6 @@ function test_base_order()
         "TST_01_HZG_01_BUS" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_HZG_01_CHP",
@@ -52,7 +48,6 @@ function test_base_order()
         "TST_01_ELT_01_BUS" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELT_01_PVP",
@@ -70,35 +65,38 @@ function test_base_order()
         ),
         "TST_01_HZG_01_CHP" => Dict{String,Any}(
             "type" => "CHPP",
-            "control_refs" => ["TST_01_HZG_01_BFT"],
             "output_refs" => [
                 "TST_01_HZG_01_BUS",
                 "TST_01_ELT_01_BUS"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "storage_driven",
-                "high_threshold" => 0.9,
-                "low_threshold" => 0.2
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "storage_driven",
+                    "storage_uac" => "TST_01_HZG_01_BFT",
+                    "high_threshold" => 0.9,
+                    "low_threshold" => 0.2
+                )
+            ],
             "power_el" => 12500
         ),
         "TST_01_HZG_01_HTP" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => ["TST_01_HZG_01_BFT"],
             "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "storage_driven",
-                "high_threshold" => 0.5,
-                "low_threshold" => 0.1
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "storage_driven",
+                    "storage_uac" => "TST_01_HZG_01_BFT",
+                    "high_threshold" => 0.9,
+                    "low_threshold" => 0.2
+                )
+            ],
             "power_th" => 20000,
             "constant_cop" => 3.0
         ),
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_HZG_01_BUS"
             ],
@@ -107,23 +105,25 @@ function test_base_order()
         ),
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
-            "control_refs" => ["TST_01_ELT_01_PVP"],
             "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "economical_discharge",
-                "pv_threshold" => 0.15,
-                "min_charge" => 0.2,
-                "discharge_limit" => 0.05
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "economical_discharge",
+                    "pv_plant_uac" => "TST_01_ELT_01_PVP",
+                    "battery_uac" => "TST_01_ELT_01_BAT",
+                    "pv_threshold" => 0.15,
+                    "min_charge" => 0.2,
+                    "discharge_limit" => 0.05
+                ),
+            ],
             "capacity" => 10000,
             "load" => 5000
         ),
         "TST_01_HZG_01_GRI" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_HZG_01_CHP"
             ],
@@ -132,7 +132,6 @@ function test_base_order()
         "TST_01_HZG_02_SRC" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_HZG_01_HTP"
             ],
@@ -143,7 +142,6 @@ function test_base_order()
         "TST_01_ELT_01_GRI" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_ELT_01_BUS"
             ],
@@ -152,7 +150,6 @@ function test_base_order()
         "TST_01_ELT_01_GRO" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false
         )
@@ -227,7 +224,6 @@ function test_ooo_middle_bus()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -236,7 +232,6 @@ function test_ooo_middle_bus()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -245,7 +240,6 @@ function test_ooo_middle_bus()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -256,7 +250,6 @@ function test_ooo_middle_bus()
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_03"
             ],
@@ -267,7 +260,6 @@ function test_ooo_middle_bus()
         "TST_GRI_EL" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -277,13 +269,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 10,
             "min_power_fraction" => 0.0
@@ -292,13 +280,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 25,
             "min_power_fraction" => 0.0
@@ -307,13 +291,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 20,
             "min_power_fraction" => 0.0
@@ -322,13 +302,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -337,13 +313,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_06"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -352,13 +324,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
@@ -366,13 +334,9 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_08"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 70,
             "min_power_fraction" => 0.0
@@ -381,20 +345,15 @@ function test_ooo_middle_bus()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_EL"
@@ -417,7 +376,6 @@ function test_ooo_middle_bus()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -513,7 +471,6 @@ function test_ooo_middle_bus_different_order()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -522,7 +479,6 @@ function test_ooo_middle_bus_different_order()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -531,7 +487,6 @@ function test_ooo_middle_bus_different_order()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -542,7 +497,6 @@ function test_ooo_middle_bus_different_order()
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_03"
             ],
@@ -553,7 +507,6 @@ function test_ooo_middle_bus_different_order()
         "TST_GRI_EL" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -563,13 +516,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 10,
             "min_power_fraction" => 0.0
@@ -578,13 +527,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 25,
             "min_power_fraction" => 0.0
@@ -593,13 +538,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 20,
             "min_power_fraction" => 0.0
@@ -608,13 +549,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -623,13 +560,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_06"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -638,13 +571,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
@@ -652,13 +581,9 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_08"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 70,
             "min_power_fraction" => 0.0
@@ -667,20 +592,15 @@ function test_ooo_middle_bus_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_EL"
@@ -703,7 +623,6 @@ function test_ooo_middle_bus_different_order()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_04",
@@ -799,7 +718,6 @@ function test_ooo_middle_transformer()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -808,7 +726,6 @@ function test_ooo_middle_transformer()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 90,
@@ -817,7 +734,6 @@ function test_ooo_middle_transformer()
         "TST_GRI_O2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -826,7 +742,6 @@ function test_ooo_middle_transformer()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -836,7 +751,6 @@ function test_ooo_middle_transformer()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -844,39 +758,27 @@ function test_ooo_middle_transformer()
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02",
                 "TST_BUS_H2",
                 "TST_GRI_O2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "m_heat_ht_out" => "m_h_w_lt1",
             "output_temperature" => 45,
             "power_el" => 40000,
@@ -889,20 +791,15 @@ function test_ooo_middle_transformer()
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "min_power_fraction" => 0,
             "power_th" => 1500
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01"
@@ -920,7 +817,6 @@ function test_ooo_middle_transformer()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -938,7 +834,6 @@ function test_ooo_middle_transformer()
         "TST_BUS_H2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELY_01"
@@ -1017,7 +912,6 @@ function test_ooo_parallels()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -1026,7 +920,6 @@ function test_ooo_parallels()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH1"
             ],
@@ -1036,7 +929,6 @@ function test_ooo_parallels()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -1046,13 +938,9 @@ function test_ooo_parallels()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -1061,13 +949,9 @@ function test_ooo_parallels()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -1075,13 +959,9 @@ function test_ooo_parallels()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -1090,13 +970,9 @@ function test_ooo_parallels()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "min_power_fraction" => 0.0
         ),
@@ -1104,20 +980,15 @@ function test_ooo_parallels()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1500,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01"
@@ -1137,7 +1008,6 @@ function test_ooo_parallels()
         "TST_BUS_TH1" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -1155,7 +1025,6 @@ function test_ooo_parallels()
         "TST_BUS_TH2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -1239,7 +1108,6 @@ function test_ooo_parallels_different_order()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -1248,7 +1116,6 @@ function test_ooo_parallels_different_order()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH1"
             ],
@@ -1258,7 +1125,6 @@ function test_ooo_parallels_different_order()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -1268,13 +1134,9 @@ function test_ooo_parallels_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -1283,13 +1145,9 @@ function test_ooo_parallels_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -1297,13 +1155,9 @@ function test_ooo_parallels_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -1312,13 +1166,9 @@ function test_ooo_parallels_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "min_power_fraction" => 0.0
         ),
@@ -1326,20 +1176,15 @@ function test_ooo_parallels_different_order()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1500,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01"
@@ -1359,7 +1204,6 @@ function test_ooo_parallels_different_order()
         "TST_BUS_TH1" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -1377,7 +1221,6 @@ function test_ooo_parallels_different_order()
         "TST_BUS_TH2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_04",
@@ -1460,7 +1303,6 @@ function test_ooo_parallels_in_chain()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 70,
@@ -1469,7 +1311,6 @@ function test_ooo_parallels_in_chain()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 90,
@@ -1478,7 +1319,6 @@ function test_ooo_parallels_in_chain()
         "TST_DEM_03" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -1487,7 +1327,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_H2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -1496,7 +1335,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_O2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -1505,7 +1343,6 @@ function test_ooo_parallels_in_chain()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_00"
             ],
@@ -1516,7 +1353,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_00" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -1525,7 +1361,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -1534,7 +1369,6 @@ function test_ooo_parallels_in_chain()
         "TST_SRC_1b" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01b"
             ],
@@ -1544,7 +1378,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
@@ -1553,7 +1386,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_03" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_03"
             ],
@@ -1562,7 +1394,6 @@ function test_ooo_parallels_in_chain()
         "TST_GRI_04" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
@@ -1570,67 +1401,47 @@ function test_ooo_parallels_in_chain()
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01b"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
         ),
         "TST_HP_01b" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0,
             "input_temperature" => 60
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0,
             "input_temperature" => 70
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => [
                 "TST_DEM_03"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0,
             "input_temperature" => 70
@@ -1638,15 +1449,11 @@ function test_ooo_parallels_in_chain()
 
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_00",
                 "TST_GRI_H2",
                 "TST_GRI_O2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "m_heat_ht_out" => "m_h_w_lt1",
             "output_temperature" => 45,
             "power_el" => 40000,
@@ -1659,7 +1466,6 @@ function test_ooo_parallels_in_chain()
         "TST_BUS_00" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELY_01",
@@ -1678,7 +1484,6 @@ function test_ooo_parallels_in_chain()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_01b",
@@ -1789,7 +1594,6 @@ function test_ooo_parallels_in_a_row()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -1798,7 +1602,6 @@ function test_ooo_parallels_in_a_row()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH1"
             ],
@@ -1808,7 +1611,6 @@ function test_ooo_parallels_in_a_row()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -1818,13 +1620,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -1833,13 +1631,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 40,
             "min_power_fraction" => 0.0
@@ -1848,13 +1642,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 35,
             "min_power_fraction" => 0.0
@@ -1863,13 +1653,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "output_temperature" => 45,
             "min_power_fraction" => 0.0
@@ -1878,13 +1664,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_06"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "output_temperature" => 65,
             "min_power_fraction" => 0.0
@@ -1893,13 +1675,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH3"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "min_power_fraction" => 0.0
         ),
@@ -1907,13 +1685,9 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_08"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "output_temperature" => 75,
             "min_power_fraction" => 0.0
@@ -1922,20 +1696,15 @@ function test_ooo_parallels_in_a_row()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH3"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 600,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01"
@@ -1958,7 +1727,6 @@ function test_ooo_parallels_in_a_row()
         "TST_BUS_TH1" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -1975,7 +1743,6 @@ function test_ooo_parallels_in_a_row()
         "TST_BUS_TH2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -1994,7 +1761,6 @@ function test_ooo_parallels_in_a_row()
         "TST_BUS_TH3" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_06",
@@ -2094,7 +1860,6 @@ function test_ooo_connected_middle_busses()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -2103,7 +1868,6 @@ function test_ooo_connected_middle_busses()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 95,
@@ -2112,7 +1876,6 @@ function test_ooo_connected_middle_busses()
         "TST_DEM_03" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "constant_temperature" => 115,
@@ -2121,7 +1884,6 @@ function test_ooo_connected_middle_busses()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -2132,7 +1894,6 @@ function test_ooo_connected_middle_busses()
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_07"
             ],
@@ -2143,7 +1904,6 @@ function test_ooo_connected_middle_busses()
         "TST_GRI_EL" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -2153,13 +1913,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 10,
             "min_power_fraction" => 0.0
@@ -2168,13 +1924,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 25,
             "min_power_fraction" => 0.0
@@ -2183,13 +1935,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_04"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -2198,13 +1946,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
@@ -2212,13 +1956,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_06"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 45,
             "min_power_fraction" => 0.0
@@ -2227,13 +1967,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 55,
             "min_power_fraction" => 0.0
@@ -2242,13 +1978,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_08"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 35,
             "min_power_fraction" => 0.0
@@ -2257,13 +1989,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 60,
             "min_power_fraction" => 0.0
@@ -2272,13 +2000,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_10"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 80,
             "min_power_fraction" => 0.0
@@ -2287,13 +2011,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
@@ -2301,13 +2021,9 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_12"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 90,
             "min_power_fraction" => 0.0
@@ -2316,20 +2032,15 @@ function test_ooo_connected_middle_busses()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_03"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_EL"
@@ -2356,7 +2067,6 @@ function test_ooo_connected_middle_busses()
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02"
@@ -2373,7 +2083,6 @@ function test_ooo_connected_middle_busses()
         "TST_BUS_TH_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_06",
@@ -2493,7 +2202,6 @@ function test_ooo_connected_middle_transformer()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -2502,7 +2210,6 @@ function test_ooo_connected_middle_transformer()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 90,
@@ -2511,7 +2218,6 @@ function test_ooo_connected_middle_transformer()
         "TST_GRI_O2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -2520,7 +2226,6 @@ function test_ooo_connected_middle_transformer()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -2529,7 +2234,6 @@ function test_ooo_connected_middle_transformer()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -2538,7 +2242,6 @@ function test_ooo_connected_middle_transformer()
         "TST_GRI_NG" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -2548,13 +2251,9 @@ function test_ooo_connected_middle_transformer()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 50,
             "min_power_fraction" => 0.0
@@ -2563,27 +2262,19 @@ function test_ooo_connected_middle_transformer()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01",
                 "TST_BUS_H2",
                 "TST_GRI_O2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "m_heat_ht_out" => "m_h_w_lt1",
             "output_temperature" => 45,
             "power_el" => 40000,
@@ -2596,35 +2287,25 @@ function test_ooo_connected_middle_transformer()
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "min_power_fraction" => 0,
             "power_th" => 1500
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-                "load_storages" => false
-            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -2645,7 +2326,6 @@ function test_ooo_connected_middle_transformer()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -2663,7 +2343,6 @@ function test_ooo_connected_middle_transformer()
         "TST_BUS_H2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELY_01"
@@ -2750,7 +2429,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -2759,7 +2437,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 90,
@@ -2768,7 +2445,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_GRI_O2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_01_ELY_01"
             ],
@@ -2777,7 +2453,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -2786,7 +2461,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -2795,7 +2469,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_SRC_01" => Dict{String,Any}(
         "type" => "BoundedSupply",
         "medium" => "m_h_w_lt1",
-        "control_refs"  => [],
         "output_refs" => ["TST_HP_03"],
         "constant_temperature" => 20,
         "constant_power" => 100000
@@ -2803,7 +2476,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_GRI_NG" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -2813,13 +2485,9 @@ function test_ooo_connected_middle_transformer_variant()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "output_temperature" => 50,
             "min_power_fraction" => 0.0
@@ -2828,13 +2496,9 @@ function test_ooo_connected_middle_transformer_variant()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0
         ),
@@ -2842,27 +2506,19 @@ function test_ooo_connected_middle_transformer_variant()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "min_power_fraction" => 0.0
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01",
                 "TST_BUS_H2",
                 "TST_GRI_O2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "m_heat_ht_out" => "m_h_w_lt1",
             "output_temperature" => 45,
             "power_el" => 40000,
@@ -2875,35 +2531,31 @@ function test_ooo_connected_middle_transformer_variant()
         "ESS_FBH2_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH2"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "min_power_fraction" => 0,
             "power_th" => 1500
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-                "load_storages" => false
-            ),
+            "control_modules" => [
+                Dict{String,Any}(
+                    "name" => "default",
+                    "load_storages m_h_w_ht1" => false
+                ),
+            ],
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -2925,7 +2577,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -2943,7 +2594,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_BUS_TH2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "ESS_FBH2_01",
@@ -2961,7 +2611,6 @@ function test_ooo_connected_middle_transformer_variant()
         "TST_BUS_H2" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_01_ELY_01"
@@ -3058,7 +2707,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -3067,7 +2715,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -3077,7 +2724,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3086,7 +2732,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3095,7 +2740,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_GRI_natgas" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -3105,13 +2749,9 @@ function test_ooo_circle_grid_input_denied()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -3119,21 +2759,16 @@ function test_ooo_circle_grid_input_denied()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -3152,7 +2787,6 @@ function test_ooo_circle_grid_input_denied()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_01",
@@ -3223,7 +2857,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -3232,7 +2865,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -3242,7 +2874,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3251,7 +2882,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3260,7 +2890,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_GRI_natgas" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -3270,13 +2899,9 @@ function test_ooo_circle_grid_input_allowed()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -3284,21 +2909,16 @@ function test_ooo_circle_grid_input_allowed()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -3317,7 +2937,6 @@ function test_ooo_circle_grid_input_allowed()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_01",
@@ -3390,7 +3009,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -3399,7 +3017,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -3409,7 +3026,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3418,7 +3034,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3427,7 +3042,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_GRI_natgas" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -3437,13 +3051,9 @@ function test_ooo_circle_middle_transformer_input()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "output_temperature" => 65,
             "min_power_fraction" => 0.0
@@ -3452,13 +3062,9 @@ function test_ooo_circle_middle_transformer_input()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -3467,21 +3073,16 @@ function test_ooo_circle_middle_transformer_input()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -3501,7 +3102,6 @@ function test_ooo_circle_middle_transformer_input()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_02",
@@ -3575,7 +3175,6 @@ function test_ooo_circle_variant()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -3584,7 +3183,6 @@ function test_ooo_circle_variant()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -3594,7 +3192,6 @@ function test_ooo_circle_variant()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3603,7 +3200,6 @@ function test_ooo_circle_variant()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3612,7 +3208,6 @@ function test_ooo_circle_variant()
         "TST_GRI_natgas_1" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -3621,7 +3216,6 @@ function test_ooo_circle_variant()
         "TST_GRI_natgas_2" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_02"
             ],
@@ -3631,13 +3225,9 @@ function test_ooo_circle_variant()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_lt1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -3645,14 +3235,10 @@ function test_ooo_circle_variant()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 500,
             "min_power_fraction" => 0.0
         ),
@@ -3660,21 +3246,16 @@ function test_ooo_circle_variant()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 120000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -3695,7 +3276,6 @@ function test_ooo_circle_variant()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_01",
@@ -3776,7 +3356,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 85,
@@ -3785,7 +3364,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature" => 50,
@@ -3794,7 +3372,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_01"
             ],
@@ -3804,7 +3381,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_GRI_natgas" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_natgas",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_CHP_01"
             ],
@@ -3813,7 +3389,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3822,7 +3397,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "input_refs" => [
                 "TST_BUS_EL"
             ],
@@ -3830,13 +3404,9 @@ function test_ooo_circle_middle_transformer_interconnections()
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 1200,
             "min_power_fraction" => 0.0
         ),
@@ -3844,13 +3414,9 @@ function test_ooo_circle_middle_transformer_interconnections()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "input_temperature" => 30,
             "min_power_fraction" => 0.0
@@ -3859,13 +3425,9 @@ function test_ooo_circle_middle_transformer_interconnections()
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_DEM_01"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_th" => 9000,
             "input_temperature" => 50,
             "min_power_fraction" => 0.0
@@ -3874,21 +3436,16 @@ function test_ooo_circle_middle_transformer_interconnections()
             "type" => "CHPP",
             "m_fuel_in" => "m_c_natgas",
             "m_heat_out" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_HP_02",
                 "TST_BUS_EL"
             ],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_CHP_01",
@@ -3909,7 +3466,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_BUS_TH" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_HP_01",
@@ -3931,7 +3487,6 @@ function test_ooo_circle_middle_transformer_interconnections()
         "TST_BFT_TH_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_TH"
             ],
