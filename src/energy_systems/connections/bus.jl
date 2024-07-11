@@ -661,6 +661,15 @@ function balance_on(
                 energy_pot = -Inf
             end
 
+            # target is transformer that has not been calculated its potential or process
+            if (input_row.source.sys_function === EnergySystems.sf_transformer
+                && output_row.target.sys_function === EnergySystems.sf_transformer
+                && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].max_energy === nothing
+                && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].sum_abs_change == 0.0
+            )
+                energy_pot = -Inf
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=output_row.target.uac,
@@ -691,6 +700,15 @@ function balance_on(
                 energy_pot = Inf
             end
 
+            # source is transformer that has not been calculated its potential or process
+            if (output_row.target.sys_function === EnergySystems.sf_transformer
+                && input_row.source.sys_function === EnergySystems.sf_transformer
+                && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].max_energy === nothing
+                && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].sum_abs_change == 0.0
+            )
+                energy_pot = Inf
+            end
+
             push!(return_exchanges, EnEx(
                 balance=0.0,
                 uac=input_row.source.uac,
@@ -718,6 +736,7 @@ other purpose.
 `unit::Bus`: The bus for which to calculate energy distribution
 """
 function inner_distribute!(unit::Bus)
+    reset_balance_table!(unit::Bus, false)
     continue_iteration = true
 
     for input_row in sort(collect(values(unit.balance_table_inputs)), by=x->x.priority)
