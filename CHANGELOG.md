@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.11
+* Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
+
 ### Version 0.8.10
 * Major refactoring of the determination of the correct order of operation for transformer potential and process steps. Now, the order of operation for complex energy systems with branched transformer chains across busses can be determined automatically and these energy systems can be simulated. See the documentation for limitations and further details.
 * Improve bus functionalities and efficiency calculations to allow the handling of branched transformer chains
