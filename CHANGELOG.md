@@ -4,6 +4,13 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.10
+* Major refactoring of the determination of the correct order of operation for transformer potential and process steps. Now, the order of operation for complex energy systems with branched transformer chains across busses can be determined automatically and these energy systems can be simulated. See the documentation for limitations and further details.
+* Improve bus functionalities and efficiency calculations to allow the handling of branched transformer chains
+* Add multiple tests to ensure the correct determination of the order of operation
+* Set new reference results for all scenarios
+* Add "is_first_timestep" to sim_params to be available for all components
+  
 ### Version 0.8.9
 * Add implementation for generic heat sources such as river water, lake water, waste water, atmosphere, industrial processes or one-way connections to a heat network. The main difference to a generic bounded supply is an option to include a temperature reduction caused by heat exchangers.
 * Add scenario reversive_heat_pump to highlight open issues with the operation of a single heat pump for both heating and cooling with a seasonal heat storage
