@@ -467,6 +467,31 @@ function lowest(
 end
 
 """
+    lowest(temperature_vector::Vector{Temperature})::Temperature
+
+Returns the lowest temperature of a vector of temperatures and handles nothing-values:
+- If all of the inputs are floats, the minimum will be returned.
+- If some of the inputs are nothing and the others are float, the lowest float will be returned.
+- If all of the inputs are nothing, nothing will be returned.
+"""
+function lowest(temperature_vector::Vector{Temperature})::Temperature
+    n_temperatures = length(temperature_vector)
+    if n_temperatures == 0
+        return nothing
+    elseif n_temperatures == 1
+        return temperature_vector[1]
+    else 
+        current_lowest = lowest(temperature_vector[1], temperature_vector[2])
+        if n_temperatures > 2
+            for idx in 3:n_temperatures
+                current_lowest = highest(current_lowest, temperature_vector[idx])
+            end
+        end
+        return current_lowest
+    end
+end
+
+"""
 Convenience type used define the required system interfaces of a component.
 
 To simultaneously define what is required and then hold references to instances after the
