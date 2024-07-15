@@ -83,6 +83,12 @@ Base type for control modules.
 """
 abstract type ControlModule end
 
+@enum ControlModuleFunction begin
+    cmf_upper_plr_limit
+    cmf_charge_is_allowed
+    cmf_discharge_is_allowed
+end
+
 """
 Wraps around the mechanism of control for the operation strategy of a Component.
 """
@@ -114,23 +120,37 @@ function update(controller::Controller)
     end
 end
 
+function has_method_for(mod::ControlModule, func::ControlModuleFunction)::Bool
+    return false # no default implementation
+end
+
+function filter(list::Vector{ControlModule}, criterium::ControlModuleFunction)
+    return (mod for mod in list if has_method_for(mod, criterium))
+end
+
 function upper_plr_limit(
     controller::Controller,
     sim_params::Dict{String,Any}
 )::Float64
     if length(controller.modules) > 0
-        return Base.maximum(upper_plr_limit(mod, sim_params) for mod in controller.modules)
+        return Base.maximum(upper_plr_limit(mod, sim_params) for mod in filter(
+            controller.modules, cmf_upper_plr_limit
+        ))
     else
         return 1.0
     end
 end
 
 function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    return all(charge_is_allowed(mod, sim_params) for mod in controller.modules)
+    return all(charge_is_allowed(mod, sim_params) for mod in filter(
+        controller.modules, cmf_charge_is_allowed
+    ))
 end
 
 function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    return all(discharge_is_allowed(mod, sim_params) for mod in controller.modules)
+    return all(discharge_is_allowed(mod, sim_params) for mod in filter(
+        controller.modules, cmf_discharge_is_allowed
+    ))
 end
 
 """

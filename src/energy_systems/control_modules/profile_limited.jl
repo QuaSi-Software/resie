@@ -26,6 +26,10 @@ mutable struct CM_ProfileLimited <: ControlModule
     end
 end
 
+function has_method_for(mod::CM_ProfileLimited, func::ControlModuleFunction)::Bool
+    return func == cmf_upper_plr_limit
+end
+
 function update(mod::CM_ProfileLimited)
     # nothing to do
 end

@@ -78,6 +78,10 @@ mutable struct CM_StorageDriven <: ControlModule
     end
 end
 
+function has_method_for(mod::CM_StorageDriven, func::ControlModuleFunction)::Bool
+    return func == cmf_upper_plr_limit
+end
+
 function update(mod::CM_StorageDriven)
     move_state(mod.state_machine)
 end

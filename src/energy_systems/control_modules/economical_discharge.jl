@@ -90,6 +90,11 @@ mutable struct CM_EconomicalDischarge <: ControlModule
     end
 end
 
+function has_method_for(mod::CM_EconomicalDischarge, func::ControlModuleFunction)::Bool
+    return func == cmf_charge_is_allowed ||
+        func == cmf_discharge_is_allowed
+end
+
 function update(mod::CM_EconomicalDischarge)
     move_state(mod.state_machine)
 end
