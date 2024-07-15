@@ -94,10 +94,13 @@ function update(mod::CM_EconomicalDischarge)
     move_state(mod.state_machine)
 end
 
-function charge_is_allowed(mod::CM_EconomicalDischarge, sim_params::Dict{String,Any})
+function charge_is_allowed(mod::CM_EconomicalDischarge, sim_params::Dict{String,Any})::Bool
     return mod.state_machine.state == 1
 end
 
-function discharge_is_allowed(mod::CM_EconomicalDischarge, sim_params::Dict{String,Any})
+function discharge_is_allowed(
+    mod::CM_EconomicalDischarge,
+    sim_params::Dict{String,Any}
+)::Bool
     return mod.state_machine.state == 2
 end

@@ -82,6 +82,6 @@ function update(mod::CM_StorageDriven)
     move_state(mod.state_machine)
 end
 
-function upper_plr_limit(mod::CM_StorageDriven, sim_params::Dict{String,Any})
+function upper_plr_limit(mod::CM_StorageDriven, sim_params::Dict{String,Any})::Float64
     return mod.state_machine.state == 2 ? 1.0 : 0.0
 end

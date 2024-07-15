@@ -30,6 +30,6 @@ function update(mod::CM_ProfileLimited)
     # nothing to do
 end
 
-function upper_plr_limit(mod::CM_ProfileLimited, sim_params::Dict{String,Any})
+function upper_plr_limit(mod::CM_ProfileLimited, sim_params::Dict{String,Any})::Float64
     return value_at_time(mod.profile, sim_params["time"])
 end

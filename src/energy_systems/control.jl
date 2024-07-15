@@ -125,11 +125,11 @@ function upper_plr_limit(
     end
 end
 
-function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})
+function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
     return all(charge_is_allowed(mod, sim_params) for mod in controller.modules)
 end
 
-function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})
+function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
     return all(discharge_is_allowed(mod, sim_params) for mod in controller.modules)
 end
 
