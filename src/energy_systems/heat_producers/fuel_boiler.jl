@@ -67,7 +67,7 @@ mutable struct FuelBoiler <: Component
 
         return new(
             uac,
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_transformer,
             InterfaceMap(
                 m_fuel_in => nothing

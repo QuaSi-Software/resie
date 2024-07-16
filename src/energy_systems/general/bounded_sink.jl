@@ -36,7 +36,7 @@ mutable struct BoundedSink <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

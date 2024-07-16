@@ -93,14 +93,30 @@ end
 Wraps around the mechanism of control for the operation strategy of a Component.
 """
 mutable struct Controller
+    parameters::Dict{String,Any}
     base_module::Union{Nothing,ControlModule}
     modules::Vector{ControlModule}
+
+    function Controller(config::Union{Nothing,Dict{String,Any}})::Controller
+        return new(
+            Base.merge( # parameters
+                Dict{String,Any}(
+                    "aggregation_plr_limit" => "max",
+                    "aggregation_charge" => "all",
+                    "aggregation_discharge" => "all",
+                ),
+                config === nothing ? Dict{String,Any}() : config
+            ),
+            nothing, # base_module
+            [] # modules
+        )
+    end
 end
 
 """
-Default constructor with empty fields.
+Default constructor with empty modules fields and only default parameters.
 """
-Controller() = Controller(nothing, [])
+Controller() = Controller(nothing)
 
 function load_storages(controller::Controller, medium::Symbol)::Bool
     return default(

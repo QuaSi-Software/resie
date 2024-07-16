@@ -24,7 +24,7 @@ mutable struct Storage <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 medium => nothing

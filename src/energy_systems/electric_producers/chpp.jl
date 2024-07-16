@@ -75,7 +75,7 @@ mutable struct CHPP <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_fuel_in => nothing

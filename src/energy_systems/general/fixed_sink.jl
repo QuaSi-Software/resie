@@ -39,7 +39,7 @@ mutable struct FixedSink <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_fixed_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

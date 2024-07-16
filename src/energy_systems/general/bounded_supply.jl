@@ -36,7 +36,7 @@ mutable struct BoundedSupply <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces

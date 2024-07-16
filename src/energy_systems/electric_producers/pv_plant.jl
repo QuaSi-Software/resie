@@ -31,7 +31,7 @@ mutable struct PVPlant <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_fixed_source, # sys_function
             InterfaceMap(), # input_interfaces
             InterfaceMap( # output_interfaces

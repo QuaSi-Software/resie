@@ -105,7 +105,7 @@ mutable struct GeothermalProbes <: Component
     
         return new(
             uac,                     # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             sf_storage,              # sys_function
             InterfaceMap(            # input_interfaces
                 m_heat_in => nothing

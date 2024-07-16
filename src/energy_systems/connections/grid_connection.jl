@@ -26,7 +26,7 @@ mutable struct GridConnection <: Component
 
         return new(
             uac, # uac
-            Controller(),
+            Controller(default(config, "control_parameters", nothing)),
             if Bool(config["is_source"])
                 sf_bounded_source
             else

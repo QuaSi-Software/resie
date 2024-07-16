@@ -172,7 +172,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
 
     return Bus(
         uac, # uac
-        Controller(),
+        Controller(default(config, "control_parameters", nothing)),
         sf_bus, # sys_function
         medium, # medium
         [], # input_interfaces
@@ -208,7 +208,7 @@ function Bus(
 )
     return Bus(
         uac,
-        Controller(),
+        Controller(nothing),
         sf_bus,
         medium,
         [], # input_interfaces
