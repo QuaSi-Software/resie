@@ -140,33 +140,61 @@ function has_method_for(mod::ControlModule, func::ControlModuleFunction)::Bool
     return false # no default implementation
 end
 
-function filter(list::Vector{ControlModule}, criterium::ControlModuleFunction)
-    return (mod for mod in list if has_method_for(mod, criterium))
-end
-
-function upper_plr_limit(
-    controller::Controller,
-    sim_params::Dict{String,Any}
-)::Float64
-    if length(controller.modules) > 0
-        return Base.maximum(upper_plr_limit(mod, sim_params) for mod in filter(
-            controller.modules, cmf_upper_plr_limit
-        ))
-    else
+function upper_plr_limit(controller::Controller, sim_params::Dict{String,Any})::Float64
+    limits = collect(
+        upper_plr_limit(mod, sim_params)
+        for mod in controller.modules
+        if has_method_for(mod, cmf_upper_plr_limit)
+    )
+    if length(limits) == 0
         return 1.0
     end
+
+    if controller.parameters["aggregation_plr_limit"] == "max"
+        return Base.maximum(limits)
+    elseif controller.parameters["aggregation_plr_limit"] == "min"
+        return Base.minimum(limits)
+    end
+
+    return 1.0
 end
 
 function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    return all(charge_is_allowed(mod, sim_params) for mod in filter(
-        controller.modules, cmf_charge_is_allowed
-    ))
+    flags = collect(
+        charge_is_allowed(mod, sim_params)
+        for mod in controller.modules
+        if has_method_for(mod, cmf_charge_is_allowed)
+    )
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_charge"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_charge"] == "any"
+        return any(flags)
+    end
+
+    return true
 end
 
 function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    return all(discharge_is_allowed(mod, sim_params) for mod in filter(
-        controller.modules, cmf_discharge_is_allowed
-    ))
+    flags = collect(
+        discharge_is_allowed(mod, sim_params)
+        for mod in controller.modules
+        if has_method_for(mod, cmf_discharge_is_allowed)
+    )
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_discharge"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_discharge"] == "any"
+        return any(flags)
+    end
+
+    return true
 end
 
 """
