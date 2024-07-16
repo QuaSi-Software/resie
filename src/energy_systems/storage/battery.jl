@@ -2,10 +2,7 @@
 Implementation of a battery component holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
-parameters (its capacity).
-
-Implements a strategy that toggles the unloading of the battery dependent on available PV
-power and its own charge.
+parameter (its capacity).
 """
 Base.@kwdef mutable struct Battery <: Component
     uac::String

@@ -1,7 +1,7 @@
 """
 Implementation of an electrolyser, turning electricity and pure water into H2, O2 and heat.
 
-At time of writing only pure water hydrolysis electrolysers are supported as they are the
+At time of writing only electrolysers splitting pure water are supported as they are the
 most relevant technology at time of writing. The produced heat has a high temperature output
 (depending on technology 50-65 °C) and an optional low temperature output (25-35 °C), which
 is more difficult to utilise in reality as this is waste heat from cooling power electronics

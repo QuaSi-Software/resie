@@ -1,11 +1,8 @@
 """
 Implementation of a photovoltaic (PV) power plant.
 
-For the moment this remains a simple implementation approximating a PV plant with a sinoid
-function. As the calculation of potential PV power is done outside the simulation by a
-seperate tool, a proper implemention would mostly just load a profile and consider only
-some system losses. The amplitude parameter is a scaling factor, but is not an average
-power value.
+No calculation of power is happening here, this is mostly just a wrapper around a yield
+profile that must be calculated before a simulation and be imported.
 """
 mutable struct PVPlant <: Component
     uac::String
