@@ -12,7 +12,7 @@ mutable struct CM_ProfileLimited <: ControlModule
         sim_params::Dict{String,Any}
     )
         default_parameters=Dict{String,Any}(
-            "name" => "default",
+            "name" => "profile_limited",
             "profile_path" => nothing
         )
         params = Base.merge(default_parameters, parameters)
@@ -22,7 +22,7 @@ mutable struct CM_ProfileLimited <: ControlModule
         end
         profile = Profile(params["profile_path"], sim_params)
 
-        return new("default", params, profile)
+        return new("profile_limited", params, profile)
     end
 end
 

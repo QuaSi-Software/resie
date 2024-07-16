@@ -16,7 +16,7 @@ mutable struct CM_EconomicalDischarge <: ControlModule
         sim_params::Dict{String,Any}
     )
         default_parameters=Dict{String,Any}(
-            "name" => "storage_driven",
+            "name" => "economical_discharge",
             "pv_threshold" => 1.0, # [Wh], a value of 1.0 essentially requires that the PV
             "min_charge" => 0.2,   # plant produces (almost) no power at all
             "discharge_limit" => 0.05,
