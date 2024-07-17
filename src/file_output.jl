@@ -219,7 +219,14 @@ function output_keys(
             if length(splitted) > 1
                 medium_key = splitted[1]
                 medium = Symbol(String(medium_key))
-                value_key = splitted[2]
+                if medium in EnergySystems.medium_categories
+                    value_key = splitted[2]
+                else
+                    @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an output key. 
+Make sure that the medium \"$medium\" exists and that you have not used spaces accidentally. 
+Spaces are only allowed if you want to specify an output channel of a specific medium!"
+                    throw(InputError)
+                end
             else
                 medium = nothing
                 value_key = splitted[1]
