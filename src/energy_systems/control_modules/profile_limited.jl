@@ -1,5 +1,5 @@
 """
-
+Control module for setting limits to the PLR of a component according to a profile.
 """
 mutable struct CM_ProfileLimited <: ControlModule
     name::String

@@ -1,9 +1,6 @@
 """
-# strt_desc_economical_discharge = Economical discharge
-# ------------------------
-# Discharges a battery when a linked PV plant produces little power and the battery has
-# sufficient charge to provide substantial amounts of energy.
-# 
+Control module for controlling the discharge of a battery depending on if it has a suffcient
+amount of charge and if a linked PV plant produces power below a certain threshold.
 """
 mutable struct CM_EconomicalDischarge <: ControlModule
     name::String

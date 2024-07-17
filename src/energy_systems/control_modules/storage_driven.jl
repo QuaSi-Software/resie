@@ -1,10 +1,9 @@
-
-# strt_desc_storage_driven = """Storage-driven
-# ------------------------
-# Run a component depending on the state of a linked thermal buffer tank. In particular
-# this strategy enables processing when the tank has fallen below a certain threshold and
-# disables it when the tank has reached another threshold.
-# """
+"""
+Control module for running a component depending on the state of a linked storage component.
+In particular it switches to a state of allowing operation of the component when the load
+of the linked storage falls below the lower threshold. The module stays in this state until
+the load has reached the upper threshold and the minimum run time has passed.
+"""
 
 mutable struct CM_StorageDriven <: ControlModule
     name::String
