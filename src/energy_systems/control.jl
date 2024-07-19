@@ -163,6 +163,16 @@ mutable struct Controller
                     "aggregation_plr_limit" => "max",
                     "aggregation_charge" => "all",
                     "aggregation_discharge" => "all",
+                    "consider_m_el_in" => true,
+                    "consider_m_el_out" => true,
+                    "consider_m_gas_in" => true,
+                    "consider_m_fuel_in" => true,
+                    "consider_m_h2_out" => true,
+                    "consider_m_o2_out" => true,
+                    "consider_m_heat_out" => true,
+                    "consider_m_heat_ht_out" => true,
+                    "consider_m_heat_lt_out" => true,
+                    "consider_m_heat_in" => true
                 ),
                 config === nothing ? Dict{String,Any}() : config
             ),

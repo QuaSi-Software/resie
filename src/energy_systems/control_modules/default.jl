@@ -2,8 +2,6 @@
 Default control module that all components have. If no module is specified in the component
 config, this module is initialised with default-only parameters. Supports several mechanisms
 of controlling operation, including:
-  * Setting specific inputs or outputs to be assumed infinite when calculating the energies
-    that can be utilised in a time step
   * Defining for any input or output if the energy supplied/requested over that interface is
     allowed to be used for un-/loading storage components
 """
@@ -18,16 +16,6 @@ mutable struct CM_Default <: ControlModule
     )
         default_parameters=Dict{String,Any}(
             "name" => "default",
-            "consider_m_el_in" => true,
-            "consider_m_el_out" => true,
-            "consider_m_gas_in" => true,
-            "consider_m_fuel_in" => true,
-            "consider_m_h2_out" => true,
-            "consider_m_o2_out" => true,
-            "consider_m_heat_out" => true,
-            "consider_m_heat_ht_out" => true,
-            "consider_m_heat_lt_out" => true,
-            "consider_m_heat_in" => true
         )
 
         return new(

@@ -178,7 +178,7 @@ function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
             load_storages(unit.controller, unit.m_heat_lt_out)
         )
     else
-        unit.controller.base_module.parameters["consider_m_heat_lt_out"] = false
+        unit.controller.parameters["consider_m_heat_lt_out"] = false
     end
 
     set_storage_transfer!(

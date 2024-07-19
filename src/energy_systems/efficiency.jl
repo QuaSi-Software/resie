@@ -338,7 +338,7 @@ function check_fuel_in(
     unit::Union{CHPP,FuelBoiler},
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_fuel_in"]
+    if !unit.controller.parameters["consider_m_fuel_in"]
         return Inf
     end
 
@@ -377,7 +377,7 @@ function check_el_in(
     unit::Electrolyser,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_el_in"]
+    if !unit.controller.parameters["consider_m_el_in"]
         return Inf
     end
 
@@ -416,7 +416,7 @@ function check_el_out(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_el_out"]
+    if !unit.controller.parameters["consider_m_el_out"]
         return -Inf
     end
 
@@ -456,7 +456,7 @@ function check_h2_out(
     unit::Electrolyser,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_h2_out"]
+    if !unit.controller.parameters["consider_m_h2_out"]
         return -Inf
     end
 
@@ -496,7 +496,7 @@ function check_o2_out(
     unit::Electrolyser,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_o2_out"]
+    if !unit.controller.parameters["consider_m_o2_out"]
         return -Inf
     end
 
@@ -549,7 +549,7 @@ function check_heat_out_impl(
     output_temperature::Floathing,
     sim_params::Dict{String,Any}
 )
-    if !unit.controller.base_module.parameters["consider_m_"*interface_name]
+    if !unit.controller.parameters["consider_m_"*interface_name]
         return -Inf
     end
 

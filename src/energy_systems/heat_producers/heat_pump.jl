@@ -121,7 +121,7 @@ function check_el_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_el_in"] == true
+    if unit.controller.parameters["consider_m_el_in"] == true
         if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
             && unit.input_interfaces[unit.m_el_in].max_energy === nothing              # ...and none of them have had their potential step
         )
@@ -146,7 +146,7 @@ function check_heat_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_heat_in"] == true
+    if unit.controller.parameters["consider_m_heat_in"] == true
         if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
              && unit.input_interfaces[unit.m_heat_in].max_energy === nothing             # ...and none of them have had their potential step
         )
@@ -177,7 +177,7 @@ function check_heat_out(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.base_module.parameters["consider_m_heat_out"] == true
+    if unit.controller.parameters["consider_m_heat_out"] == true
         if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
             && unit.output_interfaces[unit.m_heat_out].max_energy === nothing               # ...and none of them have had their potential step
         )
