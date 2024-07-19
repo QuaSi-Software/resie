@@ -192,12 +192,9 @@
             "output_refs": [
                 "ESS_BUS_TH_02"
             ],
-            "control_modules": [
-                {
-                    "name": "default",
-                    "load_storages m_h_w_ht1": false
-                }
-            ],
+            "control_parameters": {
+                "load_storages m_h_w_ht1": false
+            },
             "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
@@ -207,12 +204,9 @@
             "output_refs": [
                 "ESS_BUS_TH_03"
             ],
-            "control_modules": [
-                {
-                    "name": "default",
-                    "load_storages m_h_w_ht1": false
-                }
-            ],
+            "control_parameters": {
+                "load_storages m_h_w_ht1": false
+            },
             "medium": "m_h_w_ht1",
             "capacity": 4000,
             "load": 2000
@@ -222,12 +216,9 @@
             "output_refs": [
                 "ESS_BUS_TH_01"
             ],
-            "control_modules": [
-                {
-                    "name": "default",
-                    "load_storages m_h_w_ht1": false
-                }
-            ],
+            "control_parameters": {
+                "load_storages m_h_w_ht1": false
+            },
             "medium": "m_h_w_ht1",
             "capacity": 15000,
             "load": 7000

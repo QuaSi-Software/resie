@@ -2544,12 +2544,9 @@ function test_ooo_connected_middle_transformer_variant()
                 "TST_BUS_TH",
                 "TST_BUS_EL"
             ],
-            "control_modules" => [
-                Dict{String,Any}(
-                    "name" => "default",
-                    "load_storages m_h_w_ht1" => false
-                ),
-            ],
+            "control_parameters" => Dict{String,Any}(
+                "load_storages m_h_w_ht1" => false
+            ),
             "power_el" => 250000,
             "min_power_fraction" => 0.0
         ),

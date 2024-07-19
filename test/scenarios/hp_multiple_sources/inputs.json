@@ -130,12 +130,9 @@
         "TST_SRC_01": {
             "type": "GenericHeatSource",
             "medium": "m_h_w_lt1",
-            "control_modules": [
-                {
-                    "name": "default",
-                    "load_storages m_h_w_lt1": false
-                }
-            ],
+            "control_parameters": {
+                "load_storages m_h_w_lt1": false
+            },
             "output_refs": [
                 "TST_BUS_TH_01"
             ],

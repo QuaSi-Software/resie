@@ -190,8 +190,8 @@ Controller() = Controller(nothing)
 """
 Returns if the given medium is configured to be allowed to load storages.
 
-This checks if the corresponding parameter is set in the default control module and is set
-to true. The default behaviour is to allow storage loading.
+This checks if the corresponding parameter is set and is set to true. The default behaviour
+is to allow storage loading.
 
 # Arguments
 - `controller::Controller`: The controller of the component
@@ -201,15 +201,15 @@ to true. The default behaviour is to allow storage loading.
 """
 function load_storages(controller::Controller, medium::Symbol)::Bool
     return default(
-        controller.base_module.parameters, "load_storages " * String(medium), true
+        controller.parameters, "load_storages " * String(medium), true
     )
 end
 
 """
 Returns if the given medium is configured to be allowed to unload storages.
 
-This checks if the corresponding parameter is set in the default control module and is set
-to true. The default behaviour is to allow storage unloading.
+This checks if the corresponding parameter is set and is set to true. The default behaviour
+is to allow storage unloading.
 
 # Arguments
 - `controller::Controller`: The controller of the component
@@ -219,7 +219,7 @@ to true. The default behaviour is to allow storage unloading.
 """
 function unload_storages(controller::Controller, medium::Symbol)::Bool
     return default(
-        controller.base_module.parameters, "unload_storages " * String(medium), true
+        controller.parameters, "unload_storages " * String(medium), true
     )
 end
 
