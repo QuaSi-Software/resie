@@ -907,7 +907,6 @@ include("efficiency.jl")
 # definitions
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
 
-include("control_modules/default.jl")
 include("control_modules/economical_discharge.jl")
 include("control_modules/profile_limited.jl")
 include("control_modules/storage_driven.jl")

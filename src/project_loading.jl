@@ -82,11 +82,7 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         # TODO: rewrite this for automatic selection of modules so they don't need to be
         # registered here, compare automatic selection of component class
         for module_config in default(entry, "control_modules", [])
-            if lowercase(module_config["name"]) === "default"
-                unit.controller.base_module = EnergySystems.CM_Default(
-                    module_config, components, sim_params
-                )
-            elseif lowercase(module_config["name"]) === "economical_discharge"
+            if lowercase(module_config["name"]) === "economical_discharge"
                 push!(
                     unit.controller.modules,
                     EnergySystems.CM_EconomicalDischarge(
@@ -104,10 +100,6 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
                     EnergySystems.CM_StorageDriven(module_config, components, sim_params)
                 )
             end
-        end
-
-        if unit.controller.base_module === nothing
-            unit.controller.base_module = EnergySystems.CM_Default()
         end
     end
 

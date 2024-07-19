@@ -148,12 +148,10 @@ end
 """
 Wraps around the mechanism of control for the operational strategy of a Component.
 
-Contains parameters and control modules, one of which is of type CM_Default, as this holds
-certain parameters applicable to all component types.
+Holds general parameters of control and acts as container for control modules.
 """
 mutable struct Controller
     parameters::Dict{String,Any}
-    base_module::Union{Nothing,ControlModule}
     modules::Vector{ControlModule}
 
     function Controller(config::Union{Nothing,Dict{String,Any}})::Controller
@@ -176,7 +174,6 @@ mutable struct Controller
                 ),
                 config === nothing ? Dict{String,Any}() : config
             ),
-            nothing, # base_module
             [] # modules
         )
     end
