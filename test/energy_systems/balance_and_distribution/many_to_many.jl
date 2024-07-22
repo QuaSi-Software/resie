@@ -11,7 +11,6 @@ function test_many_to_many()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "constant_power" => 1000,
             "constant_temperature" => 55,
@@ -19,7 +18,6 @@ function test_many_to_many()
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "constant_power" => 4000,
             "constant_temperature" => 55,
@@ -27,7 +25,6 @@ function test_many_to_many()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
             "constant_temperature" => 55,
@@ -35,7 +32,6 @@ function test_many_to_many()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 2000,
             "constant_temperature" => 55,
@@ -43,7 +39,6 @@ function test_many_to_many()
         "TST_TES_01" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "capacity" => 10000,
             "load" => 5000,
@@ -51,7 +46,6 @@ function test_many_to_many()
         "TST_TES_02" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "capacity" => 10000,
             "load" => 5000,
@@ -59,7 +53,6 @@ function test_many_to_many()
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_SRC_01",

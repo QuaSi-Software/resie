@@ -11,7 +11,6 @@ function test_one_bus_to_many_bus()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
             "constant_power" => 400,
@@ -19,7 +18,6 @@ function test_one_bus_to_many_bus()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_01",
@@ -33,7 +31,6 @@ function test_one_bus_to_many_bus()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -48,7 +45,6 @@ function test_one_bus_to_many_bus()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -63,7 +59,6 @@ function test_one_bus_to_many_bus()
         "TST_TES_01" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_02"],
             "capacity" => 1000,
             "load" => 500,
@@ -71,7 +66,6 @@ function test_one_bus_to_many_bus()
         "TST_TES_02" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
             "capacity" => 1000,
             "load" => 500,
@@ -79,7 +73,6 @@ function test_one_bus_to_many_bus()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 400.0,
             "constant_temperature" => 55.0,
@@ -87,7 +80,6 @@ function test_one_bus_to_many_bus()
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 400.0,
             "constant_temperature" => 55.0,

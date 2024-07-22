@@ -38,10 +38,10 @@ accompanying documentation on the project file.
 """
 function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})::Grouping
     components = Grouping()
+
+    # create instances
     for (unit_key, entry) in pairs(config)
-        default_dict = Dict{String,Any}(
-            "strategy" => Dict{String,Any}("name" => "default")
-        )
+        default_dict = Dict{String,Any}()
         unit_config = Base.merge(default_dict, entry)
 
         symbol = Symbol(String(unit_config["type"]))
@@ -52,12 +52,8 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         end
     end
 
+    # link inputs/outputs
     for (unit_key, entry) in pairs(config)
-        if length(entry["control_refs"]) > 0
-            others = Grouping(key => components[key] for key in entry["control_refs"])
-            link_control_with(components[unit_key], others)
-        end
-
         if (
             String(entry["type"]) != "Bus"
             && haskey(entry, "output_refs")
@@ -79,13 +75,43 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         end
     end
 
+    # add control modules to components
+    for (unit_key, entry) in pairs(config)
+        unit = components[unit_key]
+
+        # TODO: rewrite this for automatic selection of modules so they don't need to be
+        # registered here, compare automatic selection of component class
+        for module_config in default(entry, "control_modules", [])
+            if lowercase(module_config["name"]) === "economical_discharge"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_EconomicalDischarge(
+                        module_config, components, sim_params
+                    )
+                )
+            elseif lowercase(module_config["name"]) === "profile_limited"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_ProfileLimited(module_config, components, sim_params)
+                )
+            elseif lowercase(module_config["name"]) === "storage_driven"
+                push!(
+                    unit.controller.modules,
+                    EnergySystems.CM_StorageDriven(module_config, components, sim_params)
+                )
+            end
+        end
+    end
+
     # the input/output interfaces of busses are constructed in the order of appearance in
     # the config, so after all components are loaded they need to be reordered to match
     # the input/output priorities
     components = reorder_interfaces_of_busses(components)
 
+    # other type-specific initialisation
     EnergySystems.initialise_components(components, sim_params)
 
+    # create proxy busses from bus chains
     chains = find_chains(values(components), EnergySystems.sf_bus)
     EnergySystems.merge_bus_chains(chains, components, sim_params)
 

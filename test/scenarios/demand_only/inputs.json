@@ -18,7 +18,6 @@
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -27,7 +26,6 @@
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_DEM"
             ],

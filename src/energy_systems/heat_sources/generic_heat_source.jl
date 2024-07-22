@@ -47,9 +47,7 @@ mutable struct GenericHeatSource <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -78,9 +76,7 @@ end
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
+        load_storages(unit.controller, unit.medium)
     )
 
     if unit.temperature_reduction_model == "lmtd"
@@ -101,7 +97,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)

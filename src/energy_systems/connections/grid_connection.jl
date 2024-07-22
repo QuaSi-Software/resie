@@ -33,9 +33,7 @@ mutable struct GridConnection <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             if Bool(config["is_source"])
                 sf_bounded_source
             else
@@ -61,16 +59,12 @@ function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
         set_storage_transfer!(
             unit.output_interfaces[unit.medium],
-            default(
-                unit.controller.parameter, "load_storages " * String(unit.medium), false
-            )
+            load_storages(unit.controller, unit.medium)
         )
     else
         set_storage_transfer!(
             unit.input_interfaces[unit.medium],
-            default(
-                unit.controller.parameter, "unload_storages " * String(unit.medium), false
-            )
+            unload_storages(unit.controller, unit.medium)
         )
     end
 end
@@ -80,7 +74,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
