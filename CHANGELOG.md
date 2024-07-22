@@ -4,6 +4,18 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.9.0
+* Implement functionality of control modules, that can be added to components and that control the operation of the components via defined callback functions. This replaces the previous implementation of "strategies", as this was too limiting. The currently implemented control module types are:
+  * economical_discharge: Handles the discharging of a battery to only be allowed if sufficient charge is available and a linked PV plant has available power below a given threshold. Mostly used for examplatory purposes.
+  * profile_limited: Sets the maximum PLR of a component to values from a profile. Used to set the operation of a component to a fixed schedule while allowing circumstances to override the schedule in favour of lower values (e.g. the produced energy could not be used up completely).
+  * storage_driven: Controls a component to only operate when the charge of a linked storage component falls below a certain threshold and keep operation until a certain higher threshold is reached. This is often used to avoid components switching on and off rapdily to keep a storage topped up, as realised systems often operate with this kind of hysteresis behaviour.
+* Restructure how the operational strategy is defined in the input file. In particular:
+  * Remove entry "strategy"
+  * Remove entry "control_refs"
+  * Add entry "control_modules" that holds the definitions of control modules active for this component
+  * Add entry "control_parameters" as container for miscellaneous parameters of the control behaviour as well as parameters to configure the storage un-/loading flags and special flags to modify the potential step of transformers to not consider given interfaces in during calculation.
+* Add scenario "chpp_two_hyst" to highlight the operation of a transformer with two storage_driven control modules
+
 ### Version 0.8.11
 * Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
 
