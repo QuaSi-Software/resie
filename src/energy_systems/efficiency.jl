@@ -344,7 +344,7 @@ function check_fuel_in(
 
     if (
         unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
-        && unit.input_interfaces[unit.m_fuel_in].max_energy === nothing
+        && is_max_energy_nothing(unit.input_interfaces[unit.m_fuel_in].max_energy)
     )
         return Inf
     else
@@ -383,7 +383,7 @@ function check_el_in(
 
     if (
         unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-        && unit.input_interfaces[unit.m_el_in].max_energy === nothing
+        && is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy)
     )
         return Inf
     else
@@ -422,7 +422,7 @@ function check_el_out(
 
     if (
         unit.output_interfaces[unit.m_el_out].target.sys_function == sf_transformer
-        && unit.output_interfaces[unit.m_el_out].max_energy === nothing
+        && is_max_energy_nothing(unit.output_interfaces[unit.m_el_out].max_energy)
     )
         return -Inf
     end
@@ -462,7 +462,7 @@ function check_h2_out(
 
     if (
         unit.output_interfaces[unit.m_h2_out].target.sys_function == sf_transformer
-        && unit.output_interfaces[unit.m_h2_out].max_energy === nothing
+        && is_max_energy_nothing(unit.output_interfaces[unit.m_h2_out].max_energy)
     )
         return -Inf
     end
@@ -502,7 +502,7 @@ function check_o2_out(
 
     if (
         unit.output_interfaces[unit.m_o2_out].target.sys_function == sf_transformer
-        && unit.output_interfaces[unit.m_o2_out].max_energy === nothing
+        && is_max_energy_nothing(unit.output_interfaces[unit.m_o2_out].max_energy)
     )
         return -Inf
     end
@@ -555,7 +555,7 @@ function check_heat_out_impl(
 
     if (
         unit.output_interfaces[medium].target.sys_function == sf_transformer
-        && unit.output_interfaces[medium].max_energy === nothing
+        && is_max_energy_nothing(unit.output_interfaces[medium].max_energy)
     )
         return -Inf
     end

@@ -105,11 +105,12 @@ function balance_on(
     unit::SeasonalThermalStorage
 )::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(
         balance=interface.balance,
-        uac=unit.uac,
         energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        purpose_uac = purpose_uac,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,

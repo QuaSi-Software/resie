@@ -178,6 +178,41 @@ Convenience alias for a float that can also have a value of "nothing".
 const Floathing = Union{Nothing,Float64}
 
 """
+Convenience alias for a string that can also have a value of "nothing".
+"""
+const Stringing = Union{Nothing,String}
+
+"""
+Struct for the max_energy in the SystemInterface. 
+Can handle multiple maximum energies at different temperatures, also in the case when 
+for each tempearture the full max_energy is calculated by the components. Then, 
+has_calculated_all_maxima is set to true.
+"""
+mutable struct MaxEnergy
+    max_energy::Vector{Floathing}
+    has_calculated_all_maxima::Bool
+    temperatures::Vector{Temperature}
+    purpose_uac::Vector{Stringing}
+end
+
+MaxEnergy() = MaxEnergy([nothing], false, [], [])
+
+
+"""
+Copy function for custom type MaxEnergy
+"""
+function Base.copy(original::MaxEnergy)
+    return MaxEnergy(copy(original.max_energy), copy(original.has_calculated_all_maxima), copy(original.temperatures), copy(original.purpose_uac))
+end
+
+"""
+Copy function for type Nothing
+"""
+function Base.copy(value::Nothing)
+    return value
+end
+
+"""
 Holds the options which output values should be recorded.
 
 This is a specific data structure intended to speed up recording output by avoiding the
@@ -232,7 +267,7 @@ Base.@kwdef mutable struct SystemInterface
     temperature_max::Temperature = nothing
 
     """Maximum energy the source can provide in the current timestep"""
-    max_energy::Union{Nothing,Float64} = nothing
+    max_energy::MaxEnergy = MaxEnergy()
 
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
@@ -371,19 +406,108 @@ on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
-    value::Union{Nothing,Float64}
+    value::Union{Floathing, Vector{Floathing}},
+    purpose_uac::Union{Stringing, Vector{Stringing}} = nothing,
+    temperature::Union{Temperature, Vector{Temperature}} = nothing,
+    has_calculated_all_maxima::Bool = false
 )
-    if interface.max_energy === nothing
-        interface.max_energy = value
-    else
-        interface.max_energy = min(interface.max_energy, value)
-    end
+
+    set_max_energy!(interface.max_energy, value, purpose_uac, temperature, has_calculated_all_maxima)
 
     if interface.source.sys_function == sf_bus
-        set_max_energy!(interface.source, interface.target, false, value)
+        set_max_energy!(interface.source, interface.target, false, value, purpose_uac, temperature, has_calculated_all_maxima)
     elseif interface.target.sys_function == sf_bus
-        set_max_energy!(interface.target, interface.source, true, value)
+        set_max_energy!(interface.target, interface.source, true, value, purpose_uac, temperature, has_calculated_all_maxima)
     end
+end
+
+function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::Stringing=nothing)
+    if purpose_uac === nothing || is_purpose_uac_nothing(max_energy)
+        return max_energy_sum(max_energy)
+    else
+        idx = findall(==(purpose_uac), max_energy.purpose_uac)
+        if isempty(idx)
+            return 0.0
+        else
+            return sum(max_energy.max_energy[i] for i in idx)
+        end
+    end
+end
+
+# Function to reduce the the energy by a specified amount.
+# If the maximum energy has been calculated for all energies, reduce it for all!
+function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy, amount::Float64, uac_to_reduce::Stringing=nothing)
+    if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
+        for i in eachindex(max_energy.max_energy)
+            to_reduce = min(amount, max_energy.max_energy[i])
+            max_energy.max_energy[i] -= to_reduce
+            amount -= to_reduce
+            if amount <= 0.0 break end
+        end
+    else
+        idx = findfirst(==(uac_to_reduce), max_energy.purpose_uac)
+        if idx !== nothing
+            if max_energy.has_calculated_all_maxima
+                max_energy.max_energy .*= 1 - (amount / max_energy.max_energy[idx])
+            else
+                max_energy.max_energy[idx] -= amount
+            end
+        else
+            @error "The uac could not be found in the max_energy."
+        end
+    end
+end
+
+function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
+    if is_max_energy_nothing(max_energy)
+        return 0.0
+    else
+        return sum(e for e in max_energy.max_energy; init=0.0)
+    end
+end
+
+"""
+        set_max_energy!(max_energy,  values, purpose_uac, temperature, has_calculated_all_maxima)
+
+Fills a MaxEnergy struct with given values.
+"""
+function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
+                         values::Union{Floathing, Vector{Floathing}},
+                         purpose_uac::Union{Stringing, Vector{Stringing}},
+                         temperature::Union{Temperature, Vector{Temperature}},
+                         has_calculated_all_maxima::Bool)
+
+    if !isa(values, AbstractVector)
+        values = [values]
+    end
+    if !isa(temperature, AbstractVector)
+        temperature = [temperature]
+    end
+    if !isa(purpose_uac, AbstractVector)
+        purpose_uac = [purpose_uac]
+    end
+
+    # make sure that if values is empty, the first entry is zero to allow accessibility of vector
+    if length(values) == 0
+        push!(values, 0.0)
+    end
+
+    # overwriting is possible here as either the interface has no max energy yet, or a component has already
+    # read out the max energy and has considered it (it can only be equal or smaller) or a component is overwriting
+    # its own max_energy.
+    max_energy.max_energy = values
+    max_energy.temperatures = temperature
+    max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+    max_energy.purpose_uac = purpose_uac
+
+end
+
+function is_max_energy_nothing(max_energy::EnergySystems.MaxEnergy)
+    return max_energy.max_energy[1] === nothing && length(max_energy.max_energy) == 1
+end
+
+function is_purpose_uac_nothing(max_energy::EnergySystems.MaxEnergy)
+    return isempty(max_energy.purpose_uac) || max_energy.purpose_uac[1] === nothing && length(max_energy.purpose_uac) == 1
 end
 
 """
@@ -396,7 +520,7 @@ function reset!(interface::SystemInterface)
     interface.sum_abs_change = 0.0
     interface.temperature_min = nothing
     interface.temperature_max = nothing
-    interface.max_energy = nothing
+    interface.max_energy = MaxEnergy()
 end
 
 """
@@ -505,8 +629,8 @@ Contains the data on the energy exchance (and related information) on an interfa
 """
 Base.@kwdef mutable struct EnergyExchange
     balance::Float64
-    uac::String
     energy_potential::Float64
+    purpose_uac::String
     temperature_min::Temperature
     temperature_max::Temperature
     pressure::Union{Nothing,Float64}
@@ -655,17 +779,18 @@ without having to check if its connected to a Bus or directly to a component.
     required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
-    balance_written = interface.max_energy === nothing || interface.sum_abs_change > 0.0
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     input_sign = unit.uac == interface.target.uac ? -1 : +1
+    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(
         balance=interface.balance,
-        uac=unit.uac,
-        energy_potential=(balance_written ? 0.0 : input_sign * interface.max_energy),
+        energy_potential=(balance_written ? 0.0 : input_sign * get_max_energy(interface.max_energy)),
+        purpose_uac=purpose_uac,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
-        voltage=nothing,
+        voltage=nothing
     )]
 end
 

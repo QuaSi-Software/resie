@@ -870,12 +870,13 @@ function balance_on(
     unit::GeothermalProbes
 )::Vector{EnergyExchange}
 
-caller_is_input = unit.uac == interface.target.uac
+    caller_is_input = unit.uac == interface.target.uac
+    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(
         balance=interface.balance,
-        uac=unit.uac,
         energy_potential=caller_is_input ? - unit.max_input_energy : unit.max_output_energy,
+        purpose_uac = purpose_uac,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
