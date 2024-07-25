@@ -183,10 +183,10 @@ Convenience alias for a string that can also have a value of "nothing".
 const Stringing = Union{Nothing,String}
 
 """
-Struct for the max_energy in the SystemInterface. 
-Can handle multiple maximum energies at different temperatures, also in the case when 
-for each tempearture the full max_energy is calculated by the components. Then, 
-has_calculated_all_maxima is set to true.
+Struct for the max_energy in the SystemInterface of in the bus balance_table. 
+Can handle multiple maximum energies at different temperatures or for different components, 
+also in the case when for each max_energy the maximum energy is calculated by the components. 
+Then, has_calculated_all_maxima is set to true.
 """
 mutable struct MaxEnergy
     max_energy::Vector{Floathing}
@@ -197,12 +197,14 @@ end
 
 MaxEnergy() = MaxEnergy([nothing], false, [], [])
 
-
 """
 Copy function for custom type MaxEnergy
 """
 function Base.copy(original::MaxEnergy)
-    return MaxEnergy(copy(original.max_energy), copy(original.has_calculated_all_maxima), copy(original.temperatures), copy(original.purpose_uac))
+    return MaxEnergy(copy(original.max_energy),
+                     copy(original.has_calculated_all_maxima),
+                     copy(original.temperatures),
+                     copy(original.purpose_uac))
 end
 
 """
@@ -415,12 +417,34 @@ function set_max_energy!(
     set_max_energy!(interface.max_energy, value, purpose_uac, temperature, has_calculated_all_maxima)
 
     if interface.source.sys_function == sf_bus
-        set_max_energy!(interface.source, interface.target, false, value, purpose_uac, temperature, has_calculated_all_maxima)
+        set_max_energy!(interface.source,
+                        interface.target,
+                        false,
+                        value,
+                        purpose_uac,
+                        temperature,
+                        has_calculated_all_maxima)
     elseif interface.target.sys_function == sf_bus
-        set_max_energy!(interface.target, interface.source, true, value, purpose_uac, temperature, has_calculated_all_maxima)
+        set_max_energy!(interface.target,
+                        interface.source,
+                        true,
+                        value,
+                        purpose_uac,
+                        temperature,
+                        has_calculated_all_maxima)
     end
 end
 
+"""
+    get_max_energy(max_energy, purpose_uac)
+
+This function extracts the `max_energy` values from a given `MaxEnergy` struct.
+If `purpose_uac` is provided and found within `max_energy.purpose_uac`, it returns the sum
+of all `max_energy` values corresponding to the specific `purpose_uac`. If `purpose_uac` is
+provided but not found, the function returns 0.0. If `purpose_uac` is not provided or is
+considered "nothing" based on `is_purpose_uac_nothing(max_energy)`, it returns the sum of 
+all `max_energy` values.
+"""
 function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::Stringing=nothing)
     if purpose_uac === nothing || is_purpose_uac_nothing(max_energy)
         return max_energy_sum(max_energy)
@@ -434,8 +458,15 @@ function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::String
     end
 end
 
-# Function to reduce the the energy by a specified amount.
-# If the maximum energy has been calculated for all energies, reduce it for all!
+"""
+    reduce_max_energy!(max_energy, amount, uac_to_reduce)
+
+This function decreases the maximum energy values stored in `max_energy` by the given `amount`.
+If `uac_to_reduce` is specified and found in `max_energy.purpose_uac`, only the corresponding
+max_energy value will be reduced. If the maximum possible energy for all max_energy have been 
+calculated (`has_calculated_all_maxima` is true), the other max_energy values will be reduced 
+proportionally by a linear percentage.
+"""
 function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy, amount::Float64, uac_to_reduce::Stringing=nothing)
     if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
         for i in eachindex(max_energy.max_energy)
@@ -458,6 +489,11 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy, amount::Float64
     end
 end
 
+"""
+    max_energy_sum(max_energy)
+
+Returns the sum of all `max_energy` in a MaxEnergy struct while ignoring nothing values.
+"""
 function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
     if is_max_energy_nothing(max_energy)
         return 0.0
@@ -470,6 +506,8 @@ end
         set_max_energy!(max_energy,  values, purpose_uac, temperature, has_calculated_all_maxima)
 
 Fills a MaxEnergy struct with given values.
+If the given values are scalars, they are converted into vectors.
+If `values` is empty, a zero is added to ensure accessibility.
 """
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
                          values::Union{Floathing, Vector{Floathing}},
@@ -487,14 +525,15 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
         purpose_uac = [purpose_uac]
     end
 
-    # make sure that if values is empty, the first entry is zero to allow accessibility of vector
     if length(values) == 0
         push!(values, 0.0)
     end
 
-    # overwriting is possible here as either the interface has no max energy yet, or a component has already
-    # read out the max energy and has considered it (it can only be equal or smaller) or a component is overwriting
-    # its own max_energy.
+    """
+    overwriting is possible here as either the interface has no max energy yet, or a component
+    has already read out the max energy and has considered it (it can only be equal or smaller)
+    or a component is overwriting its own max_energy.
+    """
     max_energy.max_energy = values
     max_energy.temperatures = temperature
     max_energy.has_calculated_all_maxima = has_calculated_all_maxima
@@ -502,12 +541,24 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
 
 end
 
+"""
+    is_max_energy_nothing(max_energy)
+
+Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has beed performed (yet).
+"""
 function is_max_energy_nothing(max_energy::EnergySystems.MaxEnergy)
     return max_energy.max_energy[1] === nothing && length(max_energy.max_energy) == 1
 end
 
+"""
+    is_purpose_uac_nothing(max_energy)
+
+Checks a MaxEnergy struct if the `purpose_uac` is nothing/empty (true), meaning that the max_energy is not indtended
+for a specific component.
+"""
 function is_purpose_uac_nothing(max_energy::EnergySystems.MaxEnergy)
-    return isempty(max_energy.purpose_uac) || max_energy.purpose_uac[1] === nothing && length(max_energy.purpose_uac) == 1
+    return (isempty(max_energy.purpose_uac) || 
+            max_energy.purpose_uac[1] === nothing && length(max_energy.purpose_uac) == 1)
 end
 
 """
