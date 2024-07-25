@@ -605,6 +605,24 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], heat_out, highest(energies[6]))
 end
 
+# has its own reset function as here more parameters are present that need to be reset in every timestep
+function reset(unit::HeatPump)
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing
+            reset!(inface)
+        end
+    end
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing
+            reset!(outface)
+        end
+    end
+
+    # reset other parameter
+    unit.losses = 0.0
+    unit.cop = 0.0
+end
+
 function output_values(unit::HeatPump)::Vector{String}
     return [string(unit.m_el_in)*" IN", 
             string(unit.m_heat_in)*" IN",
