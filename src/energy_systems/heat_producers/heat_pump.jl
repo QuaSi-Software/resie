@@ -308,8 +308,8 @@ function calculate_energies_heatpump(unit::HeatPump,
             end
         end 
 
-        if current_in_temp >= current_out_temp 
-            # bypass
+        if current_in_temp >= current_out_temp && unit.constant_cop === nothing
+            # bypass only if no constant cop is given
             heat_transfer = minimum([
                 available_heat_in[current_in_idx],
                 available_heat_out[current_out_idx],
@@ -323,6 +323,7 @@ function calculate_energies_heatpump(unit::HeatPump,
             current_out_temp = current_in_temp
             # TODO: Whats about the usage_fraction, should the bypass be kept included in the usage_fraction calculation?
             # Or should we deny the bypass and force users to implement heat pumps in parallel if they want a bypass?
+            # TODO: Whats about a constant COP? Should this be still be valid even during bypass?
         else
             # calculate cop
             cop = unit.constant_cop === nothing ?
@@ -456,11 +457,10 @@ before the heat pump $(unit.uac) has its potential step."
                                                             out_temps_max,
                                                             out_uacs)
                                                         
-
             append!(layers_heat_in, layers_heat_in_temp)
             append!(layers_heat_in_temperature, layers_heat_in_temperature_temp)
             append!(layers_heat_in_uac, layers_heat_in_uac_temp)
-            if heat_in_idx == 1 #|| layers_heat_out[1] < layers_heat_out_temp[1]   # TODO: Think about if this is right...
+            if heat_in_idx == 1   # TODO: Think about if this is right...
                 layers_el_in = layers_el_in_temp
                 layers_heat_out = layers_heat_out_temp
                 layers_heat_out_temperature = layers_heat_out_temperature_temp
@@ -496,11 +496,10 @@ before the heat pump $(unit.uac) has its potential step."
                                                             [out_temps_max[heat_out_idx]],
                                                             [out_uacs[heat_out_idx]])
                                                         
-
             append!(layers_heat_out, layers_heat_out_temp)
             append!(layers_heat_out_temperature, layers_heat_out_temperature_temp)
             append!(layers_heat_out_uac, layers_heat_out_uac_temp)
-            if heat_out_idx == 1 #|| layers_heat_in[1] < layers_heat_in_temp[1]   # TODO: Think about if this is right...
+            if heat_out_idx == 1  # TODO: Think about if this is right...
                 layers_el_in = layers_el_in_temp
                 layers_heat_in = layers_heat_in_temp
                 layers_heat_in_temperature = layers_heat_in_temperature_temp
