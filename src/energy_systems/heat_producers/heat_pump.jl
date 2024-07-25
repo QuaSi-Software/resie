@@ -460,11 +460,21 @@ before the heat pump $(unit.uac) has its potential step."
             append!(layers_heat_in, layers_heat_in_temp)
             append!(layers_heat_in_temperature, layers_heat_in_temperature_temp)
             append!(layers_heat_in_uac, layers_heat_in_uac_temp)
-            if heat_in_idx == 1   # TODO: Think about if this is right...
+            # Is this correct? Using the highest energy as worst case should be good for now...
+            if heat_in_idx == 1
                 layers_el_in = layers_el_in_temp
                 layers_heat_out = layers_heat_out_temp
                 layers_heat_out_temperature = layers_heat_out_temperature_temp
                 layers_heat_out_uac = layers_heat_out_uac_temp
+            else
+                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
+                    layers_el_in = layers_el_in_temp
+                end
+                if _isless(_sum(layers_heat_out), _sum(layers_heat_out_temp))
+                    layers_heat_out = layers_heat_out_temp
+                    layers_heat_out_temperature = layers_heat_out_temperature_temp
+                    layers_heat_out_uac = layers_heat_out_uac_temp
+                end
             end
         end
     elseif heat_out_has_inf_energy
@@ -499,11 +509,21 @@ before the heat pump $(unit.uac) has its potential step."
             append!(layers_heat_out, layers_heat_out_temp)
             append!(layers_heat_out_temperature, layers_heat_out_temperature_temp)
             append!(layers_heat_out_uac, layers_heat_out_uac_temp)
-            if heat_out_idx == 1  # TODO: Think about if this is right...
+            # Is this correct? Using the highest energy as worst case should be good for now...
+            if heat_out_idx == 1
                 layers_el_in = layers_el_in_temp
                 layers_heat_in = layers_heat_in_temp
                 layers_heat_in_temperature = layers_heat_in_temperature_temp
                 layers_heat_in_uac = layers_heat_in_uac_temp
+            else
+                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
+                    layers_el_in = layers_el_in_temp
+                end
+                if _isless(_sum(layers_heat_in), _sum(layers_heat_in_temp))
+                    layers_heat_in = layers_heat_in_temp
+                    layers_heat_in_temperature = layers_heat_in_temperature_temp
+                    layers_heat_in_uac = layers_heat_in_uac_temp
+                end
             end
         end
     else

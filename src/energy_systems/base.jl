@@ -681,11 +681,11 @@ Contains the data on the energy exchance (and related information) on an interfa
 Base.@kwdef mutable struct EnergyExchange
     balance::Float64
     energy_potential::Float64
-    purpose_uac::String
+    purpose_uac::Stringing
     temperature_min::Temperature
     temperature_max::Temperature
-    pressure::Union{Nothing,Float64}
-    voltage::Union{Nothing,Float64}
+    pressure::Floathing
+    voltage::Floathing
 end
 
 """

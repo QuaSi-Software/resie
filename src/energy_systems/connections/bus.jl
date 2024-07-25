@@ -416,6 +416,11 @@ function _sum(vector::Vector{Union{Float64, Nothing}})
     return sum
 end
 
+function _isless(first::Nothing, second::Nothing) return false end
+function _isless(first::Float64, second::Nothing) return false end
+function _isless(first::Nothing, second::Float64) return true end
+function _isless(first::Float64, second::Float64) return first < second end
+
 """
     set_max_energy!(bus, input, true, value)
 
@@ -741,6 +746,18 @@ function balance_on(
                 voltage=nothing
             ))
         end
+    end
+
+    if isempty(return_exchanges)
+        push!(return_exchanges, EnEx(
+            balance=0.0,
+            energy_potential=0.0,
+            purpose_uac=nothing,
+            temperature_min=nothing,
+            temperature_max=nothing,
+            pressure=nothing,
+            voltage=nothing
+        ))
     end
 
     return return_exchanges
