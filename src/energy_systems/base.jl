@@ -191,11 +191,10 @@ Then, has_calculated_all_maxima is set to true.
 mutable struct MaxEnergy
     max_energy::Vector{Floathing}
     has_calculated_all_maxima::Bool
-    temperatures::Vector{Temperature}
     purpose_uac::Vector{Stringing}
 end
 
-MaxEnergy() = MaxEnergy([nothing], false, [], [])
+MaxEnergy() = MaxEnergy([nothing], false, [])
 
 """
 Copy function for custom type MaxEnergy
@@ -203,7 +202,6 @@ Copy function for custom type MaxEnergy
 function Base.copy(original::MaxEnergy)
     return MaxEnergy(copy(original.max_energy),
                      copy(original.has_calculated_all_maxima),
-                     copy(original.temperatures),
                      copy(original.purpose_uac))
 end
 
@@ -399,7 +397,7 @@ function set_temperature!(
 end
 
 """
-    set_max_energy!(interface, value)
+    set_max_energy!(interface, value, purpose_uac, has_calculated_all_maxima)
 
 Set the maximum power that can be delivered to the given value.
 
@@ -410,28 +408,30 @@ function set_max_energy!(
     interface::SystemInterface,
     value::Union{Floathing, Vector{Floathing}},
     purpose_uac::Union{Stringing, Vector{Stringing}} = nothing,
-    temperature::Union{Temperature, Vector{Temperature}} = nothing,
     has_calculated_all_maxima::Bool = false
 )
-
-    set_max_energy!(interface.max_energy, value, purpose_uac, temperature, has_calculated_all_maxima)
-
     if interface.source.sys_function == sf_bus
+        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
         set_max_energy!(interface.source,
                         interface.target,
                         false,
                         value,
                         purpose_uac,
-                        temperature,
                         has_calculated_all_maxima)
     elseif interface.target.sys_function == sf_bus
+        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
         set_max_energy!(interface.target,
                         interface.source,
                         true,
                         value,
                         purpose_uac,
-                        temperature,
                         has_calculated_all_maxima)
+    else
+        # 1-to-1 interface between two components 
+        # --> check if value is smaller than current max_energy
+        if is_max_energy_nothing(interface.max_energy) || _isless(_sum(value), get_max_energy(interface.max_energy))
+            set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
+        end
     end
 end
 
@@ -503,7 +503,7 @@ function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
 end
 
 """
-        set_max_energy!(max_energy,  values, purpose_uac, temperature, has_calculated_all_maxima)
+        set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
 
 Fills a MaxEnergy struct with given values.
 If the given values are scalars, they are converted into vectors.
@@ -512,14 +512,10 @@ If `values` is empty, a zero is added to ensure accessibility.
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
                          values::Union{Floathing, Vector{Floathing}},
                          purpose_uac::Union{Stringing, Vector{Stringing}},
-                         temperature::Union{Temperature, Vector{Temperature}},
                          has_calculated_all_maxima::Bool)
 
     if !isa(values, AbstractVector)
         values = [values]
-    end
-    if !isa(temperature, AbstractVector)
-        temperature = [temperature]
     end
     if !isa(purpose_uac, AbstractVector)
         purpose_uac = [purpose_uac]
@@ -535,7 +531,6 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
     or a component is overwriting its own max_energy.
     """
     max_energy.max_energy = values
-    max_energy.temperatures = temperature
     max_energy.has_calculated_all_maxima = has_calculated_all_maxima
     max_energy.purpose_uac = purpose_uac
 

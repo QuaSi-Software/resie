@@ -408,7 +408,7 @@ function _abs(val::Union{Floathing, Vector{Floathing}})
     return abs_val
 end
 
-function _sum(vector::Vector{Union{Float64, Nothing}})
+function _sum(vector::Union{Floathing,Vector{Floathing}})
     sum = nothing
     for entry in vector
         sum = _add(sum, entry)
@@ -422,7 +422,7 @@ function _isless(first::Nothing, second::Float64) return true end
 function _isless(first::Float64, second::Float64) return first < second end
 
 """
-    set_max_energy!(bus, input, true, value)
+    set_max_energy!(bus, component, is_input, value, purpose_uac, has_calculated_all_maxima)
 
 Communicates the max_energy of an input/output on a bus.
 
@@ -440,7 +440,6 @@ function set_max_energy!(unit::Bus,
                          is_input::Bool,
                          value::Union{Floathing, Vector{Floathing}},
                          purpose_uac::Union{Stringing, Vector{Stringing}},
-                         temperature::Union{Temperature, Vector{Temperature}},
                          has_calculated_all_maxima::Bool)
 
     bus = unit.proxy === nothing ? unit : unit.proxy
@@ -449,13 +448,11 @@ function set_max_energy!(unit::Bus,
         set_max_energy!(bus.balance_table_inputs[comp.uac].energy_potential, 
                         _abs(value),
                         purpose_uac,
-                        temperature,
                         has_calculated_all_maxima)
     else
         set_max_energy!(bus.balance_table_outputs[comp.uac].energy_potential, 
                         _abs(value),
                         purpose_uac,
-                        temperature,
                         has_calculated_all_maxima)
     end
 
@@ -466,7 +463,6 @@ function set_max_energy!(unit::Bus,
         set_max_energy!(proxy_interface.max_energy, 
             value,
             purpose_uac,
-            temperature,
             has_calculated_all_maxima)
     end
 end

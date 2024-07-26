@@ -114,14 +114,12 @@ function set_max_energies!(
     heat_out::Union{Floathing, Vector{Floathing}},
     purpose_uac_heat_in::Union{Stringing, Vector{Stringing}}=nothing,
     purpose_uac_heat_out::Union{Stringing, Vector{Stringing}}=nothing,
-    temperature_heat_in::Union{Temperature, Vector{Temperature}}=nothing,
-    temperature_heat_out::Union{Temperature, Vector{Temperature}}=nothing,
     has_calculated_all_maxima_heat_in::Bool=false,
     has_calculated_all_maxima_heat_out::Bool=false
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, purpose_uac_heat_in, temperature_heat_in, has_calculated_all_maxima_heat_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, purpose_uac_heat_out, temperature_heat_out, has_calculated_all_maxima_heat_out)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
 end
 
 function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
@@ -580,8 +578,6 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
             energies[5],
             energies[4],
             energies[7],
-            energies[3],
-            energies[6],
             energies[8],
             energies[9]
         )
