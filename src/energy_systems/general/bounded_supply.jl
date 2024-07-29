@@ -102,10 +102,30 @@ end
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    energy_demand = balance(exchanges) + energy_potential(exchanges)
+
+    # if we get multiple exchanges from balance_on, a bus is involved, which means the
+    # temperature check has already been performed. we only need to check the case for
+    # a single output which can happen for direct 1-to-1 connections or if the bus has
+    # filtered outputs down to a single entry, which works the same as the 1-to-1 case
+    if length(exchanges) > 1
+        energy_demand = balance(exchanges) + energy_potential(exchanges)
+        temp_out = temp_min_highest(exchanges)
+    else
+        e = first(exchanges)
+        if (
+            unit.temperature === nothing ||
+            (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
+        )
+            energy_demand = e.balance + e.energy_potential
+            temp_out = lowest(e.temperature_min, unit.temperature)
+        else
+            energy_demand = 0.0
+        end
+    end
 
     if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
+        add!(outface, min(abs(energy_demand), unit.max_energy), temp_out)
     end
 end
 

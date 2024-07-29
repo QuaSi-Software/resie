@@ -4,6 +4,59 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.8.11
+* Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
+
+### Version 0.8.10
+* Major refactoring of the determination of the correct order of operation for transformer potential and process steps. Now, the order of operation for complex energy systems with branched transformer chains across busses can be determined automatically and these energy systems can be simulated. See the documentation for limitations and further details.
+* Improve bus functionalities and efficiency calculations to allow the handling of branched transformer chains
+* Add multiple tests to ensure the correct determination of the order of operation
+* Set new reference results for all scenarios
+* Add "is_first_timestep" to sim_params to be available for all components
+  
+### Version 0.8.9
+* Add implementation for generic heat sources such as river water, lake water, waste water, atmosphere, industrial processes or one-way connections to a heat network. The main difference to a generic bounded supply is an option to include a temperature reduction caused by heat exchangers.
+* Add scenario reversive_heat_pump to highlight open issues with the operation of a single heat pump for both heating and cooling with a seasonal heat storage
+
+### Version 0.8.8
+* Refactor part load ratio dependent efficiency (PLRDE) functionality to have its own submodule (of sorts)
+* Refactor CHPP to use PLRDE functionality
+* Refactor Electrolyser to use PLRDE functionality, a secondary low temperature heat output and a sub-unit model where efficiencies are specific to subunits that can be utilised to different degrees
+
+### Version 0.8.7
+* Add example and scenario that highlights how both heating and cooling can be handled at the same time by modelling the cooling demand as a fixed supply heat source
+
+### Version 0.8.6
+* Refactor fuel boiler to use a customisable part-load ratio dependent efficiency function. This functionality will likely also be used by other components in future releases.
+
+### Version 0.8.5
+* Fix a problem with general bounded supply and sink implementations not considering temperatures correctly. This was mostly an issue with direct 1-to-1 connections between components as busses do consider this already.
+
+### Version 0.8.4
+* Add geothermal probe as new component. It acts like a storage and there are many precalculated input parameters for a variety of probe field configurations. Both the simplified and the extended version were successfully validated.
+* Add new szenario with geothermal probe and heat pump.
+* Add geothermal collector files. This component is not finished yet and needs some rework.
+* Add standalone julia code to create figures from profile data
+* Add julia packages Roots and Plots
+* Add function plot_optional_figures(), available to include in every component, that is called after initialize!() to create additional plots if the component offers them. Added optional flags in input file to control the auxiliary plots: auxiliary_plots, auxiliary_plots_path, auxiliary_plots_formats
+* Bugfix in Resie.jl to call set_time_step ahead of the initialize!() of each component
+
+### Version 0.8.3
+* Tweak examples to match the description in the documentation
+* Update profiles used in examples and move the files into subfolders
+* Update installation and quick-use instructions
+
+### Version 0.8.2
+* Add testing and development feature "scenarios": Project files with certain expected outputs, which are used to test if the calculations have changed and thus produce different outputs than in the last verified version. This differs from unit tests in that the tests are not fully automated and require a certain expert knowledge to verify. The advantage over unit tests is that these outputs are less brittle and test cases can be added more easily.
+* Add CLI for generating the output of scenarios, set reference outputs, compare the generated order of operations against the reference and generate an overview page over the scenario outputs
+* Move most examples over to scenarios, as they were already used in such a manner. The remaining examples are intended to be developed as actual examples for new users of ReSiE.
+
+### Version 0.8.1
+* Rename output parameters `dump_info` and `dump_info_file` to `auxiliary_info` and `auxiliary_info_file`
+* Rename output parameter `output_file` to `csv_output_file`
+* Add output parameters `sankey_plot_file` and `output_plot_file` to allow control of where the plots will be saved
+* Move input parameter `weather_file_path` from the `io_settings` section of the project config to the `simulation_parameters` section
+
 ### Version 0.8.0
 * Standardise storage un-/loading control parameters for all components and make them customisable to the input/output media
 * Remove operational strategy "extended_storage_loading_control"

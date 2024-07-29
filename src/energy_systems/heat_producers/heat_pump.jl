@@ -108,12 +108,18 @@ function control(
 end
 
 function set_max_energies!(
-    unit::HeatPump, el_in::Float64,
-    heat_in::Float64, heat_out::Float64
+    unit::HeatPump,
+    el_in::Union{Floathing, Vector{Floathing}},
+    heat_in::Union{Floathing, Vector{Floathing}},
+    heat_out::Union{Floathing, Vector{Floathing}},
+    purpose_uac_heat_in::Union{Stringing, Vector{Stringing}}=nothing,
+    purpose_uac_heat_out::Union{Stringing, Vector{Stringing}}=nothing,
+    has_calculated_all_maxima_heat_in::Bool=false,
+    has_calculated_all_maxima_heat_out::Bool=false
 )
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
 end
 
 function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
@@ -130,9 +136,8 @@ function check_el_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_el_in"] == true
-        if (
-            unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_el_in].max_energy === nothing
+        if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
+            && is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy)   # ...and none of them have had their potential step
         )
             return (Inf)
         else
@@ -156,13 +161,13 @@ function check_heat_in(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_in"] == true
-        if (
-            unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
-            && unit.input_interfaces[unit.m_heat_in].max_energy === nothing
+        if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
+             && is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy)  # ...and none of them have had their potential step
         )
-            return ([Inf], 
+            return ([Inf],
                     [unit.input_interfaces[unit.m_heat_in].temperature_min], 
-                    [unit.input_interfaces[unit.m_heat_in].temperature_max]
+                    [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                    [unit.input_interfaces[unit.m_heat_in].source.uac]
                 )
         else
             exchanges = balance_on(
@@ -172,13 +177,15 @@ function check_heat_in(
             return (
                 [e.balance + e.energy_potential for e in exchanges],
                 temp_min_all(exchanges),
-                temp_max_all(exchanges)
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges]
             )
         end
     else
         return ([Inf],
                 [unit.input_interfaces[unit.m_heat_in].temperature_min], 
-                [unit.input_interfaces[unit.m_heat_in].temperature_max]
+                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].source.uac]
             )
     end
 end
@@ -188,20 +195,189 @@ function check_heat_out(
     sim_params::Dict{String,Any}
 )
     if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
+        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
+            && is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)    # ...and none of them have had their potential step
         )
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        temperature = temp_min_highest(exchanges)
-        if potential_energy_heat_out >= -sim_params["epsilon"]
-            return (0.0, temperature)
+            return ([-Inf],
+                    [unit.output_interfaces[unit.m_heat_out].temperature_min], 
+                    [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                    [unit.output_interfaces[unit.m_heat_out].target.uac]
+                )
+        else
+            exchanges = balance_on(
+                unit.output_interfaces[unit.m_heat_out],
+                unit.output_interfaces[unit.m_heat_out].target
+            )
+            return (
+                [e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges),
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges]
+            )
         end
-        return (potential_energy_heat_out, temperature)
     else
-        return (-Inf, nothing)
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].temperature_min], 
+                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].target.uac]
+                )
     end
 end
+
+
+function calculate_energies_heatpump(unit::HeatPump,
+                                     sim_params::Dict{String,Any},
+                                     available_el_in,
+                                     available_heat_in,
+                                     available_heat_out,
+                                     max_usage_fraction,
+                                     in_temps_min,
+                                     in_temps_max,
+                                     in_uacs,
+                                     out_temps_min,
+                                     out_temps_max,
+                                     out_uacs)
+    layers_el_in = Vector{Floathing}()
+    layers_heat_in = Vector{Floathing}()
+    layers_heat_in_temperature = Vector{Temperature}()
+    layers_heat_in_uac = Vector{Stringing}()
+    layers_heat_out = Vector{Floathing}()
+    layers_heat_out_temperature = Vector{Temperature}()
+    layers_heat_out_uac = Vector{Stringing}()
+
+    current_in_idx = 1
+    current_out_idx = 1
+    while (
+           sum(available_el_in; init=0.0) > sim_params["epsilon"]
+           && sum(available_heat_in; init=0.0) > sim_params["epsilon"]
+           && sum(available_heat_out; init=0.0) > sim_params["epsilon"]
+           && max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0) > sim_params["epsilon"]
+       )
+        # find first non-zero index
+        while available_heat_in[current_in_idx] <= sim_params["epsilon"]
+            current_in_idx += 1
+        end
+        while available_heat_out[current_out_idx] <= sim_params["epsilon"]
+            current_out_idx += 1
+        end
+
+        # detect and check temperatures. If a input or an output temperature is given, this will be set!
+        if unit.input_temperature === nothing
+            current_in_temp = highest(in_temps_min[current_in_idx], in_temps_max[current_in_idx])
+            if current_in_temp === nothing && unit.constant_cop === nothing
+                @error "Error: The input temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'input_temperature' or check the connected components."
+                throw(InputError)
+            end
+        else
+            # skip layer if given fixed input temperature is not within the temperature band of the layer
+            if (
+                in_temps_min[current_in_idx] !== nothing
+                   && in_temps_min[current_in_idx] > unit.input_temperature
+                || in_temps_max[current_in_idx] !== nothing
+                   && in_temps_max[current_in_idx] < unit.input_temperature
+            )
+                available_heat_in[current_in_idx] = 0.0
+                current_in_idx += 1
+                continue
+            else
+                current_in_temp = unit.input_temperature
+            end
+        end
+
+        if unit.output_temperature === nothing
+            current_out_temp = lowest(out_temps_min[current_out_idx], out_temps_max[current_out_idx])
+            if current_out_temp === nothing && unit.constant_cop === nothing
+                @error "Error: The output temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'output_temperature' or check the connected components."
+                throw(InputError)
+            end
+        else
+            # skip layer if given fixed output temperature is not within the temperature band of the layer
+            if (
+                out_temps_min[current_out_idx] !== nothing
+                    && out_temps_min[current_out_idx] > unit.output_temperature
+                || out_temps_max[current_out_idx] !== nothing
+                    && out_temps_max[current_out_idx] < unit.output_temperature
+            )
+                available_heat_out[current_out_idx] = 0.0
+                current_out_idx += 1
+                continue
+            else
+                current_out_temp = unit.output_temperature
+            end
+        end 
+
+        if current_in_temp >= current_out_temp && unit.constant_cop === nothing
+            # bypass only if no constant cop is given
+            heat_transfer = minimum([
+                available_heat_in[current_in_idx],
+                available_heat_out[current_out_idx],
+                max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0)
+            ])
+            used_heat_in = heat_transfer
+            used_heat_out = heat_transfer
+            # The el. energy can not be zero as this would lead to problems in process step
+            # as then it seems that no electrical energy is available!
+            used_el_in = 0.01 # TODO
+            current_out_temp = current_in_temp
+            # TODO: Whats about the usage_fraction, should the bypass be kept included in the usage_fraction calculation?
+            # Or should we deny the bypass and force users to implement heat pumps in parallel if they want a bypass?
+            # TODO: Whats about a constant COP? Should this be still be valid even during bypass?
+        else
+            # calculate cop
+            cop = unit.constant_cop === nothing ?
+                dynamic_cop(current_in_temp, current_out_temp) :
+                unit.constant_cop
+            if cop === nothing
+                @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
+                throw(InputError)
+            end
+
+            # calculate energies with the current cop
+            # energies for current layer with potential heat in as basis
+            used_heat_in = copy(available_heat_in[current_in_idx])
+            used_el_in = used_heat_in / (cop - 1.0)
+            used_heat_out = used_heat_in + used_el_in
+
+            # check heat out as limiter, also checking for limit of heat pump
+            max_heat_out = min(available_heat_out[current_out_idx], 
+                               max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0))
+            if used_heat_out > max_heat_out
+                used_heat_out = max_heat_out
+                used_el_in = used_heat_out / cop
+                used_heat_in = used_el_in * (cop - 1.0)
+            end
+
+            # check electricity in as limiter
+            if used_el_in > available_el_in
+                used_el_in = available_el_in
+                used_heat_in = used_el_in * (cop - 1.0)
+                used_heat_out = used_heat_in + used_el_in
+            end
+        end
+
+        # finally all checks done, we add the layer and update remaining energies
+        push!(layers_el_in, used_el_in)
+        push!(layers_heat_in, used_heat_in)
+        push!(layers_heat_in_temperature, current_in_temp)
+        push!(layers_heat_in_uac, in_uacs[current_in_idx])
+        push!(layers_heat_out, used_heat_out)
+        push!(layers_heat_out_temperature, current_out_temp)
+        push!(layers_heat_out_uac, out_uacs[current_out_idx])
+
+        available_el_in -= used_el_in
+        available_heat_in[current_in_idx] -= used_heat_in
+        available_heat_out[current_out_idx] -= used_heat_out
+    end
+
+    return layers_el_in,
+           layers_heat_in,
+           layers_heat_in_temperature,
+           layers_heat_in_uac,
+           layers_heat_out,
+           layers_heat_out_temperature,
+           layers_heat_out_uac
+end
+
 
 function calculate_energies(
     unit::HeatPump,
@@ -212,173 +388,222 @@ function calculate_energies(
         unit.controller.strategy == "storage_driven"
         && unit.controller.state_machine.state != 2
     )
-        return (false, nothing, nothing, nothing)
+        return false, (nothing, nothing, nothing)
     end
 
-    # get usage fraction of external profile (normalized from 0 to 1)
+    # get usage fraction of external profile (normalized from 0 to 1, related to unit.power_th)
     max_usage_fraction = (
         unit.controller.parameter["operation_profile_path"] === nothing
         ? 1.0
         : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
     )
     if max_usage_fraction <= 0.0
-        return (false, nothing, nothing, nothing)
+        return false, (nothing, nothing, nothing)
     end
 
     # get potentials from inputs/outputs. only the heat input is calculated as vector,
     # the electricity input and heat output are calculated as scalars
     potential_energy_el = check_el_in(unit, sim_params)
-    potentials_energy_heat_in,
+    potentials_energies_heat_in,
         in_temps_min,
-        in_temps_max = check_heat_in(unit, sim_params)
-    potential_energy_heat_out, out_temp = check_heat_out(unit, sim_params)
-
-    available_el_in = potential_energy_el
-    available_heat_out = potential_energy_heat_out
+        in_temps_max,
+        in_uacs = check_heat_in(unit, sim_params)
+    potential_energies_heat_out, 
+        out_temps_min,
+        out_temps_max,
+        out_uacs = check_heat_out(unit, sim_params)
 
     # in the following we want to work with positive values as it is easier
-    available_heat_out = abs(available_heat_out)
+    available_el_in = copy(potential_energy_el)
+    available_heat_in = copy(abs.(potentials_energies_heat_in))
+    available_heat_out = copy(abs.(potential_energies_heat_out))
 
-    # limit heat output to design power
-    available_heat_out = min(available_heat_out, watt_to_wh(unit.power_th))
+    heat_in_has_inf_energy = any(isinf, available_heat_in)
+    heat_out_has_inf_energy = any(isinf, available_heat_out)
 
-    # shortcut if we're limited by electricity input or heat output or the requested
-    # temperature is higher than a set limit of the heat pump
-    if (
-        available_el_in <= sim_params["epsilon"]
-        || available_heat_out <= sim_params["epsilon"]
-        || unit.output_temperature !== nothing && out_temp > unit.output_temperature
-    )
-        return (false, nothing, nothing, nothing)
-    end
+    if heat_in_has_inf_energy && heat_out_has_inf_energy
+        # can not perform calculation if both inputs and outputs have inf energies
+        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and outputs. This cannot be resolved. 
+Please check the order of operation and make sure that either the inputs or the outputs have been fully calculated 
+before the heat pump $(unit.uac) has its potential step."
+    elseif heat_in_has_inf_energy 
+        layers_el_in = Vector{Floathing}()
+        layers_heat_in = Vector{Floathing}()
+        layers_heat_in_temperature = Vector{Temperature}()
+        layers_heat_in_uac = Vector{Stringing}()
+        layers_heat_out = Vector{Floathing}()
+        layers_heat_out_temperature = Vector{Temperature}()
+        layers_heat_out_uac = Vector{Stringing}()
 
-    layers_el_in = []
-    layers_heat_in = []
-    layers_heat_in_temperature = []
-    layers_heat_out = []
-
-    for (idx_layer, pot_heat_in) in pairs(potentials_energy_heat_in)
-        # if all electricity input or heat output was used up, skip through the rest
-        # of the heat input layers
-        if (
-            available_el_in <= sim_params["epsilon"]
-            || available_heat_out <= sim_params["epsilon"]
-        )
-            continue
+        for heat_in_idx in eachindex(available_heat_in)
+            layers_el_in_temp,
+            layers_heat_in_temp,
+            layers_heat_in_temperature_temp,
+            layers_heat_in_uac_temp,
+            layers_heat_out_temp,
+            layers_heat_out_temperature_temp,
+            layers_heat_out_uac_temp  = calculate_energies_heatpump(unit,
+                                                            sim_params,
+                                                            copy(available_el_in),
+                                                            [Inf],
+                                                            copy(available_heat_out),
+                                                            max_usage_fraction,
+                                                            [in_temps_min[heat_in_idx]],
+                                                            [in_temps_max[heat_in_idx]],
+                                                            [in_uacs[heat_in_idx]],
+                                                            out_temps_min,
+                                                            out_temps_max,
+                                                            out_uacs)
+                                                        
+            append!(layers_heat_in, layers_heat_in_temp)
+            append!(layers_heat_in_temperature, layers_heat_in_temperature_temp)
+            append!(layers_heat_in_uac, layers_heat_in_uac_temp)
+            # Is this correct? Using the highest energy as worst case should be good for now...
+            if heat_in_idx == 1
+                layers_el_in = layers_el_in_temp
+                layers_heat_out = layers_heat_out_temp
+                layers_heat_out_temperature = layers_heat_out_temperature_temp
+                layers_heat_out_uac = layers_heat_out_uac_temp
+            else
+                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
+                    layers_el_in = layers_el_in_temp
+                end
+                if _isless(_sum(layers_heat_out), _sum(layers_heat_out_temp))
+                    layers_heat_out = layers_heat_out_temp
+                    layers_heat_out_temperature = layers_heat_out_temperature_temp
+                    layers_heat_out_uac = layers_heat_out_uac_temp
+                end
+            end
         end
+    elseif heat_out_has_inf_energy
+        layers_el_in = Vector{Floathing}()
+        layers_heat_in = Vector{Floathing}()
+        layers_heat_in_temperature = Vector{Temperature}()
+        layers_heat_in_uac = Vector{Stringing}()
+        layers_heat_out = Vector{Floathing}()
+        layers_heat_out_temperature = Vector{Temperature}()
+        layers_heat_out_uac = Vector{Stringing}()
 
-        # check if it is an "empty" layer, usually from other outputs on a bus, which are
-        # included for balance calculations but cannot offer energy
-        if pot_heat_in <= sim_params["epsilon"]
-            continue
+        for heat_out_idx in eachindex(available_heat_out)
+            layers_el_in_temp,
+            layers_heat_in_temp,
+            layers_heat_in_temperature_temp,
+            layers_heat_in_uac_temp,
+            layers_heat_out_temp,
+            layers_heat_out_temperature_temp,
+            layers_heat_out_uac_temp  = calculate_energies_heatpump(unit,
+                                                            sim_params,
+                                                            copy(available_el_in),
+                                                            copy(available_heat_in),
+                                                            [Inf],
+                                                            max_usage_fraction,
+                                                            in_temps_min,
+                                                            in_temps_max,
+                                                            in_uacs,
+                                                            [out_temps_min[heat_out_idx]],
+                                                            [out_temps_max[heat_out_idx]],
+                                                            [out_uacs[heat_out_idx]])
+                                                        
+            append!(layers_heat_out, layers_heat_out_temp)
+            append!(layers_heat_out_temperature, layers_heat_out_temperature_temp)
+            append!(layers_heat_out_uac, layers_heat_out_uac_temp)
+            # Is this correct? Using the highest energy as worst case should be good for now...
+            if heat_out_idx == 1
+                layers_el_in = layers_el_in_temp
+                layers_heat_in = layers_heat_in_temp
+                layers_heat_in_temperature = layers_heat_in_temperature_temp
+                layers_heat_in_uac = layers_heat_in_uac_temp
+            else
+                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
+                    layers_el_in = layers_el_in_temp
+                end
+                if _isless(_sum(layers_heat_in), _sum(layers_heat_in_temp))
+                    layers_heat_in = layers_heat_in_temp
+                    layers_heat_in_temperature = layers_heat_in_temperature_temp
+                    layers_heat_in_uac = layers_heat_in_uac_temp
+                end
+            end
         end
-
-        # skip layer if optionally given fixed input temperature is not within
-        # temperature band of the layer
-        if (
-            unit.input_temperature !== nothing
-                && in_temps_min[idx_layer] !== nothing
-                && in_temps_min[idx_layer] > unit.input_temperature
-            || unit.input_temperature !== nothing
-                && in_temps_max[idx_layer] !== nothing
-                && in_temps_max[idx_layer] < unit.input_temperature
-        )
-            continue
-        end
-        in_temp = unit.input_temperature !== nothing ?
-            unit.input_temperature :
-            highest(in_temps_min[idx_layer], in_temps_max[idx_layer])
-
-        # a constant COP has priority. if it's not given the dynamic cop requires temperatures
-        cop = unit.constant_cop === nothing ?
-              dynamic_cop(in_temp, out_temp) :
-              unit.constant_cop
-        if cop === nothing
-            @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
-            exit()
-        end
-
-        # energies for current layer with potential heat in as basis
-        used_heat_in = pot_heat_in
-        used_el_in = used_heat_in / (cop - 1.0)
-        used_heat_out = used_heat_in + used_el_in
-
-        # check heat out as limiter
-        if used_heat_out > available_heat_out
-            used_heat_out = available_heat_out
-            used_el_in = used_heat_out / cop
-            used_heat_in = used_el_in * (cop - 1.0)
-        end
-
-        # check electricity in as limiter
-        if used_el_in > available_el_in
-            used_el_in = available_el_in
-            used_heat_in = used_el_in * (cop - 1.0)
-            used_heat_out = used_heat_in + used_el_in
-        end
-
-        # check if usage fraction went over the maximum, in which case the last layer added
-        # can't be fully utilised and is added with the remaining fraction to the max
-        old_usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
-        new_usage_fraction = (sum(layers_heat_out; init=0.0) + used_heat_out) /
-                             watt_to_wh(unit.power_th)
-        if new_usage_fraction > max_usage_fraction
-            used_heat_out *= (max_usage_fraction - old_usage_fraction)
-            used_el_in = used_heat_out * cop
-            used_heat_in = used_el_in * (cop - 1.0)
-        end
-
-        # finally all checks done, we add the layer and update remaining energies
-        push!(layers_el_in, used_el_in)
-        push!(layers_heat_in, used_heat_in)
-        push!(layers_heat_in_temperature, in_temp)
-        push!(layers_heat_out, used_heat_out)
-        available_el_in -= used_el_in
-        available_heat_out -= used_heat_out
+    else
+        layers_el_in,
+        layers_heat_in,
+        layers_heat_in_temperature,
+        layers_heat_in_uac,
+        layers_heat_out,
+        layers_heat_out_temperature,
+        layers_heat_out_uac  = calculate_energies_heatpump(unit,
+                                                           sim_params,
+                                                           available_el_in,
+                                                           available_heat_in,
+                                                           available_heat_out,
+                                                           max_usage_fraction,
+                                                           in_temps_min,
+                                                           in_temps_max,
+                                                           in_uacs,
+                                                           out_temps_min,
+                                                           out_temps_max,
+                                                           out_uacs)
     end
 
     # if all chosen heat layers combined are not enough to meet minimum power fraction,
     # the heat pump doesn't run at all
     usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
     if usage_fraction < unit.min_power_fraction
-        return (false, nothing, nothing, nothing)
+        return false, (nothing, nothing, nothing)
     end
 
-    return (
-        true,
-        layers_el_in,
-        layers_heat_in,
-        layers_heat_in_temperature,
-        layers_heat_out,
-        out_temp
-    )
+    return true,                          
+           (layers_el_in,                 # 1
+           layers_heat_in,                # 2 
+           layers_heat_in_temperature,    # 3
+           layers_heat_in_uac,            # 4
+           layers_heat_out,               # 5
+           layers_heat_out_temperature,   # 6
+           layers_heat_out_uac,           # 7
+           heat_in_has_inf_energy,        # 8
+           heat_out_has_inf_energy        # 9 
+       )
 end
 
 function potential(unit::HeatPump, sim_params::Dict{String,Any})
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(
             unit,
-            sum(energies[2]; init=0.0),
-            sum(energies[3]; init=0.0),
-            sum(energies[5]; init=0.0)
+            energies[1],
+            energies[2],
+            energies[5],
+            energies[4],
+            energies[7],
+            energies[8],
+            energies[9]
+        )
+        set_temperature!(
+            unit.input_interfaces[unit.m_heat_in],
+            lowest(energies[3]),
+            nothing
+        )
+        set_temperature!(
+            unit.output_interfaces[unit.m_heat_out],
+            nothing,
+            highest(energies[6])
         )
     end
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
-    energies = calculate_energies(unit, sim_params)
+    success, energies = calculate_energies(unit, sim_params)
 
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    el_in = sum(energies[2]; init=0.0)
-    heat_in = sum(energies[3]; init=0.0)
+    el_in = sum(energies[1]; init=0.0)
+    heat_in = sum(energies[2]; init=0.0)
     heat_out = sum(energies[5]; init=0.0)
 
     if heat_out < sim_params["epsilon"]
@@ -386,13 +611,32 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
+    # calculate average cop of current time step
     if el_in > sim_params["epsilon"]
         unit.cop = heat_out / el_in
     end
 
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, nothing)
-    add!(unit.output_interfaces[unit.m_heat_out], heat_out, energies[6])
+    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, lowest(energies[3]))
+    add!(unit.output_interfaces[unit.m_heat_out], heat_out, highest(energies[6]))
+end
+
+# has its own reset function as here more parameters are present that need to be reset in every timestep
+function reset(unit::HeatPump)
+    for inface in values(unit.input_interfaces)
+        if inface !== nothing
+            reset!(inface)
+        end
+    end
+    for outface in values(unit.output_interfaces)
+        if outface !== nothing
+            reset!(outface)
+        end
+    end
+
+    # reset other parameter
+    unit.losses = 0.0
+    unit.cop = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}

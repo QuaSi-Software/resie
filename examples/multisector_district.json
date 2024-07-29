@@ -1,0 +1,423 @@
+{
+    "io_settings": {
+        "csv_output_file": "./output/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./output/auxiliary_info.md",
+        "sankey_plot": {
+            "m_h_w_lt1": "red",
+            "m_h_w_ht1": "darkred",
+            "m_e_ac_230v": "darkgoldenrod1",
+            "m_c_g_natgas": "purple3",
+            "m_c_g_h2": "lime",
+            "m_c_g_o2": "firebrick1",
+            "Losses": "black"
+        },
+        "csv_output_keys": {
+			"TST_DEM_TH_01":  ["m_h_w_ht1 IN"],
+            "TST_BFT_TH_01": ["Load"],
+            "TST_DEM_TH_02": ["m_h_w_ht1 IN"],
+            "TST_BFT_TH_02": ["Load"],
+            "TST_STES_TH_01": ["Load"],
+            "TST_ELY_01": ["m_h_w_lt1 OUT"],
+            "TST_CHP_01": ["m_h_w_ht1 OUT"],
+            "TST_GBO_01": ["m_h_w_ht1 OUT"],
+            "TST_HTP_01": ["m_h_w_ht1 OUT"],
+            "TST_HTP_02": ["m_h_w_ht1 OUT"],
+            "TST_BUS_TH_00": ["Balance"],
+            "TST_PVP_EL_01": ["m_e_ac_230v OUT"]
+        },
+        "output_plot": {
+            "1": {
+                "key": {"TST_DEM_TH_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_BFT_TH_01": ["Load"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_DEM_TH_02": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_BFT_TH_02": ["Load"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_STES_TH_01": ["Load"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_ELY_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"TST_CHP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "8": {
+                "key": {"TST_GBO_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "9": {
+                "key": {"TST_HTP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "10": {
+                "key": {"TST_HTP_02": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "11": {
+                "key": {"TST_BUS_TH_00": ["Balance"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "12": {
+                "key": {"TST_PVP_EL_01": ["m_e_ac_230v OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "13": {
+                "key": {"TST_STES_TH_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": -0.001
+            },
+            "14": {
+                "key": {"TST_STES_TH_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 31535100,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_DEM_TH_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "constant_temperature": 60,
+            "scale": 16000
+        },
+        "TST_DEM_TH_02": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
+            "constant_temperature": 60,
+            "scale": 19000
+        },
+        "TST_DEM_EL_01": {
+            "type": "Demand",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 13000
+        },   
+        "TST_DEM_EL_02": {
+            "type": "Demand",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 15000
+        }, 
+        "TST_GRI_EL_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": ["TST_BUS_EL_01"],
+            "is_source": true
+        },
+        "TST_GRI_EL_01_out": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [],
+            "is_source": false
+        },
+        "TST_GRI_H2_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_h2",
+            "control_refs": [],
+            "output_refs": [],
+            "is_source": false
+        },
+        "TST_GRI_O2_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_o2",
+            "control_refs": [],
+            "output_refs": [],
+            "is_source": false
+        },
+        "TST_GRI_EG_01": {
+            "type": "GridConnection",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_GAS_01"],
+            "is_source": true
+        },
+        "TST_PVP_EL_01": {
+            "type": "PVPlant",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_EL_01"
+            ],
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 3500
+        },
+        "TST_BUS_EL_01": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_PVP_EL_01",
+                    "TST_CHP_01",
+                    "TST_GRI_EL_01"
+                ],
+                "output_order": [
+                    "TST_DEM_EL_01",
+                    "TST_DEM_EL_02",
+                    "TST_ELY_01",
+                    "TST_HTP_02",
+                    "TST_HTP_01",
+                    "TST_GRI_EL_01_out"
+                ],
+                "energy_flow":[
+                    [1,1,1,1,1,1],
+                    [1,1,1,1,1,1],
+                    [1,1,1,1,1,0]
+                ]
+            }
+        },
+        "TST_BUS_TH_00": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_HTP_02",
+                    "TST_HTP_01",
+                    "TST_CHP_01"
+                ],
+                "output_order": [
+                    "TST_BUS_TH_02",
+                    "TST_BUS_TH_01",
+                    "TST_STES_TH_01"
+                ],
+                "energy_flow": [
+                    [1, 1, 1],
+                    [1, 1, 0],
+                    [1, 1, 0]
+                ]
+            }
+        },
+        "TST_BUS_TH_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_BUS_TH_00",
+                    "TST_BFT_TH_01",
+                    "TST_GBO_01"
+                ],
+                "output_order": [
+                    "TST_DEM_TH_01",
+                    "TST_BFT_TH_01"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 1],
+                    [1, 0]
+                ]
+            }
+        },
+        "TST_BUS_TH_02": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_BUS_TH_00",
+                    "TST_BFT_TH_02"
+                ],
+                "output_order": [
+                    "TST_DEM_TH_02",
+                    "TST_BFT_TH_02"
+                ]
+            }
+        },
+        "TST_BUS_GAS_01": {
+            "type": "Bus",
+            "medium": "m_c_g_natgas",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_GRI_EG_01"
+                ],
+                "output_order": [
+                    "TST_CHP_01",
+                    "TST_GBO_01"
+                ]
+            }
+        },
+        "TST_ELY_01": {
+            "type": "Electrolyser",
+            "control_refs": [],
+            "output_refs": [
+                "TST_GRI_H2_01",
+                "TST_GRI_O2_01",
+                "TST_HTP_02"
+            ],
+            "strategy": {
+                "name": "demand_driven",
+                "operation_profile_path": "profiles/examples/district/4000hours_with_least_CO2_2022.prf"
+            },
+            "power_el": 600000,
+            "output_temperature_ht": 50.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.2,
+            "min_power_fraction_total": 0.2,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
+        },
+        "TST_CHP_01": {
+            "type": "CHPP",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_00",
+                "TST_BUS_EL_01"
+            ],
+            "strategy": {
+                "name": "demand_driven",
+                "load_storages m_h_w_ht1": true,
+                "load_storages m_e_ac_230v": true
+            },
+            "m_heat_out": "m_h_w_ht1",
+            "m_el_out": "m_e_ac_230v",
+            "power_el": 60000,
+            "linear_interface": "fuel_in",
+            "efficiency_fuel_in": "const:1.0",
+            "efficiency_el_out": "const:0.4",
+            "efficiency_heat_out": "const:0.6",
+            "output_temperature": 60,
+            "min_power_fraction": 1.0
+        },
+        "TST_GBO_01": {
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
+            "control_refs": ["TST_BFT_TH_01"],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "strategy": {
+                "name": "storage_driven",
+                "high_threshold": 0.5,
+                "low_threshold": 0.5          
+            },
+            "power_th": 400000,
+            "output_temperature": 60,
+            "min_power_fraction": 0.0,
+            "efficiency_fuel_in": "const:1.0"
+        },
+        "TST_BFT_TH_01": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_01"
+            ],
+            "capacity": 500000,
+            "load": 0,
+            "high_temperature": 60.0
+        },
+        "TST_BFT_TH_02": {
+            "type": "BufferTank",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_02"
+            ],
+            "capacity": 500000,
+            "load": 150000,
+            "high_temperature": 60.0
+        },
+        "TST_STES_TH_01": {
+            "type": "SeasonalThermalStorage",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HTP_01"
+            ],
+            "capacity": 400000000,
+            "load": 190000000,
+            "high_temperature": 60.0
+        },
+        "TST_HTP_01": {
+            "type": "HeatPump",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_00"
+            ],
+            "strategy": {
+                "name": "demand_driven",
+                "load_storages m_h_w_ht1": false
+            },
+            "m_heat_out": "m_h_w_ht1",
+            "power_th": 550000,
+            "constant_cop": 3.0,
+            "min_power_fraction": 0.2
+        },
+        "TST_HTP_02": {
+            "type": "HeatPump",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH_00"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 300000,
+            "constant_cop": 3.5
+        }
+    }
+}
