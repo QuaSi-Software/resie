@@ -743,8 +743,7 @@ function inner_distribute!(unit::Bus)
         end
 
         for output_row in sort(collect(values(unit.balance_table_outputs)), by=x->x.priority)
-            continue_iteration = continue_iteration && !is_empty(output_row)
-            if !continue_iteration
+            if is_empty(output_row)
                 break
             end
 
