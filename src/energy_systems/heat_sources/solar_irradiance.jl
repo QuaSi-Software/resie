@@ -6,6 +6,10 @@ function sun_position(dt::DateTime, longitude::Number, latitude::Number,
 Calculate solar position in degrees
 Based on Roberto Grena (2012), Five new algorithms for the computation of sun position
 from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.01.024.
+dt must be provided in UTC.
+longitude and latitude should be provided in WGS84
+pressure and temperature are needed to apply the refraction correction which is relevant
+when the sun is low.
 """
 
     longitude = deg2rad(longitude)
@@ -78,8 +82,9 @@ function alg5(t2060::Number, tt::Number, longitude::Number)
 end
 
 
-function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zenith, solar_azimuth, 
-                           global_solar_hor_irradiance, diffuse_solar_hor_irradiance, dni=nothing)
+function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zenith::Number, solar_azimuth::Number, 
+                           global_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
+                           zenith_threshold_for_zero_dni::Number=89.5)
     """
     Calculate beam irradiance in collector plane and direct_normal_irradiance
     All angles are in degrees and irradiances in W/m²
@@ -99,9 +104,13 @@ function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zeni
     # calculate direct normal irradiance from global horrizontal irradiance (GHI) and 
     # diffuse horrizontal irradiance (DHI)
     if isnothing(dni)
-        direct_normal_irradiance = max(
-            (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
-            )
+        if solar_zenith >= zenith_threshold_for_zero_dni
+            direct_normal_irradiance = 0
+        else
+            direct_normal_irradiance = max(
+                (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
+                )
+        end
     else
         direct_normal_irradiance = dni
     end
