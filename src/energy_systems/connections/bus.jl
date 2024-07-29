@@ -387,50 +387,6 @@ function energy_flow_is_denied(unit::Bus, input_row::BTInputRow, output_row::BTO
     )
 end
 
-# The following functions are effectively arithmetic operations on floats where one or both
-# operands may be nothing. It is possible to overwrite the typical operators + and -,
-# however this was deemed too dangerous.
-function _sub(first::Float64, second::Float64) return first - second end
-function _sub(first::Nothing, second::Float64) return -second end
-function _sub(first::Float64, second::Nothing) return first end
-function _sub(first::Nothing, second::Nothing) return nothing end
-
-function _add(first::Float64, second::Float64) return first + second end
-function _add(first::Nothing, second::Float64) return second end
-function _add(first::Float64, second::Nothing) return first end
-function _add(first::Nothing, second::Nothing) return nothing end
-
-function _abs(val::Union{Floathing, Vector{<:Floathing}})
-    if !isa(val, AbstractVector)
-        val = [val]
-    end
-    abs_val = Vector{Floathing}(collect(x === nothing ? nothing : abs(x) for x in val))
-    return abs_val
-end
-
-function _sum(vector::Union{Floathing,Vector{<:Floathing}})
-    sum = nothing
-    for entry in vector
-        sum = _add(sum, entry)
-    end
-    return sum
-end
-
-function _mean(vector::Union{Floathing,Vector{<:Floathing}})
-    number_of_values = count(x -> x !== nothing, vector)
-    sum = _sum(vector)
-    if number_of_values > 0 && sum !== nothing
-        return sum / number_of_values
-    else 
-        return nothing
-    end
-end
-
-function _isless(first::Nothing, second::Nothing) return false end
-function _isless(first::Float64, second::Nothing) return false end
-function _isless(first::Nothing, second::Float64) return true end
-function _isless(first::Float64, second::Float64) return first < second end
-
 """
     set_max_energy!(bus, component, is_input, value, purpose_uac, has_calculated_all_maxima)
 
