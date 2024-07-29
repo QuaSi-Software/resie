@@ -299,11 +299,12 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function add!(
     interface::SystemInterface,
-    change::Float64,
-    temperature::Temperature=nothing
+    change::Union{Floathing, Vector{<:Floathing}},
+    temperature::Temperature=nothing,
+    purpose_uac::Union{Stringing, Vector{Stringing}}=nothing,
 )
-    interface.balance += change
-    interface.sum_abs_change += abs(change)
+    interface.balance += sum(change)
+    interface.sum_abs_change += sum(abs.(change))
 
     if temperature !== nothing
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
@@ -316,9 +317,9 @@ function add!(
     end
 
     if interface.source.sys_function == sf_bus
-        add_balance!(interface.source, interface.target, false, change)
+        add_balance!(interface.source, interface.target, false, change, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change)
+        add_balance!(interface.target, interface.source, true, change, purpose_uac)
     end
 end
 
@@ -331,11 +332,12 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function sub!(
     interface::SystemInterface,
-    change::Float64,
-    temperature::Temperature=nothing
+    change::Union{Floathing, Vector{<:Floathing}},
+    temperature::Temperature=nothing,
+    purpose_uac::Union{Stringing, Vector{Stringing}}=nothing,
 )
-    interface.balance -= change
-    interface.sum_abs_change += abs(change)
+    interface.balance -= sum(change)
+    interface.sum_abs_change += sum(abs.(change))
 
     if temperature !== nothing
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
@@ -348,9 +350,9 @@ function sub!(
     end
 
     if interface.source.sys_function == sf_bus
-        sub_balance!(interface.source, interface.target, false, change)
+        sub_balance!(interface.source, interface.target, false, change, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change)
+        sub_balance!(interface.target, interface.source, true, change, purpose_uac)
     end
 end
 
@@ -406,7 +408,7 @@ on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
-    value::Union{Floathing, Vector{Floathing}},
+    value::Union{Floathing, Vector{<:Floathing}},
     purpose_uac::Union{Stringing, Vector{Stringing}} = nothing,
     has_calculated_all_maxima::Bool = false
 )
@@ -467,27 +469,65 @@ max_energy value will be reduced. If the maximum possible energy for all max_ene
 calculated (`has_calculated_all_maxima` is true), the other max_energy values will be reduced 
 proportionally by a linear percentage.
 """
-function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy, amount::Float64, uac_to_reduce::Stringing=nothing)
-    if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
-        for i in eachindex(max_energy.max_energy)
-            to_reduce = min(amount, max_energy.max_energy[i])
-            max_energy.max_energy[i] -= to_reduce
-            amount -= to_reduce
-            if amount <= 0.0 break end
-        end
-    else
-        idx = findfirst(==(uac_to_reduce), max_energy.purpose_uac)
-        if idx !== nothing
-            if max_energy.has_calculated_all_maxima
-                max_energy.max_energy .*= 1 - (amount / max_energy.max_energy[idx])
-            else
-                max_energy.max_energy[idx] -= amount
+function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
+                            amount::Union{Float64, Vector{Float64}},
+                            uac_to_reduce::Union{Stringing, Vector{Stringing}}=nothing)
+    for amount_idx in eachindex(amount)
+        current_amount = length(amount) == 1 ? amount : amount[amount_idx]
+        if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
+            for i in eachindex(max_energy.max_energy)
+                to_reduce = min(current_amount, max_energy.max_energy[i])
+                max_energy.max_energy[i] -= to_reduce
+                current_amount -= to_reduce
+                if current_amount <= 0.0 break end
             end
         else
-            @error "The uac could not be found in the max_energy."
+            currrent_uac_to_reduce = isa(uac_to_reduce, AbstractVector) ? uac_to_reduce[amount_idx] : uac_to_reduce
+            idx = findfirst(==(currrent_uac_to_reduce), max_energy.purpose_uac)
+            if idx !== nothing
+                if max_energy.has_calculated_all_maxima
+                    max_energy.max_energy .*= 1 - (current_amount / max_energy.max_energy[idx])
+                else
+                    max_energy.max_energy[idx] -= current_amount
+                end
+            else
+                @error "The uac could not be found in the max_energy."
+            end
         end
     end
 end
+
+"""
+    increase_max_energy!(max_energy, amount, uac_to_reduce)
+
+This function increases the maximum energy values stored in `max_energy` by the given `amount`.
+If `uac_to_increase` is specified and found in `max_energy.purpose_uac`, only the corresponding
+max_energy value will be increased.
+"""
+function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
+                              amount::Union{Float64, Vector{Float64}},
+                              uac_to_increase::Union{Stringing, Vector{Stringing}}=nothing)
+    for amount_idx in eachindex(amount)
+        current_amount = length(amount) == 1 ? amount : amount[amount_idx]
+        currrent_uac_to_increase = isa(uac_to_increase, AbstractVector) ? uac_to_increase[amount_idx] : uac_to_increase
+        if uac_to_increase === nothing || is_purpose_uac_nothing(max_energy)
+            if is_max_energy_nothing(max_energy) || length(max_energy.max_energy) == 0
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false)
+            else
+                max_energy.max_energy[1] += current_amount
+            end
+        else
+            idx = findfirst(==(currrent_uac_to_increase), max_energy.purpose_uac)
+            if idx === nothing
+
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, true)
+            else
+                max_energy.max_energy[idx] += current_amount
+            end
+        end
+    end
+end
+
 
 """
     max_energy_sum(max_energy)
@@ -510,9 +550,10 @@ If the given values are scalars, they are converted into vectors.
 If `values` is empty, a zero is added to ensure accessibility.
 """
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
-                         values::Union{Floathing, Vector{Floathing}},
+                         values::Union{Floathing, Vector{<:Floathing}},
                          purpose_uac::Union{Stringing, Vector{Stringing}},
-                         has_calculated_all_maxima::Bool)
+                         has_calculated_all_maxima::Bool,
+                         append::Bool=false)
 
     if !isa(values, AbstractVector)
         values = [values]
@@ -530,10 +571,15 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
     has already read out the max energy and has considered it (it can only be equal or smaller)
     or a component is overwriting its own max_energy.
     """
-    max_energy.max_energy = values
-    max_energy.has_calculated_all_maxima = has_calculated_all_maxima
-    max_energy.purpose_uac = purpose_uac
-
+    if append
+        append!(max_energy.max_energy, values)
+        append!(max_energy.purpose_uac, purpose_uac)
+        max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+    else
+        max_energy.max_energy = values
+        max_energy.purpose_uac = purpose_uac
+        max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+    end
 end
 
 """
