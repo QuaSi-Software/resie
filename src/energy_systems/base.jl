@@ -448,10 +448,31 @@ end
 """
     set_max_energy!(interface, value, purpose_uac, has_calculated_all_maxima)
 
-Set the maximum power that can be delivered to the given value.
+Set the maximum energy in the `interface` to the given `value` representing the maximum 
+energy that the calling component can deliver.
+For 1-to-1 connection between two components, the minimum value of the current max_energy 
+and the given `value` is written to the interface.
 
-If the source or target of the interface is a bus, also calls the set_max_energy! function
-on that bus.
+If the source or target of the interface is a bus, the set_max_energy! function
+on that bus is called as well to write the max_energy into the balance table of the bus.
+
+The optional `purpose_uac` can be set by the calling component to define the component 
+that is supposed to receive or deliver the given energy. This makes not much sense on 1-to-1 
+interfaces, but is set for uniformity as well.
+
+Both `value` and `purpose_uac` can be given either as scalars or as vectors, defining multiple
+maximum energies for multiple other components (purposes). The given `purpose_uac` do not have
+to be necessarily unique. 
+
+The flag `has_calculated_all_maxima` can be set to true if the calling component has not known
+the combination of temperature and energy of a source or a sink during its pre-calculation. 
+Then, the calling component can calculate the maximum energy that could potentially be taken 
+or delivered for each source or for each sink seperately, ignoring all other inputs or outputs. 
+Setting the flag, the max_energy is then later handeled accordingly by reduce_max_energy!(),
+considering that the single values can not be summed up but they all have to be linearly
+decreased if one of them is reduced. An analogy would be to divide the current time step 
+into smaller time steps, in each of which a different component is supplied or drawn with
+a subset of the maximum possible energy of the current time step.
 """
 function set_max_energy!(
     interface::SystemInterface,
@@ -489,10 +510,10 @@ end
 
 This function extracts the `max_energy` values from a given `MaxEnergy` struct.
 If `purpose_uac` is provided and found within `max_energy.purpose_uac`, it returns the sum
-of all `max_energy` values corresponding to the specific `purpose_uac`. If `purpose_uac` is
-provided but not found, the function returns 0.0. If `purpose_uac` is not provided or is
-considered "nothing" based on `is_purpose_uac_nothing(max_energy)`, it returns the sum of 
-all `max_energy` values.
+of all `max_energy` values corresponding to the specific `purpose_uac`.
+If `purpose_uac` is provided but not found, the function returns 0.0.
+If `purpose_uac` is not provided or if `max_energy.purpose_uac` is empty, the sum of 
+all `max_energy` values is returned.
 """
 function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::Stringing=nothing)
     if purpose_uac === nothing || is_purpose_uac_nothing(max_energy)
@@ -512,9 +533,14 @@ end
 
 This function decreases the maximum energy values stored in `max_energy` by the given `amount`.
 If `uac_to_reduce` is specified and found in `max_energy.purpose_uac`, only the corresponding
-max_energy value will be reduced. If the maximum possible energy for all max_energy have been 
-calculated (`has_calculated_all_maxima` is true), the other max_energy values will be reduced 
-proportionally by a linear percentage.
+max_energy value will be reduced. 
+f the maximum possible energy for all max_energy have been calculated (`has_calculated_all_maxima` 
+is true), the other max_energy values will be reduced proportionally by a linear percentage. 
+If `uac_to_reduce` could not be found, an error arises.
+
+If no `uac_to_reduce` is specified of if `max_energy.purpose_uac` is empty, the amount 
+decreases the entries in max_energy.max_energy, starting with the first one, until the amount 
+is fully distributed.
 """
 function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                             amount::Union{Float64, Vector{Float64}},
@@ -548,8 +574,12 @@ end
     increase_max_energy!(max_energy, amount, uac_to_reduce)
 
 This function increases the maximum energy values stored in `max_energy` by the given `amount`.
-If `uac_to_increase` is specified and found in `max_energy.purpose_uac`, only the corresponding
-max_energy value will be increased.
+If `uac_to_increase` is specified and found in `max_energy.purpose_uac`, the corresponding
+max_energy value will be increased. 
+If `uac_to_increase` could not be found, a new value in max_energy is added.
+If no `uac_to_increase` is given of if `max_energy.purpose_uac` is empty, the given amount is added
+to the first max_energy.max_energy as in this case, only one value should be present (e.g 1-to-1 
+connection or components that don't care).
 """
 function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                               amount::Union{Float64, Vector{Float64}},
@@ -566,7 +596,6 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
         else
             idx = findfirst(==(currrent_uac_to_increase), max_energy.purpose_uac)
             if idx === nothing
-
                 set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, true)
             else
                 max_energy.max_energy[idx] += current_amount
@@ -590,7 +619,7 @@ function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
 end
 
 """
-        set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
+    set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
 
 Fills a MaxEnergy struct with given values.
 If the given values are scalars, they are converted into vectors.
@@ -614,9 +643,9 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
     end
 
     """
-    overwriting is possible here as either the interface has no max energy yet, or a component
-    has already read out the max energy and has considered it (it can only be equal or smaller)
-    or a component is overwriting its own max_energy.
+    Overwriting is possible here as either the interface has no max energy yet, or a component
+    or the set_max_energy!(interface, ...) has already read out the max energy and has considered 
+    it (it can only be equal or smaller) or a component is overwriting its own max_energy.
     """
     if append
         append!(max_energy.max_energy, values)
@@ -632,7 +661,8 @@ end
 """
     is_max_energy_nothing(max_energy)
 
-Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has beed performed (yet).
+Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has
+beed performed (yet).
 """
 function is_max_energy_nothing(max_energy::EnergySystems.MaxEnergy)
     return max_energy.max_energy[1] === nothing && length(max_energy.max_energy) == 1
@@ -641,8 +671,8 @@ end
 """
     is_purpose_uac_nothing(max_energy)
 
-Checks a MaxEnergy struct if the `purpose_uac` is nothing/empty (true), meaning that the max_energy is not indtended
-for a specific component.
+Checks a MaxEnergy struct if the `purpose_uac` is nothing/empty (true), meaning that the 
+max_energy is not intended for a specific component.
 """
 function is_purpose_uac_nothing(max_energy::EnergySystems.MaxEnergy)
     return (isempty(max_energy.purpose_uac) || 
