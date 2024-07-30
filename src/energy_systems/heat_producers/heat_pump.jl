@@ -438,8 +438,8 @@ function calculate_energies(
         return false, (nothing, nothing, nothing)
     end
 
-    # get potentials from inputs/outputs. only the heat input is calculated as vector,
-    # the electricity input and heat output are calculated as scalars
+    # get potentials from inputs/outputs. The heat input and output are calculated as 
+    # vectors to allow for temperautre layers, while the electricity input is a scalar
     potential_energy_el = check_el_in(unit, sim_params)
     potentials_energies_heat_in,
         in_temps_min,
