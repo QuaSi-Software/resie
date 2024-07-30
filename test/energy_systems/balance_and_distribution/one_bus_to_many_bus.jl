@@ -161,7 +161,7 @@ function test_one_bus_to_many_bus()
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[3], bus_2)  # TES_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 0.0
-    @test EnergySystems.temp_min_highest(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) === nothing
 
     exchanges = EnergySystems.balance_on(bus_proxy.input_interfaces[2], bus_3)  # TES_02
     @test EnergySystems.balance(exchanges) ≈ 0.0

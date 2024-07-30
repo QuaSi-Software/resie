@@ -661,15 +661,17 @@ function balance_on(
                 end
             end
 
-            push!(return_exchanges, EnEx(
-                balance=0.0,
-                energy_potential=energy_pot,
-                purpose_uac=output_row.target.uac,
-                temperature_min=output_row.temperature_min,
-                temperature_max=output_row.temperature_max,
-                pressure=nothing,
-                voltage=nothing
-            ))
+            if energy_pot < 0.0
+                push!(return_exchanges, EnEx(
+                    balance=0.0,
+                    energy_potential=energy_pot,
+                    purpose_uac=output_row.target.uac,
+                    temperature_min=output_row.temperature_min,
+                    temperature_max=output_row.temperature_max,
+                    pressure=nothing,
+                    voltage=nothing
+                ))
+            end
         end
     else
         output_row = [row for row in values(unit.balance_table_outputs) if row.target.uac == interface.target.uac][1]
@@ -693,16 +695,18 @@ function balance_on(
                     energy_pot = unit.balance_table[input_row.priority, output_row.priority*2-1]
                 end
             end
-
-            push!(return_exchanges, EnEx(
-                balance=0.0,
-                energy_potential=energy_pot,
-                purpose_uac=input_row.source.uac,
-                temperature_min=input_row.temperature_min,
-                temperature_max=input_row.temperature_max,
-                pressure=nothing,
-                voltage=nothing
-            ))
+            
+            if energy_pot > 0.0
+                push!(return_exchanges, EnEx(
+                    balance=0.0,
+                    energy_potential=energy_pot,
+                    purpose_uac=input_row.source.uac,
+                    temperature_min=input_row.temperature_min,
+                    temperature_max=input_row.temperature_max,
+                    pressure=nothing,
+                    voltage=nothing
+                ))
+            end
         end
     end
 
