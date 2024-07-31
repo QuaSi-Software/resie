@@ -1,0 +1,174 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/hp_temperature_layer/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/hp_temperature_layer/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/hp_temperature_layer/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": {},
+        "output_plot_file": "./test/scenarios/hp_temperature_layer/output_plot.html",
+        "output_plot": "all"
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 603900,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "constant_temperature": 85,
+            "scale": 500
+        },
+        "TST_DEM_02": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "constant_temperature": 90,
+            "scale": 200
+        },
+        "TST_SRC_01": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "constant_power": 500000,
+            "constant_temperature": 5
+        },
+        "TST_SRC_02": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_lt1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_HP_02"
+            ],
+            "constant_power": 500000,
+            "constant_temperature": 20
+        },
+        "TST_SRC_03": {
+            "type": "BoundedSupply",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH"
+            ],
+            "constant_power": 300,
+            "constant_temperature": 26
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_EL"
+            ],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "m_heat_in": "m_h_w_lt1",
+            "m_heat_out": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 300,
+            "output_temperature": 30,
+            "min_power_fraction": 0.0
+        },
+        "TST_HP_02": {
+            "type": "HeatPump",
+            "m_heat_in": "m_h_w_lt1",
+            "m_heat_out": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_BUS_TH"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 500,
+            "output_temperature": 40,
+            "min_power_fraction": 0.0
+        },
+        "TST_HP_03": {
+            "type": "HeatPump",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_DEM_01"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 1000,
+            "min_power_fraction": 0.0
+        },
+        "TST_HP_04": {
+            "type": "HeatPump",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_ht1",
+            "control_refs": [],
+            "output_refs": [
+                "TST_DEM_02"
+            ],
+            "strategy": {
+                "name": "demand_driven"
+            },
+            "power_th": 500,
+            "min_power_fraction": 0.0
+        },
+        "TST_BUS_EL": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_GRI_01"
+                ],
+                "output_order": [
+                    "TST_HP_01",
+                    "TST_HP_02",
+                    "TST_HP_03",
+                    "TST_HP_04"
+                ],
+                "energy_flow": [
+                    [1, 1, 1, 1]
+                ]
+            }
+        },
+        "TST_BUS_TH": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "control_refs": [],
+            "connections": {
+                "input_order": [
+                    "TST_HP_01",
+                    "TST_HP_02",
+                    "TST_SRC_03"
+                ],
+                "output_order": [
+                    "TST_HP_03",
+                    "TST_HP_04"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 1],
+                    [1, 1]
+                ]
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+ReSiE general log file of simulation started at: 2024-07-31 17:21:01
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_DEM_01', a constant temperature of 85 °C is set.
+[Info] For 'TST_SRC_03', a constant temperature of 26 °C is set.
+[Info] For 'TST_SRC_01', a constant temperature of 5 °C is set.
+[Info] For 'TST_SRC_02', a constant temperature of 20 °C is set.
+[Info] For 'TST_GRI_01', no temperature is set.
+[Info] For 'TST_DEM_02', a constant temperature of 90 °C is set.
+[Info] Auxiliary info dumped to file ./test/scenarios/hp_temperature_layer/auxiliary_info.md
+[Info] Line plot created and saved to .output/output_plot.html
+[Info] Sankey created and saved to .output/output_sankey.html
+[Info] CSV-file with outputs written to ./test/scenarios/hp_temperature_layer/out.csv
+[Info] general log saved to ./.\test\scenarios\hp_temperature_layer\general.log
