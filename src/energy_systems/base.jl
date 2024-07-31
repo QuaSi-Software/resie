@@ -336,6 +336,20 @@ function _isless(first::Float64, second::Nothing) return false end
 function _isless(first::Nothing, second::Float64) return true end
 function _isless(first::Float64, second::Float64) return first < second end
 
+"""
+    check_epsilon(value, sim_params)
+
+Function to check if a value is withing +/- epsilon.
+Returns 0.0 if value is within the epsilon boundaries and
+the original value if value is out of the boundaries.
+"""
+function check_epsilon(value::Float64, sim_params::Dict{String,Any})
+    if abs(value) < sim_params["epsilon"]
+        return 0.0
+    else 
+        return value
+    end
+end
 
 """
     add!(interface, change, temperature)
