@@ -331,6 +331,30 @@ function _mean(vector::Union{Floathing,Vector{<:Floathing}})
     end
 end
 
+function _weighted_mean(values::Union{Floathing,Vector{<:Floathing}},
+                        weights::Union{Floathing,Vector{<:Floathing}})
+    if isempty(values) || isempty(weights)
+        return 0.0
+    end
+
+    if !isa(values, Vector)
+        values = [values]
+    end
+    if !isa(weights, Vector)
+        weights = [weights]
+    end
+
+    valid_weights = filter(!isnothing, weights)
+    normalized_weights = valid_weights ./ _sum(valid_weights)
+    valid_values = filter(!isnothing, values)
+
+    if length(valid_values) != length(normalized_weights)
+        return 0.0
+    end
+
+    return _sum(valid_values .* normalized_weights)
+end
+
 function _isless(first::Nothing, second::Nothing) return false end
 function _isless(first::Float64, second::Nothing) return false end
 function _isless(first::Nothing, second::Float64) return true end

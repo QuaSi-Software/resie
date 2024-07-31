@@ -398,7 +398,8 @@ function reorder_energies(unit,
             return a > b
         end
     end
-                        
+
+    # TODO: Implement contol module!    
     if order == "highest_in_temps_max_first"
         order_idx = sortperm(temps_max, by=x -> x, lt=highest_first_with_nothing)
         energies = energies[order_idx]
@@ -414,7 +415,6 @@ function reorder_energies(unit,
     end
     return energies, temps_min, temps_max, uacs
 end
-
 
 function calculate_energies(
     unit::HeatPump,
@@ -664,8 +664,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     if el_in > sim_params["epsilon"]
         unit.cop = heat_out / el_in
     end
-    unit.mix_temp_input = _mean(energies[3])
-    unit.mix_temp_output = _mean(energies[6])
+    unit.mix_temp_input = _weighted_mean(energies[3], energies[2])
+    unit.mix_temp_output = _weighted_mean(energies[6], energies[5])
 
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
     sub!(unit.input_interfaces[unit.m_heat_in], energies[2], lowest(energies[3]), energies[4])
