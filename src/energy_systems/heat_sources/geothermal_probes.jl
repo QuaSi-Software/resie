@@ -889,6 +889,7 @@ function output_values(unit::GeothermalProbes)::Vector{String}
             string(unit.m_heat_out)*" OUT",
             "new_fluid_temperature",
             "current_output_temperature",
+            "current_input_temperature",
             "fluid_reynolds_number"
 			]
 end
@@ -902,6 +903,8 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         return unit.fluid_temperature
     elseif key.value_key == "current_output_temperature"
         return unit.current_output_temperature
+    elseif key.value_key == "current_input_temperature"
+        return unit.current_input_temperature
     elseif key.value_key =="fluid_reynolds_number"
         return unit.fluid_reynolds_number
     end
