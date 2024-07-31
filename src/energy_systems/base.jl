@@ -777,7 +777,7 @@ function lowest(temperature_vector::Vector{Temperature})::Temperature
         current_lowest = lowest(temperature_vector[1], temperature_vector[2])
         if n_temperatures > 2
             for idx in 3:n_temperatures
-                current_lowest = highest(current_lowest, temperature_vector[idx])
+                current_lowest = lowest(current_lowest, temperature_vector[idx])
             end
         end
         return current_lowest
