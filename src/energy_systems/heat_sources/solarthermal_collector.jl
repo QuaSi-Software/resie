@@ -229,6 +229,25 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
     
     exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
 
+    if sum([abs(e.balance + e.energy_potential) for e in exchanges]) == 0
+        average_temperature = find_zero(
+            (t_avg->spec_thermal_power_func(t_avg, t_avg, unit.last_average_temperature, 0, unit, sim_params["time_step_seconds"]), 
+                t_avg->derivate_spec_thermal_power_func(t_avg, 0, unit, sim_params["time_step_seconds"])
+            ), 
+            unit.last_average_temperature, 
+            Roots.Newton()
+            )
+
+        return (
+            [0],
+            nothing,
+            false,
+            [average_temperature],
+            [average_temperature],
+            [1] 
+        )
+    end
+
     available_energies = zeros(length(exchanges))
     calculated_values = Dict()
     average_temperatures = Vector{Temperature}(nothing, length(exchanges))
