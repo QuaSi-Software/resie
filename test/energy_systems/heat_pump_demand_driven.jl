@@ -68,7 +68,7 @@ function test_heat_pump_demand_driven_correct_order()
     EnergySystems.control(source, components, simulation_parameters)
 
     source.output_interfaces[source.medium].temperature_max = 35
-    source.output_interfaces[source.medium].max_energy = 5000/4
+    source.output_interfaces[source.medium].max_energy.max_energy[1] = 5000/4
 
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(grid, components, simulation_parameters)
@@ -113,8 +113,8 @@ function test_heat_pump_demand_driven_correct_order()
     EnergySystems.control(source, components, simulation_parameters)
 
     source.output_interfaces[source.medium].temperature_max = 35
-    source.output_interfaces[source.medium].max_energy = 500
-
+    source.output_interfaces[source.medium].max_energy.max_energy[1] = 500.0
+    
     EnergySystems.control(heat_pump, components, simulation_parameters)
     EnergySystems.control(grid, components, simulation_parameters)
 

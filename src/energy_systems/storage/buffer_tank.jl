@@ -23,6 +23,8 @@ mutable struct BufferTank <: Component
     high_temperature::Float64
     low_temperature::Float64
 
+    current_max_output_temperature::Float64
+
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
@@ -45,6 +47,7 @@ mutable struct BufferTank <: Component
             default(config, "switch_point", 0.15),
             default(config, "high_temperature", 75.0),
             default(config, "low_temperature", 20),
+            0.0 # current_max_output_temperature at the beginning of the time step
         )
     end
 end
@@ -67,10 +70,12 @@ function control(
 )
     update(unit.controller)
 
+    unit.current_max_output_temperature = temperature_at_load(unit)
+
     set_temperature!(
         unit.output_interfaces[unit.medium],
         nothing,
-        temperature_at_load(unit)
+        unit.current_max_output_temperature
     )
     set_temperature!(
         unit.input_interfaces[unit.medium],
@@ -96,11 +101,12 @@ function balance_on(
     unit::BufferTank
 )::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(
         balance=interface.balance,
-        uac=unit.uac,
         energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        purpose_uac = purpose_uac,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
         pressure=nothing,
@@ -200,7 +206,8 @@ function output_values(unit::BufferTank)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses"]
+            "Losses",
+            "CurrentMaxOutTemp"]
 end
 
 function output_value(unit::BufferTank, key::OutputKey)::Float64
@@ -216,6 +223,8 @@ function output_value(unit::BufferTank, key::OutputKey)::Float64
         return unit.capacity
     elseif key.value_key == "Losses"
         return unit.losses
+    elseif key.value_key == "CurrentMaxOutTemp"
+        return unit.current_max_output_temperature
     end
     throw(KeyError(key.value_key))
 end

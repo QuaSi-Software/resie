@@ -218,10 +218,10 @@ function test_gas_boiler_supply_driven_plrd()
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 1000 / expected_efficiency
-    grid.output_interfaces[grid.medium].max_energy = grid.supply
+    grid.output_interfaces[grid.medium].max_energy.max_energy[1] = grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy = 1000 * 10
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] =  1000 * 10.0
     demand.max_energy = 1000 * 10
 
     EnergySystems.process(grid, simulation_parameters)
@@ -245,10 +245,10 @@ function test_gas_boiler_supply_driven_plrd()
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 500 / expected_efficiency
-    grid.output_interfaces[grid.medium].max_energy = grid.supply
+    grid.output_interfaces[grid.medium].max_energy.max_energy[1] =  grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy = 500 * 10
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 500 * 10.0
     demand.max_energy = 500 * 10
 
     EnergySystems.process(grid, simulation_parameters)
@@ -330,7 +330,7 @@ function test_CHPP_el_eff_plrd()
 
     EnergySystems.control(chpp, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy = 1000
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 1000.0
     demand.demand = 1000
     EnergySystems.control(grid_in, components, simulation_parameters)
     EnergySystems.control(grid_out, components, simulation_parameters)
@@ -361,7 +361,7 @@ function test_CHPP_el_eff_plrd()
 
     EnergySystems.control(chpp, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy = 1250 * 2.0 / 3.0
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 1250 * 2.0 / 3.0
     demand.demand = 1250 * 2.0 / 3.0
     EnergySystems.control(grid_in, components, simulation_parameters)
     EnergySystems.control(grid_out, components, simulation_parameters)

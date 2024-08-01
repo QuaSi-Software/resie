@@ -1,4 +1,4 @@
-ReSiE balanceWarn log file of simulation started at: 2024-07-09 16:37:37
+ReSiE balanceWarn log file of simulation started at: 2024-07-31 17:21:03
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 281700: -22469.011706000078
@@ -100,6 +100,7 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6431400: -17886.440640999994
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6432300: -19386.292851
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6433200: -18299.732706999996
+[BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6562800: -6251.56648
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6937200: -30718.94776400004
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6938100: -83217.511127
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 6939000: -77405.42839799999
@@ -162,36 +163,34 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 7463700: -9149.751144000002
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 7464600: -7682.586457999998
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 7465500: -7020.879405
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 25931700: -11251.249966428566
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 25931700: -11251.249966428566
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 25989300: -11459.006282142856
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 25989300: -11459.006282142856
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 25994700: -11745.965476428573
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 25994700: -11745.965476428573
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26002800: -11793.478297142854
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26002800: -11793.478297142854
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26002800: -11793.478297142856
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26002800: -11793.478297142856
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26004600: -10834.769786428553
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26004600: -10834.769786428553
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26051400: -10792.497080714285
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26051400: -10792.497080714285
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26055900: -11630.398284285713
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26055900: -11630.398284285713
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26051400: -10792.497080714287
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26051400: -10792.497080714287
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26055900: -11630.398284285715
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26055900: -11630.398284285715
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26368200: -11217.315917857144
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26368200: -11217.315917857144
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26426700: -10854.511720714287
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26426700: -10854.511720714287
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26453700: -10847.863177142865
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26453700: -10847.863177142865
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26513100: -10854.511720714287
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26513100: -10854.511720714287
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26426700: -10854.511720714283
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26426700: -10854.511720714283
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26453700: -10847.863177142866
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26453700: -10847.863177142866
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26513100: -10854.511720714283
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26513100: -10854.511720714283
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26526600: -11571.373651428581
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26526600: -11571.373651428581
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26545500: -11701.551147857142
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26545500: -11701.551147857142
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26681400: -11694.259632857142
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26681400: -11694.259632857142
-[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26712000: -11032.273959285738
-[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26712000: -11032.273959285738
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26681400: -11694.259632857144
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26681400: -11694.259632857144
+[BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26712000: -11032.273959285736
+[BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26712000: -11032.273959285736
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26799300: -11832.965078571422
 [BalanceWarning] Balance for component TST_ELY_01 was not zero in timestep 26799300: -11832.965078571422
 [BalanceWarning] Balance for component TST_HTP_02 was not zero in timestep 26883000: -11670.87146142856
