@@ -291,6 +291,91 @@ function set_storage_transfer!(interface::SystemInterface, flag::Bool)
 end
 
 """
+The following functions are effectively arithmetic operations on floats where one or both
+operands may be nothing. It is possible to overwrite the typical operators + and -,
+however this was deemed too dangerous.
+"""
+function _sub(first::Float64, second::Float64) return first - second end
+function _sub(first::Nothing, second::Float64) return -second end
+function _sub(first::Float64, second::Nothing) return first end
+function _sub(first::Nothing, second::Nothing) return nothing end
+
+function _add(first::Float64, second::Float64) return first + second end
+function _add(first::Nothing, second::Float64) return second end
+function _add(first::Float64, second::Nothing) return first end
+function _add(first::Nothing, second::Nothing) return nothing end
+
+function _abs(val::Union{Floathing, Vector{<:Floathing}})
+    if !isa(val, AbstractVector)
+        val = [val]
+    end
+    abs_val = Vector{Floathing}(collect(x === nothing ? nothing : abs(x) for x in val))
+    return abs_val
+end
+
+function _sum(vector::Union{Floathing,Vector{<:Floathing}})
+    sum = nothing
+    for entry in vector
+        sum = _add(sum, entry)
+    end
+    return sum
+end
+
+function _mean(vector::Union{Floathing,Vector{<:Floathing}})
+    number_of_values = count(x -> x !== nothing, vector)
+    sum = _sum(vector)
+    if number_of_values > 0 && sum !== nothing
+        return sum / number_of_values
+    else 
+        return nothing
+    end
+end
+
+function _weighted_mean(values::Union{Floathing,Vector{<:Floathing}},
+                        weights::Union{Floathing,Vector{<:Floathing}})
+    if isempty(values) || isempty(weights)
+        return 0.0
+    end
+
+    if !isa(values, Vector)
+        values = [values]
+    end
+    if !isa(weights, Vector)
+        weights = [weights]
+    end
+
+    valid_weights = filter(!isnothing, weights)
+    normalized_weights = valid_weights ./ _sum(valid_weights)
+    valid_values = filter(!isnothing, values)
+
+    if length(valid_values) != length(normalized_weights)
+        return 0.0
+    end
+
+    return _sum(valid_values .* normalized_weights)
+end
+
+function _isless(first::Nothing, second::Nothing) return false end
+function _isless(first::Float64, second::Nothing) return false end
+function _isless(first::Nothing, second::Float64) return true end
+function _isless(first::Float64, second::Float64) return first < second end
+
+"""
+    check_epsilon(value, sim_params)
+
+Function to check if a value is withing +/- epsilon.
+Returns 0.0 if value is within the epsilon boundaries and
+the original value if value is out of the boundaries.
+"""
+function check_epsilon(value::Float64, sim_params::Dict{String,Any})
+    if abs(value) < sim_params["epsilon"]
+        return 0.0
+    else 
+        return value
+    end
+end
+
+"""
     add!(interface, change, temperature)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
@@ -299,11 +384,12 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function add!(
     interface::SystemInterface,
-    change::Float64,
-    temperature::Temperature=nothing
+    change::Union{Floathing, Vector{<:Floathing}},
+    temperature::Temperature=nothing,
+    purpose_uac::Union{Stringing, Vector{Stringing}}=nothing,
 )
-    interface.balance += change
-    interface.sum_abs_change += abs(change)
+    interface.balance += sum(change)
+    interface.sum_abs_change += sum(abs.(change))
 
     if temperature !== nothing
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
@@ -316,9 +402,9 @@ function add!(
     end
 
     if interface.source.sys_function == sf_bus
-        add_balance!(interface.source, interface.target, false, change)
+        add_balance!(interface.source, interface.target, false, change, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change)
+        add_balance!(interface.target, interface.source, true, change, purpose_uac)
     end
 end
 
@@ -331,11 +417,12 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function sub!(
     interface::SystemInterface,
-    change::Float64,
-    temperature::Temperature=nothing
+    change::Union{Floathing, Vector{<:Floathing}},
+    temperature::Temperature=nothing,
+    purpose_uac::Union{Stringing, Vector{Stringing}}=nothing,
 )
-    interface.balance -= change
-    interface.sum_abs_change += abs(change)
+    interface.balance -= sum(change)
+    interface.sum_abs_change += sum(abs.(change))
 
     if temperature !== nothing
         if interface.temperature_min !== nothing && temperature < interface.temperature_min
@@ -348,9 +435,9 @@ function sub!(
     end
 
     if interface.source.sys_function == sf_bus
-        sub_balance!(interface.source, interface.target, false, change)
+        sub_balance!(interface.source, interface.target, false, change, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change)
+        sub_balance!(interface.target, interface.source, true, change, purpose_uac)
     end
 end
 
@@ -399,10 +486,31 @@ end
 """
     set_max_energy!(interface, value, purpose_uac, has_calculated_all_maxima)
 
-Set the maximum power that can be delivered to the given value.
+Set the maximum energy in the `interface` to the given `value` representing the maximum 
+energy that the calling component can deliver.
+For 1-to-1 connection between two components, the minimum value of the current max_energy 
+and the given `value` is written to the interface.
 
-If the source or target of the interface is a bus, also calls the set_max_energy! function
-on that bus.
+If the source or target of the interface is a bus, the set_max_energy! function
+on that bus is called as well to write the max_energy into the balance table of the bus.
+
+The optional `purpose_uac` can be set by the calling component to define the component 
+that is supposed to receive or deliver the given energy. This makes not much sense on 1-to-1 
+interfaces, but is set for uniformity as well.
+
+Both `value` and `purpose_uac` can be given either as scalars or as vectors, defining multiple
+maximum energies for multiple other components (purposes). The given `purpose_uac` do not have
+to be necessarily unique. 
+
+The flag `has_calculated_all_maxima` can be set to true if the calling component has not known
+the combination of temperature and energy of a source or a sink during its pre-calculation. 
+Then, the calling component can calculate the maximum energy that could potentially be taken 
+or delivered for each source or for each sink seperately, ignoring all other inputs or outputs. 
+Setting the flag, the max_energy is then later handeled accordingly by reduce_max_energy!(),
+considering that the single values can not be summed up but they all have to be linearly
+decreased if one of them is reduced. An analogy would be to divide the current time step 
+into smaller time steps, in each of which a different component is supplied or drawn with
+a subset of the maximum possible energy of the current time step.
 """
 function set_max_energy!(
     interface::SystemInterface,
@@ -440,10 +548,10 @@ end
 
 This function extracts the `max_energy` values from a given `MaxEnergy` struct.
 If `purpose_uac` is provided and found within `max_energy.purpose_uac`, it returns the sum
-of all `max_energy` values corresponding to the specific `purpose_uac`. If `purpose_uac` is
-provided but not found, the function returns 0.0. If `purpose_uac` is not provided or is
-considered "nothing" based on `is_purpose_uac_nothing(max_energy)`, it returns the sum of 
-all `max_energy` values.
+of all `max_energy` values corresponding to the specific `purpose_uac`.
+If `purpose_uac` is provided but not found, the function returns 0.0.
+If `purpose_uac` is not provided or if `max_energy.purpose_uac` is empty, the sum of 
+all `max_energy` values is returned.
 """
 function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::Stringing=nothing)
     if purpose_uac === nothing || is_purpose_uac_nothing(max_energy)
@@ -463,31 +571,77 @@ end
 
 This function decreases the maximum energy values stored in `max_energy` by the given `amount`.
 If `uac_to_reduce` is specified and found in `max_energy.purpose_uac`, only the corresponding
-max_energy value will be reduced. If the maximum possible energy for all max_energy have been 
-calculated (`has_calculated_all_maxima` is true), the other max_energy values will be reduced 
-proportionally by a linear percentage.
+max_energy value will be reduced. 
+f the maximum possible energy for all max_energy have been calculated (`has_calculated_all_maxima` 
+is true), the other max_energy values will be reduced proportionally by a linear percentage. 
+If `uac_to_reduce` could not be found, an error arises.
+
+If no `uac_to_reduce` is specified of if `max_energy.purpose_uac` is empty, the amount 
+decreases the entries in max_energy.max_energy, starting with the first one, until the amount 
+is fully distributed.
 """
-function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy, amount::Float64, uac_to_reduce::Stringing=nothing)
-    if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
-        for i in eachindex(max_energy.max_energy)
-            to_reduce = min(amount, max_energy.max_energy[i])
-            max_energy.max_energy[i] -= to_reduce
-            amount -= to_reduce
-            if amount <= 0.0 break end
-        end
-    else
-        idx = findfirst(==(uac_to_reduce), max_energy.purpose_uac)
-        if idx !== nothing
-            if max_energy.has_calculated_all_maxima
-                max_energy.max_energy .*= 1 - (amount / max_energy.max_energy[idx])
-            else
-                max_energy.max_energy[idx] -= amount
+function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
+                            amount::Union{Float64, Vector{Float64}},
+                            uac_to_reduce::Union{Stringing, Vector{Stringing}}=nothing)
+    for amount_idx in eachindex(amount)
+        current_amount = length(amount) == 1 ? amount : amount[amount_idx]
+        if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
+            for i in eachindex(max_energy.max_energy)
+                to_reduce = min(current_amount, max_energy.max_energy[i])
+                max_energy.max_energy[i] -= to_reduce
+                current_amount -= to_reduce
+                if current_amount <= 0.0 break end
             end
         else
-            @error "The uac could not be found in the max_energy."
+            currrent_uac_to_reduce = isa(uac_to_reduce, AbstractVector) ? uac_to_reduce[amount_idx] : uac_to_reduce
+            idx = findfirst(==(currrent_uac_to_reduce), max_energy.purpose_uac)
+            if idx !== nothing
+                if max_energy.has_calculated_all_maxima
+                    max_energy.max_energy .*= 1 - (current_amount / max_energy.max_energy[idx])
+                else
+                    max_energy.max_energy[idx] -= current_amount
+                end
+            else
+                @error "The uac could not be found in the max_energy."
+            end
         end
     end
 end
+
+"""
+    increase_max_energy!(max_energy, amount, uac_to_reduce)
+
+This function increases the maximum energy values stored in `max_energy` by the given `amount`.
+If `uac_to_increase` is specified and found in `max_energy.purpose_uac`, the corresponding
+max_energy value will be increased. 
+If `uac_to_increase` could not be found, a new value in max_energy is added.
+If no `uac_to_increase` is given of if `max_energy.purpose_uac` is empty, the given amount is added
+to the first max_energy.max_energy as in this case, only one value should be present (e.g 1-to-1 
+connection or components that don't care).
+"""
+function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
+                              amount::Union{Float64, Vector{Float64}},
+                              uac_to_increase::Union{Stringing, Vector{Stringing}}=nothing)
+    for amount_idx in eachindex(amount)
+        current_amount = length(amount) == 1 ? amount : amount[amount_idx]
+        currrent_uac_to_increase = isa(uac_to_increase, AbstractVector) ? uac_to_increase[amount_idx] : uac_to_increase
+        if uac_to_increase === nothing || is_purpose_uac_nothing(max_energy)
+            if is_max_energy_nothing(max_energy) || length(max_energy.max_energy) == 0
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false)
+            else
+                max_energy.max_energy[1] += current_amount
+            end
+        else
+            idx = findfirst(==(currrent_uac_to_increase), max_energy.purpose_uac)
+            if idx === nothing
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, true)
+            else
+                max_energy.max_energy[idx] += current_amount
+            end
+        end
+    end
+end
+
 
 """
     max_energy_sum(max_energy)
@@ -503,7 +657,7 @@ function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
 end
 
 """
-        set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
+    set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
 
 Fills a MaxEnergy struct with given values.
 If the given values are scalars, they are converted into vectors.
@@ -512,7 +666,8 @@ If `values` is empty, a zero is added to ensure accessibility.
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
                          values::Union{Floathing, Vector{<:Floathing}},
                          purpose_uac::Union{Stringing, Vector{<:Stringing}},
-                         has_calculated_all_maxima::Bool)
+                         has_calculated_all_maxima::Bool,
+                         append::Bool=false)
 
     if !isa(values, AbstractVector)
         values = [values]
@@ -526,20 +681,26 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
     end
 
     """
-    overwriting is possible here as either the interface has no max energy yet, or a component
-    has already read out the max energy and has considered it (it can only be equal or smaller)
-    or a component is overwriting its own max_energy.
+    Overwriting is possible here as either the interface has no max energy yet, or a component
+    or the set_max_energy!(interface, ...) has already read out the max energy and has considered 
+    it (it can only be equal or smaller) or a component is overwriting its own max_energy.
     """
-    max_energy.max_energy = values
-    max_energy.has_calculated_all_maxima = has_calculated_all_maxima
-    max_energy.purpose_uac = purpose_uac
-
+    if append
+        append!(max_energy.max_energy, values)
+        append!(max_energy.purpose_uac, purpose_uac)
+        max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+    else
+        max_energy.max_energy = values
+        max_energy.purpose_uac = purpose_uac
+        max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+    end
 end
 
 """
     is_max_energy_nothing(max_energy)
 
-Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has beed performed (yet).
+Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has
+beed performed (yet).
 """
 function is_max_energy_nothing(max_energy::EnergySystems.MaxEnergy)
     return max_energy.max_energy[1] === nothing && length(max_energy.max_energy) == 1
@@ -548,8 +709,8 @@ end
 """
     is_purpose_uac_nothing(max_energy)
 
-Checks a MaxEnergy struct if the `purpose_uac` is nothing/empty (true), meaning that the max_energy is not indtended
-for a specific component.
+Checks a MaxEnergy struct if the `purpose_uac` is nothing/empty (true), meaning that the 
+max_energy is not intended for a specific component.
 """
 function is_purpose_uac_nothing(max_energy::EnergySystems.MaxEnergy)
     return (isempty(max_energy.purpose_uac) || 
@@ -654,7 +815,7 @@ function lowest(temperature_vector::Vector{<:Temperature})::Temperature
         current_lowest = lowest(temperature_vector[1], temperature_vector[2])
         if n_temperatures > 2
             for idx in 3:n_temperatures
-                current_lowest = highest(current_lowest, temperature_vector[idx])
+                current_lowest = lowest(current_lowest, temperature_vector[idx])
             end
         end
         return current_lowest

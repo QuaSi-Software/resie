@@ -26,6 +26,8 @@ mutable struct HeatPump <: Component
     cop::Float64
 
     losses::Float64
+    mix_temp_input::Float64
+    mix_temp_output::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
@@ -57,6 +59,8 @@ mutable struct HeatPump <: Component
             default(config, "input_temperature", nothing),
             0.0, # cop
             0.0, # losses
+            0.0, # mixing temperature in the input interface
+            0.0, # mixing temperature in the output interface
         )
     end
 end
@@ -109,9 +113,9 @@ end
 
 function set_max_energies!(
     unit::HeatPump,
-    el_in::Union{Floathing, Vector{Floathing}},
-    heat_in::Union{Floathing, Vector{Floathing}},
-    heat_out::Union{Floathing, Vector{Floathing}},
+    el_in::Union{Floathing, Vector{<:Floathing}},
+    heat_in::Union{Floathing, Vector{<:Floathing}},
+    heat_out::Union{Floathing, Vector{<:Floathing}},
     purpose_uac_heat_in::Union{Stringing, Vector{Stringing}}=nothing,
     purpose_uac_heat_out::Union{Stringing, Vector{Stringing}}=nothing,
     has_calculated_all_maxima_heat_in::Bool=false,
@@ -378,6 +382,39 @@ function calculate_energies_heatpump(unit::HeatPump,
            layers_heat_out_uac
 end
 
+function reorder_energies(unit,
+                          order,
+                          energies,
+                          temps_min,
+                          temps_max,
+                          uacs)
+
+    function highest_first_with_nothing(a, b)
+        if a === nothing
+            return false
+        elseif b === nothing
+            return true
+        else
+            return a > b
+        end
+    end
+
+    # TODO: Implement contol module!    
+    if order == "highest_in_temps_max_first"
+        order_idx = sortperm(temps_max, by=x -> x, lt=highest_first_with_nothing)
+        energies = energies[order_idx]
+        temps_min = temps_min[order_idx]
+        temps_max = temps_max[order_idx]
+        uacs = uacs[order_idx]
+    elseif order == "smallest_out_temps_min_first"
+        order_idx = reverse(sortperm(temps_min, by=x -> x, lt=highest_first_with_nothing))
+        energies = energies[order_idx]
+        temps_min = temps_min[order_idx]
+        temps_max = temps_max[order_idx]
+        uacs = uacs[order_idx]
+    end
+    return energies, temps_min, temps_max, uacs
+end
 
 function calculate_energies(
     unit::HeatPump,
@@ -401,41 +438,62 @@ function calculate_energies(
         return false, (nothing, nothing, nothing)
     end
 
-    # get potentials from inputs/outputs. only the heat input is calculated as vector,
-    # the electricity input and heat output are calculated as scalars
+    # get potentials from inputs/outputs. The heat input and output are calculated as 
+    # vectors to allow for temperautre layers, while the electricity input is a scalar
     potential_energy_el = check_el_in(unit, sim_params)
     potentials_energies_heat_in,
         in_temps_min,
         in_temps_max,
         in_uacs = check_heat_in(unit, sim_params)
-    potential_energies_heat_out, 
+    potentials_energies_heat_out, 
         out_temps_min,
         out_temps_max,
         out_uacs = check_heat_out(unit, sim_params)
 
     # in the following we want to work with positive values as it is easier
-    available_el_in = copy(potential_energy_el)
-    available_heat_in = copy(abs.(potentials_energies_heat_in))
-    available_heat_out = copy(abs.(potential_energies_heat_out))
+    potentials_energies_heat_in = abs.(potentials_energies_heat_in)
+    potentials_energies_heat_out = abs.(potentials_energies_heat_out)
 
-    heat_in_has_inf_energy = any(isinf, available_heat_in)
-    heat_out_has_inf_energy = any(isinf, available_heat_out)
+    # exemplary control function that orders the available input sources by their
+    # temperaturue. This overwrites the order in potentially connected busses!
+    # TODO: Implement in control modules!
+    # potentials_energies_heat_in,
+    #     in_temps_min,
+    #     in_temps_max,
+    #     in_uacs = reorder_energies(unit,
+    #                                "highest_in_temps_max_first",
+    #                                potentials_energies_heat_in,
+    #                                in_temps_min,
+    #                                in_temps_max,
+    #                                in_uacs)
+    # potentials_energies_heat_out,
+    #     out_temps_min,
+    #     out_temps_max,
+    #     out_uacs = reorder_energies(unit,
+    #                                 "smallest_out_temps_min_first",
+    #                                 potentials_energies_heat_out,
+    #                                 out_temps_min,
+    #                                 out_temps_max,
+    #                                 out_uacs)
+
+    heat_in_has_inf_energy = any(isinf, potentials_energies_heat_in)
+    heat_out_has_inf_energy = any(isinf, potentials_energies_heat_out)
+
+    layers_el_in = Vector{Floathing}()
+    layers_heat_in = Vector{Floathing}()
+    layers_heat_in_temperature = Vector{Temperature}()
+    layers_heat_in_uac = Vector{Stringing}()
+    layers_heat_out = Vector{Floathing}()
+    layers_heat_out_temperature = Vector{Temperature}()
+    layers_heat_out_uac = Vector{Stringing}()
 
     if heat_in_has_inf_energy && heat_out_has_inf_energy
         # can not perform calculation if both inputs and outputs have inf energies
-        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and outputs. This cannot be resolved. 
-Please check the order of operation and make sure that either the inputs or the outputs have been fully calculated 
-before the heat pump $(unit.uac) has its potential step."
+        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and outputs. This cannot be resolved. " *
+              "Please check the order of operation and make sure that either the inputs or the outputs have been fully calculated " *
+              "before the heat pump $(unit.uac) has its potential step."
     elseif heat_in_has_inf_energy 
-        layers_el_in = Vector{Floathing}()
-        layers_heat_in = Vector{Floathing}()
-        layers_heat_in_temperature = Vector{Temperature}()
-        layers_heat_in_uac = Vector{Stringing}()
-        layers_heat_out = Vector{Floathing}()
-        layers_heat_out_temperature = Vector{Temperature}()
-        layers_heat_out_uac = Vector{Stringing}()
-
-        for heat_in_idx in eachindex(available_heat_in)
+        for heat_in_idx in eachindex(potentials_energies_heat_in)
             layers_el_in_temp,
             layers_heat_in_temp,
             layers_heat_in_temperature_temp,
@@ -444,9 +502,9 @@ before the heat pump $(unit.uac) has its potential step."
             layers_heat_out_temperature_temp,
             layers_heat_out_uac_temp  = calculate_energies_heatpump(unit,
                                                             sim_params,
-                                                            copy(available_el_in),
+                                                            copy(potential_energy_el),
                                                             [Inf],
-                                                            copy(available_heat_out),
+                                                            copy(potentials_energies_heat_out),
                                                             max_usage_fraction,
                                                             [in_temps_min[heat_in_idx]],
                                                             [in_temps_max[heat_in_idx]],
@@ -476,15 +534,7 @@ before the heat pump $(unit.uac) has its potential step."
             end
         end
     elseif heat_out_has_inf_energy
-        layers_el_in = Vector{Floathing}()
-        layers_heat_in = Vector{Floathing}()
-        layers_heat_in_temperature = Vector{Temperature}()
-        layers_heat_in_uac = Vector{Stringing}()
-        layers_heat_out = Vector{Floathing}()
-        layers_heat_out_temperature = Vector{Temperature}()
-        layers_heat_out_uac = Vector{Stringing}()
-
-        for heat_out_idx in eachindex(available_heat_out)
+        for heat_out_idx in eachindex(potentials_energies_heat_out)
             layers_el_in_temp,
             layers_heat_in_temp,
             layers_heat_in_temperature_temp,
@@ -493,8 +543,8 @@ before the heat pump $(unit.uac) has its potential step."
             layers_heat_out_temperature_temp,
             layers_heat_out_uac_temp  = calculate_energies_heatpump(unit,
                                                             sim_params,
-                                                            copy(available_el_in),
-                                                            copy(available_heat_in),
+                                                            copy(potential_energy_el),
+                                                            copy(potentials_energies_heat_in),
                                                             [Inf],
                                                             max_usage_fraction,
                                                             in_temps_min,
@@ -524,7 +574,7 @@ before the heat pump $(unit.uac) has its potential step."
                 end
             end
         end
-    else
+    else # fully known energies and temperatures in inputs and outputs
         layers_el_in,
         layers_heat_in,
         layers_heat_in_temperature,
@@ -533,9 +583,9 @@ before the heat pump $(unit.uac) has its potential step."
         layers_heat_out_temperature,
         layers_heat_out_uac  = calculate_energies_heatpump(unit,
                                                            sim_params,
-                                                           available_el_in,
-                                                           available_heat_in,
-                                                           available_heat_out,
+                                                           potential_energy_el,
+                                                           potentials_energies_heat_in,
+                                                           potentials_energies_heat_out,
                                                            max_usage_fraction,
                                                            in_temps_min,
                                                            in_temps_max,
@@ -603,7 +653,6 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     end
 
     el_in = sum(energies[1]; init=0.0)
-    heat_in = sum(energies[2]; init=0.0)
     heat_out = sum(energies[5]; init=0.0)
 
     if heat_out < sim_params["epsilon"]
@@ -615,10 +664,12 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     if el_in > sim_params["epsilon"]
         unit.cop = heat_out / el_in
     end
+    unit.mix_temp_input = _weighted_mean(energies[3], energies[2])
+    unit.mix_temp_output = _weighted_mean(energies[6], energies[5])
 
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    sub!(unit.input_interfaces[unit.m_heat_in], heat_in, lowest(energies[3]))
-    add!(unit.output_interfaces[unit.m_heat_out], heat_out, highest(energies[6]))
+    sub!(unit.input_interfaces[unit.m_heat_in], energies[2], lowest(energies[3]), energies[4])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[5], highest(energies[6]), energies[7])
 end
 
 # has its own reset function as here more parameters are present that need to be reset in every timestep
@@ -637,6 +688,8 @@ function reset(unit::HeatPump)
     # reset other parameter
     unit.losses = 0.0
     unit.cop = 0.0
+    unit.mix_temp_input = 0.0
+    unit.mix_temp_output = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -644,7 +697,9 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_in)*" IN",
             string(unit.m_heat_out)*" OUT",
             "COP", 
-            "Losses"]
+            "Losses",
+            "MixingTemperature_Input",
+            "MixingTemperature_Output"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -656,6 +711,10 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return unit.cop
     elseif key.value_key == "Losses"
         return unit.losses
+    elseif key.value_key == "MixingTemperature_Input"
+        return unit.mix_temp_input
+    elseif key.value_key == "MixingTemperature_Output"
+        return unit.mix_temp_output
     end
     throw(KeyError(key.value_key))
 end

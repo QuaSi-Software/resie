@@ -418,6 +418,9 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     unit.losses_heat = energies[1] - energies[2] +
         (unit.heat_lt_is_usable ? -1 : 0) * energies[3] -
         h2_out_lossless
+    unit.losses_hydrogen = check_epsilon(unit.losses_hydrogen, sim_params)
+    unit.losses_heat = check_epsilon(unit.losses_heat, sim_params)
+
     unit.losses = unit.losses_heat + unit.losses_hydrogen
 
     sub!(unit.input_interfaces[unit.m_el_in], energies[1])
@@ -477,7 +480,7 @@ function output_value(unit::Electrolyser, key::OutputKey)::Float64
     elseif key.value_key == "Losses_hydrogen"
         return unit.losses_hydrogen
     elseif key.value_key == "Losses"
-        return unit.losses_hydrogen + unit.losses_heat
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end
