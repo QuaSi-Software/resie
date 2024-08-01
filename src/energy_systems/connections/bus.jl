@@ -405,7 +405,7 @@ function set_max_energy!(unit::Bus,
                          comp::Component,
                          is_input::Bool,
                          value::Union{Floathing, Vector{<:Floathing}},
-                         purpose_uac::Union{Stringing, Vector{Stringing}},
+                         purpose_uac::Union{Stringing, Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool)
 
     bus = unit.proxy === nothing ? unit : unit.proxy
@@ -645,12 +645,14 @@ function balance_on(
                 continue
             end
 
-            if (input_row.source.sys_function === EnergySystems.sf_transformer
-                && output_row.target.sys_function === EnergySystems.sf_transformer
-                && is_max_energy_nothing(unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].max_energy)
-                && unit.output_interfaces[unit.balance_table_outputs[output_row.target.uac].output_index].sum_abs_change == 0.0
-                || get_max_energy(output_row.energy_pool, input_row.source.uac) == Inf || get_max_energy(output_row.energy_potential, input_row.source.uac) == Inf
-            )   # target is transformer that has not been calculated its potential or process
+            if (# target is transformer that has not been calculated its potential or process...
+                output_row.target.sys_function === EnergySystems.sf_transformer
+                && is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_potential)
+                && is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_pool)
+                # or has Inf written in its interface
+                || get_max_energy(output_row.energy_pool, input_row.source.uac) == Inf 
+                || get_max_energy(output_row.energy_potential, input_row.source.uac) == Inf
+            )   
                 energy_pot = -Inf
             else
                 if is_max_energy_nothing(interface.max_energy)  # the caller has not performed a potential
@@ -680,12 +682,14 @@ function balance_on(
                 continue
             end
 
-            if (output_row.target.sys_function === EnergySystems.sf_transformer
-                && input_row.source.sys_function === EnergySystems.sf_transformer
-                && is_max_energy_nothing(unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].max_energy)
-                && unit.input_interfaces[unit.balance_table_inputs[input_row.source.uac].input_index].sum_abs_change == 0.0
-                || input_row.energy_pool == Inf || get_max_energy(input_row.energy_potential,output_row.target.uac) == Inf
-            )    # source is transformer that has not been calculated its potential or process
+            if (# source is transformer that has not been calculated its potential or process...
+                input_row.source.sys_function === EnergySystems.sf_transformer
+                && is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_potential)
+                && is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_pool)
+                # or has Inf written in its interface
+                || get_max_energy(input_row.energy_pool, output_row.target.uac) == Inf 
+                || get_max_energy(input_row.energy_potential, output_row.target.uac) == Inf
+            )   
                 energy_pot = Inf
             else
                 if is_max_energy_nothing(interface.max_energy)
@@ -695,7 +699,7 @@ function balance_on(
                     energy_pot = unit.balance_table[input_row.priority, output_row.priority*2-1]
                 end
             end
-            
+
             if energy_pot > 0.0
                 push!(return_exchanges, EnEx(
                     balance=0.0,
