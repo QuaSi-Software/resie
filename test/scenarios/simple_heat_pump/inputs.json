@@ -70,7 +70,6 @@
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -79,7 +78,6 @@
         "TST_SRC_01": {
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -90,7 +88,6 @@
         "TST_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -98,15 +95,9 @@
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [
-                "TST_DEM_01"
-            ],
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 9000,
             "constant_cop": 3.0,
             "min_power_fraction": 0.0

@@ -96,7 +96,6 @@
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
             "constant_temperature": 55,
@@ -104,7 +103,6 @@
         },
         "TST_STH_01": {
             "type": "FixedSupply",
-            "control_refs": [],
             "medium": "m_h_w_ht1",
             "output_refs": [
                 "TST_GTP_01"
@@ -115,20 +113,15 @@
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 225000,
             "min_power_fraction": 0.0
         },
         "TST_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -138,7 +131,6 @@
         "TST_GTP_01": {
             "type": "GeothermalProbes",
             "m_heat_out": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],

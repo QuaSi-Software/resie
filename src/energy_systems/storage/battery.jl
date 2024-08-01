@@ -2,8 +2,7 @@
 Implementation of a battery component holding electric charge.
 
 For the moment the implementation remains simple with only one state (its charge) and one
-parameters (its capacity). However the default operation strategy is more complex and
-toggles the processing of the battery dependant on available PV power and its own charge.
+parameter (its capacity).
 """
 Base.@kwdef mutable struct Battery <: Component
     uac::String
@@ -19,15 +18,16 @@ Base.@kwdef mutable struct Battery <: Component
     load::Float64
     losses::Float64
 
+    max_charge::Float64
+    max_discharge::Float64
+
     function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_storage, # sys_function
             InterfaceMap( # input_interfaces
                 medium => nothing
@@ -38,7 +38,9 @@ Base.@kwdef mutable struct Battery <: Component
             medium,
             config["capacity"], # capacity
             config["load"], # load
-            0.0  # losses
+            0.0, # losses
+            0.0, # max_charge
+            0.0 # max_discharge
         )
     end
 end
@@ -46,16 +48,19 @@ end
 function initialise!(unit::Battery, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
-        )
+        unload_storages(unit.controller, unit.medium)
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
+        load_storages(unit.controller, unit.medium)
     )
+end
+
+function reset(unit::Battery)
+    invoke(reset, Tuple{Component}, unit)
+
+    unit.max_charge = 0.0
+    unit.max_discharge = 0.0
 end
 
 function control(
@@ -63,10 +68,21 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
+    if discharge_is_allowed(unit.controller, sim_params)
+        unit.max_discharge = unit.load
+    else
+        unit.max_discharge = 0.0
+    end
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_discharge)
+
+    if charge_is_allowed(unit.controller, sim_params)
+        unit.max_charge = unit.capacity - unit.load
+    else
+        unit.max_charge = 0.0
+    end
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge)
 end
 
 
@@ -79,7 +95,7 @@ function balance_on(
 
     return [EnEx(
         balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+        energy_potential=caller_is_input ? -(unit.max_charge) : unit.max_discharge,
         purpose_uac = purpose_uac,
         temperature_min=interface.temperature_min,
         temperature_max=interface.temperature_max,
@@ -89,8 +105,8 @@ function balance_on(
 end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
-    if unit.controller.state_machine.state != 2
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+    if unit.max_discharge < sim_params["epsilon"]
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return
     end
 
@@ -113,8 +129,8 @@ function process(unit::Battery, sim_params::Dict{String,Any})
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
-    if unit.controller.state_machine.state != 1
-        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+    if unit.max_charge < sim_params["epsilon"]
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
         return
     end
 
@@ -124,7 +140,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
-        return # load is only concerned with receiving energy from the target
+        return # load is only concerned with receiving energy from the source
     end
 
     diff = unit.capacity - unit.load

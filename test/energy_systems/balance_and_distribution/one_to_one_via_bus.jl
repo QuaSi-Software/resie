@@ -11,14 +11,12 @@ function test_one_to_one_via_bus()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "constant_temperature" => 55,
@@ -26,7 +24,6 @@ function test_one_to_one_via_bus()
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
                 "input_order" => [
                     "TST_GRI_01",

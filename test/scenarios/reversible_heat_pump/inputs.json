@@ -18,7 +18,6 @@
         "TST_TH_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "temperature_profile_file_path": "./profiles/examples/general/dem_heat_temp_var_avg55.prf",
@@ -27,7 +26,6 @@
         "TST_TH_DEM_02": {
             "type": "FixedSupply",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": ["TST_TH_BUS_02"],
             "energy_profile_file_path": "./profiles/examples/general/src_heat_maxpow_dailyvar_lo-amp.prf",
             "temperature_profile_file_path": "./profiles/examples/general/src_heat_temp_dailyvar_avg30.prf",
@@ -36,7 +34,6 @@
         "TST_TH_BUS_01": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_TH_HP_01"
@@ -53,7 +50,6 @@
         "TST_TH_BUS_02": {
             "type": "Bus",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_TH_DEM_02",
@@ -67,7 +63,6 @@
         "TST_EL_BUS_01": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_EL_GRI_01"
@@ -81,7 +76,6 @@
             "type": "GeothermalProbes",
             "m_heat_in": "m_h_w_ht1",
             "m_heat_out": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_TH_BUS_02"
             ],
@@ -121,21 +115,16 @@
         },
         "TST_TH_HP_01": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_TH_BUS_01"
             ],
             "m_heat_out": "m_h_w_ht1",
-            "strategy": {
-                "name": "supply_driven"
-            },
             "power_th": 4500,
             "min_power_fraction": 0.0
         },
         "TST_EL_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_EL_BUS_01"
             ],

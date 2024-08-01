@@ -67,9 +67,7 @@ mutable struct FuelBoiler <: Component
 
         return new(
             uac,
-            controller_for_strategy(
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_transformer,
             InterfaceMap(
                 m_fuel_in => nothing
@@ -96,15 +94,11 @@ end
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_fuel_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_fuel_in), true
-        )
+        unload_storages(unit.controller, unit.m_fuel_in)
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
-        )
+        load_storages(unit.controller, unit.m_heat_out)
     )
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
@@ -115,7 +109,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
     set_temperature!(
         unit.output_interfaces[unit.m_heat_out],
         nothing,
@@ -135,20 +129,8 @@ function calculate_energies(
     unit::FuelBoiler,
     sim_params::Dict{String,Any},
 )::Tuple{Bool, Vector{Floathing}}
-    # check operational state for strategy storage_driven
-    if (
-        unit.controller.strategy == "storage_driven"
-        && unit.controller.state_machine.state != 2
-    )
-        return (false, [])
-    end
-
-    # get max PLR of external profile, if any
-    max_plr = (
-        unit.controller.parameter["operation_profile_path"] === nothing
-        ? 1.0
-        : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    )
+    # get maximum PLR from control modules
+    max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
         return (false, [])
     end

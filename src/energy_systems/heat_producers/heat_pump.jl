@@ -37,9 +37,7 @@ mutable struct HeatPump <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
                 m_heat_in => nothing,
@@ -68,21 +66,15 @@ end
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
     set_storage_transfer!(
         unit.input_interfaces[unit.m_heat_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_heat_in), true
-        )
+        unload_storages(unit.controller, unit.m_heat_in)
     )
     set_storage_transfer!(
         unit.input_interfaces[unit.m_el_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
-        )
+        unload_storages(unit.controller, unit.m_el_in)
     )
     set_storage_transfer!(
         unit.output_interfaces[unit.m_heat_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_out), true
-        )
+        load_storages(unit.controller, unit.m_heat_out)
     )
 end
 
@@ -91,7 +83,7 @@ function control(
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
@@ -139,7 +131,7 @@ function check_el_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_el_in"] == true
+    if unit.controller.parameters["consider_m_el_in"] == true
         if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
             && is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy)   # ...and none of them have had their potential step
         )
@@ -164,7 +156,7 @@ function check_heat_in(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_heat_in"] == true
+    if unit.controller.parameters["consider_m_heat_in"] == true
         if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
              && is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy)  # ...and none of them have had their potential step
         )
@@ -198,7 +190,7 @@ function check_heat_out(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    if unit.controller.parameter["consider_m_heat_out"] == true
+    if unit.controller.parameters["consider_m_heat_out"] == true
         if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
             && is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)    # ...and none of them have had their potential step
         )
@@ -420,20 +412,8 @@ function calculate_energies(
     unit::HeatPump,
     sim_params::Dict{String,Any}
 )
-    # check operational strategy, specifically storage_driven
-    if (
-        unit.controller.strategy == "storage_driven"
-        && unit.controller.state_machine.state != 2
-    )
-        return false, (nothing, nothing, nothing)
-    end
-
-    # get usage fraction of external profile (normalized from 0 to 1, related to unit.power_th)
-    max_usage_fraction = (
-        unit.controller.parameter["operation_profile_path"] === nothing
-        ? 1.0
-        : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    )
+    # get usage fraction from control modules
+    max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
     if max_usage_fraction <= 0.0
         return false, (nothing, nothing, nothing)
     end

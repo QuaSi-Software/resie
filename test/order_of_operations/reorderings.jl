@@ -10,7 +10,6 @@ function test_data_input_priorities()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => ["TST_BUS_03"],
@@ -19,7 +18,6 @@ function test_data_input_priorities()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => ["TST_BUS_03"],
@@ -28,7 +26,6 @@ function test_data_input_priorities()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
@@ -118,7 +115,6 @@ function test_data_busses_distribute()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
@@ -131,7 +127,6 @@ function test_data_busses_distribute()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => [],
@@ -140,7 +135,6 @@ function test_data_busses_distribute()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -154,7 +148,6 @@ function test_data_busses_distribute()
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_01"],
                 "output_order" => [],
@@ -163,7 +156,6 @@ function test_data_busses_distribute()
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_03"],
                 "output_order" => [],
@@ -172,7 +164,6 @@ function test_data_busses_distribute()
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => ["TST_BUS_03"],
                 "output_order" => [],
@@ -250,7 +241,6 @@ function test_data_storage_loading()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01"
@@ -265,7 +255,6 @@ function test_data_storage_loading()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -279,7 +268,6 @@ function test_data_storage_loading()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -292,7 +280,6 @@ function test_data_storage_loading()
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
             ],
@@ -301,7 +288,6 @@ function test_data_storage_loading()
         ),
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_02"
             ],
@@ -310,7 +296,6 @@ function test_data_storage_loading()
         ),
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_03"
             ],
@@ -433,14 +418,12 @@ function test_data_storage_loading_with_matrix()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),   
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_01",
@@ -460,7 +443,6 @@ function test_data_storage_loading_with_matrix()
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_02",
@@ -478,7 +460,6 @@ function test_data_storage_loading_with_matrix()
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BFT_03",
@@ -495,7 +476,6 @@ function test_data_storage_loading_with_matrix()
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_01"
             ],
@@ -504,7 +484,6 @@ function test_data_storage_loading_with_matrix()
         ),
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_02"
             ],
@@ -513,7 +492,6 @@ function test_data_storage_loading_with_matrix()
         ),
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => [
                 "TST_BUS_03"
             ],

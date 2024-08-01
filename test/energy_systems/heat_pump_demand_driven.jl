@@ -11,7 +11,6 @@ function test_heat_pump_demand_driven_correct_order()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
@@ -20,7 +19,6 @@ function test_heat_pump_demand_driven_correct_order()
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
@@ -29,17 +27,12 @@ function test_heat_pump_demand_driven_correct_order()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 12000
         ),
     )
@@ -56,8 +49,6 @@ function test_heat_pump_demand_driven_correct_order()
     source = components["TST_SRC_01"]
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
-
-    @test heat_pump.controller.state_machine.state == 1
 
     # first time step: demand is below max power of source (adjusted for additional input
     # of electricity), small delta T leads to high COP = 12.725999999999999

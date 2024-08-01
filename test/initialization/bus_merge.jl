@@ -7,7 +7,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "constant_supply" => 1500,
             "constant_temperature" => 65
@@ -15,7 +14,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_02"],
             "constant_supply" => 500,
             "constant_temperature" => 40
@@ -23,7 +21,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_01"
@@ -40,7 +37,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -58,7 +54,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 65
@@ -66,7 +61,6 @@ function energy_system_simple()::Dict{String,Any}
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 40
@@ -125,7 +119,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_SRC_01" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "constant_supply" => 1500,
             "constant_temperature" => 65
@@ -133,7 +126,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_SRC_02" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_02"],
             "constant_supply" => 500,
             "constant_temperature" => 60
@@ -141,7 +133,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_SRC_03" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
             "constant_supply" => 500,
             "constant_temperature" => 55
@@ -149,7 +140,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_SRC_04" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_04"],
             "constant_supply" => 500,
             "constant_temperature" => 50
@@ -157,7 +147,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_SRC_05" => Dict{String,Any}(
             "type" => "BoundedSupply",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_05"],
             "constant_supply" => 500,
             "constant_temperature" => 45
@@ -165,7 +154,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "capacity" => 4000,
             "load" => 2000,
@@ -173,7 +161,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_02"],
             "capacity" => 4000,
             "load" => 2000,
@@ -181,7 +168,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_03"],
             "capacity" => 40000,
             "load" => 20000,
@@ -189,7 +175,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BFT_04" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_04"],
             "capacity" => 4000,
             "load" => 2000,
@@ -197,7 +182,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BFT_05" => Dict{String,Any}(
             "type" => "Storage",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_05"],
             "capacity" => 4000,
             "load" => 2000,
@@ -205,7 +189,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_01",
@@ -225,7 +208,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_02",
@@ -245,7 +227,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_03",
@@ -270,7 +251,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_04",
@@ -291,7 +271,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_SRC_05",
@@ -312,7 +291,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 65
@@ -320,7 +298,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_DEM_02" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 60
@@ -328,7 +305,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_DEM_03" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 55
@@ -336,7 +312,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_DEM_04" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 50
@@ -344,7 +319,6 @@ function energy_system_complicated()::Dict{String,Any}
         "TST_DEM_05" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 1000,
             "constant_temperature" => 45
@@ -682,7 +656,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
@@ -693,7 +666,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [],
                 "output_order" => [
@@ -704,7 +676,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_01",
@@ -720,7 +691,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_02",
@@ -738,7 +708,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_05" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_04",
@@ -755,7 +724,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_06" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_05",
@@ -771,7 +739,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_07" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_05",
@@ -782,7 +749,6 @@ function energy_system_busses_only()::Dict{String,Any}
         "TST_BUS_08" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String, Any}(
                 "input_order" => [
                     "TST_BUS_06",
@@ -826,13 +792,11 @@ function test_merge_preserves_storage_transfer()
     components_config["TST_BFT_02"] = Dict{String,Any}(
         "type" => "Storage",
         "medium" => "m_h_w_ht1",
-        "control_refs" => [],
         "output_refs" => ["TST_BUS_02"],
         "capacity" => 4000,
         "load" => 2000,
     )
-    components_config["TST_SRC_01"]["strategy"] = Dict{String,Any}(
-        "name" => "default",
+    components_config["TST_SRC_01"]["control_parameters"] = Dict{String,Any}(
         "load_storages m_h_w_ht1" => false
     )
     simulation_parameters = Dict{String,Any}(
