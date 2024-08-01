@@ -247,13 +247,14 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
     component_idx = 1
     left_energy_factor = 1.0
    
-    while component_idx <= length(target_temperatures) && left_energy_factor > 0
+    while component_idx <= length(exchanges) && left_energy_factor > 0
         
         # calcualte specific thermal power depending on control mode; reuse already caluclated values
         if target_temperatures[component_idx] in collect(keys(calculated_values))
             p_spec_th, t_avg, t_target = calculated_values[target_temperatures[component_idx]]
 
         elseif unit.delta_T !== nothing && unit.spec_flow_rate === nothing
+            print(exchanges)
             p_spec_th, t_avg, t_target = calc_thermal_power_fixed_delta_T(unit, sim_params, target_temperatures[component_idx])
 
         elseif unit.delta_T === nothing && unit.spec_flow_rate !== nothing

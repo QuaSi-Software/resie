@@ -1256,7 +1256,7 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 #TODO only for validation
-include("heat_sources/solarthermal_collector_validation.jl")
+# include("heat_sources/solarthermal_collector_validation.jl")
 
 load_condition_prototypes()
 
