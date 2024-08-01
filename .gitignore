@@ -12,3 +12,27 @@ test/scenarios/*
 # input files (force-add new examples)
 examples/*.json
 profiles/examples/district/230413_profiles_management.xlsx
+src/energy_systems/heat_sources/solarthermal_test.jl
+profiles/create_prf_from_csv.jl
+profiles/convert_polysun_logging.jl
+src/energy_systems/heat_sources/solarthermal_collector_validation_old.jl
+profiles/validation/RSTV/absorber_temperature_out_ba2.prf
+profiles/validation/RSTV/absorber_temperature_out_haus4a_shift.prf
+profiles/validation/RSTV/absorber_temperature_out_haus4a.prf
+profiles/validation/RSTV/absorber_temperature_out_haus4b.prf
+profiles/validation/RSTV/absorber_temperature_out_haus5.prf
+profiles/validation/RSTV/air_humidity_measure.prf
+profiles/validation/RSTV/all_temperature_in.prf
+profiles/validation/RSTV/all_temperature_out.prf
+profiles/validation/RSTV/ambient_temperature_measure.prf
+profiles/validation/RSTV/ambient_temperature_station.prf
+profiles/validation/RSTV/DWD_diffuse_irr.prf
+profiles/validation/RSTV/DWD_globa_irr.prf
+profiles/validation/RSTV/DWD_long_wave_irr.prf
+profiles/validation/RSTV/DWD_temperature.prf
+profiles/validation/RSTV/DWD_wind_speed.prf
+profiles/validation/RSTV/global_irr_hor.prf
+profiles/validation/RSTV/WMZ_flow_rate_m3_h.prf
+profiles/validation/RSTV/WMZ_power_kW.prf
+profiles/validation/RSTV/WMZ_temperature_in.prf
+profiles/validation/RSTV/WMZ_temperature_out.prf

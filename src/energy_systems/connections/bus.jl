@@ -400,7 +400,7 @@ function _add(first::Nothing, second::Float64) return second end
 function _add(first::Float64, second::Nothing) return first end
 function _add(first::Nothing, second::Nothing) return nothing end
 
-function _abs(val::Union{Floathing, Vector{Floathing}})
+function _abs(val::Union{Floathing, Vector{<:Floathing}})
     if !isa(val, AbstractVector)
         val = [val]
     end
@@ -408,7 +408,7 @@ function _abs(val::Union{Floathing, Vector{Floathing}})
     return abs_val
 end
 
-function _sum(vector::Union{Floathing,Vector{Floathing}})
+function _sum(vector::Union{Floathing,Vector{<:Floathing}})
     sum = nothing
     for entry in vector
         sum = _add(sum, entry)
@@ -438,8 +438,8 @@ the set_max_energy! function on an interface, if one side is a bus.
 function set_max_energy!(unit::Bus, 
                          comp::Component,
                          is_input::Bool,
-                         value::Union{Floathing, Vector{Floathing}},
-                         purpose_uac::Union{Stringing, Vector{Stringing}},
+                         value::Union{Floathing, Vector{<:Floathing}},
+                         purpose_uac::Union{Stringing, Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool)
 
     bus = unit.proxy === nothing ? unit : unit.proxy

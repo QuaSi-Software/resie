@@ -406,8 +406,8 @@ on that bus.
 """
 function set_max_energy!(
     interface::SystemInterface,
-    value::Union{Floathing, Vector{Floathing}},
-    purpose_uac::Union{Stringing, Vector{Stringing}} = nothing,
+    value::Union{Floathing, Vector{<:Floathing}},
+    purpose_uac::Union{Stringing, Vector{<:Stringing}} = nothing,
     has_calculated_all_maxima::Bool = false
 )
     if interface.source.sys_function == sf_bus
@@ -510,8 +510,8 @@ If the given values are scalars, they are converted into vectors.
 If `values` is empty, a zero is added to ensure accessibility.
 """
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy, 
-                         values::Union{Floathing, Vector{Floathing}},
-                         purpose_uac::Union{Stringing, Vector{Stringing}},
+                         values::Union{Floathing, Vector{<:Floathing}},
+                         purpose_uac::Union{Stringing, Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool)
 
     if !isa(values, AbstractVector)
@@ -598,7 +598,7 @@ Returns the highest temperature of a vector of temperatures and handles nothing-
 - If some of the inputs are nothing and the others are float, the highest float will be returned.
 - If all of the inputs are nothing, nothing will be returned.
 """
-function highest(temperature_vector::Vector{Temperature})::Temperature
+function highest(temperature_vector::Vector{<:Temperature})::Temperature
     n_temperatures = length(temperature_vector)
     if n_temperatures == 0
         return nothing
@@ -644,7 +644,7 @@ Returns the lowest temperature of a vector of temperatures and handles nothing-v
 - If some of the inputs are nothing and the others are float, the lowest float will be returned.
 - If all of the inputs are nothing, nothing will be returned.
 """
-function lowest(temperature_vector::Vector{Temperature})::Temperature
+function lowest(temperature_vector::Vector{<:Temperature})::Temperature
     n_temperatures = length(temperature_vector)
     if n_temperatures == 0
         return nothing
