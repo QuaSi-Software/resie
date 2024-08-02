@@ -1,0 +1,4 @@
+style = "yas"
+margin = 120
+variable_call_indent = ["Dict"]
+always_use_return = false
