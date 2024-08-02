@@ -4,6 +4,14 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.9.1
+* Add temperature layers in the input and output interfaces of components, if they need it. Currently only used by the heat pump, but solarthermal collector will follow.
+* Refactor heat pump to handle temperature layer in the input and output interfaces and add a bypass if the input temperature is higher than the output temperature.
+* Add method to deal with unknown energies at known temperatures for components during the potential step to avoid balance errors due to changed temperatures in process.
+* Add basic functionalites for component-controlled order on busses. The respective control_modules are not included yet.
+* Add two new scenarios "transformer_chain" and "hp_temperature_layer". Set new scenario reference due to bypass and correct calculation of COP for multiple heat layers in the output of heat pumps.
+* Add output channels for temperatures for heat pump ("MixingTemperature_Input", "MixingTemperature_Output"), buffer tank ("CurrentMaxOutTemp") and geothermal probe ("current_input_temperature").
+
 ### Version 0.9.0
 * Implement functionality of control modules, that can be added to components and that control the operation of the components via defined callback functions. This replaces the previous implementation of "strategies", as this was too limiting. The currently implemented control module types are:
   * economical_discharge: Handles the discharging of a battery to only be allowed if sufficient charge is available and a linked PV plant has available power below a given threshold. Mostly used for examplatory purposes.
