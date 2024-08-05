@@ -4,6 +4,11 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.9.2
+* Add configuration for YAS code style using JuliaFormatter
+* Add configuration for pre-commit hook to run the formatter automatically before a commit
+* Extend README explaining things about the chosen code style and how to use it
+
 ### Version 0.9.1
 * Add temperature layers in the input and output interfaces of components, if they need it. Currently only used by the heat pump, but solarthermal collector will follow.
 * Refactor heat pump to handle temperature layer in the input and output interfaces and add a bypass if the input temperature is higher than the output temperature.
