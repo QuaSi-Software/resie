@@ -32,6 +32,7 @@ mutable struct SolarthermalCollector <: Component
 
     eta_0_b::Float32
     K_b_array::Array{Union{Missing, Float32}, 2}
+    K_b_itp
     K_b::Float32
     K_d::Float32
     a_params::Array{Float32, 1}
@@ -115,9 +116,13 @@ mutable struct SolarthermalCollector <: Component
         
             config["eta_0_b"],
             vcat([10,20,30,40,50,60,70,80,90]', config["K_b_t_array"]', config["K_b_l_array"]'), 
-                                 # row1: angle 0° to 90°/vertical/west, 
-                                 # row2: transversal/tilt, 
-                                 # row3: longitudinal/azimuth/orientation
+                                # row1: angle 0° to 90°/vertical/west, 
+                                # row2: transversal/tilt, 
+                                # row3: longitudinal/azimuth/orientation
+            (), # initialise Interpolation functions for K_b
+                                # row1: angle 0° to 90°/vertical/west, 
+                                # row2: transversal/tilt, 
+                                # row3: longitudinal/azimuth/orientation
             1, # Calculate K_b from K_b_array in control()
             config["K_d"], # collector parameter for diffuse irradiance 
             config["a_params"], # collector sim_params a1 to a8 corresponding to EN ISO 9806:2017
@@ -176,6 +181,8 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     unit.last_average_temperature = Profiles.value_at_time(
         unit.ambient_temperature_profile, sim_params["time"]
         )
+
+    unit.K_b_itp = init_K_b(unit.K_b_array)
 end
 
 function control(
@@ -184,7 +191,7 @@ function control(
     sim_params::Dict{String,Any}
     )
     move_state(unit, components, sim_params)
-    
+
     # get values from profiles
     global_solar_hor_irradiance = Profiles.value_at_time(
         unit.global_solar_hor_irradiance_profile, sim_params["time"]
@@ -208,16 +215,22 @@ function control(
 
     start_date = DateTime(Dates.year(Dates.now()), 1, 1, 0, 30, 0) - Dates.Hour(1) # TODO centralise start_date
     time = start_date + Dates.Second(sim_params["time"])
-
+    
     solar_zenith, solar_azimuth = sun_position(time, 9.18, 47.67, 1.0, unit.ambient_temperature)
-
+    
     unit.beam_solar_irradiance_in_plane, unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = beam_irr_in_plane(
         unit.tilt_angle, unit.azimuth_angle, solar_zenith, solar_azimuth, 
         global_solar_hor_irradiance, diffuse_solar_hor_irradiance
         )
-
-    unit.K_b = calc_K_b!(unit.K_b_array, transversal_angle, longitudinal_angle)
-
+    
+    # Calculate K_b based on a table with provided values for longitudinal and transversal angles.
+    # Table with provided values is mirrored for negative angles.
+    if abs(transversal_angle) < 90 && abs(longitudinal_angle) < 90
+        unit.K_b = unit.K_b_itp[1](abs(transversal_angle)) * unit.K_b_itp[2](abs(longitudinal_angle))
+    else
+        unit.K_b = 0
+    end
+ 
     unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
 
     unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, _sum(collect(values(unit.available_energies))))
@@ -225,6 +238,55 @@ function control(
     
     set_max_energy!(unit.output_interfaces[unit.medium], collect(values(sort(unit.available_energies))), collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
     set_temperature!(unit.output_interfaces[unit.medium], nothing, unit.output_temperature)
+end
+
+function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
+    
+    exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
+    energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
+    
+    output_temperature_interface = lowest(unit.output_temperature, temp_min_highest(exchanges))
+
+    if sum(energy_demands) > 0.0
+        for e in exchanges
+            comp_uac = e.purpose_uac
+            comp_energy_demand = abs(e.balance + e.energy_potential)
+            used_energy_comp = min(comp_energy_demand, unit.available_energies[comp_uac])
+
+            # recalculate the average_temperature if not all energy is used to keep a constant 
+            # flow rate
+            if unit.delta_T === nothing && unit.spec_flow_rate !== nothing && used_energy_comp < unit.available_energies[comp_uac]
+                unit.average_temperatures[comp_uac] = e.temperature_min - wh_to_watts(used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
+            end
+
+            unit.used_energy += used_energy_comp
+            unit.runtimes[comp_uac] = comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac]
+            # unit.runtimes[comp_uac] = ifelse(unit.available_energies[comp_uac] == 0, 0, comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac])
+        end
+
+        unit.runtimes[unit.uac] = 0
+        add!(
+            unit.output_interfaces[unit.medium],
+            unit.used_energy,
+            output_temperature_interface
+        )
+
+    else
+        unit.used_energy = 0.0
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+    end
+    
+    for uac in keys(unit.runtimes)
+        if !(uac in [e.purpose_uac for e in exchanges] || uac == unit.uac) && !isnothing(unit.average_temperatures[uac])
+            unit.runtimes[uac] = 0
+        elseif isnothing(unit.average_temperatures[uac])
+            unit.runtimes[uac] = nothing
+        end
+    end
+
+    unit.output_temperature = _weighted_mean(collect(values(sort(unit.output_temperatures))), collect(values(sort(unit.runtimes))))
+    unit.average_temperature = _weighted_mean(collect(values(sort(unit.average_temperatures))), collect(values(sort(unit.runtimes))))
+    unit.last_average_temperature = unit.average_temperature
 end
 
 function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String,Any})
@@ -345,64 +407,12 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
     )
 end
 
-function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
-
-    exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
-    energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
-    
-    output_temperature_interface = lowest(unit.output_temperature, temp_min_highest(exchanges))
-
-    if sum(energy_demands) > 0.0
-        for e in exchanges
-            comp_uac = e.purpose_uac
-            comp_energy_demand = abs(e.balance + e.energy_potential)
-            used_energy_comp = min(comp_energy_demand, unit.available_energies[comp_uac])
-
-            # recalculate the average_temperature if not all energy is used to keep a constant 
-            # flow rate
-            if unit.delta_T === nothing && unit.spec_flow_rate !== nothing && used_energy_comp < unit.available_energies[comp_uac]
-                unit.average_temperatures[comp_uac] = e.temperature_min - wh_to_watts(used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
-            end
-
-            unit.used_energy += used_energy_comp
-            unit.runtimes[comp_uac] = comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac]
-            # unit.runtimes[comp_uac] = ifelse(unit.available_energies[comp_uac] == 0, 0, comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac])
-        end
-
-        unit.runtimes[unit.uac] = 0
-        add!(
-            unit.output_interfaces[unit.medium],
-            unit.used_energy,
-            output_temperature_interface
-        )
-
-    else
-        unit.used_energy = 0.0
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
-    end
-    
-    for uac in keys(unit.runtimes)
-        if !(uac in [e.purpose_uac for e in exchanges] || uac == unit.uac) && !isnothing(unit.average_temperatures[uac])
-            unit.runtimes[uac] = 0
-        elseif isnothing(unit.average_temperatures[uac])
-            unit.runtimes[uac] = nothing
-        end
-    end
-
-    unit.output_temperature = _weighted_mean(collect(values(sort(unit.output_temperatures))), collect(values(sort(unit.runtimes))))
-    unit.average_temperature = _weighted_mean(collect(values(sort(unit.average_temperatures))), collect(values(sort(unit.runtimes))))
-    unit.last_average_temperature = unit.average_temperature
-end
-
 """
 Calculate K_b based on a table with provided values for longitudinal and transversal angles 
 and the angle of irradiance on the plane of the solarthermal collector.
 Table with provided values is mirrored for negative angles.
 """
-function calc_K_b!(K_b_array, transversal_angle, longitudinal_angle)
-    transversal_angle = abs(transversal_angle)
-    longitudinal_angle = abs(longitudinal_angle)
-
+function init_K_b(K_b_array)
     K_b_array = hcat([0, 1, 1], K_b_array)
     angle_range = K_b_array[1, 1]:10:K_b_array[1, end]
 
@@ -413,12 +423,8 @@ function calc_K_b!(K_b_array, transversal_angle, longitudinal_angle)
 
     interp_transversal = cubic_spline_interpolation(angle_range, K_b_array[2,:])
     interp_longitudinal = cubic_spline_interpolation(angle_range, K_b_array[3,:])
-    if transversal_angle < 90 && longitudinal_angle < 90
-        K_b = interp_transversal(transversal_angle) * interp_longitudinal(longitudinal_angle)
-    else
-        K_b = 0
-    end
-    return K_b
+
+    return (interp_transversal, interp_longitudinal)
 end
 
 """
