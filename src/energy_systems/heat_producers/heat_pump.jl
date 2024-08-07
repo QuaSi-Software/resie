@@ -107,32 +107,6 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
 end
 
-function check_heat_in(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_heat_in"] == true
-        if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
-            # end of condition
-            return ([Inf],
-                    [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                    [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                    [unit.input_interfaces[unit.m_heat_in].source.uac])
-        else
-            exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
-                                   unit.input_interfaces[unit.m_heat_in].source)
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
-        end
-    else
-        return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                [unit.input_interfaces[unit.m_heat_in].source.uac])
-    end
-end
-
 function check_heat_out(unit::HeatPump, sim_params::Dict{String,Any})
     if unit.controller.parameters["consider_m_heat_out"] == true
         if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
@@ -363,7 +337,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     potentials_energies_heat_in,
     in_temps_min,
     in_temps_max,
-    in_uacs = check_heat_in(unit, sim_params)
+    in_uacs = check_heat_in_layered(unit, sim_params)
 
     potentials_energies_heat_out,
     out_temps_min,

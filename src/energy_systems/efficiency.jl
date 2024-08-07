@@ -374,6 +374,47 @@ function check_el_in(unit::Union{Electrolyser,HeatPump},
 end
 
 """
+    check_heat_in_layered(unit, sim_params)
+
+Checks the available energy on the input heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The available energy on the interface as one layer per source. The
+    value can be `Inf`, which is a special floating point value signifying an infinite value
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per source.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
+- `Vector{Stringing}`: The UACs of the sources on the interface.
+"""
+function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_heat_in"]
+        return ([Inf],
+                [unit.input_interfaces[unit.m_heat_in].temperature_min],
+                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].source.uac])
+    end
+
+    if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
+        # end of condition
+        return ([Inf],
+                [unit.input_interfaces[unit.m_heat_in].temperature_min],
+                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].source.uac])
+    else
+        exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
+                               unit.input_interfaces[unit.m_heat_in].source)
+        return ([e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges),
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges])
+    end
+end
+
+"""
     check_el_out(unit, sim_params)
 
 Checks the available energy on the electricity output interface.
