@@ -107,27 +107,6 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
 end
 
-function check_el_in(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_el_in"] == true
-        if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy))
-            # end of condition
-            return (Inf)
-        else
-            exchanges = balance_on(unit.input_interfaces[unit.m_el_in],
-                                   unit.input_interfaces[unit.m_el_in].source)
-            potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-            if potential_energy_el <= sim_params["epsilon"]
-                return (0.0)
-            end
-            return (potential_energy_el)
-        end
-    else
-        return (Inf)
-    end
-end
-
 function check_heat_in(unit::HeatPump, sim_params::Dict{String,Any})
     if unit.controller.parameters["consider_m_heat_in"] == true
         if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
@@ -370,16 +349,22 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     # get usage fraction from control modules
     max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
     if max_usage_fraction <= 0.0
-        return false, (nothing, nothing, nothing)
+        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     end
 
     # get potentials from inputs/outputs. The heat input and output are calculated as 
-    # vectors to allow for temperautre layers, while the electricity input is a scalar
+    # vectors to allow for temperature layers, while the electricity input is a scalar
     potential_energy_el = check_el_in(unit, sim_params)
+    if potential_energy_el === nothing
+        # shortcut if we're limited by zero input electricity
+        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+    end
+
     potentials_energies_heat_in,
     in_temps_min,
     in_temps_max,
     in_uacs = check_heat_in(unit, sim_params)
+
     potentials_energies_heat_out,
     out_temps_min,
     out_temps_max,
@@ -534,7 +519,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     # the heat pump doesn't run at all
     usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
     if usage_fraction < unit.min_power_fraction
-        return false, (nothing, nothing, nothing)
+        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
     end
 
     return true,

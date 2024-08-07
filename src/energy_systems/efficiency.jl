@@ -344,14 +344,14 @@ end
 Checks the available energy on the input electricity interface.
 
 # Arguments
-- `unit::Electrolyser`: The component
+- `unit::Union{Electrolyser,HeatPump}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_in(unit::Electrolyser,
+function check_el_in(unit::Union{Electrolyser,HeatPump},
                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_in"]
         return Inf
