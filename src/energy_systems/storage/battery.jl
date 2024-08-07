@@ -16,8 +16,11 @@ Base.@kwdef mutable struct Battery <: Component
 
     capacity::Float64
     load::Float64
-    losses::Float64
+    charge_efficiency::Float64
+    discharge_efficiency::Float64
+    self_discharge_rate::Float64
 
+    losses::Float64
     max_charge::Float64
     max_discharge::Float64
 
@@ -25,35 +28,28 @@ Base.@kwdef mutable struct Battery <: Component
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_storage, # sys_function
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            medium,
-            config["capacity"], # capacity
-            config["load"], # load
-            0.0, # losses
-            0.0, # max_charge
-            0.0 # max_discharge
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_storage, # sys_function
+                   InterfaceMap(medium => nothing),
+                   InterfaceMap(medium => nothing),
+                   medium,
+                   config["capacity"], # capacity
+                   config["load"], # load
+                   config["charge_efficiency"],
+                   config["discharge_efficiency"],
+                   config["self_discharge_rate"],
+                   0.0, # losses
+                   0.0, # max_charge
+                   0.0)
     end
 end
 
 function initialise!(unit::Battery, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        unload_storages(unit.controller, unit.medium)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        load_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
 function reset(unit::Battery)
@@ -63,45 +59,42 @@ function reset(unit::Battery)
     unit.max_discharge = 0.0
 end
 
-function control(
-    unit::Battery,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::Battery,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
+    old_load = unit.load
+    unit.load *= unit.self_discharge_rate
+    unit.losses += old_load - unit.load
+
     if discharge_is_allowed(unit.controller, sim_params)
-        unit.max_discharge = unit.load
+        unit.max_discharge = unit.load * unit.discharge_efficiency
     else
         unit.max_discharge = 0.0
     end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_discharge)
 
     if charge_is_allowed(unit.controller, sim_params)
-        unit.max_charge = unit.capacity - unit.load
+        unit.max_charge = (unit.capacity - unit.load) / unit.charge_efficiency
     else
         unit.max_charge = 0.0
     end
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge)
 end
 
-
-function balance_on(
-    interface::SystemInterface,
-    unit::Battery
-)::Vector{EnergyExchange}
+function balance_on(interface::SystemInterface,
+                    unit::Battery)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(
-        balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.max_charge) : unit.max_discharge,
-        purpose_uac = purpose_uac,
-        temperature_min=interface.temperature_min,
-        temperature_max=interface.temperature_max,
-        pressure=nothing,
-        voltage=nothing,
-    )]
+    return [EnEx(; balance=interface.balance,
+                 energy_potential=caller_is_input ? -(unit.max_charge) : unit.max_discharge,
+                 purpose_uac=purpose_uac,
+                 temperature_min=interface.temperature_min,
+                 temperature_max=interface.temperature_max,
+                 pressure=nothing,
+                 voltage=nothing)]
 end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
@@ -115,22 +108,24 @@ function process(unit::Battery, sim_params::Dict{String,Any})
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
     end
 
-    if unit.load > abs(energy_demand)
-        unit.load += energy_demand
+    if unit.load > abs(energy_demand) * unit.discharge_efficiency
+        unit.losses += abs(energy_demand) * (1.0 - unit.discharge_efficiency)
+        unit.load += energy_demand * unit.discharge_efficiency
         add!(outface, abs(energy_demand))
     else
-        add!(outface, unit.load)
+        unit.losses += unit.load * (1.0 - unit.discharge_efficiency)
+        add!(outface, unit.load * unit.discharge_efficiency)
         unit.load = 0.0
     end
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_charge < sim_params["epsilon"]
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return
     end
 
@@ -144,18 +139,18 @@ function load(unit::Battery, sim_params::Dict{String,Any})
     end
 
     diff = unit.capacity - unit.load
-    if diff > energy_available
-        unit.load += energy_available
-        sub!(inface, energy_available)
+    if diff > energy_available * unit.charge_efficiency
+        unit.load += energy_available * unit.charge_efficiency
+        sub!(inface, energy_available * unit.charge_efficiency)
     else
         unit.load = unit.capacity
-        sub!(inface, diff)
+        sub!(inface, diff * unit.charge_efficiency)
     end
 end
 
 function output_values(unit::Battery)::Vector{String}
-    return [string(unit.medium)*" IN",
-            string(unit.medium)*" OUT",
+    return [string(unit.medium) * " IN",
+            string(unit.medium) * " OUT",
             "Load",
             "Load%",
             "Capacity",
