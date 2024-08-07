@@ -1,5 +1,4 @@
 using Interpolations
-using Impute
 using Roots
 
 include("solar_irradiance.jl")
@@ -241,7 +240,7 @@ function control(
 end
 
 function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
-    
+
     exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
     energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
     
@@ -261,7 +260,6 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
 
             unit.used_energy += used_energy_comp
             unit.runtimes[comp_uac] = comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac]
-            # unit.runtimes[comp_uac] = ifelse(unit.available_energies[comp_uac] == 0, 0, comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac])
         end
 
         unit.runtimes[unit.uac] = 0
@@ -413,16 +411,34 @@ and the angle of irradiance on the plane of the solarthermal collector.
 Table with provided values is mirrored for negative angles.
 """
 function init_K_b(K_b_array)
-    K_b_array = hcat([0, 1, 1], K_b_array)
+    # K_b_array = hcat([0, 1, 1], K_b_array)
+    # K_b_array[:,10] = [90,0,0]
     angle_range = K_b_array[1, 1]:10:K_b_array[1, end]
 
     if any(ismissing, K_b_array) 
-        K_b_array[:,10] = [90,0,0]
-        K_b_array = Impute.interp(K_b_array; dims=1)
-    end
 
-    interp_transversal = cubic_spline_interpolation(angle_range, K_b_array[2,:])
-    interp_longitudinal = cubic_spline_interpolation(angle_range, K_b_array[3,:])
+        K_b_filtered = []
+        missing_idx = []
+
+        for col_idx in 1:length(K_b_array[1, :])
+            if any(ismissing, K_b_array[:, col_idx])
+                append!(missing_idx, col_idx)
+            else
+                append!(K_b_filtered, K_b_array[:, col_idx])
+            end
+        end
+        K_b_filtered = reshape(K_b_filtered, (3, :))
+
+        itp_t = interpolate((K_b_filtered[1, :],), K_b_filtered[2, :], Gridded(Linear()))
+        itp_l = interpolate((K_b_filtered[1, :],), K_b_filtered[3, :], Gridded(Linear()))
+
+        for idx in missing_idx
+            K_b_array[2, idx] = itp_t(angle_range[idx])
+            K_b_array[3, idx] = itp_l(angle_range[idx])
+        end
+    end
+    interp_transversal = scale(interpolate(K_b_array[2, :], BSpline(Cubic(Flat(OnGrid())))), angle_range)
+    interp_longitudinal = scale(interpolate(K_b_array[2, :], BSpline(Cubic(Flat(OnGrid())))), angle_range)
 
     return (interp_transversal, interp_longitudinal)
 end
