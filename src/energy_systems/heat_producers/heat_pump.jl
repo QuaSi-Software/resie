@@ -107,32 +107,6 @@ function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing
     return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
 end
 
-function check_heat_out(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_heat_out"] == true
-        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
-            # end of condition
-            return ([-Inf],
-                    [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                    [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                    [unit.output_interfaces[unit.m_heat_out].target.uac])
-        else
-            exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
-                                   unit.output_interfaces[unit.m_heat_out].target)
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
-        end
-    else
-        return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                [unit.output_interfaces[unit.m_heat_out].target.uac])
-    end
-end
-
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
                                      available_el_in,
@@ -342,7 +316,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     potentials_energies_heat_out,
     out_temps_min,
     out_temps_max,
-    out_uacs = check_heat_out(unit, sim_params)
+    out_uacs = check_heat_out_layered(unit, sim_params)
 
     # in the following we want to work with positive values as it is easier
     potentials_energies_heat_in = abs.(potentials_energies_heat_in)

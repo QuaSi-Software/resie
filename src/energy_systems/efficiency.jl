@@ -625,3 +625,45 @@ function check_heat_lt_out(unit::Electrolyser,
                                unit.output_temperature_lt,
                                sim_params)
 end
+
+"""
+    check_heat_out_layered(unit, sim_params)
+
+Checks the available energy on the output heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The requested energy on the interface as one layer per target. The
+    value can be `-Inf`, which is a special floating point value signifying a negative
+    infinite value.
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per target.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
+- `Vector{Stringing}`: The UACs of the targets on the interface.
+"""
+function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_heat_out"]
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].temperature_min],
+                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].target.uac])
+    end
+
+    if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        # end of condition
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].temperature_min],
+                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].target.uac])
+    else
+        exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
+                               unit.output_interfaces[unit.m_heat_out].target)
+        return ([e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges),
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges])
+    end
+end
