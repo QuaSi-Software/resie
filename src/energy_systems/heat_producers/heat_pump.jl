@@ -132,7 +132,8 @@ function calculate_energies_heatpump(unit::HeatPump,
     while (sum(available_el_in; init=0.0) > sim_params["epsilon"]
            && sum(available_heat_in; init=0.0) > sim_params["epsilon"]
            && sum(available_heat_out; init=0.0) > sim_params["epsilon"]
-           && max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0) > sim_params["epsilon"])
+           && (max_usage_fraction * watt_to_wh(unit.power_th) -
+               sum(layers_heat_out; init=0.0) > sim_params["epsilon"]))
         # find first non-zero index
         while available_heat_in[current_in_idx] <= sim_params["epsilon"]
             current_in_idx += 1
@@ -141,15 +142,19 @@ function calculate_energies_heatpump(unit::HeatPump,
             current_out_idx += 1
         end
 
-        # detect and check temperatures. If a input or an output temperature is given, this will be set!
+        # detect and check temperatures. If a input or an output temperature is given, this
+        # will be set!
         if unit.input_temperature === nothing
             current_in_temp = highest(in_temps_min[current_in_idx], in_temps_max[current_in_idx])
             if current_in_temp === nothing && unit.constant_cop === nothing
-                @error "Error: The input temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'input_temperature' or check the connected components."
+                @error "Error: The input temperature for $(unit.uac) could not be detected. " *
+                       "Please specify one with the parameter 'input_temperature' or check " *
+                       "the connected components."
                 throw(InputError)
             end
         else
-            # skip layer if given fixed input temperature is not within the temperature band of the layer
+            # skip layer if given fixed input temperature is not within the temperature band
+            # of the layer
             if (in_temps_min[current_in_idx] !== nothing
                 &&
                 in_temps_min[current_in_idx] > unit.input_temperature
@@ -169,11 +174,14 @@ function calculate_energies_heatpump(unit::HeatPump,
         if unit.output_temperature === nothing
             current_out_temp = lowest(out_temps_min[current_out_idx], out_temps_max[current_out_idx])
             if current_out_temp === nothing && unit.constant_cop === nothing
-                @error "Error: The output temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'output_temperature' or check the connected components."
+                @error "Error: The output temperature for $(unit.uac) could not be detected. " *
+                       "Please specify one with the parameter 'output_temperature' or check " *
+                       "the connected components."
                 throw(InputError)
             end
         else
-            # skip layer if given fixed output temperature is not within the temperature band of the layer
+            # skip layer if given fixed output temperature is not within the temperature
+            # band of the layer
             if (out_temps_min[current_out_idx] !== nothing
                 &&
                 out_temps_min[current_out_idx] > unit.output_temperature
@@ -201,16 +209,20 @@ function calculate_energies_heatpump(unit::HeatPump,
             # as then it seems that no electrical energy is available!
             used_el_in = 0.01 # TODO
             current_out_temp = current_in_temp
-            # TODO: Whats about the usage_fraction, should the bypass be kept included in the usage_fraction calculation?
-            # Or should we deny the bypass and force users to implement heat pumps in parallel if they want a bypass?
-            # TODO: Whats about a constant COP? Should this be still be valid even during bypass?
+            # TODO: Whats about the usage_fraction, should the bypass be kept included in
+            # the usage_fraction calculation?
+            # Or should we deny the bypass and force users to implement heat pumps in
+            # parallel if they want a bypass?
+            # TODO: Whats about a constant COP? Should this be still be valid even during
+            # bypass?
         else
             # calculate cop
             cop = unit.constant_cop === nothing ?
                   dynamic_cop(current_in_temp, current_out_temp) :
                   unit.constant_cop
             if cop === nothing
-                @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
+                @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
+                        "given. Provide temperatures or fixed cop.")
                 throw(InputError)
             end
 
@@ -297,7 +309,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     # get usage fraction from control modules
     max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
     if max_usage_fraction <= 0.0
-        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+        return false, (nothing)
     end
 
     # get potentials from inputs/outputs. The heat input and output are calculated as 
@@ -305,7 +317,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     potential_energy_el = check_el_in(unit, sim_params)
     if potential_energy_el === nothing
         # shortcut if we're limited by zero input electricity
-        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+        return false, (nothing)
     end
 
     potentials_energies_heat_in,
@@ -357,8 +369,9 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
     if heat_in_has_inf_energy && heat_out_has_inf_energy
         # can not perform calculation if both inputs and outputs have inf energies
-        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and outputs. This cannot be resolved. " *
-              "Please check the order of operation and make sure that either the inputs or the outputs have been fully calculated " *
+        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and " *
+              "outputs. This cannot be resolved. Please check the order of operation and " *
+              "make sure that either the inputs or the outputs have been fully calculated " *
               "before the heat pump $(unit.uac) has its potential step."
     elseif heat_in_has_inf_energy
         for heat_in_idx in eachindex(potentials_energies_heat_in)
@@ -467,7 +480,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     # the heat pump doesn't run at all
     usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
     if usage_fraction < unit.min_power_fraction
-        return false, (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+        return false, (nothing)
     end
 
     return true,
@@ -533,21 +546,12 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[5], highest(energies[6]), energies[7])
 end
 
-# has its own reset function as here more parameters are present that need to be reset in every timestep
+# has its own reset function as here more parameters are present that need to be reset in
+# every timestep
 function reset(unit::HeatPump)
-    for inface in values(unit.input_interfaces)
-        if inface !== nothing
-            reset!(inface)
-        end
-    end
-    for outface in values(unit.output_interfaces)
-        if outface !== nothing
-            reset!(outface)
-        end
-    end
+    invoke(reset, Tuple{Component}, unit)
 
     # reset other parameter
-    unit.losses = 0.0
     unit.cop = 0.0
     unit.mix_temp_input = 0.0
     unit.mix_temp_output = 0.0
