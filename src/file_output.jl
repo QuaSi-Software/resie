@@ -28,11 +28,11 @@ function get_output_keys(io_settings::Dict{String, Any},
 
     do_write_all_CSV_outputs = false
     do_write_CSV = false
-    if haskey(io_settings, "output_keys")
+    if haskey(io_settings, "csv_output_keys")
         do_write_CSV = true  # if the key exists, set do_create_plot to true by default
-        if io_settings["output_keys"] == "all"
+        if io_settings["csv_output_keys"] == "all"
             do_write_all_CSV_outputs = true
-        elseif io_settings["output_keys"] == "nothing"
+        elseif io_settings["csv_output_keys"] == "nothing"
             do_write_CSV = false
         end
     end
@@ -64,7 +64,7 @@ function get_output_keys(io_settings::Dict{String, Any},
         if do_write_all_CSV_outputs # gather all outputs
             output_keys_to_csv = all_output_keys
         else  # get only requested output keys from input file for CSV-export
-            output_keys_to_csv = output_keys(components, io_settings["output_keys"])
+            output_keys_to_csv = output_keys(components, io_settings["csv_output_keys"])
         end
     else
         output_keys_to_csv = nothing
@@ -99,7 +99,10 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 each_outputinterface = each_outputinterface[2]
             end
 
-            if isdefined(each_outputinterface, :target)
+            if (isdefined(each_outputinterface, :target) && 
+               !startswith(each_outputinterface.target.uac, "Proxy") &&
+               !startswith(each_outputinterface.source.uac, "Proxy"))
+
                 # count interface
                 nr_of_interfaces += 1
 
@@ -166,8 +169,11 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                 each_outputinterface = each_outputinterface[2]
             end
-            if isdefined(each_outputinterface, :target)
-                energies[n] = calculate_energy_flow(each_outputinterface) 
+            if (isdefined(each_outputinterface, :target) && 
+                !startswith(each_outputinterface.target.uac, "Proxy") &&
+                !startswith(each_outputinterface.source.uac, "Proxy"))
+
+                energies[n] = calculate_energy_flow(each_outputinterface)
                 n += 1
                 
                 # If source or target is fixed source or sink, gather also demand and supply
@@ -213,7 +219,14 @@ function output_keys(
             if length(splitted) > 1
                 medium_key = splitted[1]
                 medium = Symbol(String(medium_key))
-                value_key = splitted[2]
+                if medium in EnergySystems.medium_categories
+                    value_key = splitted[2]
+                else
+                    @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an output key. 
+Make sure that the medium \"$medium\" exists and that you have not used spaces accidentally. 
+Spaces are only allowed if you want to specify an output channel of a specific medium!"
+                    throw(InputError)
+                end
             else
                 medium = nothing
                 value_key = splitted[1]
@@ -279,32 +292,53 @@ function write_to_file(
 end
 
 """
-dump_info(file_path, components, order_of_operations, sim_params)
+    dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
 
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_info(
-    file_path::String,
+function dump_auxiliary_outputs(
+    project_config::Dict{AbstractString,Any},
     components::Grouping,
     order_of_operations::StepInstructions,
     sim_params::Dict{String,Any}
 )
-    open(abspath(file_path), "w") do file_handle
-        write(file_handle, "# Simulation step order\n")
+    # export order of operation
+    if default(project_config["io_settings"], "auxiliary_info", false)
+        aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
+        open(abspath(aux_info_file_path), "w") do file_handle
+            write(file_handle, "# Simulation step order\n")
 
-        for entry in order_of_operations
-            for step in entry[2:lastindex(entry)]
-                if entry == last(order_of_operations)
-                    write(file_handle, "\"$(entry[1]) $(entry[2])\"\n")
-                else
-                    write(file_handle, "\"$(entry[1]) $(entry[2])\",\n")
+            for entry in order_of_operations
+                for step in entry[2:lastindex(entry)]
+                    if entry == last(order_of_operations)
+                        write(file_handle, "\"$(entry[1]) $(entry[2])\"\n")
+                    else
+                        write(file_handle, "\"$(entry[1]) $(entry[2])\",\n")
+                    end
                 end
             end
         end
+        @info "Auxiliary info dumped to file $(aux_info_file_path)"
     end
+
+    # plot additional figures potentially available from components after initialisation
+    if default(project_config["io_settings"], "auxiliary_plots", false)
+        aux_plots_output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+        component_list = []
+        for component in components
+            if plot_optional_figures(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
+                push!(component_list, component[2].uac)
+            end
+        end
+        if length(component_list) > 0
+            @info "Auxiliary plots are saved to folder $(aux_plots_output_path) for the following components: $(join(component_list, ", "))"
+        end
+    end
+    
 end
 
 
@@ -413,10 +447,14 @@ function create_profile_line_plots(
         xaxis_title_text="Time [$(project_config["io_settings"]["output_plot_time_unit"])]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))
-
     p = plot(traces, layout)
-    savefig(p, "output/output_plot.html")
 
+    file_path = default(
+        project_config["io_settings"],
+        "output_plot_file",
+        "./output/output_plot.html"
+    )
+    savefig(p, file_path)
 end
 
 
@@ -436,6 +474,7 @@ function create_sankey(
     output_all_values::Matrix{Float64},
     medium_of_interfaces::Vector{Any},
     nr_of_interfaces::Int64,
+    io_settings::Dict{String, Any}
 )
 
     # sum up data of each interface
@@ -447,12 +486,16 @@ function create_sankey(
     # remove data that should not be plotted in Sankey
     interface_new = 1
     for _ in 1:nr_of_interfaces
-        if ( 
+        if (
             # remove oxygen from data as the energy of oxygen is considered to be zero
-            medium_of_interfaces[interface_new] == :m_c_g_o2 ||  
+            medium_of_interfaces[interface_new] == :m_c_g_o2
             # remove real sinks and sources if they match the delivered energy
-            # to enable this to work, the "real" demand/supply needs to be always one entry below the delivered/requested one in the array!
-             (medium_of_interfaces[interface_new] == "hide_medium" && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1])
+            # to enable this to work, the "real" demand/supply needs to be always one entry
+            # below the delivered/requested one in the array!
+            || (
+                medium_of_interfaces[interface_new] == "hide_medium"
+                && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
+            )
         )
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
@@ -463,6 +506,7 @@ function create_sankey(
         end
         interface_new += 1
     end
+    interface_new -= 1
 
     # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
     output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
@@ -477,13 +521,38 @@ function create_sankey(
     # set label and colour of interfaces
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
-    if length(unique_medium_labels) > 1
-        colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
-        color_map = Dict(zip(unique_medium_labels, colors))
-        colors_for_medium = map(x -> color_map[x], medium_labels)
-    else # account for cases with only one medium in the system topology
-        colors_for_medium = get(ColorSchemes.roma, 0.5)
+
+    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], Dict{})
+        if length(unique_medium_labels) > 1
+            colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
+            color_map = Dict(zip(unique_medium_labels, colors))
+        else
+            color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
+        end
+    else
+        color_map = Dict{String, Any}(io_settings["sankey_plot"])
+        for (medium, color) in color_map
+            try
+                color_entry = Colors.color_names[color]
+                color_map[medium] = RGB(color_entry[1]/255, color_entry[2]/255, color_entry[3]/255)
+            catch e
+                @error "The color for the sankey '$color' of medium '$medium' could not be detected. The following error occured: $e\n" *
+                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                throw(InputError)
+            end
+        end
+        for medium in unique_medium_labels
+            if medium in keys(color_map)
+                continue
+            elseif medium == "hide_medium"
+                color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
+            else
+                @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
+                throw(InputError)
+            end
+        end
     end
+    colors_for_medium = map(x -> color_map[x], medium_labels)
 
     do_hide_real_demands = true
     if do_hide_real_demands
@@ -533,6 +602,6 @@ function create_sankey(
     )
 
     # save plot
-    savefig(p, "output/output_sankey.html")
-
+    file_path = default(io_settings, "sankey_plot_file", "./output/output_sankey.html")
+    savefig(p, file_path)
 end

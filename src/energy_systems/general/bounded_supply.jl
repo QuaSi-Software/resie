@@ -36,9 +36,7 @@ mutable struct BoundedSupply <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -58,12 +56,19 @@ mutable struct BoundedSupply <: Component
     end
 end
 
+function initialise!(unit::BoundedSupply, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        load_storages(unit.controller, unit.medium)
+    )
+end
+
 function control(
     unit::BoundedSupply,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
@@ -83,28 +88,40 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.output_interfaces[unit.medium].temperature = highest(
-        unit.temperature,
-        unit.output_interfaces[unit.medium].temperature
+    set_temperature!(
+        unit.output_interfaces[unit.medium],
+        nothing,
+        unit.temperature
     )
 end
 
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
-    blnc = balance(exchanges)
 
-    if (
-        unit.controller.parameter["name"] == "extended_storage_control"
-        && unit.controller.parameter["load_any_storage"]
-    )
-        energy_demand = blnc + storage_potential(exchanges)
+    # if we get multiple exchanges from balance_on, a bus is involved, which means the
+    # temperature check has already been performed. we only need to check the case for
+    # a single output which can happen for direct 1-to-1 connections or if the bus has
+    # filtered outputs down to a single entry, which works the same as the 1-to-1 case
+    if length(exchanges) > 1
+        energy_demand = balance(exchanges) + energy_potential(exchanges)
+        temp_out = temp_min_highest(exchanges)
     else
-        energy_demand = blnc
+        e = first(exchanges)
+        if (
+            unit.temperature === nothing ||
+            (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
+        )
+            energy_demand = e.balance + e.energy_potential
+            temp_out = lowest(e.temperature_min, unit.temperature)
+        else
+            energy_demand = 0.0
+        end
     end
 
     if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature)
+        add!(outface, min(abs(energy_demand), unit.max_energy), temp_out)
     end
 end
 

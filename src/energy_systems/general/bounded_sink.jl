@@ -36,9 +36,7 @@ mutable struct BoundedSink <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -58,12 +56,19 @@ mutable struct BoundedSink <: Component
     end
 end
 
+function initialise!(unit::BoundedSink, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        unload_storages(unit.controller, unit.medium)
+    )
+end
+
 function control(
     unit::BoundedSink,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
@@ -83,21 +88,38 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.input_interfaces[unit.medium].temperature = highest(
+    set_temperature!(
+        unit.input_interfaces[unit.medium],
         unit.temperature,
-        unit.input_interfaces[unit.medium].temperature
+        nothing
     )
 end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
-    blnc = balance(exchanges)
-    if blnc > 0.0
-        sub!(
-            inface,
-            min(abs(blnc), unit.max_energy)
+
+    # if we get multiple exchanges from balance_on, a bus is involved, which means the
+    # temperature check has already been performed. we only need to check the case for
+    # a single input which can happen for direct 1-to-1 connections or if the bus has
+    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
+    if length(exchanges) > 1
+        energy_supply = balance(exchanges) + energy_potential(exchanges)
+    else
+        e = first(exchanges)
+        if (
+            unit.temperature === nothing ||
+            (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
         )
+            energy_supply = e.balance + e.energy_potential
+        else
+            energy_supply = 0.0
+        end
+    end
+
+    if energy_supply > 0.0
+        sub!(inface, min(energy_supply, unit.max_energy), unit.temperature)
     end
 end
 

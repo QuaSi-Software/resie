@@ -1,35 +1,155 @@
 # Changes made, features added and bugs fixed
-In general the development follows the [semantic versioning](https://semver.org/) scheme.
-As the simulation is parameterized by the project file, the structure and meaning of this
-file represents the API of the simulation engine. Evaluating compatability then follows
-required changes in the project file. This is complicated by the implementation of the
-individual energy systems, which happens within the framework but also reasonably
-independant of the simulation model. A change in the implementation may have big effects
-on simulation results without requiring any change in the project file. It is up to the
-developers to find a workable middle ground.
+In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatability then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independant of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
 
 ## Pre-1.0-releases
-As per the definition of semantic versioning and the reality of early development, in
-versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat,
-the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some
-breaking changes may slip beneath notice.
+As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
-## Version 0.7.0
-* Change the inputs and outputs of busses such that the order matches the input and output priorities
+### Version 0.9.2
+* Add configuration for YAS code style using JuliaFormatter
+* Add configuration for pre-commit hook to run the formatter automatically before a commit
+* Extend README explaining things about the chosen code style and how to use it
+
+### Version 0.9.1
+* Add temperature layers in the input and output interfaces of components, if they need it. Currently only used by the heat pump, but solarthermal collector will follow.
+* Refactor heat pump to handle temperature layer in the input and output interfaces and add a bypass if the input temperature is higher than the output temperature.
+* Add method to deal with unknown energies at known temperatures for components during the potential step to avoid balance errors due to changed temperatures in process.
+* Add basic functionalites for component-controlled order on busses. The respective control_modules are not included yet.
+* Add two new scenarios "transformer_chain" and "hp_temperature_layer". Set new scenario reference due to bypass and correct calculation of COP for multiple heat layers in the output of heat pumps.
+* Add output channels for temperatures for heat pump ("MixingTemperature_Input", "MixingTemperature_Output"), buffer tank ("CurrentMaxOutTemp") and geothermal probe ("current_input_temperature").
+
+### Version 0.9.0
+* Implement functionality of control modules, that can be added to components and that control the operation of the components via defined callback functions. This replaces the previous implementation of "strategies", as this was too limiting. The currently implemented control module types are:
+  * economical_discharge: Handles the discharging of a battery to only be allowed if sufficient charge is available and a linked PV plant has available power below a given threshold. Mostly used for examplatory purposes.
+  * profile_limited: Sets the maximum PLR of a component to values from a profile. Used to set the operation of a component to a fixed schedule while allowing circumstances to override the schedule in favour of lower values (e.g. the produced energy could not be used up completely).
+  * storage_driven: Controls a component to only operate when the charge of a linked storage component falls below a certain threshold and keep operation until a certain higher threshold is reached. This is often used to avoid components switching on and off rapdily to keep a storage topped up, as realised systems often operate with this kind of hysteresis behaviour.
+* Restructure how the operational strategy is defined in the input file. In particular:
+  * Remove entry "strategy"
+  * Remove entry "control_refs"
+  * Add entry "control_modules" that holds the definitions of control modules active for this component
+  * Add entry "control_parameters" as container for miscellaneous parameters of the control behaviour as well as parameters to configure the storage un-/loading flags and special flags to modify the potential step of transformers to not consider given interfaces in during calculation.
+* Add scenario "chpp_two_hyst" to highlight the operation of a transformer with two storage_driven control modules
+
+### Version 0.8.11
+* Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
+
+### Version 0.8.10
+* Major refactoring of the determination of the correct order of operation for transformer potential and process steps. Now, the order of operation for complex energy systems with branched transformer chains across busses can be determined automatically and these energy systems can be simulated. See the documentation for limitations and further details.
+* Improve bus functionalities and efficiency calculations to allow the handling of branched transformer chains
+* Add multiple tests to ensure the correct determination of the order of operation
+* Set new reference results for all scenarios
+* Add "is_first_timestep" to sim_params to be available for all components
+  
+### Version 0.8.9
+* Add implementation for generic heat sources such as river water, lake water, waste water, atmosphere, industrial processes or one-way connections to a heat network. The main difference to a generic bounded supply is an option to include a temperature reduction caused by heat exchangers.
+* Add scenario reversive_heat_pump to highlight open issues with the operation of a single heat pump for both heating and cooling with a seasonal heat storage
+
+### Version 0.8.8
+* Refactor part load ratio dependent efficiency (PLRDE) functionality to have its own submodule (of sorts)
+* Refactor CHPP to use PLRDE functionality
+* Refactor Electrolyser to use PLRDE functionality, a secondary low temperature heat output and a sub-unit model where efficiencies are specific to subunits that can be utilised to different degrees
+
+### Version 0.8.7
+* Add example and scenario that highlights how both heating and cooling can be handled at the same time by modelling the cooling demand as a fixed supply heat source
+
+### Version 0.8.6
+* Refactor fuel boiler to use a customisable part-load ratio dependent efficiency function. This functionality will likely also be used by other components in future releases.
+
+### Version 0.8.5
+* Fix a problem with general bounded supply and sink implementations not considering temperatures correctly. This was mostly an issue with direct 1-to-1 connections between components as busses do consider this already.
+
+### Version 0.8.4
+* Add geothermal probe as new component. It acts like a storage and there are many precalculated input parameters for a variety of probe field configurations. Both the simplified and the extended version were successfully validated.
+* Add new szenario with geothermal probe and heat pump.
+* Add geothermal collector files. This component is not finished yet and needs some rework.
+* Add standalone julia code to create figures from profile data
+* Add julia packages Roots and Plots
+* Add function plot_optional_figures(), available to include in every component, that is called after initialize!() to create additional plots if the component offers them. Added optional flags in input file to control the auxiliary plots: auxiliary_plots, auxiliary_plots_path, auxiliary_plots_formats
+* Bugfix in Resie.jl to call set_time_step ahead of the initialize!() of each component
+
+### Version 0.8.3
+* Tweak examples to match the description in the documentation
+* Update profiles used in examples and move the files into subfolders
+* Update installation and quick-use instructions
+
+### Version 0.8.2
+* Add testing and development feature "scenarios": Project files with certain expected outputs, which are used to test if the calculations have changed and thus produce different outputs than in the last verified version. This differs from unit tests in that the tests are not fully automated and require a certain expert knowledge to verify. The advantage over unit tests is that these outputs are less brittle and test cases can be added more easily.
+* Add CLI for generating the output of scenarios, set reference outputs, compare the generated order of operations against the reference and generate an overview page over the scenario outputs
+* Move most examples over to scenarios, as they were already used in such a manner. The remaining examples are intended to be developed as actual examples for new users of ReSiE.
+
+### Version 0.8.1
+* Rename output parameters `dump_info` and `dump_info_file` to `auxiliary_info` and `auxiliary_info_file`
+* Rename output parameter `output_file` to `csv_output_file`
+* Add output parameters `sankey_plot_file` and `output_plot_file` to allow control of where the plots will be saved
+* Move input parameter `weather_file_path` from the `io_settings` section of the project config to the `simulation_parameters` section
+
+### Version 0.8.0
+* Standardise storage un-/loading control parameters for all components and make them customisable to the input/output media
+* Remove operational strategy "extended_storage_loading_control"
+* Update line plot & sankey outputs to better show missing demands
+* Rework internal energy distribution calculations on busses:
+  * If two or more busses are connected in a chain (necessarily of the same medium), a so-called proxy bus is created, which handles the calculations for any energy transfer from components on any of the principal/original busses
+  * Remove the distinction of maximum potential energy utilisation (`max_energy`) and storage un-/loading potential, as the calculation on a bus considers storages according to the energy flow matrix as well as storage loading flags and thus does not require a distinction anymore. Direct 1-to-1 connections do not require this either, hence the removal.
+  * Add automatically generated output channels for busses in a chain, where each bus tracks how much energy is transfered to other busses in the input->output direction
+  * Some slight changes the generated order of operations, as this now makes use of the input and output order on proxy busses. This should not have an impact on results, but might change the order of operations compared to versions before v0.8.0.
+
+### Version 0.7.1
+* bugfix in sankey diagram if only one medium is present
+* added possibility to not plot the sankey by adding "sankey_plot" to "io_settings"
+* added possibility to define custom colors in sankey for each medium
+* renamed input variable "output_keys" --> "csv_output_keys" in input file
+
+### Version 0.7.0
+#### Input and output
+* Rename parameters and output variables across several components:
+  * Load --> Demand                     in output channel of FixedSink
+  * static_load --> constant_demand     for parameters of sinks
+  * static_* --> constant_*             for parameters where * in (power, temperature, demand, supply)
+  * fixed_cop --> constant_cop          for HeatPump
+  * draw sum --> output_sum             in output channel of GridConnection
+  * load sum --> input_sum              in output channel of GridConnection
+  * power --> power_*                   for parameters of all transformers, where * in (el, th)
+  * medium --> consider_medium          for control strategy parameters of all transformers
+* Add output channel "Losses" to all components and to Sankey output. "Losses" are total losses, while "Losses_XX" are medium-wise break downs
+* Constant values for fixed sources and sinks are now given as power instead of work/energy to be consistent with bounded sources and sinks
+* Add global logging functionalities with the following categories: Debug, Info, BalanceWarn, Warn, Error and redirected all println() to logger (console and/or logging files, separately for general logs and Balancewarn)
+* Update configuration options for busses:
+  * Rename "connection_matrix" to "connections"
+  * Rename "storage_loading" to "energy_flow"
+  * Make "connections" a required part of the config for a bus, including items "input_order" and "output_order", however "energy_flow" remains optional
+  * Remove "output_refs" item as "output_order" contains the same information and is now required
+
+#### Functionality
+* Sankey diagrams now display the difference of requested and delivered energy in fixed sinks and sources
+* Remove condition "would overfill thermal buffer" in storage_driven strategy as this is now handled implicitly
+* Add profile aggregation and segmentation with testcases
+* Add import of weather files in EPW format and .dat format (DWD)
+* Add functionality to map profiles from weather file to component profiles, like ambient temperature from the weather file to a geothermal collector
+
+#### Fixes
 * Fix generic storage implementation not being available due to the module not being included
 * Fix the profile scaling factor of some components being required despite profiles being optional
-* Rename helper function highest_temperature to highest and add types to inputs
+* Add missing output channels to Electrolyser
 
-## Version 0.6.5
+#### Refactorings
+* Change the input and output interfaces of busses such that the order matches the input and output priorities
+* Rename helper function highest_temperature to highest and add types to inputs
+* Provide docstrings for some structs and functions that were missing them
+* Rename internal variables to match changes in the input and output variables mentioned above
+* Remove last potential() step of transformer chains as this is not needed
+* Add required Julia packages: Colors, Interpolations, Dates, Logging
+* Rename argument "parameters" for simulation parameters to "sim_params" and add them to all components and profiles
+* Rework communication of balances, energy/storage potentials and temperatures via busses. This is an extensive rework that touches almost all components and how the `process` and `potential` simulation steps work. Please note that the rework is not finished with v0.7.0 and will continue to support more energy systems and component configurations that might be of interest to users. However no compatability is knowingly broken with examples that worked in previous versions.
+
+### Version 0.6.5
 * "output_keys" and "output_plot" in the input file can now be "all", "nothing" or a list of entries for custom outputs of the CSV file and lineplot (backwards compatibility is given)
 * output_values() of all components was changed to not only return the available channels, but also the corresponding media
 * restructured "run_simulation()" for better readability
 
-## Version 0.6.4
+### Version 0.6.4
 * Generalise implementation of gas boiler to that of a fuel boiler
   * Although this implicates the use of a chemical fuel to generate heat, the current implementation works with any kind of input including electricity
 
-## Version 0.6.3
+### Version 0.6.3
 * Remove abstract subtype ControlledComponent and use abstract top-level type Component in its stead
 * Add a generic implementation for storage components
 * Standardise the generic implementations of fixed/bounded sources/sinks by:
@@ -37,13 +157,13 @@ breaking changes may slip beneath notice.
   * making Demand an alias to generic implementation FixedSink
 * Add "Load%" output for storage components making outputting the state of charge more convenient
 
-## Version 0.6.2
+### Version 0.6.2
 * Added part-load-ratio efficiency calculation for gas boiler component
 
-## Version 0.6.1
+### Version 0.6.1
 * corrected wrong units given for output_plot in example files
 
-## Version 0.6.0
+### Version 0.6.0
 * Refactor terms and names used to refer to various concepts in the simulation model:
   * energy system => component
   * energy network / system topology => energy system

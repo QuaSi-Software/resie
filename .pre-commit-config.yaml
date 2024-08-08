@@ -1,0 +1,6 @@
+repos:
+  - repo: https://github.com/siz-energieplus/pre-commit-julia-format
+    rev: v0.2.0
+    hooks:
+    - id: julia-format
+      args: [--project=.]

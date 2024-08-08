@@ -39,9 +39,7 @@ mutable struct FixedSink <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_fixed_sink, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -61,12 +59,19 @@ mutable struct FixedSink <: Component
     end
 end
 
+function initialise!(unit::FixedSink, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.medium],
+        unload_storages(unit.controller, unit.medium)
+    )
+end
+
 function control(
     unit::FixedSink,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_demand !== nothing
         unit.demand = watt_to_wh(unit.constant_demand)
@@ -86,9 +91,10 @@ function control(
             unit.temperature_profile, sim_params["time"]
         )
     end
-    unit.input_interfaces[unit.medium].temperature = highest(
+    set_temperature!(
+        unit.input_interfaces[unit.medium],
         unit.temperature,
-        unit.input_interfaces[unit.medium].temperature
+        nothing
     )
 end
 

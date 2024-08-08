@@ -1,0 +1,145 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/hp_cascade/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/hp_cascade/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/hp_cascade/sankey_plot.html",
+        "sankey_plot": "default",
+        "__heating_output_keys": {
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
+			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
+			"TST_01_ELT_01_ELY": ["m_e_ac_230v IN"]
+        },
+        "csv_output_keys": {
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
+			"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
+			"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht2 OUT"],			
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"]
+        }
+    },
+    "simulation_parameters": {
+        "start": 0,
+        "end": 604800,
+        "time_step_seconds": 900
+    },
+    "components": {
+        "TST_01_HZG_01_DEM": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "scale": 2000.0
+        },
+        "TST_01_HZG_02_DEM": {
+            "type": "Demand",
+            "medium": "m_c_g_h2",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
+            "scale": 2000.0
+        },
+        "TST_01_ELT_01_BUS": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "TST_01_ELT_01_GRI"
+                ],
+                "output_order": [
+                    "TST_01_HZG_01_HTP",
+                    "TST_01_HZG_02_HTP",
+                    "TST_01_ELT_01_ELY"
+                ]
+            }
+        },
+        "TST_01_HZG_01_BUS": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "TST_01_HZG_02_HTP",
+                    "TST_01_HZG_01_GBO"
+                ],
+                "output_order": [
+                    "TST_01_HZG_01_DEM"
+                ]
+            }
+        },
+        "TST_01_ELT_01_ELY": {
+            "type": "Electrolyser",
+            "output_refs": [
+                "TST_01_HZG_01_HTP",
+                "TST_01_HZG_02_DEM",
+                "TST_01_ELT_01_GRO"
+            ],
+            "power_el": 20000,
+            "output_temperature_ht": 25.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.0,
+            "min_power_fraction_total": 0.0,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
+        },
+        "TST_01_HZG_01_HTP": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_01_HZG_02_HTP"
+            ],
+            "power_th": 10000,
+            "output_temperature": 35,
+            "m_heat_out": "m_h_w_ht2",
+            "min_power_fraction" : 0.0
+        },
+        "TST_01_HZG_02_HTP": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "power_th": 10000,
+            "m_heat_in": "m_h_w_ht2",
+            "min_power_fraction" : 0.0
+        },
+        "TST_01_HZG_01_GBO": {
+            "type": "FuelBoiler",
+            "m_fuel_in": "m_c_g_natgas",
+            "output_refs": [
+                "TST_01_HZG_01_BUS"
+            ],
+            "power_th": 40000,
+            "min_power_fraction": 0.0,
+            "efficiency_fuel_in": "const:1.0"
+        },
+        "TST_01_HZG_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_c_g_natgas",
+            "output_refs": [
+                "TST_01_HZG_01_GBO"
+            ],
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRI": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "TST_01_ELT_01_BUS"
+            ],
+            "is_source": true
+        },
+        "TST_01_ELT_01_GRO": {
+            "type": "GridConnection",
+            "medium": "m_c_g_o2",
+            "output_refs": [],
+            "is_source": false
+        }
+    }
+}

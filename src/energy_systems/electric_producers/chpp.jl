@@ -1,15 +1,17 @@
 """
-Implementation of a combined-heat-power-plant (CHPP) component.
+Implementation of a combined-heat-and-power plant (CHPP) component.
 
-For the moment this remains a simple implementation that converts natural gas into
-electricity and heat (as medium m_h_w_ht1) at a defined ratio of 1:0.4:0.6. Has a minimum
-run time of 1800s taken into consideration in its control behaviour and a minimum power
-fraction of 20%. The power_gas is considered the maximum amount of both heat and electricity
-that the CHPP can produce.
+The implementation is flexible enough to cover any type of CHPP that takes in chemical fuel
+and produces electricity and heat. The archetypical CHPP chosen uses natural gas in a
+reprocating internal combustion engine and utilises heat extraction via jacketing and
+exhaust cooling. Heat extraction via engine oil cooling is possible, but typically not done
+with plants of less than around 1 MW electrical output power.
 
-The only currently implemented operation strategy involves checking the load of a linked
-buffer tank and en-/disabling the CHPP when a threshold is reached, in addition to an
-overfill shutoff condition.
+The heat is typically extracted at temperatures higher than those common in heating and
+cooling systems and thus has been chosen as not having an upper limit to the temperatures
+by default, but this is customizable.
+
+Implements traits: PLRDEComponent
 """
 mutable struct CHPP <: Component
     uac::String
@@ -19,43 +21,79 @@ mutable struct CHPP <: Component
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
 
-    m_gas_in::Symbol
+    m_fuel_in::Symbol
     m_heat_out::Symbol
     m_el_out::Symbol
 
-    power_gas::Float64
-    electricity_fraction::Float64
+    power::Float64
+    linear_interface::Symbol
     min_power_fraction::Float64
+    # efficiency functions by input/output
+    efficiencies::Dict{Symbol,Function}
+    # list of names of input and output interfaces, used internally only
+    interface_list::Tuple{Symbol,Symbol,Symbol}
+    # lookup tables for conversion of energy values to PLR
+    energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
+    discretization_step::Float64
+
     min_run_time::UInt
     output_temperature::Temperature
 
     losses::Float64
 
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_gas_in = Symbol(default(config, "m_gas_in", "m_c_g_natgas"))
+        m_fuel_in = Symbol(default(config, "m_fuel_in", "m_c_g_natgas"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
-        register_media([m_gas_in, m_heat_out, m_el_out])
+        register_media([m_fuel_in, m_heat_out, m_el_out])
+        interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
+
+        linear_interface = Symbol(
+            replace(
+                default(config, "linear_interface", "fuel_in"),
+                "m_" => ""
+            )
+        )
+        if !(linear_interface in interface_list)
+            @error "Given unknown interface name $linear_interface designated as linear " *
+                "for component $uac"
+        end
+
+        efficiencies = Dict{Symbol,Function}(
+            Symbol("fuel_in") => parse_efficiency_function(default(config,
+                "efficiency_fuel_in", "const:1.0"
+            )),
+            Symbol("el_out") => parse_efficiency_function(default(config,
+                "efficiency_el_out",
+                "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38"
+            )),
+            Symbol("heat_out") => parse_efficiency_function(default(config,
+                "efficiency_heat_out",
+                "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49"
+            )),
+        )
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_transformer, # sys_function
             InterfaceMap( # input_interfaces
-                m_gas_in => nothing
+                m_fuel_in => nothing
             ),
             InterfaceMap( # output_interfaces
                 m_heat_out => nothing,
                 m_el_out => nothing
             ),
-            m_gas_in,
+            m_fuel_in,
             m_heat_out,
             m_el_out,
-            config["power_gas"], # power_gas
-            default(config, "electricity_fraction", 0.4),
+            config["power_el"] / efficiencies[Symbol("el_out")](1.0),
+            linear_interface,
             default(config, "min_power_fraction", 0.2),
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
             default(config, "min_run_time", 1800),
             default(config, "output_temperature", nothing),
             0.0, # losses
@@ -63,163 +101,54 @@ mutable struct CHPP <: Component
     end
 end
 
+function initialise!(unit::CHPP, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.input_interfaces[unit.m_fuel_in],
+        unload_storages(unit.controller, unit.m_fuel_in)
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_heat_out],
+        load_storages(unit.controller, unit.m_heat_out)
+    )
+    set_storage_transfer!(
+        unit.output_interfaces[unit.m_el_out],
+        load_storages(unit.controller, unit.m_el_out)
+    )
+
+    unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
+end
+
 function control(
     unit::CHPP,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
-    unit.output_interfaces[unit.m_heat_out].temperature = highest(unit.output_temperature, unit.output_interfaces[unit.m_heat_out].temperature)
+    update(unit.controller)
+    set_temperature!(
+        unit.output_interfaces[unit.m_heat_out],
+        nothing,
+        unit.output_temperature,
+    )
 end
 
-function set_max_energies!(unit::CHPP, gas_in::Float64, el_out::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_gas_in], gas_in)
+function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
-end
-
-function check_gas_in(
-    unit::CHPP,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_gas_in"] == true
-        if (
-            unit.input_interfaces[unit.m_gas_in].source.sys_function == sf_transformer
-            &&
-            unit.input_interfaces[unit.m_gas_in].max_energy === nothing
-        )
-            return (Inf, Inf)
-        else
-            exchanges = balance_on(
-                unit.input_interfaces[unit.m_gas_in],
-                unit.input_interfaces[unit.m_gas_in].source
-            )
-            potential_energy_gas = balance(exchanges) + energy_potential(exchanges)
-            potential_storage_gas = storage_potential(exchanges)
-            if (
-                unit.controller.parameter["unload_storages"]
-                ? potential_energy_gas + potential_storage_gas
-                : potential_energy_gas
-            ) <= sim_params["epsilon"]
-                return (nothing, nothing)
-            end
-            return (potential_energy_gas, potential_storage_gas)
-        end
-    else
-        return (Inf, Inf)
-    end
-end
-
-function check_el_out(
-    unit::CHPP,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_el_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_el_out],
-            unit.output_interfaces[unit.m_el_out].target
-        )
-        potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_el = storage_potential(exchanges)
-        if (
-            unit.controller.parameter["unload_storages"]
-            ? potential_energy_el + potential_storage_el
-            : potential_energy_el
-        ) >= -sim_params["epsilon"]
-            return (nothing, nothing)
-        end
-        return (potential_energy_el, potential_storage_el)
-    else
-        return (-Inf, -Inf)
-    end
-end
-
-function check_heat_out(
-    unit::CHPP,
-    sim_params::Dict{String,Any}
-)
-    if unit.controller.parameter["consider_m_heat_out"] == true
-        exchanges = balance_on(
-            unit.output_interfaces[unit.m_heat_out],
-            unit.output_interfaces[unit.m_heat_out].target
-        )
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-        potential_storage_heat_out = storage_potential(exchanges)
-        if (
-            unit.controller.parameter["load_storages"]
-            ? potential_energy_heat_out + potential_storage_heat_out
-            : potential_energy_heat_out
-        ) >= -sim_params["epsilon"]
-            return (nothing, nothing)
-        end
-        return (potential_energy_heat_out, potential_storage_heat_out)
-    else
-        return (-Inf, -Inf)
-    end
 end
 
 function calculate_energies(
     unit::CHPP,
     sim_params::Dict{String,Any},
-    potentials::Vector{Float64}
-)
-    potential_energy_gas_in = potentials[1]
-    potential_storage_gas_in = potentials[2]
-    potential_energy_el_out = potentials[3]
-    potential_storage_el_out = potentials[4]
-    potential_energy_heat_out = potentials[5]
-    potential_storage_heat_out = potentials[6]
-
-    max_produce_heat = watt_to_wh(unit.power_gas * (1.0 - unit.electricity_fraction))
-    max_produce_el = watt_to_wh(unit.power_gas * unit.electricity_fraction)
-    max_consume_gas = max_produce_heat + max_produce_el
-
-    # get usage fraction of external profile (normalized from 0 to 1)
-    usage_fraction_operation_profile = unit.controller.parameter["operation_profile_path"] === nothing ? 1.0 : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    if usage_fraction_operation_profile <= 0.0
-        return # no operation allowed from external profile
+)::Tuple{Bool, Vector{Floathing}}
+    # get maximum PLR from control modules
+    max_plr = upper_plr_limit(unit.controller, sim_params)
+    if max_plr <= 0.0
+        return (false, [])
     end
 
-    # all three standard operating strategies behave the same, but it is better to be
-    # explicit about the behaviour rather than grouping all together
-    if unit.controller.strategy == "storage_driven" && unit.controller.state_machine.state == 2
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.controller.parameter["load_storages"] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-
-    elseif unit.controller.strategy == "storage_driven"
-        return (false, nothing, nothing, nothing)
-
-    elseif unit.controller.strategy == "supply_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.controller.parameter["load_storages"] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-
-    elseif unit.controller.strategy == "demand_driven"
-        usage_fraction_heat_out = -((unit.controller.parameter["load_storages"] ? potential_energy_heat_out + potential_storage_heat_out : potential_energy_heat_out) / max_produce_heat)
-        usage_fraction_el_out = -((unit.controller.parameter["load_storages"] ? potential_energy_el_out + potential_storage_el_out : potential_energy_el_out) / max_produce_el)
-        usage_fraction_gas_in = +((unit.controller.parameter["unload_storages"] ? potential_energy_gas_in + potential_storage_gas_in : potential_energy_gas_in) / max_consume_gas)
-
-    end
-
-    # limit actual usage by limits of inputs, outputs and profile
-    usage_fraction = min(
-        1.0,
-        usage_fraction_heat_out,
-        usage_fraction_el_out,
-        usage_fraction_gas_in,
-        usage_fraction_operation_profile
-    )
-
-    if usage_fraction < unit.min_power_fraction
-        return (false, nothing, nothing, nothing)
-    end
-
-    return (
-        true,
-        max_consume_gas * usage_fraction,
-        max_produce_el * usage_fraction,
-        max_produce_heat * usage_fraction
+    return calculate_energies_for_plrde(
+        unit, sim_params, unit.min_power_fraction, max_plr
     )
 end
 
@@ -227,79 +156,32 @@ function potential(
     unit::CHPP,
     sim_params::Dict{String,Any}
 )
-    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
+    success, energies = calculate_energies(unit, sim_params)
 
-    potential_energy_el_out, potential_storage_el_out = check_el_out(unit, sim_params)
-    if potential_energy_el_out === nothing && potential_storage_el_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    energies = calculate_energies(
-        unit, sim_params,
-        [
-            potential_energy_gas_in, potential_storage_gas_in,
-            potential_energy_el_out, potential_storage_el_out,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
-    )
-
-    if !energies[1]
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[2], energies[3], energies[4])
+        set_max_energies!(unit, energies[1], energies[2], energies[3])
     end
 end
 
 function process(unit::CHPP, sim_params::Dict{String,Any})
-    potential_energy_gas_in, potential_storage_gas_in = check_gas_in(unit, sim_params)
-    if potential_energy_gas_in === nothing && potential_storage_gas_in === nothing
+    success, energies = calculate_energies(unit, sim_params)
+
+    if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    potential_energy_el_out, potential_storage_el_out = check_el_out(unit, sim_params)
-    if potential_energy_el_out === nothing && potential_storage_el_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
+    sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
+    add!(unit.output_interfaces[unit.m_el_out], energies[2])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[3])
 
-    potential_energy_heat_out, potential_storage_heat_out = check_heat_out(unit, sim_params)
-    if potential_energy_heat_out === nothing && potential_storage_heat_out === nothing
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-        return
-    end
-
-    energies = calculate_energies(
-        unit, sim_params,
-        [
-            potential_energy_gas_in, potential_storage_gas_in,
-            potential_energy_el_out, potential_storage_el_out,
-            potential_energy_heat_out, potential_storage_heat_out
-        ]
-    )
-
-    if energies[1]
-        sub!(unit.input_interfaces[unit.m_gas_in], energies[2])
-        add!(unit.output_interfaces[unit.m_el_out], energies[3])
-        add!(unit.output_interfaces[unit.m_heat_out], energies[4])
-    else
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
-    end
+    unit.losses = energies[1] - energies[2] - energies[3]
 end
 
 function output_values(unit::CHPP)::Vector{String}
-    return [string(unit.m_gas_in)*" IN", 
+    return [string(unit.m_fuel_in)*" IN",
             string(unit.m_el_out)*" OUT",
             string(unit.m_heat_out)*" OUT",
             "Losses"]

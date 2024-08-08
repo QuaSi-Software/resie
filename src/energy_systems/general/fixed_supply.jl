@@ -39,9 +39,7 @@ mutable struct FixedSupply <: Component
 
         return new(
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_fixed_source, # sys_function
             medium, # medium
             InterfaceMap( # input_interfaces
@@ -61,12 +59,19 @@ mutable struct FixedSupply <: Component
     end
 end
 
+function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
+    set_storage_transfer!(
+        unit.output_interfaces[unit.medium],
+        load_storages(unit.controller, unit.medium)
+    )
+end
+
 function control(
     unit::FixedSupply,
     components::Grouping,
     sim_params::Dict{String,Any}
 )
-    move_state(unit, components, sim_params)
+    update(unit.controller)
 
     if unit.constant_supply !== nothing
         unit.supply = watt_to_wh(unit.constant_supply)
@@ -82,7 +87,12 @@ function control(
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
     end
-    unit.output_interfaces[unit.medium].temperature = highest(unit.temperature, unit.output_interfaces[unit.medium].temperature)
+
+    set_temperature!(
+        unit.output_interfaces[unit.medium],
+        nothing,
+        unit.temperature
+    )
 end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})

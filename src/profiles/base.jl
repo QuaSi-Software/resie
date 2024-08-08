@@ -91,9 +91,9 @@ mutable struct Profile
         simulation_time_step = sim_params["time_step_seconds"]  # seconds 
 
         if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0) 
-            @error ("The timestep of the profile $(file_path), which is $(string(profile_time_step)) s,\n" *
-                    "is not a multiple or a divisor of the requested simulation timestep of $(string(simulation_time_step)) s!")
-            exit()
+            @error ("The timestep of the profile " * file_path * ", which is " * string(profile_time_step) * " s,\n" *
+                    "is not a multiple or a divisor of the requested simulation timestep of " * string(simulation_time_step) * " s!")
+            throw(InputError)
         end
 
         if is_power # meaning intensive values (e.g., temperature, power)
@@ -193,6 +193,33 @@ function value_at_time(profile::Profile, time::Int)
 end
 
 """
+    minimum(profile)
+
+The smallest value of the profile.
+
+# Arguments
+- `profile::Profile`: The profile
+# Returns
+- `Float64`: The smallest value
+"""
+function minimum(profile::Profile)::Float64
+    return Base.minimum(profile.data)
+end
+
+"""
+    maximum(profile)
+
+The largest value of the profile.
+
+# Arguments
+- `profile::Profile`: The profile
+# Returns
+- `Float64`: The largest value
+"""
+function maximum(profile::Profile)::Float64
+    return Base.maximum(profile.data)
+end
+"""
     convert_extensive_profile
 
 Function to convert extensive profiles(e.g., energy demand) from the profile time step to the simulation time step.
@@ -220,7 +247,7 @@ If `original_time_step` equals the `new_time_step`, the original `values` will b
     end
 
     # handle segmentation and aggregation at once
-    new_max_timestep = ceil(Int, maximum(timestamps) / new_time_step) * new_time_step
+    new_max_timestep = ceil(Int, Base.maximum(timestamps) / new_time_step) * new_time_step
     if original_time_step > new_time_step
         new_length = ceil(Int, new_max_timestep / new_time_step + original_time_step / new_time_step)
     else
@@ -278,7 +305,7 @@ function convert_intensive_profile(values::Vector{Float64},
 
     elseif new_time_step < original_time_step  # segmentation
         interp = interpolate((timestamps,), values, Gridded(Linear()))
-        new_timestamps = minimum(timestamps):new_time_step:maximum(timestamps)
+        new_timestamps = Base.minimum(timestamps):new_time_step:Base.maximum(timestamps)
         converted_profile = [interp(t) for t in new_timestamps]
 
         # add missing entries by coping the last entry
