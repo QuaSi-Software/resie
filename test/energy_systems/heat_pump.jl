@@ -153,3 +153,221 @@ end
 @testset "heat_pump_demand_one_source_dynamic_cop" begin
     test_heat_pump_demand_one_source_dynamic_cop()
 end
+
+function get_config_heat_pump_2S2D()
+    return Dict{String,Any}(
+        "TST_DEM_01" => Dict{String,Any}(
+            "type" => "Demand",
+            "medium" => "m_h_w_ht1",
+            "output_refs" => [],
+            "constant_demand" => 8000,
+            "constant_temperature" => 70,
+        ),
+        "TST_DEM_02" => Dict{String,Any}(
+            "type" => "Demand",
+            "medium" => "m_h_w_ht1",
+            "output_refs" => [],
+            "constant_demand" => 4000,
+            "constant_temperature" => 50,
+        ),
+        "TST_SRC_01" => Dict{String,Any}(
+            "type" => "BoundedSupply",
+            "medium" => "m_h_w_lt1",
+            "output_refs" => ["TST_BUS_01"],
+            "constant_power" => 4000,
+            "constant_temperature" => 40,
+        ),
+        "TST_SRC_02" => Dict{String,Any}(
+            "type" => "BoundedSupply",
+            "medium" => "m_h_w_lt1",
+            "output_refs" => ["TST_BUS_01"],
+            "constant_power" => 8000,
+            "constant_temperature" => 20,
+        ),
+        "TST_BUS_01" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_lt1",
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_SRC_01",
+                                  "TST_SRC_02"],
+                "output_order" => ["TST_HP_01"],
+            ),
+        ),
+        "TST_BUS_02" => Dict{String,Any}(
+            "type" => "Bus",
+            "medium" => "m_h_w_ht1",
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_HP_01"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_DEM_02"],
+            ),
+        ),
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "output_refs" => ["TST_HP_01"],
+            "is_source" => true,
+        ),
+        "TST_HP_01" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "output_refs" => ["TST_BUS_02"],
+            "power_th" => 12000,
+        ),
+    )
+end
+
+function test_heat_pump_demand_2S2D_constant_cop()
+    components_config = get_config_heat_pump_2S2D()
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true,
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    heat_pump.constant_cop = 3.0
+    heat_pump.bypass_cop = 10.0
+
+    # first time step: no bypass, regular calculation
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 2000.0 * 2
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1000.0 * 2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
+
+    # second time step: bypass would be applicable, but is ignored with constant cop
+    source_1.constant_temperature = 71.0
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 2000.0 * 2
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1000.0 * 2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
+end
+
+@testset "heat_pump_demand_2S2D_constant_cop" begin
+    test_heat_pump_demand_2S2D_constant_cop()
+end
+
+function test_heat_pump_demand_2S2D_dynamic_cop()
+    components_config = get_config_heat_pump_2S2D()
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true,
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    heat_pump.bypass_cop = 10.0
+
+    # first time step: no bypass, regular calculation
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    # cop_1_1 = 4.5753333333333
+    # cop_1_2 = 12.926
+    # cop_2_1 = 2.7452
+    # cop_2_2 = 4.3086666666666
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4187.2924962864345
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1812.707530713566
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change /
+          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 3.309965837477
+
+    # second time step: bypass should reduce required electricity
+    source_1.constant_temperature = 71.0
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4401.638415335049
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1598.3615846649507
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change /
+          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 3.753843972206
+end
+
+@testset "heat_pump_demand_2S2D_dynamic_cop" begin
+    test_heat_pump_demand_2S2D_dynamic_cop()
+end
