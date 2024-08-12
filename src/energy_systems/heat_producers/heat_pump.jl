@@ -21,6 +21,7 @@ mutable struct HeatPump <: Component
     min_power_fraction::Float64
     min_run_time::UInt
     constant_cop::Any
+    bypass_cop::Float64
     output_temperature::Temperature
     input_temperature::Temperature
     cop::Float64
@@ -48,6 +49,7 @@ mutable struct HeatPump <: Component
                    default(config, "min_power_fraction", 0.2),
                    default(config, "min_run_time", 0),
                    default(config, "constant_cop", nothing),
+                   default(config, "bypass_cop", 15.0),
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
                    0.0, # cop
@@ -204,38 +206,24 @@ function get_layer_temperature(unit::HeatPump,
     end
 end
 
-function handle_layer_bypass(unit::HeatPump,
-                             available_heat_in::Floathing,
-                             available_heat_out::Floathing,
-                             max_usage_fraction::Float64,
-                             sum_heat_out::Float64,
-                             current_in_temp::Temperature)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
-    # TODO: Whats about the usage_fraction, should the bypass be kept included in
-    # the usage_fraction calculation?
-    # Or should we deny the bypass and force users to implement heat pumps in
-    # parallel if they want a bypass?
-    # TODO: Whats about a constant COP? Should this be still be valid even during
-    # bypass?
-    heat_transfer = minimum([available_heat_in,
-                             available_heat_out,
-                             max_usage_fraction * watt_to_wh(unit.power_th) - sum_heat_out])
-    return (heat_transfer, # heat_in
-            0.01, # el_in, TODO: use bypass_COP instead? but consider limited el_in!
-            heat_transfer, # heat_out
-            current_in_temp, # in_temp
-            current_in_temp) # out_temp, equals in_temp because of bypass
-end
-
 function handle_layer(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
                       available_heat_out::Floathing,
                       max_usage_fraction::Float64,
                       sum_heat_out::Float64,
-                      current_in_temp::Temperature,
-                      current_out_temp::Temperature)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
-    # calculate cop
-    cop = unit.constant_cop === nothing ? dynamic_cop(current_in_temp, current_out_temp) : unit.constant_cop
+                      in_temp::Temperature,
+                      out_temp::Temperature)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
+    # determine COP depending on three cases. a constant COP precludes the use of a bypass
+    do_bypass = false
+    if unit.constant_cop !== nothing
+        cop = unit.constant_cop
+    elseif in_temp >= out_temp
+        cop = unit.bypass_cop
+        do_bypass = true
+    else
+        cop = dynamic_cop(in_temp, out_temp)
+    end
     if cop === nothing
         @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
                 "given. Provide temperatures or fixed cop.")
@@ -248,7 +236,7 @@ function handle_layer(unit::HeatPump,
     used_el_in = used_heat_in / (cop - 1.0)
     used_heat_out = used_heat_in + used_el_in
 
-    # check heat out as limiter, also checking for limit of heat pump
+    # check heat out as limiter, also checking for power limit of heat pump
     max_heat_out = min(available_heat_out, max_usage_fraction * watt_to_wh(unit.power_th) - sum_heat_out)
     if used_heat_out > max_heat_out
         used_heat_out = max_heat_out
@@ -266,8 +254,8 @@ function handle_layer(unit::HeatPump,
     return (used_heat_in,
             used_el_in,
             used_heat_out,
-            current_in_temp,
-            current_out_temp)
+            in_temp,
+            do_bypass ? in_temp : out_temp)
 end
 
 function calculate_energies_heatpump(unit::HeatPump,
@@ -336,33 +324,18 @@ function calculate_energies_heatpump(unit::HeatPump,
             continue
         end
 
-        # if temperatures COP allow it and no constant COP is used, use bypass. otherwise
-        # handle the layer normally
-        if current_in_temp >= current_out_temp && unit.constant_cop === nothing
-            used_heat_in,
-            used_el_in,
-            used_heat_out,
-            current_in_temp,
-            current_out_temp = handle_layer_bypass(unit,
-                                                   energies.available_heat_in[current_in_idx],
-                                                   energies.available_heat_out[current_out_idx],
-                                                   energies.max_usage_fraction,
-                                                   sum(energies.layers_heat_out_temp; init=0.0),
-                                                   current_in_temp)
-        else
-            used_heat_in,
-            used_el_in,
-            used_heat_out,
-            current_in_temp,
-            current_out_temp = handle_layer(unit,
-                                            energies.available_el_in,
-                                            energies.available_heat_in[current_in_idx],
-                                            energies.available_heat_out[current_out_idx],
-                                            energies.max_usage_fraction,
-                                            sum(energies.layers_heat_out_temp; init=0.0),
-                                            current_in_temp,
-                                            current_out_temp)
-        end
+        used_heat_in,
+        used_el_in,
+        used_heat_out,
+        current_in_temp,
+        current_out_temp = handle_layer(unit,
+                                        energies.available_el_in,
+                                        energies.available_heat_in[current_in_idx],
+                                        energies.available_heat_out[current_out_idx],
+                                        energies.max_usage_fraction,
+                                        sum(energies.layers_heat_out_temp; init=0.0),
+                                        current_in_temp,
+                                        current_out_temp)
 
         # finally all checks done, we add the layer and update remaining energies
         push!(energies.layers_el_in_temp, used_el_in)
