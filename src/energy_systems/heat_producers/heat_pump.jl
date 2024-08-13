@@ -354,39 +354,6 @@ function calculate_energies_heatpump(unit::HeatPump,
     return energies
 end
 
-function reorder_energies(unit,
-                          order,
-                          energies,
-                          temps_min,
-                          temps_max,
-                          uacs)
-    function highest_first_with_nothing(a, b)
-        if a === nothing
-            return false
-        elseif b === nothing
-            return true
-        else
-            return a > b
-        end
-    end
-
-    # TODO: Implement contol module!    
-    if order == "highest_in_temps_max_first"
-        order_idx = sortperm(temps_max; by=x -> x, lt=highest_first_with_nothing)
-        energies = energies[order_idx]
-        temps_min = temps_min[order_idx]
-        temps_max = temps_max[order_idx]
-        uacs = uacs[order_idx]
-    elseif order == "smallest_out_temps_min_first"
-        order_idx = reverse(sortperm(temps_min; by=x -> x, lt=highest_first_with_nothing))
-        energies = energies[order_idx]
-        temps_min = temps_min[order_idx]
-        temps_max = temps_max[order_idx]
-        uacs = uacs[order_idx]
-    end
-    return energies, temps_min, temps_max, uacs
-end
-
 function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies = HPEnergies()
 
@@ -418,33 +385,26 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies.potentials_energies_heat_in = abs.(energies.potentials_energies_heat_in)
     energies.potentials_energies_heat_out = abs.(energies.potentials_energies_heat_out)
 
-    # exemplary control function that orders the available input sources by their
-    # temperaturue. This overwrites the order in potentially connected busses!
-    # TODO: Implement in control modules!
-    # potentials_energies_heat_in,
-    #     in_temps_min,
-    #     in_temps_max,
-    #     in_uacs = reorder_energies(unit,
-    #                                "highest_in_temps_max_first",
-    #                                potentials_energies_heat_in,
-    #                                in_temps_min,
-    #                                in_temps_max,
-    #                                in_uacs)
-    # potentials_energies_heat_out,
-    #     out_temps_min,
-    #     out_temps_max,
-    #     out_uacs = reorder_energies(unit,
-    #                                 "smallest_out_temps_min_first",
-    #                                 potentials_energies_heat_out,
-    #                                 out_temps_min,
-    #                                 out_temps_max,
-    #                                 out_uacs)
+    # reorder inputs and outputs according to control modules
+    index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
+    energies.in_temps_min = energies.in_temps_min[index]
+    energies.in_temps_max = energies.in_temps_max[index]
+    energies.in_uacs = energies.in_uacs[index]
+    energies.potentials_energies_heat_in = energies.potentials_energies_heat_in[index]
 
+    index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
+    energies.out_temps_min = energies.out_temps_min[index]
+    energies.out_temps_max = energies.out_temps_max[index]
+    energies.out_uacs = energies.out_uacs[index]
+    energies.potentials_energies_heat_out = energies.potentials_energies_heat_out[index]
+
+    # there are three different cases of how to handle the layered approach of operating the
+    # heat pump, depending on wether or not the input or output heat has infinite values. if
+    # both have infinite values the calculation cannot be resolved.
     energies.heat_in_has_inf_energy = any(isinf, energies.potentials_energies_heat_in)
     energies.heat_out_has_inf_energy = any(isinf, energies.potentials_energies_heat_out)
 
     if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
-        # can not perform calculation if both inputs and outputs have inf energies
         @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and " *
               "outputs. This cannot be resolved. Please check the order of operation and " *
               "make sure that either the inputs or the outputs have been fully calculated " *
