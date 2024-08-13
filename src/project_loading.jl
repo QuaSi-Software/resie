@@ -1,7 +1,7 @@
 # this file contains functionality pertaining to loading a project's metadata and the
 # energy system components from the project config file, as well as constructing certain
 # helpful information data structures from the inputs in the config
-import JSON
+using JSON: JSON
 
 """
     read_JSON(filepath)
@@ -54,23 +54,19 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
 
     # link inputs/outputs
     for (unit_key, entry) in pairs(config)
-        if (
-            String(entry["type"]) != "Bus"
+        if (String(entry["type"]) != "Bus"
             && haskey(entry, "output_refs")
-            && length(entry["output_refs"]) > 0
-        )
+            && length(entry["output_refs"]) > 0)
+            # end of condition
             others = Grouping(key => components[key] for key in entry["output_refs"])
             link_output_with(components[unit_key], others)
 
-        elseif (
-            String(entry["type"]) == "Bus"
-            && haskey(entry, "connections")
-            && length(entry["connections"]) > 0
-        )
-            others = Grouping(
-                key => components[key]
-                for key in entry["connections"]["output_order"]
-            )
+        elseif (String(entry["type"]) == "Bus"
+                && haskey(entry, "connections")
+                && length(entry["connections"]) > 0)
+            # end of condition
+            others = Grouping(key => components[key]
+                              for key in entry["connections"]["output_order"])
             link_output_with(components[unit_key], others)
         end
     end
@@ -83,22 +79,14 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         # registered here, compare automatic selection of component class
         for module_config in default(entry, "control_modules", [])
             if lowercase(module_config["name"]) === "economical_discharge"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_EconomicalDischarge(
-                        module_config, components, sim_params
-                    )
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params))
             elseif lowercase(module_config["name"]) === "profile_limited"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_ProfileLimited(module_config, components, sim_params)
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params))
             elseif lowercase(module_config["name"]) === "storage_driven"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_StorageDriven(module_config, components, sim_params)
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_StorageDriven(module_config, components, sim_params))
             end
         end
     end
@@ -143,14 +131,10 @@ function reorder_interfaces_of_busses(components::Grouping)::Grouping
 
             # Get the permutation indices that would sort the 'source'/'target' field by
             # 'uac' order
-            output_perm_indices = sortperm([
-                output_order_dict[unit.output_interfaces[i].target.uac]
-                for i in 1:length(unit.output_interfaces)
-            ])
-            input_perm_indices = sortperm([
-                input_order_dict[unit.input_interfaces[i].source.uac]
-                for i in 1:length(unit.input_interfaces)
-            ])
+            output_perm_indices = sortperm([output_order_dict[unit.output_interfaces[i].target.uac]
+                                            for i in 1:length(unit.output_interfaces)])
+            input_perm_indices = sortperm([input_order_dict[unit.input_interfaces[i].source.uac]
+                                           for i in 1:length(unit.input_interfaces)])
 
             # Reorder the input and output interfaces using the permutation indices
             unit.output_interfaces = unit.output_interfaces[output_perm_indices]
@@ -170,7 +154,7 @@ time_step = 900 s
 start_timestamp = 0 s
 end_timestamp = 900 s
 """
-function get_timesteps(simulation_parameters::Dict{String, Any})
+function get_timesteps(simulation_parameters::Dict{String,Any})
     time_step = 900
     if "time_step_seconds" in keys(simulation_parameters)
         time_step = UInt(simulation_parameters["time_step_seconds"])
