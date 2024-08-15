@@ -69,6 +69,66 @@ function parse_efficiency_function(eff_def::String)::Function
     return plr -> plr
 end
 
+function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        if method == "const"
+            c = parse(Float64, data)
+            return c, function (src, snk)
+                       return plr -> c
+                   end
+
+        elseif method == "carnot"
+            c = parse(Float64, data)
+            return nothing, function (src, snk)
+                       if src === nothing || snk === nothing
+                           return plr -> nothing
+                       end
+                       return plr -> (c * (273.15 + snk) / (snk - src))
+                   end
+
+        elseif method == "field"
+            rows = split(data, ';')
+            cells = [parse.(Float64, split(row, ",")) for row in rows]
+            dim_src = length(cells)
+            dim_snk = length(cells[1])
+            values = Array{Float64,2}(undef, dim_src, dim_snk)
+            for (idx_src, row) in pairs(cells)
+                for (idx_snk, val) in pairs(row)
+                    values[idx_src, idx_snk] = val
+                end
+            end
+
+            return nothing, function (src, snk)
+                       src_idx = nothing
+                       for idx in 2:(dim_src - 1)
+                           if src >= values[idx, 1] && src < values[idx + 1, 1]
+                               src_idx = idx
+                           end
+                       end
+                       snk_idx = nothing
+                       for idx in 2:(dim_snk - 1)
+                           if snk >= values[1, idx] && snk < values[1, idx + 1]
+                               snk_idx = idx
+                           end
+                       end
+                       if snk_idx === nothing || src_idx === nothing
+                           @error "Given temperatures $src and $snk outside of COP field."
+                           throw(BoundsError(values, (src_idx, snk_idx)))
+                       end
+                       return plr -> values[src_idx, snk_idx]
+                   end
+        end
+    end
+
+    @warn "Cannot parse COP function from: $eff_def"
+    return nothing, (plr -> plr)
+end
+
 """
     create_plr_lookup_tables(unit)
 

@@ -62,6 +62,46 @@ end
     test_efficiency_parsing()
 end
 
+function test_cop_parsing()
+    const_val, cop_func = EnergySystems.parse_cop_function("const:0.314")
+    @test const_val == 0.314
+    plr_func = cop_func(30.0, 50.0)
+    @test plr_func(1.0) ≈ 0.314
+    plr_func = cop_func(10.0, 70.0)
+    @test plr_func(1.0) ≈ 0.314
+
+    const_val, cop_func = EnergySystems.parse_cop_function("carnot:0.4")
+    @test const_val === nothing
+    plr_func = cop_func(30.0, 50.0)
+    @test plr_func(1.0) ≈ 6.463
+    plr_func = cop_func(10.0, 70.0)
+    @test plr_func(1.0) ≈ 2.2876666666666
+
+    field_def = "field:" *
+                " 0, 0,10,20,30;" *
+                " 0,30,20,10, 5;" *
+                "10,30,30,20,10;" *
+                "20,30,30,30,20"
+    const_val, cop_func = EnergySystems.parse_cop_function(field_def)
+    @test const_val === nothing
+    @test cop_func(5.0, 5.0)(1.0) ≈ 30.0
+    @test cop_func(10.0, 5.0)(1.0) ≈ 30.0
+    @test cop_func(5.0, 10.0)(1.0) ≈ 20.0
+    @test cop_func(12.0, 27.0)(1.0) ≈ 20.0
+
+    error_occured = false
+    try
+        cop_func(9.0, 31.0)(1.0) # ≈ 5.0
+    catch BoundsError
+        error_occured = true
+    end
+    @test error_occured
+end
+
+@testset "test_cop_parsing" begin
+    test_cop_parsing()
+end
+
 function test_inverse_efficiency()
     components_config = get_demand_energy_system_config()
     components_config["TST_GB_01"]["nr_discretization_steps"] = 10
