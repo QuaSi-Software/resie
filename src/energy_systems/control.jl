@@ -73,29 +73,21 @@ end
 """
 Constructor of StateMachine for non-default fields.
 """
-StateMachine(
-    state::UInt,
-    state_names::Dict{UInt,String},
-    transitions::Dict{UInt,TruthTable}
-) = StateMachine(
-    state,
-    state_names,
-    transitions,
-    UInt(0)
-)
+StateMachine(state::UInt,
+state_names::Dict{UInt,String},
+transitions::Dict{UInt,TruthTable}) = StateMachine(state,
+                                                   state_names,
+                                                   transitions,
+                                                   UInt(0))
 
 """
 Default constructor of StateMachine that creates a state machine with only one state called
 "Default" and no transitions (as there no other states).
 """
-StateMachine() = StateMachine(
-    UInt(1),
-    Dict(UInt(1) => "Default"),
-    Dict(UInt(1) => TruthTable(
-        conditions=Vector(),
-        table_data=Dict()
-    ))
-)
+StateMachine() = StateMachine(UInt(1),
+                              Dict(UInt(1) => "Default"),
+                              Dict(UInt(1) => TruthTable(; conditions=Vector(),
+                                                         table_data=Dict())))
 
 """
 Advances the given state machine by checking the conditions in its current state.
@@ -155,27 +147,23 @@ mutable struct Controller
     modules::Vector{ControlModule}
 
     function Controller(config::Union{Nothing,Dict{String,Any}})::Controller
-        return new(
-            Base.merge( # parameters
-                Dict{String,Any}(
-                    "aggregation_plr_limit" => "max",
-                    "aggregation_charge" => "all",
-                    "aggregation_discharge" => "all",
-                    "consider_m_el_in" => true,
-                    "consider_m_el_out" => true,
-                    "consider_m_gas_in" => true,
-                    "consider_m_fuel_in" => true,
-                    "consider_m_h2_out" => true,
-                    "consider_m_o2_out" => true,
-                    "consider_m_heat_out" => true,
-                    "consider_m_heat_ht_out" => true,
-                    "consider_m_heat_lt_out" => true,
-                    "consider_m_heat_in" => true
-                ),
-                config === nothing ? Dict{String,Any}() : config
-            ),
-            [] # modules
-        )
+        return new(Base.merge(Dict{String,Any}(
+                                  "aggregation_plr_limit" => "max",
+                                  "aggregation_charge" => "all",
+                                  "aggregation_discharge" => "all",
+                                  "consider_m_el_in" => true,
+                                  "consider_m_el_out" => true,
+                                  "consider_m_gas_in" => true,
+                                  "consider_m_fuel_in" => true,
+                                  "consider_m_h2_out" => true,
+                                  "consider_m_o2_out" => true,
+                                  "consider_m_heat_out" => true,
+                                  "consider_m_heat_ht_out" => true,
+                                  "consider_m_heat_lt_out" => true,
+                                  "consider_m_heat_in" => true,
+                              ),
+                              config === nothing ? Dict{String,Any}() : config),
+                   [])
     end
 end
 
@@ -197,9 +185,7 @@ is to allow storage loading.
 - `Bool`: True if the parameter is set and is false, true otherwise
 """
 function load_storages(controller::Controller, medium::Symbol)::Bool
-    return default(
-        controller.parameters, "load_storages " * String(medium), true
-    )
+    return default(controller.parameters, "load_storages " * String(medium), true)
 end
 
 """
@@ -215,9 +201,7 @@ is to allow storage unloading.
 - `Bool`: True if the parameter is set and is false, true otherwise
 """
 function unload_storages(controller::Controller, medium::Symbol)::Bool
-    return default(
-        controller.parameters, "unload_storages " * String(medium), true
-    )
+    return default(controller.parameters, "unload_storages " * String(medium), true)
 end
 
 """
@@ -264,11 +248,9 @@ have a value larger zero for the component to run.
 - `Float64`: The aggregated upper PLR limit
 """
 function upper_plr_limit(controller::Controller, sim_params::Dict{String,Any})::Float64
-    limits = collect(
-        upper_plr_limit(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_upper_plr_limit)
-    )
+    limits = collect(upper_plr_limit(mod, sim_params)
+                     for mod in controller.modules
+                     if has_method_for(mod, cmf_upper_plr_limit))
     if length(limits) == 0
         return 1.0
     end
@@ -297,11 +279,9 @@ method "any" it is sufficient if any one module returns true.
 - `Bool`: The aggregated charging flag with true meaning charging is allowed
 """
 function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    flags = collect(
-        charge_is_allowed(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_charge_is_allowed)
-    )
+    flags = collect(charge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_charge_is_allowed))
     if length(flags) == 0
         return true
     end
@@ -330,11 +310,9 @@ aggregation method "any" it is sufficient if any one module returns true.
 - `Bool`: The aggregated charging flag with true meaning discharging is allowed
 """
 function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    flags = collect(
-        discharge_is_allowed(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_discharge_is_allowed)
-    )
+    flags = collect(discharge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_discharge_is_allowed))
     if length(flags) == 0
         return true
     end

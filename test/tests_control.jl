@@ -20,16 +20,14 @@ function setup_control_tests()
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "output_refs" => ["TST_BT_01"],
-            "control_modules" => [
-                Dict{String,Any}(
-                    "name" => "storage_driven",
-                    "high_threshold" => 0.9,
-                    "low_threshold" => 0.2,
-                    "storage_uac" => "TST_BT_01"  
-                )
-            ],
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "storage_driven",
+                                      "high_threshold" => 0.9,
+                                      "low_threshold" => 0.2,
+                                      "storage_uac" => "TST_BT_01",
+                                  )],
             "power_th" => 20000,
-            "constant_cop" => 3.0
+            "constant_cop" => 3.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -50,7 +48,7 @@ function setup_control_tests()
     simulation_params = Dict{String,Any}(
         "time" => 0,
         "time_step_seconds" => 900,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_params)
