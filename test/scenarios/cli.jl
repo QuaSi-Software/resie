@@ -25,12 +25,10 @@ include("../../src/resie_logger.jl")
 using .Resie_Logger
 using Resie
 
-KNOWN_COMMANDS = Set([
-    "generate_output",
-    "set_reference",
-    "compare_ooo",
-    "rebuild_overview"
-])
+KNOWN_COMMANDS = Set(["generate_output",
+                      "set_reference",
+                      "compare_ooo",
+                      "rebuild_overview"])
 
 """
     setup_logger(subdir)
@@ -52,13 +50,13 @@ function setup_logger(subdir)
     general_logfile_path = joinpath(subdir, "general.log")
     balanceWarn_logfile_path = joinpath(subdir, "balanceWarn.log")
     min_log_level = Resie_Logger.Logging.Debug
-    log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(
-        log_to_console,
-        log_to_file,
-        general_logfile_path,
-        balanceWarn_logfile_path,
-        min_log_level
-    )
+
+    log_file_general,
+    log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
+                                                     log_to_file,
+                                                     general_logfile_path,
+                                                     balanceWarn_logfile_path,
+                                                     min_log_level)
     @info "Logging set up"
     return log_file_general, log_file_balanceWarn
 end
@@ -85,10 +83,7 @@ function compare_files(file_1, file_2)
     differences = []
 
     if length(lines_1) != length(lines_2)
-        push!(
-            differences,
-            (0, "Different number of lines: $(length(lines_1))|$(length(lines_2))")
-        )
+        push!(differences, (0, "Different number of lines: $(length(lines_1))|$(length(lines_2))"))
     end
 
     for i in 1:min(length(lines_1), length(lines_2))
@@ -142,10 +137,7 @@ function generate_output(name::String, subdir::String)
     components = nothing
     try
         if sim_params !== nothing && project_config !== nothing
-            components = Resie.load_components(
-                project_config["components"],
-                sim_params
-            )
+            components = Resie.load_components(project_config["components"], sim_params)
             print("|  ✓  ")
         else
             print("|     ")
@@ -158,14 +150,12 @@ function generate_output(name::String, subdir::String)
     step_order = nothing
     try
         if project_config !== nothing && components !== nothing
-            if (
-                haskey(project_config, "order_of_operation")
-                && length(project_config["order_of_operation"]) > 0
-            )
-                step_order = Resie.load_order_of_operations(
-                    project_config["order_of_operation"],
-                    components
-                )
+            if (haskey(project_config, "order_of_operation")
+                &&
+                length(project_config["order_of_operation"]) > 0)
+                # end of condition
+                step_order = Resie.load_order_of_operations(project_config["order_of_operation"],
+                                                            components)
             else
                 step_order = Resie.calculate_order_of_operations(components)
             end
@@ -178,12 +168,11 @@ function generate_output(name::String, subdir::String)
         print("|  X  ")
     end
 
-    if (
-        project_config !== nothing
+    if (project_config !== nothing
         && sim_params !== nothing
         && components !== nothing
-        && step_order !== nothing
-    )
+        && step_order !== nothing)
+        # end of condition
         Resie.run_simulation_loop(project_config, sim_params, components, step_order)
         print("|  ✓  ")
     else
@@ -206,13 +195,11 @@ Set the reference outputs by copying relevant output files.
 -`subdir::String`: Full path of the subdir for the scenario
 """
 function set_reference(name, subdir)
-    outputs_to_set = [
-        "auxiliary_info.md",
-        "balanceWarn.log",
-        "out.csv",
-        "output_plot.html",
-        "sankey_plot.html"
-    ]
+    outputs_to_set = ["auxiliary_info.md",
+                      "balanceWarn.log",
+                      "out.csv",
+                      "output_plot.html",
+                      "sankey_plot.html"]
 
     println("Setting reference outputs for scenario $name")
 
@@ -221,7 +208,7 @@ function set_reference(name, subdir)
         ref_file_path = joinpath(subdir, "ref_" * file_name)
 
         if isfile(output_file_path)
-            cp(output_file_path, ref_file_path, force=true)
+            cp(output_file_path, ref_file_path; force=true)
         end
     end
 end
@@ -238,10 +225,8 @@ Compare the order of operations between the reference and output files.
 function compare_ooo(name, subdir)
     print("Comparing order of operations for scenario $name: ")
 
-    differences = compare_files(
-        joinpath(subdir, "auxiliary_info.md"),
-        joinpath(subdir, "ref_auxiliary_info.md")
-    )
+    differences = compare_files(joinpath(subdir, "auxiliary_info.md"),
+                                joinpath(subdir, "ref_auxiliary_info.md"))
 
     if length(differences) == 0
         print("✓\n")
@@ -266,22 +251,18 @@ Rebuild the overview HTML page for the scenario outputs.
 function rebuild_overview(scenarios_dir)
     println("Rebuilding overview in dir $scenarios_dir")
 
-    main_outputs = [
-        "output_plot.html",
-        "ref_output_plot.html",
-        "sankey_plot.html",
-        "ref_sankey_plot.html",
-    ]
-    other_files = [
-        "auxiliary_info.md",
-        "balanceWarn.log",
-        "general.log",
-        "inputs.json",
-        "out.csv",
-        "ref_auxiliary_info.md",
-        "ref_balanceWarn.log",
-        "ref_out.csv",
-    ]
+    main_outputs = ["output_plot.html",
+                    "ref_output_plot.html",
+                    "sankey_plot.html",
+                    "ref_sankey_plot.html"]
+    other_files = ["auxiliary_info.md",
+                   "balanceWarn.log",
+                   "general.log",
+                   "inputs.json",
+                   "out.csv",
+                   "ref_auxiliary_info.md",
+                   "ref_balanceWarn.log",
+                   "ref_out.csv"]
 
     scenarios_list_html = ""
     for name in readdir(scenarios_dir)
