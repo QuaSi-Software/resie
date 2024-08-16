@@ -20,7 +20,8 @@ mutable struct HeatPump <: Component
     power_th::Float64
     min_power_fraction::Float64
     min_run_time::UInt
-    constant_cop::Any
+    constant_cop::Floathing
+    dynamic_cop::Function
     bypass_cop::Float64
     output_temperature::Temperature
     input_temperature::Temperature
@@ -36,6 +37,9 @@ mutable struct HeatPump <: Component
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in])
 
+        func_def = default(config, "cop_function", "carnot:0.4")
+        constant_cop, cop_function = parse_cop_function(func_def)
+
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
                    sf_transformer, # sys_function
@@ -48,7 +52,8 @@ mutable struct HeatPump <: Component
                    config["power_th"], # power_th
                    default(config, "min_power_fraction", 0.2),
                    default(config, "min_run_time", 0),
-                   default(config, "constant_cop", nothing),
+                   constant_cop,
+                   cop_function,
                    default(config, "bypass_cop", 15.0),
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
@@ -168,15 +173,6 @@ function set_max_energies!(unit::HeatPump,
                     has_calculated_all_maxima_heat_out)
 end
 
-function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
-    if (in_temp === nothing || out_temp === nothing)
-        return nothing
-    end
-
-    # Carnot-COP with 40 % efficiency
-    return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
-end
-
 function get_layer_temperature(unit::HeatPump,
                                current_idx::Integer,
                                temps_min::Vector{<:Temperature},
@@ -222,7 +218,7 @@ function handle_layer(unit::HeatPump,
         cop = unit.bypass_cop
         do_bypass = true
     else
-        cop = dynamic_cop(in_temp, out_temp)
+        cop = unit.dynamic_cop(in_temp, out_temp)(1.0)
     end
     if cop === nothing
         @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
