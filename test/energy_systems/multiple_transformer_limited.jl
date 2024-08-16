@@ -65,7 +65,7 @@ function test_multiple_transformer_with_limitations()
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_heat_01"],
             "power_th" => 2240,
-            "constant_cop" => 3.5,
+            "cop_function" => "const:3.5",
             "min_power_fraction" => 0.0,
         ),
     )

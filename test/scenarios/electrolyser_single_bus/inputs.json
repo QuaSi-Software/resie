@@ -211,7 +211,7 @@
                 "TST_01_HZG_00_BUS"
             ],
             "power_th": 20000,
-            "constant_cop": 3.0
+            "cop_function": "const:3.0"
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -219,7 +219,7 @@
                 "TST_01_HZG_00_BUS"
             ],
             "power_th": 20000,
-            "constant_cop": 3.0
+            "cop_function": "const:3.0"
         },
         "TST_01_HZG_00_BFT": {
             "type": "BufferTank",

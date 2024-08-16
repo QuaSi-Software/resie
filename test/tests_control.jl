@@ -27,7 +27,7 @@ function setup_control_tests()
                                       "storage_uac" => "TST_BT_01",
                                   )],
             "power_th" => 20000,
-            "constant_cop" => 3.0,
+            "cop_function" => "const:3.0",
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
