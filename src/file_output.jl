@@ -422,7 +422,7 @@ function create_profile_line_plots(
             start_date = Dates.DateTime("2015/1/1 00:00:00","yyyy/m/d HH:MM:SS")
             @info ("Date of first data point in ouput line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
         else
-            start_date = Dates.DateTime(year(sim_params["start_date"]), 1, 1, 0, 0 ,0)
+            start_date = sim_params["start_date"]
         end
         x = [start_date + Dates.Second(s) for s in outputs_plot_data[:, 1]]
     end
@@ -443,7 +443,7 @@ function create_profile_line_plots(
         push!(traces, trace)
     end
 
-    layout = Layout(title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within the current time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
+    layout = Layout(title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
         xaxis_title_text="Time [$(project_config["io_settings"]["output_plot_time_unit"])]",
         yaxis_title_text="",
         yaxis2=attr(title="", overlaying="y", side="right"))
