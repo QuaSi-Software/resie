@@ -1,6 +1,7 @@
 module Weatherdata
 
 using Resie.Profiles
+using Dates
 
 export WeatherData
 
@@ -13,14 +14,17 @@ mutable struct WeatherData
     """Wind speed, in m/s."""
     wind_speed::Profile
 
-    """Direct horizontal irradiation, in W/m^2."""
+    """Direct horizontal irradiation, in Wh/m^2."""
     dirHorIrr::Profile
 
-    """Diffuse horizontal irradiation, in W/m^2."""
+    """Diffuse horizontal irradiation, in Wh/m^2."""
     difHorIrr::Profile
 
-    """Global horizontal irradiation, in W/m^2."""
+    """Global horizontal irradiation, in Wh/m^2."""
     globHorIrr::Profile
+
+    """Horizontal long wave (infrared) irradiation, in Wh/m^2."""
+    longWaveIrr::Profile
    
 """
 get_weather_data(weather_file_path, sim_params)
@@ -32,41 +36,90 @@ The returned values are of type WeaterData containing profiles of type Profile.
 """
     function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
         if !isfile(weather_file_path)
-            @error "The DWD weather file could not be found in: \n $weather_file_path"
+            @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
         end
     
+        time_step = Second(3600)  # set fixed time step width for weather data
+        start_year = Dates.value(Year(sim_params["start_date"]))
+        end_year = Dates.value(Year(sim_params["end_date"]))
+        timestamp = remove_leap_days(collect(range(DateTime(start_year, 1, 1, 0, 0, 0),
+                                                   stop=DateTime(end_year, 12, 31, 23, 0, 0),
+                                                   step=time_step)))
+        nr_of_years = end_year - start_year + 1
+
         if endswith(lowercase(weather_file_path), ".dat")
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
-            timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
-            time_step = 900*4 # s, of weatherdata
-    
-            # convert required data to profile
-            temp_ambient_air  = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["temp_air"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["wind_speed"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            dirHorIrr         = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["dirHorIrr"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["difHorIrr"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            globHorIrr        = deepcopy(dirHorIrr)
-            globHorIrr.data   = globHorIrr.data .+ difHorIrr.data
+
+            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
+            #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
+
+            # convert solar radiation data to profile
+            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
+                                sim_params,
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_is_power=false)
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params,
+                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_is_power=false) 
+            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
     
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
-            timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
-            time_step = 900*4 # s, of weatherdata   
-            
-            temp_ambient_air  = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["temp_air"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["wind_speed"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            globHorIrr        = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["ghi"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", sim_params, given_profile_values=Float64.(weatherdata_dict["dhi"]), given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            dirHorIrr         = deepcopy(globHorIrr)
-            dirHorIrr.data    = dirHorIrr.data .- difHorIrr.data
+
+            # convert solar radiation data to profile
+            globHorIrr = Profile(weather_file_path * ":GlobalHorizontalIrradiation",
+                                 sim_params,
+                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
+                                 given_timestamps=timestamp,
+                                 given_time_step=time_step,
+                                 given_is_power=false) 
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params,
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_is_power=false) 
+            dirHorIrr = deepcopy(globHorIrr)
+            dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
+
         end
-    
-        return new(temp_ambient_air, 
-                   wind_speed, 
-                   dirHorIrr, 
-                   difHorIrr, 
-                   globHorIrr)
+
+        # convert long wave radiation data
+        longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
+                              sim_params,
+                              given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
+                              given_timestamps=timestamp,
+                              given_time_step=time_step,
+                              given_is_power=false)
+
+        # convert other data to profile
+        temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
+                                   sim_params;
+                                   given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
+                                   given_timestamps=timestamp,
+                                   given_time_step=time_step,
+                                   given_is_power=true)
+
+        wind_speed = Profile(weather_file_path * ":WindSpeed",
+                             sim_params;
+                             given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
+                             given_timestamps=timestamp,
+                             given_time_step=time_step,
+                             given_is_power=true)
+
+        return new(temp_ambient_air,
+                   wind_speed,
+                   dirHorIrr,
+                   difHorIrr,
+                   globHorIrr,
+                   longWaveIrr)
     end
 end
 
@@ -159,7 +212,7 @@ function read_dat_file(weather_file_path::String)
     colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air", 
                 "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover", 
                 "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr", 
-                "athmospheric_heat_irr", "terrestric_heat_irr", "quality"]
+                "longWaveIrr", "terrestric_heat_irr", "quality"]
 
     weatherdata_dict = Dict{String, Vector{Any}}()
     for col_name in colnames
@@ -231,7 +284,7 @@ function read_epw_file(weather_file_path::String)
     weatherdata_dict = Dict{String, Vector{Any}}()
     colnames = ["year", "month", "day", "hour", "minute", "data_source_unct",
                 "temp_air", "temp_dew", "relative_humidity",
-                "atmospheric_pressure", "etr", "etrn", "ghi_infrared", "ghi",
+                "atmospheric_pressure", "etr", "etrn", "longWaveIrr", "ghi",
                 "dni", "dhi", "global_hor_illum", "direct_normal_illum",
                 "diffuse_horizontal_illum", "zenith_luminance",
                 "wind_direction", "wind_speed", "total_sky_cover",
