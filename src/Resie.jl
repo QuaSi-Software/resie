@@ -26,6 +26,7 @@ using ColorSchemes
 using Colors
 using Interpolations
 using JSON
+using Dates
 
 
 """
@@ -39,27 +40,28 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_timestamp, end_timestamp, start_date = get_timesteps(
+    time_step, start_date, end_date, nr_of_steps = get_timesteps(
         project_config["simulation_parameters"]
     )
-    nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
 
     sim_params = Dict{String,Any}(
-        "time" => start_timestamp,
+        "time" => 0,
+        "current_date" => start_date,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
         "start_date" => start_date,
+        "end_date" => end_date,
         "epsilon" => 1e-9,
         "is_first_timestep" => true
     )
 
-    file_path = default(
+    weather_file_path = default(
         project_config["simulation_parameters"],
         "weather_file_path",
         nothing
     )
-    if file_path !== nothing
-        sim_params["weather_data"] = WeatherData(file_path, sim_params)
+    if weather_file_path !== nothing
+        sim_params["weather_data"] = WeatherData(weather_file_path, sim_params)
     end
 
     return sim_params
@@ -183,6 +185,7 @@ function run_simulation_loop(
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
+        sim_params["current_date"] += Second(sim_params["time_step_seconds"])
 
         if steps == 1
             sim_params["is_first_timestep"] = false
