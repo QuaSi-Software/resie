@@ -73,9 +73,7 @@ function control(
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
     elseif unit.max_power_profile !== nothing
-        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
-            unit.max_power_profile, sim_params["time"]
-        )
+        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, sim_params)
     else
         unit.max_energy = 0.0
     end
@@ -84,9 +82,7 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(
-            unit.temperature_profile, sim_params["time"]
-        )
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
     set_temperature!(
         unit.output_interfaces[unit.medium],
