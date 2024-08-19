@@ -69,6 +69,25 @@ function parse_efficiency_function(eff_def::String)::Function
     return plr -> plr
 end
 
+function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
+    lin_x = (x2 - x1) / (x3 - x1)
+    lin_y = (y2 - y1) / (y3 - y1)
+    # value in plane spanned by v1, v3 and v4
+    u = v1 + lin_x * (v4 - v3)
+    v = v3 + lin_x * (v4 - v3)
+    val_134 = u + lin_y * (v - u)
+    # value in plane spanned by v1, v2 and v4
+    u = v1 + lin_x * (v2 - v1)
+    v = v4 - (1.0 - lin_x) * (v2 - v1)
+    val_124 = u + lin_y * (v - u)
+    # if the crease is convex, we take the min, otherwise the max
+    if v2 < v1 + (v4 - v3)
+        return min(val_134, val_124)
+    else
+        return max(val_134, val_124)
+    end
+end
+
 function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
     splitted = split(eff_def, ":")
 
@@ -103,7 +122,10 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                 end
             end
 
-            return nothing, function (src, snk)
+            # first dim of value is source, second is sink. source is vertical, sink horizontal
+            # first row is sink temperatures, first column is source temperatures
+            return nothing,
+                   function (src, snk)
                        src_idx = nothing
                        for idx in 2:(dim_src - 1)
                            if src >= values[idx, 1] && src < values[idx + 1, 1]
@@ -120,7 +142,16 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                            @error "Given temperatures $src and $snk outside of COP field."
                            throw(BoundsError(values, (src_idx, snk_idx)))
                        end
-                       return plr -> values[src_idx, snk_idx]
+                       return plr -> bilinear_interpolate(values[1, snk_idx],
+                                                          snk,
+                                                          values[1, snk_idx + 1],
+                                                          values[src_idx, 1],
+                                                          src,
+                                                          values[src_idx + 1, 1],
+                                                          values[src_idx, snk_idx],
+                                                          values[src_idx, snk_idx + 1],
+                                                          values[src_idx + 1, snk_idx],
+                                                          values[src_idx + 1, snk_idx + 1])
                    end
         end
     end
