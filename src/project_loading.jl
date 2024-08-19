@@ -169,30 +169,18 @@ will be set:
 time_step = 900 s
 """
 function get_timesteps(simulation_parameters::Dict{String, Any})
-    start_date = nothing
-
-    if simulation_parameters["start_end_unit"] == "seconds"
-        start_timestamp = simulation_parameters["start"]
-        end_timestamp = simulation_parameters["end"]
-    elseif simulation_parameters["start_end_unit"] == "hours"
-        start_timestamp = simulation_parameters["start"] * 60 * 60
-        end_timestamp = simulation_parameters["end"] * 60 * 60
-    else
-        try
-            start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
-            end_timestamp_input = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
-
-            start_of_year = Dates.DateTime(year(start_date), 1, 1, 0, 0 ,0)
-            start_timestamp = Dates.value(Second(start_date - start_of_year))
-            end_timestamp = Dates.value(Second(end_timestamp_input - start_of_year))
-
-        catch e
-            @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
-                   "'start_end_unit' has to be 'seconds', 'hours' or a specific daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
-                   "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
-                   "The following error occured: $e")
-            exit()  
-        end
+    start_date = DateTime(0)
+    end_date = DateTime(0)
+    try
+        start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
+        end_date = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
+    catch e
+        @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
+               "'start_end_unit' has to be a daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
+               "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start"*
+               "and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
+               "The following error occured: $e")
+        exit()  
     end
 
     if simulation_parameters["time_step_unit"] == "seconds"
@@ -203,10 +191,13 @@ function get_timesteps(simulation_parameters::Dict{String, Any})
         time_step = simulation_parameters["time_step"] * 60 * 60
     else
         time_step = 900
-        @info("The simulation time step is set to 900 s as default, as it could not be found in the input file (`time_step` and `time_step_unit` has to be given!).")
+        @info("The simulation time step is set to 900 s as default, as it could not be found in the input file" *
+             "(`time_step` and `time_step_unit` have to be given!).")
     end
 
-    return UInt(time_step), Int64(start_timestamp), Int64(end_timestamp), start_date
+    nr_of_steps = UInt(max(1, floor(Dates.value(Second(end_date - start_date)) / time_step)))
+
+    return UInt(time_step), start_date, end_date, nr_of_steps
 end
 
 # calculation of the order of operations has its own include files due to its complexity
