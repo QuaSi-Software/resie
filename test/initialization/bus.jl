@@ -15,7 +15,7 @@ function energy_system()::Dict{String,Any}
             "type" => "PVPlant",
             "output_refs" => ["TST_BUS_01"],
             "energy_profile_file_path" => "./profiles/tests/source_power_pv.prf",
-            "scale" => 20000
+            "scale" => 20000,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
@@ -24,18 +24,16 @@ function energy_system()::Dict{String,Any}
         "TST_BAT_01" => Dict{String,Any}(
             "type" => "Battery",
             "output_refs" => ["TST_BUS_01"],
-            "control_modules" => [
-                Dict{String,Any}(
-                    "name" => "economical_discharge",
-                    "pv_threshold" => 750.0,
-                    "min_charge" => 0.2,
-                    "discharge_limit" => 0.05,
-                    "pv_plant_uac" => "TST_PVP_01",
-                    "battery_uac" => "TST_BAT_01"
-                )
-            ],
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "economical_discharge",
+                                      "pv_threshold" => 750.0,
+                                      "min_charge" => 0.2,
+                                      "discharge_limit" => 0.05,
+                                      "pv_plant_uac" => "TST_PVP_01",
+                                      "battery_uac" => "TST_BAT_01",
+                                  )],
             "capacity" => 10000,
-            "load" => 5000
+            "load" => 5000,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -54,7 +52,7 @@ function test_load_no_connections()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     exception_occured = false
@@ -87,7 +85,7 @@ function test_load_given_lists_empty()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
     exception_occured = false
     try
@@ -112,26 +110,20 @@ end
 function test_fully_specified()
     components_config = energy_system()
     components_config["TST_BUS_01"]["connections"] = Dict{String,Any}(
-        "input_order" => [
-            "TST_PVP_01",
-            "TST_BAT_01",
-            "TST_GRI_01",
-        ],
-        "output_order" => [
-            "TST_DEM_01",
-            "TST_BAT_01"
-        ],
-        "energy_flow" => [
-            [1, 1],
-            [1, 0],
-            [1, 0]
-        ]
+        "input_order" => ["TST_PVP_01",
+                          "TST_BAT_01",
+                          "TST_GRI_01"],
+        "output_order" => ["TST_DEM_01",
+                           "TST_BAT_01"],
+        "energy_flow" => [[1, 1],
+                          [1, 0],
+                          [1, 0]],
     )
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

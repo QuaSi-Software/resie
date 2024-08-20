@@ -29,7 +29,7 @@ mutable struct Profile
     is_power::Bool
 
     """Holds the profile values indexed by the time step number"""
-    data::Dict{DateTime, Float64}
+    data::Dict{DateTime,Float64}
 
     """Construct a profile from the file at the given path or convert given data to profile (optional)."""
     function Profile(file_path::String,                               # file path to a .prf file
@@ -38,7 +38,6 @@ mutable struct Profile
                      given_timestamps::Vector{DateTime}=DateTime[],   # optional: Vector{DateTime} that holds the time step as DateTime
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the timestep in seconds of the given data
                      given_is_power::Bool=false)                      # optional: Bool that indicates if the data is intensive or extensive
-
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -50,7 +49,7 @@ mutable struct Profile
             profile_start_date = nothing
             profile_start_date_format = nothing
             time_zone = nothing
-            
+
             file_handle = nothing
 
             try
@@ -112,7 +111,7 @@ mutable struct Profile
             if time_definition == "startdate_timestepsize"
                 if isnothing(profile_start_date) || isnothing(profile_start_date_format) || isnothing(profile_time_step)
                     @error "For the profile at $(file_path) a time definition via startdate_timestepsize is chosen. " *
-                            "Specify 'profile_start_date', 'profile_start_date_format' and 'profile_time_step_seconds' in the profile header!"
+                           "Specify 'profile_start_date', 'profile_start_date_format' and 'profile_time_step_seconds' in the profile header!"
                     throw(InputError)
                 else
                     # create time step from startdate and timestep
@@ -126,13 +125,13 @@ mutable struct Profile
                                                  file_path,
                                                  "profile_start_date_format")
                     for idx in eachindex(profile_values)
-                        profile_timestamps_date[idx] = start_date + Second((idx-1) * profile_time_step)
+                        profile_timestamps_date[idx] = start_date + Second((idx - 1) * profile_time_step)
                     end
                 end
             elseif time_definition == "startdate_timestamp"
                 if isnothing(profile_start_date) || isnothing(profile_start_date_format) || isnothing(timestamp_format)
                     @error "For the profile at $(file_path) a time definition via startdate_timestamp is chosen. " *
-                            "Specify 'profile_start_date', 'profile_start_date_format' and 'timestamp_format' in the profile header!"
+                           "Specify 'profile_start_date', 'profile_start_date_format' and 'timestamp_format' in the profile header!"
                     throw(InputError)
                 else
                     # calculate time step from startdate and continuos timestamp
@@ -160,7 +159,7 @@ mutable struct Profile
             elseif time_definition == "datestamp"
                 if isnothing(timestamp_format)
                     @error "For the profile at $(file_path) a time definition via datestamp is chosen. " *
-                            "Specify 'timestamp_format' in the profile header!"
+                           "Specify 'timestamp_format' in the profile header!"
                     throw(InputError)
                 else
                     # get time step from datestamp
@@ -177,12 +176,12 @@ mutable struct Profile
                 throw(InputError)
             end
 
-            if isnothing(profile_time_step) && length(profile_timestamps_date) > 1 
+            if isnothing(profile_time_step) && length(profile_timestamps_date) > 1
                 profile_time_step = Dates.value(Second(profile_timestamps_date[2] - profile_timestamps_date[1]))
                 @info "For the profile at $(file_path), a timestep of $(string(profile_time_step)) seconds was detected."
             elseif isnothing(profile_time_step)
                 @error "For the profile at $(file_path) no profile time step could be determined. " *
-                        "Please specify one with the parameter 'profile_time_step_seconds'."
+                       "Please specify one with the parameter 'profile_time_step_seconds'."
                 throw(InputError)
             end
         else # data was read in from somewhere else and is provided as vector
@@ -204,21 +203,24 @@ mutable struct Profile
         elseif length(profile_timestamps_date) !== length(unique(profile_timestamps_date))
             @error "The timestamp of the profile at $(file_path) has duplicates!"
             throw(InputError)
-        elseif length(profile_timestamps_date) > 1 && length(unique(diff_ignore_leap_days(profile_timestamps_date))) !== 1
+        elseif length(profile_timestamps_date) > 1 &&
+               length(unique(diff_ignore_leap_days(profile_timestamps_date))) !== 1
             @error "The timestamp of the profile at $(file_path) has an inconsistent time step width! " *
                    "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'!"
             throw(InputError)
         end
 
         # check time step compatibility
-        if !(sim_params["time_step_seconds"] % profile_time_step == 0) && !(profile_time_step % sim_params["time_step_seconds"] == 0) 
+        if !(sim_params["time_step_seconds"] % profile_time_step == 0) &&
+           !(profile_time_step % sim_params["time_step_seconds"] == 0)
             @error ("The timestep of the profile at $(file_path), which is $(string(profile_time_step)),\n" *
                     "is not a multiple or a divisor of the requested simulation timestep of $(string(sim_params["time_step_seconds"]))!")
             throw(InputError)
         end
 
         # check coverage of simulation time
-        if profile_timestamps_date[1] > sim_params["start_date"] || profile_timestamps_date[end] < sim_params["end_date"]
+        if profile_timestamps_date[1] > sim_params["start_date"] ||
+           profile_timestamps_date[end] < sim_params["end_date"]
             @error "In the profile at $(file_path), the simulation time is not fully covered!\n" *
                    "Provide a profile that covers the simulation time of:\n" *
                    "Begin: $(Dates.format(sim_params["start_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
@@ -245,11 +247,9 @@ mutable struct Profile
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
-        return new(
-            sim_params["time_step_seconds"],   # Period: time_step, equals simulation time step after conversion, in seconds
-            is_power,                          # Bool: to indicate if profil is intensive or extensive (true means is intensive profile)
-            profile_dict                       # Dict{DateTime, Float64}() dict with timestamp as key and data of profile, in simulation time step
-        )
+        return new(sim_params["time_step_seconds"],   # Period: time_step, equals simulation time step after conversion, in seconds
+                   is_power,                          # Bool: to indicate if profil is intensive or extensive (true means is intensive profile)
+                   profile_dict)                      # Dict{DateTime, Float64}() dict with timestamp as key and data of profile, in simulation time step
     end
 end
 
@@ -268,15 +268,15 @@ Returns
 function parse_datestamp(datetime_str::String,
                          time_format::String,
                          file_path::String,
-                         time_format_variable_name::String) 
+                         time_format_variable_name::String)
     try
         return Dates.DateTime(datetime_str, time_format)
     catch e
         @error("Time given date specifier of profile at $(file_path) does not fit to the data.\n" *
-                "'$(time_format_variable_name)' has to match the dataformat, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
-                "'$(time_format_variable_name)' is `$(time_format)` which does not fit to the " *
-                "timestamp given `$(datetime_str)`.\n The following error occured: $e")
-        throw(InputError)  
+               "'$(time_format_variable_name)' has to match the dataformat, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
+               "'$(time_format_variable_name)' is `$(time_format)` which does not fit to the " *
+               "timestamp given `$(datetime_str)`.\n The following error occured: $e")
+        throw(InputError)
     end
 end
 
@@ -289,7 +289,7 @@ function remove_leap_days(timestamp::Vector{DateTime}, values::Vector{Float64}, 
     filtered_pairs = [(dt, val) for (dt, val) in zip(timestamp, values) if !(month(dt) == 2 && day(dt) == 29)]
     filtered_timestamp = [dt for (dt, val) in filtered_pairs]
     filtered_values = [val for (dt, val) in filtered_pairs]
-                                                 
+
     if length(filtered_timestamp) < length(timestamp)
         @info "In the profile at $file_path, a leap day has been removed."
     end
@@ -314,13 +314,13 @@ while considering removed leap days. Returns the differences as vector.
 """
 function diff_ignore_leap_days(timestamps::Vector{DateTime})
     diffs = Period[]
-    
+
     for i in 2:length(timestamps)
-        diff = timestamps[i] - timestamps[i-1]
+        diff = timestamps[i] - timestamps[i - 1]
 
         # Check if the range includes a leap day and adjust the difference
         if isleapyear(timestamps[i]) &&
-           month(timestamps[i-1]) <= 2 && day(timestamps[i-1]) <= 28 &&
+           month(timestamps[i - 1]) <= 2 && day(timestamps[i - 1]) <= 28 &&
            month(timestamps[i]) >= 3 && day(timestamps[i]) >= 1
             diff = diff - Millisecond(86400000)  # equals 1 day
         end
@@ -341,9 +341,9 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
     else
         tz = ""
         try
-             tz = TimeZone(time_zone)
+            tz = TimeZone(time_zone)
         catch e
-            @error "In the profile at $file_path, the given time zone $(time_zone) could not be detected. " * 
+            @error "In the profile at $file_path, the given time zone $(time_zone) could not be detected. " *
                    "It has to be an IANA (also known as TZ or TZDB) time zone identifier."
             throw(InputError)
         end
@@ -359,7 +359,6 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
             if zoned_time.zone.offset.dst !== Second(0)
                 has_corrected = true
             end
-
         end
 
         if has_corrected
@@ -450,12 +449,11 @@ Outputs:
 
 If `original_time_step` equals the `new_time_step`, the original `values` will be returned.
 """
- function convert_extensive_profile(values::Vector{Float64},
-                                    timestamps::Vector{DateTime},
-                                    original_time_step::Period,
-                                    new_time_step::Period,
-                                    file_path::String)
-
+function convert_extensive_profile(values::Vector{Float64},
+                                   timestamps::Vector{DateTime},
+                                   original_time_step::Period,
+                                   new_time_step::Period,
+                                   file_path::String)
     if original_time_step == new_time_step
         return values, timestamps
     end
@@ -488,14 +486,13 @@ If `original_time_step` equals the `new_time_step`, the original `values` will b
     end
 
     end_time = start_time + new_time_step * (new_length - 1)
-    new_timestamps = remove_leap_days(collect(range(start_time, stop=end_time, step=new_time_step)))
+    new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
 
     @info "The profile at $(file_path) (extensive profile) was converted from the profile timestep " *
           "$(original_time_step) to the simulation timestep of $(new_time_step)."
 
     return converted_profile, new_timestamps
 end
-
 
 """
     convert_intensive_profile
@@ -519,7 +516,6 @@ function convert_intensive_profile(values::Vector{Float64},
                                    original_time_step::Period,
                                    new_time_step::Period,
                                    file_path::String)
-
     if new_time_step == original_time_step # no change
         return values, timestamps
 
@@ -527,20 +523,20 @@ function convert_intensive_profile(values::Vector{Float64},
         ref_time = Base.minimum(timestamps)
         numeric_timestamps = [Dates.value(Second(dt - ref_time)) for dt in timestamps]
         interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
-        new_timestamps = remove_leap_days(collect(range(Base.minimum(timestamps),
+        new_timestamps = remove_leap_days(collect(range(Base.minimum(timestamps);
                                                         stop=Base.maximum(timestamps),
                                                         step=new_time_step)))
-        new_numeric_timestamps =  [Dates.value(Second(dt - ref_time)) for dt in new_timestamps]
+        new_numeric_timestamps = [Dates.value(Second(dt - ref_time)) for dt in new_timestamps]
         converted_profile = [interp(t) for t in new_numeric_timestamps]
 
         # add missing entries by coping the last entry
-        for _ in 1:ceil(Int,(original_time_step-new_time_step)/new_time_step)
+        for _ in 1:ceil(Int, (original_time_step - new_time_step) / new_time_step)
             append!(converted_profile, converted_profile[end])
         end
 
         @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
               "$(original_time_step) to the simulation timestep of $(new_time_step)."
-        
+
         return converted_profile, new_timestamps
 
     else # aggregation
@@ -548,21 +544,21 @@ function convert_intensive_profile(values::Vector{Float64},
         old_length = length(timestamps)
         new_length = ceil(Int, old_length / aggregation_factor)
         converted_profile = zeros(new_length)
-        
+
         for n in 1:new_length
-            old_index_start = Int((n-1) * aggregation_factor + 1)
+            old_index_start = Int((n - 1) * aggregation_factor + 1)
             old_index_end = Int(min(n * aggregation_factor, old_length))
             old_number_of_steps = Int(old_index_end - old_index_start + 1)
-            converted_profile[n] = sum(values[old_index_start:old_index_end])/old_number_of_steps
+            converted_profile[n] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
         end
 
         start_time = Base.minimum(timestamps)
         end_time = start_time + new_time_step * (new_length - 1)
-        new_timestamps = remove_leap_days(collect(range(start_time, stop=end_time, step=new_time_step)))
-        
+        new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
+
         @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
               "$(original_time_step) to the simulation timestep of $(new_time_step)."
-        
+
         return converted_profile, new_timestamps
     end
 end

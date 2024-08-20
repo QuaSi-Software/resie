@@ -26,40 +26,30 @@ mutable struct PVPlant <: Component
         # load energy profile from path
         energy_profile = Profile(config["energy_profile_file_path"], sim_params)
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_fixed_source, # sys_function
-            InterfaceMap(), # input_interfaces
-            InterfaceMap( # output_interfaces
-                m_el_out => nothing
-            ),
-            m_el_out,
-            energy_profile, # energy_profile
-            config["scale"], # scaling_factor
-            0.0 # supply
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_fixed_source,                   # sys_function
+                   InterfaceMap(),                    # input_interfaces
+                   InterfaceMap(m_el_out => nothing), # output_interfaces
+                   m_el_out,
+                   energy_profile,  # energy_profile
+                   config["scale"], # scaling_factor
+                   0.0)             # supply
     end
 end
 
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_el_out],
-        load_storages(unit.controller, unit.m_el_out)
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
+                          load_storages(unit.controller, unit.m_el_out))
 end
 
-function control(
-    unit::PVPlant,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::PVPlant,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
     unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
-
 end
-
 
 function process(unit::PVPlant, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
@@ -67,7 +57,7 @@ function process(unit::PVPlant, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::PVPlant)::Vector{String}
-    return [string(unit.m_el_out)*" OUT",
+    return [string(unit.m_el_out) * " OUT",
             "Supply"]
 end
 

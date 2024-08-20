@@ -30,25 +30,17 @@ function test_short_chain_distribution()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_SRC_01"
-                ],
-                "output_order" => [
-                    "TST_BUS_02",
-                ],
+                "input_order" => ["TST_SRC_01"],
+                "output_order" => ["TST_BUS_02"],
             ),
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_BUS_01"
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                    "TST_DEM_02"
-                ],
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_DEM_02"],
             ),
         ),
     )
@@ -56,7 +48,7 @@ function test_short_chain_distribution()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -126,49 +118,33 @@ function test_long_chain_distribution()
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_SRC_01"
-                ],
-                "output_order" => [
-                    "TST_BUS_02",
-                ],
+                "input_order" => ["TST_SRC_01"],
+                "output_order" => ["TST_BUS_02"],
             ),
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_BUS_01"
-                ],
-                "output_order" => [
-                    "TST_BUS_03",
-                    "TST_BUS_04"
-                ],
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_BUS_03",
+                                   "TST_BUS_04"],
             ),
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_BUS_02"
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => ["TST_DEM_01"],
             ),
         ),
         "TST_BUS_04" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_BUS_02"
-                ],
-                "output_order" => [
-                    "TST_DEM_02",
-                ],
+                "input_order" => ["TST_BUS_02"],
+                "output_order" => ["TST_DEM_02"],
             ),
         ),
     )
@@ -176,7 +152,7 @@ function test_long_chain_distribution()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

@@ -40,20 +40,14 @@ function test_many_plus_storage_to_one()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_SRC_01",
-                    "TST_SRC_02",
-                    "TST_TES_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                    "TST_TES_01",
-                ],
-                "energy_flow" => [
-                    [1,1],
-                    [1,1],
-                    [1,0],
-                ],
+                "input_order" => ["TST_SRC_01",
+                                  "TST_SRC_02",
+                                  "TST_TES_01"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_TES_01"],
+                "energy_flow" => [[1, 1],
+                                  [1, 1],
+                                  [1, 0]],
             ),
         ),
     )
@@ -61,7 +55,7 @@ function test_many_plus_storage_to_one()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

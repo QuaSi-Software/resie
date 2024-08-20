@@ -28,7 +28,6 @@ using Interpolations
 using JSON
 using Dates
 
-
 """
     get_simulation_params(project_config)
 
@@ -40,9 +39,7 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_date, end_date, nr_of_steps = get_timesteps(
-        project_config["simulation_parameters"]
-    )
+    time_step, start_date, end_date, nr_of_steps = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
         "time" => 0,
@@ -52,14 +49,12 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "start_date" => start_date,
         "end_date" => end_date,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true
+        "is_first_timestep" => true,
     )
 
-    weather_file_path = default(
-        project_config["simulation_parameters"],
-        "weather_file_path",
-        nothing
-    )
+    weather_file_path = default(project_config["simulation_parameters"],
+                                "weather_file_path",
+                                nothing)
     if weather_file_path !== nothing
         sim_params["weather_data"] = WeatherData(weather_file_path, sim_params)
     end
@@ -88,14 +83,8 @@ function prepare_inputs(project_config::Dict{AbstractString,Any})
 
     components = load_components(project_config["components"], sim_params)
 
-    if (
-        haskey(project_config, "order_of_operation")
-        && length(project_config["order_of_operation"]) > 0
-    )
-        step_order = load_order_of_operations(
-            project_config["order_of_operation"],
-            components
-        )
+    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
+        step_order = load_order_of_operations(project_config["order_of_operation"], components)
         @info "The order of operations was successfully imported from the input file.\n" *
               "Note that the order of operations has a major impact on the simulation " *
               "result and should only be changed by experienced users!"
@@ -117,21 +106,17 @@ Performs the simulation as loop over time steps and records outputs.
 -`components::Grouping`: The energy system components
 -`step_order::StepInstructions`:: Order of operations
 """
-function run_simulation_loop(
-    project_config::Dict{AbstractString,Any},
-    sim_params::Dict{String,Any},
-    components::Grouping,
-    step_order::StepInstructions
-)
+function run_simulation_loop(project_config::Dict{AbstractString,Any},
+                             sim_params::Dict{String,Any},
+                             components::Grouping,
+                             step_order::StepInstructions)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
     do_create_plot = !(output_keys_lineplot === nothing)
     do_write_CSV = !(output_keys_to_csv === nothing)
-    csv_output_file_path = default(
-        project_config["io_settings"],
-        "csv_output_file",
-        "./output/out.csv"
-    )
+    csv_output_file_path = default(project_config["io_settings"],
+                                   "csv_output_file",
+                                   "./output/out.csv")
 
     # Initialize the array for output plots
     if do_create_plot
@@ -141,20 +126,24 @@ function run_simulation_loop(
     if do_write_CSV
         reset_file(csv_output_file_path, output_keys_to_csv)
     end
-   
+
     # check if sankey should be plotted
-    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") && project_config["io_settings"]["sankey_plot"] !== "nothing"
+    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
+                       project_config["io_settings"]["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get infomration about all interfaces for Sankey
-        nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey = get_interface_information(components)
+        nr_of_interfaces,
+        medium_of_interfaces,
+        output_sourcenames_sankey,
+        output_targetnames_sankey = get_interface_information(components)
         # preallocate for speed: Matrix with data of interfaces in every timestep
         output_interface_values = zeros(Float64, sim_params["number_of_time_steps"], nr_of_interfaces)
-    end 
+    end
 
     # export order of operation and other additional info like optional plots
     dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
-    for steps = 1:sim_params["number_of_time_steps"]
+    for steps in 1:sim_params["number_of_time_steps"]
         # perform the simulation
         perform_steps(components, step_order, sim_params)
 
@@ -200,14 +189,18 @@ function run_simulation_loop(
 
     ### create Sankey diagram
     if do_create_sankey
-        create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces, project_config["io_settings"])
+        create_sankey(output_sourcenames_sankey,
+                      output_targetnames_sankey,
+                      output_interface_values,
+                      medium_of_interfaces,
+                      nr_of_interfaces,
+                      project_config["io_settings"])
         @info "Sankey created and saved to .output/output_sankey.html"
     end
-    
+
     if do_write_CSV
         @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
-
 end
 
 """
