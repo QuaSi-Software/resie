@@ -45,76 +45,53 @@ mutable struct FuelBoiler <: Component
         register_media([m_fuel_in, m_heat_out])
         interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
 
-        linear_interface = Symbol(
-            replace(
-                default(config, "linear_interface", "heat_out"),
-                "m_" => ""
-            )
-        )
+        linear_interface = Symbol(replace(default(config, "linear_interface", "heat_out"), "m_" => ""))
         if !(linear_interface in interface_list)
             @error "Given unknown interface name $linear_interface designated as linear " *
-                "for component $uac"
+                   "for component $uac"
         end
 
         efficiencies = Dict{Symbol,Function}(
-            Symbol("fuel_in") => parse_efficiency_function(default(config,
-                "efficiency_fuel_in", "const:1.1"
-            )),
-            Symbol("heat_out") => parse_efficiency_function(default(config,
-                "efficiency_heat_out", "const:1.0"
-            )),
+            Symbol("fuel_in") => parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.1")),
+            Symbol("heat_out") => parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
         )
 
-        return new(
-            uac,
-            Controller(default(config, "control_parameters", nothing)),
-            sf_transformer,
-            InterfaceMap(
-                m_fuel_in => nothing
-            ),
-            InterfaceMap(
-                m_heat_out => nothing
-            ),
-            m_fuel_in,
-            m_heat_out,
-            config["power_th"] / efficiencies[Symbol("heat_out")](1.0),
-            linear_interface,
-            default(config, "min_power_fraction", 0.1),
-            efficiencies,
-            interface_list,
-            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
-            1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
-            default(config, "min_run_time", 0),
-            default(config, "output_temperature", nothing),
-            0.0, # losses
-        )
+        return new(uac,
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_transformer,
+                   InterfaceMap(m_fuel_in => nothing),
+                   InterfaceMap(m_heat_out => nothing),
+                   m_fuel_in,
+                   m_heat_out,
+                   config["power_th"] / efficiencies[Symbol("heat_out")](1.0),
+                   linear_interface,
+                   default(config, "min_power_fraction", 0.1),
+                   efficiencies,
+                   interface_list,
+                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
+                   1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
+                   default(config, "min_run_time", 0),
+                   default(config, "output_temperature", nothing),
+                   0.0)  # losses
     end
 end
 
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.m_fuel_in],
-        unload_storages(unit.controller, unit.m_fuel_in)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_heat_out],
-        load_storages(unit.controller, unit.m_heat_out)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.m_fuel_in],
+                          unload_storages(unit.controller, unit.m_fuel_in))
+    set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
+                          load_storages(unit.controller, unit.m_heat_out))
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
-function control(
-    unit::FuelBoiler,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::FuelBoiler,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
-    set_temperature!(
-        unit.output_interfaces[unit.m_heat_out],
-        nothing,
-        unit.output_temperature
-    )
+    set_temperature!(unit.output_interfaces[unit.m_heat_out],
+                     nothing,
+                     unit.output_temperature)
 end
 
 """
@@ -125,25 +102,18 @@ function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
 end
 
-function calculate_energies(
-    unit::FuelBoiler,
-    sim_params::Dict{String,Any},
-)::Tuple{Bool, Vector{Floathing}}
+function calculate_energies(unit::FuelBoiler,
+                            sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
         return (false, [])
     end
 
-    return calculate_energies_for_plrde(
-        unit, sim_params, unit.min_power_fraction, max_plr
-    )
+    return calculate_energies_for_plrde(unit, sim_params, unit.min_power_fraction, max_plr)
 end
 
-function potential(
-    unit::FuelBoiler,
-    sim_params::Dict{String,Any}
-)
+function potential(unit::FuelBoiler, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
@@ -168,8 +138,8 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}
-    return [string(unit.m_fuel_in)*" IN", 
-            string(unit.m_heat_out)*" OUT",
+    return [string(unit.m_fuel_in) * " IN",
+            string(unit.m_heat_out) * " OUT",
             "Losses"]
 end
 

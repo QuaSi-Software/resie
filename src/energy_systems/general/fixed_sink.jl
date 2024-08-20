@@ -37,48 +37,36 @@ mutable struct FixedSink <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_fixed_sink, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            energy_profile, # energy_profile
-            temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
-            0.0, # demand
-            nothing, # temperature
-            default(config, "constant_demand", nothing), # constant_demand (power, not work!)
-            default(config, "constant_temperature", nothing), # constant_temperature
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_fixed_sink,   # sys_function
+                   medium,          # medium
+                   InterfaceMap(medium => nothing),  # input_interfaces
+                   InterfaceMap(medium => nothing),  # output_interfaces
+                   energy_profile,                   # energy_profile
+                   temperature_profile,              # temperature_profile
+                   default(config, "scale", 1.0),    # scaling_factor
+                   0.0,     # demand
+                   nothing, # temperature
+                   default(config, "constant_demand", nothing),       # constant_demand (power, not work!)
+                   default(config, "constant_temperature", nothing))  # constant_temperature
     end
 end
 
 function initialise!(unit::FixedSink, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        unload_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::FixedSink,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::FixedSink,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_demand !== nothing
         unit.demand = watt_to_wh(unit.constant_demand)
     elseif unit.energy_profile !== nothing
-        unit.demand = unit.scaling_factor * Profiles.work_at_time(
-            unit.energy_profile, sim_params["time"]
-        )
+        unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
     else
         unit.demand = 0.0
     end
@@ -87,15 +75,11 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(
-            unit.temperature_profile, sim_params["time"]
-        )
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
     end
-    set_temperature!(
-        unit.input_interfaces[unit.medium],
-        unit.temperature,
-        nothing
-    )
+    set_temperature!(unit.input_interfaces[unit.medium],
+                     unit.temperature,
+                     nothing)
 end
 
 function process(unit::FixedSink, sim_params::Dict{String,Any})
@@ -105,10 +89,10 @@ end
 
 function output_values(unit::FixedSink)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" IN",
+        return [string(unit.medium) * " IN",
                 "Demand"]
     else
-        return [string(unit.medium)*" IN",
+        return [string(unit.medium) * " IN",
                 "Demand",
                 "Temperature"]
     end

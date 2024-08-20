@@ -1,6 +1,5 @@
 # this file contains functionality for writing output of the simulation to files.
 
-
 """
 get_output_keys(config[io_settings], components)
 
@@ -11,9 +10,9 @@ they should be created:
         - all possible keys if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
-function get_output_keys(io_settings::Dict{String, Any}, 
-                         components::Grouping
-                         )::Tuple{Union{Nothing, Vector{EnergySystems.OutputKey}}, Union{Nothing, Vector{EnergySystems.OutputKey}}}
+function get_output_keys(io_settings::Dict{String,Any},
+                         components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                      Union{Nothing,Vector{EnergySystems.OutputKey}}}
     # determine if lineplot and csv should be created
     do_plot_all_outputs = false
     do_create_plot = false
@@ -37,11 +36,11 @@ function get_output_keys(io_settings::Dict{String, Any},
         end
     end
 
-     # collect all possible outputs of all units if needed
+    # collect all possible outputs of all units if needed
     if do_plot_all_outputs || do_write_all_CSV_outputs
         all_output_keys = Vector{EnergySystems.OutputKey}()
         for unit in components
-            temp_dict = Dict{String, Any}(unit[2].uac => output_values(unit[2]))
+            temp_dict = Dict{String,Any}(unit[2].uac => output_values(unit[2]))
             append!(all_output_keys, output_keys(components, temp_dict))
         end
     end
@@ -86,7 +85,7 @@ Determines
 
 The information is returned as single vectors with the indicees matching together.
 """
-function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any},Vector{Any},Vector{Any}} 
+function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any},Vector{Any},Vector{Any}}
     nr_of_interfaces = 0
     medium_of_interfaces = []
     output_sourcenames_sankey = []
@@ -99,9 +98,9 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 each_outputinterface = each_outputinterface[2]
             end
 
-            if (isdefined(each_outputinterface, :target) && 
-               !startswith(each_outputinterface.target.uac, "Proxy") &&
-               !startswith(each_outputinterface.source.uac, "Proxy"))
+            if (isdefined(each_outputinterface, :target) &&
+                !startswith(each_outputinterface.target.uac, "Proxy") &&
+                !startswith(each_outputinterface.source.uac, "Proxy"))
 
                 # count interface
                 nr_of_interfaces += 1
@@ -123,24 +122,24 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
 
                 # add "real" demands and sources
                 if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
-                    push!(output_sourcenames_sankey, string(each_outputinterface.source.uac,"_total_supply"))
-                    push!(output_targetnames_sankey, each_outputinterface.source.uac)       
+                    push!(output_sourcenames_sankey, string(each_outputinterface.source.uac, "_total_supply"))
+                    push!(output_targetnames_sankey, each_outputinterface.source.uac)
                     push!(medium_of_interfaces, "hide_medium")
                     nr_of_interfaces += 1
                 end
                 if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
                     push!(output_sourcenames_sankey, each_outputinterface.target.uac)
-                    push!(output_targetnames_sankey, string(each_outputinterface.target.uac,"_total_demand"))       
+                    push!(output_targetnames_sankey, string(each_outputinterface.target.uac, "_total_demand"))
                     push!(medium_of_interfaces, "hide_medium")
                     nr_of_interfaces += 1
-                end 
+                end
             end
         end
 
         # add losses
         if hasfield(typeof(each_component[2]), Symbol("losses"))
             push!(output_sourcenames_sankey, each_component[2].uac)
-            push!(output_targetnames_sankey, "Losses")       
+            push!(output_targetnames_sankey, "Losses")
             push!(medium_of_interfaces, "Losses")
             nr_of_interfaces += 1
         end
@@ -169,22 +168,22 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
             if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
                 each_outputinterface = each_outputinterface[2]
             end
-            if (isdefined(each_outputinterface, :target) && 
-                !startswith(each_outputinterface.target.uac, "Proxy") &&
-                !startswith(each_outputinterface.source.uac, "Proxy"))
-
+            if (isdefined(each_outputinterface, :target)
+                && !startswith(each_outputinterface.target.uac, "Proxy")
+                && !startswith(each_outputinterface.source.uac, "Proxy"))
+                # end of condition
                 energies[n] = calculate_energy_flow(each_outputinterface)
                 n += 1
-                
+
                 # If source or target is fixed source or sink, gather also demand and supply
                 if each_outputinterface.source.sys_function == EnergySystems.sf_fixed_source
-                    energies[n] = each_outputinterface.source.supply  
+                    energies[n] = each_outputinterface.source.supply
                     n += 1
                 end
-                
+
                 if each_outputinterface.target.sys_function == EnergySystems.sf_fixed_sink
                     energies[n] = each_outputinterface.target.demand
-                    n += 1 
+                    n += 1
                 end
             end
         end
@@ -196,7 +195,7 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
         end
     end
     return energies
-end    
+end
 
 """
 output_keys(from_config)
@@ -205,10 +204,7 @@ Transform the output keys definition in the project config file into a list of O
 items. This is done to speed up selection of values for the output in each time step,
 as this transformation has to be done only once at the beginning.
 """
-function output_keys(
-    components::Grouping,
-    from_config::Dict{String,Any}
-)::Vector{EnergySystems.OutputKey}
+function output_keys(components::Grouping, from_config::Dict{String,Any})::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
     for unit_key in keys(from_config)
@@ -232,11 +228,9 @@ Spaces are only allowed if you want to specify an output channel of a specific m
                 value_key = splitted[1]
             end
 
-            push!(outputs, EnergySystems.OutputKey(
-                unit=unit,
-                medium=medium,
-                value_key=value_key
-            ))
+            push!(outputs, EnergySystems.OutputKey(; unit=unit,
+                                                   medium=medium,
+                                                   value_key=value_key))
         end
     end
 
@@ -248,10 +242,7 @@ reset_file(filepath, output_keys)
 
 Reset the output file and add headers for the given outputs.
 """
-function reset_file(
-    filepath::String,
-    output_keys::Vector{EnergySystems.OutputKey}
-)
+function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey})
     open(abspath(filepath), "w") do file_handle
         write(file_handle, "Time [s]")
 
@@ -273,11 +264,9 @@ write_to_file(filepath, output_keys, time)
 
 Write the given outputs for the given time to file.
 """
-function write_to_file(
-    filepath::String,
-    output_keys::Vector{EnergySystems.OutputKey},
-    time::Int
-)
+function write_to_file(filepath::String,
+                       output_keys::Vector{EnergySystems.OutputKey},
+                       time::Int)
     open(abspath(filepath), "a") do file_handle
         write(file_handle, "$time")
 
@@ -299,12 +288,10 @@ Dump a bunch of information to file that might be useful to explain the result o
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_outputs(
-    project_config::Dict{AbstractString,Any},
-    components::Grouping,
-    order_of_operations::StepInstructions,
-    sim_params::Dict{String,Any}
-)
+function dump_auxiliary_outputs(project_config::Dict{AbstractString,Any},
+                                components::Grouping,
+                                order_of_operations::StepInstructions,
+                                sim_params::Dict{String,Any})
     # export order of operation
     if default(project_config["io_settings"], "auxiliary_info", false)
         aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
@@ -338,19 +325,14 @@ function dump_auxiliary_outputs(
             @info "Auxiliary plots are saved to folder $(aux_plots_output_path) for the following components: $(join(component_list, ", "))"
         end
     end
-    
 end
-
 
 """
 geather_output_data(output_keys, time)
 
 returns a vektor with the requested data in output_keys
 """
-function geather_output_data(
-    output_keys::Vector{EnergySystems.OutputKey},
-    time::Int
-)
+function geather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
     return_values = Vector{Any}()
     append!(return_values, time)
 
@@ -361,19 +343,16 @@ function geather_output_data(
     return return_values
 end
 
-
 """
 create_profile_line_plots(data, keys, user_input)
 
 create a line plot with data and label. user_input is dict from input file
 """
-function create_profile_line_plots(
-    outputs_plot_data::Matrix{Float64},
-    outputs_plot_keys::Vector{EnergySystems.OutputKey},
-    project_config::Dict{AbstractString, Any}
-)
+function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
+                                   outputs_plot_keys::Vector{EnergySystems.OutputKey},
+                                   project_config::Dict{AbstractString,Any})
     plot_all = project_config["io_settings"]["output_plot"] == "all"
-    
+
     # set Axis, unit and scale factor if given
     if plot_all  # plot all outputs. Here no units or scaling factors are available.
         labels = String[]
@@ -395,7 +374,7 @@ function create_profile_line_plots(
             push!(unit, string(plot[2]["unit"]))
             push!(scale_fact, plot[2]["scale_factor"])
         end
-   
+
         # create legend entries
         labels = String[]
         n = 1
@@ -403,7 +382,8 @@ function create_profile_line_plots(
             if outkey.medium === nothing
                 push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
             else
-                push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+                push!(labels,
+                      string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
             end
             n += 1
         end
@@ -415,9 +395,9 @@ function create_profile_line_plots(
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
-            trace = scatter(x=x / 60 / 60, y=y[:, i], mode="lines", name=labels[i])            
+            trace = scatter(; x=x / 60 / 60, y=y[:, i], mode="lines", name=labels[i])
         else
-            trace = scatter(x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+            trace = scatter(; x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
             if axis[i] == "right"
                 trace.yaxis = "y2"
             else  # default is left axis
@@ -427,20 +407,17 @@ function create_profile_line_plots(
         push!(traces, trace)
     end
 
-    layout = Layout(title_text="Plot of outputs as defined in the input-file",
-        xaxis_title_text="Time [hour]",
-        yaxis_title_text="",
-        yaxis2=attr(title="", overlaying="y", side="right"))
+    layout = Layout(; title_text="Plot of outputs as defined in the input-file",
+                    xaxis_title_text="Time [hour]",
+                    yaxis_title_text="",
+                    yaxis2=attr(; title="", overlaying="y", side="right"))
     p = plot(traces, layout)
 
-    file_path = default(
-        project_config["io_settings"],
-        "output_plot_file",
-        "./output/output_plot.html"
-    )
+    file_path = default(project_config["io_settings"],
+                        "output_plot_file",
+                        "./output/output_plot.html")
     savefig(p, file_path)
 end
-
 
 """
 create_sankey(output_all_sourcenames, output_all_targetnames, output_all_values, medium_of_interfaces, nr_of_interfaces)
@@ -452,14 +429,12 @@ output_all_values are logs with data from each timestep in the shape [timestep,i
 medium_of_interface is a vector of the medium corresponding to each interface
 nr_of_interfaces is the total number of iterfaces in the current energy system
 """
-function create_sankey(
-    output_all_sourcenames::Vector{Any},
-    output_all_targetnames::Vector{Any},
-    output_all_values::Matrix{Float64},
-    medium_of_interfaces::Vector{Any},
-    nr_of_interfaces::Int64,
-    io_settings::Dict{String, Any}
-)
+function create_sankey(output_all_sourcenames::Vector{Any},
+                       output_all_targetnames::Vector{Any},
+                       output_all_values::Matrix{Float64},
+                       medium_of_interfaces::Vector{Any},
+                       nr_of_interfaces::Int64,
+                       io_settings::Dict{String,Any})
 
     # sum up data of each interface
     output_all_value_sum = zeros(Float64, nr_of_interfaces)
@@ -476,11 +451,11 @@ function create_sankey(
             # remove real sinks and sources if they match the delivered energy
             # to enable this to work, the "real" demand/supply needs to be always one entry
             # below the delivered/requested one in the array!
-            || (
-                medium_of_interfaces[interface_new] == "hide_medium"
-                && output_all_value_sum[interface_new] == output_all_value_sum[interface_new-1]
-            )
-        )
+            ||
+            (medium_of_interfaces[interface_new] == "hide_medium"
+             &&
+             output_all_value_sum[interface_new] == output_all_value_sum[interface_new - 1]))
+            # end of condition 
             deleteat!(output_all_sourcenames, interface_new)
             deleteat!(output_all_targetnames, interface_new)
             deleteat!(output_all_value_sum, interface_new)
@@ -508,20 +483,22 @@ function create_sankey(
 
     if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], Dict{})
         if length(unique_medium_labels) > 1
-            colors = get(ColorSchemes.roma, (0:length(unique_medium_labels)-1) ./ (length(unique_medium_labels) - 1))
+            colors = get(ColorSchemes.roma,
+                         (0:(length(unique_medium_labels) - 1)) ./ (length(unique_medium_labels) - 1))
             color_map = Dict(zip(unique_medium_labels, colors))
         else
             color_map = Dict(unique_medium_labels[1] => get(ColorSchemes.roma, 0.7))
         end
     else
-        color_map = Dict{String, Any}(io_settings["sankey_plot"])
+        color_map = Dict{String,Any}(io_settings["sankey_plot"])
         for (medium, color) in color_map
             try
                 color_entry = Colors.color_names[color]
-                color_map[medium] = RGB(color_entry[1]/255, color_entry[2]/255, color_entry[3]/255)
+                color_map[medium] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
             catch e
-                @error "The color for the sankey '$color' of medium '$medium' could not be detected. The following error occured: $e\n" *
-                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
+                @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
+                       "The following error occured: $e\n" *
+                       "Color has to be one of: $(collect(keys(Colors.color_names)))"
                 throw(InputError)
             end
         end
@@ -563,27 +540,21 @@ function create_sankey(
     else
         colors_for_medium_RGBA = colors_for_medium
     end
-    
+
     # create plot
-    p = plot(sankey(
-            node=attr(
-                pad=25,
-                thickness=20,
-                line=do_hide_real_demands ? attr(color="white", width=0.0) : nothing,
-                label=block_labels,
-                color=do_hide_real_demands ? block_colors : "blue" ,
-            ),
-            link=attr(
-                source=output_all_source_num .- 1, # indices correspond to block_labels starting from index 0
-                target=output_all_target_num .- 1, # indices correspond to block_labels starting from index 0
-                value=output_all_value_sum,
-                label=medium_labels,
-                color=colors_for_medium_RGBA
-            )),
-        Layout( title_text="Sankey diagram of system topology and energy flows", 
-                font_size=14,
-                )
-    )
+    p = plot(sankey(;
+                    node=attr(; pad=25,
+                              thickness=20,
+                              line=do_hide_real_demands ? attr(; color="white", width=0.0) : nothing,
+                              label=block_labels,
+                              color=do_hide_real_demands ? block_colors : "blue"),
+                    link=attr(; source=output_all_source_num .- 1, # indices correspond to block_labels starting from index 0
+                              target=output_all_target_num .- 1, # indices correspond to block_labels starting from index 0
+                              value=output_all_value_sum,
+                              label=medium_labels,
+                              color=colors_for_medium_RGBA)),
+             Layout(; title_text="Sankey diagram of system topology and energy flows",
+                    font_size=14))
 
     # save plot
     file_path = default(io_settings, "sankey_plot_file", "./output/output_sankey.html")

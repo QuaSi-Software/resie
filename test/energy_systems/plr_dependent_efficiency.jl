@@ -69,7 +69,7 @@ function test_inverse_efficiency()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => eps
+        "epsilon" => eps,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -103,7 +103,7 @@ function test_gas_boiler_demand_driven_plrd()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -120,7 +120,7 @@ function test_gas_boiler_demand_driven_plrd()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 1.0 
+    expected_efficiency = 1.0
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(gasboiler, components, simulation_parameters)
@@ -197,9 +197,9 @@ function test_gas_boiler_supply_driven_plrd()
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
-    
+
     components = Resie.load_components(components_config, simulation_parameters)
     gasboiler = components["TST_GB_01"]
     grid = components["TST_GRI_01"]
@@ -221,7 +221,7 @@ function test_gas_boiler_supply_driven_plrd()
     grid.output_interfaces[grid.medium].max_energy.max_energy[1] = grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy.max_energy[1] =  1000 * 10.0
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 1000 * 10.0
     demand.max_energy = 1000 * 10
 
     EnergySystems.process(grid, simulation_parameters)
@@ -245,7 +245,7 @@ function test_gas_boiler_supply_driven_plrd()
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 500 / expected_efficiency
-    grid.output_interfaces[grid.medium].max_energy.max_energy[1] =  grid.supply
+    grid.output_interfaces[grid.medium].max_energy.max_energy[1] = grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
     demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 500 * 10.0
@@ -293,24 +293,22 @@ function test_CHPP_el_eff_plrd()
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_natgas",
-            "output_refs" => [
-                "TST_DEM_01",
-                "TST_GRO_01",
-            ],
+            "output_refs" => ["TST_DEM_01",
+                              "TST_GRO_01"],
             "power_el" => 5000,
             "linear_interface" => "el_out",
             "min_power_fraction" => 0.1,
             "efficiency_fuel_in" => "const:2.5",
             "efficiency_heat_out" => "pwlin:0.8,0.9,1.0,0.8",
             "efficiency_el_out" => "const:1.0",
-            "nr_discretization_steps" => 25
+            "nr_discretization_steps" => 25,
         ),
     )
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -421,24 +419,22 @@ function test_electrolyser_dispatch_units()
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "output_refs" => [
-                "TST_DEM_01",
-                "TST_GRO_01",
-                "TST_GRO_02"
-            ],
+            "output_refs" => ["TST_DEM_01",
+                              "TST_GRO_01",
+                              "TST_GRO_02"],
             "power_el" => 4000,
             "heat_lt_is_usable" => false,
             "nr_switchable_units" => 4,
             "dispatch_strategy" => "equal_with_mpf",
             "min_power_fraction_total" => 0.3,
-            "min_power_fraction" => 0.4
+            "min_power_fraction" => 0.4,
         ),
     )
 
     simulation_parameters = Dict{String,Any}(
         "time_step_seconds" => 900,
         "time" => 0,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

@@ -29,13 +29,12 @@ mutable struct Profile
     data::Vector{Float64}
 
     """Construct a profile from the file at the given path or convert given data to profile (optional)."""
-    function Profile(file_path::String, 
-                     sim_params::Dict{String,Any}; 
+    function Profile(file_path::String,
+                     sim_params::Dict{String,Any};
                      given_profile_values::Vector{Any}=[],
                      given_timestamps::Vector{Int64}=[0],
                      given_time_step::Int=0,
                      given_is_power::Bool=false)
-
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{Float64}()
@@ -71,10 +70,12 @@ mutable struct Profile
 
             if !given_timestep
                 profile_time_step = profile_timestamps[2] - profile_timestamps[1]
-                @warn "For the profile at " * file_path * " no timestep is given! A timestep of " * string(profile_time_step) * " seconds was detected."
+                @warn "For the profile at $file_path no timestep is given! A timestep of " *
+                      string(profile_time_step) * " seconds was detected."
             end
             if !given_type
-                @warn "For the profile at " * file_path * " no profile type ('is_power') is given! An energy-profile (extensive) is assumed!"
+                @warn "For the profile at $file_path no profile type ('is_power') is given! " *
+                      "An energy-profile (extensive) is assumed!"
             end
         else # data was read in from somewhere else and is provided as vector
             profile_values = given_profile_values
@@ -85,29 +86,28 @@ mutable struct Profile
 
         simulation_time_step = sim_params["time_step_seconds"]  # seconds 
 
-        if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0) 
+        if !(simulation_time_step % profile_time_step == 0) && !(profile_time_step % simulation_time_step == 0)
             @error ("The timestep of the profile " * file_path * ", which is " * string(profile_time_step) * " s,\n" *
-                    "is not a multiple or a divisor of the requested simulation timestep of " * string(simulation_time_step) * " s!")
+                    "is not a multiple or a divisor of the requested simulation timestep of " *
+                    string(simulation_time_step) * " s!")
             throw(InputError)
         end
 
         if is_power # meaning intensive values (e.g., temperature, power)
-            values_converted = convert_intensive_profile(profile_values, 
-                                                         profile_timestamps, 
-                                                         profile_time_step, 
+            values_converted = convert_intensive_profile(profile_values,
+                                                         profile_timestamps,
+                                                         profile_time_step,
                                                          simulation_time_step)
         else # meaning extensive values (e.g., energy demand)
-            values_converted = convert_extensive_profile(profile_values, 
+            values_converted = convert_extensive_profile(profile_values,
                                                          profile_timestamps,
                                                          profile_time_step,
                                                          simulation_time_step)
         end
 
-        return new(
-            simulation_time_step, # time_step, equals simulation time step after conversion
-            is_power, # is_power (is intensive profile)
-            values_converted # data of profiles in simulation time step
-        )
+        return new(simulation_time_step, # time_step, equals simulation time step after conversion
+                   is_power,             # is_power (is intensive profile)
+                   values_converted)     # data of profiles in simulation time step
     end
 end
 
@@ -179,7 +179,7 @@ function maximum(profile::Profile)::Float64
 end
 
 # Function to handle extensive profiles to the simulation time step  (e.g., energy demand)
- function convert_extensive_profile(values, timestamps, original_time_step, new_time_step)
+function convert_extensive_profile(values, timestamps, original_time_step, new_time_step)
     if original_time_step == new_time_step
         return values
     end
@@ -221,7 +221,7 @@ function convert_intensive_profile(values, timestamps, original_time_step, new_t
         new_timestamps = Base.minimum(timestamps):new_time_step:Base.maximum(timestamps)
         converted_profile = [interp(t) for t in new_timestamps]
         # add missing entries by coping the last entry
-        for _ in 1:ceil(Int,(original_time_step-new_time_step)/new_time_step)
+        for _ in 1:ceil(Int, (original_time_step - new_time_step) / new_time_step)
             append!(converted_profile, converted_profile[end])
         end
         return converted_profile
@@ -230,12 +230,12 @@ function convert_intensive_profile(values, timestamps, original_time_step, new_t
         old_length = length(timestamps)
         new_length = ceil(Int, old_length / aggregation_factor)
         converted_profile = zeros(new_length)
-        
+
         for n in 1:new_length
-            old_index_start = Int((n-1) * aggregation_factor + 1)
+            old_index_start = Int((n - 1) * aggregation_factor + 1)
             old_index_end = Int(min(n * aggregation_factor, old_length))
             old_number_of_steps = Int(old_index_end - old_index_start + 1)
-            converted_profile[n] = sum(values[old_index_start:old_index_end])/old_number_of_steps
+            converted_profile[n] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
         end
         return converted_profile
     end
