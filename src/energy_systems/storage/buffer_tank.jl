@@ -29,59 +29,43 @@ mutable struct BufferTank <: Component
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_storage, # sys_function
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            medium,
-            config["capacity"], # capacity
-            config["load"], # load
-            0.0, # losses
-            default(config, "use_adaptive_temperature", false),
-            default(config, "switch_point", 0.15),
-            default(config, "high_temperature", 75.0),
-            default(config, "low_temperature", 20),
-            0.0 # current_max_output_temperature at the beginning of the time step
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_storage, # sys_function
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   medium,
+                   config["capacity"],  # capacity
+                   config["load"],      # load
+                   0.0,                 # losses
+                   default(config, "use_adaptive_temperature", false),
+                   default(config, "switch_point", 0.15),
+                   default(config, "high_temperature", 75.0),
+                   default(config, "low_temperature", 20),
+                   0.0) # current_max_output_temperature at the beginning of the time step
     end
 end
 
 function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        unload_storages(unit.controller, unit.medium)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        load_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::BufferTank,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::BufferTank,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     unit.current_max_output_temperature = temperature_at_load(unit)
 
-    set_temperature!(
-        unit.output_interfaces[unit.medium],
-        nothing,
-        unit.current_max_output_temperature
-    )
-    set_temperature!(
-        unit.input_interfaces[unit.medium],
-        unit.high_temperature,
-        unit.high_temperature
-    )
+    set_temperature!(unit.output_interfaces[unit.medium],
+                     nothing,
+                     unit.current_max_output_temperature)
+    set_temperature!(unit.input_interfaces[unit.medium],
+                     unit.high_temperature,
+                     unit.high_temperature)
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
@@ -96,22 +80,19 @@ function temperature_at_load(unit::BufferTank)::Temperature
     end
 end
 
-function balance_on(
-    interface::SystemInterface,
-    unit::BufferTank
-)::Vector{EnergyExchange}
+function balance_on(interface::SystemInterface,
+                    unit::BufferTank)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(
-        balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        purpose_uac = purpose_uac,
-        temperature_min=interface.temperature_min,
-        temperature_max=interface.temperature_max,
-        pressure=nothing,
-        voltage=nothing,
-    )]
+    return [EnEx(;
+                 balance=interface.balance,
+                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 purpose_uac=purpose_uac,
+                 temperature_min=interface.temperature_min,
+                 temperature_max=interface.temperature_max,
+                 pressure=nothing,
+                 voltage=nothing)]
 end
 
 function process(unit::BufferTank, sim_params::Dict{String,Any})
@@ -121,7 +102,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return
     end
 
@@ -133,10 +114,9 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
         end
 
         tank_temp = temperature_at_load(unit)
-        if (
-            exchange.temperature_min !== nothing
-            && exchange.temperature_min > tank_temp
-        )
+        if (exchange.temperature_min !== nothing
+            &&
+            exchange.temperature_min > tank_temp)
             # we can only supply energy at a temperature at or below the tank's current
             # output temperature
             continue
@@ -174,12 +154,11 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        if (
-            exchange.temperature_min !== nothing
-                && exchange.temperature_min > unit.high_temperature
-            || exchange.temperature_max !== nothing
-                && exchange.temperature_max < unit.high_temperature
-        )
+        if (exchange.temperature_min !== nothing &&
+            exchange.temperature_min > unit.high_temperature
+            ||
+            exchange.temperature_max !== nothing &&
+            exchange.temperature_max < unit.high_temperature)
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue
@@ -201,8 +180,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::BufferTank)::Vector{String}
-    return [string(unit.medium)*" IN",
-            string(unit.medium)*" OUT",
+    return [string(unit.medium) * " IN",
+            string(unit.medium) * " OUT",
             "Load",
             "Load%",
             "Capacity",
