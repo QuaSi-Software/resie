@@ -69,6 +69,37 @@ function parse_efficiency_function(eff_def::String)::Function
     return plr -> plr
 end
 
+function parse_2dim_function(eff_def::String)::Function
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        if method == "const"
+            c = parse(Float64, data)
+            return (x, y) -> c
+
+        elseif method == "poly-2"
+            params = parse.(Float64, split(data, ","))
+            return function (x, y)
+                return params[1] +
+                       params[2] * x +
+                       params[3] * y +
+                       params[4] * x * x +
+                       params[5] * y * y +
+                       params[6] * x * y +
+                       params[7] * x * x * y +
+                       params[8] * x * y * y +
+                       params[9] * x * x * y * y
+            end
+        end
+    end
+
+    @warn "Cannot parse 2-dimensional function from: $eff_def"
+    return (x, y) -> 0.0
+end
+
 function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
     lin_x = (x2 - x1) / (x3 - x1)
     lin_y = (y2 - y1) / (y3 - y1)
