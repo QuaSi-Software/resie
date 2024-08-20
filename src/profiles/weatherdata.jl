@@ -2,6 +2,7 @@ module Weatherdata
 
 using Resie.Profiles
 using Dates
+using Proj
 
 export WeatherData
 
@@ -70,6 +71,12 @@ mutable struct WeatherData
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
+            # calculate latitude and longitude from Hochwert and Rechtswert from header
+            inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
+            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
+            transform = Proj.Transformation(inProj, outProj)
+            latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
+
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
 
@@ -88,6 +95,9 @@ mutable struct WeatherData
                                 given_is_power=false)
             dirHorIrr = deepcopy(globHorIrr)
             dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
+
+            latitude = headerdata["latitude"]
+            longitude = headerdata["longitude"]
         end
 
         # convert long wave radiation data
@@ -118,7 +128,9 @@ mutable struct WeatherData
                    dirHorIrr,
                    difHorIrr,
                    globHorIrr,
-                   longWaveIrr)
+                   longWaveIrr),
+               latitude,
+               longitude
     end
 end
 
