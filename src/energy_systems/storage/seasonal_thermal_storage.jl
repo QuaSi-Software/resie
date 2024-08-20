@@ -29,57 +29,41 @@ mutable struct SeasonalThermalStorage <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_storage, # sys_function
-            InterfaceMap( # input_interfaces
-                m_heat_in => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                m_heat_out => nothing
-            ),
-            m_heat_in,
-            m_heat_out,
-            config["capacity"], # capacity
-            config["load"], # load
-            0.0, # losses
-            default(config, "use_adaptive_temperature", false),
-            default(config, "switch_point", 0.25),
-            default(config, "high_temperature", 90.0),
-            default(config, "low_temperature", 15.0),
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_storage, # sys_function
+                   InterfaceMap(m_heat_in => nothing),  # input_interfaces
+                   InterfaceMap(m_heat_out => nothing), # output_interfaces
+                   m_heat_in,
+                   m_heat_out,
+                   config["capacity"], # capacity
+                   config["load"],     # load
+                   0.0,                # losses
+                   default(config, "use_adaptive_temperature", false),
+                   default(config, "switch_point", 0.25),
+                   default(config, "high_temperature", 90.0),
+                   default(config, "low_temperature", 15.0))
     end
 end
 
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.m_heat_in],
-        unload_storages(unit.controller, unit.m_heat_in)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_heat_out],
-        load_storages(unit.controller, unit.m_heat_out)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
+                          unload_storages(unit.controller, unit.m_heat_in))
+    set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
+                          load_storages(unit.controller, unit.m_heat_out))
 end
 
-function control(
-    unit::SeasonalThermalStorage,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::SeasonalThermalStorage,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
-    set_temperature!(
-        unit.output_interfaces[unit.m_heat_out],
-        nothing,
-        temperature_at_load(unit)
-    )
-    set_temperature!(
-        unit.input_interfaces[unit.m_heat_in],
-        unit.high_temperature,
-        unit.high_temperature
-    )
+    set_temperature!(unit.output_interfaces[unit.m_heat_out],
+                     nothing,
+                     temperature_at_load(unit))
+    set_temperature!(unit.input_interfaces[unit.m_heat_in],
+                     unit.high_temperature,
+                     unit.high_temperature)
 
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.capacity - unit.load)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.load)
@@ -94,22 +78,19 @@ function temperature_at_load(unit::SeasonalThermalStorage)::Temperature
     end
 end
 
-function balance_on(
-    interface::SystemInterface,
-    unit::SeasonalThermalStorage
-)::Vector{EnergyExchange}
+function balance_on(interface::SystemInterface,
+                    unit::SeasonalThermalStorage)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(
-        balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        purpose_uac = purpose_uac,
-        temperature_min=interface.temperature_min,
-        temperature_max=interface.temperature_max,
-        pressure=nothing,
-        voltage=nothing,
-    )]
+    return [EnEx(;
+                 balance=interface.balance,
+                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 purpose_uac=purpose_uac,
+                 temperature_min=interface.temperature_min,
+                 temperature_max=interface.temperature_max,
+                 pressure=nothing,
+                 voltage=nothing)]
 end
 
 function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
@@ -119,7 +100,7 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
 
@@ -131,10 +112,8 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         end
 
         tank_temp = temperature_at_load(unit)
-        if (
-            exchange.temperature_min !== nothing
-            && exchange.temperature_min > tank_temp
-        )
+        if (exchange.temperature_min !== nothing &&
+            exchange.temperature_min > tank_temp)
             # we can only supply energy at a temperature at or below the tank's current
             # output temperature
             continue
@@ -172,12 +151,11 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
             continue
         end
 
-        if (
-            exchange.temperature_min !== nothing
-                && exchange.temperature_min > unit.high_temperature
-            || exchange.temperature_max !== nothing
-                && exchange.temperature_max < unit.high_temperature
-        )
+        if (exchange.temperature_min !== nothing &&
+            exchange.temperature_min > unit.high_temperature
+            ||
+            exchange.temperature_max !== nothing &&
+            exchange.temperature_max < unit.high_temperature)
             # we can only take in energy if it's at a higher/equal temperature than the
             # storage's upper limit for temperatures
             continue
@@ -199,8 +177,8 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
-    return [string(unit.m_heat_in)*" IN",
-            string(unit.m_heat_out)*" OUT",
+    return [string(unit.m_heat_in) * " IN",
+            string(unit.m_heat_out) * " OUT",
             "Load",
             "Load%",
             "Capacity",
