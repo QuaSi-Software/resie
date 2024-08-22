@@ -44,6 +44,7 @@ mutable struct GeothermalProbes <: Component
     energy_in_out_per_probe_meter::Vector{Float64}
     power_in_out_difference_per_probe_meter::Vector{Float64}
 
+    g_function_file_path::Stringing
     probe_field_geometry::String
     number_of_probes_x::Int
     number_of_probes_y::Int
@@ -138,6 +139,7 @@ mutable struct GeothermalProbes <: Component
                    [],                                                   # vector to hold specific energy sum (in and out) per probe meter in each time step
                    [],                                                   # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
                    #
+                   default(config, "g_function_file_path", nothing),     # path to a file with a custom g-function
                    probe_field_geometry,                                 # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
                    default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
                    default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
@@ -240,31 +242,37 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     soil_diffusivity = unit.soil_heat_conductivity / (unit.soil_density * unit.soil_specific_heat_capacity)    # [m^2/s]
     steady_state_time = unit.probe_depth^2 / (9 * soil_diffusivity)  # [s]
 
-    # Get pre-caluclated g-function values out of g-function library json file
-    # time stamps are the same for each set of grid points out of the library, as follows:
-    #! format: off
-    library_time_grid_normalized = [-8.5,   -7.8,   -7.2,   -6.5,   -5.9,   -5.2,   -4.5,
-                                    -3.963, -3.27,  -2.864, -2.577, -2.171, -1.884, -1.191,
-                                    -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,
-                                     1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
-    #! format: on
-
-    g_values_long_term_library, number_of_probes, probe_coordinates = get_library_g_values(unit,
-                                                                                           unit.probe_depth,
-                                                                                           unit.radius_borehole,
-                                                                                           unit.borehole_spacing,
-                                                                                           key1,
-                                                                                           key2,
-                                                                                           libfile_path)
+    if unit.g_function_file_path === nothing
+        # Get pre-caluclated g-function values out of g-function library json file
+        g_values_long_term,
+        log_time_stamp,
+        number_of_probes,
+        probe_coordinates = get_g_values_from_library(unit,
+                                                      unit.probe_depth,
+                                                      unit.radius_borehole,
+                                                      unit.borehole_spacing,
+                                                      key1,
+                                                      key2,
+                                                      libfile_path)
+    else
+        # Get pre-caluclated g-function values from custom input file
+        g_values_long_term, log_time_stamp, number_of_probes, probe_coordinates = get_g_values_from_file(unit)
+    end
 
     # Change normalized time values to absolut time and round to fit into simulation step width.
-    library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(library_time_grid_normalized,
+    library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(log_time_stamp,
                                                                              steady_state_time),
                                                                 sim_params["time_step_seconds"])
 
     # Interpolation between grid points of library, to get g-function values for eacht time-step.
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
-    if simulation_end_timestamp < library_time_grid_absolute[2]  # make sure that the log() function can be parameterised
+    if library_time_grid_absolute[end] < simulation_end_timestamp
+        @error "The duration of the time horizon given for the g_function of \"$(unit.uac)\" does not cover " *
+               "the complete simulation time! Reduce the simulation time or provide a g-function with longer time horizon."
+        throw(InputError)
+    end
+    # ensure that the transformation can be made
+    if simulation_end_timestamp < library_time_grid_absolute[2]
         simulation_end_timestamp = library_time_grid_absolute[2] + sim_params["time_step_seconds"]
     end
     simulation_time_grid_precalculated = collect(0:sim_params["time_step_seconds"]:simulation_end_timestamp)
@@ -272,7 +280,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     # linear interpolation. 
     # May change later to something else than linear interpolation between irregular grid points?
     # Though spline interpolation from Dierckx does not really work here...
-    itp = interpolate((vcat(0, library_time_grid_absolute),), vcat(0, g_values_long_term_library), Gridded(Linear()))
+    itp = interpolate((vcat(0, library_time_grid_absolute),), vcat(0, g_values_long_term), Gridded(Linear()))
     g_function = itp.(simulation_time_grid_precalculated)
 
     # change first time period of g-function to fitted f(x)=a*log(b*x) function to better represent short term effects.
@@ -321,31 +329,33 @@ function plot_optional_figures(unit::GeothermalProbes, output_path::String, outp
         savefig(output_path * "/" * fig_name * "." * output_format)
     end
 
-    # plot probe field configuration
-    lib_default_spacing = 5
-    scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing),
-            [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing);
-            title="probe field configuration for \"$(unit.uac)\"",
-            xlabel="distribution in x direction [m]",
-            ylabel="distribution in y direction [m]",
-            aspect_ratio=:equal,
-            legend=false,
-            markersize=6,
-            gridlinewidth=1,
-            size=(1800, 1200),
-            titlefontsize=30,
-            guidefontsize=24,
-            tickfontsize=24,
-            legendfontsize=24,
-            grid=true,
-            minorgrid=true,
-            margin=10Plots.mm)
-    fig_name = "probe_field_geometry_$(unit.uac)"
-    for output_format in output_formats
-        savefig(output_path * "/" * fig_name * "." * output_format)
+    if unit.probe_coordinates !== nothing
+        # plot probe field configuration
+        lib_default_spacing = 5
+        scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing),
+                [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing);
+                title="probe field configuration for \"$(unit.uac)\"",
+                xlabel="distribution in x direction [m]",
+                ylabel="distribution in y direction [m]",
+                aspect_ratio=:equal,
+                legend=false,
+                markersize=6,
+                gridlinewidth=1,
+                size=(1800, 1200),
+                titlefontsize=30,
+                guidefontsize=24,
+                tickfontsize=24,
+                legendfontsize=24,
+                grid=true,
+                minorgrid=true,
+                margin=10Plots.mm)
+        fig_name = "probe_field_geometry_$(unit.uac)"
+        for output_format in output_formats
+            savefig(output_path * "/" * fig_name * "." * output_format)
+        end
+        # throw not needed values away
+        unit.probe_coordinates = nothing
     end
-    # throw not needed values away
-    unit.probe_coordinates = nothing
 
     return true
 end
@@ -356,22 +366,22 @@ end
 Calculates the absolute from normalized time values as used in library by T. West, J. Cook and D. Spitler
 
 Inputs:
-    library_time_grid_normalized::Array{Float64}    - array of normalized time from West/Cook/Spitler library, 
-                                                      given as ln(absolute_time/steady_state_time) 
-    steady_state_time::Float64                      - steady state time = unit.probe_depth^2/(9* soil_diffusivity) in [s]
+    time_step_ln_normalized::Array{Float64}    - array of normalized time from West/Cook/Spitler library, 
+                                                 given as ln(absolute_time/steady_state_time) 
+    steady_state_time::Float64                 - steady state time = unit.probe_depth^2/(9* soil_diffusivity) in [s]
 Returns:
-    time::Array{Float64}                            - array of absolute time calculated from the normlized time as
-                                                      exp(library_time_grid_normalized)*steady_state_time
+    time::Array{Float64}                       - array of absolute time calculated from the normlized time as
+                                                 exp(time_step_ln_normalized)*steady_state_time
 """
-function ln_to_normal(library_time_grid_normalized::Array{Float64}, steady_state_time::Float64)
-    n = length(library_time_grid_normalized)     # number of grid points of spitler/cook data set.
-    library_time_grid_absolute = zeros(n)
+function ln_to_normal(time_step_ln_normalized::Array{Float64}, steady_state_time::Float64)
+    n = length(time_step_ln_normalized)     # number of grid points of spitler/cook data set.
+    time_step_ln_absolute = zeros(n)
 
     for i in 1:n
-        library_time_grid_absolute[i] = round(exp(library_time_grid_normalized[i]) * steady_state_time)
+        time_step_ln_absolute[i] = round(exp(time_step_ln_normalized[i]) * steady_state_time)
     end
 
-    return library_time_grid_absolute
+    return time_step_ln_absolute
 end
 
 """
@@ -399,7 +409,102 @@ function round_to_simulation_step_width(grid_points_time::Vector{Float64}, simul
 end
 
 """
-    get_library_g_values()
+   	get_g_values_from_file(unit::GeothermalProbes)
+
+Read out g-function values from given profile file.
+The file has to be the following structure
+
+        comment1                // comments can be given without limitation
+        number_of_probes: 42    // required variable
+        ***                     // start of data has to be specified with three stars
+        -8.84569; 1.07147
+        -7.90838; 1.38002
+        -7.24323; 1.65958
+        -6.68104; 1.99430
+        -6.16948; 2.28428
+        -5.68586; 2.62013
+        -5.21865; 2.90993
+        -4.76141; 3.01677
+        ...
+
+The first column has to hold the normalized logarithmic time as ln(real time / characteristic time)
+with the characteristic time = borewhole_depth^2 / (9 * ground thermal diffusivity [m^2/s]).
+
+The second column, separatey by a semicolon, holds the g-function values.
+Note that the number of probes has to be given as well in the header.
+
+"""
+function get_g_values_from_file(unit::GeothermalProbes)
+    num_probes = 0
+    g_func_vals = Float64[]
+    ln_time_normalized = Float64[]
+    reading_data = false
+
+    try
+        open(unit.g_function_file_path, "r") do file
+            for line in eachline(file)
+                line = strip(line)
+                if occursin("number_of_probes:", line)
+                    num_probes = try
+                        parse(Int, split(line, ":")[2])
+                    catch e
+                        @error "The number_of_probes could not be read out of the file with given g-function values for the " *
+                               "\"$(unit.uac)\" at $(unit.g_function_file_path). Please specify them in the header section."
+                        throw(InputError)
+                    end
+                    continue
+                end
+
+                # Detect the start of data section
+                if line == "***"
+                    reading_data = true
+                    continue
+                end
+
+                if reading_data
+                    if !isempty(line)
+                        try
+                            values = split(line, ";")
+                            push!(ln_time_normalized, parse(Float64, strip(values[1])))
+                            push!(g_func_vals, parse(Float64, strip(values[2])))
+                        catch e
+                            @error "Invalid data line \"$line\" in the file with given g-function values for the " *
+                                   "\"$(unit.uac)\" at $(unit.g_function_file_path). The follwoing error occured: $e. " *
+                                   "Please check the data given in the file."
+                            throw(InputError)
+                        end
+                    end
+                end
+            end
+        end
+
+        if num_probes == 0
+            @error "The number_of_probes could not be read out of the file with given g-function values for the " *
+                   "\"$(unit.uac)\" at $(unit.g_function_file_path). Please specify them in the header section."
+            throw(InputError)
+        elseif !reading_data || length(ln_time_normalized) == 0 || length(g_func_vals) == 0
+            @error "No data could not be read out of the file with given g-function values for the " *
+                   "\"$(unit.uac)\" at $(unit.g_function_file_path). Please make sure the data starts with ***."
+            throw(InputError)
+        else
+            @info "Succesfully read out the g-function values from $(unit.g_function_file_path) for \"$(unit.uac)\"."
+            return g_func_vals, ln_time_normalized, num_probes, nothing
+        end
+    catch e
+        if isa(e, SystemError)
+            @error "Could not open the file with given g-function values for the \"$(unit.uac)\" at " *
+                   "$(unit.g_function_file_path). The following error occured: $e"
+            throw(InputError)
+        else
+            @error "An error occured reading the file with given g-function values for the \"$(unit.uac)\" at " *
+                   "$(unit.g_function_file_path). The following error occured: $e"
+            throw(InputError)
+        end
+    end
+end
+
+"""
+    get_g_values_from_library()
 
 Read long term g-function from the precalculated library provided by:
 G-Function Library V1.0 by T. West, J. Cook and D. Spitler, 2021, Oklahoma State University
@@ -430,17 +535,25 @@ Returns:
     probe_coordinates::Vector{Vector{Float64}} - The coordinates of all probes in the probe field in m.
 
 """
-function get_library_g_values(unit::Component,
-                              borehole_depth::Float64,
-                              borehole_radius::Float64,
-                              borehole_spacing::Float64,
-                              key1::String,
-                              key2::String,
-                              libfile_path::String)
+function get_g_values_from_library(unit::Component,
+                                   borehole_depth::Float64,
+                                   borehole_radius::Float64,
+                                   borehole_spacing::Float64,
+                                   key1::String,
+                                   key2::String,
+                                   libfile_path::String)
+
+    # normalized characteristic logaritmic time stamps used in the library.
+    # They are the same for each set of grid points, as follows:
+    #! format: off
+    library_time_grid_normalized = Float64[-8.5,   -7.8,   -7.2,   -6.5,   -5.9,   -5.2,   -4.5,
+                                           -3.963, -3.27,  -2.864, -2.577, -2.171, -1.884, -1.191,
+                                           -0.497, -0.274, -0.051,  0.196,  0.419,  0.642,  0.873,
+                                            1.112,  1.335,  1.679,  2.028,  2.275,  3.003]
+
     # Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
     # Define the depth, borehole radius and spacings of the g-functions given in the library.
     # Must be in descending order in relation to lib_spacings_to_depths
-    #! format: off
     lib_borehole_depths =   [24,    48,    96,    192,  384   ]  # [m]
     lib_borehole_radiuses = [0.075, 0.075, 0.075, 0.08, 0.0875]  # [m]
     #! format: on
@@ -541,7 +654,7 @@ function get_library_g_values(unit::Component,
 
     g_values_library_corrected = g_values_library_interpolated .- log(borehole_radius / (borehole_radius_interpolated))
 
-    return g_values_library_corrected, number_of_probes, probe_coordinates
+    return g_values_library_corrected, library_time_grid_normalized, number_of_probes, probe_coordinates
 end
 
 function control(unit::GeothermalProbes,
