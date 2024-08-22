@@ -21,7 +21,6 @@ mutable struct HeatPump <: Component
     max_power_function::Function
     min_power_function::Function
     min_power_fraction::Float64
-    min_run_time::UInt
     constant_cop::Floathing
     dynamic_cop::Function
     bypass_cop::Float64
@@ -61,7 +60,6 @@ mutable struct HeatPump <: Component
                    max_power_function,
                    min_power_function,
                    default(config, "min_power_fraction", 0.2),
-                   default(config, "min_run_time", 0),
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),

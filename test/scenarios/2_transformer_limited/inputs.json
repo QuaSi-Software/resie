@@ -124,8 +124,7 @@
             "efficiency_h2_out": "const:0.6",
             "efficiency_h2_out_lossless": "const:0.6",
             "efficiency_o2_out": "const:0.6",
-            "efficiency_heat_ht_out": "const:0.4",
-            "min_run_time": 0
+            "efficiency_heat_ht_out": "const:0.4"
         }
         
     }

@@ -59,7 +59,6 @@ function test_multiple_transformer_with_limitations()
             "efficiency_h2_out_lossless" => "const:0.6",
             "efficiency_o2_out" => "const:0.6",
             "efficiency_heat_ht_out" => "const:0.4",
-            "min_run_time" => 0.0,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
