@@ -31,53 +31,43 @@ mutable struct GenericHeatSource <: Component
     temperature_src_in::Temperature
     temperature_snk_out::Temperature
 
-    function GenericHeatSource(
-        uac::String,
-        config::Dict{String,Any},
-        sim_params::Dict{String,Any}
-    )
+    function GenericHeatSource(uac::String,
+                               config::Dict{String,Any},
+                               sim_params::Dict{String,Any})
         max_power_profile = "max_power_profile_file_path" in keys(config) ?
-            Profile(config["max_power_profile_file_path"], sim_params) :
-            nothing
+                            Profile(config["max_power_profile_file_path"], sim_params) :
+                            nothing
 
         temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
 
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_bounded_source, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            max_power_profile,
-            temperature_profile,
-            default(config, "scale", 1.0), # scaling_factor
-            default(config, "constant_power", nothing),
-            default(config, "constant_temperature", nothing),
-            default(config, "temperature_reduction_model", "none"),
-            default(config, "min_source_in_temperature", nothing),
-            default(config, "max_source_in_temperature", nothing),
-            nothing, # avg_source_in_temperature
-            default(config, "minimal_reduction", 2.0), # lmtd_min
-            0.0, # max_energy
-            nothing, # temperature_src_in
-            nothing, # temperature_snk_out
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_bounded_source,               # sys_function
+                   medium,                          # medium
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   max_power_profile,
+                   temperature_profile,
+                   default(config, "scale", 1.0),   # scaling_factor
+                   default(config, "constant_power", nothing),
+                   default(config, "constant_temperature", nothing),
+                   default(config, "temperature_reduction_model", "none"),
+                   default(config, "min_source_in_temperature", nothing),
+                   default(config, "max_source_in_temperature", nothing),
+                   nothing,                                   # avg_source_in_temperature
+                   default(config, "minimal_reduction", 2.0), # lmtd_min
+                   0.0,     # max_energy
+                   nothing, # temperature_src_in
+                   nothing) # temperature_snk_out
     end
 end
 
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        load_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 
     if unit.temperature_reduction_model == "lmtd"
         if unit.min_source_in_temperature === nothing && unit.temperature_profile !== nothing
@@ -86,25 +76,19 @@ function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
         if unit.max_source_in_temperature === nothing && unit.temperature_profile !== nothing
             unit.max_source_in_temperature = Profiles.maximum(unit.temperature_profile)
         end
-        unit.avg_source_in_temperature = 0.5 * (
-            unit.min_source_in_temperature + unit.max_source_in_temperature
-        )
+        unit.avg_source_in_temperature = 0.5 * (unit.min_source_in_temperature + unit.max_source_in_temperature)
     end
 end
 
-function control(
-    unit::GenericHeatSource,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::GenericHeatSource,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
     elseif unit.max_power_profile !== nothing
-        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
-            unit.max_power_profile, sim_params["time"]
-        )
+        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, sim_params["time"])
     else
         unit.max_energy = 0.0
     end
@@ -113,32 +97,27 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature_src_in = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature_src_in = Profiles.value_at_time(
-            unit.temperature_profile, sim_params["time"]
-        )
+        unit.temperature_src_in = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
     end
 
     if unit.temperature_reduction_model == "constant" && unit.temperature_src_in !== nothing
         unit.temperature_snk_out = unit.temperature_src_in - unit.lmtd_min
 
     elseif unit.temperature_reduction_model == "lmtd" && unit.temperature_src_in !== nothing
-        alpha = min(
-            0.95, # alpha_max
-            1 - abs(unit.avg_source_in_temperature - unit.temperature_src_in)
-                / (unit.max_source_in_temperature - unit.min_source_in_temperature)
-        )
-        unit.temperature_snk_out = unit.temperature_src_in -
-            unit.lmtd_min * log(1 / alpha) / (1 - alpha)
+        alpha = min(0.95, # alpha_max
+                    1 -
+                    abs(unit.avg_source_in_temperature - unit.temperature_src_in)
+                    /
+                    (unit.max_source_in_temperature - unit.min_source_in_temperature))
+        unit.temperature_snk_out = unit.temperature_src_in - unit.lmtd_min * log(1 / alpha) / (1 - alpha)
 
     else
         unit.temperature_snk_out = unit.temperature_src_in
     end
 
-    set_temperature!(
-        unit.output_interfaces[unit.medium],
-        nothing,
-        unit.temperature_snk_out
-    )
+    set_temperature!(unit.output_interfaces[unit.medium],
+                     nothing,
+                     unit.temperature_snk_out)
 end
 
 function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
@@ -153,11 +132,10 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
         energy_demand = balance(exchanges) + energy_potential(exchanges)
     else
         e = first(exchanges)
-        if (
-            unit.temperature_snk_out === nothing ||
+        if (unit.temperature_snk_out === nothing ||
             (e.temperature_min === nothing || e.temperature_min <= unit.temperature_snk_out) &&
-            (e.temperature_max === nothing || e.temperature_max >= unit.temperature_snk_out)
-        )
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature_snk_out))
+            # end of condition
             energy_demand = e.balance + e.energy_potential
         else
             energy_demand = 0.0
@@ -171,10 +149,10 @@ end
 
 function output_values(unit::GenericHeatSource)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Max_Energy"]
     else
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Max_Energy",
                 "Temperature_src_in",
                 "Temperature_snk_out"]

@@ -22,40 +22,28 @@ mutable struct Storage <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_storage, # sys_function
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            medium,
-            config["capacity"], # capacity
-            config["load"], # load
-            0.0, # losses
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_storage,                      # sys_function
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   medium,
+                   config["capacity"],  # capacity
+                   config["load"],      # load
+                   0.0)                 # losses
     end
 end
 
 function initialise!(unit::Storage, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        unload_storages(unit.controller, unit.medium)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        load_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::Storage,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::Storage,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
@@ -66,15 +54,14 @@ function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExc
     caller_is_input = unit.uac == interface.target.uac
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(
-        balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        purpose_uac=purpose_uac,
-        temperature_min=interface.temperature_min,
-        temperature_max=interface.temperature_max,
-        pressure=nothing,
-        voltage=nothing,
-    )]
+    return [EnEx(;
+                 balance=interface.balance,
+                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 purpose_uac=purpose_uac,
+                 temperature_min=interface.temperature_min,
+                 temperature_max=interface.temperature_max,
+                 pressure=nothing,
+                 voltage=nothing)]
 end
 
 function process(unit::Storage, sim_params::Dict{String,Any})
@@ -83,7 +70,7 @@ function process(unit::Storage, sim_params::Dict{String,Any})
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
     end
 
@@ -117,8 +104,8 @@ function load(unit::Storage, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::Storage)::Vector{String}
-    return [string(unit.medium)*" IN",
-            string(unit.medium)*" OUT",
+    return [string(unit.medium) * " IN",
+            string(unit.medium) * " OUT",
             "Load",
             "Load%",
             "Capacity",

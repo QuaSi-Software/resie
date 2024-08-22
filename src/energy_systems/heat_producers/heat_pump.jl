@@ -153,7 +153,6 @@ end
 
 function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,Any})
     update(unit.controller)
-
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
     if unit.output_temperature !== nothing

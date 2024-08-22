@@ -6,14 +6,12 @@ mutable struct CM_ProfileLimited <: ControlModule
     parameters::Dict{String,Any}
     profile::Profile
 
-    function CM_ProfileLimited(
-        parameters::Dict{String,Any},
-        components::Grouping,
-        sim_params::Dict{String,Any}
-    )
-        default_parameters=Dict{String,Any}(
+    function CM_ProfileLimited(parameters::Dict{String,Any},
+                               components::Grouping,
+                               sim_params::Dict{String,Any})
+        default_parameters = Dict{String,Any}(
             "name" => "profile_limited",
-            "profile_path" => nothing
+            "profile_path" => nothing,
         )
         params = Base.merge(default_parameters, parameters)
 
