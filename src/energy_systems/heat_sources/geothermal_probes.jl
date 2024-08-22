@@ -172,8 +172,10 @@ mutable struct GeothermalProbes <: Component
 end
 
 function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+    if unit.regeneration
+        set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
+                              unload_storages(unit.controller, unit.m_heat_in))
+    end
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
 
@@ -193,7 +195,9 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # calculate max energies
     unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
-    unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
+    if unit.regeneration
+        unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
+    end
 end
 
 """
@@ -293,7 +297,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     return g_function, number_of_probes, probe_coordinates
 end
 
-function plot_optional_figures(unit::GeothermalProbes, output_path::String, output_formats::Vector{Any},
+function plot_optional_figures(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
                                sim_params::Dict{String,Any})
     # plot g-function values during simulation time
     plot(0:Int(sim_params["number_of_time_steps"]),
@@ -318,9 +322,9 @@ function plot_optional_figures(unit::GeothermalProbes, output_path::String, outp
     end
 
     # plot probe field configuration
-    borehole_spacing_library_default = 5
-    scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / borehole_spacing_library_default),
-            [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / borehole_spacing_library_default);
+    lib_default_spacing = 5
+    scatter([v[1] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing),
+            [v[2] for v in values(unit.probe_coordinates)] * (unit.borehole_spacing / lib_default_spacing);
             title="probe field configuration for \"$(unit.uac)\"",
             xlabel="distribution in x direction [m]",
             ylabel="distribution in y direction [m]",
@@ -434,29 +438,32 @@ function get_library_g_values(unit::Component,
                               key2::String,
                               libfile_path::String)
     # Check, which two sets of grid-points will be read out of the library-file to be interpolated later.
-    # Define the ranges and corresponding values in an array of tuples
-    borehole_ranges = [(24, 0.075),
-                       (48, 0.075),
-                       (96, 0.075),
-                       (192, 0.08),
-                       (384, 0.0875)]  # defines the borehole depth [m] and corresponding borehole radius [m] of the library. 
-    #                                    They are the same for all configurations.
+    # Define the depth, borehole radius and spacings of the g-functions given in the library.
+    # Must be in descending order in relation to lib_spacings_to_depths
+    #! format: off
+    lib_borehole_depths =   [24,    48,    96,    192,  384   ]  # [m]
+    lib_borehole_radiuses = [0.075, 0.075, 0.075, 0.08, 0.0875]  # [m]
+    #! format: on
+    lib_default_spacing = 5   # Default borehole spacing for each configuration.
+    #                           Attention: Also change in plot_optional_figures!
+    lib_borehole_spacings = fill(lib_default_spacing, length(lib_borehole_depths))
 
-    depths = first.(borehole_ranges)
-    upper_index = findfirst(x -> x > borehole_depth, depths)
+    lib_spacings_to_depths = lib_borehole_spacings ./ lib_borehole_depths
+    spacing_to_depth = borehole_spacing / borehole_depth
+    if spacing_to_depth > lib_spacings_to_depths[2]
+        upper_index = 2
+    elseif spacing_to_depth < lib_spacings_to_depths[end]
+        upper_index = length(lib_spacings_to_depths)
+    else
+        upper_index = findfirst(x -> x < spacing_to_depth, lib_spacings_to_depths)
+    end
     lower_index = upper_index - 1
 
-    # If borehole_depth is less than the first depth or beyond all known ranges
-    if upper_index === nothing || upper_index == 1
-        @error "In geothermal probe \"$(unit.uac)\", the borehole_depth needs to be between $(depths[1]) m and $(depths[end]) m, but is $(borehole_depth) m."
-        throw(InputError)
-    end
-
     # Extracting the lower and upper bounds details
-    borehole_depth_library_lower = borehole_ranges[lower_index][1]
-    borehole_depth_library_upper = borehole_ranges[upper_index][1]
-    borehole_radius_library_lower = borehole_ranges[lower_index][2]
-    borehole_radius_library_upper = borehole_ranges[upper_index][2]
+    borehole_depth_library_lower = lib_borehole_depths[lower_index]
+    borehole_depth_library_upper = lib_borehole_depths[upper_index]
+    borehole_radius_library_lower = lib_borehole_radiuses[lower_index]
+    borehole_radius_library_upper = lib_borehole_radiuses[upper_index]
 
     # Read in given library file
     local library
@@ -488,20 +495,35 @@ function get_library_g_values(unit::Component,
     # calculate number of probes in probe field
     number_of_probes = length(probe_coordinates)
 
+    if number_of_probes == 1 && borehole_spacing !== 5
+        @error "You are requesting a single probe for the probe field \"$(unit.uac)\". Due to the underlaying library, " *
+               "the borehole_spacing has to be set to 5 m in this case! Otherwise, a wrong g-function will be calculated."
+        throw(InputError)
+    end
+
     # Getting a specific G-Function for the default configuration
-    borehole_spacing_library_default = 5   # Default borehole spacing for each configuration. Attention: Also change in plot_optional_figures!
-    g_values_library_lower = gVals["$borehole_spacing_library_default._$borehole_depth_library_lower._$borehole_radius_library_lower"]
-    g_values_library_upper = gVals["$borehole_spacing_library_default._$borehole_depth_library_upper._$borehole_radius_library_upper"]
+    g_values_library_lower = gVals["$lib_default_spacing._$borehole_depth_library_lower._$borehole_radius_library_lower"]
+    g_values_library_upper = gVals["$lib_default_spacing._$borehole_depth_library_upper._$borehole_radius_library_upper"]
 
     # Linear intepolation between upper and lower default g_values on B/H-ratio. B: Borehole spacing. H: Borehole depth.
-    B_H_ratio_configuration = borehole_spacing / borehole_depth
-    B_H_ratio_library_default_lower = borehole_spacing_library_default / borehole_depth_library_lower
-    B_H_ratio_library_default_upper = borehole_spacing_library_default / borehole_depth_library_upper
+    spacing_to_depth_ratio_library_lower = lib_default_spacing / borehole_depth_library_lower
+    spacing_to_depth_ratio_library_upper = lib_default_spacing / borehole_depth_library_upper
+
+    if spacing_to_depth > spacing_to_depth_ratio_library_lower ||
+       spacing_to_depth < spacing_to_depth_ratio_library_upper
+        @warn "The g-function for the probe field \"$(unit.uac)\" has been extrapolated! " *
+              "The ratio of the requested borehole spacing ($borehole_spacing m) to the borehole depth " *
+              "($borehole_depth m) is not covered in the library! The g-values will be extrapolated " *
+              "from the nearest ratios which are $(round(spacing_to_depth_ratio_library_lower; digits=2)) and " *
+              "$(round(spacing_to_depth_ratio_library_upper; digits=2)) to the requested ratio of " *
+              "$(round(spacing_to_depth; digits=2)). Note that this can leed to unexpected g-function shapes! " *
+              "Check the shape of the g-fuction by activating auxiliary_plots."
+    end
 
     # Substitution "interpolation_factor". 
-    # Describes, if B_H_ratio_configuration is closer to B_H_ratio_library_default_lower or B_H_ratio_library_default_upper
-    interpolation_factor = (B_H_ratio_configuration - B_H_ratio_library_default_lower) /
-                           (B_H_ratio_library_default_upper - B_H_ratio_library_default_lower)
+    # Describes, if spacing_to_depth is closer to spacing_to_depth_ratio_library_lower or spacing_to_depth_ratio_library_upper
+    interpolation_factor = (spacing_to_depth - spacing_to_depth_ratio_library_lower) /
+                           (spacing_to_depth_ratio_library_upper - spacing_to_depth_ratio_library_lower)
 
     g_values_library_interpolated = g_values_library_upper -
                                     (1 - interpolation_factor) * (g_values_library_upper - g_values_library_lower)
@@ -839,15 +861,17 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
 end
 
 function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
+    if !unit.regeneration
+        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
+        return
+    end
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) + energy_potential(exchanges)
     energy_demand = unit.max_input_energy  # is positive
 
     # shortcut if there is no energy to be used
-    if (energy_available <= sim_params["epsilon"] ||
-        !unit.regeneration)
-        # end of condition
+    if energy_available <= sim_params["epsilon"]
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
         return
@@ -902,12 +926,18 @@ function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{
 end
 
 function output_values(unit::GeothermalProbes)::Vector{String}
-    return [string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
-            "new_fluid_temperature",
-            "current_output_temperature",
-            "current_input_temperature",
-            "fluid_reynolds_number"]
+    output_vals = []
+    if unit.regeneration
+        push!(output_vals, string(unit.m_heat_in) * " IN")
+    end
+
+    append!(output_vals,
+            [string(unit.m_heat_out) * " OUT",
+             "new_fluid_temperature",
+             "current_output_temperature",
+             "current_input_temperature",
+             "fluid_reynolds_number"])
+    return output_vals
 end
 
 function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
