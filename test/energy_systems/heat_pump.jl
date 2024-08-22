@@ -231,7 +231,7 @@ function test_heat_pump_2S2D_constant_cop()
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
     demand_1 = components["TST_DEM_01"]
-    demand_2 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
@@ -306,7 +306,7 @@ function test_heat_pump_2S2D_dynamic_cop()
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
     demand_1 = components["TST_DEM_01"]
-    demand_2 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
@@ -335,11 +335,11 @@ function test_heat_pump_2S2D_dynamic_cop()
     # cop_1_2 = 12.926
     # cop_2_1 = 2.7452
     # cop_2_2 = 4.3086666666666
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4187.2924962864345
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1812.707530713566
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4451.65614361108
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1548.3438563889197
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change /
-          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 3.309965837477
+          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 3.8751082165904203
 
     # second time step: bypass should reduce required electricity
     source_1.constant_temperature = 71.0
@@ -361,11 +361,11 @@ function test_heat_pump_2S2D_dynamic_cop()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4401.638415335049
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1598.3615846649507
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change ≈ 4666.002062659695
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 1333.9979373403046
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 3000.0 * 2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change /
-          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 3.753843972206
+          heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change ≈ 4.497758078968747
 end
 
 @testset "heat_pump_2S2D_dynamic_cop" begin
@@ -391,7 +391,7 @@ function test_heat_pump_2S2D_reorder_inputs()
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
     demand_1 = components["TST_DEM_01"]
-    demand_2 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
