@@ -455,3 +455,85 @@ end
 @testset "heat_pump_2S2D_reorder_inputs" begin
     test_heat_pump_2S2D_reorder_inputs()
 end
+
+function test_heat_pump_2S2D_min_power()
+    components_config = get_config_heat_pump_2S2D()
+
+    components_config["TST_HP_01"]["power_th"] = 28000
+    components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
+    components_config["TST_HP_01"]["min_power_function"] = "const:0.5"
+    components_config["TST_HP_01"]["min_power_fraction"] = 0.5
+
+    simulation_parameters = Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true,
+    )
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    # first time step: full power is too much to fullfill min_power_fraction, but some layers
+    # can be "slowed down" to compensate
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    energy_full_power = EnergySystems.watt_to_wh(heat_pump.design_power_th)
+    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test produced_heat ≈ 3000.0
+    @test produced_heat / energy_full_power < heat_pump.min_power_fraction
+
+    # second time step: min power of each layer is so high that they can't be "slowed down"
+    # enough to compensate
+    heat_pump.min_power_function = (x, y) -> 0.8
+    heat_pump.min_power_fraction = 0.6
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    energy_full_power = EnergySystems.watt_to_wh(heat_pump.design_power_th)
+    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test produced_heat ≈ 0.0
+    @test produced_heat / energy_full_power ≈ 0.0
+end
+
+@testset "heat_pump_2S2D_min_power" begin
+    test_heat_pump_2S2D_min_power()
+end

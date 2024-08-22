@@ -17,16 +17,18 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_in::Symbol
 
-    power_th::Float64
+    design_power_th::Float64
+    max_power_function::Function
+    min_power_function::Function
     min_power_fraction::Float64
     min_run_time::UInt
     constant_cop::Floathing
     dynamic_cop::Function
     bypass_cop::Float64
+
     output_temperature::Temperature
     input_temperature::Temperature
     cop::Float64
-
     losses::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
@@ -40,16 +42,24 @@ mutable struct HeatPump <: Component
         func_def = default(config, "cop_function", "carnot:0.4")
         constant_cop, cop_function = parse_cop_function(func_def)
 
-        return new(uac, # uac
+        func_def = default(config, "max_power_function", "const:1.0")
+        max_power_function = parse_2dim_function(func_def)
+
+        func_def = default(config, "min_power_function", "const:0.2")
+        min_power_function = parse_2dim_function(func_def)
+
+        return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer, # sys_function
-                   InterfaceMap(m_heat_in => nothing, # input_interfaces
+                   sf_transformer,
+                   InterfaceMap(m_heat_in => nothing,
                                 m_el_in => nothing),
-                   InterfaceMap(m_heat_out => nothing), # output_interfaces
+                   InterfaceMap(m_heat_out => nothing),
                    m_el_in,
                    m_heat_out,
                    m_heat_in,
-                   config["power_th"], # power_th
+                   config["power_th"],
+                   max_power_function,
+                   min_power_function,
                    default(config, "min_power_fraction", 0.2),
                    default(config, "min_run_time", 0),
                    constant_cop,
@@ -206,8 +216,6 @@ function handle_layer(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
                       available_heat_out::Floathing,
-                      max_usage_fraction::Float64,
-                      sum_heat_out::Float64,
                       in_temp::Temperature,
                       out_temp::Temperature)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
@@ -232,10 +240,9 @@ function handle_layer(unit::HeatPump,
     used_el_in = used_heat_in / (cop - 1.0)
     used_heat_out = used_heat_in + used_el_in
 
-    # check heat out as limiter, also checking for power limit of heat pump
-    max_heat_out = min(available_heat_out, max_usage_fraction * watt_to_wh(unit.power_th) - sum_heat_out)
-    if used_heat_out > max_heat_out
-        used_heat_out = max_heat_out
+    # check heat out as limiter
+    if used_heat_out > available_heat_out
+        used_heat_out = available_heat_out
         used_el_in = used_heat_out / cop
         used_heat_in = used_el_in * (cop - 1.0)
     end
@@ -265,6 +272,9 @@ function calculate_energies_heatpump(unit::HeatPump,
     energies.layers_heat_out_temperature_temp = Vector{Temperature}()
     energies.layers_heat_out_uac_temp = Vector{Stringing}()
 
+    times_min = []
+    times_max = []
+    sum_usage = 0.0
     current_in_idx::Int = 0
     current_out_idx::Int = 0
     EPS = sim_params["epsilon"]
@@ -282,8 +292,7 @@ function calculate_energies_heatpump(unit::HeatPump,
         if energies.available_el_in < EPS ||
            sum(energies.available_heat_in; init=0.0) < EPS ||
            sum(energies.available_heat_out; init=0.0) < EPS ||
-           (energies.max_usage_fraction * watt_to_wh(unit.power_th) -
-            sum(energies.layers_heat_out_temp; init=0.0) < EPS)
+           energies.max_usage_fraction - sum_usage < EPS
             # end of condition
             break
         end
@@ -320,6 +329,14 @@ function calculate_energies_heatpump(unit::HeatPump,
             continue
         end
 
+        min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
+        min_power = max(0.0, unit.design_power_th * min_power_frac)
+        max_power_frac = min(1.0, unit.max_power_function(current_in_temp, current_out_temp))
+        max_power = max(min_power, unit.design_power_th * max_power_frac)
+
+        remaining_heat_out = min(energies.available_heat_out[current_out_idx],
+                                 (energies.max_usage_fraction - sum_usage) * watt_to_wh(max_power))
+
         used_heat_in,
         used_el_in,
         used_heat_out,
@@ -327,9 +344,7 @@ function calculate_energies_heatpump(unit::HeatPump,
         current_out_temp = handle_layer(unit,
                                         energies.available_el_in,
                                         energies.available_heat_in[current_in_idx],
-                                        energies.available_heat_out[current_out_idx],
-                                        energies.max_usage_fraction,
-                                        sum(energies.layers_heat_out_temp; init=0.0),
+                                        remaining_heat_out,
                                         current_in_temp,
                                         current_out_temp)
 
@@ -345,6 +360,25 @@ function calculate_energies_heatpump(unit::HeatPump,
         energies.available_el_in -= used_el_in
         energies.available_heat_in[current_in_idx] -= used_heat_in
         energies.available_heat_out[current_out_idx] -= used_heat_out
+
+        sum_usage += used_heat_out / watt_to_wh(unit.design_power_th)
+        push!(times_min, used_heat_out * 3600 / min_power)
+        push!(times_max, used_heat_out * 3600 / max_power)
+    end
+
+    # as long as the times_max sum is smaller than the time step and the times_min sum is
+    # larger than the time step multiplied with the min power fraction, we can find a
+    # dispatch of each layer within their min/max times so the overall sum works
+    if (sum(times_max; init=0.0) > sim_params["time_step_seconds"] ||
+        sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"])
+        # end of condition
+        energies.layers_el_in_temp = []
+        energies.layers_heat_in_temp = []
+        energies.layers_heat_in_temperature_temp = []
+        energies.layers_heat_in_uac_temp = []
+        energies.layers_heat_out_temp = []
+        energies.layers_heat_out_temperature_temp = []
+        energies.layers_heat_out_uac_temp = []
     end
 
     return energies
@@ -483,13 +517,6 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies.layers_heat_out = energies.layers_heat_out_temp
         energies.layers_heat_out_temperature = energies.layers_heat_out_temperature_temp
         energies.layers_heat_out_uac = energies.layers_heat_out_uac_temp
-    end
-
-    # if all chosen heat layers combined are not enough to meet minimum power fraction,
-    # the heat pump doesn't run at all
-    usage_fraction = (sum(energies.layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
-    if usage_fraction < unit.min_power_fraction
-        return false, (nothing)
     end
 
     return true, energies

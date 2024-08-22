@@ -53,7 +53,7 @@ function test_load_from_dict()
     @test length(keys(components)) == 5
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
     @test components["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
-    @test components["TST_HP_01"].power_th == 20000
+    @test components["TST_HP_01"].design_power_th == 20000
 end
 
 @testset "load_from_dict" begin
