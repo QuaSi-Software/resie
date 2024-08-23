@@ -65,3 +65,20 @@ function pwc_ooo_astr(expected::Vector, actual::Vector)
 
     return result
 end
+
+"""
+    get_default_sim_params()
+
+Returns default simulation parameters useful for tests.
+
+# Returns
+- `Dict{String,Any}`: Default simulation parameters
+"""
+function get_default_sim_params()::Dict{String,Any}
+    return Dict{String,Any}(
+        "time_step_seconds" => 900,
+        "time" => 0,
+        "epsilon" => 1e-9,
+        "is_first_timestep" => true,
+    )
+end

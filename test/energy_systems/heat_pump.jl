@@ -4,6 +4,8 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
+include("../test_util.jl")
+
 EnergySystems.set_timestep(900)
 
 function get_config_heat_pump_1S1D()
@@ -40,13 +42,7 @@ end
 
 function test_heat_pump_one_source_dynamic_cop()
     components_config = get_config_heat_pump_1S1D()
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -218,13 +214,7 @@ end
 
 function test_heat_pump_2S2D_constant_cop()
     components_config = get_config_heat_pump_2S2D()
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -293,13 +283,7 @@ end
 
 function test_heat_pump_2S2D_dynamic_cop()
     components_config = get_config_heat_pump_2S2D()
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -378,13 +362,7 @@ function test_heat_pump_2S2D_reorder_inputs()
     components_config["TST_HP_01"]["control_modules"] = [Dict{String,Any}(
                                                              "name" => "temperature_sorting",
                                                          )]
-
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -464,12 +442,7 @@ function test_heat_pump_2S2D_min_power()
     components_config["TST_HP_01"]["min_power_function"] = "const:0.5"
     components_config["TST_HP_01"]["min_power_fraction"] = 0.5
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
