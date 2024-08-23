@@ -19,6 +19,8 @@ mutable struct GeothermalProbes <: Component
 
     model_type::String
 
+    max_probe_temperature_loading::Temperature
+    min_probe_temperature_unloading::Temperature
     unloading_temperature_spread::Temperature
     loading_temperature::Temperature
     loading_temperature_spread::Temperature
@@ -27,6 +29,7 @@ mutable struct GeothermalProbes <: Component
     regeneration::Bool
     max_output_energy::Float64
     current_max_output_energy::Float64
+    current_max_input_energy::Float64
     max_input_energy::Float64
     current_output_temperature::Temperature
     current_input_temperature::Temperature
@@ -114,6 +117,8 @@ mutable struct GeothermalProbes <: Component
                    model_type,     # model type. currently "simplified" with constant thermal borehole resistance and 
                    #                 "detailed" with calculated thermal borehole resistance in every time step are available.
 
+                   default(config, "max_probe_temperature_loading", nothing),     # upper temperauture limit in the probe for loading
+                   default(config, "min_probe_temperature_unloading", nothing),   # lower temperature limit in the probe for unloading
                    default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
                    default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
                    default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading, within one probe!
@@ -122,6 +127,7 @@ mutable struct GeothermalProbes <: Component
                    default(config, "regeneration", true),                # flag if regeneration should be taken into account
                    0.0,                                                  # max_output_energy in every time step, calculated in control()
                    0.0,                                                  # current_max_output_energy
+                   0.0,                                                  # current_max_input_energy
                    0.0,                                                  # max_input_energy in every time step, calculated in control()
                    0.0,                                                  # output temperature in current time step, calculated in control()
                    0.0,                                                  # input temperature in current time step, calculated in control()
@@ -412,7 +418,7 @@ end
    	get_g_values_from_file(unit::GeothermalProbes)
 
 Read out g-function values from given profile file.
-The file has to be the following structure
+The file needs to have the following structure (without the notes!):
 
         comment1                // comments can be given without limitation
         number_of_probes: 42    // required variable
@@ -669,7 +675,7 @@ function control(unit::GeothermalProbes,
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
                      nothing,
-                     unit.current_output_temperature)
+                     highest(unit.min_probe_temperature_unloading, unit.current_output_temperature))
 
     # get requested temperature of the probe output, if they are written and present, to set the desired output 
     # temperature. If the output interface does not provide a temperature, the highest requested temperature of the last
@@ -679,11 +685,16 @@ function control(unit::GeothermalProbes,
                                                               unit.output_interfaces[unit.m_heat_out].target))
     desired_output_temperature = highest(exchange_temperatures[exchange_temperatures .< unit.current_output_temperature])
 
-    if desired_output_temperature === nothing  # desired temperature not given in output interface, use temperature of last timestep
-        desired_output_temperature = highest(unit.output_temperatures_last_timestep)
+    if desired_output_temperature === nothing
+        # desired temperature not given in output interface, use temperature of last timestep
+        desired_output_temperature = highest(highest(unit.output_temperatures_last_timestep),
+                                             unit.min_probe_temperature_unloading)
     end
     if desired_output_temperature !== nothing
-        desired_output_temperature += 0.001  # add small number to avoid problems with rough tolerances of find_zero()
+        # limit to minimum output temperature
+        desired_output_temperature = highest(desired_output_temperature, unit.min_probe_temperature_unloading)
+        # add small number to avoid problems with rough tolerances of find_zero()    
+        desired_output_temperature += 0.001
     end
 
     local max_energy_in_out_per_probe_meter
@@ -722,8 +733,14 @@ function control(unit::GeothermalProbes,
         set_temperature!(unit.input_interfaces[unit.m_heat_in],
                          unit.current_input_temperature,
                          nothing)
-
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+        if unit.max_probe_temperature_loading !== nothing &&
+           unit.current_input_temperature > unit.max_probe_temperature_loading
+            set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+            unit.current_max_input_energy = 0.0
+        else
+            set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+            unit.current_max_input_energy = unit.max_input_energy
+        end
     end
 end
 
@@ -981,7 +998,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) + energy_potential(exchanges)
-    energy_demand = unit.max_input_energy  # is positive
+    energy_demand = unit.current_max_input_energy  # is positive
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
@@ -1018,7 +1035,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     end
 
     # Add loaded specific heat flux to vector
-    energy_taken = unit.max_input_energy - energy_demand
+    energy_taken = unit.current_max_input_energy - energy_demand
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
 
     # recalculate borehole temperature for next timestep
@@ -1030,7 +1047,7 @@ function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(; balance=interface.balance,
-                 energy_potential=caller_is_input ? -unit.max_input_energy : unit.max_output_energy,
+                 energy_potential=caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy,
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
