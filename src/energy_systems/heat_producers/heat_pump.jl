@@ -25,8 +25,11 @@ mutable struct HeatPump <: Component
     dynamic_cop::Function
     bypass_cop::Float64
 
+    consider_icing::Bool
+    icing_coefficients::Vector{Float64}
     output_temperature::Temperature
     input_temperature::Temperature
+
     cop::Float64
     losses::Float64
     mix_temp_input::Float64
@@ -47,6 +50,9 @@ mutable struct HeatPump <: Component
         func_def = default(config, "min_power_function", "const:0.2")
         min_power_function = parse_2dim_function(func_def)
 
+        coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
+        icing_coefficients = parse.(Float64, split(coeff_def, ","))
+
         return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
                    sf_transformer,
@@ -63,6 +69,8 @@ mutable struct HeatPump <: Component
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),
+                   default(config, "considering_icing", false),
+                   icing_coefficients,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
                    0.0, # cop
@@ -209,6 +217,19 @@ function get_layer_temperature(unit::HeatPump,
     end
 end
 
+function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature)::Floathing
+    if cop === nothing
+        return nothing
+    end
+
+    lin_factor = unit.icing_coefficients[1] + unit.icing_coefficients[2] * in_temp
+    exp_factor = unit.icing_coefficients[3] * exp(-1.0
+                                                  * (in_temp - unit.icing_coefficients[4])^2
+                                                  /
+                                                  unit.icing_coefficients[5])
+    return cop * (1 - 0.01 * (max(0.0, lin_factor) + exp_factor))
+end
+
 function handle_layer(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
@@ -224,6 +245,9 @@ function handle_layer(unit::HeatPump,
         do_bypass = true
     else
         cop = unit.dynamic_cop(in_temp, out_temp)(1.0)
+        if unit.consider_icing
+            cop = icing_correction(unit, cop, in_temp)
+        end
     end
     if cop === nothing
         @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *

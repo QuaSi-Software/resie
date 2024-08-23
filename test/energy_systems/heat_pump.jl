@@ -150,6 +150,83 @@ end
     test_heat_pump_one_source_dynamic_cop()
 end
 
+function test_heat_pump_1S1D_icing_losses()
+    components_config = get_config_heat_pump_1S1D()
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    heat_pump.consider_icing = true
+
+    # first time step: source is warm enough to not incur icing losses
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    demand.constant_demand = 900.0 * 4
+    demand.constant_temperature = 45.0
+
+    source.constant_power = 1000.0 * 4
+    source.constant_temperature = 20.0
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+
+    @test heat_out ≈ 900
+    @test el_in + heat_in ≈ heat_out
+    # COP without icing losses would be 5.0904
+    @test heat_out / el_in ≈ 5.090384423755175
+
+    # second step: source is in a range where icing losses are significant
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    demand.constant_demand = 900.0 * 4
+    demand.constant_temperature = 45.0
+
+    source.constant_power = 1000.0 * 4
+    source.constant_temperature = 5.0
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+
+    @test heat_out ≈ 900
+    @test el_in + heat_in ≈ heat_out
+    # COP without icing losses would be 3.1815
+    @test heat_out / el_in ≈ 2.7993295246351666
+end
+
+@testset "test_heat_pump_1S1D_icing_losses" begin
+    test_heat_pump_1S1D_icing_losses()
+end
+
 function get_config_heat_pump_2S2D()
     return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
