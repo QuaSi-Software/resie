@@ -98,20 +98,20 @@ mutable struct HPEnergies
     out_uacs::Vector{<:Stringing}
     heat_in_has_inf_energy::Bool
     heat_out_has_inf_energy::Bool
-    layers_el_in::Vector{Floathing}
-    layers_heat_in::Vector{Floathing}
-    layers_heat_in_temperature::Vector{Temperature}
-    layers_heat_in_uac::Vector{Stringing}
-    layers_heat_out::Vector{Floathing}
-    layers_heat_out_temperature::Vector{Temperature}
-    layers_heat_out_uac::Vector{Stringing}
-    layers_el_in_temp::Vector{Floathing}
-    layers_heat_in_temp::Vector{Floathing}
-    layers_heat_in_temperature_temp::Vector{Temperature}
-    layers_heat_in_uac_temp::Vector{Stringing}
-    layers_heat_out_temp::Vector{Floathing}
-    layers_heat_out_temperature_temp::Vector{Temperature}
-    layers_heat_out_uac_temp::Vector{Stringing}
+    slices_el_in::Vector{Floathing}
+    slices_heat_in::Vector{Floathing}
+    slices_heat_in_temperature::Vector{Temperature}
+    slices_heat_in_uac::Vector{Stringing}
+    slices_heat_out::Vector{Floathing}
+    slices_heat_out_temperature::Vector{Temperature}
+    slices_heat_out_uac::Vector{Stringing}
+    slices_el_in_temp::Vector{Floathing}
+    slices_heat_in_temp::Vector{Floathing}
+    slices_heat_in_temperature_temp::Vector{Temperature}
+    slices_heat_in_uac_temp::Vector{Stringing}
+    slices_heat_out_temp::Vector{Floathing}
+    slices_heat_out_temperature_temp::Vector{Temperature}
+    slices_heat_out_uac_temp::Vector{Stringing}
 
     function HPEnergies()
         return new(0.0,
@@ -206,7 +206,7 @@ function get_layer_temperature(unit::HeatPump,
         return false, layer_temp
     end
 
-    # skip layer if given static temperature is not within the temperature band of the layer
+    # skip slice if given static temperature is not within the temperature band of the layer
     if (temps_min[current_idx] !== nothing && temps_min[current_idx] > static_temperature
         ||
         temps_max[current_idx] !== nothing && temps_max[current_idx] < static_temperature)
@@ -230,7 +230,7 @@ function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature):
     return cop * (1 - 0.01 * (max(0.0, lin_factor) + exp_factor))
 end
 
-function handle_layer(unit::HeatPump,
+function handle_slice(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
                       available_heat_out::Floathing,
@@ -256,7 +256,7 @@ function handle_layer(unit::HeatPump,
     end
 
     # calculate energies with the current cop
-    # energies for current layer with potential heat in as basis
+    # energies for current slice with potential heat in as basis
     used_heat_in = available_heat_in
     used_el_in = used_heat_in / (cop - 1.0)
     used_heat_out = used_heat_in + used_el_in
@@ -285,13 +285,13 @@ end
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
                                      energies::HPEnergies)::HPEnergies
-    energies.layers_el_in_temp = Vector{Floathing}()
-    energies.layers_heat_in_temp = Vector{Floathing}()
-    energies.layers_heat_in_temperature_temp = Vector{Temperature}()
-    energies.layers_heat_in_uac_temp = Vector{Stringing}()
-    energies.layers_heat_out_temp = Vector{Floathing}()
-    energies.layers_heat_out_temperature_temp = Vector{Temperature}()
-    energies.layers_heat_out_uac_temp = Vector{Stringing}()
+    energies.slices_el_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_in_uac_temp = Vector{Stringing}()
+    energies.slices_heat_out_temp = Vector{Floathing}()
+    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_out_uac_temp = Vector{Stringing}()
 
     times_min = []
     times_max = []
@@ -329,22 +329,22 @@ function calculate_energies_heatpump(unit::HeatPump,
         end
 
         # check and determine input temperature of layer
-        skip_layer, current_in_temp = get_layer_temperature(unit, current_in_idx,
+        skip_slice, current_in_temp = get_layer_temperature(unit, current_in_idx,
                                                             energies.in_temps_min,
                                                             energies.in_temps_max;
                                                             input=true)
-        if skip_layer
+        if skip_slice
             energies.available_heat_in[current_in_idx] = 0.0
             current_in_idx = popfirst!(energies.in_indices)
             continue
         end
 
         # check and determine output temperature of layer
-        skip_layer, current_out_temp = get_layer_temperature(unit, current_out_idx,
+        skip_slice, current_out_temp = get_layer_temperature(unit, current_out_idx,
                                                              energies.out_temps_min,
                                                              energies.out_temps_max;
                                                              input=false)
-        if skip_layer
+        if skip_slice
             energies.available_heat_out[current_out_idx] = 0.0
             current_out_idx = popfirst!(energies.out_indices)
             continue
@@ -362,21 +362,21 @@ function calculate_energies_heatpump(unit::HeatPump,
         used_el_in,
         used_heat_out,
         current_in_temp,
-        current_out_temp = handle_layer(unit,
+        current_out_temp = handle_slice(unit,
                                         energies.available_el_in,
                                         energies.available_heat_in[current_in_idx],
                                         remaining_heat_out,
                                         current_in_temp,
                                         current_out_temp)
 
-        # finally all checks done, we add the layer and update remaining energies
-        push!(energies.layers_el_in_temp, used_el_in)
-        push!(energies.layers_heat_in_temp, used_heat_in)
-        push!(energies.layers_heat_in_temperature_temp, current_in_temp)
-        push!(energies.layers_heat_in_uac_temp, energies.in_uacs[current_in_idx])
-        push!(energies.layers_heat_out_temp, used_heat_out)
-        push!(energies.layers_heat_out_temperature_temp, current_out_temp)
-        push!(energies.layers_heat_out_uac_temp, energies.out_uacs[current_out_idx])
+        # finally all checks done, we add the slice and update remaining energies
+        push!(energies.slices_el_in_temp, used_el_in)
+        push!(energies.slices_heat_in_temp, used_heat_in)
+        push!(energies.slices_heat_in_temperature_temp, current_in_temp)
+        push!(energies.slices_heat_in_uac_temp, energies.in_uacs[current_in_idx])
+        push!(energies.slices_heat_out_temp, used_heat_out)
+        push!(energies.slices_heat_out_temperature_temp, current_out_temp)
+        push!(energies.slices_heat_out_uac_temp, energies.out_uacs[current_out_idx])
 
         energies.available_el_in -= used_el_in
         energies.available_heat_in[current_in_idx] -= used_heat_in
@@ -389,17 +389,17 @@ function calculate_energies_heatpump(unit::HeatPump,
 
     # as long as the times_max sum is smaller than the time step and the times_min sum is
     # larger than the time step multiplied with the min power fraction, we can find a
-    # dispatch of each layer within their min/max times so the overall sum works
+    # dispatch of each slice within their min/max times so the overall sum works
     if (sum(times_max; init=0.0) > sim_params["time_step_seconds"] ||
         sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"])
         # end of condition
-        energies.layers_el_in_temp = []
-        energies.layers_heat_in_temp = []
-        energies.layers_heat_in_temperature_temp = []
-        energies.layers_heat_in_uac_temp = []
-        energies.layers_heat_out_temp = []
-        energies.layers_heat_out_temperature_temp = []
-        energies.layers_heat_out_uac_temp = []
+        energies.slices_el_in_temp = []
+        energies.slices_heat_in_temp = []
+        energies.slices_heat_in_temperature_temp = []
+        energies.slices_heat_in_uac_temp = []
+        energies.slices_heat_out_temp = []
+        energies.slices_heat_out_temperature_temp = []
+        energies.slices_heat_out_uac_temp = []
     end
 
     return energies
@@ -473,23 +473,23 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
             energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
             energies = calculate_energies_heatpump(unit, sim_params, energies)
 
-            append!(energies.layers_heat_in, energies.layers_heat_in_temp)
-            append!(energies.layers_heat_in_temperature, energies.layers_heat_in_temperature_temp)
-            append!(energies.layers_heat_in_uac, energies.layers_heat_in_uac_temp)
+            append!(energies.slices_heat_in, energies.slices_heat_in_temp)
+            append!(energies.slices_heat_in_temperature, energies.slices_heat_in_temperature_temp)
+            append!(energies.slices_heat_in_uac, energies.slices_heat_in_uac_temp)
             # Is this correct? Using the highest energy as worst case should be good for now...
             if heat_in_idx == 1
-                energies.layers_el_in = energies.layers_el_in_temp
-                energies.layers_heat_out = energies.layers_heat_out_temp
-                energies.layers_heat_out_temperature = energies.layers_heat_out_temperature_temp
-                energies.layers_heat_out_uac = energies.layers_heat_out_uac_temp
+                energies.slices_el_in = energies.slices_el_in_temp
+                energies.slices_heat_out = energies.slices_heat_out_temp
+                energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+                energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
             else
-                if _isless(_sum(energies.layers_el_in), _sum(energies.layers_el_in_temp))
-                    energies.layers_el_in = energies.layers_el_in_temp
+                if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+                    energies.slices_el_in = energies.slices_el_in_temp
                 end
-                if _isless(_sum(energies.layers_heat_out), _sum(energies.layers_heat_out_temp))
-                    energies.layers_heat_out = energies.layers_heat_out_temp
-                    energies.layers_heat_out_temperature = energies.layers_heat_out_temperature_temp
-                    energies.layers_heat_out_uac = energies.layers_heat_out_uac_temp
+                if _isless(_sum(energies.slices_heat_out), _sum(energies.slices_heat_out_temp))
+                    energies.slices_heat_out = energies.slices_heat_out_temp
+                    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+                    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
                 end
             end
         end
@@ -503,23 +503,23 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
             energies.out_indices = [heat_out_idx]
             energies = calculate_energies_heatpump(unit, sim_params, energies)
 
-            append!(energies.layers_heat_out, energies.layers_heat_out_temp)
-            append!(energies.layers_heat_out_temperature, energies.layers_heat_out_temperature_temp)
-            append!(energies.layers_heat_out_uac, energies.layers_heat_out_uac_temp)
+            append!(energies.slices_heat_out, energies.slices_heat_out_temp)
+            append!(energies.slices_heat_out_temperature, energies.slices_heat_out_temperature_temp)
+            append!(energies.slices_heat_out_uac, energies.slices_heat_out_uac_temp)
             # Is this correct? Using the highest energy as worst case should be good for now...
             if heat_out_idx == 1
-                energies.layers_el_in = energies.layers_el_in_temp
-                energies.layers_heat_in = energies.layers_heat_in_temp
-                energies.layers_heat_in_temperature = energies.layers_heat_in_temperature_temp
-                energies.layers_heat_in_uac = energies.layers_heat_in_uac_temp
+                energies.slices_el_in = energies.slices_el_in_temp
+                energies.slices_heat_in = energies.slices_heat_in_temp
+                energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+                energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
             else
-                if _isless(_sum(energies.layers_el_in), _sum(energies.layers_el_in_temp))
-                    energies.layers_el_in = energies.layers_el_in_temp
+                if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+                    energies.slices_el_in = energies.slices_el_in_temp
                 end
-                if _isless(_sum(energies.layers_heat_in), _sum(energies.layers_heat_in_temp))
-                    energies.layers_heat_in = energies.layers_heat_in_temp
-                    energies.layers_heat_in_temperature = energies.layers_heat_in_temperature_temp
-                    energies.layers_heat_in_uac = energies.layers_heat_in_uac_temp
+                if _isless(_sum(energies.slices_heat_in), _sum(energies.slices_heat_in_temp))
+                    energies.slices_heat_in = energies.slices_heat_in_temp
+                    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+                    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
                 end
             end
         end
@@ -531,13 +531,13 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
         energies = calculate_energies_heatpump(unit, sim_params, energies)
 
-        energies.layers_el_in = energies.layers_el_in_temp
-        energies.layers_heat_in = energies.layers_heat_in_temp
-        energies.layers_heat_in_temperature = energies.layers_heat_in_temperature_temp
-        energies.layers_heat_in_uac = energies.layers_heat_in_uac_temp
-        energies.layers_heat_out = energies.layers_heat_out_temp
-        energies.layers_heat_out_temperature = energies.layers_heat_out_temperature_temp
-        energies.layers_heat_out_uac = energies.layers_heat_out_uac_temp
+        energies.slices_el_in = energies.slices_el_in_temp
+        energies.slices_heat_in = energies.slices_heat_in_temp
+        energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+        energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+        energies.slices_heat_out = energies.slices_heat_out_temp
+        energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+        energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
     end
 
     return true, energies
@@ -550,19 +550,19 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit,
-                          energies.layers_el_in,
-                          energies.layers_heat_in,
-                          energies.layers_heat_out,
-                          energies.layers_heat_in_uac,
-                          energies.layers_heat_out_uac,
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          energies.slices_heat_out,
+                          energies.slices_heat_in_uac,
+                          energies.slices_heat_out_uac,
                           energies.heat_in_has_inf_energy,
                           energies.heat_out_has_inf_energy)
         set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         lowest(energies.layers_heat_in_temperature),
+                         lowest(energies.slices_heat_in_temperature),
                          nothing)
         set_temperature!(unit.output_interfaces[unit.m_heat_out],
                          nothing,
-                         highest(energies.layers_heat_out_temperature))
+                         highest(energies.slices_heat_out_temperature))
     end
 end
 
@@ -574,8 +574,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    el_in = sum(energies.layers_el_in; init=0.0)
-    heat_out = sum(energies.layers_heat_out; init=0.0)
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
 
     if heat_out < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
@@ -586,18 +586,18 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     if el_in > sim_params["epsilon"]
         unit.cop = heat_out / el_in
     end
-    unit.mix_temp_input = _weighted_mean(energies.layers_heat_in_temperature, energies.layers_heat_in)
-    unit.mix_temp_output = _weighted_mean(energies.layers_heat_out_temperature, energies.layers_heat_out)
+    unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
+    unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
 
-    sub!(unit.input_interfaces[unit.m_el_in], energies.layers_el_in)
+    sub!(unit.input_interfaces[unit.m_el_in], energies.slices_el_in)
     sub!(unit.input_interfaces[unit.m_heat_in],
-         energies.layers_heat_in,
-         lowest(energies.layers_heat_in_temperature),
-         energies.layers_heat_in_uac)
+         energies.slices_heat_in,
+         lowest(energies.slices_heat_in_temperature),
+         energies.slices_heat_in_uac)
     add!(unit.output_interfaces[unit.m_heat_out],
-         energies.layers_heat_out,
-         highest(energies.layers_heat_out_temperature),
-         energies.layers_heat_out_uac)
+         energies.slices_heat_out,
+         highest(energies.slices_heat_out_temperature),
+         energies.slices_heat_out_uac)
 end
 
 # has its own reset function as here more parameters are present that need to be reset in

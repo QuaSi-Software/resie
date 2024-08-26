@@ -531,7 +531,7 @@ function test_heat_pump_2S2D_min_power()
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
 
-    # first time step: full power is too much to fullfill min_power_fraction, but some layers
+    # first time step: full power is too much to fullfill min_power_fraction, but some slices
     # can be "slowed down" to compensate
 
     for unit in values(components)
@@ -556,7 +556,7 @@ function test_heat_pump_2S2D_min_power()
     @test produced_heat ≈ 3000.0
     @test produced_heat / energy_full_power < heat_pump.min_power_fraction
 
-    # second time step: min power of each layer is so high that they can't be "slowed down"
+    # second time step: min power of each slice is so high that they can't be "slowed down"
     # enough to compensate
     heat_pump.min_power_function = (x, y) -> 0.8
     heat_pump.min_power_fraction = 0.6
