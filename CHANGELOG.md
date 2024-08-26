@@ -4,6 +4,13 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.9.4
+* Improve geothermal probe:
+  * fix interpolation of g-functions
+  * fix error if no regeneration is required
+  * add import of custom g-function via txt file
+  * add temperature limit for loading and unloading
+
 ### Version 0.9.3
 * Apply autoformat to all remaining non-formatted files
   
