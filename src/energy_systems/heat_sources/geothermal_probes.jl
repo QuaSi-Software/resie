@@ -493,7 +493,7 @@ function get_g_values_from_file(unit::GeothermalProbes)
                    "\"$(unit.uac)\" at $(unit.g_function_file_path). Please make sure the data starts with ***."
             throw(InputError)
         else
-            @info "Succesfully read out the g-function values from $(unit.g_function_file_path) for \"$(unit.uac)\"."
+            @info "Successfully read out the g-function values from $(unit.g_function_file_path) for \"$(unit.uac)\"."
             return g_func_vals, ln_time_normalized, num_probes, nothing
         end
     catch e
