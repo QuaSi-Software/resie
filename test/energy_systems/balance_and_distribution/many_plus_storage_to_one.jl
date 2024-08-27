@@ -52,11 +52,7 @@ function test_many_plus_storage_to_one()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     source_1 = components["TST_SRC_01"]

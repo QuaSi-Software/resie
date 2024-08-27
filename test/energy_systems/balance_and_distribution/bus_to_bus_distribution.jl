@@ -45,11 +45,7 @@ function test_short_chain_distribution()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     proxy = components["Proxy-TST_BUS_01|TST_BUS_02"]
@@ -149,11 +145,7 @@ function test_long_chain_distribution()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     proxy = components["Proxy-TST_BUS_01|TST_BUS_02|TST_BUS_04|TST_BUS_03"]

@@ -454,6 +454,8 @@ end
     convert_extensive_profile
 
 Function to convert extensive profiles(e.g., energy demand) from the profile time step to the simulation time step.
+Note: This function might return data extending beyond the end_time specified in the input file. 
+      This extra data is retained as it does not affect any calculations or results.
 
 Inputs: 
     values::Vector{Float64}         values of the profile to convert
