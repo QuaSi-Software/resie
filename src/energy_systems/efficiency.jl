@@ -65,7 +65,7 @@ function parse_efficiency_function(eff_def::String)::Function
         end
     end
 
-    @warn "Cannot parse efficiency function from: $eff_def"
+    @error "Cannot parse efficiency function from: $eff_def"
     return plr -> plr
 end
 
@@ -96,7 +96,7 @@ function parse_2dim_function(eff_def::String)::Function
         end
     end
 
-    @warn "Cannot parse 2-dimensional function from: $eff_def"
+    @error "Cannot parse 2-dimensional function from: $eff_def"
     return (x, y) -> 0.0
 end
 
@@ -187,7 +187,7 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
         end
     end
 
-    @warn "Cannot parse COP function from: $eff_def"
+    @error "Cannot parse COP function from: $eff_def"
     return nothing, (plr -> plr)
 end
 
