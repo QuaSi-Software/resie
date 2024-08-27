@@ -235,7 +235,8 @@ function handle_slice(unit::HeatPump,
                       available_heat_in::Floathing,
                       available_heat_out::Floathing,
                       in_temp::Temperature,
-                      out_temp::Temperature)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
+                      out_temp::Temperature,
+                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
     do_bypass = false
     if unit.constant_cop !== nothing
@@ -244,7 +245,7 @@ function handle_slice(unit::HeatPump,
         cop = unit.bypass_cop
         do_bypass = true
     else
-        cop = unit.dynamic_cop(in_temp, out_temp)(1.0)
+        cop = unit.dynamic_cop(in_temp, out_temp)(plr)
         if unit.consider_icing
             cop = icing_correction(unit, cop, in_temp)
         end
@@ -367,7 +368,8 @@ function calculate_energies_heatpump(unit::HeatPump,
                                         energies.available_heat_in[current_in_idx],
                                         remaining_heat_out,
                                         current_in_temp,
-                                        current_out_temp)
+                                        current_out_temp,
+                                        1.0) # for the first approximation we use full power
 
         # finally all checks done, we add the slice and update remaining energies
         push!(energies.slices_el_in_temp, used_el_in)

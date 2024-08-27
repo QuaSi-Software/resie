@@ -123,26 +123,31 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
-        method = lowercase(splitted[1])
-        data = splitted[2]
+        method_cop = lowercase(splitted[1])
+        data_cop = splitted[2]
 
-        if method == "const"
-            c = parse(Float64, data)
+        plr_func = plr -> 1.0
+        if length(splitted) == 4
+            plr_func = parse_efficiency_function("$(splitted[3]):$(splitted[4])")
+        end
+
+        if method_cop == "const"
+            c = parse(Float64, data_cop)
             return c, function (src, snk)
                        return plr -> c
                    end
 
-        elseif method == "carnot"
-            c = parse(Float64, data)
+        elseif method_cop == "carnot"
+            c = parse(Float64, data_cop)
             return nothing, function (src, snk)
                        if src === nothing || snk === nothing
                            return plr -> nothing
                        end
-                       return plr -> (c * (273.15 + snk) / (snk - src))
+                       return plr -> (plr_func(plr) * c * (273.15 + snk) / (snk - src))
                    end
 
-        elseif method == "field"
-            rows = split(data, ';')
+        elseif method_cop == "field"
+            rows = split(data_cop, ';')
             cells = [parse.(Float64, split(row, ",")) for row in rows]
             dim_src = length(cells)
             dim_snk = length(cells[1])
@@ -173,16 +178,19 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                            @error "Given temperatures $src and $snk outside of COP field."
                            throw(BoundsError(values, (src_idx, snk_idx)))
                        end
-                       return plr -> bilinear_interpolate(values[1, snk_idx],
-                                                          snk,
-                                                          values[1, snk_idx + 1],
-                                                          values[src_idx, 1],
-                                                          src,
-                                                          values[src_idx + 1, 1],
-                                                          values[src_idx, snk_idx],
-                                                          values[src_idx, snk_idx + 1],
-                                                          values[src_idx + 1, snk_idx],
-                                                          values[src_idx + 1, snk_idx + 1])
+                       return function (plr)
+                           factor = plr_func(plr)
+                           return bilinear_interpolate(values[1, snk_idx],
+                                                       snk,
+                                                       values[1, snk_idx + 1],
+                                                       values[src_idx, 1],
+                                                       src,
+                                                       values[src_idx + 1, 1],
+                                                       factor * values[src_idx, snk_idx],
+                                                       factor * values[src_idx, snk_idx + 1],
+                                                       factor * values[src_idx + 1, snk_idx],
+                                                       factor * values[src_idx + 1, snk_idx + 1])
+                       end
                    end
         end
     end
