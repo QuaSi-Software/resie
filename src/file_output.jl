@@ -392,20 +392,27 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
     end
 
     # create plot
-    if project_config["io_settings"]["output_plot_time_unit"] == "seconds"
+    output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
+                            project_config["io_settings"]["output_plot_time_unit"] : "date"
+    if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
+        @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
+              "It will be set to `date` as default."
+        output_plot_time_unit = "date"
+    end
+    if output_plot_time_unit == "seconds"
         x = outputs_plot_data[:, 1]
-    elseif project_config["io_settings"]["output_plot_time_unit"] == "minutes"
+    elseif output_plot_time_unit == "minutes"
         x = outputs_plot_data[:, 1] / 60
-    elseif project_config["io_settings"]["output_plot_time_unit"] == "hours"
+    elseif output_plot_time_unit == "hours"
         x = outputs_plot_data[:, 1] / 60 / 60
-    elseif project_config["io_settings"]["output_plot_time_unit"] == "date"
+    else
         if sim_params["start_date"] === nothing
             start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
             @info ("Date of first data point in ouput line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
         else
             start_date = sim_params["start_date"]
         end
-        x = [start_date + Dates.Second(s) for s in outputs_plot_data[:, 1]]
+        x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in outputs_plot_data[:, 1]]
     end
 
     y = outputs_plot_data[:, 2:end]
@@ -424,12 +431,29 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
         push!(traces, trace)
     end
 
-    layout = Layout(;
-                    title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
-                               "the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
-                    xaxis_title_text="Time [$(project_config["io_settings"]["output_plot_time_unit"])]",
-                    yaxis_title_text="",
-                    yaxis2=attr(; title="", overlaying="y", side="right"))
+    if output_plot_time_unit == "date"
+        leap_days_str = string.([Date(year, 2, 29)
+                                 for year in
+                                     Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                                 if isleapyear(year)])
+
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"),
+                        xaxis=attr(; type="date",
+                                   rangebreaks=[Dict("values" => leap_days_str)]))
+    else
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"))
+    end
+
     p = plot(traces, layout)
 
     file_path = default(project_config["io_settings"],

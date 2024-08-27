@@ -56,17 +56,19 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
     weather_file_path = default(project_config["simulation_parameters"],
                                 "weather_file_path",
                                 nothing)
+
     if weather_file_path !== nothing
         sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params)
-    end
 
-    if sim_params["latitude"] !== nothing || sim_params["longitude"] !== nothing
-        @info "The coordinates given in the simulation_parameters in the input file where overwritten by the " *
-              "ones given in the provided weather file:\n" *
-              "Latidude: $lat; Longitude: $long"
+        if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+            sim_params["latitude"] = lat
+            sim_params["longitude"] = long
+        else
+            @info "The coordinates given in the weather file where overwritten by the " *
+                  "ones given in the input file:\n" *
+                  "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+        end
     end
-    sim_params["latitude"] = lat
-    sim_params["longitude"] = long
 
     return sim_params
 end

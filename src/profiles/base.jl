@@ -4,7 +4,8 @@ using Dates, TimeZones
 
 # TimeZones.TZData.compile(max_year=2200)
 
-export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days, add_ignoring_leap_days
+export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
+       add_ignoring_leap_days, sub_ignoring_leap_days
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
@@ -119,7 +120,8 @@ mutable struct Profile
                                                  file_path,
                                                  "profile_start_date_format")
                     for idx in eachindex(profile_values)
-                        profile_timestamps_date[idx] = start_date + Second((idx - 1) * profile_time_step)
+                        profile_timestamps_date[idx] = add_ignoring_leap_days(start_date,
+                                                                              Second((idx - 1) * profile_time_step))
                     end
                 end
             elseif time_definition == "startdate_timestamp"
@@ -135,15 +137,17 @@ mutable struct Profile
                                                  "profile_start_date_format")
                     if timestamp_format == "seconds"
                         for (idx, entry) in enumerate(profile_timestamps)
-                            profile_timestamps_date[idx] = start_date + Second(parse(Int64, entry))
+                            profile_timestamps_date[idx] = add_ignoring_leap_days(start_date,
+                                                                                  Second(parse(Int64, entry)))
                         end
                     elseif timestamp_format == "minutes"
                         for (idx, entry) in enumerate(profile_timestamps)
-                            profile_timestamps_date[idx] = start_date + Minute(parse(Int64, entry))
+                            profile_timestamps_date[idx] = add_ignoring_leap_days(start_date,
+                                                                                  Minute(parse(Int64, entry)))
                         end
                     elseif timestamp_format == "hours"
                         for (idx, entry) in enumerate(profile_timestamps)
-                            profile_timestamps_date[idx] = start_date + Hour(parse(Int64, entry))
+                            profile_timestamps_date[idx] = add_ignoring_leap_days(start_date, Hour(parse(Int64, entry)))
                         end
                     else
                         @error "For the profile at $(file_path) the 'timestamp_format' has to be one of 'seconds', 'minutes' or 'hours'!"
@@ -308,14 +312,43 @@ end
     add_ignoring_leap_days(timestamp::DateTime, diff::DateTime.Period)
 
 Adds diff to the timestamp. If the result is a leap day, skip to the next day.
+If a leap day is in between, do not count it!
 """
 function add_ignoring_leap_days(timestamp::DateTime, diff::Period)
     new_time = timestamp + diff
-    if month(new_time) == 2 && day(new_time) == 29
-        return new_time + Day(1)
-    else
-        return new_time
+    nr_of_leap_days = 0
+    for year in year(timestamp):year(new_time)
+        if isleapyear(year)
+            leap_day = DateTime(year, 2, 29)
+            if leap_day >= timestamp && leap_day <= new_time
+                nr_of_leap_days += 1
+            end
+        end
     end
+
+    return new_time + nr_of_leap_days * Day(1)
+end
+
+"""
+    sub_ignoring_leap_days(end_date::DateTime, begin_date::DateTime)
+
+Substract: DateTime.Period = end_date - begin_date
+If the result is a leap day, skip to the next day.
+If a leap day is in between, do not count it!
+"""
+function sub_ignoring_leap_days(end_date::DateTime, begin_date::DateTime)
+    time_span = end_date - begin_date
+    nr_of_leap_days = 0
+    for year in year(begin_date):year(end_date)
+        if isleapyear(year)
+            leap_day = DateTime(year, 2, 29)
+            if leap_day >= begin_date && leap_day <= end_date
+                nr_of_leap_days += 1
+            end
+        end
+    end
+
+    return time_span - Millisecond(nr_of_leap_days * 24 * 60 * 60 * 1000)
 end
 
 """
@@ -479,7 +512,8 @@ function convert_extensive_profile(values::Vector{Float64},
     end
 
     # handle segmentation and aggregation at once
-    new_max_timestep = ceil(Int, Second(timestamps[end] - timestamps[1]) / new_time_step) * new_time_step
+    new_max_timestep = ceil(Int, Second(sub_ignoring_leap_days(timestamps[end], timestamps[1])) / new_time_step) *
+                       new_time_step
     if original_time_step > new_time_step
         new_length = ceil(Int, new_max_timestep / new_time_step + original_time_step / new_time_step)
     else
@@ -489,7 +523,7 @@ function convert_extensive_profile(values::Vector{Float64},
     start_time = Base.minimum(timestamps)
 
     for (timestamp, value) in zip(timestamps, values)
-        current_running_time = Second(timestamp - start_time)
+        current_running_time = Second(sub_ignoring_leap_days(timestamp, start_time))
         new_time_index_start = floor(Int, current_running_time / new_time_step) + 1
         new_time_index_end = floor(Int, (current_running_time + original_time_step) / new_time_step) + 1
 
@@ -505,7 +539,7 @@ function convert_extensive_profile(values::Vector{Float64},
         end
     end
 
-    end_time = start_time + new_time_step * (new_length - 1)
+    end_time = add_ignoring_leap_days(start_time, new_time_step * (new_length - 1))
     new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
 
     @info "The profile at $(file_path) (extensive profile) was converted from the profile timestep " *
@@ -541,12 +575,12 @@ function convert_intensive_profile(values::Vector{Float64},
 
     elseif new_time_step < original_time_step  # segmentation
         ref_time = Base.minimum(timestamps)
-        numeric_timestamps = [Dates.value(Second(dt - ref_time)) for dt in timestamps]
+        numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
         interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
         new_timestamps = remove_leap_days(collect(range(Base.minimum(timestamps);
                                                         stop=Base.maximum(timestamps),
                                                         step=new_time_step)))
-        new_numeric_timestamps = [Dates.value(Second(dt - ref_time)) for dt in new_timestamps]
+        new_numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
         converted_profile = [interp(t) for t in new_numeric_timestamps]
 
         # add missing entries by coping the last entry
@@ -573,7 +607,7 @@ function convert_intensive_profile(values::Vector{Float64},
         end
 
         start_time = Base.minimum(timestamps)
-        end_time = start_time + new_time_step * (new_length - 1)
+        end_time = add_ignoring_leap_days(start_time, new_time_step * (new_length - 1))
         new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
 
         @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
