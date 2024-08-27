@@ -15,18 +15,18 @@ of the requested simulation timestep. Otherwise, an error will arise.
 
 This function can handle either a path to a .prf file, or the profile data can be
 handed over as vectors. Then, the profile with the corresponding timestamps, the time step
-and the flag is_power has to be provided as optional arguments. 
+and the data_type (intensive/extensive) has to be provided as optional arguments. 
 
-The flag is_power is essential to make sure that the profile data is converted correcty.
-It has to be set true for all intensive values like temperatures, power, wind speed or
-for profiles containting states. Only for energies, is_power has to be set to false.
+The data_type is essential to make sure that the profile data is converted correcty.
+It has to be set to "intensive" for values like temperatures, power, wind speed or
+for profiles containting states. Only for energies, data_type has to be set to "extensive".
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
     time_step::Int
 
-    """Indicates whether the profile values are power or work."""
-    is_power::Bool
+    """Indicates whether the profile values are power/temperature ("intensive") or work ("extensive")."""
+    data_type::String
 
     """Holds the profile values indexed by the time step number"""
     data::Dict{DateTime,Float64}
@@ -37,13 +37,13 @@ mutable struct Profile
                      given_profile_values::Vector{Float64}=Float64[], # optional: Vector{Float64} that holds values of the profile
                      given_timestamps::Vector{DateTime}=DateTime[],   # optional: Vector{DateTime} that holds the time step as DateTime
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the timestep in seconds of the given data
-                     given_is_power::Bool=false)                      # optional: Bool that indicates if the data is intensive or extensive
+                     given_data_type::Union{String,Nothing}=nothing) # optional: datatype, shoule be "intensive" or "extensive"
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
 
             profile_time_step = nothing
-            is_power = nothing
+            data_type = nothing
             timestamp_format = nothing
             time_definition = nothing
             profile_start_date = nothing
@@ -63,8 +63,8 @@ mutable struct Profile
                         splitted = split(strip(line, '#'), ':'; limit=2)
                         if strip(splitted[1]) == "profile_time_step_seconds"
                             profile_time_step = parse(Int, String(strip(splitted[2])))
-                        elseif strip(splitted[1]) == "is_power"
-                            is_power = parse(Bool, String(strip(splitted[2])))
+                        elseif strip(splitted[1]) == "data_type"
+                            data_type = String(strip(splitted[2]))
                         elseif strip(splitted[1]) == "timestamp_format"
                             timestamp_format = String(strip(splitted[2]))
                         elseif strip(splitted[1]) == "time_definition"
@@ -100,13 +100,7 @@ mutable struct Profile
                 end
             end
 
-            if is_power === nothing
-                @error "For the profile at $(file_path) no profile type ('is_power') is given!"
-                throw(InputError)
-            end
-
             profile_timestamps_date = Vector{DateTime}(undef, length(profile_values))
-
             # convert profile_timestamps to DateTime
             if time_definition == "startdate_timestepsize"
                 if isnothing(profile_start_date) || isnothing(profile_start_date_format) || isnothing(profile_time_step)
@@ -188,7 +182,7 @@ mutable struct Profile
             profile_values = given_profile_values
             profile_time_step = Dates.value(given_time_step)
             profile_timestamps_date = given_timestamps
-            is_power = given_is_power
+            data_type = given_data_type
             time_zone = nothing
         end
 
@@ -231,24 +225,28 @@ mutable struct Profile
             throw(InputError)
         end
 
-        if is_power # meaning intensive values (e.g., temperature, power)
+        if data_type == "intensive"         # e.g., temperature, power
             values_converted, profile_timestamps_date_converted = convert_intensive_profile(profile_values,
                                                                                             profile_timestamps_date,
                                                                                             Second(Int(profile_time_step)),
                                                                                             Second(sim_params["time_step_seconds"]),
                                                                                             file_path)
-        else # meaning extensive values (e.g., energy demand)
+        elseif data_type == "extensive"     # e.g., energy demand
             values_converted, profile_timestamps_date_converted = convert_extensive_profile(profile_values,
                                                                                             profile_timestamps_date,
                                                                                             Second(Int(profile_time_step)),
                                                                                             Second(sim_params["time_step_seconds"]),
                                                                                             file_path)
+        else
+            @error "For the profile at $(file_path) no valid 'data_type' is given! " *
+                   "Has to be either 'intensive' or 'extensive'."
+            throw(InputError)
         end
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
         return new(sim_params["time_step_seconds"],   # Period: time_step, equals simulation time step after conversion, in seconds
-                   is_power,                          # Bool: to indicate if profil is intensive or extensive (true means is intensive profile)
+                   data_type,                         # String: intensive or extensive profile data
                    profile_dict)                      # Dict{DateTime, Float64}() dict with timestamp as key and data of profile, in simulation time step
     end
 end
@@ -389,10 +387,13 @@ end
 Get the power value of the profile at the given time.
 """
 function power_at_time(profile::Profile, sim_params::Dict{String,Any})
-    if profile.is_power
+    if profile.data_type == "intensive"
         return profile.data[sim_params["current_date"]]
-    else
+    elseif profile.data_type == "extensive"
         return profile.data[sim_params["current_date"]] * (3600 / profile.time_step)
+    else
+        @error "For current profile has no information on the 'data_type'! " *
+               "Has to be either 'intensive' or 'extensive'."
     end
 end
 
@@ -402,10 +403,13 @@ end
 Get the work value of the profile at the given time.
 """
 function work_at_time(profile::Profile, sim_params::Dict{String,Any})
-    if profile.is_power
+    if profile.data_type == "intensive"
         return profile.data[sim_params["current_date"]] * (profile.time_step / 3600)
-    else
+    elseif profile.data_type == "extensive"
         return profile.data[sim_params["current_date"]]
+    else
+        @error "For current profile has no information on the 'data_type'! " *
+               "Has to be either 'intensive' or 'extensive'."
     end
 end
 
@@ -413,7 +417,7 @@ end
     value_at_time(profile, time)
 
 Get the value of the profile at the given time without any conversion.
-The flag is_power will be ignored.
+The data_type will be ignored.
 """
 function value_at_time(profile::Profile, sim_params::Dict{String,Any})
     return profile.data[sim_params["current_date"]]

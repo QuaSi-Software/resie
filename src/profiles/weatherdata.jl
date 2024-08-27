@@ -61,13 +61,13 @@ mutable struct WeatherData
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
-                                given_is_power=false)
+                                given_data_type="extensive")
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
-                                given_is_power=false)
+                                given_data_type="extensive")
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
@@ -86,13 +86,13 @@ mutable struct WeatherData
                                  given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
                                  given_timestamps=timestamp,
                                  given_time_step=time_step,
-                                 given_is_power=false)
+                                 given_data_type="extensive")
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
-                                given_is_power=false)
+                                given_data_type="extensive")
             dirHorIrr = deepcopy(globHorIrr)
             dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
@@ -106,7 +106,7 @@ mutable struct WeatherData
                               given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
                               given_timestamps=timestamp,
                               given_time_step=time_step,
-                              given_is_power=false)
+                              given_data_type="extensive")
 
         # convert other data to profile
         temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -114,14 +114,14 @@ mutable struct WeatherData
                                    given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
                                    given_timestamps=timestamp,
                                    given_time_step=time_step,
-                                   given_is_power=true)
+                                   given_data_type="intensive")
 
         wind_speed = Profile(weather_file_path * ":WindSpeed",
                              sim_params;
                              given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
                              given_timestamps=timestamp,
                              given_time_step=time_step,
-                             given_is_power=true)
+                             given_data_type="intensive")
 
         return new(temp_ambient_air,
                    wind_speed,
