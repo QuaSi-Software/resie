@@ -60,7 +60,7 @@ mutable struct Profile
                     if isempty(line) || length(line) < 2 # handle empty lines
                         continue
                     elseif line[1] == '#'
-                        splitted = split(strip(line, '#'), ';')
+                        splitted = split(strip(line, '#'), ':'; limit=2)
                         if strip(splitted[1]) == "profile_time_step_seconds"
                             profile_time_step = parse(Int, String(strip(splitted[2])))
                         elseif strip(splitted[1]) == "is_power"
