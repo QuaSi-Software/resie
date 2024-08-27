@@ -184,7 +184,8 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
-        sim_params["current_date"] += Second(sim_params["time_step_seconds"])
+        sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
+                                                            Second(sim_params["time_step_seconds"]))
 
         if steps == 1
             sim_params["is_first_timestep"] = false

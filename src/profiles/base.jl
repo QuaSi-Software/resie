@@ -4,7 +4,7 @@ using Dates, TimeZones
 
 # TimeZones.TZData.compile(max_year=2200)
 
-export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days
+export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days, add_ignoring_leap_days
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
@@ -304,6 +304,20 @@ Detect and remove a leap day from a timestep.
 """
 function remove_leap_days(timestamp::Vector{DateTime})
     return [dt for dt in timestamp if !(month(dt) == 2 && day(dt) == 29)]
+end
+
+"""
+    add_ignoring_leap_days(timestamp::DateTime, diff::DateTime.Period)
+
+Adds diff to the timestamp. If the result is a leap day, skip to the next day.
+"""
+function add_ignoring_leap_days(timestamp::DateTime, diff::Period)
+    new_time = timestamp + diff
+    if month(new_time) == 2 && day(new_time) == 29
+        return new_time + Day(1)
+    else
+        return new_time
+    end
 end
 
 """
