@@ -179,7 +179,7 @@ function get_timesteps(simulation_parameters::Dict{String,Any})
               "(`time_step` and `time_step_unit` have to be given!).")
     end
 
-    nr_of_steps = UInt(max(1, floor(Dates.value(Second(end_date - start_date)) / time_step)))
+    nr_of_steps = UInt(max(1, floor(Dates.value(Second(end_date - start_date)) / time_step)) + 1)
 
     return UInt(time_step), start_date, end_date, nr_of_steps
 end
