@@ -43,7 +43,6 @@ function test_gasboiler_demand_driven_with_bus()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -246,7 +245,6 @@ function test_gasboiler_demand_driven_without_bus()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

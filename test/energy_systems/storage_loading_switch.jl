@@ -75,7 +75,6 @@ function test_primary_producer_can_load_storage()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

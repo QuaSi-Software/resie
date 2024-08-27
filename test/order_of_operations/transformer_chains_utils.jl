@@ -59,7 +59,6 @@ function test_distance_from_sink()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -132,7 +131,6 @@ function test_iteration_order()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -226,7 +224,6 @@ function test_find_chains()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -402,7 +399,6 @@ function test_find_indirect_chains()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -614,7 +610,6 @@ function test_find_indirect_chains_denied()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -828,7 +823,6 @@ function test_find_indirect_chains_denied2()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

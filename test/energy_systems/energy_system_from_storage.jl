@@ -56,7 +56,6 @@ function test_run_energy_system_from_storage()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -217,7 +216,6 @@ function test_run_energy_system_from_storage_denied()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

@@ -41,7 +41,6 @@ function test_heat_pump_demand_driven_correct_order()
         "time_step_seconds" => 900,
         "time" => 0,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true
     )
 
     components = Resie.load_components(components_config, simulation_parameters)

@@ -49,7 +49,6 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "start_date" => start_date,
         "end_date" => end_date,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
     )
@@ -186,10 +185,6 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         sim_params["time"] += Int(sim_params["time_step_seconds"])
         sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
                                                             Second(sim_params["time_step_seconds"]))
-
-        if steps == 1
-            sim_params["is_first_timestep"] = false
-        end
     end
 
     ### create profile line plot
