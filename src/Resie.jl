@@ -128,6 +128,11 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
+    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
+    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
+        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
+        throw(IntputError)
+    end
 
     # Initialize the array for output plots
     if do_create_plot
@@ -135,7 +140,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     end
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_csv)
+        reset_file(csv_output_file_path, output_keys_to_csv, csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -170,7 +175,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params["time"])
+            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params, csv_time_unit)
         end
 
         # get the energy transported through each interface in every timestep for Sankey

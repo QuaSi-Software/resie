@@ -243,9 +243,19 @@ reset_file(filepath, output_keys)
 
 Reset the output file and add headers for the given outputs.
 """
-function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey})
+function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey}, csv_time_unit::String)
     open(abspath(filepath), "w") do file_handle
-        write(file_handle, "Time [s]")
+        if csv_time_unit == "seconds"
+            time_unit = "[s]"
+        elseif csv_time_unit == "minutes"
+            time_unit = "[min]"
+        elseif csv_time_unit == "hours"
+            time_unit = "[h]"
+        elseif csv_time_unit == "date"
+            time_unit = "[dd.mm.yyyy HH:MM:SS]"
+        end
+
+        write(file_handle, "Time $time_unit")
 
         for outkey in output_keys
             if outkey.medium === nothing
@@ -267,8 +277,19 @@ Write the given outputs for the given time to file.
 """
 function write_to_file(filepath::String,
                        output_keys::Vector{EnergySystems.OutputKey},
-                       time::Int)
+                       sim_params::Dict{String,Any},
+                       csv_time_unit::String)
     open(abspath(filepath), "a") do file_handle
+        if csv_time_unit == "seconds"
+            time = sim_params["time"]
+        elseif csv_time_unit == "minutes"
+            time = sim_params["time"] / 60
+        elseif csv_time_unit == "hours"
+            time = sim_params["time"] / 60 / 60
+        elseif csv_time_unit == "date"
+            time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+        end
+
         write(file_handle, "$time")
 
         for outkey in output_keys
