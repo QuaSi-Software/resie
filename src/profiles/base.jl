@@ -116,7 +116,7 @@ mutable struct Profile
                         throw(InputError)
                     end
                     start_date = parse_datestamp(profile_start_date,
-                                                 profile_start_date_format,
+                                                 convert_String_to_DateFormat(profile_start_date_format, file_path),
                                                  file_path,
                                                  "profile_start_date_format")
                     for idx in eachindex(profile_values)
@@ -132,7 +132,7 @@ mutable struct Profile
                 else
                     # calculate time step from startdate and continuos timestamp
                     start_date = parse_datestamp(profile_start_date,
-                                                 profile_start_date_format,
+                                                 convert_String_to_DateFormat(profile_start_date_format, file_path),
                                                  file_path,
                                                  "profile_start_date_format")
                     if timestamp_format == "seconds"
@@ -161,9 +161,10 @@ mutable struct Profile
                     throw(InputError)
                 else
                     # get time step from datestamp
+                    df = convert_String_to_DateFormat(timestamp_format, file_path)
                     for (idx, entry) in enumerate(profile_timestamps)
                         profile_timestamps_date[idx] = parse_datestamp(entry,
-                                                                       timestamp_format,
+                                                                       df,
                                                                        file_path,
                                                                        "timestamp_format")
                     end
@@ -176,7 +177,6 @@ mutable struct Profile
 
             if isnothing(profile_time_step) && length(profile_timestamps_date) > 1
                 profile_time_step = Dates.value(Second(profile_timestamps_date[2] - profile_timestamps_date[1]))
-                @info "For the profile at $(file_path), a timestep of $(string(profile_time_step)) seconds was detected."
             elseif isnothing(profile_time_step)
                 @error "For the profile at $(file_path) no profile time step could be determined. " *
                        "Please specify one with the parameter 'profile_time_step_seconds'."
@@ -256,11 +256,32 @@ mutable struct Profile
 end
 
 """
+    convert_String_to_DateFormat()
+
+function to pase a string to a a DateFormat.
+    datetime_str::String      A DateFormat as string
+    file_path::String         File path of the profile for error handling, for error message.
+
+Returns
+    datetime_dt::DateFormat   The parsed DateFormat
+"""
+function convert_String_to_DateFormat(datetime_str::String, file_path::String)::DateFormat
+    try
+        return DateFormat(datetime_str)
+    catch e
+        @error "Time given date specifier '$(datetime_str)' of profile at $(file_path) could not be converted " *
+               "to a DateFormat. Make shure, is matches the format specification of the Julia Dates package. " *
+               "The following error occured: $e"
+        throw(InputError)
+    end
+end
+
+"""
     parse_datestamp()
 
 function to pase a datestamp from a string to a given date format.
     datetime_str::String        Timestamp read from the profile file. Should be a specified DateTime format as string.
-    time_format::String         Format of datetime_str. Shoule be a DateTime format, like "dd-mm-yyyy HH:MM:SS"
+    time_format::DateFormat     Format of datetime_str. Shoule be a DateTime format, like "dd-mm-yyyy HH:MM:SS"
     file_path::String           File path of the profile for error handling, for error message.
     time_format_variable_name::String   The variable name of the time format, for error message.
 
@@ -268,16 +289,16 @@ Returns
     parsed_timestep::DateTime   The parsed timestep as DateTime
 """
 function parse_datestamp(datetime_str::String,
-                         time_format::String,
+                         time_format::DateFormat,
                          file_path::String,
                          time_format_variable_name::String)
     try
         return Dates.DateTime(datetime_str, time_format)
     catch e
-        @error("Time given date specifier of profile at $(file_path) does not fit to the data.\n" *
-               "'$(time_format_variable_name)' has to match the dataformat, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
+        @error "Time given date specifier of profile at $(file_path) does not fit to the data. " *
+               "'$(time_format_variable_name)' has to match the dataformat, e.g. 'dd-mm-yyyy HH:MM:SS'. " *
                "'$(time_format_variable_name)' is `$(time_format)` which does not fit to the " *
-               "timestamp given `$(datetime_str)`.\n The following error occured: $e")
+               "timestamp given `$(datetime_str)`.\n The following error occured: $e"
         throw(InputError)
     end
 end
