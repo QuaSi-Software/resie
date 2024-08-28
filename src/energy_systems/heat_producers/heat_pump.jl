@@ -283,19 +283,16 @@ function handle_slice(unit::HeatPump,
             do_bypass ? in_temp : out_temp)
 end
 
-function calculate_energies_heatpump(unit::HeatPump,
-                                     sim_params::Dict{String,Any},
-                                     energies::HPEnergies)::HPEnergies
-    energies.slices_el_in_temp = Vector{Floathing}()
-    energies.slices_heat_in_temp = Vector{Floathing}()
-    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
-    energies.slices_heat_in_uac_temp = Vector{Stringing}()
-    energies.slices_heat_out_temp = Vector{Floathing}()
-    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
-    energies.slices_heat_out_uac_temp = Vector{Stringing}()
+function calculate_slices(unit::HeatPump,
+                          sim_params::Dict{String,Any},
+                          energies::HPEnergies,
+                          plrs::Array{<:Floathing,2})::Tuple{HPEnergies,Vector{Float64},Vector{Float64},
+                                                             Array{<:Floathing,2}}
 
-    times_min = []
-    times_max = []
+    # times_min means the time slice assuming minimum power. times_min are actually larger
+    # than times_max
+    times_min = Vector{Float64}()
+    times_max = Vector{Float64}()
     sum_usage = 0.0
     current_in_idx::Int = 0
     current_out_idx::Int = 0
@@ -359,6 +356,10 @@ function calculate_energies_heatpump(unit::HeatPump,
         remaining_heat_out = min(energies.available_heat_out[current_out_idx],
                                  (energies.max_usage_fraction - sum_usage) * watt_to_wh(max_power))
 
+        if plrs[current_in_idx, current_out_idx] === nothing
+            plrs[current_in_idx, current_out_idx] = 1.0
+        end
+
         used_heat_in,
         used_el_in,
         used_heat_out,
@@ -369,7 +370,7 @@ function calculate_energies_heatpump(unit::HeatPump,
                                         remaining_heat_out,
                                         current_in_temp,
                                         current_out_temp,
-                                        1.0) # for the first approximation we use full power
+                                        plrs[current_in_idx, current_out_idx])
 
         # finally all checks done, we add the slice and update remaining energies
         push!(energies.slices_el_in_temp, used_el_in)
@@ -389,12 +390,32 @@ function calculate_energies_heatpump(unit::HeatPump,
         push!(times_max, used_heat_out * 3600 / max_power)
     end
 
-    # as long as the times_max sum is smaller than the time step and the times_min sum is
-    # larger than the time step multiplied with the min power fraction, we can find a
-    # dispatch of each slice within their min/max times so the overall sum works
-    if (sum(times_max; init=0.0) > sim_params["time_step_seconds"] ||
-        sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"])
-        # end of condition
+    return energies, times_min, times_max, plrs
+end
+
+function calculate_energies_heatpump(unit::HeatPump,
+                                     sim_params::Dict{String,Any},
+                                     energies::HPEnergies)::HPEnergies
+    energies.slices_el_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_in_uac_temp = Vector{Stringing}()
+    energies.slices_heat_out_temp = Vector{Floathing}()
+    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_out_uac_temp = Vector{Stringing}()
+
+    # initial PLRs are nothing, as we do not yet know which slices are used and which aren't
+    plrs = Array{Floathing,2}(nothing,
+                              length(energies.available_heat_in),
+                              length(energies.available_heat_out))
+
+    energies, times_min, times_max, plrs = calculate_slices(unit, sim_params, energies, plrs)
+
+    # as long as sum of times with minimum power per slice is larger than the time step
+    # multiplied with the min power fraction, we can find a dispatch of each slice by
+    # "slowing them down", so the sum exceeds the minimum power fraction. if not, the heat
+    # pump should not run at all
+    if sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"]
         energies.slices_el_in_temp = []
         energies.slices_heat_in_temp = []
         energies.slices_heat_in_temperature_temp = []
