@@ -227,6 +227,138 @@ end
     test_heat_pump_1S1D_icing_losses()
 end
 
+function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
+    base_dict = Dict{String,Any}(
+        "TST_GRI_01" => Dict{String,Any}(
+            "type" => "GridConnection",
+            "medium" => "m_e_ac_230v",
+            "output_refs" => ["TST_HP_01"],
+            "is_source" => true,
+        ),
+        "TST_HP_01" => Dict{String,Any}(
+            "type" => "HeatPump",
+            "output_refs" => ["TST_DEM_01"],
+            "power_th" => 2500 * 4,
+        ),
+    )
+
+    if inf_as_source
+        base_dict["TST_HP_01"]["input_temperature"] = 30
+
+        extended = Dict{String,Any}(
+            "TST_DEM_01" => Dict{String,Any}(
+                "type" => "Demand",
+                "medium" => "m_h_w_ht1",
+                "output_refs" => [],
+                "constant_demand" => 2000 * 4,
+                "constant_temperature" => 60,
+            ),
+            "TST_SRC_01" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_h_w_lt1",
+                "output_refs" => ["TST_HP_01"],
+                "is_source" => true,
+            ),
+        )
+    else
+        base_dict["TST_HP_01"]["output_temperature"] = 60
+
+        extended = Dict{String,Any}(
+            "TST_DEM_01" => Dict{String,Any}(
+                "type" => "GridConnection",
+                "medium" => "m_h_w_lt1",
+                "output_refs" => ["TST_HP_01"],
+                "is_source" => false,
+            ),
+            "TST_SRC_01" => Dict{String,Any}(
+                "type" => "FixedSupply",
+                "medium" => "m_h_w_lt1",
+                "output_refs" => ["TST_HP_01"],
+                "constant_supply" => 2000 * 4,
+                "constant_temperature" => 30,
+            ),
+        )
+    end
+
+    return Base.merge(base_dict, extended)
+end
+
+function test_heat_pump_1S1D_infinite_input()
+    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=true)
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    cop = heat_out / el_in
+    @test el_in ≈ 450.24763619991
+    @test heat_in ≈ 1549.7523638
+    @test heat_out ≈ 2000
+    @test cop ≈ 4.442
+end
+
+@testset "test_heat_pump_1S1D_infinite_output" begin
+    test_heat_pump_1S1D_infinite_input()
+end
+
+function test_heat_pump_1S1D_infinite_output()
+    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    cop = heat_out / el_in
+    @test el_in ≈ 581.0575246949
+    @test heat_in ≈ 2000
+    @test heat_out ≈ 2581.0575246949
+    @test cop ≈ 4.442
+end
+
+@testset "test_heat_pump_1S1D_infinite_input" begin
+    test_heat_pump_1S1D_infinite_input()
+end
+
 function get_config_heat_pump_2S2D()
     return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
