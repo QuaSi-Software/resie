@@ -460,7 +460,7 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
 
         layout = Layout(;
                         title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
-                                   "the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
                         xaxis_title_text="Time [$(output_plot_time_unit)]",
                         yaxis_title_text="",
                         yaxis2=attr(; title="", overlaying="y", side="right"),
@@ -469,7 +469,7 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
     else
         layout = Layout(;
                         title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
-                                   "the simulation time step of $(Int(sim_params["time_step_seconds"]/60)) min!",
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
                         xaxis_title_text="Time [$(output_plot_time_unit)]",
                         yaxis_title_text="",
                         yaxis2=attr(; title="", overlaying="y", side="right"))
