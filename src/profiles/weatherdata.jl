@@ -77,6 +77,9 @@ mutable struct WeatherData
             transform = Proj.Transformation(inProj, outProj)
             latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
 
+            # No shift here, as temperatures are measured half an hour bevor the timestep indicated.
+            shift = Second(0)
+
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
 
@@ -98,6 +101,15 @@ mutable struct WeatherData
 
             latitude = headerdata["latitude"]
             longitude = headerdata["longitude"]
+
+            # According to the EPW definition, most non-energy related values are given at the time
+            # stamp indicated. In order to be consistent with DWD-dat and the energy-related values,
+            # that represent the mean or the middle of the timestamp indicated, the values will be 
+            # shifted by 30 minutes for aggregation and (60 min - timestep / 2) for segmentation. 
+            # The interpolation algorithm in Profiles will then shift the data so that the values
+            # are defined as the mean value for the upcomming timestep.
+            # Note that this currently works for intensive values only!
+            shift = Second(max(30 * 60, 60 * 60 - sim_params["time_step_seconds"] / 2))
         end
 
         # convert long wave radiation data
@@ -114,14 +126,16 @@ mutable struct WeatherData
                                    given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
                                    given_timestamps=timestamp,
                                    given_time_step=time_step,
-                                   given_data_type="intensive")
+                                   given_data_type="intensive",
+                                   shift=shift)
 
         wind_speed = Profile(weather_file_path * ":WindSpeed",
                              sim_params;
                              given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
                              given_timestamps=timestamp,
                              given_time_step=time_step,
-                             given_data_type="intensive")
+                             given_data_type="intensive",
+                             shift=shift)
 
         return new(temp_ambient_air,
                    wind_speed,

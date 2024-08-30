@@ -38,7 +38,8 @@ mutable struct Profile
                      given_profile_values::Vector{Float64}=Float64[], # optional: Vector{Float64} that holds values of the profile
                      given_timestamps::Vector{DateTime}=DateTime[],   # optional: Vector{DateTime} that holds the time step as DateTime
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the timestep in seconds of the given data
-                     given_data_type::Union{String,Nothing}=nothing) # optional: datatype, shoule be "intensive" or "extensive"
+                     given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, shoule be "intensive" or "extensive"
+                     shift::Dates.Second=Second(0))                   # optional: timeshift for data
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -193,6 +194,30 @@ mutable struct Profile
         # remove leap days and daiylight savings from profile
         profile_timestamps_date, profile_values = remove_leap_days(profile_timestamps_date, profile_values, file_path)
         profile_timestamps_date = remove_day_light_saving(profile_timestamps_date, time_zone, file_path)
+        if shift > Second(0)
+            profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, shift)
+        elseif shift < Second(0)
+            profile_timestamps_date = sub_ignoring_leap_days.(profile_timestamps_date, -shift)
+        end
+
+        if shift !== Second(0) && data_type == "extensive"
+            @error "Timeshift of profiles is currently only possible for intensive profiles."
+            throw(ValueError)
+        end
+
+        # add first or last entry if only one time step is missing. copy first or last value.
+        if profile_timestamps_date[1] > sim_params["start_date"] &&
+           profile_timestamps_date[1] - Second(profile_time_step) <= sim_params["start_date"]
+            profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
+                                           profile_timestamps_date)
+            profile_values = vcat(profile_values[1], profile_values)
+        end
+        if profile_timestamps_date[end] < sim_params["end_date"] &&
+           profile_timestamps_date[end] + Second(profile_time_step) >= sim_params["end_date"]
+            profile_timestamps_date = vcat(profile_timestamps_date,
+                                           profile_timestamps_date[end] + Second(profile_time_step))
+            profile_values = vcat(profile_values, profile_values[end])
+        end
 
         # check timestamp for order, duplicates and consistency
         if !issorted(profile_timestamps_date)
@@ -234,13 +259,15 @@ mutable struct Profile
                                                                                             profile_timestamps_date,
                                                                                             Second(Int(profile_time_step)),
                                                                                             Second(sim_params["time_step_seconds"]),
-                                                                                            file_path)
+                                                                                            file_path,
+                                                                                            sim_params)
         elseif data_type == "extensive"     # e.g., energy demand
             values_converted, profile_timestamps_date_converted = convert_extensive_profile(profile_values,
                                                                                             profile_timestamps_date,
                                                                                             Second(Int(profile_time_step)),
                                                                                             Second(sim_params["time_step_seconds"]),
-                                                                                            file_path)
+                                                                                            file_path,
+                                                                                            sim_params)
         else
             @error "For the profile at $(file_path) no valid 'data_type' is given! " *
                    "Has to be either 'intensive' or 'extensive'."
@@ -340,14 +367,35 @@ function add_ignoring_leap_days(timestamp::DateTime, diff::Period)
     nr_of_leap_days = 0
     for year in year(timestamp):year(new_time)
         if isleapyear(year)
-            leap_day = DateTime(year, 2, 29)
-            if leap_day >= timestamp && leap_day <= new_time
+            leap_day = Date(year, 2, 29)
+            if leap_day >= Date(timestamp) && leap_day <= Date(new_time)
                 nr_of_leap_days += 1
             end
         end
     end
 
     return new_time + nr_of_leap_days * Day(1)
+end
+
+"""
+    sub_ignoring_leap_days(timestamp::DateTime, diff::DateTime.Period)
+
+Subs diff of the timestamp. If the result is a leap day, skip to the previous day.
+If a leap day is in between, do not count it!
+"""
+function sub_ignoring_leap_days(timestamp::DateTime, diff::Period)
+    new_time = timestamp - diff
+    nr_of_leap_days = 0
+    for year in year(new_time):year(timestamp)
+        if isleapyear(year)
+            leap_day = Date(year, 2, 29)
+            if leap_day <= Date(timestamp) && leap_day >= Date(new_time)
+                nr_of_leap_days += 1
+            end
+        end
+    end
+
+    return new_time - nr_of_leap_days * Day(1)
 end
 
 """
@@ -362,8 +410,8 @@ function sub_ignoring_leap_days(end_date::DateTime, begin_date::DateTime)
     nr_of_leap_days = 0
     for year in year(begin_date):year(end_date)
         if isleapyear(year)
-            leap_day = DateTime(year, 2, 29)
-            if leap_day >= begin_date && leap_day <= end_date
+            leap_day = Date(year, 2, 29)
+            if leap_day >= Date(begin_date) && leap_day <= Date(end_date)
                 nr_of_leap_days += 1
             end
         end
@@ -379,9 +427,10 @@ Calculates all differences of consecutive elements of the timestep vector
 while considering removed leap days. Returns the differences as vector.
 """
 function diff_ignore_leap_days(timestamps::Vector{DateTime})
-    diffs = Period[]
+    number_of_timesteps = length(timestamps)
+    diffs = Vector{Period}(undef, number_of_timesteps - 1)
 
-    for i in 2:length(timestamps)
+    for i in 2:number_of_timesteps
         diff = timestamps[i] - timestamps[i - 1]
 
         # Check if the range includes a leap day and adjust the difference
@@ -390,7 +439,10 @@ function diff_ignore_leap_days(timestamps::Vector{DateTime})
            month(timestamps[i]) >= 3 && day(timestamps[i]) >= 1
             diff = diff - Millisecond(86400000)  # equals 1 day
         end
-        push!(diffs, diff)
+        diffs[i - 1] = diff
+        if diff !== Millisecond(3600000)
+            test = 0
+        end
     end
 
     return diffs
@@ -420,7 +472,7 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
             # Convert the timestamp to ZonedDateTime and back to DateTime to eliminate any DST effects.
             # This results in local standard time.
             zoned_time = ZonedDateTime(ts, tz)
-            push!(corrected_timestamps, DateTime(zoned_time) - zoned_time.zone.offset.dst)
+            push!(corrected_timestamps, sub_ignoring_leap_days(DateTime(zoned_time), zoned_time.zone.offset.dst))
 
             if zoned_time.zone.offset.dst !== Second(0)
                 has_corrected = true
@@ -517,6 +569,7 @@ Inputs:
     original_time_step::Int         the timestep in seconds of the values and the timestamps
     new_time_step::UInt64           the simulation time step to wich the profile should be converted
     file_path::String               the file path of the profile, for error messages only
+    sim_params::Dict{String,Any}    simulation parameters
 
 Outputs:
     converted_profile::Vector{Float64}      values of the converted profile in the `new_time_step`
@@ -527,8 +580,10 @@ function convert_extensive_profile(values::Vector{Float64},
                                    timestamps::Vector{DateTime},
                                    original_time_step::Period,
                                    new_time_step::Period,
-                                   file_path::String)
-    if original_time_step == new_time_step
+                                   file_path::String,
+                                   sim_params::Dict{String,Any})
+    time_is_aligned = sim_params["start_date"] in timestamps
+    if original_time_step == new_time_step && time_is_aligned
         return values, timestamps
     end
 
@@ -580,6 +635,7 @@ Inputs:
     original_time_step::Int         the timestep in seconds of the values and the timestamps
     new_time_step::UInt64           the simulation time step to wich the profile should be converted
     file_path::String               the file path of the profile, for error messages only
+    sim_params::Dict{String,Any}    simulation parameters
 
 Outputs:
     converted_profile::Vector{Float64}      values of the converted profile in the `new_time_step`
@@ -590,16 +646,18 @@ function convert_intensive_profile(values::Vector{Float64},
                                    timestamps::Vector{DateTime},
                                    original_time_step::Period,
                                    new_time_step::Period,
-                                   file_path::String)
-    if new_time_step == original_time_step # no change
+                                   file_path::String,
+                                   sim_params::Dict{String,Any})
+    time_is_aligned = sim_params["start_date"] in timestamps
+    if new_time_step == original_time_step && time_is_aligned # no change
         return values, timestamps
 
-    elseif new_time_step < original_time_step  # segmentation
-        ref_time = Base.minimum(timestamps)
+    elseif new_time_step <= original_time_step # segmentation or time shifting
+        ref_time = sim_params["start_date"]
         numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
         interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
-        new_timestamps = remove_leap_days(collect(range(Base.minimum(timestamps);
-                                                        stop=Base.maximum(timestamps),
+        new_timestamps = remove_leap_days(collect(range(sim_params["start_date"];
+                                                        stop=sim_params["end_date"],
                                                         step=new_time_step)))
         new_numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
         converted_profile = [interp(t) for t in new_numeric_timestamps]
@@ -609,12 +667,26 @@ function convert_intensive_profile(values::Vector{Float64},
             append!(converted_profile, converted_profile[end])
         end
 
-        @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
-              "$(original_time_step) to the simulation timestep of $(new_time_step)."
+        if new_time_step == original_time_step
+            @info "The profile at $(file_path) (intensive profile) was shifted to fit the simulation start time."
+        else
+            @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
+                  "$(original_time_step) to the simulation timestep of $(new_time_step)."
+        end
 
         return converted_profile, new_timestamps
 
     else # aggregation
+        if !time_is_aligned
+            # If the timestamps do not align, shift them with linear interpolation to fit together
+            values, timestamps = convert_intensive_profile(values,
+                                                           timestamps,
+                                                           original_time_step,
+                                                           original_time_step,
+                                                           file_path,
+                                                           sim_params)
+        end
+
         aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full dividers are allowed
         old_length = length(timestamps)
         new_length = ceil(Int, old_length / aggregation_factor)
