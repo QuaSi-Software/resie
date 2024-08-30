@@ -486,82 +486,20 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         return false, energies
     end
 
-    if energies.heat_in_has_inf_energy
-        for heat_in_idx in eachindex(energies.potentials_energies_heat_in)
-            energies.available_el_in = copy(energies.potential_energy_el)
-            energies.available_heat_in = copy(energies.potentials_energies_heat_in)
-            energies.available_heat_out = copy(energies.potentials_energies_heat_out)
-            energies.available_heat_in[heat_in_idx] = Inf
-            energies.in_indices = [heat_in_idx]
-            energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
-            energies = calculate_energies_heatpump(unit, sim_params, energies)
+    energies.available_el_in = copy(energies.potential_energy_el)
+    energies.available_heat_in = copy(energies.potentials_energies_heat_in)
+    energies.available_heat_out = copy(energies.potentials_energies_heat_out)
+    energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
+    energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
+    energies = calculate_energies_heatpump(unit, sim_params, energies)
 
-            append!(energies.slices_heat_in, energies.slices_heat_in_temp)
-            append!(energies.slices_heat_in_temperature, energies.slices_heat_in_temperature_temp)
-            append!(energies.slices_heat_in_uac, energies.slices_heat_in_uac_temp)
-            # Is this correct? Using the highest energy as worst case should be good for now...
-            if heat_in_idx == 1
-                energies.slices_el_in = energies.slices_el_in_temp
-                energies.slices_heat_out = energies.slices_heat_out_temp
-                energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
-                energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
-            else
-                if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
-                    energies.slices_el_in = energies.slices_el_in_temp
-                end
-                if _isless(_sum(energies.slices_heat_out), _sum(energies.slices_heat_out_temp))
-                    energies.slices_heat_out = energies.slices_heat_out_temp
-                    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
-                    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
-                end
-            end
-        end
-    elseif energies.heat_out_has_inf_energy
-        for heat_out_idx in eachindex(energies.potentials_energies_heat_out)
-            energies.available_el_in = copy(energies.potential_energy_el)
-            energies.available_heat_in = copy(energies.potentials_energies_heat_in)
-            energies.available_heat_out = copy(energies.potentials_energies_heat_out)
-            energies.available_heat_out[heat_out_idx] = Inf
-            energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
-            energies.out_indices = [heat_out_idx]
-            energies = calculate_energies_heatpump(unit, sim_params, energies)
-
-            append!(energies.slices_heat_out, energies.slices_heat_out_temp)
-            append!(energies.slices_heat_out_temperature, energies.slices_heat_out_temperature_temp)
-            append!(energies.slices_heat_out_uac, energies.slices_heat_out_uac_temp)
-            # Is this correct? Using the highest energy as worst case should be good for now...
-            if heat_out_idx == 1
-                energies.slices_el_in = energies.slices_el_in_temp
-                energies.slices_heat_in = energies.slices_heat_in_temp
-                energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
-                energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
-            else
-                if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
-                    energies.slices_el_in = energies.slices_el_in_temp
-                end
-                if _isless(_sum(energies.slices_heat_in), _sum(energies.slices_heat_in_temp))
-                    energies.slices_heat_in = energies.slices_heat_in_temp
-                    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
-                    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
-                end
-            end
-        end
-    else # fully known energies and temperatures in inputs and outputs
-        energies.available_el_in = copy(energies.potential_energy_el)
-        energies.available_heat_in = copy(energies.potentials_energies_heat_in)
-        energies.available_heat_out = copy(energies.potentials_energies_heat_out)
-        energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
-        energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
-        energies = calculate_energies_heatpump(unit, sim_params, energies)
-
-        energies.slices_el_in = energies.slices_el_in_temp
-        energies.slices_heat_in = energies.slices_heat_in_temp
-        energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
-        energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
-        energies.slices_heat_out = energies.slices_heat_out_temp
-        energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
-        energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
-    end
+    energies.slices_el_in = energies.slices_el_in_temp
+    energies.slices_heat_in = energies.slices_heat_in_temp
+    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+    energies.slices_heat_out = energies.slices_heat_out_temp
+    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
 
     return true, energies
 end
