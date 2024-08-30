@@ -27,6 +27,9 @@ mutable struct HeatPump <: Component
 
     consider_icing::Bool
     icing_coefficients::Vector{Float64}
+    optimise_slice_dispatch::Bool
+    nr_optimisation_passes::UInt
+    optimal_plr::Float64
     output_temperature::Temperature
     input_temperature::Temperature
 
@@ -53,6 +56,18 @@ mutable struct HeatPump <: Component
         coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
         icing_coefficients = parse.(Float64, split(coeff_def, ","))
 
+        optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
+        optimal_plr = default(config, "optimal_plr", 1.0)
+        if optimise_slice_dispatch && 1.0 - optimal_plr < sim_params["epsilon"]
+            @warn "Heat pump $(unit.uac) is configured to optimise slice dispatch but has an " *
+                  "optimal PLR of 1.0. Consider toggling optimisation off as it has no effect."
+        end
+        if optimise_slice_dispatch && constant_cop !== nothing
+            @error "Heat pump $(unit.uac) is configured to optimise slice dispatch but has " *
+                   "a constant COP. Toggle optimisation off as the algorithm is unstable " *
+                   "in this case."
+        end
+
         return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
                    sf_transformer,
@@ -71,6 +86,9 @@ mutable struct HeatPump <: Component
                    default(config, "bypass_cop", 15.0),
                    default(config, "considering_icing", false),
                    icing_coefficients,
+                   optimise_slice_dispatch,
+                   UInt(default(config, "nr_optimisation_passes", 10)),
+                   optimal_plr,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
                    0.0, # cop
@@ -146,6 +164,37 @@ mutable struct HPEnergies
                    Vector{Temperature}(),
                    Vector{Stringing}())
     end
+end
+
+function reset_temp_slices!(energies::HPEnergies)::HPEnergies
+    energies.slices_el_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_in_uac_temp = Vector{Stringing}()
+    energies.slices_heat_out_temp = Vector{Floathing}()
+    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_out_uac_temp = Vector{Stringing}()
+    return energies
+end
+
+function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
+    energies.slices_el_in = energies.slices_el_in_temp
+    energies.slices_heat_in = energies.slices_heat_in_temp
+    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+    energies.slices_heat_out = energies.slices_heat_out_temp
+    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
+    return energies
+end
+
+function reset_available!(energies::HPEnergies)::HPEnergies
+    energies.available_el_in = copy(energies.potential_energy_el)
+    energies.available_heat_in = copy(energies.potentials_energies_heat_in)
+    energies.available_heat_out = copy(energies.potentials_energies_heat_out)
+    energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
+    energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
+    return energies
 end
 
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
@@ -230,6 +279,39 @@ function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature):
     return cop * (1 - 0.01 * (max(0.0, lin_factor) + exp_factor))
 end
 
+function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::Dict{String,Any})::Bool
+    # accept if the "signature" of the given pass is the same as that of the best pass and
+    # the timestep hasn't been used up. the signature is a tuple with flags of which in- or
+    # outputs are non-zero
+    EPS = sim_params["epsilon"]
+    signature_best = (energies.potential_energy_el - sum(energies.slices_el_in; init=0.0) > EPS,
+                      sum(energies.potentials_energies_heat_in; init=0.0)
+                      -
+                      sum(energies.slices_heat_in; init=0.0)
+                      >
+                      EPS,
+                      sum(energies.potentials_energies_heat_out; init=0.0)
+                      -
+                      sum(energies.slices_heat_out; init=0.0)
+                      >
+                      EPS)
+    signature_given = (energies.available_el_in > EPS,
+                       sum(energies.available_heat_in; init=0.0) > EPS,
+                       sum(energies.available_heat_out; init=0.0) > EPS)
+    return signature_given == signature_best
+end
+
+function pass_is_better(energies::HPEnergies, sim_params::Dict{String,Any})::Bool
+    return sum(energies.slices_el_in_temp; init=0.0) < sum(energies.slices_el_in; init=0.0)
+end
+
+function update_plrs!(energies::HPEnergies,
+                      plrs::Array{<:Floathing,2},
+                      previous_idx::Tuple{Integer,Integer})::Tuple{Integer,Integer}
+    # for the moment a NOP "implementation"
+    return previous_idx
+end
+
 function handle_slice(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
@@ -288,11 +370,11 @@ function calculate_slices(unit::HeatPump,
                           energies::HPEnergies,
                           plrs::Array{<:Floathing,2})::Tuple{HPEnergies,Vector{Float64},Vector{Float64},
                                                              Array{<:Floathing,2}}
-
-    # times_min means the time slice assuming minimum power. times_min are actually larger
-    # than times_max
+    # times are the timespans each slice takes. times_min means the time slice assuming
+    # minimum power. times_min are actually larger than times
     times_min = Vector{Float64}()
-    times_max = Vector{Float64}()
+    times = Vector{Float64}()
+
     sum_usage = 0.0
     current_in_idx::Int = 0
     current_out_idx::Int = 0
@@ -348,17 +430,18 @@ function calculate_slices(unit::HeatPump,
             continue
         end
 
-        min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
-        min_power = max(0.0, unit.design_power_th * min_power_frac)
-        max_power_frac = min(1.0, unit.max_power_function(current_in_temp, current_out_temp))
-        max_power = max(min_power, unit.design_power_th * max_power_frac)
-
-        remaining_heat_out = min(energies.available_heat_out[current_out_idx],
-                                 (energies.max_usage_fraction - sum_usage) * watt_to_wh(max_power))
-
         if plrs[current_in_idx, current_out_idx] === nothing
             plrs[current_in_idx, current_out_idx] = 1.0
         end
+
+        min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
+        min_power = max(0.0, unit.design_power_th * min_power_frac)
+        used_power_frac = min(plrs[current_in_idx, current_out_idx],
+                              unit.max_power_function(current_in_temp, current_out_temp))
+        used_power = max(min_power, unit.design_power_th * used_power_frac)
+
+        remaining_heat_out = min(energies.available_heat_out[current_out_idx],
+                                 (energies.max_usage_fraction - sum_usage) * watt_to_wh(used_power))
 
         used_heat_in,
         used_el_in,
@@ -387,42 +470,50 @@ function calculate_slices(unit::HeatPump,
 
         sum_usage += used_heat_out / watt_to_wh(unit.design_power_th)
         push!(times_min, used_heat_out * 3600 / min_power)
-        push!(times_max, used_heat_out * 3600 / max_power)
+        push!(times, used_heat_out * 3600 / used_power)
     end
 
-    return energies, times_min, times_max, plrs
+    return energies, times_min, times, plrs
 end
 
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
                                      energies::HPEnergies)::HPEnergies
-    energies.slices_el_in_temp = Vector{Floathing}()
-    energies.slices_heat_in_temp = Vector{Floathing}()
-    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
-    energies.slices_heat_in_uac_temp = Vector{Stringing}()
-    energies.slices_heat_out_temp = Vector{Floathing}()
-    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
-    energies.slices_heat_out_uac_temp = Vector{Stringing}()
+    energies = reset_temp_slices!(energies)
 
     # initial PLRs are nothing, as we do not yet know which slices are used and which aren't
     plrs = Array{Floathing,2}(nothing,
                               length(energies.available_heat_in),
                               length(energies.available_heat_out))
 
-    energies, times_min, times_max, plrs = calculate_slices(unit, sim_params, energies, plrs)
+    # first pass with full power (or only pass if no optimisation is used)
+    energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
 
     # as long as sum of times with minimum power per slice is larger than the time step
     # multiplied with the min power fraction, we can find a dispatch of each slice by
     # "slowing them down", so the sum exceeds the minimum power fraction. if not, the heat
     # pump should not run at all
     if sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"]
-        energies.slices_el_in_temp = []
-        energies.slices_heat_in_temp = []
-        energies.slices_heat_in_temperature_temp = []
-        energies.slices_heat_in_uac_temp = []
-        energies.slices_heat_out_temp = []
-        energies.slices_heat_out_temperature_temp = []
-        energies.slices_heat_out_uac_temp = []
+        energies = reset_temp_slices!(energies)
+        return energies
+    end
+
+    energies = copy_temp_to_slices!(energies)
+
+    # warning: this optimisation is janky and doesn't work as well as it could
+    if unit.optimise_slice_dispatch
+        last_updated = (0, 0)
+
+        for idx in 1:(unit.nr_optimisation_passes)
+            if idx > 1 && accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
+                energies = copy_temp_to_slices!(energies)
+            end
+
+            energies = reset_temp_slices!(energies)
+            energies = reset_available!(energies)
+            last_updated = update_plrs!(energies, plrs, last_updated)
+            energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+        end
     end
 
     return energies
@@ -486,20 +577,8 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         return false, energies
     end
 
-    energies.available_el_in = copy(energies.potential_energy_el)
-    energies.available_heat_in = copy(energies.potentials_energies_heat_in)
-    energies.available_heat_out = copy(energies.potentials_energies_heat_out)
-    energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
-    energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
+    energies = reset_available!(energies)
     energies = calculate_energies_heatpump(unit, sim_params, energies)
-
-    energies.slices_el_in = energies.slices_el_in_temp
-    energies.slices_heat_in = energies.slices_heat_in_temp
-    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
-    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
-    energies.slices_heat_out = energies.slices_heat_out_temp
-    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
-    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
 
     return true, energies
 end

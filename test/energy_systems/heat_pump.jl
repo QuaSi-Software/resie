@@ -719,3 +719,58 @@ end
 @testset "heat_pump_2S2D_min_power" begin
     test_heat_pump_2S2D_min_power()
 end
+
+function test_heat_pump_2S2D_optimising_slices()
+    components_config = get_config_heat_pump_2S2D()
+
+    components_config["TST_HP_01"]["power_th"] = 28000
+    components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
+    components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
+    components_config["TST_HP_01"]["min_power_fraction"] = 0.2
+    components_config["TST_HP_01"]["cop_function"] = "carnot:0.4:poly:-1.93407,1.53407,0.9"
+    components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
+    components_config["TST_HP_01"]["optimal_plr"] = 0.4
+
+    simulation_parameters = get_default_sim_params()
+    eps = simulation_parameters["epsilon"]
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    # without optimisation, at full power each slice, energies would be:
+    # 1403.5371253472942
+    # 1596.4628746527055
+    # 3000.0
+
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 < 1403.5371253472942 - eps
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 > 1596.4628746527055 + eps
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 3000.0
+end
+
+@testset "heat_pump_2S2D_optimising_slices" begin
+    test_heat_pump_2S2D_optimising_slices()
+end
