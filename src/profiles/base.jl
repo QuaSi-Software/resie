@@ -2,8 +2,6 @@ module Profiles
 using Interpolations
 using Dates, TimeZones
 
-# TimeZones.TZData.compile(max_year=2200)
-
 export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
 
@@ -229,7 +227,8 @@ mutable struct Profile
         elseif length(profile_timestamps_date) > 1 &&
                length(unique(diff_ignore_leap_days(profile_timestamps_date))) !== 1
             @error "The timestamp of the profile at $(file_path) has an inconsistent time step width! " *
-                   "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'!"
+                   "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'!" *
+                   "If the profile has no daylight savings, a 'time_zone' must not be given!"
             throw(InputError)
         end
 
@@ -440,9 +439,6 @@ function diff_ignore_leap_days(timestamps::Vector{DateTime})
             diff = diff - Millisecond(86400000)  # equals 1 day
         end
         diffs[i - 1] = diff
-        if diff !== Millisecond(3600000)
-            test = 0
-        end
     end
 
     return diffs
@@ -452,6 +448,22 @@ end
     remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Stringing, file_path::String)
 
 If DST is present in the timestamp, shift it to local standard time.
+
+This may require a recompilation of the TZData of the Julia package TimeZones. From first installation,
+if only covers DST shifts until the year 2037. 
+
+If the recompilation fails, try to follow these steps:
+- create the following folder, if it doesn't exist:
+  "user_home_directory"/.julia/scratchspaces/"TimeZone package UUID"/build/tzsource/2024a
+  The Universally Unique Identifier (UUID) of your TimeZone package installation can be found in the Project.toml file. 
+  Currently, for the TimeZone package, it is f269a46b-ccf7-5d73-abea-4c690281aa53.
+- download the latest tz data from https://www.iana.org/time-zones (Data only)
+- unzip the data
+- delete all files except the ones named as continent, e.g. "europe", "asia"
+- create a destination folder for the recompilation, if it doesn't exist:
+  "user_home_directory"/.julia/scratchspaces/"TimeZone package UUID"/build/compiled/tzjf/v1/2024a
+- re-run the compilation with the required max_year, e.g. TimeZones.TZData.compile(max_year=2200)
+
 """
 function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{Nothing,String}, file_path::String)
     if time_zone === nothing
@@ -465,16 +477,48 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
                    "It has to be an IANA (also known as TZ or TZDB) time zone identifier."
             throw(InputError)
         end
+
+        timestamp_max_year = year(timestamp[end])
+        if year(tz.transitions[end].utc_datetime) < timestamp_max_year
+            try
+                TimeZones.TZData.compile(; max_year=Int(timestamp_max_year))
+            catch e
+                timezones_uuid = Base.identify_package("TimeZones").uuid
+                @error "The Julia package TimeZones could not be recompiled to cover the DST for the requested year " *
+                       "$timestamp_max_year. The currently supported latest year is " *
+                       "$(year(tz.transitions[end].utc_datetime)). The following error occured: $e\n" *
+                       "If the recompilation fails, try to follow these steps: \n" *
+                       "- create the following folder, if it doesn't exist:" *
+                       "'user_home_directory'/.julia/scratchspaces/$(timezones_uuid)/build/tzsource/2024a \n" *
+                       "- download the latest tz data from https://www.iana.org/time-zones (Data only)\n" *
+                       "- unzip the data\n" *
+                       "- delete all files except the ones named as continent, e.g. 'europe', 'asia' \n" *
+                       "- create a destination folder for the recompilation, if it doesn't exist:" *
+                       "'user_home_directory'/.julia/scratchspaces/$(timezones_uuid)/build/compiled/tzjf/v1/2024a \n" *
+                       "- re-run the compilation by running ReSiE or with TimeZones.TZData.compile(max_year=2200) in Julia."
+                throw(InputError)
+            end
+            # re-creation of the TimeZone is required to apply the recompilation
+            tz = TimeZone(time_zone)
+        end
+
         corrected_timestamps = DateTime[]
         has_corrected = false
+        zoned_time = 0
 
         for ts in timestamp
             # Convert the timestamp to ZonedDateTime and back to DateTime to eliminate any DST effects.
             # This results in local standard time.
-            zoned_time = ZonedDateTime(ts, tz)
-            push!(corrected_timestamps, sub_ignoring_leap_days(DateTime(zoned_time), zoned_time.zone.offset.dst))
+            try
+                zoned_time = ZonedDateTime(ts, tz)
+                push!(corrected_timestamps, sub_ignoring_leap_days(DateTime(zoned_time), zoned_time.zone.offset.dst))
+            catch e
+                @error "In the profile at $file_path, the datestamp $ts is probably invalid for the specified time zone " *
+                       "$time_zone. The following error occured: $e"
+                throw(InputError)
+            end
 
-            if zoned_time.zone.offset.dst !== Second(0)
+            if zoned_time.zone.offset.dst !== Second(0) && !has_corrected
                 has_corrected = true
             end
         end
