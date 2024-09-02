@@ -116,6 +116,7 @@ mutable struct HPEnergies
     out_uacs::Vector{<:Stringing}
     heat_in_has_inf_energy::Bool
     heat_out_has_inf_energy::Bool
+    slices_idx_to_plr::Dict{Integer,Tuple{Integer,Integer}}
     slices_el_in::Vector{Floathing}
     slices_heat_in::Vector{Floathing}
     slices_heat_in_temperature::Vector{Temperature}
@@ -149,6 +150,7 @@ mutable struct HPEnergies
                    Vector{Stringing}(),
                    false,
                    false,
+                   Dict{Integer,Tuple{Integer,Integer}}(),
                    Vector{Floathing}(),
                    Vector{Floathing}(),
                    Vector{Temperature}(),
@@ -305,11 +307,31 @@ function pass_is_better(energies::HPEnergies, sim_params::Dict{String,Any})::Boo
     return sum(energies.slices_el_in_temp; init=0.0) < sum(energies.slices_el_in; init=0.0)
 end
 
-function update_plrs!(energies::HPEnergies,
+function update_plrs!(unit::HeatPump,
+                      energies::HPEnergies,
                       plrs::Array{<:Floathing,2},
-                      previous_idx::Tuple{Integer,Integer})::Tuple{Integer,Integer}
-    # for the moment a NOP "implementation"
-    return previous_idx
+                      ignore_idx::Tuple{Integer,Integer})::Tuple{Integer,Integer}
+    best_idx = (0, 0)
+    best_val = 0.0
+
+    for (slice_idx, idxs) in pairs(energies.slices_idx_to_plr)
+        idx_src, idx_snk = idxs
+        if idx_src == ignore_idx[1] && idx_snk == ignore_idx[2]
+            continue
+        end
+
+        val = (plrs[idx_src, idx_snk] - unit.optimal_plr) * energies.slices_el_in[slice_idx]
+        if val > best_val
+            best_idx = (idx_src, idx_snk)
+            best_val = val
+        end
+    end
+
+    if best_idx != (0, 0)
+        plrs[best_idx[1], best_idx[2]] -= 0.5 * (plrs[best_idx[1], best_idx[2]] - unit.optimal_plr)
+    end
+
+    return best_idx
 end
 
 function handle_slice(unit::HeatPump,
@@ -376,6 +398,7 @@ function calculate_slices(unit::HeatPump,
     times = Vector{Float64}()
 
     sum_usage = 0.0
+    slice_idx::Int = 1
     current_in_idx::Int = 0
     current_out_idx::Int = 0
     EPS = sim_params["epsilon"]
@@ -471,6 +494,9 @@ function calculate_slices(unit::HeatPump,
         sum_usage += used_heat_out / watt_to_wh(unit.design_power_th)
         push!(times_min, used_heat_out * 3600 / min_power)
         push!(times, used_heat_out * 3600 / used_power)
+
+        energies.slices_idx_to_plr[slice_idx] = (current_in_idx, current_out_idx)
+        slice_idx += 1
     end
 
     return energies, times_min, times, plrs
@@ -511,7 +537,7 @@ function calculate_energies_heatpump(unit::HeatPump,
 
             energies = reset_temp_slices!(energies)
             energies = reset_available!(energies)
-            last_updated = update_plrs!(energies, plrs, last_updated)
+            last_updated = update_plrs!(unit, energies, plrs, last_updated)
             energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
         end
     end
