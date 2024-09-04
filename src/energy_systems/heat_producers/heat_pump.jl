@@ -20,7 +20,6 @@ mutable struct HeatPump <: Component
     design_power_th::Float64
     max_power_function::Function
     min_power_function::Function
-    min_power_fraction::Float64
     constant_cop::Floathing
     dynamic_cop::Function
     bypass_cop::Float64
@@ -80,7 +79,6 @@ mutable struct HeatPump <: Component
                    config["power_th"],
                    max_power_function,
                    min_power_function,
-                   default(config, "min_power_fraction", 0.2),
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),
@@ -458,7 +456,7 @@ function calculate_slices(unit::HeatPump,
         end
 
         min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
-        min_power = max(0.0, unit.design_power_th * min_power_frac)
+        min_power = max(EPS, unit.design_power_th * min_power_frac)
         used_power_frac = min(plrs[current_in_idx, current_out_idx],
                               unit.max_power_function(current_in_temp, current_out_temp))
         used_power = max(min_power, unit.design_power_th * used_power_frac)
@@ -515,11 +513,13 @@ function calculate_energies_heatpump(unit::HeatPump,
     # first pass with full power (or only pass if no optimisation is used)
     energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
 
-    # as long as sum of times with minimum power per slice is larger than the time step
-    # multiplied with the min power fraction, we can find a dispatch of each slice by
-    # "slowing them down", so the sum exceeds the minimum power fraction. if not, the heat
-    # pump should not run at all
-    if sum(times_min; init=0.0) < unit.min_power_fraction * sim_params["time_step_seconds"]
+    # as long as the sum of times with minimum power per slice is larger than the time step
+    # and the sum of times with chosen power per slice is smaller or equal to the time step
+    # (which is implicit in the calculation), we can find a dispatch of each slice by
+    # "slowing them down" from the minimum power up to the chosen power, so the sum works
+    # out. we don't have to calculate this dispatch, it is theoretical. if the minimum power
+    # cannot be observed, the heat pump should not run at all
+    if sum(times_min; init=0.0) < sim_params["time_step_seconds"]
         energies = reset_temp_slices!(energies)
         return energies
     end
