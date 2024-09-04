@@ -99,7 +99,7 @@ mutable struct HeatPump <: Component
 end
 
 mutable struct HPEnergies
-    potential_energy_el::Float64
+    potential_energy_el::Floathing
     potentials_energies_heat_in::Vector{<:Floathing}
     potentials_energies_heat_out::Vector{<:Floathing}
     available_el_in::Float64
