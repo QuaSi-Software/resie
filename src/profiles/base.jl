@@ -25,7 +25,7 @@ mutable struct Profile
     time_step::Int
 
     """Indicates whether the profile values are power/temperature ("intensive") or work ("extensive")."""
-    data_type::String
+    data_type::Symbol
 
     """Holds the profile values indexed by the time step number"""
     data::Dict{DateTime,Float64}
@@ -55,6 +55,7 @@ mutable struct Profile
             profile_start_date_format = nothing
             time_zone = nothing
             time_shift_seconds = nothing
+            use_linear_segmentation = false
 
             file_handle = nothing
 
@@ -83,6 +84,8 @@ mutable struct Profile
                             time_zone = String(strip(splitted[2]))
                         elseif strip(splitted[1]) == "time_shift_seconds"
                             time_shift_seconds = parse(Int, String(strip(splitted[2])))
+                        elseif strip(splitted[1]) == "use_linear_segmentation"
+                            use_linear_segmentation = parse(Bool, String(strip(splitted[2])))
                         end
                     else
                         splitted = split(line, ';')
@@ -208,6 +211,7 @@ mutable struct Profile
             profile_timestamps_date = given_timestamps
             data_type = given_data_type
             time_zone = nothing
+            use_linear_segmentation = false
         end
 
         # remove leap days and daiylight savings from profile
@@ -227,12 +231,17 @@ mutable struct Profile
             profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
                                            profile_timestamps_date)
             profile_values = vcat(profile_values[1], profile_values)
+            @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the fist value."
         end
-        if profile_timestamps_date[end] < sim_params["end_date"] &&
-           profile_timestamps_date[end] + Second(profile_time_step) >= sim_params["end_date"]
-            profile_timestamps_date = vcat(profile_timestamps_date,
-                                           profile_timestamps_date[end] + Second(profile_time_step))
-            profile_values = vcat(profile_values, profile_values[end])
+        time_diff = Second(max(0, sim_params["time_step_seconds"] - profile_time_step))
+        if profile_timestamps_date[end] < sim_params["end_date"] + time_diff &&
+           profile_timestamps_date[end] + time_diff >= sim_params["end_date"]
+            while profile_timestamps_date[end] < sim_params["end_date"] + time_diff
+                profile_timestamps_date = vcat(profile_timestamps_date,
+                                               profile_timestamps_date[end] + Second(profile_time_step))
+                profile_values = vcat(profile_values, profile_values[end])
+            end
+            @info "The profile at $(file_path) has been extended by one timestep at the end by doubling the last value."
         end
 
         # check timestamp for order, duplicates and consistency
@@ -273,26 +282,24 @@ mutable struct Profile
         end
 
         if data_type == "intensive"         # e.g., temperature, power
-            values_converted,
-            profile_timestamps_date_converted = convert_intensive_profile(profile_values,
-                                                                          profile_timestamps_date,
-                                                                          Second(Int(profile_time_step)),
-                                                                          Second(sim_params["time_step_seconds"]),
-                                                                          file_path,
-                                                                          sim_params)
+            data_type = :intensive
         elseif data_type == "extensive"     # e.g., energy demand
-            values_converted,
-            profile_timestamps_date_converted = convert_extensive_profile(profile_values,
-                                                                          profile_timestamps_date,
-                                                                          Second(Int(profile_time_step)),
-                                                                          Second(sim_params["time_step_seconds"]),
-                                                                          file_path,
-                                                                          sim_params)
+            data_type = :extensive
         else
             @error "For the profile at $(file_path) no valid 'data_type' is given! " *
                    "Has to be either 'intensive' or 'extensive'."
             throw(InputError)
         end
+
+        values_converted,
+        profile_timestamps_date_converted = convert_profile(profile_values,
+                                                            profile_timestamps_date,
+                                                            Second(Int(profile_time_step)),
+                                                            Second(sim_params["time_step_seconds"]),
+                                                            data_type,
+                                                            file_path,
+                                                            sim_params,
+                                                            use_linear_segmentation)
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
@@ -559,9 +566,9 @@ end
 Get the power value of the profile at the given time.
 """
 function power_at_time(profile::Profile, sim_params::Dict{String,Any})
-    if profile.data_type == "intensive"
+    if profile.data_type == :intensive
         return profile.data[sim_params["current_date"]]
-    elseif profile.data_type == "extensive"
+    elseif profile.data_type == :extensive
         return profile.data[sim_params["current_date"]] * (3600 / profile.time_step)
     else
         @error "For current profile has no information on the 'data_type'! " *
@@ -575,9 +582,9 @@ end
 Get the work value of the profile at the given time.
 """
 function work_at_time(profile::Profile, sim_params::Dict{String,Any})
-    if profile.data_type == "intensive"
+    if profile.data_type == :intensive
         return profile.data[sim_params["current_date"]] * (profile.time_step / 3600)
-    elseif profile.data_type == "extensive"
+    elseif profile.data_type == :extensive
         return profile.data[sim_params["current_date"]]
     else
         @error "For current profile has no information on the 'data_type'! " *
@@ -624,195 +631,189 @@ function maximum(profile::Profile)::Float64
 end
 
 """
-    convert_extensive_profile
+    convert_profile
 
-Function to convert extensive profiles(e.g., energy demand) from the profile time step to the simulation time step.
-Note: This function might return data extending beyond the end_time specified in the input file. 
-      This extra data is retained as it does not affect any calculations or results.
+Function to convert intensive and extensive profiles from the profile time step to the simulation time step.
+
 
 Inputs: 
     values::Vector{Float64}         values of the profile to convert
     timestamps::Vector{Int64}       timestamps in seconds corresponding to values
     original_time_step::Int         the timestep in seconds of the values and the timestamps
     new_time_step::UInt64           the simulation time step to wich the profile should be converted
+    profile_type::Symbol            the profile type, can be :extensive (e.g. energies) or :intensive (e.g. temperatures)        
     file_path::String               the file path of the profile, for error messages only
     sim_params::Dict{String,Any}    simulation parameters
     use_linear_segmentation::Bool   flag if a linear (true) or stepwise (false) interpolation should 
                                     be used for segmentation.
 
 Outputs:
-    converted_profile::Vector{Float64}      values of the converted profile in the `new_time_step`
+    values::Vector{Float64}         values of the converted profile in the `new_time_step`
+    timestamp::Vector{DateTime}     corresponding new timestep
 
 If `original_time_step` equals the `new_time_step`, the original `values` will be returned.
 """
-function convert_extensive_profile(values::Vector{Float64},
-                                   timestamps::Vector{DateTime},
-                                   original_time_step::Period,
-                                   new_time_step::Period,
-                                   file_path::String,
-                                   sim_params::Dict{String,Any},
-                                   use_linear_segmentation::Bool=false)
+function convert_profile(values::Vector{Float64},
+                         timestamps::Vector{DateTime},
+                         original_time_step::Period,
+                         new_time_step::Period,
+                         profile_type::Symbol,
+                         file_path::String,
+                         sim_params::Dict{String,Any},
+                         use_linear_segmentation::Bool)
+
+    # construct info message
+    info_message = "The profile at $(file_path) "
+
     time_is_aligned = sim_params["start_date"] in timestamps
-    if original_time_step == new_time_step && time_is_aligned
+
+    if original_time_step == new_time_step && time_is_aligned   # do nothing
         return values, timestamps
-    end
-
-    if new_time_step <= original_time_step && use_linear_segmentation  # segmentation using linear interpolation 
-        conversion_factor = original_time_step / new_time_step
-        values = values ./ conversion_factor
-        converted_profile, new_timestamps = convert_intensive_profile(values,
-                                                                      timestamps,
-                                                                      original_time_step,
-                                                                      new_time_step,
-                                                                      file_path,
-                                                                      sim_params,
-                                                                      true)
-
-    else # aggregation or stepwise segmentation
-        if !time_is_aligned && new_time_step > original_time_step # shift first for aggregation
-            values, timestamps = convert_intensive_profile(values,
-                                                           timestamps,
-                                                           original_time_step,
-                                                           original_time_step,
-                                                           file_path,
-                                                           sim_params,
-                                                           true)
-        end
-
-        new_max_timestep = ceil(Int, Second(sub_ignoring_leap_days(timestamps[end], timestamps[1])) / new_time_step) *
-                           new_time_step
-        if original_time_step > new_time_step
-            new_length = ceil(Int, new_max_timestep / new_time_step + original_time_step / new_time_step)
+    elseif original_time_step == new_time_step                  # time shift only
+        values, timestamps = profile_linear_interpolation(values,
+                                                          timestamps,
+                                                          original_time_step,
+                                                          new_time_step,
+                                                          sim_params)
+        info_message *= "was shifted using linear interpolation to fit the simulation start time. "
+    elseif original_time_step < new_time_step                   # aggregation
+        if profile_type == :extensive
+            values .*= new_time_step / original_time_step
+            info_message *= "(extensive profile) "
         else
-            new_length = ceil(Int, new_max_timestep / new_time_step)
+            info_message *= "(intensive profile) "
         end
-        converted_profile = zeros(new_length)
-        start_time = Base.minimum(timestamps)
-
-        for (timestamp, value) in zip(timestamps, values)
-            current_running_time = Second(sub_ignoring_leap_days(timestamp, start_time))
-            new_time_index_start = floor(Int, current_running_time / new_time_step) + 1
-            new_time_index_end = floor(Int, (current_running_time + original_time_step) / new_time_step) + 1
-
-            for j in max(1, new_time_index_start):min(new_time_index_end, new_length)
-                overlap_timestamp_start = max((j - 1) * new_time_step, current_running_time)
-                overlap_timestamp_end = min(j * new_time_step, current_running_time + original_time_step)
-                overlap_time_duration = max(Second(0), (overlap_timestamp_end - overlap_timestamp_start))
-
-                if overlap_time_duration > Second(0)
-                    overlap_fraction = overlap_time_duration / original_time_step
-                    converted_profile[j] += value * overlap_fraction
-                end
+        if !time_is_aligned  # do time shift
+            values, timestamps = profile_linear_interpolation(values,
+                                                              timestamps,
+                                                              original_time_step,
+                                                              original_time_step,
+                                                              sim_params)
+            info_message *= "was shifted using linear interpolation to fit the simulation start time and "
+        end
+        values, timestamps = profile_calculate_means(values,
+                                                     timestamps,
+                                                     original_time_step,
+                                                     new_time_step,
+                                                     sim_params)
+        info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+                        "timestep of $(new_time_step)."
+    elseif original_time_step > new_time_step                   # segmentation
+        if profile_type == :extensive
+            values .*= new_time_step / original_time_step
+            info_message *= "(extensive profile) "
+        else
+            info_message *= "(intensive profile) "
+        end
+        if use_linear_segmentation
+            values, timestamps = profile_linear_interpolation(values,
+                                                              timestamps,
+                                                              original_time_step,
+                                                              new_time_step,
+                                                              sim_params)
+            if !time_is_aligned
+                info_message *= "was shifted to fit the simulation start time and "
             end
-        end
-
-        end_time = add_ignoring_leap_days(start_time, new_time_step * (new_length - 1))
-        new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
-
-        if !time_is_aligned && new_time_step < original_time_step  # shift afterwards for segmentation
-            converted_profile, new_timestamps = convert_intensive_profile(converted_profile,
-                                                                          new_timestamps,
-                                                                          new_time_step,
-                                                                          new_time_step,
-                                                                          file_path,
-                                                                          sim_params,
-                                                                          true)
+            info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+                            "timestep of $(new_time_step) using linear interpolation."
+        else # stepwise conversion
+            values, timestamps = profile_spread_to_segments(values,
+                                                            timestamps,
+                                                            original_time_step,
+                                                            new_time_step,
+                                                            sim_params)
+            if !time_is_aligned  # do time shift
+                values, timestamps = profile_linear_interpolation(values,
+                                                                  timestamps,
+                                                                  new_time_step,
+                                                                  new_time_step,
+                                                                  sim_params)
+                info_message *= "was shifted using linear interpolation to fit the simulation start time and "
+            end
+            info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+                            "timestep of $(new_time_step) using stepwise segmentation."
         end
     end
 
-    @info "The profile at $(file_path) (extensive profile) was converted from the profile timestep " *
-          "$(original_time_step) to the simulation timestep of $(new_time_step)."
+    @info info_message
+
+    return values, timestamps
+end
+
+function profile_linear_interpolation(values,
+                                      timestamps,
+                                      original_time_step,
+                                      new_time_step,
+                                      sim_params)
+    ref_time = sim_params["start_date"]
+    numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
+    interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
+    new_timestamps = remove_leap_days(collect(range(sim_params["start_date"];
+                                                    stop=sim_params["end_date"],
+                                                    step=new_time_step)))
+    new_numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
+    converted_profile = [interp(t) for t in new_numeric_timestamps]
+
+    # add missing entries by coping the last entry
+    for _ in 1:ceil(Int, (original_time_step - new_time_step) / new_time_step)
+        append!(converted_profile, converted_profile[end])
+    end
 
     return converted_profile, new_timestamps
 end
 
-"""
-    convert_intensive_profile
+function profile_calculate_means(values,
+                                 timestamps,
+                                 original_time_step,
+                                 new_time_step,
+                                 sim_params)
+    aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full 
+    #                                                                dividers are allowed
+    old_length = length(timestamps)
+    new_length = ceil(Int, sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date"]) / new_time_step) + 1
+    start_idx = findfirst(x -> x == sim_params["start_date"], timestamps) # timeshift is already done here
 
-Function to convert intensive profiles (e.g., temperature, power) from the profile time step to the simulation time step.
+    converted_profile = zeros(new_length)
 
-Inputs: 
-    values::Vector{Float64}         values of the profile to convert
-    timestamps::Vector{Int64}       timestamps in seconds corresponding to values
-    original_time_step::Int         the timestep in seconds of the values and the timestamps
-    new_time_step::UInt64           the simulation time step to wich the profile should be converted
-    file_path::String               the file path of the profile, for error messages only
-    sim_params::Dict{String,Any}    simulation parameters
-    from_extensive_conversion::Bool flag if a extensive profile is converted, only used for logging messages
-
-Outputs:
-    converted_profile::Vector{Float64}      values of the converted profile in the `new_time_step`
-
-If `original_time_step` equals the `new_time_step`, the original `values` will be returned.
-"""
-function convert_intensive_profile(values::Vector{Float64},
-                                   timestamps::Vector{DateTime},
-                                   original_time_step::Period,
-                                   new_time_step::Period,
-                                   file_path::String,
-                                   sim_params::Dict{String,Any},
-                                   from_extensive_conversion::Bool=false)
-    time_is_aligned = sim_params["start_date"] in timestamps
-    if new_time_step == original_time_step && time_is_aligned # no change
-        return values, timestamps
-
-    elseif new_time_step <= original_time_step # segmentation or time shifting
-        ref_time = sim_params["start_date"]
-        numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
-        interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
-        new_timestamps = remove_leap_days(collect(range(sim_params["start_date"];
-                                                        stop=sim_params["end_date"],
-                                                        step=new_time_step)))
-        new_numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
-        converted_profile = [interp(t) for t in new_numeric_timestamps]
-
-        # add missing entries by coping the last entry
-        for _ in 1:ceil(Int, (original_time_step - new_time_step) / new_time_step)
-            append!(converted_profile, converted_profile[end])
-        end
-
-        if new_time_step == original_time_step || from_extensive_conversion
-            @info "The profile at $(file_path) was shifted using linear interpolation to fit the simulation start time."
-        else
-            @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
-                  "$(original_time_step) to the simulation timestep of $(new_time_step)."
-        end
-
-        return converted_profile, new_timestamps
-
-    else # aggregation
-        if !time_is_aligned
-            # If the timestamps do not align, shift them with linear interpolation to fit together
-            values, timestamps = convert_intensive_profile(values,
-                                                           timestamps,
-                                                           original_time_step,
-                                                           original_time_step,
-                                                           file_path,
-                                                           sim_params)
-        end
-
-        aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full 
-        #                                                                dividers are allowed
-        old_length = length(timestamps)
-        new_length = ceil(Int, old_length / aggregation_factor)
-        converted_profile = zeros(new_length)
-
-        for n in 1:new_length
-            old_index_start = Int((n - 1) * aggregation_factor + 1)
-            old_index_end = Int(min(n * aggregation_factor, old_length))
-            old_number_of_steps = Int(old_index_end - old_index_start + 1)
-            converted_profile[n] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
-        end
-
-        start_time = Base.minimum(timestamps)
-        end_time = add_ignoring_leap_days(start_time, new_time_step * (new_length - 1))
-        new_timestamps = remove_leap_days(collect(range(start_time; stop=end_time, step=new_time_step)))
-
-        @info "The profile at $(file_path) (intensive profile) was converted from the profile timestep " *
-              "$(original_time_step) to the simulation timestep of $(new_time_step)."
-
-        return converted_profile, new_timestamps
+    for n in start_idx:new_length
+        old_index_start = Int((n - 1) * aggregation_factor + 1)
+        old_index_end = Int(min(n * aggregation_factor, old_length))
+        old_number_of_steps = Int(old_index_end - old_index_start + 1)
+        converted_profile[n - start_idx + 1] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
     end
+
+    end_time = add_ignoring_leap_days(sim_params["start_date"], new_time_step * (new_length - 1))
+    new_timestamps = remove_leap_days(collect(range(sim_params["start_date"]; stop=end_time, step=new_time_step)))
+
+    return converted_profile, new_timestamps
+end
+
+function profile_spread_to_segments(values,
+                                    timestamps,
+                                    original_time_step,
+                                    new_time_step,
+                                    sim_params)
+    segmentation_factor = Int(original_time_step / new_time_step)   # is always > 1 and of type {Int} as only full 
+    #                                                                 dividers are allowed
+
+    if sim_params["start_date"] in timestamps
+        start_idx = findfirst(x -> x == sim_params["start_date"], timestamps)
+    else
+        start_idx = findfirst(x -> x >= sim_params["start_date"], timestamps) - 1
+    end
+    new_length = ceil(Int, sub_ignoring_leap_days(sim_params["end_date"], timestamps[start_idx]) / new_time_step) + 1
+
+    converted_profile = zeros(new_length)
+
+    for new_idx in 1:new_length
+        old_idx = Int(ceil((start_idx + new_idx - 1) / segmentation_factor))
+        converted_profile[new_idx] = values[old_idx]
+    end
+
+    end_time = add_ignoring_leap_days(timestamps[start_idx], new_time_step * (new_length - 1))
+    new_timestamps = remove_leap_days(collect(range(timestamps[start_idx]; stop=end_time, step=new_time_step)))
+
+    return converted_profile, new_timestamps
 end
 
 end
