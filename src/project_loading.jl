@@ -179,7 +179,7 @@ function get_timesteps(simulation_parameters::Dict{String,Any})
               "(`time_step` and `time_step_unit` have to be given!).")
     end
 
-    nr_of_steps = UInt(max(1, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
+    nr_of_steps = UInt(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
 
     # set end_date to be integer dividable by the timestep
     end_date = add_ignoring_leap_days(start_date, (nr_of_steps - 1) * Second(time_step))
