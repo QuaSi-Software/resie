@@ -98,7 +98,7 @@
             "power_th": 10000,
             "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
-            "min_power_fraction" : 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -107,7 +107,7 @@
             ],
             "power_th": 10000,
             "m_heat_in": "m_h_w_ht2",
-            "min_power_fraction" : 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_01_HZG_01_GBO": {
             "type": "FuelBoiler",

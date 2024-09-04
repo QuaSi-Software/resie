@@ -101,7 +101,7 @@
             "output_refs": ["TST_DEM_ht_01" ],
             "power_th": 5000,
             "cop_function": "const:3.0",
-            "min_power_fraction": 0
+            "min_power_function": "const:0.0"
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",

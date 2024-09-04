@@ -100,7 +100,7 @@
             ],
             "power_th": 9000,
             "cop_function": "const:3.0",
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         }
     }
 }

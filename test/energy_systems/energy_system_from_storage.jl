@@ -48,7 +48,7 @@ function test_run_energy_system_from_storage()
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "cop_function" => "const:3.0",
-            "min_power_fraction" => 0.0,
+            "min_power_function" => "const:0.0",
         ),
     )
 
@@ -209,7 +209,7 @@ function test_run_energy_system_from_storage_denied()
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "cop_function" => "const:3.0",
-            "min_power_fraction" => 0.0,
+            "min_power_function" => "const:0.0",
         ),
     )
 

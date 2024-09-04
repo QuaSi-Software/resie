@@ -34,7 +34,7 @@ function load_order_of_operation()
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 9000,
             "cop_function" => "const:3.0",
-            "min_power_fraction" => 0.0,
+            "min_power_function" => "const:0.0",
         ),
     )
     order_of_operation = ["TST_DEM_01 s_reset",

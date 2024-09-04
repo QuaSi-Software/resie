@@ -120,7 +120,7 @@
             ],
             "m_heat_out": "m_h_w_ht1",
             "power_th": 4500,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_EL_GRI_01": {
             "type": "GridConnection",

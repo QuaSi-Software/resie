@@ -75,7 +75,7 @@
             ],
             "power_th": 300,
             "output_temperature": 30,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_HP_02": {
             "type": "HeatPump",
@@ -86,7 +86,7 @@
             ],
             "power_th": 500,
             "output_temperature": 40,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_HP_03": {
             "type": "HeatPump",
@@ -96,7 +96,7 @@
                 "TST_DEM_01"
             ],
             "power_th": 1000,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_HP_04": {
             "type": "HeatPump",
@@ -106,7 +106,7 @@
                 "TST_DEM_02"
             ],
             "power_th": 500,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         },
         "TST_BUS_EL": {
             "type": "Bus",

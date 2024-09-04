@@ -648,8 +648,7 @@ function test_heat_pump_2S2D_min_power()
 
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
-    components_config["TST_HP_01"]["min_power_function"] = "const:0.5"
-    components_config["TST_HP_01"]["min_power_fraction"] = 0.5
+    components_config["TST_HP_01"]["min_power_function"] = "const:0.35"
 
     simulation_parameters = get_default_sim_params()
 
@@ -663,8 +662,7 @@ function test_heat_pump_2S2D_min_power()
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
 
-    # first time step: full power is too much to fullfill min_power_fraction, but some slices
-    # can be "slowed down" to compensate
+    # first time step: slices can be "slowed down" enough to compensate for high power
 
     for unit in values(components)
         EnergySystems.reset(unit)
@@ -686,12 +684,11 @@ function test_heat_pump_2S2D_min_power()
     energy_full_power = EnergySystems.watt_to_wh(heat_pump.design_power_th)
     produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     @test produced_heat ≈ 3000.0
-    @test produced_heat / energy_full_power < heat_pump.min_power_fraction
+    @test produced_heat / energy_full_power > 0.35
 
     # second time step: min power of each slice is so high that they can't be "slowed down"
     # enough to compensate
     heat_pump.min_power_function = (x, y) -> 0.8
-    heat_pump.min_power_fraction = 0.6
 
     for unit in values(components)
         EnergySystems.reset(unit)

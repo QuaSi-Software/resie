@@ -232,7 +232,7 @@
                 "TST_BUS_TH_02"
             ],
             "power_th": 9000,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0"
         }
     }
 }
