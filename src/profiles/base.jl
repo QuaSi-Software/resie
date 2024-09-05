@@ -634,7 +634,7 @@ end
     convert_profile
 
 Function to convert intensive and extensive profiles from the profile time step to the simulation time step.
-
+Handles all cases for aggregation and segmentation (linear and stepwise) as well as required time shifts.
 
 Inputs: 
     values::Vector{Float64}         values of the profile to convert
@@ -740,11 +740,20 @@ function convert_profile(values::Vector{Float64},
     return values, timestamps
 end
 
-function profile_linear_interpolation(values,
-                                      timestamps,
-                                      original_time_step,
-                                      new_time_step,
-                                      sim_params)
+"""
+    profile_linear_interpolation(values, timestamps, original_time_step, new_time_step, sim_params)
+
+This function takes the values and corresponding timestamps and converts them from the original_time_step 
+to the new_time_step using linear interpolation. It can also handle time shifts if the datestamp of
+the profile does not align with the sim_params["start"] datetime.
+It is used to break down profiles from a coarser timestep to a finer one (segmentation) or for a time shift only.
+
+"""
+function profile_linear_interpolation(values::Vector{Float64},
+                                      timestamps::Vector{DateTime},
+                                      original_time_step::Period,
+                                      new_time_step::Period,
+                                      sim_params::Dict{String,Any})
     ref_time = sim_params["start_date"]
     numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
     interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
@@ -762,37 +771,19 @@ function profile_linear_interpolation(values,
     return converted_profile, new_timestamps
 end
 
-function profile_calculate_means(values,
-                                 timestamps,
-                                 original_time_step,
-                                 new_time_step,
-                                 sim_params)
-    aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full 
-    #                                                                dividers are allowed
-    old_length = length(timestamps)
-    new_length = ceil(Int, sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date"]) / new_time_step) + 1
-    start_idx = findfirst(x -> x == sim_params["start_date"], timestamps) # timeshift is already done here
+"""
+    profile_spread_to_segments(values, timestamps, original_time_step, new_time_step, sim_params)
 
-    converted_profile = zeros(new_length)
+This function takes the values and corresponding timestamps and converts them from the original_time_step 
+to the new_time_step using a stepwise interpolation. 
+It is used to break down profiles from a coarser timestep to a finer one (segmentation).
 
-    for n in start_idx:new_length
-        old_index_start = Int((n - 1) * aggregation_factor + 1)
-        old_index_end = Int(min(n * aggregation_factor, old_length))
-        old_number_of_steps = Int(old_index_end - old_index_start + 1)
-        converted_profile[n - start_idx + 1] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
-    end
-
-    end_time = add_ignoring_leap_days(sim_params["start_date"], new_time_step * (new_length - 1))
-    new_timestamps = remove_leap_days(collect(range(sim_params["start_date"]; stop=end_time, step=new_time_step)))
-
-    return converted_profile, new_timestamps
-end
-
-function profile_spread_to_segments(values,
-                                    timestamps,
-                                    original_time_step,
-                                    new_time_step,
-                                    sim_params)
+"""
+function profile_spread_to_segments(values::Vector{Float64},
+                                    timestamps::Vector{DateTime},
+                                    original_time_step::Period,
+                                    new_time_step::Period,
+                                    sim_params::Dict{String,Any})
     segmentation_factor = Int(original_time_step / new_time_step)   # is always > 1 and of type {Int} as only full 
     #                                                                 dividers are allowed
 
@@ -812,6 +803,40 @@ function profile_spread_to_segments(values,
 
     end_time = add_ignoring_leap_days(timestamps[start_idx], new_time_step * (new_length - 1))
     new_timestamps = remove_leap_days(collect(range(timestamps[start_idx]; stop=end_time, step=new_time_step)))
+
+    return converted_profile, new_timestamps
+end
+
+"""
+    profile_calculate_means(values, timestamps, original_time_step, new_time_step, sim_params)
+
+This function takes the values and corresponding timestamps and converts them from the original_time_step 
+to the new_time_step using the mean of several original_time_steps to get one new_time_step. 
+It is used to aggregate profiles from a finer timestep to a coarser one (aggregation).
+
+"""
+function profile_calculate_means(values::Vector{Float64},
+                                 timestamps::Vector{DateTime},
+                                 original_time_step::Period,
+                                 new_time_step::Period,
+                                 sim_params::Dict{String,Any})
+    aggregation_factor = Int(new_time_step / original_time_step)   # is always > 1 and of type {Int} as only full 
+    #                                                                dividers are allowed
+    old_length = length(timestamps)
+    new_length = ceil(Int, sub_ignoring_leap_days(sim_params["end_date"], sim_params["start_date"]) / new_time_step) + 1
+    start_idx = findfirst(x -> x == sim_params["start_date"], timestamps) # timeshift is already done here
+
+    converted_profile = zeros(new_length)
+
+    for n in start_idx:new_length
+        old_index_start = Int((n - 1) * aggregation_factor + 1)
+        old_index_end = Int(min(n * aggregation_factor, old_length))
+        old_number_of_steps = Int(old_index_end - old_index_start + 1)
+        converted_profile[n - start_idx + 1] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
+    end
+
+    end_time = add_ignoring_leap_days(sim_params["start_date"], new_time_step * (new_length - 1))
+    new_timestamps = remove_leap_days(collect(range(sim_params["start_date"]; stop=end_time, step=new_time_step)))
 
     return converted_profile, new_timestamps
 end
