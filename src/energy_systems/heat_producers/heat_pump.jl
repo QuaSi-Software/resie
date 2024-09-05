@@ -655,7 +655,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
     unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
 
-    sub!(unit.input_interfaces[unit.m_el_in], energies.slices_el_in)
+    sub!(unit.input_interfaces[unit.m_el_in], el_in)
     sub!(unit.input_interfaces[unit.m_heat_in],
          energies.slices_heat_in,
          lowest(energies.slices_heat_in_temperature),
