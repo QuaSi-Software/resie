@@ -233,7 +233,7 @@ mutable struct Profile
             profile_values = vcat(profile_values[1], profile_values)
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the fist value."
         end
-        time_diff = Second(max(0, sim_params["time_step_seconds"] - profile_time_step))
+        time_diff = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
         if profile_timestamps_date[end] < sim_params["end_date"] + time_diff &&
            profile_timestamps_date[end] + time_diff >= sim_params["end_date"]
             while profile_timestamps_date[end] < sim_params["end_date"] + time_diff
