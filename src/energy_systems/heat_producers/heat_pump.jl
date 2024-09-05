@@ -188,12 +188,69 @@ function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
     return energies
 end
 
-function reset_available!(energies::HPEnergies)::HPEnergies
+function reset_available!(energies::HPEnergies; as_inf::Integer=0, idx::Integer=0)::HPEnergies
     energies.available_el_in = copy(energies.potential_energy_el)
     energies.available_heat_in = copy(energies.potentials_energies_heat_in)
     energies.available_heat_out = copy(energies.potentials_energies_heat_out)
-    energies.in_indices = [Int(i) for i in eachindex(energies.available_heat_in)]
-    energies.out_indices = [Int(i) for i in eachindex(energies.available_heat_out)]
+    if as_inf == 1
+        energies.available_heat_in[idx] = Inf
+    elseif as_inf == 2
+        energies.available_heat_out[idx] = Inf
+    end
+    energies.in_indices = as_inf == 1 ? [idx] : [Int(i) for i in eachindex(energies.available_heat_in)]
+    energies.out_indices = as_inf == 2 ? [idx] : [Int(i) for i in eachindex(energies.available_heat_out)]
+    return energies
+end
+
+function add_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
+    append!(energies.slices_heat_in, energies.slices_heat_in_temp)
+    append!(energies.slices_heat_in_temperature, energies.slices_heat_in_temperature_temp)
+    append!(energies.slices_heat_in_uac, energies.slices_heat_in_uac_temp)
+    return energies
+end
+
+function add_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
+    append!(energies.slices_heat_out, energies.slices_heat_out_temp)
+    append!(energies.slices_heat_out_temperature, energies.slices_heat_out_temperature_temp)
+    append!(energies.slices_heat_out_uac, energies.slices_heat_out_uac_temp)
+    return energies
+end
+
+function copy_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
+    if length(energies.slices_heat_in) == 0
+        energies.slices_el_in = copy(energies.slices_el_in_temp)
+        energies.slices_heat_in = copy(energies.slices_heat_in_temp)
+        energies.slices_heat_in_temperature = copy(energies.slices_heat_in_temperature_temp)
+        energies.slices_heat_in_uac = copy(energies.slices_heat_in_uac_temp)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+            energies.slices_el_in = energies.slices_el_in_temp
+        end
+        if _isless(_sum(energies.slices_heat_in), _sum(energies.slices_heat_in_temp))
+            energies.slices_heat_in = energies.slices_heat_in_temp
+            energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+            energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+        end
+    end
+    return energies
+end
+
+function copy_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
+    if length(energies.slices_heat_out) == 0
+        energies.slices_el_in = copy(energies.slices_el_in_temp)
+        energies.slices_heat_out = copy(energies.slices_heat_out_temp)
+        energies.slices_heat_out_temperature = copy(energies.slices_heat_out_temperature_temp)
+        energies.slices_heat_out_uac = copy(energies.slices_heat_out_uac_temp)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+            energies.slices_el_in = energies.slices_el_in_temp
+        end
+        if _isless(_sum(energies.slices_heat_out), _sum(energies.slices_heat_out_temp))
+            energies.slices_heat_out = energies.slices_heat_out_temp
+            energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+            energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
+        end
+    end
     return energies
 end
 
@@ -502,7 +559,8 @@ end
 
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
-                                     energies::HPEnergies)::HPEnergies
+                                     energies::HPEnergies,
+                                     optimise_slice_dispatch::Bool=false)::HPEnergies
     energies = reset_temp_slices!(energies)
 
     # initial PLRs are nothing, as we do not yet know which slices are used and which aren't
@@ -524,21 +582,20 @@ function calculate_energies_heatpump(unit::HeatPump,
         return energies
     end
 
-    energies = copy_temp_to_slices!(energies)
-
     # warning: this optimisation is janky and doesn't work as well as it could
-    if unit.optimise_slice_dispatch
+    if optimise_slice_dispatch
+        energies = copy_temp_to_slices!(energies)
         last_updated = (0, 0)
 
-        for idx in 1:(unit.nr_optimisation_passes)
-            if idx > 1 && accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
-                energies = copy_temp_to_slices!(energies)
-            end
-
+        for _ in 1:(unit.nr_optimisation_passes)
             energies = reset_temp_slices!(energies)
             energies = reset_available!(energies)
             last_updated = update_plrs!(unit, energies, plrs, last_updated)
             energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+
+            if accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
+                energies = copy_temp_to_slices!(energies)
+            end
         end
     end
 
@@ -603,8 +660,25 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         return false, energies
     end
 
-    energies = reset_available!(energies)
-    energies = calculate_energies_heatpump(unit, sim_params, energies)
+    if energies.heat_in_has_inf_energy
+        for heat_in_idx in eachindex(energies.potentials_energies_heat_in)
+            energies = reset_available!(energies; as_inf=1, idx=heat_in_idx)
+            energies = calculate_energies_heatpump(unit, sim_params, energies)
+            energies = add_heat_in_temp_to_slices(energies)
+            energies = copy_heat_out_temp_to_slices(energies)
+        end
+    elseif energies.heat_out_has_inf_energy
+        for heat_out_idx in eachindex(energies.potentials_energies_heat_out)
+            energies = reset_available!(energies; as_inf=2, idx=heat_out_idx)
+            energies = calculate_energies_heatpump(unit, sim_params, energies)
+            energies = add_heat_out_temp_to_slices(energies)
+            energies = copy_heat_in_temp_to_slices(energies)
+        end
+    else
+        energies = reset_available!(energies)
+        energies = calculate_energies_heatpump(unit, sim_params, energies, unit.optimise_slice_dispatch)
+        energies = copy_temp_to_slices!(energies)
+    end
 
     return true, energies
 end
