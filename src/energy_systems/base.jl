@@ -1165,7 +1165,7 @@ Possible output formats are:
 """
 function plot_optional_figures(unit::Component,
                                output_path::String,
-                               output_formats::Vector{Any},
+                               output_formats::Vector{String},
                                sim_params::Dict{String,Any})
     # default implementation is to do nothing
     return false
