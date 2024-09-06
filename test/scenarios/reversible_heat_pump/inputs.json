@@ -94,7 +94,7 @@
             "number_of_probes_x": 1, 
             "number_of_probes_y": 1,
             "probe_field_key_2": "",
-            "borehole_spacing": 8,
+            "borehole_spacing": 5,
             "probe_depth": 150,
             "borehole_diameter": 0.16,
             "boreholewall_start_temperature": 13,
