@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10492373.svg)](https://zenodo.org/doi/10.5281/zenodo.10492373)
+
 # Resie - simulation engine for district-scale networks of energy systems
 
 Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
