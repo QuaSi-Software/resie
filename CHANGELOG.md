@@ -4,6 +4,30 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.10.1
+* Change handling and definition of timesteps by introducing datetime indexes for profiles and for internal handling:
+  * Profile values in ReSiE are now defined as the mean/sum of the timespan following the current timestep. This affects mainly the weather data from a global weather file. If this is not used, any definition can be used, the provided profiles just have to be consistent.
+  * Simulation start and end time have to be given as datetime now.
+  * Simulation time step can now be given in multiple time formats: seconds, minutes, hours
+  * Profiles now have to be referenced in time and have to cover the simulation start and end time.
+  * Major restructuring of profile definition: Can now be startdate & timestepsize, startdate & timestamp or a datestamp with custom format.
+  * Add parameter "data_type" in profiles and explicitly setting it as "intensive" or "extensive" values. "is_power" is no longer used.
+  * Add parameter "time_shift_seconds" in profiles to manually shift profile data by a given time span
+  * Add parameter "use_linear_segmentation" if linear and not stepwise interpolation should be used for segmentation.
+  * Fix import of weather data to meet new time definition in ReSiE, especially for intensive values of EPW which are defined as values at the time indicated.
+  * Add multi-year usage of weather data files. Weatherdata from weather file can have any year.
+  * Improve segmentation and aggregation algorithms. Segmentation can now be either linear or stepwise (default) interpolation, depending on user input.
+  * Add handling of daylight savings: Internally, ReSiE uses now local standard time. Profiles with a datestamp including DST are converted to local standard time. Output is always local standard time without DST. DST in EWP-Header will not be considered.
+  * Add handling of leap days: They are ignored in all input and output. See documentation for details.
+  * Line plot x-axis is now configurable to show seconds, hours or a datetime index.
+* Removed deprecated internal parameter "is_first_timestep" as this is now indicated by "time" that starts always at zero.
+* Add input of coordinates (optional) and reading and conversion of coordinates given in weather data files (default)
+* Add long wave irradiation as available profile for other components from weather file
+* Add and improve tests to cover profile conversion algorithms
+* Add default simulation parameters for tests
+* Add Julia packages Dates, TimeZones, Proj (for coordinate transformation)
+* For handling of timezones beyond 2038, files for a required recompilation of the package TimeZones and a description in the README has been included.
+
 ### Version 0.9.4
 * Improve geothermal probe:
   * fix interpolation of g-functions
