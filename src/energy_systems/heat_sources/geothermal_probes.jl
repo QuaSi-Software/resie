@@ -614,7 +614,7 @@ function get_g_values_from_library(unit::Component,
     # calculate number of probes in probe field
     number_of_probes = length(probe_coordinates)
 
-    if number_of_probes == 1 && borehole_spacing !== 5
+    if number_of_probes == 1 && borehole_spacing != 5.0
         @error "You are requesting a single probe for the probe field \"$(unit.uac)\". Due to the underlaying library, " *
                "the borehole_spacing has to be set to 5 m in this case! Otherwise, a wrong g-function will be calculated."
         throw(InputError)

@@ -1,4 +1,5 @@
 # this file contains functionality for writing output of the simulation to files.
+using Dates
 
 """
 get_output_keys(config[io_settings], components)
@@ -242,9 +243,19 @@ reset_file(filepath, output_keys)
 
 Reset the output file and add headers for the given outputs.
 """
-function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey})
+function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey}, csv_time_unit::String)
     open(abspath(filepath), "w") do file_handle
-        write(file_handle, "Time [s]")
+        if csv_time_unit == "seconds"
+            time_unit = "[s]"
+        elseif csv_time_unit == "minutes"
+            time_unit = "[min]"
+        elseif csv_time_unit == "hours"
+            time_unit = "[h]"
+        elseif csv_time_unit == "date"
+            time_unit = "[dd.mm.yyyy HH:MM:SS]"
+        end
+
+        write(file_handle, "Time $time_unit")
 
         for outkey in output_keys
             if outkey.medium === nothing
@@ -266,8 +277,19 @@ Write the given outputs for the given time to file.
 """
 function write_to_file(filepath::String,
                        output_keys::Vector{EnergySystems.OutputKey},
-                       time::Int)
+                       sim_params::Dict{String,Any},
+                       csv_time_unit::String)
     open(abspath(filepath), "a") do file_handle
+        if csv_time_unit == "seconds"
+            time = sim_params["time"]
+        elseif csv_time_unit == "minutes"
+            time = sim_params["time"] / 60
+        elseif csv_time_unit == "hours"
+            time = sim_params["time"] / 60 / 60
+        elseif csv_time_unit == "date"
+            time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+        end
+
         write(file_handle, "$time")
 
         for outkey in output_keys
@@ -350,7 +372,8 @@ create a line plot with data and label. user_input is dict from input file
 """
 function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
                                    outputs_plot_keys::Vector{EnergySystems.OutputKey},
-                                   project_config::Dict{AbstractString,Any})
+                                   project_config::Dict{AbstractString,Any},
+                                   sim_params::Dict{String,Any})
     plot_all = project_config["io_settings"]["output_plot"] == "all"
 
     # set Axis, unit and scale factor if given
@@ -390,14 +413,36 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
     end
 
     # create plot
-    x = outputs_plot_data[:, 1]
+    output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
+                            project_config["io_settings"]["output_plot_time_unit"] : "date"
+    if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
+        @info "The `output_plot_time_unit` has to be one of `seconds`, `minutes`, `hours` or `date. " *
+              "It will be set to `date` as default."
+        output_plot_time_unit = "date"
+    end
+    if output_plot_time_unit == "seconds"
+        x = outputs_plot_data[:, 1]
+    elseif output_plot_time_unit == "minutes"
+        x = outputs_plot_data[:, 1] / 60
+    elseif output_plot_time_unit == "hours"
+        x = outputs_plot_data[:, 1] / 60 / 60
+    else
+        if sim_params["start_date"] === nothing
+            start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
+            @info ("Date of first data point in ouput line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
+        else
+            start_date = sim_params["start_date"]
+        end
+        x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in outputs_plot_data[:, 1]]
+    end
+
     y = outputs_plot_data[:, 2:end]
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all
-            trace = scatter(; x=x / 60 / 60, y=y[:, i], mode="lines", name=labels[i])
+            trace = scatter(; x=x, y=y[:, i], mode="lines", name=labels[i])
         else
-            trace = scatter(; x=x / 60 / 60, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
+            trace = scatter(; x=x, y=scale_fact[i] * y[:, i], mode="lines", name=labels[i])
             if axis[i] == "right"
                 trace.yaxis = "y2"
             else  # default is left axis
@@ -407,10 +452,29 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
         push!(traces, trace)
     end
 
-    layout = Layout(; title_text="Plot of outputs as defined in the input-file",
-                    xaxis_title_text="Time [hour]",
-                    yaxis_title_text="",
-                    yaxis2=attr(; title="", overlaying="y", side="right"))
+    if output_plot_time_unit == "date"
+        leap_days_str = string.([Date(year, 2, 29)
+                                 for year in
+                                     Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                                 if isleapyear(year)])
+
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"),
+                        xaxis=attr(; type="date",
+                                   rangebreaks=[Dict("values" => leap_days_str)]))
+    else
+        layout = Layout(;
+                        title_text="Plot of outputs as defined in the input-file. Attention: Energies are given within " *
+                                   "the simulation time step of $(Int(sim_params["time_step_seconds"])) s",
+                        xaxis_title_text="Time [$(output_plot_time_unit)]",
+                        yaxis_title_text="",
+                        yaxis2=attr(; title="", overlaying="y", side="right"))
+    end
+
     p = plot(traces, layout)
 
     file_path = default(project_config["io_settings"],

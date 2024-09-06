@@ -3,6 +3,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -49,11 +51,7 @@ end
 function test_load_no_connections()
     components_config = energy_system()
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     exception_occured = false
     try
@@ -82,11 +80,7 @@ function test_load_given_lists_empty()
         "output_order" => [],
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
     exception_occured = false
     try
         components = Resie.load_components(components_config, simulation_parameters)
@@ -120,11 +114,7 @@ function test_fully_specified()
                           [1, 0]],
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]

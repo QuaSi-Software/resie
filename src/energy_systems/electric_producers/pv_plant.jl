@@ -47,7 +47,7 @@ function control(unit::PVPlant,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
-    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
+    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
 end
 

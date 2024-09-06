@@ -26,6 +26,7 @@ using ColorSchemes
 using Colors
 using Interpolations
 using JSON
+using Dates
 
 """
     get_simulation_params(project_config)
@@ -38,22 +39,35 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_timestamp, end_timestamp = get_timesteps(project_config["simulation_parameters"])
-    nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
+    time_step, start_date, end_date, nr_of_steps = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
-        "time" => start_timestamp,
+        "time" => 0,
+        "current_date" => start_date,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
+        "start_date" => start_date,
+        "end_date" => end_date,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
+        "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
+        "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
     )
 
-    file_path = default(project_config["simulation_parameters"],
-                        "weather_file_path",
-                        nothing)
-    if file_path !== nothing
-        sim_params["weather_data"] = WeatherData(file_path, sim_params)
+    weather_file_path = default(project_config["simulation_parameters"],
+                                "weather_file_path",
+                                nothing)
+
+    if weather_file_path !== nothing
+        sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params)
+
+        if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+            sim_params["latitude"] = lat
+            sim_params["longitude"] = long
+        else
+            @info "The coordinates given in the weather file where overwritten by the " *
+                  "ones given in the input file:\n" *
+                  "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+        end
     end
 
     return sim_params
@@ -114,6 +128,11 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
+    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
+    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
+        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
+        throw(IntputError)
+    end
 
     # Initialize the array for output plots
     if do_create_plot
@@ -121,7 +140,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     end
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_csv)
+        reset_file(csv_output_file_path, output_keys_to_csv, csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -156,7 +175,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params["time"])
+            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params, csv_time_unit)
         end
 
         # get the energy transported through each interface in every timestep for Sankey
@@ -171,15 +190,13 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
-
-        if steps == 1
-            sim_params["is_first_timestep"] = false
-        end
+        sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
+                                                            Second(sim_params["time_step_seconds"]))
     end
 
     ### create profile line plot
     if do_create_plot
-        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
+        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config, sim_params)
         @info "Line plot created and saved to .output/output_plot.html"
     end
 

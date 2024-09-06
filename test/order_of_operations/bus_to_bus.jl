@@ -83,11 +83,7 @@ function test_ooo_bus_to_bus()
                 ("TST_BUS_02", EnergySystems.s_distribute),
                 ("TST_BUS_01", EnergySystems.s_distribute)]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     ooo = Resie.calculate_order_of_operations(components)

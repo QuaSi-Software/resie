@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10492373.svg)](https://zenodo.org/doi/10.5281/zenodo.10492373)
+
 # Resie - simulation engine for district-scale networks of energy systems
 
 Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
@@ -22,10 +24,15 @@ Resie is released under the MIT license. You can find a copy of the license in f
 1. Exit out of the package REPL with shortcut `Ctrl+c`
 1. Exit out of the julia REPL with `exit()` or shortcut `Ctrl+d`
 
+To use profiles with a time-zone-aware datetime index beyond 2038, follow these steps:
+
+1. Copy the zip file found at `additional_files/move_to_user_julia_scratchspaces_and_unpack.zip` from the repository to your local Julia scratchspaces directory, typically located at `C:/users/user_name/.julia/scratchspaces`.
+2. Extract the content of the zip file directly into the `scratchspaces` folder. Ensure that the folder `f269a46b-ccf7-5d73-abea-4c690281aa53` is placed directly within `scratchspaces`, without any intermediate directories.
+
 If you wish to develop with this installation of ReSiE you should also perform the following inside the ReSiE root directory:
 
 1. Install the pre-commit framework: `pip install pre-commit`
-1. Install the pre-commit hooks into the ReSiE installation: `pre-commit install`
+2. Install the pre-commit hooks into the ReSiE installation: `pre-commit install`
 
 ## Usage
 
