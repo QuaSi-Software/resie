@@ -828,11 +828,11 @@ function profile_calculate_means(values::Vector{Float64},
 
     converted_profile = zeros(new_length)
 
-    for n in start_idx:new_length
-        old_index_start = Int((n - 1) * aggregation_factor + 1)
-        old_index_end = Int(min(n * aggregation_factor, old_length))
+    for n in 1:new_length
+        old_index_start = Int(start_idx + (n - 1) * aggregation_factor)
+        old_index_end = Int(min(start_idx + n * aggregation_factor - 1, old_length))
         old_number_of_steps = Int(old_index_end - old_index_start + 1)
-        converted_profile[n - start_idx + 1] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
+        converted_profile[n] = sum(values[old_index_start:old_index_end]) / old_number_of_steps
     end
 
     end_time = add_ignoring_leap_days(sim_params["start_date"], new_time_step * (new_length - 1))
