@@ -25,24 +25,14 @@ function test_one_to_one_via_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_GRI_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
-                "energy_flow" => [
-                    [1],
-                ],
+                "input_order" => ["TST_GRI_01"],
+                "output_order" => ["TST_DEM_01"],
+                "energy_flow" => [[1]],
             ),
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     grid = components["TST_GRI_01"]

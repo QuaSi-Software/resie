@@ -272,8 +272,8 @@ function control(unit::GeothermalHeatCollector,
     # get ambient temperature and global radiation from profile for current time step if needed (probably
     # only for geothermal collectors)
     # TODO: add link to global weather file
-    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params["time"])
-    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params["time"]))  # from Wh/m^2 to W/m^2
+    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params))  # from Wh/m^2 to W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     set_temperature!(unit.output_interfaces[unit.m_heat_out],

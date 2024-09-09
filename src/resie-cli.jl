@@ -31,14 +31,12 @@ function main()
     general_logfile_path = "output/logfile_general.log"
     balanceWarn_logfile_path = "output/logfile_balanceWarn.log"
     min_log_level = Resie_Logger.Logging.Info
-    log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(
-        log_to_console,
-        log_to_file,
-        general_logfile_path,
-        balanceWarn_logfile_path,
-        min_log_level,
-        input_filepath
-    )
+    log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
+                                                                       log_to_file,
+                                                                       general_logfile_path,
+                                                                       balanceWarn_logfile_path,
+                                                                       min_log_level,
+                                                                       input_filepath)
 
     # run the simulation
     Resie.load_and_run(input_filepath)

@@ -6,14 +6,12 @@ mutable struct CM_ProfileLimited <: ControlModule
     parameters::Dict{String,Any}
     profile::Profile
 
-    function CM_ProfileLimited(
-        parameters::Dict{String,Any},
-        components::Grouping,
-        sim_params::Dict{String,Any}
-    )
-        default_parameters=Dict{String,Any}(
+    function CM_ProfileLimited(parameters::Dict{String,Any},
+                               components::Grouping,
+                               sim_params::Dict{String,Any})
+        default_parameters = Dict{String,Any}(
             "name" => "profile_limited",
-            "profile_path" => nothing
+            "profile_path" => nothing,
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -35,5 +33,5 @@ function update(mod::CM_ProfileLimited)
 end
 
 function upper_plr_limit(mod::CM_ProfileLimited, sim_params::Dict{String,Any})::Float64
-    return value_at_time(mod.profile, sim_params["time"])
+    return value_at_time(mod.profile, sim_params)
 end

@@ -34,48 +34,36 @@ mutable struct BoundedSink <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_bounded_sink, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            max_power_profile, # max_power_profile
-            temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
-            0.0, # max_energy
-            nothing, # temperature
-            default(config, "constant_power", nothing), # constant_power
-            default(config, "constant_temperature", nothing), # constant_temperature
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_bounded_sink,                 # sys_function
+                   medium,                          # medium
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   max_power_profile,               # max_power_profile
+                   temperature_profile,             # temperature_profile
+                   default(config, "scale", 1.0),   # scaling_factor
+                   0.0,                             # max_energy
+                   nothing,                         # temperature
+                   default(config, "constant_power", nothing),      # constant_power
+                   default(config, "constant_temperature", nothing)) # constant_temperature
     end
 end
 
 function initialise!(unit::BoundedSink, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        unload_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::BoundedSink,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::BoundedSink,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_power !== nothing
         unit.max_energy = watt_to_wh(unit.constant_power)
     elseif unit.max_power_profile !== nothing
-        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
-            unit.max_power_profile, sim_params["time"]
-        )
+        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, sim_params)
     else
         unit.max_energy = 0.0
     end
@@ -84,15 +72,11 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(
-            unit.temperature_profile, sim_params["time"]
-        )
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_temperature!(
-        unit.input_interfaces[unit.medium],
-        unit.temperature,
-        nothing
-    )
+    set_temperature!(unit.input_interfaces[unit.medium],
+                     unit.temperature,
+                     nothing)
 end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})
@@ -107,11 +91,10 @@ function process(unit::BoundedSink, sim_params::Dict{String,Any})
         energy_supply = balance(exchanges) + energy_potential(exchanges)
     else
         e = first(exchanges)
-        if (
-            unit.temperature === nothing ||
+        if (unit.temperature === nothing ||
             (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-            (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
-        )
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
+            # end of condition
             energy_supply = e.balance + e.energy_potential
         else
             energy_supply = 0.0
@@ -125,10 +108,10 @@ end
 
 function output_values(unit::BoundedSink)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" IN",
+        return [string(unit.medium) * " IN",
                 "Max_Energy"]
     else
-        return [string(unit.medium)*" IN",
+        return [string(unit.medium) * " IN",
                 "Max_Energy",
                 "Temperature"]
     end

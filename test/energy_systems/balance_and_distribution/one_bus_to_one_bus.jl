@@ -17,26 +17,18 @@ function test_one_bus_to_one_bus()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_GRI_01",
-                ],
-                "output_order" => [
-                    "TST_BUS_02",
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_GRI_01"],
+                "output_order" => ["TST_BUS_02"],
+            ),
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_BUS_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01"],
+                "output_order" => ["TST_DEM_01"],
+            ),
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -47,11 +39,7 @@ function test_one_bus_to_one_bus()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
@@ -160,9 +148,8 @@ function test_one_bus_to_one_bus()
     @test bus_2.remainder ≈ 0.0
     @test bus_proxy.remainder ≈ 0.0
     @test grid.output_interfaces[grid.medium].balance ≈ 75.0
-    @test bus_proxy.balance_table[1,1] ≈ 75.0 # energy transferred from source 1 to sink 1 ...
-    @test bus_proxy.balance_table[1,2] ≈ 55.0 # with temperature of 55.0 °C
-
+    @test bus_proxy.balance_table[1, 1] ≈ 75.0 # energy transferred from source 1 to sink 1 ...
+    @test bus_proxy.balance_table[1, 2] ≈ 55.0 # with temperature of 55.0 °C
 
     EnergySystems.distribute!(bus_proxy)
     EnergySystems.distribute!(bus_2)
@@ -182,7 +169,6 @@ function test_one_bus_to_one_bus()
     @test bus_1.output_interfaces[1].sum_abs_change ≈ 150.0
     @test bus_2.input_interfaces[1].balance ≈ 0.0
     @test bus_2.input_interfaces[1].sum_abs_change ≈ 150.0
-
 end
 
 @testset "one_bus_to_one_bus" begin

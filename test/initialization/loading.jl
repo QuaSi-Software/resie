@@ -20,16 +20,14 @@ function test_load_from_dict()
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "output_refs" => ["TST_BT_01"],
-            "control_modules" => [
-                Dict{String,Any}(
-                    "name" => "storage_driven",
-                    "high_threshold" => 0.5,
-                    "low_threshold" => 0.1,
-                    "storage_uac" => "TST_BT_01"
-                )
-            ],
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "storage_driven",
+                                      "high_threshold" => 0.5,
+                                      "low_threshold" => 0.1,
+                                      "storage_uac" => "TST_BT_01",
+                                  )],
             "power_th" => 20000,
-            "constant_cop" => 3.0
+            "constant_cop" => 3.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -49,7 +47,7 @@ function test_load_from_dict()
     simulation_params = Dict{String,Any}(
         "time" => 0,
         "time_step_seconds" => 900,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
     components = Resie.load_components(components_config, simulation_params)
     @test length(keys(components)) == 5
@@ -78,11 +76,9 @@ function test_load_custom_medium_categories()
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "output_refs" => [
-                "TST_HP_01",
-                "TST_GRO_02",
-                "TST_GRO_03"
-            ],
+            "output_refs" => ["TST_HP_01",
+                              "TST_GRO_02",
+                              "TST_GRO_03"],
             "power_el" => 1000,
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_ht_out" => "m_h_w_55c",
@@ -97,7 +93,7 @@ function test_load_custom_medium_categories()
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",
             "power_th" => 12000,
-            "constant_cop" => 3.0
+            "constant_cop" => 3.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
@@ -121,7 +117,7 @@ function test_load_custom_medium_categories()
     simulation_params = Dict{String,Any}(
         "time" => 0,
         "time_step_seconds" => 900,
-        "epsilon" => 1e-9
+        "epsilon" => 1e-9,
     )
     components = Resie.load_components(components_config, simulation_params)
     electrolyser = components["TST_ELY_01"]

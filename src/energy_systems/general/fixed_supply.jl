@@ -37,46 +37,36 @@ mutable struct FixedSupply <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_fixed_source, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            energy_profile, # energy_profile
-            temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
-            0.0, # supply
-            nothing, # temperature
-            default(config, "constant_supply", nothing), # constant_supply (power, not work!)
-            default(config, "constant_temperature", nothing), # constant_temperature
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_fixed_source,                 # sys_function
+                   medium,                          # medium
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   energy_profile,                  # energy_profile
+                   temperature_profile,             # temperature_profile
+                   default(config, "scale", 1.0),   # scaling_factor
+                   0.0,                             # supply
+                   nothing,                         # temperature
+                   default(config, "constant_supply", nothing),      # constant_supply (power, not work!)
+                   default(config, "constant_temperature", nothing)) # constant_temperature
     end
 end
 
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        load_storages(unit.controller, unit.medium)
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::FixedSupply,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::FixedSupply,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_supply !== nothing
         unit.supply = watt_to_wh(unit.constant_supply)
     elseif unit.energy_profile !== nothing
-        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
+        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     else
         unit.supply = 0.0
     end
@@ -85,14 +75,12 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
-    set_temperature!(
-        unit.output_interfaces[unit.medium],
-        nothing,
-        unit.temperature
-    )
+    set_temperature!(unit.output_interfaces[unit.medium],
+                     nothing,
+                     unit.temperature)
 end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})
@@ -102,10 +90,10 @@ end
 
 function output_values(unit::FixedSupply)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Supply"]
     else
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Supply",
                 "Temperature"]
     end

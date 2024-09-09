@@ -40,28 +40,18 @@ function test_one_plus_storage_to_many()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_SRC_01",
-                    "TST_TES_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                    "TST_DEM_02",
-                    "TST_TES_01",
-                ],
-                "energy_flow" => [
-                    [1,1,1],
-                    [1,1,0],
-                ],
+                "input_order" => ["TST_SRC_01",
+                                  "TST_TES_01"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_DEM_02",
+                                   "TST_TES_01"],
+                "energy_flow" => [[1, 1, 1],
+                                  [1, 1, 0]],
             ),
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     source = components["TST_SRC_01"]
@@ -69,7 +59,6 @@ function test_one_plus_storage_to_many()
     demand_2 = components["TST_DEM_02"]
     bus = components["TST_BUS_TH_01"]
     storage = components["TST_TES_01"]
-
 
     # time step 1: the source can't cover the demands, the storage needs to fill the rest
 

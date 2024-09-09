@@ -2,7 +2,7 @@
 Trait-like type of components that implement the load ratio dependent efficiency (PLRDE)
 functionality.
 """
-const PLRDEComponent = Union{CHPP, Electrolyser, FuelBoiler}
+const PLRDEComponent = Union{CHPP,Electrolyser,FuelBoiler}
 
 """
     parse_efficiency_function(eff_def)
@@ -48,19 +48,19 @@ function parse_efficiency_function(eff_def::String)::Function
             return plr -> c
 
         elseif method == "poly"
-            params = map(x -> parse(Float64,x), split(data, ","))
-            return function(plr)
-                return sum(p * plr^(length(params)-i) for (i, p) in enumerate(params))
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return function (plr)
+                return sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
             end
 
         elseif method == "pwlin"
-            params = map(x -> parse(Float64,x), split(data, ","))
-            step = 1.0 / (length(params)-1)
-            return function(plr)
+            params = map(x -> parse(Float64, x), split(data, ","))
+            step = 1.0 / (length(params) - 1)
+            return function (plr)
                 bracket_nr = floor(Int64, plr / step) + 1
                 lower_bound = params[bracket_nr]
-                upper_bound = params[min(bracket_nr+1,length(params))]
-                return lower_bound + (upper_bound-lower_bound)*(plr%step) / step
+                upper_bound = params[min(bracket_nr + 1, length(params))]
+                return lower_bound + (upper_bound - lower_bound) * (plr % step) / step
             end
         end
     end
@@ -97,11 +97,9 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
 
     for name in unit.interface_list
         lookup_table = []
-        for plr in collect(0.0:unit.discretization_step:1.0)
-            push!(lookup_table, (
-                watt_to_wh(unit.power) * plr * unit.efficiencies[name](plr),
-                plr
-            ))
+        for plr in collect(0.0:(unit.discretization_step):1.0)
+            push!(lookup_table, (watt_to_wh(unit.power) * plr * unit.efficiencies[name](plr),
+                                 plr))
         end
         tables[name] = lookup_table
 
@@ -110,7 +108,7 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
         for (energy, plr) in lookup_table
             if energy > sim_params["epsilon"] && energy <= last_energy
                 @warn "PLR-from-energy function of component $(unit.uac) at PLR $plr " *
-                    "is not monotonic"
+                      "is not monotonic"
             end
             last_energy = energy
         end
@@ -118,7 +116,6 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
 
     return tables
 end
-
 
 """
     plr_from_energy(unit, energy_value)
@@ -144,11 +141,9 @@ is performed to calculate the corresponding PLR.
 # Returns
 - `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
 """
-function plr_from_energy(
-    unit::PLRDEComponent,
-    interface::Symbol,
-    energy_value::Float64
-)::Float64
+function plr_from_energy(unit::PLRDEComponent,
+                         interface::Symbol,
+                         energy_value::Float64)::Float64
     # shortcut if the given interface is designated as linear in respect to PLR
     if interface === unit.linear_interface
         return energy_value / watt_to_wh(unit.power)
@@ -164,21 +159,16 @@ function plr_from_energy(
     end
 
     nr_iter = 0
-    candidate_idx = max(
-        1,
-        floor(Int64, length(lookup_table) * energy_value / energy_at_max)
-    )
+    candidate_idx = max(1, floor(Int64, length(lookup_table) * energy_value / energy_at_max))
 
-    while (
-        nr_iter < length(lookup_table)
-        && candidate_idx < length(lookup_table)
-        && candidate_idx >= 1
-    )
+    while (nr_iter < length(lookup_table)
+           && candidate_idx < length(lookup_table)
+           && candidate_idx >= 1)
         (energy_lb, plr_lb) = lookup_table[candidate_idx]
-        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
+        (energy_ub, plr_ub) = lookup_table[candidate_idx + 1]
         if energy_lb <= energy_value && energy_value < energy_ub
             return plr_lb + (plr_ub - plr_lb) *
-                (energy_value - energy_lb) / (energy_ub - energy_lb)
+                            (energy_value - energy_lb) / (energy_ub - energy_lb)
         elseif energy_value < energy_lb
             candidate_idx -= 1
         elseif energy_value >= energy_ub
@@ -189,7 +179,7 @@ function plr_from_energy(
     end
 
     @warn "The energy_value on interface $(interface) in component $(unit.uac) is not " *
-        "within the range of the lookup table."
+          "within the range of the lookup table."
     return 0.0
 end
 
@@ -206,11 +196,9 @@ Calculates the energy value for the given interface from the given PLR.
 # Returns
 - `Float64`: The energy value
 """
-function energy_from_plr(
-    unit::PLRDEComponent,
-    interface::Symbol,
-    plr::Float64
-)::Float64
+function energy_from_plr(unit::PLRDEComponent,
+                         interface::Symbol,
+                         plr::Float64)::Float64
     # the intuitive solution would be to multiply the power with the part load ratio and the
     # the efficiency at that PLR, but for unknown reasons this introduces an error in the
     # linear interpolation that appears to be quadratic in the distance to the support
@@ -231,13 +219,11 @@ function energy_from_plr(
     nr_iter = 0
     candidate_idx = max(1, floor(Int64, length(lookup_table) * plr))
 
-    while (
-        nr_iter < length(lookup_table)
-        && candidate_idx < length(lookup_table)
-        && candidate_idx >= 1
-    )
+    while (nr_iter < length(lookup_table)
+           && candidate_idx < length(lookup_table)
+           && candidate_idx >= 1)
         (energy_lb, plr_lb) = lookup_table[candidate_idx]
-        (energy_ub, plr_ub) = lookup_table[candidate_idx+1]
+        (energy_ub, plr_ub) = lookup_table[candidate_idx + 1]
         if plr_lb <= plr && plr < plr_ub
             return energy_lb + (energy_ub - energy_lb) * (plr - plr_lb) / (plr_ub - plr_lb)
         elseif plr < plr_lb
@@ -250,7 +236,7 @@ function energy_from_plr(
     end
 
     @warn "The PLR on interface $(interface) in component $(unit.uac) is not " *
-        "within the range of the lookup table."
+          "within the range of the lookup table."
     return 0.0
 end
 
@@ -274,12 +260,10 @@ component.
 - `Vector{Floathing}`: The energy values in the same order as the field `interface_list` of
     the component
 """
-function calculate_energies_for_plrde(
-    unit::PLRDEComponent,
-    sim_params::Dict{String,Any},
-    min_plr::Float64,
-    max_plr::Float64
-)::Tuple{Bool, Vector{Floathing}}
+function calculate_energies_for_plrde(unit::PLRDEComponent,
+                                      sim_params::Dict{String,Any},
+                                      min_plr::Float64,
+                                      max_plr::Float64)::Tuple{Bool,Vector{Floathing}}
     # calculate available energy and PLR as inverse from that for each input/output
     available_energy = []
     plr_from_nrg = []
@@ -297,10 +281,8 @@ function calculate_energies_for_plrde(
         energy = abs(energy)
 
         # limit to design power
-        energy = min(
-            watt_to_wh(unit.power) * unit.efficiencies[name](1.0),
-            energy
-        )
+        energy = min(watt_to_wh(unit.power) * unit.efficiencies[name](1.0),
+                     energy)
 
         push!(available_energy, energy)
         push!(plr_from_nrg, plr_from_energy(unit, name, energy))
@@ -308,7 +290,7 @@ function calculate_energies_for_plrde(
 
     # the operation point of the component is the minimum of the PLR from all inputs/outputs
     # plus additional constraints and the design power (if all available energy is infinite)
-    used_plr = min(minimum(x->x, plr_from_nrg), max_plr, 1.0)
+    used_plr = min(minimum(x -> x, plr_from_nrg), max_plr, 1.0)
 
     if used_plr < min_plr
         return (false, [])
@@ -334,24 +316,20 @@ Checks the available energy on the input fuel interface.
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_fuel_in(
-    unit::Union{CHPP,FuelBoiler},
-    sim_params::Dict{String,Any}
-)
+function check_fuel_in(unit::Union{CHPP,FuelBoiler},
+                       sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_fuel_in"]
         return Inf
     end
 
-    if (
-        unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.input_interfaces[unit.m_fuel_in].max_energy)
-    )
+    if (unit.input_interfaces[unit.m_fuel_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_fuel_in].max_energy))
+        # end of condition
         return Inf
     else
-        exchanges = balance_on(
-            unit.input_interfaces[unit.m_fuel_in],
-            unit.input_interfaces[unit.m_fuel_in].source
-        )
+        exchanges = balance_on(unit.input_interfaces[unit.m_fuel_in],
+                               unit.input_interfaces[unit.m_fuel_in].source)
         potential_energy_fuel = balance(exchanges) + energy_potential(exchanges)
         if potential_energy_fuel <= sim_params["epsilon"]
             return nothing
@@ -373,24 +351,20 @@ Checks the available energy on the input electricity interface.
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_in(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
+function check_el_in(unit::Electrolyser,
+                     sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_in"]
         return Inf
     end
 
-    if (
-        unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy)
-    )
+    if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy))
+        # end of condition
         return Inf
     else
-        exchanges = balance_on(
-            unit.input_interfaces[unit.m_el_in],
-            unit.input_interfaces[unit.m_el_in].source
-        )
+        exchanges = balance_on(unit.input_interfaces[unit.m_el_in],
+                               unit.input_interfaces[unit.m_el_in].source)
         potential_energy_el = balance(exchanges) + energy_potential(exchanges)
         if potential_energy_el <= sim_params["epsilon"]
             return nothing
@@ -412,25 +386,21 @@ Checks the available energy on the electricity output interface.
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_out(
-    unit::CHPP,
-    sim_params::Dict{String,Any}
-)
+function check_el_out(unit::CHPP,
+                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_out"]
         return -Inf
     end
 
-    if (
-        unit.output_interfaces[unit.m_el_out].target.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.output_interfaces[unit.m_el_out].max_energy)
-    )
+    if (unit.output_interfaces[unit.m_el_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_el_out].max_energy))
+        # end of condition
         return -Inf
     end
 
-    exchanges = balance_on(
-        unit.output_interfaces[unit.m_el_out],
-        unit.output_interfaces[unit.m_el_out].target
-    )
+    exchanges = balance_on(unit.output_interfaces[unit.m_el_out],
+                           unit.output_interfaces[unit.m_el_out].target)
     potential_energy_el = balance(exchanges) + energy_potential(exchanges)
     if potential_energy_el >= -sim_params["epsilon"]
         return nothing
@@ -452,25 +422,21 @@ Checks the available energy on the hydrogen output interface.
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_h2_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
+function check_h2_out(unit::Electrolyser,
+                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_h2_out"]
         return -Inf
     end
 
-    if (
-        unit.output_interfaces[unit.m_h2_out].target.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.output_interfaces[unit.m_h2_out].max_energy)
-    )
+    if (unit.output_interfaces[unit.m_h2_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_h2_out].max_energy))
+        # end of condition
         return -Inf
     end
 
-    exchanges = balance_on(
-        unit.output_interfaces[unit.m_h2_out],
-        unit.output_interfaces[unit.m_h2_out].target
-    )
+    exchanges = balance_on(unit.output_interfaces[unit.m_h2_out],
+                           unit.output_interfaces[unit.m_h2_out].target)
     potential_energy_h2 = balance(exchanges) + energy_potential(exchanges)
     if potential_energy_h2 >= -sim_params["epsilon"]
         return nothing
@@ -492,25 +458,21 @@ Checks the available energy on the oxygen output interface.
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_o2_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
+function check_o2_out(unit::Electrolyser,
+                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_o2_out"]
         return -Inf
     end
 
-    if (
-        unit.output_interfaces[unit.m_o2_out].target.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.output_interfaces[unit.m_o2_out].max_energy)
-    )
+    if (unit.output_interfaces[unit.m_o2_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_o2_out].max_energy))
+        # end of condition
         return -Inf
     end
 
-    exchanges = balance_on(
-        unit.output_interfaces[unit.m_o2_out],
-        unit.output_interfaces[unit.m_o2_out].target
-    )
+    exchanges = balance_on(unit.output_interfaces[unit.m_o2_out],
+                           unit.output_interfaces[unit.m_o2_out].target)
     potential_energy_o2 = balance(exchanges) + energy_potential(exchanges)
     if potential_energy_o2 >= -sim_params["epsilon"]
         return nothing
@@ -542,28 +504,24 @@ exchange, if any is given at all.
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_heat_out_impl(
-    unit::Union{CHPP,Electrolyser,FuelBoiler},
-    interface_name::String,
-    medium::Symbol,
-    output_temperature::Floathing,
-    sim_params::Dict{String,Any}
-)
-    if !unit.controller.parameters["consider_m_"*interface_name]
+function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
+                             interface_name::String,
+                             medium::Symbol,
+                             output_temperature::Floathing,
+                             sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_" * interface_name]
         return -Inf
     end
 
-    if (
-        unit.output_interfaces[medium].target.sys_function == sf_transformer
-        && is_max_energy_nothing(unit.output_interfaces[medium].max_energy)
-    )
+    if (unit.output_interfaces[medium].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[medium].max_energy))
+        # end of condition
         return -Inf
     end
 
-    exchanges = balance_on(
-        unit.output_interfaces[medium],
-        unit.output_interfaces[medium].target
-    )
+    exchanges = balance_on(unit.output_interfaces[medium],
+                           unit.output_interfaces[medium].target)
 
     # if we get multiple exchanges from balance_on, a bus is involved, which means the
     # temperature check has already been performed. we only need to check the case for
@@ -573,11 +531,12 @@ function check_heat_out_impl(
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
     else
         e = first(exchanges)
-        if (
-            output_temperature === nothing
-            || (e.temperature_min === nothing || e.temperature_min <= output_temperature)
-            && (e.temperature_max === nothing || e.temperature_max >= output_temperature)
-        )
+        if (output_temperature === nothing
+            ||
+            (e.temperature_min === nothing || e.temperature_min <= output_temperature)
+            &&
+            (e.temperature_max === nothing || e.temperature_max >= output_temperature))
+            # end of condition
             potential_energy_heat_out = e.balance + e.energy_potential
         else
             potential_energy_heat_out = 0.0
@@ -593,47 +552,35 @@ end
 """
 Alias to check_heat_out_impl for a heat output interface called heat_out.
 """
-function check_heat_out(
-    unit::Union{CHPP,FuelBoiler},
-    sim_params::Dict{String,Any}
-)
-    return check_heat_out_impl(
-        unit,
-        "heat_out",
-        unit.m_heat_out,
-        unit.output_temperature,
-        sim_params
-    )
+function check_heat_out(unit::Union{CHPP,FuelBoiler},
+                        sim_params::Dict{String,Any})
+    return check_heat_out_impl(unit,
+                               "heat_out",
+                               unit.m_heat_out,
+                               unit.output_temperature,
+                               sim_params)
 end
 
 """
 Alias to check_heat_out_impl for a heat output interface called heat_ht_out.
 """
-function check_heat_ht_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    return check_heat_out_impl(
-        unit,
-        "heat_ht_out",
-        unit.m_heat_ht_out,
-        unit.output_temperature_ht,
-        sim_params
-    )
+function check_heat_ht_out(unit::Electrolyser,
+                           sim_params::Dict{String,Any})
+    return check_heat_out_impl(unit,
+                               "heat_ht_out",
+                               unit.m_heat_ht_out,
+                               unit.output_temperature_ht,
+                               sim_params)
 end
 
 """
 Alias to check_heat_out_impl for a heat output interface called heat_lt_out.
 """
-function check_heat_lt_out(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
-    return check_heat_out_impl(
-        unit,
-        "heat_lt_out",
-        unit.m_heat_lt_out,
-        unit.output_temperature_lt,
-        sim_params
-    )
+function check_heat_lt_out(unit::Electrolyser,
+                           sim_params::Dict{String,Any})
+    return check_heat_out_impl(unit,
+                               "heat_lt_out",
+                               unit.m_heat_lt_out,
+                               unit.output_temperature_lt,
+                               sim_params)
 end
