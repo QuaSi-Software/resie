@@ -797,7 +797,7 @@ function profile_spread_to_segments(values::Vector{Float64},
     converted_profile = zeros(new_length)
 
     for new_idx in 1:new_length
-        old_idx = Int(ceil((start_idx + new_idx - 1) / segmentation_factor))
+        old_idx = Int(start_idx + floor((new_idx - 1) / segmentation_factor))
         converted_profile[new_idx] = values[old_idx]
     end
 
