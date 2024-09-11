@@ -1242,7 +1242,7 @@ include("storage/battery.jl")
 include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
-# include("heat_sources/geothermal_heat_collectors.jl")
+include("heat_sources/geothermal_heat_collectors.jl")
 include("heat_sources/generic_heat_source.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
@@ -1458,7 +1458,7 @@ Function to determine the source of the temperature profile for fixed and bouded
 If no information is given, nothing will be returned.
 If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
 If a constant_temperature is set, this will be used.
-If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
+If temperature_from_global_file is set to a valid entr ("temp_ambient_air") of the global weather file, this will be used.
 
 The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
 """
@@ -1494,39 +1494,47 @@ function get_temperature_profile_from_config(config::Dict{String,Any}, sim_param
 end
 
 """
-get_ambient_temperature_profile_from_config(config, simulation_parameter, uac)
+get_glob_solar_radiation_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of the ambient temperature profile for geothermal sources.
-If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
-If a constant_temperature is set, this will be used.
-If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
+Function to determine the source of solar global radiationprofile.
+If no information is given, nothing will be returned.
+If a global_solar_radiation_profile_file_path is given, the global solar radiation will be read from the user-defined profile.
+If a constant_global_solar_radiation is set, this will be used.
+If global_solar_radiation_from_global_file is set to a valid entry ("globHorIrr") of the global weather file, this will be used.
 
 The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
 """
-function get_ambient_temperature_profile_from_config(config::Dict{String,Any},
-                                                     sim_params::Dict{String,Any},
-                                                     uac::String)
+function get_glob_solar_radiation_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any},
+                                                      uac::String)
     # check input
-    if (haskey(config, "ambient_temperature_profile_path") + haskey(config, "ambient_temperature_from_global_file")) > 1
-        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
+    if (haskey(config, "global_solar_radiation_profile_file_path") +
+        haskey(config, "global_solar_radiation_from_global_file") +
+        haskey(config, "constant_global_solar_radiation")) > 1
+        # end of condition
+        @warn "Two or more global radiation profile sources for $(uac) have been specified in the input file!"
     end
 
     # determine temperature
-    if haskey(config, "ambient_temperature_profile_path")
-        @info "For '$uac', the given ambient temperature profile is chosen."
-        return Profile(config["ambient_temperature_profile_path"], sim_params)
-    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weather_data")
-        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name))
+    if haskey(config, "global_solar_radiation_profile_file_path")
+        @info "For '$uac', the global solar radiation profile is taken from the user-defined .prf file."
+        return Profile(config["global_solar_radiation_profile_file_path"], sim_params)
+    elseif haskey(config, "constant_global_solar_radiation") && config["constant_global_solar_radiation"] isa Number
+        @info "For '$uac', a constant global solar radiation of $(config["constant_global_solar_radiation"]) Wh/m^2 is set."
+        return nothing
+    elseif haskey(config, "global_solar_radiation_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["global_solar_radiation_from_global_file"], string(field_name))
                for field_name in fieldnames(typeof(sim_params["weather_data"])))
-            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
-            return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
+            @info "For '$uac', the global solar radiation profile is taken from the project-wide weather file: " *
+                  "$(config["global_solar_radiation_from_global_file"])"
+            return getfield(sim_params["weather_data"], Symbol(config["global_solar_radiation_from_global_file"]))
         else
-            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
+            @error "For '$uac', the'global_solar_radiation_from_global_file' has to be one of: " *
+                   "$(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
             throw(InputError)
         end
     else
-        @error "No ambient temperature profile is given for '$uac'"
-        throw(InputError)
+        @info "For '$uac', no global solar radiation is set."
+        return nothing
     end
 end
 

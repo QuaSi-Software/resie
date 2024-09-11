@@ -1,3 +1,5 @@
+using GLMakie
+
 """
 Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
@@ -69,8 +71,6 @@ mutable struct GeothermalHeatCollector <: Component
     dz::Float64
     dt::Integer
 
-    timestep_index::Integer
-
     fluid_temperature::Temperature
     pipe_temperature::Temperature
 
@@ -86,18 +86,15 @@ mutable struct GeothermalHeatCollector <: Component
     fluid_reynolds_number::Float64
     average_temperature_adjacent_to_pipe::Float64
 
+    temp_field_output::Array{Float64}
+
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
-        # read in ambient temperature profilfe (downloaded from dwd)
-        ambient_temperature_profile = "ambient_temperature_profile_path" in keys(config) ?
-                                      Profile(config["ambient_temperature_profile_path"], sim_params) :
-                                      nothing            # TODO: add global weather file
-        # read in ambient global radiation profilfe (downloaded from dwd)
-        global_radiation_profile = "global_radiation_profile_path" in keys(config) ?
-                                   Profile(config["global_radiation_profile_path"], sim_params) :
-                                   nothing               # TODO: add global weather file                   
+
+        ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
+        global_radiation_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
 
         return new(uac,                    # uac
                    Controller(default(config, "control_parameters", nothing)),
@@ -106,8 +103,8 @@ mutable struct GeothermalHeatCollector <: Component
                    InterfaceMap(m_heat_out => nothing),  # output_interfaces
                    m_heat_in,                      # medium name of input interface
                    m_heat_out,                     # medium name of output interface
-                   ambient_temperature_profile,    # ambient temperature profile
-                   global_radiation_profile,
+                   ambient_temperature_profile,    # [°C] ambient temperature profile
+                   global_radiation_profile,       # [Wh/m^2]
                    default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading            
                    default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal heat collector storage, can also be set from other end of interface TODO
                    default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading         
@@ -121,7 +118,7 @@ mutable struct GeothermalHeatCollector <: Component
                    0.0,                        # ambient temperature in current time step, calculated in control()
                    -1.0,                       # last timestep that was calculated; used to avoid double calculation of temperature field. set to -1 for the beginning
                    15.5,                       # starting temperature near pipe. Value currently set for validation purpose. 
-                   default(config, "soil_specific_heat_capacity", 1000),  # specific heat capacity soil, 840, in J/(KgK)
+                   default(config, "soil_specific_heat_capacity", 1000),  # specific heat capacity soil, 840, in J/(kgK)
                    default(config, "soil_density", 2000),  # in kg/m^3              
                    default(config, "soil_heat_conductivity", 1.5), # soil heat conductivity in W/(mK), 
                    zeros(59),              # vector to set soil density. Size depends on discretitaion
@@ -153,7 +150,6 @@ mutable struct GeothermalHeatCollector <: Component
                    zeros(30),              # size dy. depends on discretization settings.
                    93.5,                   # dz in m, is constant. fuid-Direction. # Depending on pipe length. 
                    20.0,                   # duration time of internal time-step dt in s depending on ground properties. TODO: Calculate based on discretization and soil properties.
-                   0.0,                    # time step index. necessary for validation purposes.                     
                    10.0,                   # set starting fluid temperature.               
                    0.0,                    # pipe temperature. 
                    0.0,                    # total heat flux in or out of collector. set by ReSiE Interface.
@@ -163,14 +159,17 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "fluid_density", 1045),                     # fluid density at 30 % glycol, 0 °C in kg/m^3
                    default(config, "fluid_kinematic_viscosity", 3.9e-6),       # fluid_kinematic_viscosity at 30 % glycol, 0 °C in m^2/s
                    default(config, "fluid_heat_conductivity", 0.5),            # fluid_heat_conductivity at 30 % glycol, 0 °C  in W/(mK)
-                   0,              # fluid_reynolds_number-Number, to be calculated in function.
-                   16.0)
+                   0,                      # fluid_reynolds_number-Number, to be calculated in function.
+                   16.0,
+                   Array{Float64}(undef, 0, 0, 0))
     end
 end
 
 function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+    if unit.regeneration
+        set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
+                              unload_storages(unit.controller, unit.m_heat_in))
+    end
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
 end
@@ -180,20 +179,18 @@ function control(unit::GeothermalHeatCollector,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    unit.timestep_index += 1
-
     # reset energy summarizer
     unit.collector_total_heat_energy_in_out = 0.0
 
     # Discretization and starting Temperature-Field. --> ADD PREPROCESSING! TODO
-    if unit.timestep_index == 1
+    if sim_params["time"] == 0
 
         # calculate diameters of pipe
         unit.pipe_d_i = 2 * unit.pipe_radius_outer - (2 * unit.pipe_thickness)
         unit.pipe_d_o = 2 * unit.pipe_radius_outer
 
         # calculate max_energy
-        A_collector = unit.pipe_length * unit.pipe_spacing * (unit.number_of_pipes - 1)
+        A_collector = unit.pipe_length * unit.pipe_spacing * unit.number_of_pipes
         unit.max_output_energy = watt_to_wh(unit.max_output_power * A_collector)
         unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
 
@@ -261,19 +258,18 @@ function control(unit::GeothermalHeatCollector,
         unit.cp2 = copy(unit.cp1)
 
         # internal time step according to TRNSYS Type 710 Model (Hirsch, Hüsing & Rockendorf 2017):
-        # TODO: Values too high?
-        # unit.dt = min(watt_to_wh(1.0)*60*60, Int((unit.soil_density * unit.soil_specific_heat_capacity * min(minimum(unit.dx), minimum(unit.dy))) / (4 * unit.soil_heat_conductivity)))
+        unit.dt = Int(floor(min(sim_params["time_step_seconds"],
+                                (unit.soil_density * unit.soil_specific_heat_capacity *
+                                 min(minimum(unit.dx), minimum(unit.dy))^2) / (4 * unit.soil_heat_conductivity))))
 
+        unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], 31, 7)
     end
-
-    # in case there is a state machine for geothermal heat collectors
-    move_state(unit, components, sim_params)
 
     # get ambient temperature and global radiation from profile for current time step if needed (probably
     # only for geothermal collectors)
     # TODO: add link to global weather file
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params))  # from Wh/m^2 to W/m^2
+    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params)) # from Wh/m^2 to W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
@@ -293,18 +289,17 @@ function control(unit::GeothermalHeatCollector,
     end
 end
 
-function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64)
+function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
 
     # calculate heat transfer coefficient and thermal resistance
     alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)
 
     # calculation of pipe_thermal_resistance_length_specific with the approach by type 710 publication
-    pipe_thermal_resistance_length_specific = (4 / pi *
-                                               (unit.pipe_d_o / (alpha_fluid * unit.pipe_d_i) +
-                                                (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) /
-                                                (2 * unit.pipe_heat_conductivity) +
-                                                unit.dx[2] / (2 * unit.soil_heat_conductivity))) /
-                                              (2 * pi * unit.pipe_radius_outer)
+    k = (pi / 4) / ((unit.pipe_d_o / (alpha_fluid * unit.pipe_d_i) +
+                     (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2 * unit.pipe_heat_conductivity) +
+                     minimum(unit.dx) / (2 * unit.soil_heat_conductivity)))
+
+    pipe_thermal_resistance_length_specific = 1 / (k * pi * unit.pipe_d_o)
 
     # calculate fluid temperature
     for h in 1:length(unit.dy)
@@ -534,6 +529,37 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         unit.t1 = copy(unit.t2)
         unit.cp1 = copy(unit.cp2)
     end
+    unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t2)
+
+    activate_plot = false
+    if (Int(sim_params["time"] / sim_params["time_step_seconds"]) == sim_params["number_of_time_steps"] - 1) &&
+       activate_plot
+        f = Figure()
+        ax = Axis3(f[1, 1])
+
+        ax.zlabel = "Temperature [°C]"
+        ax.xlabel = "Vertical expansion (depth) [m]"
+        ax.ylabel = "Horizontal expansion [m]"
+        min_temp = minimum(unit.temp_field_output)
+        min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
+        max_temp = maximum(unit.temp_field_output)
+        max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
+        zlims!(ax, min_temp, max_temp)
+
+        y_abs = [0; cumsum(unit.dx)]  # Absolute x coordinates
+        x_abs = [0; cumsum(unit.dy)]  # Absolute y coordinates
+
+        time = Observable(1)
+        surfdata = @lift(unit.temp_field_output[$time, :, :])
+        surf = surface!(ax, x_abs, y_abs, surfdata)
+        scatter = scatter!(ax, x_abs, y_abs, surfdata)
+        slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
+
+        on(slg.sliders[1].value) do v
+            time[] = v
+        end
+        wait(display(f))
+    end
 end
 
 # function to check/set phase state and calculate specific heat capacity with apparent heat capacity method. Not validated yet.
@@ -589,9 +615,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
         unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
         unit.fluid_prandtl_number = fluid_dynamic_viscosity * unit.fluid_specific_heat_capacity /
                                     unit.fluid_heat_conductivity
-        fluid_reynolds_number = (unit.collector_total_heat_flux_in_out) /
-                                (unit.fluid_specific_heat_capacity * unit.unloading_temperature_spread * pi / 4 *
-                                 d_i_pipe * fluid_dynamic_viscosity)
+        fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) / (pi * unit.pipe_d_i * fluid_dynamic_viscosity)
     else
         # calculate reynolds-number, based on kinematic viscosity with constant fluid properties.
         fluid_reynolds_number = (4 * collector_mass_flow_per_pipe) /
@@ -640,9 +664,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # get actual required energy from output interface
     outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
-    energy_demanded = balance(exchanges) +
-                      energy_potential(exchanges) +
-                      (outface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_demanded = balance(exchanges) + energy_potential(exchanges)
     energy_available = unit.max_output_energy  # is positive
 
     # shortcut if there is no energy demanded
@@ -652,9 +674,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     end
 
     for exchange in exchanges
-        demanded_on_interface = exchange.balance +
-                                exchange.energy_potential +
-                                (outface.do_storage_transfer ? exchange.storage_potential : 0.0)
+        demanded_on_interface = exchange.balance + exchange.energy_potential
 
         if demanded_on_interface >= -sim_params["epsilon"]
             continue
@@ -684,25 +704,29 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 end
 
 function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
+    if !unit.regeneration
+        # calculate new temperatures of field to account for possible ambient effects
+        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
+                                         sim_params)
+        return
+    end
+
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) +
-                       energy_potential(exchanges) +
-                       (inface.do_storage_transfer ? storage_potential(exchanges) : 0.0)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
     energy_demand = unit.max_input_energy  # is positive
 
-    if (energy_available <= sim_params["epsilon"] ||
-        !unit.regeneration)
+    if energy_available <= sim_params["epsilon"]
         # shortcut if there is no energy to be used
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out)  # call calculate_new_heat_collector_temperatures!() to calculate new temperatures of field to account for possible ambient effects
+        # calculate new temperatures of field to account for possible ambient effects
+        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
+                                         sim_params)
         return
     end
 
     for exchange in exchanges
-        exchange_energy_available = exchange.balance +
-                                    exchange.energy_potential +
-                                    (inface.do_storage_transfer ? exchange.storage_potential : 0.0)
+        exchange_energy_available = exchange.balance + exchange.energy_potential
 
         if exchange_energy_available < sim_params["epsilon"]
             continue
@@ -728,7 +752,7 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     energy_taken = unit.max_input_energy - energy_demand
     unit.collector_total_heat_energy_in_out += energy_taken
-    calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out)
+    calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out, sim_params)
 end
 
 function balance_on(interface::SystemInterface,
@@ -747,10 +771,19 @@ function balance_on(interface::SystemInterface,
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
-    return [string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
-            "TEMPERATURE_#NodeNum",
-            "fluid_temperature"]
+    output_vals = []
+    if unit.regeneration
+        push!(output_vals, string(unit.m_heat_in) * " IN")
+    end
+    append!(output_vals,
+            [string(unit.m_heat_out) * " OUT",
+             "fluid_temperature",
+             "fluid_reynolds_number",
+             "ambient_temperature",
+             "global_radiation"])
+    # push!(output_vals, "TEMPERATURE_#NodeNum")
+
+    return output_vals
 end
 
 function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
@@ -771,6 +804,8 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         return unit.fluid_reynolds_number
     elseif key.value_key == "ambient_temperature"
         return unit.ambient_temperature
+    elseif key.value_key == "global_radiation"
+        return unit.global_radiation
     end
     throw(KeyError(key.value_key))
 end

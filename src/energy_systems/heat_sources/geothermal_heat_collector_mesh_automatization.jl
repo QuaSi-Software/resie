@@ -1,3 +1,5 @@
+using Plots
+
 # Mesh automatization
 
 # TODO: Modify "Special" Node(s) between increasing and decreasing mesh width. Should not be smaller than previous mesh width or min. mesh width.
@@ -27,6 +29,8 @@ function create_mesh_y(min_mesh_width,
     turning_point = 0           # set for if-condition in loop
     turning_point_index = 0     # set for if-condition in loop
 
+    difference = 0.0
+
     for i in 1:Int(floor((segment_array_y[2] - segment_array_y[1]) / min_mesh_width))
 
         # When Sum of Elements in dy_1 is equal to the size of this segment, the loop will be stoped.
@@ -41,15 +45,15 @@ function create_mesh_y(min_mesh_width,
 
             # first Element of dy_1 (directly under the surface) starts with minimal mesh width
         elseif i == 1
-            dy_1[i] .= min_mesh_width
-            difference = copy(dy_1[1])
+            dy_1[i] = min_mesh_width
+            difference = copy(dy_1[i])
 
             # as long as the depth (sum of dy_1) in the loop iteration stays smaller than the half segment size,
             # the next element of dy increases (according to the defined expansion factor)
         elseif sum(dy_1[1:i]) + min(dy_1[i - 1] * expansion_factor, max_mesh_width) <
                (segment_array_y[2] - segment_array_y[1]) / 2
             difference *= expansion_factor
-            dy_1[i] .= min(difference, max_mesh_width)
+            dy_1[i] = min(difference, max_mesh_width)
             turning_point = 0
 
         elseif sum(dy_1[1:i]) + min(dy_1[i - 1] * expansion_factor, max_mesh_width) >=
@@ -58,8 +62,8 @@ function create_mesh_y(min_mesh_width,
             # if sum of dy_1 would be greater than the half segment size for the first time, the turning point is reached.
             if turning_point == 0
                 # special dy_1-elements are calculated in between the increasing and decreasing mesh widths
-                dy_1[i] .= ((segment_array_y[2] - segment_array_y[1]) - sum(dy_1[1:(i - 1)]) * 2) / node_arrangement
-                dy_1[i + 1] .= copy(dy_1[i - 1])
+                dy_1[i] = ((segment_array_y[2] - segment_array_y[1]) - sum(dy_1[1:(i - 1)]) * 2) / node_arrangement
+                dy_1[i + 1] = copy(dy_1[i - 1])
                 turning_point_index = copy(i)
                 turning_point = 1
 
@@ -67,7 +71,7 @@ function create_mesh_y(min_mesh_width,
                 # expansion expansion_factor
             elseif turning_point == 1 && i >= (turning_point_index + 2)
                 difference /= expansion_factor
-                dy_1[i] .= min(difference, max_mesh_width)
+                dy_1[i] = min(difference, max_mesh_width)
             end
         end
     end
@@ -144,6 +148,8 @@ function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_di
 
     number_of_nodes_dx_2 = 0            # to cut dx_2 array later
 
+    difference = 0.0
+
     # segment 1
     dx_1 = [0.5 * pipe_diameter_outer]
     dx_2 = zeros(100)
@@ -158,15 +164,15 @@ function create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_di
 
             # first Element of dx_2 (right next to the fluid node) starts with minimal mesh width
         elseif i == 1
-            dx_2[i] .= min_mesh_width
-            difference = dx_2
+            dx_2[i] = min_mesh_width
+            difference = copy(dx_2[i])
 
             # as long as the Sum of dx_2 stays smaller than the length of segment 2,
             # the next element of dx increases (according to the defined expansion factor)
         elseif sum(dx_2[1:i]) + min(dx_2[i - 1] * expansion_factor, max_mesh_width) <
                (segment_array_x[3] - segment_array_x[2])
             difference *= expansion_factor
-            dx_2[i] .= min(difference, max_mesh_width)
+            dx_2[i] = min(difference, max_mesh_width)
 
         elseif sum(dx_2[1:i]) + min(dx_2[i - 1] * expansion_factor, max_mesh_width) >
                (segment_array_x[3] - segment_array_x[2])
@@ -219,4 +225,29 @@ dx = create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diamet
 
 # can be deleted later, only for debugging
 println(dy[:])
-# println(dx[:])
+println(dx[:])
+
+sc = scatter(dx, dy; label="Points", xlabel="X-axis", ylabel="Y-axis", title="Scatter Plot of Points",
+             aspect_ratio=:equal)
+display(sc)
+
+# test = 1
+
+# p = plot(xlims=(minimum(dx), maximum(dx)), ylims=(minimum(dy), maximum(dy)), ratio=:equal, legend=false)
+
+# for y in dy
+#     hline!(p, [y], label=false, color=:blue)
+# end
+
+# # Add vertical lines for each x value
+# for x in dx
+#     vline!(p, [x], label=false, color=:red)
+# end
+
+# display(p)
+# gui()
+
+println("Press Enter to close the plot window...")
+readline()
+
+# test = 2
