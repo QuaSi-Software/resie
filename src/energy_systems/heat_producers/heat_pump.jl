@@ -33,7 +33,6 @@ mutable struct HeatPump <: Component
     input_temperature::Temperature
 
     cop::Float64
-    losses::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
 
@@ -90,7 +89,6 @@ mutable struct HeatPump <: Component
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
                    0.0, # cop
-                   0.0, # losses
                    0.0, # mixing temperature in the input interface
                    0.0) # mixing temperature in the output interface
     end
@@ -756,7 +754,6 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_in) * " IN",
             string(unit.m_heat_out) * " OUT",
             "COP",
-            "Losses",
             "MixingTemperature_Input",
             "MixingTemperature_Output"]
 end
@@ -768,8 +765,6 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"
         return unit.cop
-    elseif key.value_key == "Losses"
-        return unit.losses
     elseif key.value_key == "MixingTemperature_Input"
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"
