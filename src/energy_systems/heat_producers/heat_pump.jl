@@ -82,7 +82,7 @@ mutable struct HeatPump <: Component
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),
-                   default(config, "considering_icing", false),
+                   default(config, "consider_icing", false),
                    icing_coefficients,
                    optimise_slice_dispatch,
                    UInt(default(config, "nr_optimisation_passes", 10)),
