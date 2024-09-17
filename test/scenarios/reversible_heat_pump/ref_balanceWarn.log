@@ -1,4 +1,4 @@
-ReSiE balanceWarn log file of simulation started at: 2024-09-05 14:56:21
+ReSiE balanceWarn log file of simulation started at: 2024-09-06 17:38:13
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
 [BalanceWarning] Balance for component TST_TH_BUS_01 was not zero in timestep 22500: -435.4971919999998

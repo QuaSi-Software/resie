@@ -66,7 +66,7 @@ function control(unit::FixedSink,
     if unit.constant_demand !== nothing
         unit.demand = watt_to_wh(unit.constant_demand)
     elseif unit.energy_profile !== nothing
-        unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
+        unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     else
         unit.demand = 0.0
     end
@@ -75,7 +75,7 @@ function control(unit::FixedSink,
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
     set_temperature!(unit.input_interfaces[unit.medium],
                      unit.temperature,

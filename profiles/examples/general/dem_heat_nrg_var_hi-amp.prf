@@ -1,5 +1,8 @@
-# time_step;900
-# is_power;false
+# data_type:                 extensive
+# time_definition:           startdate_timestamp
+# profile_start_date:        01.01.2024 00:00
+# profile_start_date_format: dd.mm.yyyy HH:MM
+# timestamp_format:          seconds 
 0;     0.085
 900;   0.097346221
 1800;  0.03988897

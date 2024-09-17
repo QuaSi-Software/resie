@@ -88,9 +88,11 @@
         }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 31536000,
-        "time_step_seconds": 3600
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_01": {

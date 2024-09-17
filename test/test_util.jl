@@ -1,3 +1,5 @@
+using Dates
+
 """
     pwc_units_astr(expected, actual)
 
@@ -76,9 +78,14 @@ Returns default simulation parameters useful for tests.
 """
 function get_default_sim_params()::Dict{String,Any}
     return Dict{String,Any}(
-        "time_step_seconds" => 900,
         "time" => 0,
+        "current_date" => DateTime("01.01.2024 00:00", "dd.mm.yyy HH:MM"),
+        "time_step_seconds" => 900,
+        "number_of_time_steps" => 10,
+        "start_date" => DateTime("01.01.2024 00:00", "dd.mm.yyy HH:MM"),
+        "end_date" => DateTime("01.01.2024 02:15", "dd.mm.yyy HH:MM"),
         "epsilon" => 1e-9,
-        "is_first_timestep" => true,
+        "latitude" => nothing,
+        "longitude" => nothing,
     )
 end

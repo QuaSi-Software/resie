@@ -66,7 +66,7 @@ function control(unit::FixedSupply,
     if unit.constant_supply !== nothing
         unit.supply = watt_to_wh(unit.constant_supply)
     elseif unit.energy_profile !== nothing
-        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
+        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     else
         unit.supply = 0.0
     end
@@ -75,7 +75,7 @@ function control(unit::FixedSupply,
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
     set_temperature!(unit.output_interfaces[unit.medium],

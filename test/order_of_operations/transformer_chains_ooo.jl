@@ -171,11 +171,7 @@ function test_base_order()
                 [1257, ("TST_01_ELT_01_BUS", EnergySystems.s_distribute)],
                 [1256, ("TST_01_HZG_01_BUS", EnergySystems.s_distribute)]]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     by_function = Resie.categorize_by_function(components)
@@ -375,11 +371,7 @@ function test_ooo_middle_bus()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -578,11 +570,7 @@ function test_ooo_middle_bus_different_order()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -736,11 +724,7 @@ function test_ooo_middle_transformer()
                 "TST_BUS_H2 s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -893,11 +877,7 @@ function test_ooo_parallels()
                 "TST_BUS_EL s_distribute",
                 "TST_BUS_TH1 s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -1049,11 +1029,7 @@ function test_ooo_parallels_different_order()
                 "TST_BUS_EL s_distribute",
                 "TST_BUS_TH1 s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -1290,11 +1266,7 @@ function test_ooo_parallels_in_chain()
                 "TST_BUS_00 s_distribute",
                 "TST_BUS_01 s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -1501,11 +1473,7 @@ function test_ooo_parallels_in_a_row()
                 "TST_BUS_EL s_distribute",
                 "TST_BUS_TH1 s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -1780,11 +1748,7 @@ function test_ooo_connected_middle_busses()
                 "TST_BUS_EL s_distribute",
                 "TST_BUS_TH_02 s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -1968,11 +1932,7 @@ function test_ooo_connected_middle_transformer()
                 "TST_BUS_H2 s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2194,11 +2154,7 @@ function test_ooo_connected_middle_transformer_variant()
                 "TST_BUS_H2 s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2317,11 +2273,7 @@ function test_ooo_circle_grid_input_denied()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2440,11 +2392,7 @@ function test_ooo_circle_grid_input_allowed()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2575,11 +2523,7 @@ function test_ooo_circle_middle_transformer_input()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2724,11 +2668,7 @@ function test_ooo_circle_variant()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)
@@ -2899,11 +2839,7 @@ function test_ooo_circle_middle_transformer_interconnections()
                 "TST_BUS_TH s_distribute",
                 "TST_BUS_EL s_distribute"]
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     steps = Resie.calculate_order_of_operations(components)

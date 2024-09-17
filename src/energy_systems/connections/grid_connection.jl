@@ -67,7 +67,7 @@ function control(unit::GridConnection,
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
     if unit.sys_function === sf_bounded_source

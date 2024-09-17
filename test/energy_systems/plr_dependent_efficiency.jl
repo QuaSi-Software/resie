@@ -233,11 +233,7 @@ end
 
 function test_gas_boiler_demand_driven_plrd()
     components_config = get_demand_energy_system_config()
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     gasboiler = components["TST_GB_01"]
@@ -327,11 +323,7 @@ function test_gas_boiler_supply_driven_plrd()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     gasboiler = components["TST_GB_01"]
@@ -438,11 +430,7 @@ function test_CHPP_el_eff_plrd()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     chpp = components["TST_CHP_01"]
@@ -564,11 +552,7 @@ function test_electrolyser_dispatch_units()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     electrolyser = components["TST_ELY_01"]

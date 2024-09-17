@@ -2,6 +2,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function energy_system_simple()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
@@ -59,11 +61,7 @@ end
 function test_merge_busses()
     components_config = energy_system_simple()
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     busses = Grouping(key => bus for (key, bus) in pairs(components)
@@ -277,11 +275,7 @@ end
 function test_merge_busses_cross_shape_half_manual()
     components_config = energy_system_complicated()
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     busses = Grouping(key => bus for (key, bus) in pairs(components)
@@ -336,11 +330,7 @@ end
 
 function test_merge_busses_cross_shape_full_manual()
     components_config = energy_system_complicated()
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_parameters)
     busses = Grouping(key => bus for (key, bus) in pairs(components)
                       if bus.sys_function == EnergySystems.sf_bus)
@@ -454,11 +444,7 @@ end
 
 function test_merge_busses_cross_shape_full_automatic()
     components_config = energy_system_complicated()
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_parameters)
     busses = Grouping(key => bus for (key, bus) in pairs(components)
                       if bus.sys_function == EnergySystems.sf_bus)
@@ -615,11 +601,7 @@ end
 
 function test_merge_busses_order_of_merges()
     components_config = energy_system_busses_only()
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_parameters)
     chains = Resie.find_chains(values(components), EnergySystems.sf_bus)
     chain = Grouping()
@@ -651,11 +633,7 @@ function test_merge_preserves_storage_transfer()
     components_config["TST_SRC_01"]["control_parameters"] = Dict{String,Any}(
         "load_storages m_h_w_ht1" => false,
     )
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-    )
+    simulation_parameters = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_parameters)
     busses = Grouping(key => bus for (key, bus) in pairs(components)
                       if bus.sys_function == EnergySystems.sf_bus)
