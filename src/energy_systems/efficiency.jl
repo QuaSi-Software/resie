@@ -12,14 +12,14 @@ Parse the given definition of an efficiency function and return it as a callable
 The function should return an efficiency factor e (on [0,1]) given an input of the part load
 ratio (PLR) value (on [0,1]).
 
-The definition looks like this: `<function_model>:<list_of_numbers>` with `function_model`
-being a string (see below) and `list_of_numbers` being a comma-seperated list of numbers
-with a period as decimal seperator and no thousands-seperator. The meaning of the numbers
-depends on the function model.
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
 
-Three different function models are implemented:
+Three different function prototypes are implemented:
     * const: Takes one number and uses it as a constant efficiency factor.
-    * poly: Takes a list of numbers as uses them as the coefficients of a polynomial with
+    * poly: Takes a list of numbers and uses them as the coefficients of a polynomial with
         order n-1 where n is the length of coefficients. The list starts with coefficients
         of the highest order. E.g. `poly:0.5,2.0,0.1` means e(x)=0.5x²+2x+0.1
     * pwlin: A piece-wise linear interpolation. Takes a list of numbers and uses them as
@@ -69,6 +69,29 @@ function parse_efficiency_function(eff_def::String)::Function
     return plr -> plr
 end
 
+"""
+    parse_2dim_function(eff_def)
+
+Parse the given definition of an general 2D function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
+
+Two different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant value.
+    * poly-2: Takes a list of numbers and uses them as the coefficients of a 2D polynomial
+        with order two. The coefficients are the numbered constants in the following
+        formula: f(x,y) = c_1 + c_2*x + c_3*y + c_4*x² + c_5*y² + c_6*x*y
+            + c_7*x²y + c_8*x*y² + c_9*x²*y²
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Function`: A callable function which returns a scalar value given values (usually
+    temperatures) as input.
+"""
 function parse_2dim_function(eff_def::String)::Function
     splitted = split(eff_def, ":")
 
@@ -100,6 +123,27 @@ function parse_2dim_function(eff_def::String)::Function
     return (x, y) -> 0.0
 end
 
+"""
+Performs bilinear interpolation between four support values.
+
+The interpolation is on the surface of two triangles with a common diagonal between the two
+points (x1,y1) and (x3,y3). The four values are, in order, on the points (x1,y1), (x3,y1),
+(x1,y3) and (x3,y3). The point (x2,y2) is the point at which interpolation happens.
+
+# Arguments
+- `x1::Float64`: x-coordinate of points of v1 and v3
+- `x2::Float64`: x-coordinate to interpolate
+- `x3::Float64`: x-coordinate of points of v2 and v4
+- `y1::Float64`: y-coordinate of points of v1 and v2
+- `y2::Float64`: y-coordinate to interpolate
+- `y3::Float64`: y-coordinate of points of v3 and v4
+- `v1::Float64`: value at (x1,y1)
+- `v2::Float64`: value at (x3,y1)
+- `v3::Float64`: value at (x1,y3)
+- `v4::Float64`: value at (x3,y3)
+# Returns
+- `Float64`: Interpolated value at (x2,y2)
+"""
 function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
     lin_x = (x2 - x1) / (x3 - x1)
     lin_y = (y2 - y1) / (y3 - y1)
@@ -119,6 +163,49 @@ function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
     end
 end
 
+"""
+    parse_cop_function(eff_def)
+
+Parse the given definition of a COP function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator and
+semicolon as row seperator. The meaning of the numbers depends on the function prototype.
+
+Optionally second function can be given also seperated with a colon, e.g.:
+`function_prototype_1:list_of_numbers_1:function_prototype_2:list_of_numbers_2`
+The second function definition is parsed by parse_efficiency_function and should be
+formatted accordingly. This function then turns the PLF for the given PLR, which is a
+scaling factor for the COP calculation. If no second function is given, assumes a PLF of
+1.0, which has no effect.
+
+Three different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant COP.
+    * carnot: Takes one number as uses it as the scaling factor for the Carnot-COP.
+    * field: Takes a 2D array of values and performs bilinear interpolation between the
+        surrounding four support values. An example with additional line breaks and spaces
+        added for clarity:
+        "field:
+         0, 0,10,20,30;
+         0,15, 9, 6, 4;
+        10,15,15,10, 7;
+        20,15,15,15,11"
+        The first row are the grid points along the T_sink_out dimension, with the first
+        value being ignored. The points cover a range from 0 °C to 30 °C with a spacing of
+        10 K. The first column are the grid points along the T_source_in dimension, with the
+        first value being ignored. The points cover a range from 0 °C to 20 °C with a
+        spacing of 10 K. The support values are the COP (at PLR=1), for example a value of
+        10 for T_source_in=10 and T_sink_out=20.
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
+- `Function`: A callable function which, when called with the input and output temperatures
+    as arguments, returns another function. The second function returns a scalar value as
+    the COP when given a PLR (which is a value between 0.0 and 1.0) as input.
+"""
 function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
     splitted = split(eff_def, ":")
 
@@ -158,8 +245,9 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                 end
             end
 
-            # first dim of value is source, second is sink. source is vertical, sink horizontal
-            # first row is sink temperatures, first column is source temperatures
+            # first dim of values is source, second is sink. source is vertical (one row is
+            # at the same source temp), sink is horizontal (one column is at the same sink
+            # temp). first row is sink temperatures, first column is source temperatures
             return nothing,
                    function (src, snk)
                        src_idx = nothing
