@@ -1,9 +1,18 @@
 """
-Implementation of a heat pump component.
+Implementation of a heat pump component, elevating heat to a higher temperature using
+electricity.
 
-Can be given fixed input and output temperatures instead of checking the temperature
-potentials of other components. Can also be given a fixed COP instead of dynamically
-calculating it as a Carnot-COP by input/output temperatures.
+This models includes several effects that complicate the calculation of efficiency (as COP),
+some of which involve the temperatures at which the heat input is provided and heat output
+is requested. While this is similar to the calculation of efficiencies in other transformers
+such as a CHPP, the implementation does not numerically inverse the given input functions
+and determine energies from those. Instead the efficiencies are calculated "forward", which
+has problems in reaching the equilibrium point if kappa_opt != 1.0. This might be improved
+in the future, but was deemed to difficult to implement at time of writing.
+
+The heat pump can also be configured to skip most complicated calculations and use a
+constant or Carnot-based COP and no PLRDE, etc. This too can be improved for heat pumps with
+exactly one input and exactly one output, since the slicing algorithm is not required then.
 """
 mutable struct HeatPump <: Component
     uac::String
@@ -94,6 +103,11 @@ mutable struct HeatPump <: Component
     end
 end
 
+"""
+A struct containing lots of temporary values for internal calculations of the heat pump.
+This is used to avoid excessively long argument and return lists and to improve readability.
+Unless you're changing the code for heat pumps, this can be ignored entirely.
+"""
 mutable struct HPEnergies
     potential_energy_el::Floathing
     potentials_energies_heat_in::Vector{<:Floathing}
@@ -164,6 +178,9 @@ mutable struct HPEnergies
     end
 end
 
+"""
+Reset the temp slices of an energies container.
+"""
 function reset_temp_slices!(energies::HPEnergies)::HPEnergies
     energies.slices_el_in_temp = Vector{Floathing}()
     energies.slices_heat_in_temp = Vector{Floathing}()
@@ -175,6 +192,10 @@ function reset_temp_slices!(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Copies the temp slices of an energies container to the slices output fields and overwrites
+existing values.
+"""
 function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
     energies.slices_el_in = energies.slices_el_in_temp
     energies.slices_heat_in = energies.slices_heat_in_temp
@@ -186,6 +207,20 @@ function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Resets the available energies of an energies container based on the potentials.
+If an specific input or output layer index is given, that layer will be set as infinite and
+the calculation will be done with only that layer on the input or output side.
+
+# Arguments
+- `energies::HPEnergies`: The energies container
+- `as_inf::Integer`: If 1, sets the given input layer as infinite. If 2, the outputs.
+    Defaults to 0, which does nothing.
+- `idx::Integer`: The index of the layer to set as infinte. Defaults to 0, which does
+    nothing.
+# Returns
+- `HPEnergies`: The energies container
+"""
 function reset_available!(energies::HPEnergies; as_inf::Integer=0, idx::Integer=0)::HPEnergies
     energies.available_el_in = copy(energies.potential_energy_el)
     energies.available_heat_in = copy(energies.potentials_energies_heat_in)
@@ -200,6 +235,9 @@ function reset_available!(energies::HPEnergies; as_inf::Integer=0, idx::Integer=
     return energies
 end
 
+"""
+Adds the heat_in temp slices to the existing slices output fields.
+"""
 function add_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
     append!(energies.slices_heat_in, energies.slices_heat_in_temp)
     append!(energies.slices_heat_in_temperature, energies.slices_heat_in_temperature_temp)
@@ -207,6 +245,9 @@ function add_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Adds the heat_out temp slices to the existing slices output fields.
+"""
 function add_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
     append!(energies.slices_heat_out, energies.slices_heat_out_temp)
     append!(energies.slices_heat_out_temperature, energies.slices_heat_out_temperature_temp)
@@ -214,6 +255,11 @@ function add_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Copies the electricity and heat_in temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
 function copy_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
     if length(energies.slices_heat_in) == 0
         energies.slices_el_in = copy(energies.slices_el_in_temp)
@@ -233,6 +279,11 @@ function copy_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Copies the electricity and heat_out temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
 function copy_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
     if length(energies.slices_heat_out) == 0
         energies.slices_el_in = copy(energies.slices_el_in_temp)
@@ -292,6 +343,22 @@ function set_max_energies!(unit::HeatPump,
                     has_calculated_all_maxima_heat_out)
 end
 
+"""
+Determines the temperature of the input/output layer and if it should be skipped.
+
+Layers are skipped if they have a temperature, but it does fall into the temperature band
+defined by the heat pump input/output temperatures (if any).
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `current_idx::Integer`: The index of the layer.
+- `temps_min::Vector{<:Temperature}`: The minimum temperatures of all layers.
+- `temps_max::Vector{<:Temperature}`: The maximum temperatures of all layers.
+- `input::Bool`: If the layer is an input or not. Defaults to true.
+# Returns
+- `Bool`: If the layer should be skipped.
+- `Temperature`: The layer temperature.
+"""
 function get_layer_temperature(unit::HeatPump,
                                current_idx::Integer,
                                temps_min::Vector{<:Temperature},
@@ -321,6 +388,17 @@ function get_layer_temperature(unit::HeatPump,
     end
 end
 
+"""
+Calculates the new COP due to icing losses.
+
+# Arguments
+`unit::HeatPump`: The heat pump.
+`cop::Floathing`: The COP without icing losses.
+`in_temp::Temperature`: The input temperature of the current layer.
+# Returns
+- `Floathing`: The COP corrected due to icing losses. Returns nothing if the input COP is
+    nothing.
+"""
 function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature)::Floathing
     if cop === nothing
         return nothing
@@ -334,6 +412,23 @@ function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature):
     return cop * (1 - 0.01 * (max(0.0, lin_factor) + exp_factor))
 end
 
+"""
+Determines if the optimisation pass is accepted.
+
+The optimisation might calculate a pass that would lead to implausible results, which is why
+this check must be done. The pass is accepted if the "signature" of the given pass is the
+same as that of the best pass and the timestep hasn't been more than used up. The signature
+is a tuple with flags of which remaining energies of in- or outputs are non-zero. This is
+checked because the optimisation should not change how the heat pump operates, it should
+only improve the efficiency of the selected slices.
+
+# Arguments
+- `energies::HPEnergies`: The energies container.
+- `times::Vector{Float64}`: The times of the slices.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If the pass is accepted or not.
+"""
 function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::Dict{String,Any})::Bool
     if sum(times; init=0.0) > sim_params["time_step_seconds"]
         return false
@@ -357,10 +452,40 @@ function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::D
     return signature_given == signature_best
 end
 
+"""
+Determines if the optimisation pass is better than the currently best pass.
+
+# Arguments
+- `energies::HPEnergies`: The energies container.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If the pass is better or not.
+"""
 function pass_is_better(energies::HPEnergies, sim_params::Dict{String,Any})::Bool
     return sum(energies.slices_el_in_temp; init=0.0) < sum(energies.slices_el_in; init=0.0)
 end
 
+"""
+Updates the PLRs chosen for each slices as input for the next optimisation pass.
+
+This is essentially how the optimisation is performed, by iteratively adjusting the PLRs for
+slices according to a heuristic, which approaches a local optimum if iterated long enough.
+
+The heuristic determines the most promising slice by its distance to the optimal PLR of the
+heat pump multiplies with the amount of electricity that the slice requires, then halves its
+distance to the optimal PLR.
+
+Can be given a slice to ignore, which is used to avoid trying to update the same slice twice
+in a row, which avoids some but not all problems with the algorithm getting "stuck".
+
+# Arguments
+`unit::HeatPump`: The heat pump.
+`energies::HPEnergies`: The energies container.
+`plrs::Array{<:Floathing,2}`: Current selection of PLRs of the slices.
+`ignore_idx::Tuple{Integer,Integer}`: Index of the slice to ignore.
+# Returns
+- `Tuple{Integer,Integer}`: The index of the updated slice.
+"""
 function update_plrs!(unit::HeatPump,
                       energies::HPEnergies,
                       plrs::Array{<:Floathing,2},
@@ -388,6 +513,31 @@ function update_plrs!(unit::HeatPump,
     return best_idx
 end
 
+"""
+Calculate the energies for the given slice.
+
+This is essentially how the heat pump would be calculated in the 1:1 case. The COP is
+determined first, then the available energies on all three inputs/outputs are checked as
+limiting factors. Bypass operation and icing losses are also considered. The function
+specifically does not determine the PLR. For the 1:1 case this could be done here too, but
+for the overarching slicing algorithm the PLR must be a required input.
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `available_el_in::Float64`: Available electricity.
+- `available_heat_in::Floathing`: Available heat input.
+- `available_heat_out::Floathing`: Available heat output.
+- `in_temp::Temperature`: Input temperature.
+- `out_temp::Temperature`: Output temperature.
+- `plr::Float64`: The PLR of the slice.
+# Returns
+- `Floathing`: Used input heat.
+- `Floathing`: Used electricity.
+- `Floathing`: Used output heat.
+- `Temperature`: Temperature of input heat. Same as input argument.
+- `Temperature`: Temperature of output heat. Same as output argument unless in bypass
+    operation, when it's equal to the input temperature.
+"""
 function handle_slice(unit::HeatPump,
                       available_el_in::Float64,
                       available_heat_in::Floathing,
@@ -441,6 +591,28 @@ function handle_slice(unit::HeatPump,
             do_bypass ? in_temp : out_temp)
 end
 
+"""
+Performs the slicing algorithm given a set list of PLRs for each possible slice (each
+combination input and output layer). If the PLR for a slice is nothing, sets it to 1.0 and
+calculates the slice based on that.
+
+Note the difference in indexing between the PLRs, where all possible slices are listed via
+their input layer and output layer indices, and the return values, where the selected slices
+are listed linearly and doesn't necessarily list all slices.
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+- `energies::HPEnergies`: The energies container.
+- `plrs::Array{<:Floathing,2}`: The PLRs for each slice (may be nothing). Will be modified.
+# Returns
+- `HPEnergies`: The energies container.
+- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
+    minimal power for that slice.
+- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
+    the selected PLR for that slice.
+- `Array{<:Floathing,2}`: The PLRs for each slice.
+"""
 function calculate_slices(unit::HeatPump,
                           sim_params::Dict{String,Any},
                           energies::HPEnergies,
@@ -556,6 +728,24 @@ function calculate_slices(unit::HeatPump,
     return energies, times_min, times, plrs
 end
 
+"""
+The inner part of the calculate_energies function.
+
+The steps are:
+1. Initialises the PLRs for all possible slices as nothing (they will be set as 1.0 upon
+    selection)
+2. Performs the slicing algorithm with the assumption of full power
+3. Checks if minimum power restrictions were observed.
+4. Optionally performs optimisation of the PLRs
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+- `energies::HPEnergies`: The energies container.
+- `optimise_slice_dispatch::Bool`: Defaults to false.
+# Returns
+- `HPEnergies`: The energies container.
+"""
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
                                      energies::HPEnergies,
@@ -601,6 +791,22 @@ function calculate_energies_heatpump(unit::HeatPump,
     return energies
 end
 
+"""
+Calculates the energies the heat pump can process in the timestep.
+
+This is split in an inner function (see calculate_energies_heatpump) and this outer
+function, because the calculation happens differently depending on whether there are other
+transformers in the input exchanges, outputs, both or neither.
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If false the heat pump cannot process any energy for one of several reasons. The
+    values might still be zero even if this flag is true, but a value of false definitely
+    means no operation.
+- `HPEnergies`: The energies container.
+"""
 function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies = HPEnergies()
 
