@@ -335,9 +335,10 @@ function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature):
 end
 
 function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::Dict{String,Any})::Bool
-    # accept if the "signature" of the given pass is the same as that of the best pass and
-    # the timestep hasn't been used up. the signature is a tuple with flags of which in- or
-    # outputs are non-zero
+    if sum(times; init=0.0) > sim_params["time_step_seconds"]
+        return false
+    end
+
     EPS = sim_params["epsilon"]
     signature_best = (energies.potential_energy_el - sum(energies.slices_el_in; init=0.0) > EPS,
                       sum(energies.potentials_energies_heat_in; init=0.0)
