@@ -1261,6 +1261,7 @@ const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage
 include("control_modules/economical_discharge.jl")
 include("control_modules/profile_limited.jl")
 include("control_modules/storage_driven.jl")
+include("control_modules/temperature_sorting.jl")
 
 """
     link_output_with(unit, components)

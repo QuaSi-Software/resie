@@ -46,8 +46,6 @@ mutable struct Electrolyser <: Component
     energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
-    min_run_time::UInt
-
     heat_lt_is_usable::Bool
     output_temperature_ht::Temperature
     output_temperature_lt::Temperature
@@ -133,7 +131,6 @@ mutable struct Electrolyser <: Component
                    interface_list,
                    Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),   # energy_to_plr
                    1.0 / default(config, "nr_discretization_steps", 1), # discretization_step
-                   default(config, "min_run_time", 3600),
                    heat_lt_is_usable,
                    default(config, "output_temperature_ht", 55.0),
                    default(config, "output_temperature_lt", 25.0),

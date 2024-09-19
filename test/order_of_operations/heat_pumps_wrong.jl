@@ -33,7 +33,7 @@ function test_ooo_for_heat_pumps_wrong()
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 12000,
-            "constant_cop" => 3.0,
+            "cop_function" => "const:3.0",
         ),
     )
 

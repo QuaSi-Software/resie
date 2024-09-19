@@ -12,14 +12,14 @@ Parse the given definition of an efficiency function and return it as a callable
 The function should return an efficiency factor e (on [0,1]) given an input of the part load
 ratio (PLR) value (on [0,1]).
 
-The definition looks like this: `<function_model>:<list_of_numbers>` with `function_model`
-being a string (see below) and `list_of_numbers` being a comma-seperated list of numbers
-with a period as decimal seperator and no thousands-seperator. The meaning of the numbers
-depends on the function model.
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
 
-Three different function models are implemented:
+Three different function prototypes are implemented:
     * const: Takes one number and uses it as a constant efficiency factor.
-    * poly: Takes a list of numbers as uses them as the coefficients of a polynomial with
+    * poly: Takes a list of numbers and uses them as the coefficients of a polynomial with
         order n-1 where n is the length of coefficients. The list starts with coefficients
         of the highest order. E.g. `poly:0.5,2.0,0.1` means e(x)=0.5x²+2x+0.1
     * pwlin: A piece-wise linear interpolation. Takes a list of numbers and uses them as
@@ -65,8 +65,226 @@ function parse_efficiency_function(eff_def::String)::Function
         end
     end
 
-    @warn "Cannot parse efficiency function from: $eff_def"
+    @error "Cannot parse efficiency function from: $eff_def"
     return plr -> plr
+end
+
+"""
+    parse_2dim_function(eff_def)
+
+Parse the given definition of an general 2D function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
+
+Two different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant value.
+    * poly-2: Takes a list of numbers and uses them as the coefficients of a 2D polynomial
+        with order two. The coefficients are the numbered constants in the following
+        formula: f(x,y) = c_1 + c_2*x + c_3*y + c_4*x² + c_5*y² + c_6*x*y
+            + c_7*x²y + c_8*x*y² + c_9*x²*y²
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Function`: A callable function which returns a scalar value given values (usually
+    temperatures) as input.
+"""
+function parse_2dim_function(eff_def::String)::Function
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        if method == "const"
+            c = parse(Float64, data)
+            return (x, y) -> c
+
+        elseif method == "poly-2"
+            params = parse.(Float64, split(data, ","))
+            return function (x, y)
+                return params[1] +
+                       params[2] * x +
+                       params[3] * y +
+                       params[4] * x * x +
+                       params[5] * y * y +
+                       params[6] * x * y +
+                       params[7] * x * x * y +
+                       params[8] * x * y * y +
+                       params[9] * x * x * y * y
+            end
+        end
+    end
+
+    @error "Cannot parse 2-dimensional function from: $eff_def"
+    return (x, y) -> 0.0
+end
+
+"""
+Performs bilinear interpolation between four support values.
+
+The interpolation is on the surface of two triangles with a common diagonal between the two
+points (x1,y1) and (x3,y3). The four values are, in order, on the points (x1,y1), (x3,y1),
+(x1,y3) and (x3,y3). The point (x2,y2) is the point at which interpolation happens.
+
+# Arguments
+- `x1::Float64`: x-coordinate of points of v1 and v3
+- `x2::Float64`: x-coordinate to interpolate
+- `x3::Float64`: x-coordinate of points of v2 and v4
+- `y1::Float64`: y-coordinate of points of v1 and v2
+- `y2::Float64`: y-coordinate to interpolate
+- `y3::Float64`: y-coordinate of points of v3 and v4
+- `v1::Float64`: value at (x1,y1)
+- `v2::Float64`: value at (x3,y1)
+- `v3::Float64`: value at (x1,y3)
+- `v4::Float64`: value at (x3,y3)
+# Returns
+- `Float64`: Interpolated value at (x2,y2)
+"""
+function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
+    lin_x = (x2 - x1) / (x3 - x1)
+    lin_y = (y2 - y1) / (y3 - y1)
+    # value in plane spanned by v1, v3 and v4
+    u = v1 + lin_x * (v4 - v3)
+    v = v3 + lin_x * (v4 - v3)
+    val_134 = u + lin_y * (v - u)
+    # value in plane spanned by v1, v2 and v4
+    u = v1 + lin_x * (v2 - v1)
+    v = v4 - (1.0 - lin_x) * (v2 - v1)
+    val_124 = u + lin_y * (v - u)
+    # if the crease is convex, we take the min, otherwise the max
+    if v2 < v1 + (v4 - v3)
+        return min(val_134, val_124)
+    else
+        return max(val_134, val_124)
+    end
+end
+
+"""
+    parse_cop_function(eff_def)
+
+Parse the given definition of a COP function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator and
+semicolon as row seperator. The meaning of the numbers depends on the function prototype.
+
+Optionally second function can be given also seperated with a colon, e.g.:
+`function_prototype_1:list_of_numbers_1:function_prototype_2:list_of_numbers_2`
+The second function definition is parsed by parse_efficiency_function and should be
+formatted accordingly. This function then turns the PLF for the given PLR, which is a
+scaling factor for the COP calculation. If no second function is given, assumes a PLF of
+1.0, which has no effect.
+
+Three different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant COP.
+    * carnot: Takes one number as uses it as the scaling factor for the Carnot-COP.
+    * field: Takes a 2D array of values and performs bilinear interpolation between the
+        surrounding four support values. An example with additional line breaks and spaces
+        added for clarity:
+        "field:
+         0, 0,10,20,30;
+         0,15, 9, 6, 4;
+        10,15,15,10, 7;
+        20,15,15,15,11"
+        The first row are the grid points along the T_sink_out dimension, with the first
+        value being ignored. The points cover a range from 0 °C to 30 °C with a spacing of
+        10 K. The first column are the grid points along the T_source_in dimension, with the
+        first value being ignored. The points cover a range from 0 °C to 20 °C with a
+        spacing of 10 K. The support values are the COP (at PLR=1), for example a value of
+        10 for T_source_in=10 and T_sink_out=20.
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
+- `Function`: A callable function which, when called with the input and output temperatures
+    as arguments, returns another function. The second function returns a scalar value as
+    the COP when given a PLR (which is a value between 0.0 and 1.0) as input.
+"""
+function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method_cop = lowercase(splitted[1])
+        data_cop = splitted[2]
+
+        plr_func = plr -> 1.0
+        if length(splitted) == 4
+            plr_func = parse_efficiency_function("$(splitted[3]):$(splitted[4])")
+        end
+
+        if method_cop == "const"
+            c = parse(Float64, data_cop)
+            return c, function (src, snk)
+                       return plr -> c
+                   end
+
+        elseif method_cop == "carnot"
+            c = parse(Float64, data_cop)
+            return nothing, function (src, snk)
+                       if src === nothing || snk === nothing
+                           return plr -> nothing
+                       end
+                       return plr -> (plr_func(plr) * c * (273.15 + snk) / (snk - src))
+                   end
+
+        elseif method_cop == "field"
+            rows = split(data_cop, ';')
+            cells = [parse.(Float64, split(row, ",")) for row in rows]
+            dim_src = length(cells)
+            dim_snk = length(cells[1])
+            values = Array{Float64,2}(undef, dim_src, dim_snk)
+            for (idx_src, row) in pairs(cells)
+                for (idx_snk, val) in pairs(row)
+                    values[idx_src, idx_snk] = val
+                end
+            end
+
+            # first dim of values is source, second is sink. source is vertical (one row is
+            # at the same source temp), sink is horizontal (one column is at the same sink
+            # temp). first row is sink temperatures, first column is source temperatures
+            return nothing,
+                   function (src, snk)
+                       src_idx = nothing
+                       for idx in 2:(dim_src - 1)
+                           if src >= values[idx, 1] && src < values[idx + 1, 1]
+                               src_idx = idx
+                           end
+                       end
+                       snk_idx = nothing
+                       for idx in 2:(dim_snk - 1)
+                           if snk >= values[1, idx] && snk < values[1, idx + 1]
+                               snk_idx = idx
+                           end
+                       end
+                       if snk_idx === nothing || src_idx === nothing
+                           @error "Given temperatures $src and $snk outside of COP field."
+                           throw(BoundsError(values, (src_idx, snk_idx)))
+                       end
+                       return function (plr)
+                           factor = plr_func(plr)
+                           return bilinear_interpolate(values[1, snk_idx],
+                                                       snk,
+                                                       values[1, snk_idx + 1],
+                                                       values[src_idx, 1],
+                                                       src,
+                                                       values[src_idx + 1, 1],
+                                                       factor * values[src_idx, snk_idx],
+                                                       factor * values[src_idx, snk_idx + 1],
+                                                       factor * values[src_idx + 1, snk_idx],
+                                                       factor * values[src_idx + 1, snk_idx + 1])
+                       end
+                   end
+        end
+    end
+
+    @error "Cannot parse COP function from: $eff_def"
+    return nothing, (plr -> plr)
 end
 
 """
@@ -344,14 +562,14 @@ end
 Checks the available energy on the input electricity interface.
 
 # Arguments
-- `unit::Electrolyser`: The component
+- `unit::Union{Electrolyser,HeatPump}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_in(unit::Electrolyser,
+function check_el_in(unit::Union{Electrolyser,HeatPump},
                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_in"]
         return Inf
@@ -370,6 +588,47 @@ function check_el_in(unit::Electrolyser,
             return nothing
         end
         return potential_energy_el
+    end
+end
+
+"""
+    check_heat_in_layered(unit, sim_params)
+
+Checks the available energy on the input heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The available energy on the interface as one layer per source. The
+    value can be `Inf`, which is a special floating point value signifying an infinite value
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per source.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
+- `Vector{Stringing}`: The UACs of the sources on the interface.
+"""
+function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_heat_in"]
+        return ([Inf],
+                [unit.input_interfaces[unit.m_heat_in].temperature_min],
+                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].source.uac])
+    end
+
+    if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
+        # end of condition
+        return ([Inf],
+                [unit.input_interfaces[unit.m_heat_in].temperature_min],
+                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].source.uac])
+    else
+        exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
+                               unit.input_interfaces[unit.m_heat_in].source)
+        return ([e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges),
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges])
     end
 end
 
@@ -583,4 +842,46 @@ function check_heat_lt_out(unit::Electrolyser,
                                unit.m_heat_lt_out,
                                unit.output_temperature_lt,
                                sim_params)
+end
+
+"""
+    check_heat_out_layered(unit, sim_params)
+
+Checks the available energy on the output heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The requested energy on the interface as one layer per target. The
+    value can be `-Inf`, which is a special floating point value signifying a negative
+    infinite value.
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per target.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
+- `Vector{Stringing}`: The UACs of the targets on the interface.
+"""
+function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_heat_out"]
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].temperature_min],
+                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].target.uac])
+    end
+
+    if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        # end of condition
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].temperature_min],
+                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].target.uac])
+    else
+        exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
+                               unit.output_interfaces[unit.m_heat_out].target)
+        return ([e.balance + e.energy_potential for e in exchanges],
+                temp_min_all(exchanges),
+                temp_max_all(exchanges),
+                [e.purpose_uac for e in exchanges])
+    end
 end

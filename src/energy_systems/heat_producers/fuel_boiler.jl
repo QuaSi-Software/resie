@@ -34,9 +34,7 @@ mutable struct FuelBoiler <: Component
     energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
-    min_run_time::UInt
     output_temperature::Temperature
-
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -70,7 +68,6 @@ mutable struct FuelBoiler <: Component
                    interface_list,
                    Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
                    1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
-                   default(config, "min_run_time", 0),
                    default(config, "output_temperature", nothing),
                    0.0)  # losses
     end
