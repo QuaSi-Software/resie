@@ -153,7 +153,7 @@ mutable struct GeothermalHeatCollector <: Component
                    10.0,                   # set starting fluid temperature.               
                    0.0,                    # pipe temperature. 
                    0.0,                    # total heat flux in or out of collector. set by ReSiE Interface.
-                   0.5,                    # pipe heat conductivity.               
+                   0.4,                    # pipe heat conductivity.               
                    default(config, "fluid_specific_heat_capacity", 3800),      # fluid_specific_heat_capacity in J/(kg K)
                    default(config, "fluid_prandtl_number", 30),                # prandtl number at 30 % glycol, 0 °C 
                    default(config, "fluid_density", 1045),                     # fluid density at 30 % glycol, 0 °C in kg/m^3
@@ -607,7 +607,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe /
                                    (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
 
-    use_dynamic_fluid_properties = false
+    use_dynamic_fluid_properties = true
     if use_dynamic_fluid_properties
         # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, adapted from TRNSYS Type 710:
         fluid_dynamic_viscosity = 0.0000017158 * unit.fluid_temperature^2 -
@@ -623,39 +623,53 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     end
 
     if fluid_reynolds_number <= 2300  # laminar
-        Nu = calculate_Nu_laminar(unit, fluid_reynolds_number)
+        nusselt = calculate_Nu_laminar(unit, fluid_reynolds_number)
     elseif fluid_reynolds_number > 2300 && fluid_reynolds_number <= 1e4 # transitional
         # Gielinski 1995
         factor = (fluid_reynolds_number - 2300) / (1e4 - 2300)
-        Nu = (1 - factor) * calculate_Nu_laminar(unit, 2300.0) +
-             factor * calculate_Nu_turbulent(unit, 10_000.0)
+        nusselt = (1 - factor) * calculate_Nu_laminar(unit, 2300.0) +
+                  factor * calculate_Nu_turbulent(unit, 10_000.0)
     else  # turbulent
-        Nu = calculate_Nu_turbulent(unit, fluid_reynolds_number)
+        nusselt = calculate_Nu_turbulent(unit, fluid_reynolds_number)
     end
 
-    alpha = Nu * unit.fluid_heat_conductivity / unit.pipe_d_i
+    alpha = nusselt * unit.fluid_heat_conductivity / unit.pipe_d_i
 
     return alpha, fluid_reynolds_number
 end
 
 function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
-    # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
-    k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
-    k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
+    approach = :stephan  # can be one of :ramming or :stephan
 
-    # calculate Nu-Number
-    Nu_laminar = ((k_a / (1 - k_n) *
-                   (unit.fluid_prandtl_number * unit.pipe_d_i * fluid_reynolds_number / unit.pipe_length)^k_n)^3 +
-                  4.364^3)^(1 / 3)
-    return Nu_laminar
+    if approach == :ramming
+        # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
+        k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
+        k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
+
+        # calculate Nu-Number
+        nusselt_laminar = ((k_a / (1 - k_n) *
+                            (unit.fluid_prandtl_number * unit.pipe_d_i * fluid_reynolds_number / unit.pipe_length)^k_n)^3 +
+                           4.364^3)^(1 / 3)
+    elseif approach == :stephan
+        # Stephan
+        pr_water = 13.44                # Pr Number Water 0 °C as reference
+        nusselt_laminar = 3.66 +
+                          (0.0677 *
+                           (fluid_reynolds_number * unit.fluid_prandtl_number * unit.pipe_d_i / unit.pipe_length)^1.33) /
+                          (1 +
+                           0.1 * unit.fluid_prandtl_number *
+                           (fluid_reynolds_number * unit.pipe_d_i / unit.pipe_length)^0.83) *
+                          (unit.fluid_prandtl_number / pr_water)^0.1
+    end
+    return nusselt_laminar
 end
 
 function calculate_Nu_turbulent(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
     # Approached used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240–248, 1995. 
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
-    Nu_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
-                   (1 + 12.7 * sqrt(zeta / 8) * (unit.fluid_prandtl_number^(2 / 3) - 1))
-    return Nu_turbulent
+    nusselt_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
+                        (1 + 12.7 * sqrt(zeta / 8) * (unit.fluid_prandtl_number^(2 / 3) - 1))
+    return nusselt_turbulent
 end
 
 # process function that provides energy from the geothermal heat collector and calculates new temperatures 
