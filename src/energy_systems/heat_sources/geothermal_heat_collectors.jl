@@ -29,7 +29,6 @@ mutable struct GeothermalHeatCollector <: Component
     current_output_temperature::Temperature
     current_input_temperature::Temperature
     ambient_temperature::Temperature
-    last_timestep_calculated::Float64
 
     soil_starting_temperature::Temperature
     soil_specific_heat_capacity::Float64
@@ -37,7 +36,7 @@ mutable struct GeothermalHeatCollector <: Component
     soil_heat_conductivity::Float64
     soil_density_vector::Vector
     soil_heat_conductivity_vector::Vector
-    soil_heat_fusion_energy::Float64
+    soil_specific_enthalpy_of_fusion::Float64
 
     phase_change_upper_boundary_temperature::Temperature
     phase_change_lower_boundary_temperature::Temperature
@@ -72,7 +71,6 @@ mutable struct GeothermalHeatCollector <: Component
     dt::Integer
 
     fluid_temperature::Temperature
-    pipe_temperature::Temperature
 
     collector_total_heat_energy_in_out::Float64
 
@@ -93,6 +91,7 @@ mutable struct GeothermalHeatCollector <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
+        # TODO: add link to global weather file
         ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
         global_radiation_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
 
@@ -101,67 +100,65 @@ mutable struct GeothermalHeatCollector <: Component
                    sf_storage,                           # sys_function
                    InterfaceMap(m_heat_in => nothing),   # input_interfaces
                    InterfaceMap(m_heat_out => nothing),  # output_interfaces
-                   m_heat_in,                      # medium name of input interface
-                   m_heat_out,                     # medium name of output interface
-                   ambient_temperature_profile,    # [°C] ambient temperature profile
-                   global_radiation_profile,       # [Wh/m^2]
+                   m_heat_in,                            # medium name of input interface
+                   m_heat_out,                           # medium name of output interface
+                   ambient_temperature_profile,          # [°C] ambient temperature profile
+                   global_radiation_profile,             # [Wh/m^2]
                    default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading            
                    default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal heat collector storage, can also be set from other end of interface TODO
                    default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading         
                    default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "regeneration", true),                # flag if regeneration should be taken into account
-                   0.0,                        # max_output_energy in every time step, calculated in control()
-                   0.0,                        # max_input_energy in every time step, calculated in control()
-                   0.0,                        # output temperature in current time step, calculated in control()
-                   0.0,                        # input temperature in current time step, calculated in control()
-                   0.0,                        # ambient temperature in current time step, calculated in control()
-                   -1.0,                       # last timestep that was calculated; used to avoid double calculation of temperature field. set to -1 for the beginning
-                   15.5,                       # starting temperature near pipe. Value currently set for validation purpose. 
-                   default(config, "soil_specific_heat_capacity", 1000),  # specific heat capacity soil, 840, in J/(kgK)
-                   default(config, "soil_density", 2000),  # in kg/m^3              
-                   default(config, "soil_heat_conductivity", 1.5), # soil heat conductivity in W/(mK), 
-                   zeros(59),              # vector to set soil density. Size depends on discretitaion
-                   zeros(59),              # lamda soil. TODO: Use Soil propertys of validation project! 1.9
-                   default(config, "soil_heat_fusion_energy", 90000),                  # Heat fusion Energy in J/kg. Currently out of TRNSYS Default value.
-                   -0.25,                  # phase_change_upper_boundary_temperature
-                   -1,                     # phase_change_lower_boundary_temperature
-                   14.7,                   # convective heat transfer on surface - TODO: Search for literature source.
-                   0.25,                   # Reflection factor / Albedo value of surface. 
-                   zeros(31, 7),           # t1.                   # TODO / Attention: Size of this matrix depends on discretization, which will be done in Pre-Processing. 
-                   zeros(31, 7),           # t2 grob:zeros(31,7)   # TODO / Attention: Size of this matrix depends on discretization, which will be done in Pre-Processing. 
-                   zeros(31, 7),           # phase_change_state    # TODO / Attention: Size of this matrix depends on discretization, which will be done in Pre-Processing. 
-                   zeros(31, 7),           # array to define specific heat capacity on previous timestep (for apparent heat capacity method)     # TODO / Attention: Size of this matrix depends on discretization, which will be done in Pre-Processing. 
-                   zeros(31, 7),           # array to define specific heat capacity on next timestep (for apparent heat capacity method)         # TODO / Attention: Size of this matrix depends on discretization, which will be done in Pre-Processing. 
-                   zeros(31, 7),           # Matrix, which identifies fuid node. fuid node: 1. Soil-node: 0.                         TODO: Need to adapt on Pre-Processing.
-                   zeros(31, 7),           # Matrix, which identifies nodes surrounding the fluid-node. Pipe-surrounding: 1. Else: 0.  TODO: Need to adapt on Pre-Processing. 
-                   default(config, "pipe_radius_outer", 0.016),        # pipe outer radius
-                   default(config, "pipe_thickness", 0.003),           # thickness of pipe in m
-                   0.0,                                                # pipe inner diamater, calculated in initailize() 
-                   0.0,                                                # pipe outer diamater, calculated in initailize() 
-                   default(config, "pipe_laying_depth", 1.5),          # deepth of pipe system below the ground in m
-                   default(config, "pipe_length", 100),                # pipe length of one collector in m
-                   default(config, "number_of_pipes", 1),              # numbers of paralell pipes, each with a length of "pipe_length"        
-                   default(config, "pipe_spacing", 0.5),               # distance between pipes of collector in m.
-                   0.0,                    # global radiation on surface. to be read in by weather-profile
-                   5.67e-8,                # Boltzmann-Constant
-                   0.9,                    # Emissivity on ground surface
-                   zeros(6),               # size dx. depends on discretization settings.
-                   zeros(30),              # size dy. depends on discretization settings.
-                   93.5,                   # dz in m, is constant. fuid-Direction. # Depending on pipe length. 
-                   20.0,                   # duration time of internal time-step dt in s depending on ground properties. TODO: Calculate based on discretization and soil properties.
-                   10.0,                   # set starting fluid temperature.               
-                   0.0,                    # pipe temperature. 
-                   0.0,                    # total heat flux in or out of collector. set by ReSiE Interface.
-                   0.4,                    # pipe heat conductivity.               
-                   default(config, "fluid_specific_heat_capacity", 3800),      # fluid_specific_heat_capacity in J/(kg K)
-                   default(config, "fluid_prandtl_number", 30),                # prandtl number at 30 % glycol, 0 °C 
-                   default(config, "fluid_density", 1045),                     # fluid density at 30 % glycol, 0 °C in kg/m^3
-                   default(config, "fluid_kinematic_viscosity", 3.9e-6),       # fluid_kinematic_viscosity at 30 % glycol, 0 °C in m^2/s
-                   default(config, "fluid_heat_conductivity", 0.5),            # fluid_heat_conductivity at 30 % glycol, 0 °C  in W/(mK)
-                   0,                      # fluid_reynolds_number-Number, to be calculated in function.
-                   16.0,
-                   Array{Float64}(undef, 0, 0, 0))
+                   0.0,                        # max_output_energy [Wh] in every time step, calculated in control()
+                   0.0,                        # max_input_energy [Wh] in every time step, calculated in control()
+                   0.0,                        # current_output_temperature [°C] in current time step, calculated in control()
+                   0.0,                        # current_input_temperature [°C] in current time step, calculated in control()
+                   0.0,                        # ambient_temperature [°C] in current time step, calculated in control()
+                   default(config, "soil_starting_temperature", 15.5),   # starting temperature of soil near pipe [°C]
+                   default(config, "soil_specific_heat_capacity", 1000), # specific heat capacity of soil [J/(kgK)]
+                   default(config, "soil_density", 2000),                # density of soil [kg/m^3]              
+                   default(config, "soil_heat_conductivity", 1.5),       # heat conductivity of soil (lambda) [W/(mK)]
+                   zeros(59),                  # soil_density_vector: vector to set soil density. TODO: Size depends on discretitaion
+                   zeros(59),                  # soil_heat_conductivity_vector: vector to hold the heat conductivity of soil. TODO: Size depends on discretitaion
+                   default(config, "soil_specific_enthalpy_of_fusion", 90000),            # specific enthalpy of fusion of soil [J/kg]
+                   default(config, "phase_change_upper_boundary_temperature", -0.25),     # phase_change_upper_boundary_temperature [°C]
+                   default(config, "phase_change_lower_boundary_temperature", -1),        # phase_change_lower_boundary_temperature [°C]
+                   default(config, "surface_convective_heat_transfer_coefficient", 14.7), # convective heat transfer on surface [W/(m^2 K)]
+                   default(config, "surface_reflection_factor", 0.25),                    # reflection factor / Albedo value of surface [-]
+                   zeros(31, 7),               # t1 [°C]                TODO / Attention: Size of this matrix depends on discretization
+                   zeros(31, 7),               # t2 [°C]                TODO / Attention: Size of this matrix depends on discretization
+                   zeros(31, 7),               # phase_change_state [-] TODO / Attention: Size of this matrix depends on discretization
+                   zeros(31, 7),               # cp1 [J/(kg K)], holds the specific heat capacity of previous timestep (for apparent heat capacity method)     # TODO / Attention: Size of this matrix depends on discretization
+                   zeros(31, 7),               # cp2 [J/(kg K)], holds the specific heat capacity of the current timestep (for apparent heat capacity method)         # TODO / Attention: Size of this matrix depends on discretization
+                   zeros(31, 7),               # fluid, identifies the fluid node: fuid node: 1. Soil-node: 0.                           TODO: Need to adapt on Pre-Processing.
+                   zeros(31, 7),               # pipe_surrounding, identifies nodes surrounding the fluid-node: Pipe-surrounding: 1. Else: 0.  TODO: Need to adapt on Pre-Processing. 
+                   default(config, "pipe_radius_outer", 0.016),          # pipe outer radius [m]
+                   default(config, "pipe_thickness", 0.003),             # thickness of pipe [m]
+                   0.0,                                                  # pipe_d_i: pipe inner diameter [m], calculated in initailize() 
+                   0.0,                                                  # pipe_d_o: pipe outer diameter [m], calculated in initailize() 
+                   default(config, "pipe_laying_depth", 1.5),            # deepth of pipe system below the ground sourface [m]
+                   default(config, "pipe_length", 100),                  # pipe length of one collector pipe [m]
+                   default(config, "number_of_pipes", 1),                # numbers of paralell pipes, each with a length of "pipe_length"
+                   default(config, "pipe_spacing", 0.5),                 # distance between pipes of collector [m]
+                   0.0,                        # global_radiation [W/m^2]: solar global radiation on horizontal surface, to be read in from weather-profile
+                   5.67e-8,                    # boltzmann_constant [W/(m^2 K^4)]: Stefan–Boltzmann-Constant
+                   0.9,                        # surface_emissivity [-]: emissivity on ground surface
+                   [],                         # dx [m], TODO: depends on discretization settings
+                   [],                         # dy [m], TODO: depends on discretization settings
+                   0.0,                        # dz [m] (constant, in direction of pipe), equals the length of one pipe. 
+                   0.0,                        # dt [s], time step width of internal timestep, is calculated depending on ground properties and discretisation
+                   default(config, "fluid_start_temperature", 11.0),     # fluid_temperature [°C], is set to fluid_start_temperature at the beginning               
+                   0.0,                        # collector_total_heat_energy_in_out, total heat flux in or out of collector
+                   default(config, "pipe_heat_conductivity", 0.4),                 # pipe_heat_conductivity [W/(mK)] 
+                   default(config, "fluid_specific_heat_capacity", 3800),          # fluid_specific_heat_capacity [J/(kg K)]
+                   default(config, "fluid_prandtl_number", 30),                    # prandtl number [-], preset for 30 % glycol at 0 °C 
+                   default(config, "fluid_density", 1045),                         # fluid density [kg/m^3], preset for 30 % glycol at 0 °C
+                   default(config, "fluid_kinematic_viscosity", 3.9e-6),           # fluid_kinematic_viscosity [m^2/s], preset fo 30 % glycol at 0 °C
+                   default(config, "fluid_heat_conductivity", 0.5),                # fluid_heat_conductivity [W/(mK)], preset fo 30 % glycol at 0 °C
+                   0.0,                                                            # fluid_reynolds_number, to be calculated in function.
+                   default(config, "soil_around_pip_starting_temperature", 16.0),  # average_temperature_adjacent_to_pipe [°C] TODO: Doubling with "soil_starting_temperature"?
+                   Array{Float64}(undef, 0, 0, 0))                                 # temp_field_output [°C], holds temperature field of nodes for output plot
     end
 end
 
@@ -265,9 +262,7 @@ function control(unit::GeothermalHeatCollector,
         unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], 31, 7)
     end
 
-    # get ambient temperature and global radiation from profile for current time step if needed (probably
-    # only for geothermal collectors)
-    # TODO: add link to global weather file
+    # get ambient temperature and global radiation from profile for current time step if needed
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
     unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params)) # from Wh/m^2 to W/m^2
 
@@ -531,7 +526,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     end
     unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t2)
 
-    activate_plot = false
+    activate_plot = true
     if (Int(sim_params["time"] / sim_params["time_step_seconds"]) == sim_params["number_of_time_steps"] - 1) &&
        activate_plot
         f = Figure()
@@ -590,7 +585,8 @@ function freezing(unit::GeothermalHeatCollector, t2_in, phase_change_state_in)
         dt_lat = unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature
         sigma_lat = 1 / 5 * dt_lat
         t_lat = (unit.phase_change_upper_boundary_temperature + unit.phase_change_lower_boundary_temperature) / 2
-        cp = unit.soil_heat_fusion_energy * 1 / (sigma_lat * sqrt(2 * pi)) * exp(-0.5 * (t2_in - t_lat)^2 / sigma_lat^2)
+        cp = unit.soil_specific_enthalpy_of_fusion * 1 / (sigma_lat * sqrt(2 * pi)) *
+             exp(-0.5 * (t2_in - t_lat)^2 / sigma_lat^2)
     elseif t2_in < unit.phase_change_lower_boundary_temperature
         cp = unit.soil_specific_heat_capacity - 100
     end
@@ -775,8 +771,7 @@ function balance_on(interface::SystemInterface,
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(; balance=interface.balance,
-                 energy_potential=0.0,
-                 storage_potential=caller_is_input ? -unit.max_input_energy : unit.max_output_energy,   # TODO is this to be assuemd as storage_potential?
+                 energy_potential=caller_is_input ? -unit.max_input_energy : unit.max_output_energy,
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
