@@ -186,7 +186,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe
 
     # calculate simulation mesh
-    accuracy_mode = "normal"
+    accuracy_mode = "rough"
     if accuracy_mode == "very_rough"
         min_mesh_width = unit.pipe_d_o
         max_mesh_width = unit.pipe_d_o * 256
@@ -629,7 +629,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                          unit.dz * 0.5 * (unit.dx[i] + unit.dx[i - 1]) * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature + 273.15)^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surface
                                          unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx[i] +                                                           # heat conduction in positve x-direction
                                          unit.dz * unit.dy[h] * unit.soil_heat_conductivity_vector[h] * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx[i - 1] +                                                       # heat conduction in negative x-direction
-                                         unit.dz * 0.5 * (unit.dx[i] + unit.dx[i - 1]) * unit.soil_heat_conductivity_vector[h] * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy[1]) *                               # heat conduction in y-direction
+                                         unit.dz * 0.5 * (unit.dx[i] + unit.dx[i - 1]) * unit.soil_heat_conductivity_vector[h] * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy[1]) *                                 # heat conduction in y-direction
                                         unit.dt * 1 / (unit.soil_density_vector[h] * unit.cp1[h, i] * unit.dz * 0.5 * (unit.dx[i] + unit.dx[i - 1]) * unit.dy[h])
 
                         unit.t2[h, i],
@@ -689,36 +689,39 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         unit.t1 = copy(unit.t2)
         unit.cp1 = copy(unit.cp2)
     end
+end
 
-    activate_plot = true
-    if (Int(sim_params["time"] / sim_params["time_step_seconds"]) == sim_params["number_of_time_steps"] - 1) &&
-       activate_plot
-        f = Figure()
-        ax = Axis3(f[1, 1])
+function plot_optional_figures_end(unit::GeothermalHeatCollector,
+                                   sim_params::Dict{String,Any})
+    # plot temperature field as 3D mesh with time-slider
+    @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
+          "Close figure to continue..."
 
-        ax.zlabel = "Temperature [°C]"
-        ax.xlabel = "Vertical expansion (depth) [m]"
-        ax.ylabel = "Horizontal expansion [m]"
-        min_temp = minimum(unit.temp_field_output)
-        min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
-        max_temp = maximum(unit.temp_field_output)
-        max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
-        zlims!(ax, min_temp, max_temp)
+    f = Figure()
+    ax = Axis3(f[1, 1])
 
-        y_abs = [0; cumsum(unit.dx)]  # Absolute x coordinates
-        x_abs = [0; cumsum(unit.dy)]  # Absolute y coordinates
+    ax.zlabel = "Temperature [°C]"
+    ax.xlabel = "Vertical expansion (depth) [m]"
+    ax.ylabel = "Horizontal expansion [m]"
+    min_temp = minimum(unit.temp_field_output)
+    min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
+    max_temp = maximum(unit.temp_field_output)
+    max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
+    zlims!(ax, min_temp, max_temp)
 
-        time = Observable(1)
-        surfdata = @lift(unit.temp_field_output[$time, :, :])
-        surface!(ax, x_abs, y_abs, surfdata)
-        scatter!(ax, x_abs, y_abs, surfdata)
-        slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
+    y_abs = [0; cumsum(unit.dx)]  # Absolute x coordinates
+    x_abs = [0; cumsum(unit.dy)]  # Absolute y coordinates
 
-        on(slg.sliders[1].value) do v
-            time[] = v
-        end
-        wait(display(f))
+    time = Observable(1)
+    surfdata = @lift(unit.temp_field_output[$time, :, :])
+    surface!(ax, x_abs, y_abs, surfdata)
+    scatter!(ax, x_abs, y_abs, surfdata)
+    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
+
+    on(slg.sliders[1].value) do v
+        time[] = v
     end
+    wait(display(f))
 end
 
 # function to check/set phase state and calculate specific heat capacity with apparent heat capacity method. Not validated yet.

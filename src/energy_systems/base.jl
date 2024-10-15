@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
        output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-       highest, default, plot_optional_figures
+       highest, default, plot_optional_figures_begin, plot_optional_figures_end
 
 using ..Profiles
 
@@ -1143,7 +1143,7 @@ function distribute!(unit::Component)
 end
 
 """
-    plot_optional_figures(unit, output_path, output_formats, sim_params)
+    plot_optional_figures_begin(unit, output_path, output_formats, sim_params)
 
 Plot otpional figures that are potentially created after initialisation of each 
 component. Saves all figures to "output_path" for each specified "output_formats".
@@ -1163,10 +1163,29 @@ Possible output formats are:
 # Returns:
 - Bool: true if a figure was created, false if no figure was created.
 """
-function plot_optional_figures(unit::Component,
-                               output_path::String,
-                               output_formats::Vector{String},
-                               sim_params::Dict{String,Any})
+function plot_optional_figures_begin(unit::Component,
+                                     output_path::String,
+                                     output_formats::Vector{String},
+                                     sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return false
+end
+
+"""
+    plot_optional_figures_end(unit, sim_params)
+
+Plot otpional figures that are potentially created at the end of the simulation of each 
+component. 
+
+# Arguments
+- `unit::Component`: The unit that plots additional figures
+- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+ 
+# Returns:
+- Bool: true if a figure was created, false if no figure was created.
+"""
+function plot_optional_figures_end(unit::Component,
+                                   sim_params::Dict{String,Any})
     # default implementation is to do nothing
     return false
 end

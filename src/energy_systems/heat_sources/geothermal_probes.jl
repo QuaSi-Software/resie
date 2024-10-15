@@ -311,8 +311,8 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     return g_function, number_of_probes, probe_coordinates
 end
 
-function plot_optional_figures(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
-                               sim_params::Dict{String,Any})
+function plot_optional_figures_begin(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
+                                     sim_params::Dict{String,Any})
     # plot g-function values during simulation time
     plot(0:Int(sim_params["number_of_time_steps"]),
          unit.g_function[1:Int(sim_params["number_of_time_steps"] + 1)];
@@ -564,7 +564,7 @@ function get_g_values_from_library(unit::Component,
     lib_borehole_radiuses = [0.075, 0.075, 0.075, 0.08, 0.0875]  # [m]
     #! format: on
     lib_default_spacing = 5   # Default borehole spacing for each configuration.
-    #                           Attention: Also change in plot_optional_figures!
+    #                           Attention: Also change in plot_optional_figures_begin!
     lib_borehole_spacings = fill(lib_default_spacing, length(lib_borehole_depths))
 
     lib_spacings_to_depths = lib_borehole_spacings ./ lib_borehole_depths
