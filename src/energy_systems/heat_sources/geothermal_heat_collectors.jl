@@ -48,7 +48,7 @@ mutable struct GeothermalHeatCollector <: Component
     phase_change_state::Array{Int}
     cp1::Array{Float64}
     cp2::Array{Float64}
-    is_fluid_node::Array{Bool}
+    fluid_node_y_idx::Int
     is_pipe_surrounding::Array{Bool}
 
     pipe_radius_outer::Float64
@@ -128,10 +128,10 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "surface_reflection_factor", 0.25),   # reflection factor / albedo value of surface [-]
                    Array{Float64}(undef, 0, 0),                          # t1 [°C]
                    Array{Float64}(undef, 0, 0),                          # t2 [°C]
-                   Array{Int}(undef, 0, 0),                              # phase_change_state [-] TODO What is the meaning of 0, 1, 2?
+                   Array{Int}(undef, 0, 0),                              # phase_change_state [-]: 0 = fully liquid, 1 = partly frozen, 2 = fully frozen
                    Array{Float64}(undef, 0, 0),                          # cp1 [J/(kg K)], holds the specific heat capacity of previous timestep (for apparent heat capacity method)
                    Array{Float64}(undef, 0, 0),                          # cp2 [J/(kg K)], holds the specific heat capacity of the current timestep (for apparent heat capacity method)
-                   Array{Bool}(undef, 0, 0),                             # is_fluid_node, identifies the fluid node: fuid node: true; soil-node: false
+                   0,                                                    # fluid_node_y_idx, identifies the fluid node index in y direction
                    Array{Bool}(undef, 0, 0),                             # is_pipe_surrounding, identifies nodes surrounding the fluid-node: pipe-surrounding: true; else: false
                    default(config, "pipe_radius_outer", 0.016),          # pipe outer radius [m]
                    default(config, "pipe_thickness", 0.003),             # thickness of pipe [m]
@@ -187,7 +187,11 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     # calculate simulation mesh
     accuracy_mode = "normal"
-    if accuracy_mode == "rough"
+    if accuracy_mode == "very_rough"
+        min_mesh_width = unit.pipe_d_o
+        max_mesh_width = unit.pipe_d_o * 256
+        expansion_factor = 3.0
+    elseif accuracy_mode == "rough"
         min_mesh_width = unit.pipe_d_o / 2
         max_mesh_width = unit.pipe_d_o * 128
         expansion_factor = 2.5
@@ -203,23 +207,19 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
         min_mesh_width = unit.pipe_d_o / 16
         max_mesh_width = unit.pipe_d_o * 16
         expansion_factor = 1.5
-    elseif accuracy_mode == "extreme_high"
-        min_mesh_width = unit.pipe_d_o / 32
-        max_mesh_width = unit.pipe_d_o * 8
-        expansion_factor = 1.2
     end
 
     unit.dy, y_pipe_node_num = create_mesh_y(min_mesh_width,
                                              max_mesh_width,
                                              expansion_factor,
                                              unit.pipe_laying_depth,
-                                             unit.pipe_d_o,
+                                             unit.pipe_radius_outer,
                                              unit.considered_soil_depth)
 
     unit.dx = create_mesh_x(min_mesh_width,
                             max_mesh_width,
                             expansion_factor,
-                            unit.pipe_d_o,
+                            unit.pipe_radius_outer,
                             unit.pipe_spacing)
 
     unit.dz = copy(unit.pipe_length)
@@ -228,8 +228,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     n_nodes_y = length(unit.dy) + 1
 
     # localize fluid and adjacent nodes as they will be calculated separatly later
-    unit.is_fluid_node = fill(false, n_nodes_y, n_nodes_x)        # pipe node is true, all others are false
-    unit.is_fluid_node[y_pipe_node_num, 1] = true
+    unit.fluid_node_y_idx = y_pipe_node_num
 
     # set pipe-surrounding nodes assuming that the pipe has one central
     # and 8 surrounding nodes, of which 5 are considered in the axisymmetric grid used here.
@@ -304,9 +303,10 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     unit.phase_change_state = fill(0, n_nodes_y, n_nodes_x)
 
     # internal time step according to TRNSYS Type 710 Model (Hirsch, Hüsing & Rockendorf 2017):
-    unit.dt = Int(floor(min(sim_params["time_step_seconds"],
-                            (unit.soil_density * unit.soil_specific_heat_capacity *
-                             min(minimum(unit.dx), minimum(unit.dy))^2) / (4 * unit.soil_heat_conductivity))))
+    unit.dt = Int(max(1,
+                      floor(min(sim_params["time_step_seconds"],
+                                (unit.soil_density * unit.soil_specific_heat_capacity *
+                                 min(minimum(unit.dx), minimum(unit.dy))^2) / (4 * unit.soil_heat_conductivity)))))
     # ensure that dt is a divisor of the simulation time step
     # find the largest divisor that is smaller that the calculated dt
     if sim_params["time_step_seconds"] % unit.dt != 0
@@ -320,7 +320,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 end
 
 """ 
-    create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_diameter_outer, total_depth_simulation_domain)
+    create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_radius_outer, total_depth_simulation_domain)
 
 Creates a non-uniform mesh for geothermal probe in y-direction (orthogonal to ground surface and orthogonal to pipe).
 | --------(ground surface)
@@ -342,7 +342,7 @@ function create_mesh_y(min_mesh_width::Float64,
                        max_mesh_width::Float64,
                        expansion_factor::Float64,
                        pipe_laying_depth::Float64,
-                       pipe_diameter_outer::Float64,
+                       pipe_radius_outer::Float64,
                        total_depth_simulation_domain::Float64)
     function calculate_increasing_decreasing_distances(midpoint::Float64,
                                                        min_mesh_width::Float64,
@@ -370,10 +370,10 @@ function create_mesh_y(min_mesh_width::Float64,
     end
 
     # define segments of the computing grid in y-direction 
-    sy1 = 0                                                 # surface
-    sy2 = pipe_laying_depth - 0.5 * pipe_diameter_outer     # node above fluid node
-    sy3 = pipe_laying_depth + 0.5 * pipe_diameter_outer     # node below fluid node
-    sy4 = total_depth_simulation_domain                     # lower simulation boundary
+    sy1 = 0                                         # surface
+    sy2 = pipe_laying_depth - pipe_radius_outer     # node above fluid node
+    sy3 = pipe_laying_depth + pipe_radius_outer     # node below fluid node
+    sy4 = total_depth_simulation_domain             # lower simulation boundary
 
     # segment 1: surface to pipe 
     midpoint = (sy2 - sy1) / 2
@@ -383,7 +383,7 @@ function create_mesh_y(min_mesh_width::Float64,
     y_pipe_node_num = length(dy_1) + 2
 
     # segment 2: pipe
-    dy_2 = [pipe_diameter_outer / 2, pipe_diameter_outer / 2]
+    dy_2 = [pipe_radius_outer, pipe_radius_outer]
 
     # segment 3: pipe to lower boundary 
     midpoint = (sy4 - sy3) / 2
@@ -393,7 +393,7 @@ function create_mesh_y(min_mesh_width::Float64,
 end
 
 """ 
-    create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_diameter_outer, pipe_spacing)
+    create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_radius_outer, pipe_spacing)
   
 Creates a non-uniform mesh for geothermal probe in x-direction (parallel to ground surface and orthogonal to pipe).
 -----------------------  (ground surface)
@@ -407,13 +407,13 @@ Note that the last dx can be smaller than calculated to meet the given boundary 
 function create_mesh_x(min_mesh_width::Float64,
                        max_mesh_width::Float64,
                        expansion_factor::Float64,
-                       pipe_diameter_outer::Float64,
+                       pipe_radius_outer::Float64,
                        pipe_spacing::Float64)
     # maximum width of grid in x direction
     x_bound = pipe_spacing / 2       # [m]
 
     # set first dx to half the pipe diameter
-    dx = [pipe_diameter_outer / 2]   # [m]
+    dx = [pipe_radius_outer]   # [m]
 
     # set next dx to the minumum width
     append!(dx, min_mesh_width)
@@ -475,128 +475,120 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
 
     unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
 
-    # calculate fluid temperature
-    for h in 1:length(unit.dy)
-        for i in 1:2
-            if unit.is_fluid_node[h, i]
-                # calculate specific heat extraction for 1 pipe per length
-                specific_heat_flux_pipe = (wh_to_watts(q_in_out) / (unit.pipe_length * unit.number_of_pipes))
-                unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe +
-                                         pipe_thermal_resistance_length_specific * specific_heat_flux_pipe # "+", because specific_heat_flux_pipe is negative during heat extraction.        
+    # calculate fluid temperature and pipe-surrounding nodes
+    for h in [unit.fluid_node_y_idx]  # vertical direction
+        for i in [1]                  # horizontal direction
+            # calculate specific heat extraction for 1 pipe per length
+            specific_heat_flux_pipe = (wh_to_watts(q_in_out) / (unit.pipe_length * unit.number_of_pipes))
+            unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe +
+                                     pipe_thermal_resistance_length_specific * specific_heat_flux_pipe # "+", because specific_heat_flux_pipe is negative during heat extraction.        
 
-                unit.t2[h, i] = unit.fluid_temperature
+            unit.t2[h, i] = unit.fluid_temperature
 
-                volume_adjacent_to_pipe = ((unit.dx[i] + unit.dx[i + 1] / 2) *                                        # total x-Direction
-                                           (unit.dy[h - 2] / 2 + unit.dy[h - 1] + unit.dy[h] + unit.dy[h + 1] / 2) -  # total y-Direction
-                                           (pi * unit.dy[h]^2 / 2)) * unit.dz                                         # 1/2 Area pipe.          
+            volume_adjacent_to_pipe = ((unit.dx[i] + unit.dx[i + 1] / 2) *                                        # total x-Direction
+                                       (unit.dy[h - 2] / 2 + unit.dy[h - 1] + unit.dy[h] + unit.dy[h + 1] / 2) -  # total y-Direction
+                                       (pi * unit.dy[h]^2 / 2)) * unit.dz                                         # 1/2 Area pipe.          
 
-                q_in_out_surrounding = wh_to_watts(q_in_out) / (unit.number_of_pipes)
+            q_in_out_surrounding = wh_to_watts(q_in_out) / (unit.number_of_pipes)
 
-                # upper node               
-                unit.t2[h - 1, i] = unit.t1[h - 1, i] +
-                                    (unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] *  # heat conduction in negative y-direction
-                                     (unit.t1[h - 2, i] - unit.t1[h - 1, i]) / (unit.dy[h - 2]) +
-                                     1 / 16 * q_in_out_surrounding) *                                    # heat source / sink
+            # upper node               
+            unit.t2[h - 1, i] = unit.t1[h - 1, i] +
+                                (unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] *         # heat conduction in negative y-direction
+                                 (unit.t1[h - 2, i] - unit.t1[h - 1, i]) / (unit.dy[h - 2]) +
+                                 1 / 16 * q_in_out_surrounding) *                                    # heat source / sink
+                                unit.dt * 1 /
+                                (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+
+            # lower node
+            unit.t2[h + 1, i] = unit.t1[h + 1, i] +
+                                (unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] *         # heat conduction in positive y-direction
+                                 (unit.t1[h + 2, i] - unit.t1[h + 1, i]) / (unit.dy[h + 1]) +
+                                 1 / 16 * q_in_out_surrounding) *                                    # heat source / sink
+                                unit.dt * 1 /
+                                (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+
+            # right node
+            unit.t2[h, i + 1] = unit.t1[h, i + 1] +
+                                (unit.dz * 0.5 * (unit.dy[h] + unit.dy[h + 1]) *
+                                 unit.soil_heat_conductivity_vector[h] * (unit.t1[h, i + 2] - unit.t1[h, i + 1]) /
+                                 unit.dx[i + 1] + 1 / 8 * q_in_out_surrounding) *                    # heat source / sink
+                                unit.dt * 1 /
+                                (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+
+            # upper right node
+            unit.t2[h - 1, i + 1] = unit.t1[h - 1, i + 1] +
+                                    (unit.dz * 0.5 * (unit.dy[h - 2] + unit.dy[h - 1]) *                # heat conduction in positive x-direction
+                                     unit.soil_heat_conductivity_vector[h] *
+                                     (unit.t1[h - 1, i + 2] - unit.t1[h - 1, i + 1]) / unit.dx[i] +
+                                     unit.dz * 0.5 * (unit.dx[i] + unit.dx[i + 1]) *                 # heat conduction in negative y-direction
+                                     unit.soil_heat_conductivity_vector[h] *
+                                     (unit.t1[h - 2, i + 1] - unit.t1[h - 1, i + 1]) / (unit.dy[h - 2]) +
+                                     1 / 8 * q_in_out_surrounding) *                                        # heat source / sink
                                     unit.dt * 1 /
                                     (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
 
-                # lower node
-                unit.t2[h + 1, i] = unit.t1[h + 1, i] +
-                                    (unit.dz * unit.dx[i] * unit.soil_heat_conductivity_vector[h] *  # heat conduction in positive y-direction
-                                     (unit.t1[h + 2, i] - unit.t1[h + 1, i]) / (unit.dy[h + 1]) +
-                                     1 / 16 * q_in_out_surrounding) *                                    # heat source / sink
+            # lower right node
+            unit.t2[h + 1, i + 1] = unit.t1[h + 1, i + 1] +
+                                    (unit.dz * 0.5 * (unit.dx[i] + unit.dx[i + 1]) *                    # heat conduction in positive y-direction
+                                     unit.soil_heat_conductivity_vector[h] *
+                                     (unit.t1[h + 2, i + 1] - unit.t1[h + 1, i + 1]) / (unit.dy[h + 1]) +
+                                     unit.dz * 0.5 * (unit.dy[h] + unit.dy[h + 1]) *                 # heat conduction in positive x-direction
+                                     unit.soil_heat_conductivity_vector[h] *
+                                     (unit.t1[h + 1, i + 2] - unit.t1[h + 1, i + 1]) / unit.dx[i + 1] +
+                                     1 / 8 * q_in_out_surrounding) *                                 # heat source / sink
                                     unit.dt * 1 /
                                     (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
 
-                # right node
-                unit.t2[h, i + 1] = unit.t1[h, i + 1] +
-                                    (unit.dz * 0.5 * (unit.dy[h] + unit.dy[h + 1]) *
-                                     unit.soil_heat_conductivity_vector[h] * (unit.t1[h, i + 2] - unit.t1[h, i + 1]) /
-                                     unit.dx[i + 1] + 1 / 8 * q_in_out_surrounding) *                   # heat source / sink
-                                    unit.dt * 1 /
-                                    (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+            # adjacent nodes to fluid node have uniform temperature average_temperature_adjacent_to_pipe
+            unit.average_temperature_adjacent_to_pipe = (unit.t2[h - 1, i] + unit.t2[h + 1, i] + unit.t2[h, i + 1] +
+                                                         unit.t2[h + 1, i + 1] + unit.t2[h - 1, i + 1]) / 5
+            unit.t2[h - 1, i] = copy(unit.average_temperature_adjacent_to_pipe)
+            unit.t2[h + 1, i] = copy(unit.average_temperature_adjacent_to_pipe)
+            unit.t2[h, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
 
-                # upper right node
-                unit.t2[h - 1, i + 1] = unit.t1[h - 1, i + 1] +
-                                        (unit.dz * 0.5 * (unit.dy[h - 2] + unit.dy[h - 1]) *                    # heat conduction in positive x-direction
-                                         unit.soil_heat_conductivity_vector[h] *
-                                         (unit.t1[h - 1, i + 2] - unit.t1[h - 1, i + 1]) / unit.dx[i] +
-                                         unit.dz * 0.5 * (unit.dx[i] + unit.dx[i + 1]) *                        # heat conduction in negative y-direction
-                                         unit.soil_heat_conductivity_vector[h] *
-                                         (unit.t1[h - 2, i + 1] - unit.t1[h - 1, i + 1]) / (unit.dy[h - 2]) +
-                                         1 / 8 * q_in_out_surrounding) *                                        # heat source / sink
-                                        unit.dt * 1 /
-                                        (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+            unit.t2[h + 1, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
+            unit.t2[h - 1, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
 
-                # lower right node
-                unit.t2[h + 1, i + 1] = unit.t1[h + 1, i + 1] +
-                                        (unit.dz * 0.5 * (unit.dx[i] + unit.dx[i + 1]) *                        # heat conduction in positive y-direction
-                                         unit.soil_heat_conductivity_vector[h] *
-                                         (unit.t1[h + 2, i + 1] - unit.t1[h + 1, i + 1]) / (unit.dy[h + 1]) +
-                                         unit.dz * 0.5 * (unit.dy[h] + unit.dy[h + 1]) *                        # heat conduction in positive x-direction
-                                         unit.soil_heat_conductivity_vector[h] *
-                                         (unit.t1[h + 1, i + 2] - unit.t1[h + 1, i + 1]) / unit.dx[i + 1] +
-                                         1 / 8 * q_in_out_surrounding) *                                        # heat source / sink
-                                        unit.dt * 1 /
-                                        (unit.soil_density_vector[h] * unit.cp1[h, i] * volume_adjacent_to_pipe / 5)
+            unit.t2[h - 1, i],
+            unit.phase_change_state[h - 1, i],
+            unit.cp2[h - 1, i] = freezing(unit,
+                                          unit.t2[h - 1, i],
+                                          unit.phase_change_state[h - 1, i])
+            unit.t2[h + 1, i],
+            unit.phase_change_state[h + 1, i],
+            unit.cp2[h + 1, i] = freezing(unit,
+                                          unit.t2[h + 1, i],
+                                          unit.phase_change_state[h + 1, i])
+            unit.t2[h, i + 1],
+            unit.phase_change_state[h, i + 1],
+            unit.cp2[h, i + 1] = freezing(unit,
+                                          unit.t2[h, i + 1],
+                                          unit.phase_change_state[h, i + 1])
 
-                # adjacent nodes to fluid node have uniform temperature average_temperature_adjacent_to_pipe
-                unit.average_temperature_adjacent_to_pipe = (unit.t2[h - 1, i] + unit.t2[h + 1, i] + unit.t2[h, i + 1] +
-                                                             unit.t2[h + 1, i + 1] + unit.t2[h - 1, i + 1]) / 5
-                unit.t2[h - 1, i] = copy(unit.average_temperature_adjacent_to_pipe)
-                unit.t2[h + 1, i] = copy(unit.average_temperature_adjacent_to_pipe)
-                unit.t2[h, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
-
-                unit.t2[h + 1, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
-                unit.t2[h - 1, i + 1] = copy(unit.average_temperature_adjacent_to_pipe)
-
-                unit.t2[h - 1, i],
-                unit.phase_change_state[h - 1, i],
-                unit.cp2[h - 1, i] = freezing(unit,
-                                              unit.t2[h - 1, i],
-                                              unit.phase_change_state[h - 1, i])
-                unit.t2[h + 1, i],
-                unit.phase_change_state[h + 1, i],
-                unit.cp2[h + 1, i] = freezing(unit,
-                                              unit.t2[h + 1, i],
-                                              unit.phase_change_state[h + 1, i])
-                unit.t2[h, i + 1],
-                unit.phase_change_state[h, i + 1],
-                unit.cp2[h, i + 1] = freezing(unit,
-                                              unit.t2[h, i + 1],
-                                              unit.phase_change_state[h, i + 1])
-
-                unit.t2[h, i + 1],
-                unit.phase_change_state[h, i + 1],
-                unit.cp2[h, i + 1] = freezing(unit,
-                                              unit.t2[h + 1, i + 1],
-                                              unit.phase_change_state[h + 1, i + 1])
-                unit.t2[h, i + 1],
-                unit.phase_change_state[h, i + 1],
-                unit.cp2[h, i + 1] = freezing(unit,
-                                              unit.t2[h - 1, i + 1],
-                                              unit.phase_change_state[h - 1, i + 1])
-            end
+            unit.t2[h, i + 1],
+            unit.phase_change_state[h, i + 1],
+            unit.cp2[h, i + 1] = freezing(unit,
+                                          unit.t2[h + 1, i + 1],
+                                          unit.phase_change_state[h + 1, i + 1])
+            unit.t2[h, i + 1],
+            unit.phase_change_state[h, i + 1],
+            unit.cp2[h, i + 1] = freezing(unit,
+                                          unit.t2[h - 1, i + 1],
+                                          unit.phase_change_state[h - 1, i + 1])
         end
     end
 
+    # loop over internal timesteps
     for _ in 1:(unit.n_internal_timesteps)
-
-        # Loop - vertical direction
+        # loop over vertical direction
         for h in 1:(length(unit.dy))
-
-            # Loop - horizontal direction
+            # loop over horizontal direction
             for i in 1:(length(unit.dx) + 1)
-
                 # calculate temperature of adjacent nodes to fluid
-                if unit.is_fluid_node[h, i]
-                    # do nothing, because fuid temperature and surrounding nodes are already calculated before iteration started.
+                if (h == unit.fluid_node_y_idx && i == 1) || unit.is_pipe_surrounding[h, i]
+                    # do nothing, because fuid temperature and surrounding nodes are already calculated before
                     continue
-                elseif unit.is_pipe_surrounding[h, i]
-                    # Skip fluid_reynolds_number-calculation. already calculated.      
-                    continue
-                    # ground surface boundary 
-                elseif h == 1
+                elseif h == 1  # surface layer
                     #! format: off
                     # left boundary
                     if i == 1
@@ -647,9 +639,9 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                                       unit.phase_change_state[h, i])
 
                     end
-                else
+                else # other layers below surface
                     # left boundary
-                    if i == 1 && !unit.is_pipe_surrounding[h, i]
+                    if i == 1
                         unit.t2[h, i] = unit.t1[h, i] +
                                         (unit.dz * 0.5 * (unit.dy[h] + unit.dy[h - 1]) * unit.soil_heat_conductivity_vector[h] * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx[i] +  # heat conduction in positve x-direction
                                          unit.dz *       unit.dx[i] * unit.soil_heat_conductivity_vector[h] * (unit.t1[h + 1, i] - unit.t1[h, i]) / (unit.dy[h]) +                   # heat conduction in positive y-direction
@@ -733,6 +725,7 @@ end
 function freezing(unit::GeothermalHeatCollector, t2_in, phase_change_state_in)
     cp = unit.soil_specific_heat_capacity
 
+    # identify new phase_change_state_out and temperature
     if t2_in < unit.phase_change_upper_boundary_temperature && phase_change_state_in == 0
         t2_out = unit.phase_change_upper_boundary_temperature
         phase_change_state_out = 1
@@ -760,7 +753,7 @@ function freezing(unit::GeothermalHeatCollector, t2_in, phase_change_state_in)
         cp = unit.soil_specific_enthalpy_of_fusion * 1 / (sigma_lat * sqrt(2 * pi)) *
              exp(-0.5 * (t2_in - t_lat)^2 / sigma_lat^2)
     elseif t2_in < unit.phase_change_lower_boundary_temperature
-        cp = unit.soil_specific_heat_capacity - 100
+        cp = unit.soil_specific_heat_capacity - 100 # TODO: What is this?? Whats about the soil_heat_conductivity? 
     end
 
     return (t2_out, phase_change_state_out, cp)
