@@ -1,6 +1,6 @@
 using GLMakie
 using Roots
-# using Plots
+using Plots
 
 """
 Implementation of geothermal heat collector.
@@ -95,7 +95,7 @@ mutable struct GeothermalHeatCollector <: Component
     n_internal_timesteps::Int
     sigma_lat::Float64
     t_lat::Float64
-    delta_lat::Float64
+    delta_t_lat::Float64
     volume_adjacent_to_pipe::Float64
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -178,7 +178,7 @@ mutable struct GeothermalHeatCollector <: Component
                    0,                                                    # n_internal_timesteps: number of internal time steps within one simulation time step
                    0.0,                                                  # sigma_lat; precalculated parameters for freezing function
                    0.0,                                                  # t_lat; precalculated parameters for freezing function
-                   0.0,                                                  # delta_lat; precalculated parameters for freezing function
+                   0.0,                                                  # delta_t_lat; precalculated parameters for freezing function
                    0.0)                                                  # volume_adjacent_to_pipe; precalculated parameter
     end
 end
@@ -198,12 +198,16 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     # calculate max_energy
     A_collector = unit.pipe_length * unit.pipe_spacing * unit.number_of_pipes
     unit.max_output_energy = watt_to_wh(unit.max_output_power * A_collector)
-    unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
+    if unit.regeneration
+        unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
+    else
+        unit.max_input_energy = 0.0
+    end
 
     # calculate coefficients for freezing function 
     unit.sigma_lat = (unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature) / 5
     unit.t_lat = (unit.phase_change_upper_boundary_temperature + unit.phase_change_lower_boundary_temperature) / 2
-    unit.delta_lat = unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature
+    unit.delta_t_lat = unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature
 
     # set fluid start temperature
     unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe
@@ -355,7 +359,9 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     # vector to hold the results of the temperatures for each node in each simulation time step
     unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], n_nodes_y, n_nodes_x)
 
+    # temporary plots for validation
     # test_freezing_function(unit, sim_params)
+    # plot_mesh(unit.dx, unit.dy)
 end
 
 """ 
@@ -619,6 +625,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                                             unit.t2[h - 1, i + 1]) / 5
                 #! format: on
 
+                # TODO: acivate? adjust documentation appropriately
                 # unit.t2[h - 1, i] = unit.average_temperature_adjacent_to_pipe
                 # unit.t2[h + 1, i] = unit.average_temperature_adjacent_to_pipe
                 # unit.t2[h, i + 1] = unit.average_temperature_adjacent_to_pipe
@@ -633,7 +640,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
             for i in 1:(length(unit.dx))
                 # calculate temperature of adjacent nodes to fluid
                 if (h == unit.fluid_node_y_idx && i == 1) || unit.is_pipe_surrounding[h, i]
-                    # do nothing, because fuid temperature and surrounding nodes are already calculated before
+                    # do nothing, because fluid temperature and surrounding nodes are already calculated before
                     continue
                 elseif h == 1  # surface layer
                     #! format: off
@@ -725,18 +732,19 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector,
     min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
     max_temp = maximum(unit.temp_field_output)
     max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
-    zlims!(ax, min_temp, max_temp)
+    Makie.zlims!(ax, min_temp, max_temp)
 
     x_abs = [0; cumsum(unit.dx_mesh)]               # Absolute x coordinates
     y_abs = [unit.dy[1] / 2; cumsum(unit.dy_mesh)]  # Absolute y coordinates
 
+    ## activate for equal axis ratio
     # xlims!(ax, 0, max(x_abs[end], y_abs[end]))
     # ylims!(ax, 0, max(x_abs[end], y_abs[end]))
 
     time = Observable(1)
     surfdata = @lift(unit.temp_field_output[$time, :, :])
-    surface!(ax, y_abs, x_abs, surfdata)
-    scatter!(ax, y_abs, x_abs, surfdata)
+    GLMakie.surface!(ax, y_abs, x_abs, surfdata)
+    GLMakie.scatter!(ax, y_abs, x_abs, surfdata)
     slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
 
     on(slg.sliders[1].value) do v
@@ -746,10 +754,50 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector,
 end
 
 # TODO: remove later, only for validation
+function plot_mesh(x_widths, y_widths)
+    # Calculate x and y node positions based on cumulative widths
+    x_positions = cumsum([0; x_widths])
+    y_positions = cumsum([0; y_widths]) .* (-1)
+
+    # Set up the plot with the specified parameters
+    plt = plot(; title="Non-uniform mesh of the collector at\n\"normal\" accuracy (dx_min = 1 mm) ",
+               xlabel="horizontal dimension [m]",
+               ylabel="vertical dimension [m]",
+               legend=false,
+               linewidth=6,
+               gridlinewidth=1,
+               size=(900, 1200),
+               titlefontsize=28,
+               guidefontsize=24,
+               tickfontsize=24,
+               legendfontsize=24,
+               margin=15Plots.mm,
+               aspect_ratio=:equal)
+
+    # Draw vertical lines
+    for x in x_positions
+        Plots.plot!(plt, [x, x], [y_positions[1], y_positions[end]]; color=:black, linewidth=1)
+    end
+
+    # Draw horizontal lines
+    for y in y_positions
+        Plots.plot!(plt, [x_positions[1], x_positions[end]], [y, y]; color=:black, linewidth=1)
+    end
+
+    output_path = "./output"
+    fig_name = "collector_calculation_mesh"
+    savefig(output_path * "/" * fig_name * "." * "svg")
+
+    gui()
+    println("Press Enter to close figure...")
+    readline()
+end
+
+# TODO: remove later, only for validation
 function test_freezing_function(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    # Um 1000 kg Material von 5 auf -5 Grad abzukühlen, braucht es 27361 Wh bei
+    # In order to cool down 1000 kg of matieral from 5 to -5 °C, 27361 Wh are needed when
     # cp_liquid = cp_frozen = 850 J/(kgK) 
-    # h_schmelz = 90_000 J/kg
+    # h_fusion = 90_000 J/kg
     numer_of_timesteps = 500                    # [-]
     start_temp = 5.0                            # [°C]
     mass = 1000.0                               # [kg]
@@ -764,22 +812,26 @@ function test_freezing_function(unit::GeothermalHeatCollector, sim_params::Dict{
         push!(t_result, end_temp_correct)
     end
 
-    plot(0:numer_of_timesteps,
-         t_result;
-         title="Temperature during freezing \"$(unit.uac)\"",
-         xlabel="time [time step]",
-         ylabel="temperature [°C]",
-         legend=false,
-         linewidth=6,
-         gridlinewidth=1,
-         size=(1800, 1200),
-         titlefontsize=30,
-         guidefontsize=24,
-         tickfontsize=24,
-         legendfontsize=24,
-         grid=true,
-         minorgrid=true,
-         margin=15Plots.mm)
+    Plots.plot(0:numer_of_timesteps,
+               t_result;
+               title="Temperature decrease during freezing with constant demand",
+               xlabel="time [time step]",
+               ylabel="soil temperature [°C]",
+               legend=false,
+               linewidth=6,
+               gridlinewidth=1,
+               size=(1800, 1200),
+               titlefontsize=30,
+               guidefontsize=24,
+               tickfontsize=24,
+               legendfontsize=24,
+               grid=true,
+               minorgrid=true,
+               margin=15Plots.mm)
+
+    output_path = "./output"
+    fig_name = "collector_soil_freezing_temperature_constant_demand"
+    savefig(output_path * "/" * fig_name * "." * "svg")
 
     gui()
     println("Press Enter to close figure...")
@@ -811,7 +863,7 @@ function freezing(unit::GeothermalHeatCollector,
                    t_new_corrected +
                    coeff / (cp_freezing(t_new_corrected) + unit.soil_specific_heat_capacity_frozen +
                             (unit.soil_specific_heat_capacity - unit.soil_specific_heat_capacity_frozen) *
-                            (t_new_corrected - (unit.t_lat - unit.delta_lat / 2)) / unit.delta_lat)
+                            (t_new_corrected - (unit.t_lat - unit.delta_t_lat / 2)) / unit.delta_t_lat)
         end
     end
 
@@ -989,10 +1041,13 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_max !== nothing &&
+        if (exchange.temperature_min !== nothing &&
+            exchange.temperature_min > unit.current_input_temperature
+            ||
+            exchange.temperature_max !== nothing &&
             exchange.temperature_max < unit.current_input_temperature)
-            # we can only take in energy if it's at a higher/equal temperature than the
-            # tank's upper limit for temperatures
+            # we can only take energy if it's at a higher/equal temperature than the
+            # collector's current input temperature
             continue
         end
 
@@ -1010,13 +1065,14 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out, sim_params)
 end
 
-function balance_on(interface::SystemInterface,
-                    unit::GeothermalHeatCollector)::Vector{EnergyExchange}
+function balance_on(interface::SystemInterface, unit::GeothermalHeatCollector)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(; balance=interface.balance,
-                 energy_potential=caller_is_input ? -unit.max_input_energy : unit.max_output_energy,
+                 energy_potential=balance_written ? 0.0 :
+                                  (caller_is_input ? -unit.max_input_energy : unit.max_output_energy),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
