@@ -63,6 +63,7 @@ mutable struct GeothermalHeatCollector <: Component
     pipe_spacing::Float64
     considered_soil_depth::Float64
     accuracy_mode::String
+    model_type::String
     pipe_soil_thermal_resistance::Floathing
 
     global_radiation_power::Float64
@@ -105,6 +106,14 @@ mutable struct GeothermalHeatCollector <: Component
 
         ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
         global_radiation_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
+
+        # get model type from input file
+        model_type = default(config, "model_type", "simplified")
+        model_type_allowed_values = ["simplified", "detailed"]
+        if !(model_type in model_type_allowed_values)
+            @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
+            throw(InputError)
+        end
 
         return new(uac,                                                  # uac
                    Controller(default(config, "control_parameters", nothing)),
@@ -153,7 +162,9 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "pipe_spacing", 0.5),                 # distance between pipes of collector [m]
                    default(config, "considered_soil_depth", 10.0),       # depth of the soil considered in the simulation [m]
                    default(config, "accuracy_mode", "normal"),           # accuracy_mode. Has to be one of "very_rough", "rough", "normal", "high", "very_high"
-                   default(config, "pipe_soil_thermal_resistance", nothing), # thermal resistance in [(m K)/W]. If set, pipe_soil_thermal_resistance is constant! (Default: 0.1 (m K)/W)
+                   model_type,                                           # model_type. currently "simplified" with constant fluid-to-soil resistance and 
+                   #                                                       "detailed" with calculated fluid-to-soil resistance in every time step are available.
+                   default(config, "pipe_soil_thermal_resistance", 0.1), # thermal resistance in [(m K)/W], only for model_type = simplified
                    0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read in from weather-profile
                    5.67e-8,                                              # boltzmann_constant [W/(m^2 K^4)]: Stefan–Boltzmann-Constant
                    default(config, "surface_emissivity", 0.9),           # surface_emissivity [-]: emissivity on ground surface
@@ -542,10 +553,9 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         return (soil_heat_conductivity_1 + soil_heat_conductivity_2) / 2
     end
 
-    if unit.pipe_soil_thermal_resistance !== nothing
+    if unit.model_type == "simplified"
         pipe_thermal_resistance_length_specific = unit.pipe_soil_thermal_resistance
-    else
-
+    elseif unit.model_type == "detailed"
         # calculate heat transfer coefficient and thermal resistance
         alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)
 
@@ -1085,10 +1095,12 @@ function output_values(unit::GeothermalHeatCollector)::Vector{String}
     if unit.regeneration
         push!(output_vals, string(unit.m_heat_in) * " IN")
     end
+    if unit.model_type == "detailed"
+        push!(output_vals, "fluid_reynolds_number")
+    end
     append!(output_vals,
             [string(unit.m_heat_out) * " OUT",
              "fluid_temperature",
-             "fluid_reynolds_number",
              "ambient_temperature",
              "global_radiation_power"])
     # push!(output_vals, "TEMPERATURE_xNodeNum_yNodeNum")
