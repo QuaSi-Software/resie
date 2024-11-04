@@ -369,10 +369,6 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     # vector to hold the results of the temperatures for each node in each simulation time step
     unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], n_nodes_y, n_nodes_x)
-
-    # temporary plots for validation
-    # test_freezing_function(unit, sim_params)
-    # plot_mesh(unit.dx, unit.dy)
 end
 
 """ 
@@ -628,19 +624,19 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
 
                 unit.t2[h + 1, i + 1], unit.cp[h + 1, i + 1] = freezing(unit, unit.t1[h + 1, i + 1], unit.t2[h + 1, i + 1], unit.cp[h + 1, i + 1], sim_params)
 
-                unit.average_temperature_adjacent_to_pipe = (unit.t2[h - 1, i]     + 
-                                                            unit.t2[h + 1, i]     +
-                                                            unit.t2[h, i + 1]     +
-                                                            unit.t2[h + 1, i + 1] + 
-                                                            unit.t2[h - 1, i + 1]) / 5
-                #! format: on
+                unit.average_temperature_adjacent_to_pipe = (unit.t2[h - 1, i]     +
+                                                             unit.t2[h + 1, i]     +
+                                                             2 * unit.t2[h, i + 1]     +
+                                                             2 * unit.t2[h + 1, i + 1] +
+                                                             2 * unit.t2[h - 1, i + 1]) / 8
+                #! format: on 
 
                 # TODO: acivate? adjust documentation appropriately
-                # unit.t2[h - 1, i] = unit.average_temperature_adjacent_to_pipe
-                # unit.t2[h + 1, i] = unit.average_temperature_adjacent_to_pipe
-                # unit.t2[h, i + 1] = unit.average_temperature_adjacent_to_pipe
-                # unit.t2[h + 1, i + 1] = unit.average_temperature_adjacent_to_pipe
-                # unit.t2[h - 1, i + 1] = unit.average_temperature_adjacent_to_pipe
+                unit.t2[h - 1, i] = unit.average_temperature_adjacent_to_pipe
+                unit.t2[h + 1, i] = unit.average_temperature_adjacent_to_pipe
+                unit.t2[h, i + 1] = unit.average_temperature_adjacent_to_pipe
+                unit.t2[h + 1, i + 1] = unit.average_temperature_adjacent_to_pipe
+                unit.t2[h - 1, i + 1] = unit.average_temperature_adjacent_to_pipe
             end
         end
 
@@ -726,6 +722,48 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     end
 end
 
+function plot_optional_figures_begin(unit::GeothermalHeatCollector,
+                                     output_path::String,
+                                     output_formats::Vector{String},
+                                     sim_params::Dict{String,Any})
+    # plot mesh of geothermal collector
+    x_positions = cumsum([0; unit.dx])
+    y_positions = cumsum([0; unit.dy]) .* (-1)
+
+    plt = plot(;
+               title="Mesh of the collector at \"$(unit.accuracy_mode)\"\n" *
+                     "accuracy (dx_min = $(round(minimum(unit.dx)*100;digits=1)) mm) ",
+               xlabel="horizontal dimension [m]",
+               ylabel="vertical dimension [m]",
+               legend=false,
+               linewidth=6,
+               gridlinewidth=1,
+               size=(900, 1200),
+               titlefontsize=28,
+               guidefontsize=24,
+               tickfontsize=24,
+               legendfontsize=24,
+               margin=15Plots.mm,
+               aspect_ratio=:equal)
+
+    # Draw vertical lines
+    for x in x_positions
+        Plots.plot!(plt, [x, x], [y_positions[1], y_positions[end]]; color=:black, linewidth=1)
+    end
+
+    # Draw horizontal lines
+    for y in y_positions
+        Plots.plot!(plt, [x_positions[1], x_positions[end]], [y, y]; color=:black, linewidth=1)
+    end
+
+    fig_name = "collector_simulation_mesh_$(unit.uac)"
+    for output_format in output_formats
+        savefig(output_path * "/" * fig_name * "." * output_format)
+    end
+
+    return true
+end
+
 function plot_optional_figures_end(unit::GeothermalHeatCollector,
                                    sim_params::Dict{String,Any})
     # plot temperature field as 3D mesh with time-slider
@@ -761,91 +799,6 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector,
         time[] = v
     end
     wait(display(f))
-end
-
-# TODO: remove later, only for validation
-function plot_mesh(x_widths, y_widths)
-    # Calculate x and y node positions based on cumulative widths
-    x_positions = cumsum([0; x_widths])
-    y_positions = cumsum([0; y_widths]) .* (-1)
-
-    # Set up the plot with the specified parameters
-    plt = plot(; title="Non-uniform mesh of the collector at\n\"normal\" accuracy (dx_min = 1 mm) ",
-               xlabel="horizontal dimension [m]",
-               ylabel="vertical dimension [m]",
-               legend=false,
-               linewidth=6,
-               gridlinewidth=1,
-               size=(900, 1200),
-               titlefontsize=28,
-               guidefontsize=24,
-               tickfontsize=24,
-               legendfontsize=24,
-               margin=15Plots.mm,
-               aspect_ratio=:equal)
-
-    # Draw vertical lines
-    for x in x_positions
-        Plots.plot!(plt, [x, x], [y_positions[1], y_positions[end]]; color=:black, linewidth=1)
-    end
-
-    # Draw horizontal lines
-    for y in y_positions
-        Plots.plot!(plt, [x_positions[1], x_positions[end]], [y, y]; color=:black, linewidth=1)
-    end
-
-    output_path = "./output"
-    fig_name = "collector_calculation_mesh"
-    savefig(output_path * "/" * fig_name * "." * "svg")
-
-    gui()
-    println("Press Enter to close figure...")
-    readline()
-end
-
-# TODO: remove later, only for validation
-function test_freezing_function(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
-    # In order to cool down 1000 kg of matieral from 5 to -5 °C, 27361 Wh are needed when
-    # cp_liquid = cp_frozen = 850 J/(kgK) 
-    # h_fusion = 90_000 J/kg
-    numer_of_timesteps = 500                    # [-]
-    start_temp = 5.0                            # [°C]
-    mass = 1000.0                               # [kg]
-    energy_out = 27361.0 / numer_of_timesteps   # [Wh]  to reach -5°C
-    cp = unit.soil_specific_heat_capacity       # [J/kgK]
-
-    t_result = [start_temp]
-    for n in 1:numer_of_timesteps
-        start_temp = t_result[n]
-        end_temp = start_temp - energy_out / (mass * cp / 3600)
-        end_temp_correct, cp = freezing(unit, start_temp, end_temp, cp, sim_params)
-        push!(t_result, end_temp_correct)
-    end
-
-    Plots.plot(0:numer_of_timesteps,
-               t_result;
-               title="Temperature decrease during freezing with constant demand",
-               xlabel="time [time step]",
-               ylabel="soil temperature [°C]",
-               legend=false,
-               linewidth=6,
-               gridlinewidth=1,
-               size=(1800, 1200),
-               titlefontsize=30,
-               guidefontsize=24,
-               tickfontsize=24,
-               legendfontsize=24,
-               grid=true,
-               minorgrid=true,
-               margin=15Plots.mm)
-
-    output_path = "./output"
-    fig_name = "collector_soil_freezing_temperature_constant_demand"
-    savefig(output_path * "/" * fig_name * "." * "svg")
-
-    gui()
-    println("Press Enter to close figure...")
-    readline()
 end
 
 # function to handle freezing of the soil. Corrects the new temperature to include the enthalpy of fusion
