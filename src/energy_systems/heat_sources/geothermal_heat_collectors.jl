@@ -19,7 +19,8 @@ mutable struct GeothermalHeatCollector <: Component
     ambient_temperature_profile::Union{Profile,Nothing}
     global_radiation_profile::Union{Profile,Nothing}
     unloading_temperature_spread::Temperature
-    loading_temperature::Temperature
+    fluid_min_output_temperature::Temperature
+    fluid_max_input_temperature::Temperature
     loading_temperature_spread::Temperature
 
     max_output_power::Union{Nothing,Float64}
@@ -87,8 +88,11 @@ mutable struct GeothermalHeatCollector <: Component
     fluid_density::Float64
     fluid_kinematic_viscosity::Float64
     fluid_heat_conductivity::Float64
+    use_dynamic_fluid_properties::Bool
+    nusselt_approach::String
 
     fluid_reynolds_number::Float64
+    alpha_fluid_pipe::Float64
     average_temperature_adjacent_to_pipe::Float64
     undisturbed_ground_temperature::Float64
 
@@ -124,9 +128,10 @@ mutable struct GeothermalHeatCollector <: Component
                    m_heat_out,                                           # medium name of output interface
                    ambient_temperature_profile,                          # [°C] ambient temperature profile
                    global_radiation_profile,                             # [Wh/m^2]
-                   default(config, "unloading_temperature_spread", 3.0), # temperature spread between forward and return flow during unloading            
-                   default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal heat collector storage, can also be set from other end of interface TODO not included yet
-                   default(config, "loading_temperature_spread", 3.0),   # temperature spread between forward and return flow during loading         
+                   default(config, "unloading_temperature_spread", 3.0), # [K] temperature spread between forward and return flow during unloading            
+                   default(config, "fluid_min_output_temperature", nothing),   # [°C] minimum output temperature of the fluid for unloading
+                   default(config, "fluid_max_input_temperature", nothing),    # [°C] maximum input temperature of the fluid for loading
+                   default(config, "loading_temperature_spread", 3.0),   # [K] temperature spread between forward and return flow during loading         
                    default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "regeneration", true),                # flag if regeneration should be taken into account
@@ -182,7 +187,10 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "fluid_density", 1045),               # fluid density [kg/m^3], preset for 30 % glycol at 0 °C
                    default(config, "fluid_kinematic_viscosity", 3.9e-6), # fluid_kinematic_viscosity [m^2/s], preset fo 30 % glycol at 0 °C
                    default(config, "fluid_heat_conductivity", 0.5),      # fluid_heat_conductivity [W/(mK)], preset fo 30 % glycol at 0 °C
+                   default(config, "use_dynamic_fluid_properties", true),# use_dynamic_fluid_properties [bool], false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
+                   default(config, "nusselt_approach", "Stephan"),       # Approach used for the caluclation of the Nußelt number, can be one of: Stephan, Ramming
                    0.0,                                                  # fluid_reynolds_number, to be calculated in function.
+                   0.0,                                                  # alpha_fluid_pipe: convective heat transfer coefficient between fluid and pipe
                    default(config, "start_temperature_fluid_and_pipe", 15.5),  # average_temperature_adjacent_to_pipe [°C], used as starting temperature of fluid and soil near pipe during initialisation
                    default(config, "undisturbed_ground_temperature", 9.0),     # undisturbed ground temperature at the bottom of the simulation boundary [°C]
                    Array{Float64}(undef, 0, 0, 0),                       # temp_field_output [°C], holds temperature field of nodes for output plot
@@ -504,6 +512,7 @@ function control(unit::GeothermalHeatCollector,
     unit.global_radiation_power = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params)) # from Wh/m^2 to W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
+    unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
                      nothing,
                      unit.current_output_temperature)
@@ -513,6 +522,7 @@ function control(unit::GeothermalHeatCollector,
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread / 2
+        unit.current_input_temperature = lowest(unit.fluid_max_input_temperature, unit.current_input_temperature)
         set_temperature!(unit.input_interfaces[unit.m_heat_in],
                          unit.current_input_temperature,
                          nothing)
@@ -553,12 +563,12 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         pipe_thermal_resistance_length_specific = unit.pipe_soil_thermal_resistance
     elseif unit.model_type == "detailed"
         # calculate heat transfer coefficient and thermal resistance
-        alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)
+        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)
 
         # calculation of pipe_thermal_resistance_length_specific with the approach by TRNSYS Type 710 publication
-        k = 1 / ((unit.pipe_d_o / (alpha_fluid * unit.pipe_d_i) +
+        k = 1 / ((unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
                   (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2 * unit.pipe_heat_conductivity) +
-                  unit.dx_mesh[1] /
+                  unit.dx_mesh[2] /
                   (2 * determine_soil_heat_conductivity(unit.fluid_node_y_idx, 2, unit.fluid_node_y_idx, 2))))
 
         pipe_thermal_resistance_length_specific = 1 / (k * pi * unit.pipe_d_o)
@@ -631,7 +641,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                                              2 * unit.t2[h - 1, i + 1]) / 8
                 #! format: on 
 
-                # TODO: acivate? adjust documentation appropriately
+                # average temperature of the nodes around the pipe
                 unit.t2[h - 1, i] = unit.average_temperature_adjacent_to_pipe
                 unit.t2[h + 1, i] = unit.average_temperature_adjacent_to_pipe
                 unit.t2[h, i + 1] = unit.average_temperature_adjacent_to_pipe
@@ -808,25 +818,25 @@ function freezing(unit::GeothermalHeatCollector,
                   t_new::Float64,
                   cp::Float64,
                   sim_params::Dict{String,Any})
-    function f(t_new_corrected)
-        function cp_freezing(t_new_corrected)
+    function f(t_new_correct)
+        function cp_freezing(t_new_correct)
             return (unit.soil_specific_enthalpy_of_fusion / (unit.sigma_lat * sqrt(2 * pi)) *
-                    exp(-0.5 * (t_new_corrected - unit.t_lat)^2 / unit.sigma_lat^2))
+                    exp(-0.5 * (t_new_correct - unit.t_lat)^2 / unit.sigma_lat^2))
         end
-        if t_new_corrected > unit.phase_change_upper_boundary_temperature
+        if t_new_correct > unit.phase_change_upper_boundary_temperature
             return t_old -
-                   t_new_corrected +
-                   coeff / (cp_freezing(t_new_corrected) + unit.soil_specific_heat_capacity)
-        elseif t_new_corrected < unit.phase_change_lower_boundary_temperature
+                   t_new_correct +
+                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity)
+        elseif t_new_correct < unit.phase_change_lower_boundary_temperature
             return t_old -
-                   t_new_corrected +
-                   coeff / (cp_freezing(t_new_corrected) + unit.soil_specific_heat_capacity_frozen)
+                   t_new_correct +
+                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity_frozen)
         else
             return t_old -
-                   t_new_corrected +
-                   coeff / (cp_freezing(t_new_corrected) + unit.soil_specific_heat_capacity_frozen +
+                   t_new_correct +
+                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity_frozen +
                             (unit.soil_specific_heat_capacity - unit.soil_specific_heat_capacity_frozen) *
-                            (t_new_corrected - (unit.t_lat - unit.delta_t_lat / 2)) / unit.delta_t_lat)
+                            (t_new_correct - (unit.t_lat - unit.delta_t_lat / 2)) / unit.delta_t_lat)
         end
     end
 
@@ -838,11 +848,17 @@ function freezing(unit::GeothermalHeatCollector,
         coeff = (t_new - t_old) * cp
         t_new_corrected = 0.0
         try
-            t_new_corrected = find_zero(f, cp)
+            t_new_corrected = find_zero(f, unit.t_lat)
         catch e
-            @error "The solving algorithm for the phase change process in the geothermal collector $(unit.uac) was not successful. " *
-                   "Manually decrease the internal time step which is currently $(unit.dt) s or change the accuracy_mode."
-            throw(CalculationError)
+            @warn "Initial solving of freezing function of the geothermal collector $(unit.uac) with strict tolerance " *
+                  "failed, retrying with rougher tolerance for the current time step..."
+            try
+                t_new_corrected = find_zero(f, t_new; tol=1e-4)
+            catch e2
+                @error "The solving algorithm for the phase change process in the geothermal collector $(unit.uac) was not successful. " *
+                       "Manually decrease the \"internal_time_step\" which is currently $(unit.dt) s or change the accuracy_mode."
+                throw(CalculationError)
+            end
         end
         cp_corrected = coeff / (t_new_corrected - t_old)
         return t_new_corrected, cp_corrected
@@ -862,8 +878,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe /
                                    (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
 
-    use_dynamic_fluid_properties = true
-    if use_dynamic_fluid_properties
+    if unit.use_dynamic_fluid_properties
         # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, 
         # adapted from TRNSYS Type 710:
         fluid_dynamic_viscosity = 0.0000017158 * unit.fluid_temperature^2 -
@@ -895,9 +910,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
 end
 
 function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
-    approach = :stephan  # can be one of :ramming or :stephan
-
-    if approach == :ramming
+    if unit.nusselt_approach == "Ramming"
         # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der
         # Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
         k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
@@ -907,7 +920,7 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
         nusselt_laminar = ((k_a / (1 - k_n) *
                             (unit.fluid_prandtl_number * unit.pipe_d_i * fluid_reynolds_number / unit.pipe_length)^k_n)^3 +
                            4.364^3)^(1 / 3)
-    elseif approach == :stephan
+    elseif unit.nusselt_approach == "Stephan"
         # Stephan
         pr_water = 13.44                # Pr Number Water 0 °C as reference
         nusselt_laminar = 3.66 +
@@ -917,6 +930,9 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
                            0.1 * unit.fluid_prandtl_number *
                            (fluid_reynolds_number * unit.pipe_d_i / unit.pipe_length)^0.83) *
                           (unit.fluid_prandtl_number / pr_water)^0.1
+    else
+        @error "In geothermal collector $(unit.uac), the nusselt_approach has to be one of: Ramming, Stephan."
+        throw(InputError)
     end
     return nusselt_laminar
 end
@@ -1050,6 +1066,7 @@ function output_values(unit::GeothermalHeatCollector)::Vector{String}
     end
     if unit.model_type == "detailed"
         push!(output_vals, "fluid_reynolds_number")
+        push!(output_vals, "alpha_fluid_pipe")
     end
     append!(output_vals,
             [string(unit.m_heat_out) * " OUT",
@@ -1085,6 +1102,8 @@ function output_value(unit::GeothermalHeatCollector, key::OutputKey)::Float64
         return unit.ambient_temperature
     elseif key.value_key == "global_radiation_power"
         return unit.global_radiation_power
+    elseif key.value_key == "alpha_fluid_pipe"
+        return unit.alpha_fluid_pipe
     end
     throw(KeyError(key.value_key))
 end
