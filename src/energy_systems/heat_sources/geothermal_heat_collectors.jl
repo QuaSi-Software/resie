@@ -187,7 +187,7 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "fluid_density", 1045),               # fluid density [kg/m^3], preset for 30 % glycol at 0 °C
                    default(config, "fluid_kinematic_viscosity", 3.9e-6), # fluid_kinematic_viscosity [m^2/s], preset fo 30 % glycol at 0 °C
                    default(config, "fluid_heat_conductivity", 0.5),      # fluid_heat_conductivity [W/(mK)], preset fo 30 % glycol at 0 °C
-                   default(config, "use_dynamic_fluid_properties", true),# use_dynamic_fluid_properties [bool], false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
+                   default(config, "use_dynamic_fluid_properties", false),# use_dynamic_fluid_properties [bool], false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
                    default(config, "nusselt_approach", "Stephan"),       # Approach used for the caluclation of the Nußelt number, can be one of: Stephan, Ramming
                    0.0,                                                  # fluid_reynolds_number, to be calculated in function.
                    0.0,                                                  # alpha_fluid_pipe: convective heat transfer coefficient between fluid and pipe
@@ -929,7 +929,7 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
                           (1 +
                            0.1 * unit.fluid_prandtl_number *
                            (fluid_reynolds_number * unit.pipe_d_i / unit.pipe_length)^0.83) *
-                          (unit.fluid_prandtl_number / pr_water)^0.1
+                          (unit.fluid_prandtl_number / pr_water)^0.11
     else
         @error "In geothermal collector $(unit.uac), the nusselt_approach has to be one of: Ramming, Stephan."
         throw(InputError)
