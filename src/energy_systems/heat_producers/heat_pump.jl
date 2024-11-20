@@ -45,6 +45,8 @@ mutable struct HeatPump <: Component
     mix_temp_input::Float64
     mix_temp_output::Float64
 
+    components::Grouping
+
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -99,7 +101,8 @@ mutable struct HeatPump <: Component
                    default(config, "input_temperature", nothing),
                    0.0, # cop
                    0.0, # mixing temperature in the input interface
-                   0.0) # mixing temperature in the output interface
+                   0.0, # mixing temperature in the output interface
+                   Grouping())
     end
 end
 
@@ -326,6 +329,10 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
                          unit.input_temperature,
                          unit.input_temperature)
     end
+
+    # link components to heat pump to be able to access them later
+    # This is only a workaround until a better way has been implemented TODO
+    unit.components = components
 end
 
 function set_max_energies!(unit::HeatPump,
@@ -853,9 +860,22 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
     # there are three different cases of how to handle the layered approach of operating the
     # heat pump, depending on wether or not the input or output heat has infinite values. if
-    # both have infinite values the calculation cannot be resolved.
-    energies.heat_in_has_inf_energy = any(isinf, energies.potentials_energies_heat_in)
-    energies.heat_out_has_inf_energy = any(isinf, energies.potentials_energies_heat_out)
+    # both have infinite values of a connected transformer, the calculation cannot be resolved.
+    potentials_energies_heat_in_transformer_only = []
+    for (idx, uac) in enumerate(energies.in_uacs)
+        if uac !== nothing && unit.components[uac].sys_function === EnergySystems.sf_transformer
+            push!(potentials_energies_heat_in_transformer_only, energies.potentials_energies_heat_in[idx])
+        end
+    end
+    potentials_energies_heat_out_transformer_only = []
+    for (idx, uac) in enumerate(energies.out_uacs)
+        if uac !== nothing && unit.components[uac].sys_function === EnergySystems.sf_transformer
+            push!(potentials_energies_heat_out_transformer_only, energies.potentials_energies_heat_out[idx])
+        end
+    end
+
+    energies.heat_in_has_inf_energy = any(isinf, potentials_energies_heat_in_transformer_only)
+    energies.heat_out_has_inf_energy = any(isinf, potentials_energies_heat_out_transformer_only)
 
     if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
         @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and " *
