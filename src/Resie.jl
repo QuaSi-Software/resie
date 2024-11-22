@@ -100,10 +100,6 @@ Construct and prepare parameters, energy system components and the order of oper
 function prepare_inputs(project_config::Dict{AbstractString,Any})
     sim_params = get_simulation_params(project_config)
 
-    # this sets a global variable in the EnergySystems module, which is required for a
-    # utility function to work properly
-    EnergySystems.set_timestep(sim_params["time_step_seconds"])
-
     components = load_components(project_config["components"], sim_params)
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0

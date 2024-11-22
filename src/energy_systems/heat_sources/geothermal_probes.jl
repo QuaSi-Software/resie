@@ -702,7 +702,7 @@ function control(unit::GeothermalProbes,
     # calculate the minimal temperature in the probe field that could occur in the current time step.
     unit.energy_in_out_per_probe_meter[unit.time_index] = -unit.max_output_energy /
                                                           (unit.probe_depth * unit.number_of_probes)
-    current_min_fluid_temperature = calculate_new_fluid_temperature(unit)
+    current_min_fluid_temperature = calculate_new_fluid_temperature(unit, sim_params["wh_to_watts"])
     unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0
 
     if desired_output_temperature !== nothing &&
@@ -710,7 +710,8 @@ function control(unit::GeothermalProbes,
         try
             max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_output_energy(energy_in_out_per_probe_meter,
                                                                                                                    unit,
-                                                                                                                   desired_output_temperature)),
+                                                                                                                   desired_output_temperature,
+                                                                                                                   sim_params["wh_to_watts"])),
                                                           -unit.max_output_energy /
                                                           (unit.probe_depth * unit.number_of_probes),
                                                           Order0();
@@ -759,6 +760,7 @@ Args:
     energy_in_out_per_probe_meter::Float64:   the energy input (positve) or output (negative) of the probe field (per probe meter!)        
     unit::GeothermalProbes :                  the unit struct of the geothermal probe with all its parameters
     desired_output_temperature::Float64       the desired temperature of the fluid temperature at the probe field output
+    wh2w::Function:                           function to convert work to power
 Returns:
     temperature_difference::Float64:          the temperature difference between the new fluid output temperature of the
                                               geothermal probe field after applying energy_in_out_per_probe_meter and the 
@@ -766,12 +768,13 @@ Returns:
 """
 function find_max_output_energy(energy_in_out_per_probe_meter::Float64,
                                 unit::GeothermalProbes,
-                                desired_output_temperature::Float64)
+                                desired_output_temperature::Float64,
+                                wh2w::Function)
     # set energy_in_out_per_probe_meter to given energy_in_out_per_probe_meter to as vehicle 
     # to deliver the information to calculate_new_fluid_temperature(unit)
     unit.energy_in_out_per_probe_meter[unit.time_index] = energy_in_out_per_probe_meter
 
-    new_fluid_temperature = calculate_new_fluid_temperature(unit)
+    new_fluid_temperature = calculate_new_fluid_temperature(unit, wh2w)
 
     # reset energy_in_out_per_probe_meter.
     unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0
@@ -795,15 +798,16 @@ Hellström, G. Ground Heat Storage [online]. Thermal Analyses of Duct Storage Sy
 
 Args:
     unit::GeothermalProbes:         the unit struct of the geothermal probe with all its parameters
+    wh2w::Function:                 function to convert work to power
 Returns:
     fluid_temperature::Float64:     the new average temperature of the fluid in the geothermal probe after an energy in- or output 
                                     stored in unit.energy_in_out_per_probe_meter
 """
-function calculate_new_fluid_temperature(unit::GeothermalProbes)
+function calculate_new_fluid_temperature(unit::GeothermalProbes, wh2w::Function)
     if unit.model_type == "detailed"
         # R_B with Hellström (thermal borehole resistance)
         # calculate convective heat transfer coefficient alpha in pipe
-        alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes)
+        alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit::GeothermalProbes, wh2w)
 
         # calculate effective thermal borehole resistance by multipole method (Hellström 1991) depending on alpha
         sigma = (unit.grout_heat_conductivity - unit.soil_heat_conductivity) /
@@ -831,9 +835,9 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes)
 
     # calculate new average fluid temperature with g-function approach
     if unit.time_index == 1
-        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index])
+        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh2w(unit.energy_in_out_per_probe_meter[unit.time_index])
     else
-        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index] -
+        unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh2w(unit.energy_in_out_per_probe_meter[unit.time_index] -
                                                                                     unit.energy_in_out_per_probe_meter[unit.time_index - 1])
     end
 
@@ -843,7 +847,7 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes)
     borehole_current_wall_temperature = unit.soil_undisturbed_ground_temperature + current_temperature_difference
 
     fluid_temperature = borehole_current_wall_temperature +
-                        wh_to_watts(unit.energy_in_out_per_probe_meter[unit.time_index]) * borehole_thermal_resistance
+                        wh2w(unit.energy_in_out_per_probe_meter[unit.time_index]) * borehole_thermal_resistance
     return fluid_temperature
 end
 
@@ -856,13 +860,14 @@ the Reynolds number, the Nusselt number for laminar or turbulent flow and finall
 
 Args:
     unit::GeothermalProbes:         the unit struct of the geothermal probe with all its parameters
+    wh2w::Function:                 function to convert work to power
 Returns:
     alpha::Float64:                 convective heat transfer coefficient in pipe in current time step
     fluid_reynolds_number::Float64  the current Reynolds number of the fluid in the pipe
 """
-function calculate_alpha_pipe(unit::GeothermalProbes)
+function calculate_alpha_pipe(unit::GeothermalProbes, wh2w::Function)
     # calculate mass flow in pipe
-    power_in_out_per_pipe = wh_to_watts(abs(unit.energy_in_out_per_probe_meter[unit.time_index])) * unit.probe_depth /
+    power_in_out_per_pipe = wh2w(abs(unit.energy_in_out_per_probe_meter[unit.time_index])) * unit.probe_depth /
                             unit.probe_type  # W/pipe
     temperature_spread = unit.energy_in_out_per_probe_meter[unit.time_index] > 0 ? unit.loading_temperature_spread :
                          unit.unloading_temperature_spread
@@ -992,7 +997,7 @@ end
 
 function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     if !unit.regeneration
-        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
+        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
         return
     end
     inface = unit.input_interfaces[unit.m_heat_in]
@@ -1003,7 +1008,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
+        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
         return
     end
 
@@ -1039,7 +1044,7 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
 
     # recalculate borehole temperature for next timestep
-    unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes)
+    unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
 end
 
 function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{EnergyExchange}

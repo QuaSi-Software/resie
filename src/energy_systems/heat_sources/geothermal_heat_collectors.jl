@@ -282,7 +282,7 @@ function control(
     # get ambient temperature and global radiation from profile for current time step if needed (probably only for geothermal collectors)
     # TODO: add link to global weather file
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-    unit.global_radiation = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params))  # from Wh/m^2 to W/m^2
+    unit.global_radiation = sim_params["wh_to_watts"](Profiles.value_at_time(unit.global_radiation_profile, sim_params))  # from Wh/m^2 to W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread/2
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
@@ -308,7 +308,7 @@ end
 function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64)
     
     # calculate heat transfer coefficient and thermal resistance
-    alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)   
+    alpha_fluid, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out, sim_params["wh_to_watts"])   
 
     # calculation of pipe_thermal_resistance_length_specific with the approach by type 710 publication
     pipe_thermal_resistance_length_specific = (4 / pi * 
@@ -323,7 +323,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         for i =1:2  
             if unit.fluid[h,i] == 1         
                 # calculate specific heat extraction for 1 pipe per length
-                specific_heat_flux_pipe = (wh_to_watts(q_in_out) / (unit.pipe_length*unit.number_of_pipes))
+                specific_heat_flux_pipe = (sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length*unit.number_of_pipes))
                 unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe + pipe_thermal_resistance_length_specific * specific_heat_flux_pipe     # "+", because specific_heat_flux_pipe is negative during heat extraction.        
                     
                 unit.t2[h,i] = unit.fluid_temperature
@@ -332,7 +332,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                           (unit.dy[h-2]/2+unit.dy[h-1]+unit.dy[h]+unit.dy[h+1]/2) -    # total y-Direction
                                           (pi*unit.dy[h]^2/2))*unit.dz                                 # 1/2 Area pipe.          
                 
-                q_in_out_surrounding = wh_to_watts(q_in_out) / (unit.number_of_pipes)
+                q_in_out_surrounding = sim_params["wh_to_watts"](q_in_out) / (unit.number_of_pipes)
                 
                 # upper node               
                 unit.t2[h-1,i] = unit.t1[h-1,i] +      
@@ -525,10 +525,10 @@ function freezing(unit::GeothermalHeatCollector,t2_in, phase_change_state_in)
 end 
 
 # function to calculate heat transfer coefficient alpha.
-function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
+function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64, wh2w::Function)
 
     # calculate mass flow in pipe
-    collector_power_in_out_per_pipe = wh_to_watts(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
+    collector_power_in_out_per_pipe = wh2w(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
     temperature_spread = q_in_out > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe / (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
 
