@@ -28,6 +28,9 @@ using Interpolations
 using JSON
 using Dates
 
+const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
+const SECONDS_PER_HOUR::Float64 = 3600.0
+
 """
     get_simulation_params(project_config)
 
@@ -52,6 +55,15 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
     )
+
+    # add helper functions to convert power to work and vice-versa. this uses the time step
+    # of the simulation as the duration required for the conversion.
+    sim_params["watt_to_wh"] = function (watts::Float64)
+        return watts * time_step * HOURS_PER_SECOND
+    end
+    sim_params["wh_to_watts"] = function (wh::Float64)
+        return wh * time_step * SECONDS_PER_HOUR
+    end
 
     weather_file_path = default(project_config["simulation_parameters"],
                                 "weather_file_path",
