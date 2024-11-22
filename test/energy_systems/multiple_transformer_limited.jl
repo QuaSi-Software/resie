@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function test_multiple_transformer_with_limitations()
     components_config = Dict{String,Any}(

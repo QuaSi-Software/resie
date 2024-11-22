@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../../test_util.jl")
 
 function test_many_to_many()
     components_config = Dict{String,Any}(

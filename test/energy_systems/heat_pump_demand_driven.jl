@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function test_heat_pump_demand_driven_correct_order()
     components_config = Dict{String,Any}(
