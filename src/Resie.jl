@@ -27,9 +27,28 @@ using Colors
 using Interpolations
 using JSON
 using Dates
+using UUIDs
 
 const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
+
+"""
+Contains the parameters, instantiated components and the order of operations for a simulation run.
+
+In short, it bundles all the data required to perform a simulation from start to finish.
+Through its fields it contains a lot of complexity in terms of hierarchical data structures.
+However the struct should not be used as argument for complex calculations. Instead it is
+mainly used for indexing the various sub data structures.
+"""
+mutable struct SimulationRun
+    parameters::Dict{String,Any}
+    components::Grouping
+    order_of_operations::StepInstructions
+end
+
+# these variables should be the only global state in the package and contain the state for
+# ongoing or paused simulation runs
+current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
 
 """
     get_simulation_params(project_config)
@@ -250,6 +269,10 @@ function load_and_run(filepath::String)
     end
 
     sim_params, components, step_order = prepare_inputs(project_config)
+    run_ID = uuid1()
+    sim_params["run_ID"] = run_ID
+    current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+
     run_simulation_loop(project_config, sim_params, components, step_order)
 end
 

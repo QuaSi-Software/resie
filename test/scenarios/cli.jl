@@ -24,6 +24,7 @@ might take a while.
 include("../../src/resie_logger.jl")
 using .Resie_Logger
 using Resie
+using UUIDs
 
 KNOWN_COMMANDS = Set(["generate_output",
                       "set_reference",
@@ -172,6 +173,9 @@ function generate_output(name::String, subdir::String)
         && components !== nothing
         && step_order !== nothing)
         # end of condition
+        run_ID = uuid1()
+        sim_params["run_ID"] = run_ID
+        Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, components, step_order)
         Resie.run_simulation_loop(project_config, sim_params, components, step_order)
         print("|  ✓  ")
     else
