@@ -202,9 +202,10 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.g_function, unit.number_of_probes, unit.probe_coordinates = calculate_g_function(unit, sim_params)
 
     # calculate max energies
-    unit.max_output_energy = watt_to_wh(unit.max_output_power * unit.probe_depth * unit.number_of_probes)
+    unit.max_output_energy = sim_params["watt_to_wh"](unit.max_output_power * unit.probe_depth * unit.number_of_probes)
     if unit.regeneration
-        unit.max_input_energy = watt_to_wh(unit.max_input_power * unit.probe_depth * unit.number_of_probes)
+        unit.max_input_energy = sim_params["watt_to_wh"](unit.max_input_power * unit.probe_depth *
+                                                         unit.number_of_probes)
     end
 end
 
@@ -838,7 +839,7 @@ function calculate_new_fluid_temperature(unit::GeothermalProbes, wh2w::Function)
         unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh2w(unit.energy_in_out_per_probe_meter[unit.time_index])
     else
         unit.power_in_out_difference_per_probe_meter[unit.time_index] = wh2w(unit.energy_in_out_per_probe_meter[unit.time_index] -
-                                                                                    unit.energy_in_out_per_probe_meter[unit.time_index - 1])
+                                                                             unit.energy_in_out_per_probe_meter[unit.time_index - 1])
     end
 
     current_temperature_difference = sum(reverse(unit.power_in_out_difference_per_probe_meter[1:(unit.time_index)]) .*
