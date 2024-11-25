@@ -1,5 +1,43 @@
 module Resie
 
+using UUIDs
+
+"""
+Contains the parameters, instantiated components and the order of operations for a simulation run.
+
+In short, it bundles all the data required to perform a simulation from start to finish.
+Through its fields it contains a lot of complexity in terms of hierarchical data structures.
+However the struct should not be used as argument for complex calculations. Instead it is
+intended to be used for the run registry only.
+
+Because the types used to represent the field are defined in modules that depend upon the
+definition of the struct in the first place, the fields are defined with the generic 'Any'
+type.
+"""
+mutable struct SimulationRun
+    parameters::Dict{String,Any}
+    components::Dict{String,Any}
+    order_of_operations::Vector{Any}
+end
+
+# this registry should be the only global state in the package and contains the state for
+# ongoing or paused simulation runs
+current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
+
+"""
+    get_run(id)
+
+Get the simulation run container for the given ID.
+
+# Args
+- `id::UUID`: The ID of the run
+# Returns
+- `SimulationRun`: The simulation run container
+"""
+function get_run(id::UUID)::SimulationRun
+    return current_runs[id]
+end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -27,28 +65,9 @@ using Colors
 using Interpolations
 using JSON
 using Dates
-using UUIDs
 
 const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
 const SECONDS_PER_HOUR::Float64 = 3600.0
-
-"""
-Contains the parameters, instantiated components and the order of operations for a simulation run.
-
-In short, it bundles all the data required to perform a simulation from start to finish.
-Through its fields it contains a lot of complexity in terms of hierarchical data structures.
-However the struct should not be used as argument for complex calculations. Instead it is
-mainly used for indexing the various sub data structures.
-"""
-mutable struct SimulationRun
-    parameters::Dict{String,Any}
-    components::Grouping
-    order_of_operations::StepInstructions
-end
-
-# these variables should be the only global state in the package and contain the state for
-# ongoing or paused simulation runs
-current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
 
 """
     get_simulation_params(project_config)
