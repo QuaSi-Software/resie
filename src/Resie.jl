@@ -62,7 +62,7 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         return watts * time_step * HOURS_PER_SECOND
     end
     sim_params["wh_to_watts"] = function (wh::Float64)
-        return wh * time_step * SECONDS_PER_HOUR
+        return wh * SECONDS_PER_HOUR / time_step
     end
 
     weather_file_path = default(project_config["simulation_parameters"],
