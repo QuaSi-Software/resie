@@ -87,5 +87,11 @@ function get_default_sim_params()::Dict{String,Any}
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.25
+        end,
+        "wh_to_watts" => function (w)
+            return w * 4.0
+        end,
     )
 end

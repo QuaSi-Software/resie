@@ -205,7 +205,10 @@ function calculate_energies_heatpump(unit::HeatPump,
     while (sum(available_el_in; init=0.0) > sim_params["epsilon"]
            && sum(available_heat_in; init=0.0) > sim_params["epsilon"]
            && sum(available_heat_out; init=0.0) > sim_params["epsilon"]
-           && max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0) > sim_params["epsilon"])
+           &&
+           max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
+           -
+           sum(layers_heat_out; init=0.0) > sim_params["epsilon"])
         # find first non-zero index
         while available_heat_in[current_in_idx] <= sim_params["epsilon"]
             current_in_idx += 1
@@ -267,7 +270,9 @@ function calculate_energies_heatpump(unit::HeatPump,
             # bypass only if no constant cop is given
             heat_transfer = minimum([available_heat_in[current_in_idx],
                                      available_heat_out[current_out_idx],
-                                     max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0)])
+                                     max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
+                                     -
+                                     sum(layers_heat_out; init=0.0)])
             used_heat_in = heat_transfer
             used_heat_out = heat_transfer
             # The el. energy can not be zero as this would lead to problems in process step
@@ -295,7 +300,9 @@ function calculate_energies_heatpump(unit::HeatPump,
 
             # check heat out as limiter, also checking for limit of heat pump
             max_heat_out = min(available_heat_out[current_out_idx],
-                               max_usage_fraction * watt_to_wh(unit.power_th) - sum(layers_heat_out; init=0.0))
+                               max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
+                               -
+                               sum(layers_heat_out; init=0.0))
             if used_heat_out > max_heat_out
                 used_heat_out = max_heat_out
                 used_el_in = used_heat_out / cop
@@ -532,7 +539,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
     # if all chosen heat layers combined are not enough to meet minimum power fraction,
     # the heat pump doesn't run at all
-    usage_fraction = (sum(layers_heat_out; init=0.0)) / watt_to_wh(unit.power_th)
+    usage_fraction = (sum(layers_heat_out; init=0.0)) / sim_params["watt_to_wh"](unit.power_th)
     if usage_fraction < unit.min_power_fraction
         return false, (nothing, nothing, nothing)
     end

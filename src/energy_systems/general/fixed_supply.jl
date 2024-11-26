@@ -64,7 +64,7 @@ function control(unit::FixedSupply,
     update(unit.controller)
 
     if unit.constant_supply !== nothing
-        unit.supply = watt_to_wh(unit.constant_supply)
+        unit.supply = sim_params["watt_to_wh"](unit.constant_supply)
     elseif unit.energy_profile !== nothing
         unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     else

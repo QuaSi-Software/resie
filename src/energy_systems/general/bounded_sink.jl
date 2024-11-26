@@ -61,7 +61,7 @@ function control(unit::BoundedSink,
     update(unit.controller)
 
     if unit.constant_power !== nothing
-        unit.max_energy = watt_to_wh(unit.constant_power)
+        unit.max_energy = sim_params["watt_to_wh"](unit.constant_power)
     elseif unit.max_power_profile !== nothing
         unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, sim_params)
     else
