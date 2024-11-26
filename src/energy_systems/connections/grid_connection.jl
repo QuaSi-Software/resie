@@ -78,8 +78,8 @@ function control(unit::GridConnection,
     else
         set_max_energy!(unit.input_interfaces[unit.medium], Inf)
         set_temperature!(unit.input_interfaces[unit.medium],
-                         nothing,
-                         unit.temperature)
+                         unit.temperature,
+                         nothing)
     end
 end
 
