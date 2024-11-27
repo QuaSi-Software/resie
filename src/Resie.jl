@@ -1,5 +1,43 @@
 module Resie
 
+using UUIDs
+
+"""
+Contains the parameters, instantiated components and the order of operations for a simulation run.
+
+In short, it bundles all the data required to perform a simulation from start to finish.
+Through its fields it contains a lot of complexity in terms of hierarchical data structures.
+However the struct should not be used as argument for complex calculations. Instead it is
+intended to be used for the run registry only.
+
+Because the types used to represent the field are defined in modules that depend upon the
+definition of the struct in the first place, the fields are defined with the generic 'Any'
+type.
+"""
+mutable struct SimulationRun
+    parameters::Dict{String,Any}
+    components::Dict{String,Any}
+    order_of_operations::Vector{Any}
+end
+
+# this registry should be the only global state in the package and contains the state for
+# ongoing or paused simulation runs
+current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
+
+"""
+    get_run(id)
+
+Get the simulation run container for the given ID.
+
+# Args
+- `id::UUID`: The ID of the run
+# Returns
+- `SimulationRun`: The simulation run container
+"""
+function get_run(id::UUID)::SimulationRun
+    return current_runs[id]
+end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -28,6 +66,9 @@ using Interpolations
 using JSON
 using Dates
 
+const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
+const SECONDS_PER_HOUR::Float64 = 3600.0
+
 """
     get_simulation_params(project_config)
 
@@ -52,6 +93,15 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
     )
+
+    # add helper functions to convert power to work and vice-versa. this uses the time step
+    # of the simulation as the duration required for the conversion.
+    sim_params["watt_to_wh"] = function (watts::Float64)
+        return watts * time_step * HOURS_PER_SECOND
+    end
+    sim_params["wh_to_watts"] = function (wh::Float64)
+        return wh * SECONDS_PER_HOUR / time_step
+    end
 
     weather_file_path = default(project_config["simulation_parameters"],
                                 "weather_file_path",
@@ -87,10 +137,6 @@ Construct and prepare parameters, energy system components and the order of oper
 """
 function prepare_inputs(project_config::Dict{AbstractString,Any})
     sim_params = get_simulation_params(project_config)
-
-    # this sets a global variable in the EnergySystems module, which is required for a
-    # utility function to work properly
-    EnergySystems.set_timestep(sim_params["time_step_seconds"])
 
     components = load_components(project_config["components"], sim_params)
 
@@ -242,6 +288,10 @@ function load_and_run(filepath::String)
     end
 
     sim_params, components, step_order = prepare_inputs(project_config)
+    run_ID = uuid1()
+    sim_params["run_ID"] = run_ID
+    current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+
     run_simulation_loop(project_config, sim_params, components, step_order)
 end
 

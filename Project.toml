@@ -1,7 +1,7 @@
 name = "Resie"
 uuid = "2e0f99b1-0d8f-4296-8d0c-1c50a50d04c8"
 authors = ["Maksim Helmann <maksim.helmann@siz-energieplus.de>", "Etienne Ott <etienne.ott@siz-energieplus.de>", "Heiner Steinacker <heiner.steinacker@siz-energieplus.de>", "Adrian Vollmer <adrian.vollmer@siz-energieplus.de>"]
-version = "0.9.4"
+version = "0.10.2"
 
 [deps]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
@@ -18,3 +18,7 @@ Proj = "c94c279d-25a6-4763-9509-64d165bea63e"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
+UUIDs = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+
+[compat]
+UUIDs = "1.11.0"

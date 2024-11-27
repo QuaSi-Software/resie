@@ -697,7 +697,7 @@ function calculate_slices(unit::HeatPump,
         used_power = max(min_power, unit.design_power_th * used_power_frac)
 
         remaining_heat_out = min(energies.available_heat_out[current_out_idx],
-                                 (energies.max_usage_fraction - sum_usage) * watt_to_wh(used_power))
+                                 (energies.max_usage_fraction - sum_usage) * sim_params["watt_to_wh"](used_power))
 
         used_heat_in,
         used_el_in,
@@ -724,7 +724,7 @@ function calculate_slices(unit::HeatPump,
         energies.available_heat_in[current_in_idx] -= used_heat_in
         energies.available_heat_out[current_out_idx] -= used_heat_out
 
-        sum_usage += used_heat_out / watt_to_wh(unit.design_power_th)
+        sum_usage += used_heat_out / sim_params["watt_to_wh"](unit.design_power_th)
         push!(times_min, used_heat_out * 3600 / min_power)
         push!(times, used_heat_out * 3600 / used_power)
 

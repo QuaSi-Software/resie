@@ -64,7 +64,7 @@ function control(unit::FixedSink,
     update(unit.controller)
 
     if unit.constant_demand !== nothing
-        unit.demand = watt_to_wh(unit.constant_demand)
+        unit.demand = sim_params["watt_to_wh"](unit.constant_demand)
     elseif unit.energy_profile !== nothing
         unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     else

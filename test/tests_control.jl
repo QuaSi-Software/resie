@@ -3,6 +3,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("./test_util.jl")
+
 function setup_control_tests()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -45,11 +47,7 @@ function setup_control_tests()
         ),
     )
 
-    simulation_params = Dict{String,Any}(
-        "time" => 0,
-        "time_step_seconds" => 900,
-        "epsilon" => 1e-9,
-    )
+    simulation_params = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_params)
 

@@ -316,7 +316,8 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
     for name in unit.interface_list
         lookup_table = []
         for plr in collect(0.0:(unit.discretization_step):1.0)
-            push!(lookup_table, (watt_to_wh(unit.power) * plr * unit.efficiencies[name](plr),
+            push!(lookup_table, (sim_params["watt_to_wh"](unit.power) * plr *
+                                 unit.efficiencies[name](plr),
                                  plr))
         end
         tables[name] = lookup_table
@@ -356,15 +357,17 @@ is performed to calculate the corresponding PLR.
 - `interface::Symbol`: The interface to which the energy value corresponds. This should be
     one of the names defined in field `interface_list` of the component.
 - `energy_value::Float64`: The energy value
+- `w2wh::Function`: Function to convert power to work
 # Returns
 - `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
 """
 function plr_from_energy(unit::PLRDEComponent,
                          interface::Symbol,
-                         energy_value::Float64)::Float64
+                         energy_value::Float64,
+                         w2wh::Function)::Float64
     # shortcut if the given interface is designated as linear in respect to PLR
     if interface === unit.linear_interface
-        return energy_value / watt_to_wh(unit.power)
+        return energy_value / w2wh(unit.power)
     end
 
     lookup_table = unit.energy_to_plr[interface]
@@ -411,22 +414,24 @@ Calculates the energy value for the given interface from the given PLR.
 - `interface::Symbol`: The interface to which the energy value corresponds. This should be
     one of the names defined in field `interface_list` of the component.
 - `plr::Float64`: The part load ratio, should be between 0.0 and 1.0
+- `w2wh::Function`: Function to convert power to work
 # Returns
 - `Float64`: The energy value
 """
 function energy_from_plr(unit::PLRDEComponent,
                          interface::Symbol,
-                         plr::Float64)::Float64
+                         plr::Float64,
+                         w2wh::Function)::Float64
     # the intuitive solution would be to multiply the power with the part load ratio and the
     # the efficiency at that PLR, but for unknown reasons this introduces an error in the
     # linear interpolation that appears to be quadratic in the distance to the support
     # values
     # @TODO: Investigate this further for improved performance
-    # return plr * watt_to_wh(unit.power) * unit.efficiencies[interface](plr)
+    # return plr * w2wh(unit.power) * unit.efficiencies[interface](plr)
 
     # shortcut if the given interface is designated as linear in respect to PLR
     if interface === unit.linear_interface
-        return plr * watt_to_wh(unit.power)
+        return plr * w2wh(unit.power)
     end
 
     lookup_table = unit.energy_to_plr[interface]
@@ -499,11 +504,11 @@ function calculate_energies_for_plrde(unit::PLRDEComponent,
         energy = abs(energy)
 
         # limit to design power
-        energy = min(watt_to_wh(unit.power) * unit.efficiencies[name](1.0),
+        energy = min(sim_params["watt_to_wh"](unit.power) * unit.efficiencies[name](1.0),
                      energy)
 
         push!(available_energy, energy)
-        push!(plr_from_nrg, plr_from_energy(unit, name, energy))
+        push!(plr_from_nrg, plr_from_energy(unit, name, energy, sim_params["watt_to_wh"]))
     end
 
     # the operation point of the component is the minimum of the PLR from all inputs/outputs
@@ -516,7 +521,7 @@ function calculate_energies_for_plrde(unit::PLRDEComponent,
 
     energies = []
     for name in unit.interface_list
-        push!(energies, energy_from_plr(unit, name, used_plr))
+        push!(energies, energy_from_plr(unit, name, used_plr, sim_params["watt_to_wh"]))
     end
     return (true, energies)
 end

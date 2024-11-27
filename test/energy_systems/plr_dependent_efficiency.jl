@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function get_demand_energy_system_config()
     return Dict{String,Any}(
@@ -199,31 +199,28 @@ function test_inverse_efficiency()
     components_config = get_demand_energy_system_config()
     components_config["TST_GB_01"]["nr_discretization_steps"] = 10
     eps = 1e-9
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => eps,
-    )
+    simulation_parameters = get_default_sim_params()
+    w2wh = simulation_parameters["watt_to_wh"]
 
     components = Resie.load_components(components_config, simulation_parameters)
     boiler = components["TST_GB_01"]
 
-    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("fuel_in"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("fuel_in"), 450.0, w2wh)
     @test plr > 0.45 - eps && plr < 0.45 + eps
 
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0, w2wh)
     @test plr > 0.5614073352582631 - eps && plr < 0.5614073352582631 + eps
 
     boiler.discretization_step = 1.0 / 20
     EnergySystems.initialise!(boiler, simulation_parameters)
 
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0, w2wh)
     @test plr > 0.561969105640274 - eps && plr < 0.561969105640274 + eps
 end
 
@@ -553,30 +550,31 @@ function test_electrolyser_dispatch_units()
     )
 
     simulation_parameters = get_default_sim_params()
+    w2wh = simulation_parameters["watt_to_wh"]
 
     components = Resie.load_components(components_config, simulation_parameters)
     electrolyser = components["TST_ELY_01"]
 
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.5, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.31, Symbol("el_in"), 310.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.31, Symbol("el_in"), 310.0, w2wh)
     @test nr_units == 3
     @test isapprox(plr, 0.41333333333, atol=1e-9)
 
     electrolyser.dispatch_strategy = "all_equal"
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.5, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.3, atol=1e-9)
 
     electrolyser.dispatch_strategy = "try_optimal"
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 3
     @test isapprox(plr, 0.66666666666, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0, w2wh)
     @test nr_units == 2
     @test isapprox(plr, 0.6, atol=1e-9)
 end

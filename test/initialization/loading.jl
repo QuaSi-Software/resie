@@ -3,6 +3,8 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function test_load_from_dict()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -44,11 +46,7 @@ function test_load_from_dict()
             "constant_temperature" => 60,
         ),
     )
-    simulation_params = Dict{String,Any}(
-        "time" => 0,
-        "time_step_seconds" => 900,
-        "epsilon" => 1e-9,
-    )
+    simulation_params = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_params)
     @test length(keys(components)) == 5
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
@@ -114,11 +112,7 @@ function test_load_custom_medium_categories()
             "medium" => "m_c_g_o2-impure",
         ),
     )
-    simulation_params = Dict{String,Any}(
-        "time" => 0,
-        "time_step_seconds" => 900,
-        "epsilon" => 1e-9,
-    )
+    simulation_params = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_params)
     electrolyser = components["TST_ELY_01"]
     heat_pump = components["TST_HP_01"]

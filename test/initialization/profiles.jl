@@ -38,6 +38,12 @@ function test_profile_aggregation_two()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.5
+        end,
+        "wh_to_watts" => function (w)
+            return w * 2.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -74,6 +80,12 @@ function test_profile_aggregation_four()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 1.0
+        end,
+        "wh_to_watts" => function (w)
+            return w * 1.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -106,6 +118,12 @@ function test_profile_segmentation_half()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.125
+        end,
+        "wh_to_watts" => function (w)
+            return w * 8.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -179,6 +197,12 @@ function test_profile_segmentation_third()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.08333333333333
+        end,
+        "wh_to_watts" => function (w)
+            return w * 12.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -295,6 +319,12 @@ function test_profile_segmentation_half_linear()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.125
+        end,
+        "wh_to_watts" => function (w)
+            return w * 8.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -368,6 +398,12 @@ function test_profile_segmentation_third_linear()
         "epsilon" => 1e-9,
         "latitude" => nothing,
         "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.0833333333333
+        end,
+        "wh_to_watts" => function (w)
+            return w * 12.0
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
