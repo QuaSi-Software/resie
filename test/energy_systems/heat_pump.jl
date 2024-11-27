@@ -6,8 +6,6 @@ using Resie.Profiles
 
 include("../test_util.jl")
 
-EnergySystems.set_timestep(900)
-
 function get_config_heat_pump_1S1D()
     return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
@@ -681,7 +679,7 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = EnergySystems.watt_to_wh(heat_pump.design_power_th)
+    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
     produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     @test produced_heat ≈ 3000.0
     @test produced_heat / energy_full_power > 0.35
@@ -707,7 +705,7 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = EnergySystems.watt_to_wh(heat_pump.design_power_th)
+    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
     produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     @test produced_heat ≈ 0.0
     @test produced_heat / energy_full_power ≈ 0.0
