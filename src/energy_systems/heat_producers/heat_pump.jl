@@ -1,3 +1,5 @@
+using ..Resie: get_run
+
 """
 Implementation of a heat pump component, elevating heat to a higher temperature using
 electricity.
@@ -44,8 +46,6 @@ mutable struct HeatPump <: Component
     cop::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
-
-    components::Grouping
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
@@ -101,8 +101,7 @@ mutable struct HeatPump <: Component
                    default(config, "input_temperature", nothing),
                    0.0, # cop
                    0.0, # mixing temperature in the input interface
-                   0.0, # mixing temperature in the output interface
-                   Grouping())
+                   0.0) # mixing temperature in the output interface
     end
 end
 
@@ -329,10 +328,6 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
                          unit.input_temperature,
                          unit.input_temperature)
     end
-
-    # link components to heat pump to be able to access them later
-    # This is only a workaround until a better way has been implemented TODO
-    unit.components = components
 end
 
 function set_max_energies!(unit::HeatPump,
@@ -518,6 +513,37 @@ function update_plrs!(unit::HeatPump,
     end
 
     return best_idx
+end
+
+"""
+    filter_by_transformer(energies, sim_param; heat_in=true)
+
+Filters the heat input or heat output potentials by system function so only transformers are
+listed.
+
+# Args
+- `energie::HPEnergies`: The energies container
+- `sim_params::Dict{String,Any}`: Simulation parameters
+- `heat_in::Bool`: (Optional) If true, filters the inputs. Otherwise the outputs. Defaults
+    to true.
+# Returns
+- `Vector{Floathing}`: The filtered input or output potentials.
+"""
+function filter_by_transformer(energies::HPEnergies,
+                               sim_params::Dict{String,Any};
+                               heat_in::Bool=true)::Vector{Floathing}
+    components = get_run(sim_params["run_ID"]).components
+    filtered = []
+    for (idx, uac) in enumerate(heat_in ? energies.in_uacs : energies.out_uacs)
+        if uac !== nothing && components[uac].sys_function === sf_transformer
+            if heat_in
+                push!(filtered, energies.potentials_energies_heat_in[idx])
+            else
+                push!(filtered, energies.potentials_energies_heat_out[idx])
+            end
+        end
+    end
+    return filtered
 end
 
 """
@@ -859,23 +885,11 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies.potentials_energies_heat_out = energies.potentials_energies_heat_out[index]
 
     # there are three different cases of how to handle the layered approach of operating the
-    # heat pump, depending on wether or not the input or output heat has infinite values. if
-    # both have infinite values of a connected transformer, the calculation cannot be resolved.
-    potentials_energies_heat_in_transformer_only = []
-    for (idx, uac) in enumerate(energies.in_uacs)
-        if uac !== nothing && unit.components[uac].sys_function === EnergySystems.sf_transformer
-            push!(potentials_energies_heat_in_transformer_only, energies.potentials_energies_heat_in[idx])
-        end
-    end
-    potentials_energies_heat_out_transformer_only = []
-    for (idx, uac) in enumerate(energies.out_uacs)
-        if uac !== nothing && unit.components[uac].sys_function === EnergySystems.sf_transformer
-            push!(potentials_energies_heat_out_transformer_only, energies.potentials_energies_heat_out[idx])
-        end
-    end
-
-    energies.heat_in_has_inf_energy = any(isinf, potentials_energies_heat_in_transformer_only)
-    energies.heat_out_has_inf_energy = any(isinf, potentials_energies_heat_out_transformer_only)
+    # heat pump, depending on wether or not any input heat or output heat transformer has a
+    # value of infinite as the potential. if this is the case for both the input and output,
+    # the calculation cannot be resolved.
+    energies.heat_in_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=true))
+    energies.heat_out_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=false))
 
     if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
         @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and " *
