@@ -55,6 +55,8 @@ function test_run_energy_system_from_storage()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]
@@ -211,6 +213,8 @@ function test_run_energy_system_from_storage_denied()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]

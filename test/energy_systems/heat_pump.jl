@@ -43,6 +43,8 @@ function test_heat_pump_one_source_dynamic_cop()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source = components["TST_SRC_01"]
     demand = components["TST_DEM_01"]
@@ -153,6 +155,8 @@ function test_heat_pump_1S1D_icing_losses()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source = components["TST_SRC_01"]
     demand = components["TST_DEM_01"]
@@ -286,6 +290,8 @@ function test_heat_pump_1S1D_infinite_input()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source = components["TST_SRC_01"]
     demand = components["TST_DEM_01"]
@@ -324,6 +330,8 @@ function test_heat_pump_1S1D_infinite_output()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source = components["TST_SRC_01"]
     demand = components["TST_DEM_01"]
@@ -424,6 +432,8 @@ function test_heat_pump_2S2D_constant_cop()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
@@ -493,6 +503,8 @@ function test_heat_pump_2S2D_dynamic_cop()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
@@ -572,6 +584,8 @@ function test_heat_pump_2S2D_reorder_inputs()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
@@ -651,6 +665,8 @@ function test_heat_pump_2S2D_min_power()
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]
@@ -730,6 +746,8 @@ function test_heat_pump_2S2D_optimising_slices()
     eps = simulation_parameters["epsilon"]
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     source_1 = components["TST_SRC_01"]
     source_2 = components["TST_SRC_02"]

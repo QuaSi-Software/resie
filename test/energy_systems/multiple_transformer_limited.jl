@@ -70,8 +70,9 @@ function test_multiple_transformer_with_limitations()
     )
 
     simulation_parameters = get_default_sim_params()
-
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     electrolyser = components["TST_ELY_01"]
     grid_el1 = components["TST_GRI_el_01"]
