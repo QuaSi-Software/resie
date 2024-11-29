@@ -135,6 +135,8 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_upper_plr_limit
     cmf_charge_is_allowed
     cmf_discharge_is_allowed
+    cmf_reorder_inputs
+    cmf_reorder_outputs
 end
 
 """
@@ -324,4 +326,70 @@ function discharge_is_allowed(controller::Controller, sim_params::Dict{String,An
     end
 
     return true
+end
+
+"""
+Callback for reordering inputs of a component according to the temperatures of the inputs.
+
+As there is no clear way to aggregate multiple reorderings the last module to apply a
+reordering "wins" and its index permutation is returned. If no module performs any
+reordering the indices of the `temps_max` argument is returned, resulting in no changes.
+
+It is assumed, but not checked, that all vectors, to which the permutation is applied, have
+the same length.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `temps_min::Vector{<:Temperature}`: The minimum temperature vector
+- `temps_max::Vector{<:Temperature}`: The maximum temperature vector
+# Returns
+- `Vector{Integer}`: The index permutation
+"""
+function reorder_inputs(controller::Controller,
+                        temps_min::Vector{<:Temperature},
+                        temps_max::Vector{<:Temperature})::Vector{Integer}
+    reordering = [i for i in 1:length(temps_max)]
+
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_reorder_inputs)
+            continue
+        end
+
+        reordering = reorder_inputs(mod, temps_min, temps_max)
+    end
+
+    return reordering
+end
+
+"""
+Callback for reordering outputs of a component according to the temperatures of the outputs.
+
+As there is no clear way to aggregate multiple reorderings the last module to apply a
+reordering "wins" and its index permutation is returned. If no module performs any
+reordering the indices of the `temps_max` argument is returned, resulting in no changes.
+
+It is assumed, but not checked, that all vectors, to which the permutation is applied, have
+the same length.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `temps_min::Vector{<:Temperature}`: The minimum temperature vector
+- `temps_max::Vector{<:Temperature}`: The maximum temperature vector
+# Returns
+- `Vector{Integer}`: The index permutation
+"""
+function reorder_outputs(controller::Controller,
+                         temps_min::Vector{<:Temperature},
+                         temps_max::Vector{<:Temperature})::Vector{Integer}
+    reordering = [i for i in 1:length(temps_min)]
+
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_reorder_outputs)
+            continue
+        end
+
+        reordering = reorder_outputs(mod, temps_min, temps_max)
+    end
+
+    return reordering
 end

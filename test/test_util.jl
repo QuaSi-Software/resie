@@ -1,4 +1,6 @@
 using Dates
+using UUIDs
+using Resie
 
 """
     pwc_units_astr(expected, actual)
@@ -94,4 +96,28 @@ function get_default_sim_params()::Dict{String,Any}
             return w * 4.0
         end,
     )
+end
+
+"""
+    setup_mock_run!(components, sim_params; ooo)
+
+Sets up the simulation run registry to contain the information of a mock simulation run for
+testing purposes.
+
+This differs from a normal simulation run only in that the given data structures need not
+correspond to a functioning energy system and are only given to enable the function of the
+code under test.
+
+# Args
+- `components::Dict{String,<:Any}`: The components
+- `sim_params::Dict{String,Any}`: The simulation parameters
+- `ooo::Vector{Any}`: (Optional) The order of operations. Defaults to an empty vector.
+# Returns
+- `UUID`: The ID of the mock simulation run
+"""
+function setup_mock_run!(components::Dict{String,<:Any}, sim_params::Dict{String,Any}; ooo::Vector{Any}=[])::UUID
+    run_id = uuid1()
+    Resie.current_runs[run_id] = Resie.SimulationRun(sim_params, components, ooo)
+    sim_params["run_ID"] = run_id
+    return run_id
 end
