@@ -11,38 +11,95 @@ mutable struct BufferTank <: Component
 
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
-
     medium::Symbol
 
-    capacity::Float64
-    load::Float64
-    losses::Float64
+    model_type::Symbol
 
-    use_adaptive_temperature::Bool
-    switch_point::Float64
+    capacity::Floathing
+    volume::Floathing
+    rho_medium::Float64
+    cp_medium::Float64
     high_temperature::Float64
     low_temperature::Float64
+    max_load_rate::Floathing
+    max_unload_rate::Floathing
+    max_input_energy::Floathing
+    max_output_energy::Floathing
+    consider_losses::Bool
+
+    # for losses
+    h_to_r::Float64
+    surface_lid_bottom::Float64
+    surface_barrel::Float64
+    thermal_transmission_lid::Float64
+    thermal_transmission_barrel::Float64
+    thermal_transmission_bottom::Float64
+    ambient_temperature_profile::Union{Profile,Nothing}
+    ambient_temperature::Temperature
+    ground_temperauture::Temperature
+
+    # for model type "balanced"
+    switch_point::Float64
 
     current_max_output_temperature::Float64
+    load::Float64
+    losses::Float64
 
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
 
+        input_model_type = default(config, "model_type", "ideally_stratified")
+        if input_model_type == "ideally_stratified"
+            model_type = :stratified
+        elseif input_model_type == "balanced"
+            model_type = :balanced
+        elseif input_model_type = "ideally_mixed"
+            model_type = :ideally_mixed
+        else
+            @error "For the buffer tank $uac, the model_type could not be detected. Is has to be one of: " *
+                   "'ideally_stratified', 'balanced', 'ideally_mixed'."
+            throw(InputError)
+        end
+
+        constant_ambient_temperature = default(config, "constant_ambient_temperature", nothing)
+        if constant_ambient_temperature !== nothing
+            ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
+        else
+            ambient_temperature_profile = nothing
+        end
+
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_storage, # sys_function
-                   InterfaceMap(medium => nothing), # input_interfaces
-                   InterfaceMap(medium => nothing), # output_interfaces
-                   medium,
-                   config["capacity"],  # capacity
-                   config["load"],      # load
-                   0.0,                 # losses
-                   default(config, "use_adaptive_temperature", false),
-                   default(config, "switch_point", 0.15),
-                   default(config, "high_temperature", 75.0),
-                   default(config, "low_temperature", 20),
-                   0.0) # current_max_output_temperature at the beginning of the time step
+                   sf_storage,                                 # sys_function
+                   InterfaceMap(medium => nothing),            # input_interfaces
+                   InterfaceMap(medium => nothing),            # output_interfaces
+                   medium,                                     # medium in the buffer tank
+                   model_type,                                 # can be one of :ideally_stratified, :balanced, :ideally_mixed
+                   default(config, "capacity", nothing),       # capacity of the buffer tank [Wh] (either capacity or volume has to be given)
+                   default(config, "volume", nothing),         # volume of the buffer tank [m^3] (either capacity or volume has to be given)
+                   default(config, "rho_medium", 1000.0),      # density of the medium [kg/m^3]
+                   default(config, "cp_medium", 4.18),         # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [°C]
+                   default(config, "low_temperature", 20),     # lower temperature of the buffer tank [°C]
+                   default(config, "max_load_rate", nothing),  # maximum load rate given in 1/h
+                   default(config, "max_unload_rate", nothing),# maximum unload rate given in 1/h
+                   nothing,                                    # maximum input energy per time step [Wh]
+                   nothing,                                    # maximum output energy per time step [Wh]
+                   default(config, "consider_losses", false),  # consider_losses [Bool]
+                   default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
+                   0.0,               # surface_lid_bottom, surface of the lid and the bottom of the cylindder [m^2]
+                   0.0,               # surface_barrel, surface of the barrel of the cylindder [m^2]
+                   default(config, "thermal_transmission_lid", 0.2),     # [W/mK]
+                   default(config, "thermal_transmission_barrel", 0.2),  # [W/mK]
+                   default(config, "thermal_transmission_bottom", 0.2),  # [W/mK]
+                   ambient_temperature_profile,                          # [°C]
+                   constant_ambient_temperature,                         # ambient_temperature [°C]
+                   default(config, "ground_temperauture", 12),           # [°C]
+                   default(config, "switch_point", 0.15),                # [%/100] load where to change from stratified to mixed mode, only for model_type :balanced
+                   0.0,                                        # current_max_output_temperature at the beginning of the time step
+                   default(config, "initial_load", 0.0),       # current load, set to inital_load at the beginning [%]
+                   0.0)                                        # losses in current time step [Wh]
     end
 end
 
@@ -51,6 +108,35 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.medium))
     set_storage_transfer!(unit.output_interfaces[unit.medium],
                           load_storages(unit.controller, unit.medium))
+
+    # calculate volume and capacity
+    if unit.capacity === nothing && unit.volume === nothing
+        @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but none of them is given."
+        throw(InputError)
+    elseif unit.capacity === nothing && unit.volume !== nothing
+        unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
+                        (unit.high_temperature - unit.low_temperature)             # [Wh]
+    elseif unit.capacity !== nothing && unit.volume === nothing
+        unit.volume = unit.capacity /
+                      (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+    else
+        @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
+        throw(InputError)
+    end
+
+    # calculate maximum input and output energy
+    if unit.max_load_rate !== nothing
+        unit.max_input_energy = unit.max_load_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+    end
+    if unit.max_unload_rate !== nothing
+        unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+    end
+
+    # calculate surfaces of the butter tank cylinder
+    radius = cbrt(unit.volume / (unit.h_to_r * pi))  # [m]
+    height = radius * unit.h_to_r                    # [m]
+    unit.surface_barrel = 2 * pi * radius * height   # [m^2]
+    unit.surface_lid_bottom = radius^2 * pi          # [m^2]
 end
 
 function control(unit::BufferTank,
@@ -69,6 +155,12 @@ function control(unit::BufferTank,
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
+
+    if unit.constant_ambient_temperature !== nothing
+        unit.ambient_temperature = unit.constant_ambient_temperature
+    else
+        unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    end
 end
 
 function temperature_at_load(unit::BufferTank)::Temperature
