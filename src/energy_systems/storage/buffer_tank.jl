@@ -36,12 +36,13 @@ mutable struct BufferTank <: Component
     thermal_transmission_bottom::Float64
     ambient_temperature_profile::Union{Profile,Nothing}
     ambient_temperature::Temperature
-    ground_temperauture::Temperature
+    ground_temperature::Temperature
 
     # for model type "balanced"
     switch_point::Float64
 
     current_max_output_temperature::Float64
+    initial_load::Float64
     load::Float64
     losses::Float64
 
@@ -51,10 +52,10 @@ mutable struct BufferTank <: Component
 
         input_model_type = default(config, "model_type", "ideally_stratified")
         if input_model_type == "ideally_stratified"
-            model_type = :stratified
+            model_type = :ideally_stratified
         elseif input_model_type == "balanced"
             model_type = :balanced
-        elseif input_model_type = "ideally_mixed"
+        elseif input_model_type == "ideally_mixed"
             model_type = :ideally_mixed
         else
             @error "For the buffer tank $uac, the model_type could not be detected. Is has to be one of: " *
@@ -63,7 +64,7 @@ mutable struct BufferTank <: Component
         end
 
         constant_ambient_temperature = default(config, "constant_ambient_temperature", nothing)
-        if constant_ambient_temperature !== nothing
+        if constant_ambient_temperature === nothing
             ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
         else
             ambient_temperature_profile = nothing
@@ -80,25 +81,26 @@ mutable struct BufferTank <: Component
                    default(config, "volume", nothing),         # volume of the buffer tank [m^3] (either capacity or volume has to be given)
                    default(config, "rho_medium", 1000.0),      # density of the medium [kg/m^3]
                    default(config, "cp_medium", 4.18),         # specific thermal capacity of medium [kJ/kgK]
-                   default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [캜]
-                   default(config, "low_temperature", 20),     # lower temperature of the buffer tank [캜]
+                   default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [째C]
+                   default(config, "low_temperature", 20),     # lower temperature of the buffer tank [째C]
                    default(config, "max_load_rate", nothing),  # maximum load rate given in 1/h
                    default(config, "max_unload_rate", nothing),# maximum unload rate given in 1/h
                    nothing,                                    # maximum input energy per time step [Wh]
                    nothing,                                    # maximum output energy per time step [Wh]
                    default(config, "consider_losses", false),  # consider_losses [Bool]
                    default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
-                   0.0,               # surface_lid_bottom, surface of the lid and the bottom of the cylindder [m^2]
-                   0.0,               # surface_barrel, surface of the barrel of the cylindder [m^2]
+                   0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylindder [m^2]
+                   0.0,                                        # surface_barrel, surface of the barrel of the cylindder [m^2]
                    default(config, "thermal_transmission_lid", 0.2),     # [W/mK]
                    default(config, "thermal_transmission_barrel", 0.2),  # [W/mK]
                    default(config, "thermal_transmission_bottom", 0.2),  # [W/mK]
-                   ambient_temperature_profile,                          # [캜]
-                   constant_ambient_temperature,                         # ambient_temperature [캜]
-                   default(config, "ground_temperauture", 12),           # [캜]
+                   ambient_temperature_profile,                          # [째C]
+                   constant_ambient_temperature,                         # ambient_temperature [째C]
+                   default(config, "ground_temperature", 12),            # [째C]
                    default(config, "switch_point", 0.15),                # [%/100] load where to change from stratified to mixed mode, only for model_type :balanced
                    0.0,                                        # current_max_output_temperature at the beginning of the time step
-                   default(config, "initial_load", 0.0),       # current load, set to inital_load at the beginning [%]
+                   default(config, "initial_load", 0.0),       # initial_load [%]
+                   0.0,                                        # load, set to inital_load at the beginning Wh
                    0.0)                                        # losses in current time step [Wh]
     end
 end
@@ -117,8 +119,10 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
-        unit.volume = unit.capacity /
-                      (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+        if unit.consider_losses
+            unit.volume = unit.capacity /
+                          (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+        end
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
         throw(InputError)
@@ -133,10 +137,15 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     # calculate surfaces of the butter tank cylinder
-    radius = cbrt(unit.volume / (unit.h_to_r * pi))  # [m]
-    height = radius * unit.h_to_r                    # [m]
-    unit.surface_barrel = 2 * pi * radius * height   # [m^2]
-    unit.surface_lid_bottom = radius^2 * pi          # [m^2]
+    if unit.consider_losses
+        radius = cbrt(unit.volume / (unit.h_to_r * pi))  # [m]
+        height = radius * unit.h_to_r                    # [m]
+        unit.surface_barrel = 2 * pi * radius * height   # [m^2]
+        unit.surface_lid_bottom = radius^2 * pi          # [m^2]
+    end
+
+    # set inital state
+    unit.load = unit.initial_load / 100 * unit.capacity
 end
 
 function control(unit::BufferTank,
@@ -153,33 +162,92 @@ function control(unit::BufferTank,
                      unit.high_temperature,
                      unit.high_temperature)
 
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
+    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy))
+    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy))
 
-    if unit.constant_ambient_temperature !== nothing
-        unit.ambient_temperature = unit.constant_ambient_temperature
-    else
+    if unit.ambient_temperature_profile !== nothing
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
     end
 end
 
 function temperature_at_load(unit::BufferTank)::Temperature
-    if unit.use_adaptive_temperature
+    if unit.model_type == :ideally_stratified
+        # always high temperature is avaliable
+        return unit.high_temperature
+    elseif unit.model_type == :balanced
+        # When the storage is loaded above the switch_point, the high temperature is available. 
+        # At loads below the switch_point, a linear course between high and low temperature can be supplied.
         partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))
         return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
-    else
-        return unit.high_temperature
+    elseif unit.model_type == :ideally_mixed
+        # A linear course between high and low temperature can be supplied related to the current load.
+        return unit.low_temperature + (unit.load / unit.capacity) * (unit.high_temperature - unit.low_temperature)
     end
+end
+
+function calculate_losses!(unit::BufferTank, sim_params)
+    if !unit.consider_losses
+        return
+    end
+
+    function calculate_energy_loss(unit, sim_params)
+        if unit.load == 0.0
+            # no gains or losses if storage is completely emtpy for ideally_stratified model
+            return 0.0
+        else
+            barrel_surface = unit.surface_barrel * unit.load / unit.capacity
+            temperature_difference = unit.high_temperature - unit.ambient_temperature
+
+            return (unit.thermal_transmission_lid * unit.surface_lid_bottom * temperature_difference +
+                    unit.thermal_transmission_barrel * barrel_surface * temperature_difference) *
+                   sim_params["time_step_seconds"] / 60 / 60
+        end
+    end
+
+    if unit.model_type == :ideally_stratified
+        # losses only through layer with high temperature (energy losses)
+        unit.losses = calculate_energy_loss(unit, sim_params)
+    elseif unit.model_type == :balanced
+        # losses above switch_point result in energy decrease, below switch_point in exergy losses
+        if unit.load / unit.capacity > unit.switch_point
+            unit.losses = calculate_energy_loss(unit, sim_params)
+        else
+            current_tank_temperature = unit.low_temperature +
+                                       (unit.load / (unit.switch_point * unit.capacity)) *
+                                       (unit.high_temperature - unit.low_temperature)
+            temperature_difference_air = current_tank_temperature - unit.ambient_temperature
+            barrel_surface = unit.surface_barrel * unit.switch_point
+
+            unit.losses = (unit.thermal_transmission_lid * unit.surface_lid_bottom * temperature_difference_air +
+                           unit.thermal_transmission_barrel * barrel_surface * temperature_difference_air) *
+                          sim_params["time_step_seconds"] / 60 / 60
+        end
+    elseif unit.model_type == :ideally_mixed
+        # losses are exergy losses through whole storage 
+        current_tank_temperature = unit.low_temperature +
+                                   (unit.load / unit.capacity) * (unit.high_temperature - unit.low_temperature)
+        temperature_difference_air = current_tank_temperature - unit.ambient_temperature
+        temperature_difference_ground = current_tank_temperature - unit.ground_temperature
+
+        unit.losses = (unit.thermal_transmission_lid * unit.surface_lid_bottom * temperature_difference_air +
+                       unit.thermal_transmission_bottom * unit.surface_lid_bottom * temperature_difference_ground +
+                       unit.thermal_transmission_barrel * unit.surface_barrel * temperature_difference_air) *
+                      sim_params["time_step_seconds"] / 60 / 60
+    end
+
+    # update load of storage
+    unit.load = max(0.0, unit.load - unit.losses)
 end
 
 function balance_on(interface::SystemInterface,
                     unit::BufferTank)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(;
                  balance=interface.balance,
-                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
@@ -236,6 +304,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+        calculate_losses!(unit, sim_params)
         return
     end
 
@@ -269,6 +338,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             energy_available -= diff
         end
     end
+
+    calculate_losses!(unit, sim_params)
 end
 
 function output_values(unit::BufferTank)::Vector{String}
