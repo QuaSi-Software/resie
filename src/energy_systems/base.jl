@@ -34,38 +34,6 @@ default(config::Dict{String,Any}, name::String, default_val::Any)::Any = return 
                                                                                 default_val
 
 """
-The number of hours per time step, used by various utility functions.
-"""
-HOURS_PER_TIME_STEP::Float64 = 0.0
-
-"""
-Update the time step, in seconds.
-"""
-function set_timestep(step_seconds::Integer)
-    global HOURS_PER_TIME_STEP = Float64(step_seconds) / 3600.0
-end
-
-"""
-Calculate energy from power by using the simulation time step.
-
-This function must be assigned a method after simulation parameters (such as the timestep)
-have been loaded.
-"""
-function watt_to_wh(watts::Float64)
-    return watts * HOURS_PER_TIME_STEP
-end
-
-"""
-Calculate power from energy by using the simulation time step.
-
-This function must be assigned a method after simulation parameters (such as the timestep)
-have been loaded.
-"""
-function wh_to_watts(wh::Float64)
-    return wh / HOURS_PER_TIME_STEP
-end
-
-"""
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
 considered the nominal range. For example, a heating component might circulate water anywhere

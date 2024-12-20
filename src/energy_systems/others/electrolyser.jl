@@ -215,26 +215,27 @@ Calculate the number of active units and the PLR for each in order to meet the g
 function dispatch_units(ely::Electrolyser,
                         plr::Float64,
                         limit_name::Symbol,
-                        limit_value::Float64)::Tuple{Integer,Float64}
+                        limit_value::Float64,
+                        w2wh::Function)::Tuple{Integer,Float64}
     if limit_value == Inf
         return ely.nr_units, 1.0
     end
 
     if ely.dispatch_strategy == "try_optimal"
-        optimal_val_per_unit = ely.optimal_unit_plr * watt_to_wh(ely.power) *
+        optimal_val_per_unit = ely.optimal_unit_plr * w2wh(ely.power) *
                                ely.efficiencies[limit_name](ely.optimal_unit_plr)
         nr_units = max(1, min(ceil(limit_value / optimal_val_per_unit - 0.5), ely.nr_units))
-        plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+        plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units, w2wh)
 
     elseif ely.dispatch_strategy == "equal_with_mpf"
         if plr >= ely.min_power_fraction
             nr_units = ely.nr_units
             plr_per_unit = plr
         else
-            min_val_per_unit = ely.min_power_fraction * watt_to_wh(ely.power) *
+            min_val_per_unit = ely.min_power_fraction * w2wh(ely.power) *
                                ely.efficiencies[limit_name](ely.min_power_fraction)
             nr_units = max(1, min(floor(limit_value / min_val_per_unit), ely.nr_units))
-            plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+            plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units, w2wh)
         end
 
     elseif ely.dispatch_strategy == "all_equal"
@@ -271,11 +272,11 @@ function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::T
         energy = abs(energy)
 
         # limit to total design power
-        energy = min(watt_to_wh(unit.power_total) * unit.efficiencies[name](1.0), energy)
+        energy = min(sim_params["watt_to_wh"](unit.power_total) * unit.efficiencies[name](1.0), energy)
 
         # we can get the total PLR by assuming all units are activated equally, even if
         # dispatch happens differently later
-        plr = plr_from_energy(unit, name, energy / unit.nr_units)
+        plr = plr_from_energy(unit, name, energy / unit.nr_units, sim_params["watt_to_wh"])
         push!(plr_from_nrg, plr)
 
         # keep track which was the limiting interface and how much energy is on that
@@ -301,12 +302,16 @@ function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::T
     # we now have the PLR of the entire assembly and the limiting energy (which might be
     # the design power) and need to decide how to dispatch the units to meet the target
     # limiting energy
-    nr_active, plr_of_unit = dispatch_units(unit, used_plr, limiting_interface, limiting_energy)
+    nr_active, plr_of_unit = dispatch_units(unit,
+                                            used_plr,
+                                            limiting_interface,
+                                            limiting_energy,
+                                            sim_params["watt_to_wh"])
 
     # now the total energies can be calculated from the number and PLR of utilised units
     energies = []
     for name in unit.interface_list
-        push!(energies, nr_active * energy_from_plr(unit, name, plr_of_unit))
+        push!(energies, nr_active * energy_from_plr(unit, name, plr_of_unit, sim_params["watt_to_wh"]))
     end
     return (true, energies)
 end
@@ -329,7 +334,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
-    plr = energies[1] / watt_to_wh(unit.power_total * unit.efficiencies[Symbol("el_in")](1.0))
+    plr = energies[1] / sim_params["watt_to_wh"](unit.power_total * unit.efficiencies[Symbol("el_in")](1.0))
     h2_out_lossless = energies[1] * unit.efficiencies[Symbol("h2_out_lossless")](plr)
     unit.losses_hydrogen = h2_out_lossless - energies[4]
     unit.losses_heat = energies[1] - energies[2] +

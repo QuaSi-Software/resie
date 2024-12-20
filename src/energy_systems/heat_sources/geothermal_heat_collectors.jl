@@ -179,7 +179,7 @@ mutable struct GeothermalHeatCollector <: Component
                    #                                                       "detailed" with calculated fluid-to-soil resistance in every time step are available.
                    default(config, "pipe_soil_thermal_resistance", 0.1), # thermal resistance in [(m K)/W], only for model_type = simplified
                    0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read in from weather-profile
-                   5.6697e-8,                                            # boltzmann_constant [W/(m^2 K^4)]: Stefan–Boltzmann-Constant
+                   5.6697e-8,                                            # boltzmann_constant [W/(m^2 K^4)]: Stefan-Boltzmann-Constant
                    default(config, "surface_emissivity", 0.9),           # surface_emissivity [-]: emissivity on ground surface
                    Array{Float64}(undef, 0),                             # dx [m] horizontal dimension parallel to ground sourface and orthogonal to pipe
                    Array{Float64}(undef, 0),                             # dy [m] vertical dimension orthogonal to ground surface and orthgonal to pipe
@@ -224,9 +224,9 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     # calculate max_energy
     A_collector = unit.pipe_length * unit.pipe_spacing * unit.number_of_pipes
-    unit.max_output_energy = watt_to_wh(unit.max_output_power * A_collector)
+    unit.max_output_energy = sim_params["watt_to_wh"](unit.max_output_power * A_collector)
     if unit.regeneration
-        unit.max_input_energy = watt_to_wh(unit.max_input_power * A_collector)
+        unit.max_input_energy = sim_params["watt_to_wh"](unit.max_input_power * A_collector)
     else
         unit.max_input_energy = 0.0
     end
@@ -562,7 +562,8 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         pipe_thermal_resistance_length_specific = unit.pipe_soil_thermal_resistance
     elseif unit.model_type == "detailed"
         # calculate heat transfer coefficient and thermal resistance
-        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out)
+        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out,
+                                                                                 sim_params["wh_to_watts"])
 
         # calculation of pipe_thermal_resistance_length_specific with the approach by TRNSYS Type 710 publication
         k = 1 / ((unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
@@ -576,7 +577,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
 
     # calculate specific heat extraction for 1 pipe per length
-    specific_heat_flux_pipe = wh_to_watts(q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
+    specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
     q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length   # [W/pipe]
 
     # calculate effective mean sky temperature (sky radiative temperature) according to Stefan-Boltzmann law assuming 
@@ -868,10 +869,10 @@ function freezing(unit::GeothermalHeatCollector,
 end
 
 # function to calculate heat transfer coefficient alpha.
-function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
+function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64, wh2w::Function)
 
     # calculate mass flow in pipe
-    collector_power_in_out_per_pipe = wh_to_watts(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
+    collector_power_in_out_per_pipe = wh2w(abs(q_in_out)) / unit.number_of_pipes  # W/pipe
     temperature_spread = q_in_out > 0 ? unit.loading_temperature_spread : unit.unloading_temperature_spread
     collector_mass_flow_per_pipe = collector_power_in_out_per_pipe /
                                    (unit.fluid_specific_heat_capacity * temperature_spread)  # kg/s
@@ -909,8 +910,8 @@ end
 
 function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
     if unit.nusselt_approach == "Ramming"
-        # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; „Grundlagen der
-        # Technischen Thermodynamik“,  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
+        # Approach used in Ramming 2007 from Elsner, Norbert; Fischer, Siegfried; Huhn, Jörg; "Grundlagen der
+        # Technischen Thermodynamik",  Band 2 Wärmeübertragung, Akademie Verlag, Berlin 1993. 
         k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
         k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
 
@@ -937,7 +938,7 @@ end
 
 function calculate_Nu_turbulent(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
     # Approached used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung 
-    # im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240–248, 1995. 
+    # im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240-248, 1995. 
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
     nusselt_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
                         (1 + 12.7 * sqrt(zeta / 8) * (unit.fluid_prandtl_number^(2 / 3) - 1))

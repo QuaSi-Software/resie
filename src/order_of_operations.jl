@@ -714,7 +714,10 @@ function add_transformer_steps(simulation_order,
         # but also possible connected upstream transformers in an output and the other way around.
         first_middle_bus,
         inface_branches_with_transformers,
-        outface_branches_with_transformers = detect_middle_bus(current_components, reverse, checked_components)
+        outface_branches_with_transformers = detect_middle_bus(current_components,
+                                                               reverse,
+                                                               checked_components,
+                                                               step_category)
 
         checked_components = add_component_to_checked_components(checked_components, inface_branches_with_transformers)
         checked_components = add_component_to_checked_components(checked_components, outface_branches_with_transformers)
@@ -1411,6 +1414,8 @@ is reversed and for output branches, the order of energy flow is kept.
 - `current_components::Array{Grouping}`: The currently considered components.
 - `reverse::Bool`: Indicates if the current_components should be considered in reverse or not.
 - `checked_components::Array{Grouping}`: A vector holding all checked components. 
+- `step_category::String`: Can be either "potential" or "process", depending on the simulation step to find for 
+                           current_components.
 
 # Returns
 - `first_middle_bus::Component`: The first middle bus as a component.
@@ -1419,7 +1424,7 @@ is reversed and for output branches, the order of energy flow is kept.
 - `outface_branches_with_transformers::Array{Array{Components}}`: An array of arrays holding the transformers and busses 
                                                                   of each output branch of the first_middle_bus.
 """
-function detect_middle_bus(current_components, reverse, checked_components)
+function detect_middle_bus(current_components, reverse, checked_components, step_category)
     middle_busses = Any[]
     transformers_in_infaces = Any[]
     transformers_in_outfaces = Any[]
@@ -1438,7 +1443,6 @@ function detect_middle_bus(current_components, reverse, checked_components)
                     continue # skip all interfaces with connection to a grid
                 end
                 if check_interface_for_transformer(inface, "input")
-                    push!(infaces_with_transformers, inface)
                     other_infaces = [x for x in values(component.input_interfaces) if x !== inface]
                     inface_transformers = Any[]
                     add_non_recursive_indirect_inputs!(inface_transformers,
@@ -1449,7 +1453,12 @@ function detect_middle_bus(current_components, reverse, checked_components)
                                                        true,
                                                        true,
                                                        false)
-                    push!(transformer_in_input_interface, inface_transformers)
+                    inface_transformers_only = [comp.sys_function === EnergySystems.sf_transformer
+                                                for comp in inface_transformers]
+                    if length(inface_transformers_only) > 1 || step_category == "potential"
+                        push!(transformer_in_input_interface, inface_transformers)
+                        push!(infaces_with_transformers, inface)
+                    end
                 end
             end
             for outface in values(component.output_interfaces)
@@ -1457,7 +1466,6 @@ function detect_middle_bus(current_components, reverse, checked_components)
                     continue # skip all interfaces with connection to a grid
                 end
                 if check_interface_for_transformer(outface, "output")
-                    push!(outfaces_with_transformers, outface)
                     other_outfaces = [x for x in values(component.output_interfaces) if x !== outface]
                     outface_transformers = Any[]
                     add_non_recursive_indirect_outputs!(outface_transformers,
@@ -1468,7 +1476,12 @@ function detect_middle_bus(current_components, reverse, checked_components)
                                                         true,
                                                         true,
                                                         false)
-                    push!(transformer_in_output_interface, outface_transformers)
+                    outface_transformers_only = [comp.sys_function === EnergySystems.sf_transformer
+                                                 for comp in outface_transformers]
+                    if length(outface_transformers_only) > 1 || step_category == "potential"
+                        push!(transformer_in_output_interface, outface_transformers)
+                        push!(outfaces_with_transformers, outface)
+                    end
                 end
             end
         end
