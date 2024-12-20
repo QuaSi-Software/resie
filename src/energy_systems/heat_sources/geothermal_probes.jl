@@ -312,8 +312,8 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     return g_function, number_of_probes, probe_coordinates
 end
 
-function plot_optional_figures(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
-                               sim_params::Dict{String,Any})
+function plot_optional_figures_begin(unit::GeothermalProbes, output_path::String, output_formats::Vector{String},
+                                     sim_params::Dict{String,Any})
     # plot g-function values during simulation time
     plot(0:Int(sim_params["number_of_time_steps"]),
          unit.g_function[1:Int(sim_params["number_of_time_steps"] + 1)];
@@ -565,7 +565,7 @@ function get_g_values_from_library(unit::Component,
     lib_borehole_radiuses = [0.075, 0.075, 0.075, 0.08, 0.0875]  # [m]
     #! format: on
     lib_default_spacing = 5   # Default borehole spacing for each configuration.
-    #                           Attention: Also change in plot_optional_figures!
+    #                           Attention: Also change in plot_optional_figures_begin!
     lib_borehole_spacings = fill(lib_default_spacing, length(lib_borehole_depths))
 
     lib_spacings_to_depths = lib_borehole_spacings ./ lib_borehole_depths
@@ -1050,10 +1050,12 @@ end
 
 function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(; balance=interface.balance,
-                 energy_potential=caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy,
+                 energy_potential=balance_written ? 0.0 :
+                                  (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
