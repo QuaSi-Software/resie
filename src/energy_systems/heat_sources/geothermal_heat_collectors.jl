@@ -331,17 +331,6 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     unit.t2 = copy(unit.t1)
 
-    # # set starting temperature distribution (current settings for validation purpose)
-    # # TODO: remove later
-    # step = Int(round((y_pipe_node_num - 3) / 4))
-    # unit.t1[(0 * step + 1):(1 * step), :] .= 9.5
-    # unit.t1[(1 * step + 1):(2 * step), :] .= 11.5
-    # unit.t1[(2 * step + 1):(3 * step), :] .= 13.5
-    # unit.t1[(3 * step + 1):(y_pipe_node_num - 4), :] .= 15.5
-    # unit.t1[(y_pipe_node_num - 3):(y_pipe_node_num + 3), :] .= 15.5
-    # unit.t1[(y_pipe_node_num + 4):(end - 1), :] .= 15.5
-    # unit.t1[end, :] .= 9
-
     # calculate volume around the pipe
     unit.volume_adjacent_to_pipe = ((unit.dx[1] + unit.dx[2]) *                                             # area adjacent to pipe in x-direction
                                     (unit.dy[unit.fluid_node_y_idx - 1] + unit.dy[unit.fluid_node_y_idx] +  # area adjacent to pipe in y-direction
