@@ -366,10 +366,9 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     if unit.dt == 0 # no dt given from input file
         unit.dt = Int(max(1,
                           floor(min(sim_params["time_step_seconds"],
-                                    (unit.soil_density *
-                                     min(unit.soil_specific_heat_capacity, unit.soil_specific_heat_capacity_frozen) *
-                                     min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) /
-                                    (4 * unit.soil_heat_conductivity)))))
+                                    (min(unit.soil_specific_heat_capacity / unit.soil_heat_conductivity,
+                                         unit.soil_specific_heat_capacity_frozen / unit.soil_heat_conductivity_frozen) *
+                                     unit.soil_density * min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) / 4))))
     end
     # ensure that dt is a divisor of the simulation time step
     # find the largest divisor that is smaller that the calculated dt
@@ -727,12 +726,6 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                                          unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h - 1, i) * (unit.t1[h - 1, i] - unit.t1[h, i]) / unit.dy_mesh[h - 1]) *  # heat conduction in negative y-direction
                                         unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
 
-                        # # (second-order central differences) TODO: remove later?
-                        # dT = unit.dt * determine_soil_heat_conductivity(h, i, h, i) / (unit.cp[h, i] * unit.soil_density_vector[h]) * (
-                        #                 2 / (unit.dx_mesh[i - 1] + unit.dx_mesh[i]) * ((unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] - (unit.t1[h, i] - unit.t1[h, i - 1]) / unit.dx_mesh[i - 1]) +
-                        #                 2 / (unit.dy_mesh[h - 1] + unit.dy_mesh[h]) * ((unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h] - (unit.t1[h, i] - unit.t1[h - 1, i]) / unit.dy_mesh[h - 1]))
-                        # unit.t2[h, i] = unit.t1[h, i] + dT
-
                     end
                     #! format: on
                 end
@@ -891,7 +884,7 @@ function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64)
 
     if unit.use_dynamic_fluid_properties
         # calculate reynolds-number based on dynamic viscosity using dynamic temperature-dependend fluid properties, 
-        # adapted from TRNSYS Type 710:
+        # adapted from TRNSYS Type 710, for 30 Vol-% ethylene glycol mix:
         fluid_dynamic_viscosity = 0.0000017158 * unit.fluid_temperature^2 -
                                   0.0001579079 * unit.fluid_temperature + 0.0048830621
         unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447
