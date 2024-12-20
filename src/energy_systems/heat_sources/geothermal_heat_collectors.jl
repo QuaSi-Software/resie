@@ -5,6 +5,11 @@ using Plots
 """
 Implementation of geothermal heat collector.
 This implementations acts as storage as is can produce and load energy.
+
+Possible improvements in the future:
+- Addition of convective heat transport at the earth's surface as a function of wind speed and ambient 
+  temperature instead of a constant factor
+- Adaptation of the model to be able to simulate a single pipe (requires adaptation of the boundary conditions)
 """
 
 mutable struct GeothermalHeatCollector <: Component
