@@ -1515,7 +1515,7 @@ end
 """
 get_glob_solar_radiation_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of solar global radiationprofile.
+Function to determine the source of solar global radiation profile.
 If no information is given, nothing will be returned.
 If a global_solar_radiation_profile_file_path is given, the global solar radiation will be read from the user-defined profile.
 If a constant_global_solar_radiation is set, this will be used.
@@ -1553,6 +1553,51 @@ function get_glob_solar_radiation_profile_from_config(config::Dict{String,Any}, 
         end
     else
         @info "For '$uac', no global solar radiation is set."
+        return nothing
+    end
+end
+
+"""
+    get_infrared_sky_radiation_profile_from_config(config, simulation_parameter, uac)
+
+Function to determine the source of infrared sky radiation profile [Wh/m^2].
+If no information is given, nothing will be returned.
+If a infrared_sky_radiation_profile_file_path is given, the infrared sky radiation will be read from the user-defined profile.
+If a constant_infrared_sky_radiation is set, this will be used.
+If infrared_sky_radiation_from_global_file is set to a valid entry ("longWaveIrr") of the global weather file, this will be used.
+
+The function also checks whether more than one source is specified and throws a warning if this is the case.
+"""
+function get_infrared_sky_radiation_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any},
+                                                        uac::String)
+    # check input
+    if (haskey(config, "infrared_sky_radiation_profile_file_path") +
+        haskey(config, "infrared_sky_radiation_from_global_file") +
+        haskey(config, "constant_infrared_sky_radiation")) > 1
+        # end of condition
+        @warn "Two or more infrared sky radiation profile sources for $(uac) have been specified in the input file!"
+    end
+
+    # determine temperature
+    if haskey(config, "infrared_sky_radiation_profile_file_path")
+        @info "For '$uac', the infrared sky radiation profile is taken from the user-defined .prf file."
+        return Profile(config["infrared_sky_radiation_profile_file_path"], sim_params)
+    elseif haskey(config, "constant_infrared_sky_radiation") && config["constant_infrared_sky_radiation"] isa Number
+        @info "For '$uac', a constant infrared sky radiation of $(config["constant_infrared_sky_radiation"]) Wh/m^2 is set."
+        return nothing
+    elseif haskey(config, "infrared_sky_radiation_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["infrared_sky_radiation_from_global_file"], string(field_name))
+               for field_name in fieldnames(typeof(sim_params["weather_data"])))
+            @info "For '$uac', the infrared sky radiation profile is taken from the project-wide weather file: " *
+                  "$(config["infrared_sky_radiation_from_global_file"])"
+            return getfield(sim_params["weather_data"], Symbol(config["infrared_sky_radiation_from_global_file"]))
+        else
+            @error "For '$uac', the'infrared_sky_radiation_from_global_file' has to be one of: " *
+                   "$(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
+            throw(InputError)
+        end
+    else
+        @info "For '$uac', no infrared sky radiation is set."
         return nothing
     end
 end

@@ -18,6 +18,7 @@ mutable struct GeothermalHeatCollector <: Component
 
     ambient_temperature_profile::Union{Profile,Nothing}
     global_radiation_profile::Union{Profile,Nothing}
+    infrared_sky_radiation_profile::Union{Profile,Nothing}
     unloading_temperature_spread::Temperature
     fluid_min_output_temperature::Temperature
     fluid_max_input_temperature::Temperature
@@ -110,6 +111,7 @@ mutable struct GeothermalHeatCollector <: Component
 
         ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
         global_radiation_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
+        infrared_sky_radiation_profile = get_infrared_sky_radiation_profile_from_config(config, sim_params, uac) # W/m^2
 
         # get model type from input file
         model_type = default(config, "model_type", "simplified")
@@ -128,6 +130,7 @@ mutable struct GeothermalHeatCollector <: Component
                    m_heat_out,                                           # medium name of output interface
                    ambient_temperature_profile,                          # [°C] ambient temperature profile
                    global_radiation_profile,                             # [Wh/m^2]
+                   infrared_sky_radiation_profile,                       # [Wh/m^2]
                    default(config, "unloading_temperature_spread", 3.0), # [K] temperature spread between forward and return flow during unloading            
                    default(config, "fluid_min_output_temperature", nothing),   # [°C] minimum output temperature of the fluid for unloading
                    default(config, "fluid_max_input_temperature", nothing),    # [°C] maximum input temperature of the fluid for loading
@@ -171,7 +174,7 @@ mutable struct GeothermalHeatCollector <: Component
                    #                                                       "detailed" with calculated fluid-to-soil resistance in every time step are available.
                    default(config, "pipe_soil_thermal_resistance", 0.1), # thermal resistance in [(m K)/W], only for model_type = simplified
                    0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read in from weather-profile
-                   5.67e-8,                                              # boltzmann_constant [W/(m^2 K^4)]: Stefan–Boltzmann-Constant
+                   5.6697e-8,                                            # boltzmann_constant [W/(m^2 K^4)]: Stefan–Boltzmann-Constant
                    default(config, "surface_emissivity", 0.9),           # surface_emissivity [-]: emissivity on ground surface
                    Array{Float64}(undef, 0),                             # dx [m] horizontal dimension parallel to ground sourface and orthogonal to pipe
                    Array{Float64}(undef, 0),                             # dy [m] vertical dimension orthogonal to ground surface and orthgonal to pipe
@@ -363,7 +366,8 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     if unit.dt == 0 # no dt given from input file
         unit.dt = Int(max(1,
                           floor(min(sim_params["time_step_seconds"],
-                                    (unit.soil_density * unit.soil_specific_heat_capacity *
+                                    (unit.soil_density *
+                                     min(unit.soil_specific_heat_capacity, unit.soil_specific_heat_capacity_frozen) *
                                      min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) /
                                     (4 * unit.soil_heat_conductivity)))))
     end
@@ -373,6 +377,8 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
         divisors = [i for i in 1:(unit.dt) if sim_params["time_step_seconds"] % i == 0]
         unit.dt = divisors[end]
     end
+    @info "The geothermal collector $(unit.uac) will be simulated with an internal time step of $(unit.dt) s."
+
     unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
 
     # vector to hold the results of the temperatures for each node in each simulation time step
@@ -382,9 +388,9 @@ end
 """ 
     create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_radius_outer, total_depth_simulation_domain)
 
-Creates a non-uniform mesh for geothermal probe in y-direction (orthogonal to ground surface and orthogonal to pipe).
+Creates a non-uniform mesh for geothermal collector in y-direction (orthogonal to ground surface and orthogonal to pipe).
 | --------(ground surface)
-| O       (pipe cross section) 
+| O       (pipe cross section)
 V ........(lower bound)
 y-direction
 
@@ -458,7 +464,7 @@ end
 """ 
     create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_radius_outer, pipe_spacing)
   
-Creates a non-uniform mesh for geothermal probe in x-direction (parallel to ground surface and orthogonal to pipe).
+Creates a non-uniform mesh for geothermal collector in x-direction (parallel to ground surface and orthogonal to pipe).
 -----------------------  (ground surface)
 O --> x-direction        (pipe cross section) 
 .......................  (lower bound)
@@ -509,7 +515,7 @@ function control(unit::GeothermalHeatCollector,
 
     # get ambient temperature and global radiation from profile for current time step if needed
     unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-    unit.global_radiation_power = wh_to_watts(Profiles.value_at_time(unit.global_radiation_profile, sim_params)) # from Wh/m^2 to W/m^2
+    unit.global_radiation_power = Profiles.power_at_time(unit.global_radiation_profile, sim_params) # W/m^2
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
@@ -579,6 +585,11 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     # calculate specific heat extraction for 1 pipe per length
     specific_heat_flux_pipe = wh_to_watts(q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
     q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length   # [W/pipe]
+
+    # calculate effective mean sky temperature (sky radiative temperature) according to Stefan-Boltzmann law assuming 
+    # the sky beeing a black body for the current time step:
+    sky_temperature = (Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params) /
+                       unit.boltzmann_constant)^0.25  # [K]
 
     # loop over internal timesteps
     for _ in 1:(unit.n_internal_timesteps)
@@ -665,7 +676,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                         unit.t2[h, i] = unit.t1[h, i] +
                                         (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.t1[h, i]) +                            # Convection on surface
                                          unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature + 273.15)^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
+                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
                                          unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +                            # heat conduction in positve x-direction
                                          unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
                                         unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
@@ -675,7 +686,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                         unit.t2[h, i] = unit.t1[h, i] +
                                         (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.t1[h, i]) +                            # Convection on surfac
                                          unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature + 273.15)^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
+                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
                                          unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +                        # heat conduction in negative x-direction
                                          unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
                                         unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
@@ -684,7 +695,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
                         unit.t2[h, i] = unit.t1[h, i] +
                                         (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient *  (unit.ambient_temperature - unit.t1[h, i]) +                           # Convection on surface
                                          unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * ((unit.ambient_temperature + 273.15)^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surface
+                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surface
                                          unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +                            # heat conduction in positve x-direction
                                          unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +                        # heat conduction in negative x-direction
                                          unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
@@ -848,12 +859,12 @@ function freezing(unit::GeothermalHeatCollector,
         coeff = (t_new - t_old) * cp
         t_new_corrected = 0.0
         try
-            t_new_corrected = find_zero(f, unit.t_lat)
+            t_new_corrected = find_zero(f, (-20, 20), Roots.A42())
         catch e
             @warn "Initial solving of freezing function of the geothermal collector $(unit.uac) with strict tolerance " *
                   "failed, retrying with rougher tolerance for the current time step..."
             try
-                t_new_corrected = find_zero(f, t_new; tol=1e-4)
+                t_new_corrected = find_zero(f, unit.t_lat; tol=1e-3)
             catch e2
                 @error "The solving algorithm for the phase change process in the geothermal collector $(unit.uac) was not successful. " *
                        "Manually decrease the \"internal_time_step\" which is currently $(unit.dt) s or change the accuracy_mode."
