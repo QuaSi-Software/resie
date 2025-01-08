@@ -33,7 +33,9 @@ mutable struct GeothermalHeatCollector <: Component
     max_input_power::Union{Nothing,Float64}
     regeneration::Bool
     max_output_energy::Float64
+    current_max_output_energy::Float64
     max_input_energy::Float64
+    current_max_input_energy::Float64
 
     current_output_temperature::Temperature
     current_input_temperature::Temperature
@@ -143,8 +145,10 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
                    default(config, "regeneration", true),                # flag if regeneration should be taken into account
-                   0.0,                                                  # max_output_energy [Wh] in every time step, calculated in control()
-                   0.0,                                                  # max_input_energy [Wh] in every time step, calculated in control()
+                   0.0,                                                  # max_output_energy [Wh] accoring to max_output_power, calculated in initialize()
+                   0.0,                                                  # current_max_output_energy [Wh] in every time step, calculated in control()
+                   0.0,                                                  # max_input_energy [Wh] according to max_input_power, calculated in initialize()
+                   0.0,                                                  # current_max_input_energy [Wh] in every time step, calculated in initialize()
                    0.0,                                                  # current_output_temperature [°C] in current time step, calculated in control()
                    0.0,                                                  # current_input_temperature [°C] in current time step, calculated in control()
                    0.0,                                                  # ambient_temperature [°C] in current time step, calculated in control()
@@ -516,7 +520,14 @@ function control(unit::GeothermalHeatCollector,
                      nothing,
                      unit.current_output_temperature)
 
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.max_output_energy)
+    # limit max_energy if current_output_temperature undercuts fluid_min_output_temperature
+    if unit.fluid_min_output_temperature === nothing
+        unit.current_max_output_energy = unit.max_output_energy
+    else
+        unit.current_max_output_energy = unit.current_output_temperature <= unit.fluid_min_output_temperature ?
+                                         0.0 : unit.max_output_energy
+    end
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
@@ -526,7 +537,14 @@ function control(unit::GeothermalHeatCollector,
                          unit.current_input_temperature,
                          nothing)
 
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+        # limit max_energy if current_input_temperature exceeds fluid_max_input_temperature
+        if unit.fluid_max_input_temperature === nothing
+            unit.current_max_input_energy = unit.max_input_energy
+        else
+            unit.current_max_input_energy = unit.current_input_temperature >= unit.fluid_max_input_temperature ?
+                                            0.0 : unit.max_input_energy
+        end
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy)
     end
 end
 
@@ -952,7 +970,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
     energy_demanded = balance(exchanges) + energy_potential(exchanges)
-    energy_available = unit.max_output_energy  # is positive
+    energy_available = unit.current_max_output_energy  # is positive
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
@@ -986,7 +1004,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     end
 
     # write output heat flux into vector
-    energy_delivered = -(unit.max_output_energy - energy_available)
+    energy_delivered = -(unit.current_max_output_energy - energy_available)
     unit.collector_total_heat_energy_in_out = energy_delivered
 end
 
@@ -1001,7 +1019,7 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
     energy_available = balance(exchanges) + energy_potential(exchanges)
-    energy_demand = unit.max_input_energy  # is positive
+    energy_demand = unit.current_max_input_energy  # is positive
 
     if energy_available <= sim_params["epsilon"]
         # shortcut if there is no energy to be used
@@ -1038,7 +1056,7 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
         end
     end
 
-    energy_taken = unit.max_input_energy - energy_demand
+    energy_taken = unit.current_max_input_energy - energy_demand
     unit.collector_total_heat_energy_in_out += energy_taken
     calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out, sim_params)
 end
@@ -1050,7 +1068,7 @@ function balance_on(interface::SystemInterface, unit::GeothermalHeatCollector)::
 
     return [EnEx(; balance=interface.balance,
                  energy_potential=balance_written ? 0.0 :
-                                  (caller_is_input ? -unit.max_input_energy : unit.max_output_energy),
+                                  (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
