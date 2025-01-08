@@ -1113,7 +1113,7 @@ end
 """
     plot_optional_figures_begin(unit, output_path, output_formats, sim_params)
 
-Plot otpional figures that are potentially created after initialisation of each 
+Plot optional figures that are potentially created after initialisation of each 
 component. Saves all figures to "output_path" for each specified "output_formats".
 Possible output formats are:
     - html
@@ -1126,10 +1126,10 @@ Possible output formats are:
 - `unit::Component`: The unit that plots additional figures
 - `output_path::String`: The output folder as string (absolute/relative) for the additional plots
 - `output_formats::Vector{Any}`: A Vector of output file formats, each as string without dot
-- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+- `sim_params::Dict{String,Any}`: Simulation parameters of ReSiE
  
 # Returns:
-- Bool: true if a figure was created, false if no figure was created.
+- Bool: True if a figure was created, false if no figure was created
 """
 function plot_optional_figures_begin(unit::Component,
                                      output_path::String,
@@ -1142,15 +1142,15 @@ end
 """
     plot_optional_figures_end(unit, sim_params)
 
-Plot otpional figures that are potentially created at the end of the simulation of each 
-component. 
+Plot optional figures that are potentially created at the end of the simulation for each 
+component.
 
 # Arguments
 - `unit::Component`: The unit that plots additional figures
-- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+- `sim_params::Dict{String,Any}`: Simulation parameters of ReSiE
  
 # Returns:
-- Bool: true if a figure was created, false if no figure was created.
+- Bool: True if a figure was created, false if no figure was created
 """
 function plot_optional_figures_end(unit::Component,
                                    sim_params::Dict{String,Any})
@@ -1441,13 +1441,17 @@ end
 """
 get_temperature_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of the temperature profile for fixed and bouded sinks and sources.
-If no information is given, nothing will be returned.
-If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
-If a constant_temperature is set, this will be used.
-If temperature_from_global_file is set to a valid entr ("temp_ambient_air") of the global weather file, this will be used.
+Function to determine the source of the temperature profile for fixed and bounded sinks
+and sources.
+* If no information is given, nothing will be returned.
+* If a temperature_profile_file_path is given, the temperature will be read from the
+  user-defined profile.
+* If a constant_temperature is set, this will be used.
+* If temperature_from_global_file is set to a valid entry ("temp_ambient_air") of the global
+  weather file, this will be used.
 
-The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
+The function also checks whether more than one temperature source is specified and throws a
+warning if this is the case.
 """
 function get_temperature_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
     # check input
@@ -1483,13 +1487,16 @@ end
 """
 get_glob_solar_radiation_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of solar global radiation profile.
-If no information is given, nothing will be returned.
-If a global_solar_radiation_profile_file_path is given, the global solar radiation will be read from the user-defined profile.
-If a constant_global_solar_radiation is set, this will be used.
-If global_solar_radiation_from_global_file is set to a valid entry ("globHorIrr") of the global weather file, this will be used.
+Function to determine the source of the solar global radiation profile.
+* If no information is given, nothing will be returned.
+* If a global_solar_radiation_profile_file_path is given, the global solar radiation will be
+  read from the user-defined profile.
+* If a constant_global_solar_radiation is set, this will be used.
+* If global_solar_radiation_from_global_file is set to a valid entry ("globHorIrr") of the
+  global weather file, this will be used.
 
-The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
+The function also checks whether more than one temperature source is specified and throws a
+warning if this is the case.
 """
 function get_glob_solar_radiation_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any},
                                                       uac::String)
@@ -1528,13 +1535,16 @@ end
 """
     get_infrared_sky_radiation_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of infrared sky radiation profile [Wh/m^2].
-If no information is given, nothing will be returned.
-If a infrared_sky_radiation_profile_file_path is given, the infrared sky radiation will be read from the user-defined profile.
-If a constant_infrared_sky_radiation is set, this will be used.
-If infrared_sky_radiation_from_global_file is set to a valid entry ("longWaveIrr") of the global weather file, this will be used.
+Function to determine the source of the infrared sky radiation profile.
+* If no information is given, nothing will be returned.
+* If a infrared_sky_radiation_profile_file_path is given, the infrared sky radiation will be
+  read from the user-defined profile.
+* If a constant_infrared_sky_radiation value is set, this will be used.
+* If infrared_sky_radiation_from_global_file is set to a valid entry ("longWaveIrr") of the
+  global weather file, this will be used.
 
-The function also checks whether more than one source is specified and throws a warning if this is the case.
+The function also checks whether more than one source is specified and throws a warning if
+this is the case.
 """
 function get_infrared_sky_radiation_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any},
                                                         uac::String)

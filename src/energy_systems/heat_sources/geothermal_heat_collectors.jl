@@ -3,13 +3,14 @@ using Roots
 using Plots
 
 """
-Implementation of geothermal heat collector.
-This implementations acts as storage as is can produce and load energy.
+Implementation of a geothermal heat collector.
+This implementation acts as storage as is can produce and load energy.
 
 Possible improvements in the future:
-- Addition of convective heat transport at the earth's surface as a function of wind speed and ambient 
-  temperature instead of a constant factor
-- Adaptation of the model to be able to simulate a single pipe (requires adaptation of the boundary conditions)
+- Addition of convective heat transport at the earth's surface as a function of wind speed
+  and ambient temperature instead of a constant factor
+- Adaptation of the model to be able to simulate a single pipe (requires adaptation of the
+  boundary conditions)
 """
 
 mutable struct GeothermalHeatCollector <: Component
@@ -142,8 +143,8 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "fluid_min_output_temperature", nothing),   # [°C] minimum output temperature of the fluid for unloading
                    default(config, "fluid_max_input_temperature", nothing),    # [°C] maximum input temperature of the fluid for loading
                    default(config, "loading_temperature_spread", 3.0),   # [K] temperature spread between forward and return flow during loading         
-                   default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
-                   default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. Depending on ground and climate localization. [VDI 4640-2.]
+                   default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. depends on ground and climate localization. [VDI 4640-2.]
+                   default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. depends on ground and climate localization. [VDI 4640-2.]
                    default(config, "regeneration", true),                # flag if regeneration should be taken into account
                    0.0,                                                  # max_output_energy [Wh] accoring to max_output_power, calculated in initialize()
                    0.0,                                                  # current_max_output_energy [Wh] in every time step, calculated in control()
@@ -171,25 +172,25 @@ mutable struct GeothermalHeatCollector <: Component
                    Array{Bool}(undef, 0, 0),                             # is_pipe_surrounding, identifies nodes surrounding the fluid-node: pipe-surrounding: true; else: false
                    default(config, "pipe_radius_outer", 0.016),          # pipe outer radius [m]
                    default(config, "pipe_thickness", 0.003),             # thickness of pipe [m]
-                   0.0,                                                  # pipe_d_i: pipe inner diameter [m], calculated in initailize() 
-                   0.0,                                                  # pipe_d_o: pipe outer diameter [m], calculated in initailize() 
-                   default(config, "pipe_laying_depth", 1.5),            # deepth of pipe system below the ground sourface [m]
+                   0.0,                                                  # pipe_d_i: pipe inner diameter [m], calculated in initialize() 
+                   0.0,                                                  # pipe_d_o: pipe outer diameter [m], calculated in initialize() 
+                   default(config, "pipe_laying_depth", 1.5),            # depth of pipe system below the ground surface [m]
                    default(config, "pipe_length", 100),                  # pipe length of one collector pipe [m]
-                   default(config, "number_of_pipes", 1),                # numbers of parallel pipes, each with a length of "pipe_length"
+                   default(config, "number_of_pipes", 1),                # number of parallel pipes, each with a length of "pipe_length"
                    default(config, "pipe_spacing", 0.5),                 # distance between pipes of collector [m]
                    default(config, "considered_soil_depth", 10.0),       # depth of the soil considered in the simulation [m]
                    default(config, "accuracy_mode", "normal"),           # accuracy_mode. Has to be one of "very_rough", "rough", "normal", "high", "very_high"
-                   model_type,                                           # model_type. currently "simplified" with constant fluid-to-soil resistance and 
-                   #                                                       "detailed" with calculated fluid-to-soil resistance in every time step are available.
+                   model_type,                                           # model_type. currently "simplified", with constant fluid-to-soil resistance, and 
+                   #                                                       "detailed", with calculated fluid-to-soil resistance in every time step, are available.
                    default(config, "pipe_soil_thermal_resistance", 0.1), # thermal resistance in [(m K)/W], only for model_type = simplified
-                   0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read in from weather-profile
+                   0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read from weather-profile
                    5.6697e-8,                                            # boltzmann_constant [W/(m^2 K^4)]: Stefan-Boltzmann-Constant
                    default(config, "surface_emissivity", 0.9),           # surface_emissivity [-]: emissivity on ground surface
-                   Array{Float64}(undef, 0),                             # dx [m] horizontal dimension parallel to ground sourface and orthogonal to pipe
-                   Array{Float64}(undef, 0),                             # dy [m] vertical dimension orthogonal to ground surface and orthgonal to pipe
+                   Array{Float64}(undef, 0),                             # dx [m] horizontal dimension parallel to ground surface and orthogonal to pipe
+                   Array{Float64}(undef, 0),                             # dy [m] vertical dimension orthogonal to ground surface and orthogonal to pipe
                    Array{Float64}(undef, 0),                             # dx_mesh [m] this is dx between the nodes (while dx is the x-width assigned to each node)
                    Array{Float64}(undef, 0),                             # dy_mesh [m] this is dy between the nodes (while dy is the y-width assigned to each node)
-                   0.0,                                                  # dz [m] horizontal dimension parallel to ground sourface and parallel to pipe (equals the length of one pipe, constant)
+                   0.0,                                                  # dz [m] horizontal dimension parallel to ground surface and parallel to pipe (equals the length of one pipe, constant)
                    default(config, "internal_time_step", 0),             # dt [s], time step width of internal timestep, is calculated depending on ground properties and discretisation
                    0.0,                                                  # fluid_temperature [°C], is set to fluid_start_temperature at the beginning               
                    0.0,                                                  # collector_total_heat_energy_in_out, total heat flux in or out of collector
@@ -197,19 +198,19 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "fluid_specific_heat_capacity", 3800),# fluid_specific_heat_capacity [J/(kg K)]
                    default(config, "fluid_prandtl_number", 30),          # prandtl number [-], preset for 30 % glycol at 0 °C 
                    default(config, "fluid_density", 1045),               # fluid density [kg/m^3], preset for 30 % glycol at 0 °C
-                   default(config, "fluid_kinematic_viscosity", 3.9e-6), # fluid_kinematic_viscosity [m^2/s], preset fo 30 % glycol at 0 °C
-                   default(config, "fluid_heat_conductivity", 0.5),      # fluid_heat_conductivity [W/(mK)], preset fo 30 % glycol at 0 °C
-                   default(config, "use_dynamic_fluid_properties", false),# use_dynamic_fluid_properties [bool], false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
-                   default(config, "nusselt_approach", "Stephan"),       # Approach used for the caluclation of the Nußelt number, can be one of: Stephan, Ramming
-                   0.0,                                                  # fluid_reynolds_number, to be calculated in function.
+                   default(config, "fluid_kinematic_viscosity", 3.9e-6), # fluid_kinematic_viscosity [m^2/s], preset for 30 % glycol at 0 °C
+                   default(config, "fluid_heat_conductivity", 0.5),      # fluid_heat_conductivity [W/(mK)], preset for 30 % glycol at 0 °C
+                   default(config, "use_dynamic_fluid_properties", false), # use_dynamic_fluid_properties, false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
+                   default(config, "nusselt_approach", "Stephan"),       # approach used for the calculation of the Nußelt number, can be one of: Stephan, Ramming
+                   0.0,                                                  # fluid_reynolds_number, to be calculated by a function
                    0.0,                                                  # alpha_fluid_pipe: convective heat transfer coefficient between fluid and pipe
-                   default(config, "start_temperature_fluid_and_pipe", 15.5),  # average_temperature_adjacent_to_pipe [°C], used as starting temperature of fluid and soil near pipe during initialisation
-                   default(config, "undisturbed_ground_temperature", 9.0),     # undisturbed ground temperature at the bottom of the simulation boundary [°C]
+                   default(config, "start_temperature_fluid_and_pipe", 15.5), # average_temperature_adjacent_to_pipe [°C], used as starting temperature of fluid and soil near pipe during initialisation
+                   default(config, "undisturbed_ground_temperature", 9.0),    # undisturbed ground temperature at the bottom of the simulation boundary [°C]
                    Array{Float64}(undef, 0, 0, 0),                       # temp_field_output [°C], holds temperature field of nodes for output plot
                    0,                                                    # n_internal_timesteps: number of internal time steps within one simulation time step
-                   0.0,                                                  # sigma_lat; precalculated parameters for freezing function
-                   0.0,                                                  # t_lat; precalculated parameters for freezing function
-                   0.0,                                                  # delta_t_lat; precalculated parameters for freezing function
+                   0.0,                                                  # sigma_lat; precalculated parameter for freezing function
+                   0.0,                                                  # t_lat; precalculated parameter for freezing function
+                   0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
                    0.0)                                                  # volume_adjacent_to_pipe; precalculated parameter
     end
 end
@@ -298,12 +299,12 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     n_nodes_x = length(unit.dx)
     n_nodes_y = length(unit.dy)
 
-    # localize fluid and adjacent nodes as they will be calculated separatly later
+    # localize fluid and adjacent nodes as they will be calculated separately later
     unit.fluid_node_y_idx = y_pipe_node_num
 
     # set pipe-surrounding nodes assuming that the pipe has one central
     # and 8 surrounding nodes, of which 5 are considered in the axisymmetric grid used here.
-    unit.is_pipe_surrounding = fill(false, n_nodes_y, n_nodes_x)  # pipe surrounding nodes are true, all others are false
+    unit.is_pipe_surrounding = fill(false, n_nodes_y, n_nodes_x)  # pipe-surrounding nodes are true, all others are false
     unit.is_pipe_surrounding[y_pipe_node_num - 1, 1] = true
     unit.is_pipe_surrounding[y_pipe_node_num - 1, 2] = true
     unit.is_pipe_surrounding[y_pipe_node_num + 0, 2] = true
@@ -311,14 +312,14 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     unit.is_pipe_surrounding[y_pipe_node_num + 1, 2] = true
 
     # set starting temperature distribution as follows:
-    # top:         average ambient temperature, linearly interpolated to pipe surrounding
-    # pipe:        6 nodes with the same starting temperature for pipe and pipe surrounding
-    # lower bound: undistrubed ground temperature
+    # top:         average ambient temperature, linearly interpolated to pipe surroundings
+    # pipe:        6 nodes with the same starting temperature for pipe and pipe surroundings
+    # lower bound: undisturbed ground temperature
     unit.t1 = fill(0.0, n_nodes_y, n_nodes_x)
     n_nodes_surface_to_pipe_surrounding = y_pipe_node_num - 3
     n_nodes_pipe_surrounding_to_ground = n_nodes_y - n_nodes_surface_to_pipe_surrounding - 5
 
-    # set temperatures from surface to pipe surrounding with linear interpolation
+    # set temperatures from surface to pipe surroundings with linear interpolation
     average_ambient_temperature = sum(values(unit.ambient_temperature_profile.data)) /
                                   length(values(unit.ambient_temperature_profile.data))
     step = (unit.average_temperature_adjacent_to_pipe - average_ambient_temperature) /
@@ -327,10 +328,10 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
         unit.t1[i, :] .= average_ambient_temperature + sum(unit.dy_mesh[1:(i - 1)]) * step
     end
 
-    # set temperatures for pipe and pipe surrounding
+    # set temperatures for pipe and pipe surroundings
     unit.t1[(n_nodes_surface_to_pipe_surrounding + 1):(n_nodes_surface_to_pipe_surrounding + 5), :] .= unit.average_temperature_adjacent_to_pipe
 
-    # set temperatures from pipe surrounding to ground with linear interpolation
+    # set temperatures from pipe surroundings to ground with linear interpolation
     step = (unit.undisturbed_ground_temperature - unit.average_temperature_adjacent_to_pipe) /
            sum(unit.dy_mesh[(n_nodes_surface_to_pipe_surrounding + 5):(n_nodes_y - 1)])
     for i in 1:n_nodes_pipe_surrounding_to_ground
@@ -346,7 +347,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
                                      unit.dy[unit.fluid_node_y_idx + 1]) -
                                     (0.5 * pi * unit.pipe_radius_outer^2)) * unit.dz                        # 1/2 cross section of pipe
 
-    # set soil density. currently only homogenous soil i  s considered, but more layers are possible
+    # set soil density. currently only homogenous soil is considered, but more layers are possible
     unit.soil_density_vector = fill(unit.soil_density, n_nodes_y)
 
     # calculate soil weight of the soil around each node
@@ -369,7 +370,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
                                      unit.soil_density * min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) / 4))))
     end
     # ensure that dt is a divisor of the simulation time step
-    # find the largest divisor that is smaller that the calculated dt
+    # find the largest divisor that is smaller than the calculated dt
     if sim_params["time_step_seconds"] % unit.dt != 0
         divisors = [i for i in 1:(unit.dt) if sim_params["time_step_seconds"] % i == 0]
         unit.dt = divisors[end]
@@ -383,26 +384,30 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 end
 
 """ 
-    create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth, pipe_radius_outer, total_depth_simulation_domain)
+    create_mesh_y(min_mesh_width, max_mesh_width, expansion_factor, pipe_laying_depth,
+                  pipe_radius_outer, total_depth_simulation_domain)
 
-Creates a non-uniform mesh for geothermal collector in y-direction (orthogonal to ground surface and orthogonal to pipe).
-| --------(ground surface)
-| O       (pipe cross section)
-V ........(lower bound)
-y-direction
+Creates a non-uniform mesh for a geothermal heat collector in y-direction (orthogonal to
+ground surface and orthogonal to pipe).
 
-The mesh starts at the ground surface with an initial width of min_mesh_width. The width expands by a factor of 
-expansion_factor for each node until reaching halfway to the pipe-laying depth. At that point, the mesh width begins
-to decrease. The pipe itself is represented by one node, surrounded by one node each in the positive and negative
-y-directions.
-Below the pipe area, the mesh width starts again at min_mesh_width, increases up to halfway to the lower bound, and 
-then decreases symmetrically.
+| -------- (ground surface)
+| O        (pipe cross section)
+V ........ (lower bound)
 
-The function determines the width of each volume element around a node point, starting with the surface layer.
-The node itself is located in the centre of the respective width.
+The arrow shows the y-direction.
 
-Note: The node spacing at the turning point between increasing and decreasing mesh width may deviate from the value
-calculated using the expansion_factor.
+The mesh starts at the ground surface with an initial width of `min_mesh_width`. The width
+expands by a factor of `expansion_factor` for each node until reaching halfway to the
+pipe-laying depth. At that point, the mesh width begins to decrease. The pipe itself is
+represented by one node, surrounded by one node each in the positive and negative
+y-directions. Below the pipe area, the mesh width starts again at `min_mesh_width`,
+increases up to halfway to the lower bound, and then decreases symmetrically.
+
+The function determines the width of each volume element around a node point, starting with
+the surface layer. The node itself is located in the center of the respective width.
+
+Note: The node spacing at the turning point between increasing and decreasing mesh width may
+deviate from the value calculated using the expansion factor.
 """
 function create_mesh_y(min_mesh_width::Float64,
                        max_mesh_width::Float64,
@@ -460,20 +465,25 @@ end
 
 """ 
     create_mesh_x(min_mesh_width, max_mesh_width, expansion_factor, pipe_radius_outer, pipe_spacing)
-  
-Creates a non-uniform mesh for geothermal collector in x-direction (parallel to ground surface and orthogonal to pipe).
+
+Creates a non-uniform mesh for a geothermal collector in x-direction (parallel to ground
+surface and orthogonal to pipe).
+
 -----------------------  (ground surface)
-O --> x-direction        (pipe cross section) 
+O ------->               (pipe cross section) 
 .......................  (lower bound)
 
-Starts with half the pipe diameter to represent the pipe nodes and increases the mesh width by the expansion_factor
-for each node until half the pipe_spacing is reached.
+The arrow shows the x-direction.
 
-The function determines the width of each volume element around a node point, starting with the vertical mirror axis
-in which the pipe lies. The node itself is located in the centre of the respective width, except of the first node
-which is located right on the mirror axis.
+Starts with half the pipe diameter to represent the pipe nodes and increases the mesh width
+by the expansion factor for each node until half the pipe spacing is reached.
 
-Note that the last dx can be smaller than calculated to meet the given boundary by pipe_spacing.
+The function determines the width of each volume element around a node point, starting with
+the vertical mirror axis in which the pipe lies. The node itself is located in the center of
+the respective width, except of the first node which is located right on the mirror axis.
+
+Note that the last dx can be smaller than calculated to meet the given boundary by
+`pipe_spacing`.
 """
 function create_mesh_x(min_mesh_width::Float64,
                        max_mesh_width::Float64,
@@ -486,7 +496,7 @@ function create_mesh_x(min_mesh_width::Float64,
     # set first two dx to half the pipe radius
     dx = [pipe_radius_outer / 2, pipe_radius_outer]       # [m]
 
-    # set next dx to the minumum width
+    # set next dx to the minimum width
     append!(dx, min_mesh_width)
 
     # add dx while x_bound is not exeeded
@@ -599,7 +609,7 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
     q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length   # [W/pipe]
 
     # calculate effective mean sky temperature (sky radiative temperature) according to Stefan-Boltzmann law assuming 
-    # the sky beeing a black body for the current time step:
+    # the sky being a black body for the current time step:
     sky_temperature = (Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params) /
                        unit.boltzmann_constant)^0.25  # [K]
 
@@ -955,7 +965,7 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
 end
 
 function calculate_Nu_turbulent(unit::GeothermalHeatCollector, fluid_reynolds_number::Float64)
-    # Approached used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung 
+    # Approach used from Gnielinski in: V. Gnielinski: Ein neues Berechnungsverfahren für die Wärmeübertragung 
     # im Übergangsbereich zwischen laminarer und turbulenter Rohrströmung. Forsch im Ing Wes 61:240-248, 1995. 
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
     nusselt_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
@@ -987,7 +997,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
         if (exchange.temperature_min !== nothing &&
             exchange.temperature_min > unit.current_output_temperature)
-            # we can only supply energy at a temperature at or below the tank's current
+            # we can only supply energy at a temperature at or below the collector's current
             # output temperature
             continue
         end
