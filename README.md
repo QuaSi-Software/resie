@@ -4,7 +4,8 @@
 
 Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
 
-Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. For information on how you can contribute please check the documentation.
+Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. External files with different license have their own license file in their respective folders.
+For information on how you can contribute please check the documentation.
 
 ## Installation
 
@@ -143,3 +144,6 @@ Open `launch.json` (via the gear wheel in the run config dropdown in the debug t
     "args": []
 }
 ```
+
+
+
