@@ -240,13 +240,13 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                                                             Second(sim_params["time_step_seconds"]))
     end
 
-    ### create profile line plot
+    # create profile line plot
     if do_create_plot
         create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config, sim_params)
         @info "Line plot created and saved to .output/output_plot.html"
     end
 
-    ### create Sankey diagram
+    # create Sankey diagram
     if do_create_sankey
         create_sankey(output_sourcenames_sankey,
                       output_targetnames_sankey,
@@ -259,6 +259,13 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     if do_write_CSV
         @info "CSV-file with outputs written to $(csv_output_file_path)"
+    end
+
+    # plot additional figures potentially available from components after simulation
+    if default(project_config["io_settings"], "auxiliary_plots", false)
+        for component in components
+            plot_optional_figures_end(component[2], sim_params)
+        end
     end
 end
 
