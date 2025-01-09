@@ -1,8 +1,23 @@
 """
 Implementation of a buffer tank holding hot water for heating or DHW purposes.
 
-This is a simplified model, which mostly deals with amounts of energy and considers
-temperatures only for the available temperature as the tank is depleted.
+This is a simplified model of a buffer tank with three different model types:
+* ideally_stratified: An ideally stratified cylindrical tank providing thermal energy always 
+                      at the tank's upper temperature. Losses, if activated, are only 
+                      energy losses reducing the amount of available energy (no exergy losses). 
+* ideally_mixed:      An ideally mixed cylindrical tank providing thermal energy at a temperature
+                      between the tank's upper and lower temperature. Note that the upper 
+                      temperature is only supplied at 100% load. Losses, if activated, are
+                      considered as energy and exergy losses reducing the energy and the 
+                      current supply temperature.
+* balanced:           The balanced model of the cylindrical buffer tank is a mix of the 
+                      ideally stratified and ideally mixed model. At a load higher than the 
+                      user-defined switch point, the ideally stratified model is used. At a 
+                      load less than the switch point, the model switches to the ideally mixed model, 
+                      representing a more realistic temperature behaviour of the energy supply.
+Note that all three models can only be loaded with energy at a temperature of at least the 
+upper temperature of the tank.
+
 """
 mutable struct BufferTank <: Component
     uac::String
@@ -89,8 +104,8 @@ mutable struct BufferTank <: Component
                    nothing,                                    # maximum output energy per time step [Wh]
                    default(config, "consider_losses", false),  # consider_losses [Bool]
                    default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
-                   0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylindder [m^2]
-                   0.0,                                        # surface_barrel, surface of the barrel of the cylindder [m^2]
+                   0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylinder [m^2]
+                   0.0,                                        # surface_barrel, surface of the barrel of the cylinder [m^2]
                    default(config, "thermal_transmission_lid", 0.2),     # [W/mK]
                    default(config, "thermal_transmission_barrel", 0.2),  # [W/mK]
                    default(config, "thermal_transmission_bottom", 0.2),  # [W/mK]
@@ -100,7 +115,7 @@ mutable struct BufferTank <: Component
                    default(config, "switch_point", 0.15),                # [%/100] load where to change from stratified to mixed mode, only for model_type :balanced
                    0.0,                                        # current_max_output_temperature at the beginning of the time step
                    default(config, "initial_load", 0.0),       # initial_load [%]
-                   0.0,                                        # load, set to inital_load at the beginning Wh
+                   0.0,                                        # load, set to inital_load at the beginning [Wh]
                    0.0)                                        # losses in current time step [Wh]
     end
 end
@@ -136,7 +151,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
-    # calculate surfaces of the butter tank cylinder
+    # calculate surfaces of the buffer tank cylinder
     if unit.consider_losses
         radius = cbrt(unit.volume / (unit.h_to_r * pi))  # [m]
         height = radius * unit.h_to_r                    # [m]
@@ -144,7 +159,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         unit.surface_lid_bottom = radius^2 * pi          # [m^2]
     end
 
-    # set inital state
+    # set initial state
     unit.load = unit.initial_load / 100 * unit.capacity
 end
 
@@ -172,7 +187,7 @@ end
 
 function temperature_at_load(unit::BufferTank)::Temperature
     if unit.model_type == :ideally_stratified
-        # always high temperature is avaliable
+        # always high temperature is available
         return unit.high_temperature
     elseif unit.model_type == :balanced
         # When the storage is loaded above the switch_point, the high temperature is available. 
@@ -180,7 +195,7 @@ function temperature_at_load(unit::BufferTank)::Temperature
         partial_load = min(1.0, unit.load / (unit.capacity * unit.switch_point))
         return (unit.high_temperature - unit.low_temperature) * partial_load + unit.low_temperature
     elseif unit.model_type == :ideally_mixed
-        # A linear course between high and low temperature can be supplied related to the current load.
+        # A linear course between high and low temperature is supplied, depending on the current load.
         return unit.low_temperature + (unit.load / unit.capacity) * (unit.high_temperature - unit.low_temperature)
     end
 end
@@ -192,7 +207,7 @@ function calculate_losses!(unit::BufferTank, sim_params)
 
     function calculate_energy_loss(unit, sim_params)
         if unit.load == 0.0
-            # no gains or losses if storage is completely emtpy for ideally_stratified model
+            # no gains or losses if storage is completely empty for ideally_stratified model
             return 0.0
         else
             barrel_surface = unit.surface_barrel * unit.load / unit.capacity
@@ -223,7 +238,7 @@ function calculate_losses!(unit::BufferTank, sim_params)
                           sim_params["time_step_seconds"] / 60 / 60
         end
     elseif unit.model_type == :ideally_mixed
-        # losses are exergy losses through whole storage 
+        # losses are exergy losses through the whole storage
         current_tank_temperature = unit.low_temperature +
                                    (unit.load / unit.capacity) * (unit.high_temperature - unit.low_temperature)
         temperature_difference_air = current_tank_temperature - unit.ambient_temperature
