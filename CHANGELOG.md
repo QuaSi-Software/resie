@@ -4,6 +4,16 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.10.3
+* Add the possibility to create optional figures at the end of the simulation period
+* Fix balance_on() of storages for direct connections
+* Finalisation of the geothermal collector (successfully validated agains TRNSYS and DELPHIN):
+  * Revision of the entire model, including bug fixed and improvements
+  * Add automatic generation of the numerical grid
+  * Add time-shiftable plot of the temperature distribution (requires GLMakie package, activate with auxiliary_plots)
+  * Add scenario using the geothermal collector
+* Update installation instructions for ReSiE
+
 ### Version 0.10.2
 * Internal changes concerning global state in the package scope:
   * Moving helper functions watt_to_wh and wh_to_watts into the simulation parameters

@@ -81,11 +81,12 @@ end
 function balance_on(interface::SystemInterface,
                     unit::SeasonalThermalStorage)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(;
                  balance=interface.balance,
-                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,

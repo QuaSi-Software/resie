@@ -4,25 +4,26 @@
 
 Use of Resie is described in more detail in the accompanying documentation. You can find a rendered version online at [the official readthedocs page](https://quasi-software.readthedocs.io). This document describes installation and contains useful information for developers, who wish to work with ReSiE.
 
-Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. For information on how you can contribute please check the documentation.
+Resie is released under the MIT license. You can find a copy of the license in file `LICENSE.md`. External files with different license have their own license file in their respective folders.
+For information on how you can contribute please check the documentation.
 
 ## Installation
 
 ### **Requirements**
 
-* Julia, minimum v1.8.5 and tested up to v1.10.4. You can find installation instructions [here](https://julialang.org/downloads/).
+* Julia, minimum v1.8.5 and tested up to v1.10.4. You can find installation instructions [here](https://julialang.org/downloads/). Works best using Juliaup instead of precompiled binary files.
 * (Optional) Python3, tested with v3.9.13. Only required for developing ReSiE.
 
 ### Instructions
 
-1. Get a copy: `git clone git@github.com:QuaSi-Software/resie.git`
-1. Switch into the ReSiE root directory: `cd /path/to/resie`
-1. Start the julia REPL with `julia`
-1. Switch to the package REPL with `]` (no enter necessary)
-1. Activate the project environment: `activate .`
-1. Install and precompile required packages: `instantiate`. This should create a file `Manifest.toml` in the ReSiE root directory
-1. Exit out of the package REPL with shortcut `Ctrl+c`
-1. Exit out of the julia REPL with `exit()` or shortcut `Ctrl+d`
+1. Get a copy: `git clone https://github.com/QuaSi-Software/resie.git`
+2. Switch into the ReSiE root directory: `cd /path/to/resie`
+3. Start the julia REPL with `julia`
+4. Switch to the package REPL with `]` (no enter necessary)
+5. Activate the project environment: `activate .`
+6. Install and precompile required packages: `instantiate`. This should create a file `Manifest.toml` in the ReSiE root directory
+7. Exit out of the package REPL with shortcut `Ctrl+c`
+8. Exit out of the julia REPL with `exit()` or shortcut `Ctrl+d`
 
 To use profiles with a time-zone-aware datetime index beyond 2038, follow these steps:
 
@@ -143,3 +144,6 @@ Open `launch.json` (via the gear wheel in the run config dropdown in the debug t
     "args": []
 }
 ```
+
+
+
