@@ -241,20 +241,23 @@ function test_data_storage_loading()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_02"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_03"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
     )
 
@@ -393,20 +396,23 @@ function test_data_storage_loading_with_matrix()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
         "TST_BFT_02" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_02"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
         "TST_BFT_03" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_03"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
     )
 
