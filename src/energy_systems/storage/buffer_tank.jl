@@ -79,7 +79,8 @@ mutable struct BufferTank <: Component
         end
 
         constant_ambient_temperature = default(config, "constant_ambient_temperature", nothing)
-        if constant_ambient_temperature === nothing
+        consider_losses = default(config, "consider_losses", false)
+        if constant_ambient_temperature === nothing && consider_losses
             ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
         else
             ambient_temperature_profile = nothing
@@ -102,7 +103,7 @@ mutable struct BufferTank <: Component
                    default(config, "max_unload_rate", nothing),# maximum unload rate given in 1/h
                    nothing,                                    # maximum input energy per time step [Wh]
                    nothing,                                    # maximum output energy per time step [Wh]
-                   default(config, "consider_losses", false),  # consider_losses [Bool]
+                   consider_losses,                            # consider_losses [Bool]
                    default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
                    0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylinder [m^2]
                    0.0,                                        # surface_barrel, surface of the barrel of the cylinder [m^2]
@@ -144,10 +145,14 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     # calculate maximum input and output energy
-    if unit.max_load_rate !== nothing
+    if unit.max_load_rate === nothing
+        unit.max_input_energy = Inf
+    else
         unit.max_input_energy = unit.max_load_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
-    if unit.max_unload_rate !== nothing
+    if unit.max_unload_rate === nothing
+        unit.max_output_energy = Inf
+    else
         unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
@@ -180,7 +185,7 @@ function control(unit::BufferTank,
     set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy))
     set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy))
 
-    if unit.ambient_temperature_profile !== nothing
+    if unit.ambient_temperature_profile !== nothing && unit.consider_losses
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
     end
 end
