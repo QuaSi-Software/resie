@@ -355,8 +355,9 @@
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 500000,
-            "load": 0,
+            "initial_load": 0,
             "high_temperature": 60.0
         },
         "TST_BFT_TH_02": {
@@ -364,8 +365,9 @@
             "output_refs": [
                 "TST_BUS_TH_02"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 500000,
-            "load": 150000,
+            "initial_load": 30,
             "high_temperature": 60.0
         },
         "TST_STES_TH_01": {

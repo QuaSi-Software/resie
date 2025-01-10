@@ -162,8 +162,9 @@
             "output_refs": [
                 "TST_TH_BUS_01"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 80000,
-            "load": 40000,
+            "initial_load": 50,
             "high_temperature": 70.0
         },
         "TST_TH_HP_01": {

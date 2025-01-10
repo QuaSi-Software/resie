@@ -49,8 +49,9 @@
             "output_refs": [
                 "TST_BUS_01"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 7000,
-            "load": 3500,
+            "initial_load": 50,
             "high_temperature": 60.0
         },
         "TST_BAT_01": {

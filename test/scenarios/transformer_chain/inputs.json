@@ -154,11 +154,11 @@
             "output_refs": [
                 "TST_BUS_TH"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 150000,
-            "load": 70000,
+            "initial_load": 46.666666666666666666666666666667,
             "high_temperature": 50.0,
-            "low_temperature": 20.0,
-            "use_adaptive_temperature": false
+            "low_temperature": 20.0
         }
     }
 }

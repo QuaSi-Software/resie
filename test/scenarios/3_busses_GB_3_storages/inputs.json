@@ -198,8 +198,9 @@
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 4000,
-            "load": 2000
+            "initial_load": 50
         },
         "TST_BFT_TH_02": {
             "type": "BufferTank",
@@ -210,8 +211,9 @@
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 4000,
-            "load": 2000
+            "initial_load": 50
         },
         "TST_BFT_TH_03": {
             "type": "BufferTank",
@@ -222,8 +224,9 @@
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 15000,
-            "load": 7000
+            "initial_load": 46.666666666666666666666666666667
         }
 
     }
