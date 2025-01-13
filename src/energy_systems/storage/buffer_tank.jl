@@ -107,9 +107,9 @@ mutable struct BufferTank <: Component
                    default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
                    0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylinder [m^2]
                    0.0,                                        # surface_barrel, surface of the barrel of the cylinder [m^2]
-                   default(config, "thermal_transmission_lid", 0.2),     # [W/mK]
-                   default(config, "thermal_transmission_barrel", 0.2),  # [W/mK]
-                   default(config, "thermal_transmission_bottom", 0.2),  # [W/mK]
+                   default(config, "thermal_transmission_lid", 1.2),     # [W/(m^2K)]
+                   default(config, "thermal_transmission_barrel", 1.2),  # [W/(m^2K)]
+                   default(config, "thermal_transmission_bottom", 1.2),  # [W/(m^2K)]
                    ambient_temperature_profile,                          # [°C]
                    constant_ambient_temperature,                         # ambient_temperature [°C]
                    default(config, "ground_temperature", 12),            # [°C]
@@ -211,7 +211,7 @@ function calculate_losses!(unit::BufferTank, sim_params)
     end
 
     function calculate_energy_loss(unit, sim_params)
-        if unit.load == 0.0
+        if unit.load <= sim_params["epsilon"]
             # no gains or losses if storage is completely empty for ideally_stratified model
             return 0.0
         else
