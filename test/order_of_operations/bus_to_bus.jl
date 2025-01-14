@@ -29,7 +29,7 @@ function test_ooo_bus_to_bus()
             "output_refs" => ["TST_BUS_01"],
             "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "initial_load" => 50,
+            "initial_load" => 0.5,
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
@@ -46,7 +46,7 @@ function test_ooo_bus_to_bus()
             "output_refs" => ["TST_BUS_02"],
             "model_type" => "ideally_stratified",
             "capacity" => 20000,
-            "initial_load" => 50,
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

@@ -357,7 +357,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 500000,
-            "initial_load": 30,
+            "initial_load": 0.3,
             "high_temperature": 60.0
         },
         "TST_STES_TH_01": {

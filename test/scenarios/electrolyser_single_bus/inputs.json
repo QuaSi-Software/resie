@@ -230,7 +230,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 40000,
-            "initial_load": 50,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_BFT": {
@@ -240,7 +240,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 20000,
-            "initial_load": 50,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_02_BFT": {
@@ -250,7 +250,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 20000,
-            "initial_load": 50,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_GBO": {

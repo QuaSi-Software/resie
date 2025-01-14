@@ -201,7 +201,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 40000,
-            "initial_load": 50
+            "initial_load": 0.5
         },
         "TST_01_ELT_01_BAT": {
             "type": "Battery",

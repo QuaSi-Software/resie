@@ -37,7 +37,7 @@ function setup_control_tests()
             "medium" => "m_h_w_ht1",
             "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "initial_load" => 50,
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

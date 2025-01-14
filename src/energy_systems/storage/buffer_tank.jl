@@ -115,7 +115,7 @@ mutable struct BufferTank <: Component
                    default(config, "ground_temperature", 12),            # [°C]
                    default(config, "switch_point", 0.15),                # [%/100] load where to change from stratified to mixed mode, only for model_type :balanced
                    0.0,                                        # current_max_output_temperature at the beginning of the time step
-                   default(config, "initial_load", 0.0),       # initial_load [%]
+                   default(config, "initial_load", 0.0),       # initial_load [%/100]
                    0.0,                                        # load, set to inital_load at the beginning [Wh]
                    0.0)                                        # losses in current time step [Wh]
     end
@@ -165,7 +165,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     end
 
     # set initial state
-    unit.load = unit.initial_load / 100 * unit.capacity
+    unit.load = unit.initial_load * unit.capacity
 end
 
 function control(unit::BufferTank,

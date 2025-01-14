@@ -156,7 +156,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 150000,
-            "initial_load": 46.666666666666666666666666666667,
+            "initial_load": 0.46666666666666666666666666666667,
             "high_temperature": 50.0,
             "low_temperature": 20.0
         }

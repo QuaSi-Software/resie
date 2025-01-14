@@ -82,7 +82,7 @@ function test_base_order()
             "output_refs" => ["TST_01_HZG_01_BUS"],
             "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "initial_load" => 50,
+            "initial_load" => 0.5,
         ),
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
@@ -2853,7 +2853,7 @@ function test_ooo_circle_middle_transformer_interconnections()
             "output_refs" => ["TST_BUS_TH"],
             "model_type" => "ideally_stratified",
             "capacity" => 150000,
-            "initial_load" => 46.666666666666666666666666666667,
+            "initial_load" => 0.46666666666666666666666666666667,
             "high_temperature" => 50.0,
             "low_temperature" => 20.0,
         ),

@@ -51,7 +51,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 7000,
-            "initial_load": 50,
+            "initial_load": 0.5,
             "high_temperature": 60.0
         },
         "TST_BAT_01": {

@@ -165,7 +165,7 @@
             ],
             "model_type": "balanced",
             "capacity": 200000,
-            "initial_load": 42.5,
+            "initial_load": 0.425,
             "high_temperature": 40.0,
             "low_temperature": 25.0
         },
@@ -177,7 +177,7 @@
             ],
             "model_type": "ideally_stratified",
             "capacity": 145000,
-            "initial_load": 48.275862068965517241379310344828,
+            "initial_load": 0.48275862068965517241379310344828,
             "high_temperature": 85.0,
             "low_temperature": 50.0
         },
