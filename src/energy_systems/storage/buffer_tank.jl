@@ -59,6 +59,7 @@ mutable struct BufferTank <: Component
     current_max_output_temperature::Float64
     initial_load::Float64
     load::Float64
+    load_end_of_last_timestep::Float64
     losses::Float64
 
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -117,6 +118,7 @@ mutable struct BufferTank <: Component
                    0.0,                                        # current_max_output_temperature at the beginning of the time step
                    default(config, "initial_load", 0.0),       # initial_load [%/100]
                    0.0,                                        # load, set to inital_load at the beginning [Wh]
+                   0.0,                                        # load_end_of_last_timestep, stores the load of the previous time step without losses
                    0.0)                                        # losses in current time step [Wh]
     end
 end
@@ -166,6 +168,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
 
     # set initial state
     unit.load = unit.initial_load * unit.capacity
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function control(unit::BufferTank,
@@ -207,6 +210,7 @@ end
 
 function calculate_losses!(unit::BufferTank, sim_params)
     if !unit.consider_losses
+        unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
 
@@ -254,6 +258,9 @@ function calculate_losses!(unit::BufferTank, sim_params)
                        unit.thermal_transmission_barrel * unit.surface_barrel * temperature_difference_air) *
                       sim_params["time_step_seconds"] / 60 / 60
     end
+
+    # save load at the end of the current time step before applying the losses for the control modules
+    unit.load_end_of_last_timestep = copy(unit.load)
 
     # update load of storage and limit losses to current load
     unit.losses = min(unit.losses, unit.load)
