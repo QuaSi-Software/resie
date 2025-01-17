@@ -4,6 +4,14 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.10.4
+* Update of buffer tank / STTES model. Now three different models are available, each with and without losses:
+  * ideally stratified: Supplies energy consistently at "high_temperature". Losses reduce energy but do not affect temperature.
+  * ideally mixed: Fully mixed model, with temperature output depending on the current load. Losses decrease both energy and temperature.
+  * balanced: Combines both models. A full tank behaves as ideally stratified, transitioning to ideally mixed as the tank empties.
+* Add workaround for storage_driven control module not recognizing a full storage if losses are activated. This can be done cleaner in the future.
+* Scenario "chpp_two_hyst" now includes losses in buffer tank
+
 ### Version 0.10.3
 * Add the possibility to create optional figures at the end of the simulation period
 * Fix balance_on() of storages for direct connections
