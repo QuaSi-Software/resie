@@ -16,6 +16,7 @@ Base.@kwdef mutable struct Battery <: Component
 
     capacity::Float64
     load::Float64
+    load_end_of_last_timestep::Float64
     losses::Float64
 
     max_charge::Float64
@@ -33,6 +34,7 @@ Base.@kwdef mutable struct Battery <: Component
                    medium,
                    config["capacity"], # capacity
                    config["load"],     # load
+                   0.0, # load_end_of_last_timestep
                    0.0, # losses
                    0.0, # max_charge
                    0.0) # max_discharge
@@ -44,6 +46,8 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.medium))
     set_storage_transfer!(unit.output_interfaces[unit.medium],
                           load_storages(unit.controller, unit.medium))
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function reset(unit::Battery)
@@ -116,6 +120,7 @@ end
 function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_charge < sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+        unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
 
@@ -125,6 +130,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+        unit.load_end_of_last_timestep = copy(unit.load)
         return # load is only concerned with receiving energy from the source
     end
 
@@ -136,6 +142,8 @@ function load(unit::Battery, sim_params::Dict{String,Any})
         unit.load = unit.capacity
         sub!(inface, diff)
     end
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function output_values(unit::Battery)::Vector{String}

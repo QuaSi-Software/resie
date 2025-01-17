@@ -37,7 +37,7 @@ mutable struct CM_StorageDriven <: ControlModule
                                      Dict{UInt,TruthTable}( # transitions
                                          1 => TruthTable(;  # State: Off
                                                          conditions=[function (state_machine)
-                                                                         return params["storage"].load <
+                                                                         return params["storage"].load_end_of_last_timestep <
                                                                                 params["storage"].capacity *
                                                                                 params["low_threshold"]
                                                                      end],
@@ -47,7 +47,7 @@ mutable struct CM_StorageDriven <: ControlModule
                                                          )),
                                          2 => TruthTable(;  # State: Load
                                                          conditions=[function (state_machine)
-                                                                         return params["storage"].load >=
+                                                                         return params["storage"].load_end_of_last_timestep >=
                                                                                 params["storage"].capacity *
                                                                                 params["high_threshold"]
                                                                      end,

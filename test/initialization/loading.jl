@@ -35,8 +35,9 @@ function test_load_from_dict()
             "type" => "BufferTank",
             "output_refs" => ["TST_DEM_01"],
             "medium" => "m_h_w_ht1",
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 20000,
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

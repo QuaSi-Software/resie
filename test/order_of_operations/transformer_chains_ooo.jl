@@ -80,8 +80,9 @@ function test_base_order()
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_01_HZG_01_BUS"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 20000,
+            "initial_load" => 0.5,
         ),
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
@@ -2850,11 +2851,11 @@ function test_ooo_circle_middle_transformer_interconnections()
             "type" => "BufferTank",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
+            "model_type" => "ideally_stratified",
             "capacity" => 150000,
-            "load" => 70000,
+            "initial_load" => 0.46666666666666666666666666666667,
             "high_temperature" => 50.0,
             "low_temperature" => 20.0,
-            "use_adaptive_temperature" => false,
         ),
     )
 

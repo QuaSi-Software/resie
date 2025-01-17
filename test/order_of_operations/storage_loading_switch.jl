@@ -50,8 +50,9 @@ function test_ooo_storage_loading_switch()
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0,
+            "initial_load" => 0,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

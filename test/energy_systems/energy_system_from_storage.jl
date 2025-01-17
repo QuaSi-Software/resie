@@ -29,8 +29,9 @@ function test_run_energy_system_from_storage()
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 30000,
+            "initial_load" => 0.75,
             "high_temperature" => 35.0,
         ),
         "TST_GRI_01" => Dict{String,Any}(
@@ -185,8 +186,9 @@ function test_run_energy_system_from_storage_denied()
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 30000,
+            "initial_load" => 0.75,
             "high_temperature" => 35,
         ),
         "TST_GRI_01" => Dict{String,Any}(
