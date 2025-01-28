@@ -68,11 +68,11 @@ mutable struct HeatPump <: Component
         optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
         optimal_plr = default(config, "optimal_plr", 1.0)
         if optimise_slice_dispatch && 1.0 - optimal_plr < sim_params["epsilon"]
-            @warn "Heat pump $(unit.uac) is configured to optimise slice dispatch but has an " *
+            @warn "Heat pump $(uac) is configured to optimise slice dispatch but has an " *
                   "optimal PLR of 1.0. Consider toggling optimisation off as it has no effect."
         end
         if optimise_slice_dispatch && constant_cop !== nothing
-            @error "Heat pump $(unit.uac) is configured to optimise slice dispatch but has " *
+            @error "Heat pump $(uac) is configured to optimise slice dispatch but has " *
                    "a constant COP. Toggle optimisation off as the algorithm is unstable " *
                    "in this case."
         end
