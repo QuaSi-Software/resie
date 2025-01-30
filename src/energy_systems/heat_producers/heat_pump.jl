@@ -424,6 +424,10 @@ is a tuple with flags of which remaining energies of in- or outputs are non-zero
 checked because the optimisation should not change how the heat pump operates, it should
 only improve the efficiency of the selected slices.
 
+If all three inputs/output are non-zero, this indicates that the PLRs were set too low and
+the heat pump can not provide requested energy at these PLRs, which causes the pass to
+not be accepted.
+
 # Arguments
 - `energies::HPEnergies`: The energies container.
 - `times::Vector{Float64}`: The times of the slices.
@@ -437,6 +441,13 @@ function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::D
     end
 
     EPS = sim_params["epsilon"]
+    signature_given = (energies.available_el_in > EPS,
+                       sum(energies.available_heat_in; init=0.0) > EPS,
+                       sum(energies.available_heat_out; init=0.0) > EPS)
+    if signature_given == (true, true, true)
+        return false
+    end
+
     signature_best = (energies.potential_energy_el - sum(energies.slices_el_in; init=0.0) > EPS,
                       sum(energies.potentials_energies_heat_in; init=0.0)
                       -
@@ -448,9 +459,6 @@ function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::D
                       sum(energies.slices_heat_out; init=0.0)
                       >
                       EPS)
-    signature_given = (energies.available_el_in > EPS,
-                       sum(energies.available_heat_in; init=0.0) > EPS,
-                       sum(energies.available_heat_out; init=0.0) > EPS)
     return signature_given == signature_best
 end
 
@@ -820,11 +828,22 @@ function calculate_energies_heatpump(unit::HeatPump,
         for _ in 1:(unit.nr_optimisation_passes)
             energies = reset_temp_slices!(energies)
             energies = reset_available!(energies)
-            last_updated = update_plrs!(unit, energies, plrs, last_updated)
-            energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
 
+            # update target PLR of one slice
+            last_updated = update_plrs!(unit, energies, plrs, last_updated)
+            # calculate slices with updated PLRs
+            energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+            # check if the new PLRs actually lead to an improvement
             if accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
                 energies = copy_temp_to_slices!(energies)
+            else
+                # if the pass is rejected we need to set the temp slices to the best guess,
+                # which has been recorded in the actual slices, because the calling function
+                # then copies the temp slices to the actual slices. this is a bit circular,
+                # but only necessary for the slice optimisation
+                energies.slices_el_in_temp = energies.slices_el_in
+                energies.slices_heat_in_temp = energies.slices_heat_in
+                energies.slices_heat_out_temp = energies.slices_heat_out
             end
         end
     end
