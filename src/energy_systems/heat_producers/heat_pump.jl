@@ -671,11 +671,14 @@ function calculate_slices(unit::HeatPump,
         end
 
         # we continue for as long as there is energy to be distributed and max power has
-        # not been reached
+        # not been reached. during slice dispatch optimisation it might also be the case
+        # that extra slices appear, with the same input and output as the previous slice,
+        # because the target PLR is too low for full operation. we need to catch that too
         if energies.available_el_in < EPS ||
            sum(energies.available_heat_in; init=0.0) < EPS ||
            sum(energies.available_heat_out; init=0.0) < EPS ||
-           energies.max_usage_fraction - sum_usage < EPS
+           energies.max_usage_fraction - sum_usage < EPS ||
+           slice_idx > length(energies.in_indices) * length(energies.out_indices)
             # end of condition
             break
         end
