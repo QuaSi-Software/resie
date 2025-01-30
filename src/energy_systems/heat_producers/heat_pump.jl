@@ -596,6 +596,11 @@ function handle_slice(unit::HeatPump,
                 "given. Provide temperatures or fixed cop.")
         throw(InputError)
     end
+    if cop < 1.0
+        cop = 1.0
+        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
+               "input for mistakes as this should not happen. COP was set to 1.0")
+    end
 
     # calculate energies with the current cop
     # energies for current slice with potential heat in as basis
