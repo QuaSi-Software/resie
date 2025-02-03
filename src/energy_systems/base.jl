@@ -1241,8 +1241,6 @@ include("electric_producers/pv_plant.jl")
 #TODO only for validation
 # include("heat_sources/solarthermal_collector_validation.jl")
 
-load_condition_prototypes()
-
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into seperate files for less clutter
 include("efficiency.jl")
