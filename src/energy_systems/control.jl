@@ -1,164 +1,3 @@
-"""Convenience type alias for requirements of components."""
-const EnSysRequirements = Dict{String,Tuple{Type,Union{Nothing,Symbol}}}
-
-"""
-Prototype for Condition, from which instances of the latter are derived.
-
-See Condition for how they are used. The prototype defines which components a
-condition requires to calculate its truth value, as well parameters for this calculation.
-The selection of component for the condition is considered an input to the simulation
-as it cannot be derived from other inputs. It is up to the user to decide which components are
-required for operational strategies (and therefore conditions) to work.
-"""
-struct ConditionPrototype
-    """An identifiable name."""
-    name::String
-
-    """Parameters the condition requires."""
-    cond_params::Dict{String,Any}
-
-    """Defines which components the condition requires, indexed by an internal name.
-
-    For some components a medium is required as they can take varying values.
-    """
-    required_components::EnSysRequirements
-
-    """Implementation of the boolean expression the condition represents."""
-    check_function::Function
-end
-
-CONDITION_PROTOTYPES = Dict{String,ConditionPrototype}()
-
-include("conditions/base.jl")
-
-"""
-A boolean decision variable for a transition in a state machine.
-
-A Condition instance is constructed from its corresponding prototype, which invokes certain
-required parameters and components.
-"""
-struct Condition
-    """From which prototype the condition is derived."""
-    prototype::ConditionPrototype
-
-    """Hold parameters the condition requires."""
-    cond_params::Dict{String,Any}
-
-    """The components linked to the condition indexed by an internal name."""
-    linked_components::Grouping
-end
-
-"""
-    rel(condition, name)
-
-Get the linked component of the given name for a condition.
-"""
-function rel(condition::Condition, name::String)::Component
-    return condition.linked_components[name]
-end
-
-"""
-Constructor for Condition.
-
-# Arguments
-- `name::String`: The name of the condition
-- `cond_params::Dict{String, Any]`: Parameters for the condition. Not to be confused with
-    the project-wide parameters for the entire simulation.
-
-# Returns
-- `Condition`: A Condition instance with default parameter values and information on which
-    components are required, but components have not been linked yet
-"""
-function Condition(
-    name::String,
-    cond_params::Dict{String,Any}
-)::Condition
-    prototype = CONDITION_PROTOTYPES[name]
-    return Condition(
-        prototype,
-        Base.merge(prototype.cond_params, cond_params),
-        Grouping()
-    )
-end
-
-"""
-    link(condition, components)
-
-Look for the condition's required components in the given set and link the condition to them.
-
-For example, if a condition required a component "grid_out" of type GridConnection and medium
-m_e_ac_230v, it will look through the set of given components and link to the first match.
-"""
-function link(condition::Condition, components::Grouping)
-    for (name, req_unit) in pairs(condition.prototype.required_components)
-        found_link = false
-        for unit in each(components)
-            if isa(unit, req_unit[1])
-                if (req_unit[2] !== nothing
-                    && hasfield(typeof(unit), Symbol("medium"))
-                    && unit.medium == req_unit[2]
-                )
-                    condition.linked_components[name] = unit
-                    found_link = true
-                elseif req_unit[2] === nothing
-                    condition.linked_components[name] = unit
-                    found_link = true
-                end
-            end
-        end
-
-        if !found_link
-            throw(KeyError(
-                    "Could not find match for required component $name "
-                    * "for condition $(condition.prototype.name)"
-            ))
-        end
-    end
-end
-
-"""
-    link_control_with(unit, components)
-
-Link the given components with the control mechanisms of the given unit.
-
-The components are the same as the control_refs project config entry, meaning this is user
-input, but correction configuration should have been checked beforehand by automated
-mechanisms. See also [`link`](@ref) for how linking conditions works.
-"""
-function link_control_with(unit::Component, components::Grouping)
-    for table in values(unit.controller.state_machine.transitions)
-        for condition in table.conditions
-            link(condition, components)
-        end
-    end
-
-    # @TODO: if a strategy requires multiple components of general description, the first
-    # component in the grouping will be matched multiple times, instead of each being matched
-    # only once
-    strategy_type = OP_STRATS[unit.controller.strategy]
-    for (req_type, medium) in values(strategy_type.required_components)
-        for other_unit in values(components)
-            if typeof(other_unit) <: req_type
-                if medium === nothing || (
-                    hasfield(typeof(other_unit), Symbol("medium"))
-                    &&
-                    other_unit.medium == medium
-                )
-                    unit.controller.linked_components[other_unit.uac] = other_unit
-                end
-            end
-        end
-    end
-
-    for table in values(unit.controller.state_machine.transitions)
-        for condition in table.conditions
-            for other_unit in values(condition.linked_components)
-                unit.controller.linked_components[other_unit.uac] = other_unit
-            end
-        end
-    end
-end
-
 """
 Maps a vector of boolean values to integers.
 
@@ -168,7 +7,7 @@ conditions lead to which state.
 # Examples
 ```
 table = TruthTable(
-    conditions=[Condition("foo is big"), Condition("bar is small")],
+    conditions=[sm -> sm.x > 5, sm -> sm.y <= 3],
     table_data=Dict{Tuple, UInt}(
         (false, false) => 1,
         (false, true) => 1,
@@ -177,12 +16,30 @@ table = TruthTable(
     )
 )
 ```
-This example defines a transitions for a state machine with two states. If the condition
-"foo is big" is true and the condition "bar is small" is false, the new state should be the
-second state, otherwise the first.
+This example defines transitions from the first state of a state machine with two states to
+the second based on the results of two conditions. Only if the first condition is true and
+the second condition is false does the state machine transition to the second state
+otherwise it remains in the first.
+
+# Conditions
+The conditions given in the constructor must be functions that take only one argument,
+namely the state machine itself. All other information required for calculation should be
+given in a closure around calling the constructor. An example for a condition checking if a
+linked component has a value for "foo" greater than 5:
+```
+parameters["component"] = SomeComponent(...)
+table = TruthTable(
+    conditions=[
+        function(sm)
+            return parameters["component"].foo > 5
+        end
+    ],
+    ...
+)
+```
 """
 Base.@kwdef struct TruthTable
-    conditions::Vector{Condition}
+    conditions::Vector{Function}
     table_data::Dict{Tuple,UInt}
 end
 
@@ -214,60 +71,40 @@ mutable struct StateMachine
 end
 
 """
-Constructor for non-default fields.
+Constructor of StateMachine for non-default fields.
 """
-StateMachine(
-    state::UInt,
-    state_names::Dict{UInt,String},
-    transitions::Dict{UInt,TruthTable}
-) = StateMachine(
-    state,
-    state_names,
-    transitions,
-    UInt(0)
-)
+StateMachine(state::UInt,
+state_names::Dict{UInt,String},
+transitions::Dict{UInt,TruthTable}) = StateMachine(state,
+                                                   state_names,
+                                                   transitions,
+                                                   UInt(0))
 
 """
-Default constructor that creates a state machine with only one state called "Default".
+Default constructor of StateMachine that creates a state machine with only one state called
+"Default" and no transitions (as there no other states).
 """
-StateMachine() = StateMachine(
-    UInt(1),
-    Dict(UInt(1) => "Default"),
-    Dict(UInt(1) => TruthTable(
-        conditions=Vector(),
-        table_data=Dict()
-    ))
-)
+StateMachine() = StateMachine(UInt(1),
+                              Dict(UInt(1) => "Default"),
+                              Dict(UInt(1) => TruthTable(; conditions=Vector(),
+                                                         table_data=Dict())))
 
 """
-Wraps around the mechanism of control for the operation strategy of a Component.
-"""
-Base.@kwdef mutable struct Controller
-    strategy::String
-    parameter::Dict{String,Any}
-    state_machine::StateMachine
-    linked_components::Grouping
-end
+Advances the given state machine by checking the conditions in its current state.
 
-"""
-    move_state(unit, components, sim_params)
+This also sets or increments the number of timesteps the state machine has been in the
+current state. If the machine switched to a different state, this number is then 1 as the
+current timestep is considered to be part of the new state.
 
-Checks the controller of the given unit and moves the state machine to its new state.
+# Arguments
+- `machine::StateMachine`: The state machine to advance
 """
-function move_state(
-    unit::Component,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
-    machine = unit.controller.state_machine
+function move_state(machine::StateMachine)
     old_state = machine.state
     table = machine.transitions[machine.state]
 
     if length(table.conditions) > 0
-        evaluations = Tuple(
-            condition.prototype.check_function(condition, unit, sim_params)
-            for condition in table.conditions
-        )
+        evaluations = Tuple(condition(machine) for condition in table.conditions)
         new_state = table.table_data[evaluations]
         machine.state = new_state
     else
@@ -282,84 +119,209 @@ function move_state(
 end
 
 """
-A type of operational strategy that defines which parameters and components a strategy requires.
+Base type for control modules.
+
+Implementing types are expected to have the fields:
+  - name::String
+  - parameters::Dict{String,Any}
 """
-Base.@kwdef struct OperationalStrategyType
-    """Machine-readable name of the strategy."""
-    name::String
+abstract type ControlModule end
 
-    """Human-readable description that explains how to use the strategy."""
-    description::String
-
-    """Constructor method for the state machine used by the strategy."""
-    sm_constructor::Function
-
-    """A list of condition names that the strategy uses."""
-    conditions::Vector{String}
-
-    """Required parameters for the strategy including those for the conditions."""
-    strategy_parameters::Dict{String,Any}
-
-    """Components that the strategy requires for the correct order of execution.
-
-    This differs from the component the conditions of the strategy require.
-    """
-    required_components::EnSysRequirements
+"""
+Encodes for which functions a control module type implements methods for, which is required
+to filter modules to a selection of modules that have methods for a specific function.
+"""
+@enum ControlModuleFunction begin
+    cmf_upper_plr_limit
+    cmf_charge_is_allowed
+    cmf_discharge_is_allowed
 end
 
-OP_STRATS = Dict{String,OperationalStrategyType}()
+"""
+Wraps around the mechanism of control for the operational strategy of a Component.
 
-include("strategies/economical_discharge.jl")
-include("strategies/storage_driven.jl")
-include("strategies/demand_driven.jl")
-include("strategies/supply_driven.jl")
+Holds general parameters of control and acts as container for control modules.
+"""
+mutable struct Controller
+    parameters::Dict{String,Any}
+    modules::Vector{ControlModule}
+
+    function Controller(config::Union{Nothing,Dict{String,Any}})::Controller
+        return new(Base.merge(Dict{String,Any}(
+                                  "aggregation_plr_limit" => "max",
+                                  "aggregation_charge" => "all",
+                                  "aggregation_discharge" => "all",
+                                  "consider_m_el_in" => true,
+                                  "consider_m_el_out" => true,
+                                  "consider_m_gas_in" => true,
+                                  "consider_m_fuel_in" => true,
+                                  "consider_m_h2_out" => true,
+                                  "consider_m_o2_out" => true,
+                                  "consider_m_heat_out" => true,
+                                  "consider_m_heat_ht_out" => true,
+                                  "consider_m_heat_lt_out" => true,
+                                  "consider_m_heat_in" => true,
+                              ),
+                              config === nothing ? Dict{String,Any}() : config),
+                   [])
+    end
+end
 
 """
-    controller_for_strategy(strategy, strategy_config, sim_params)
+Default constructor with empty modules fields and only default parameters.
+"""
+Controller() = Controller(nothing)
 
-Construct the controller for the strategy of the given name using the given parameters.
+"""
+Returns if the given medium is configured to be allowed to load storages.
+
+This checks if the corresponding parameter is set and is set to true. The default behaviour
+is to allow storage loading.
 
 # Arguments
-- `strategy::String`: Must be an exact match to the name defined in the strategy's code file.
-- `strategy_config::Dict{String, Any}`: Parameters for the configuration of the strategy. The
-    names must match those in the default parameter values dictionary defined in the
-    strategy's code file. Given values override default values.
-- `sim_params::Dict{String,Any}`: General simulation sim_params
+- `controller::Controller`: The controller of the component
+- `medium::Symbol`: Which medium to check
 # Returns
-- `Controller`: The constructed controller for the given strategy.
+- `Bool`: True if the parameter is set and is false, true otherwise
 """
-function controller_for_strategy(strategy::String, strategy_config::Dict{String,Any}, sim_params::Dict{String,Any})::Controller
-    if lowercase(strategy) == "default"
-        return Controller("default", strategy_config, StateMachine(), Grouping())
-    end
-
-    if !(strategy in keys(OP_STRATS))
-        throw(ArgumentError("Unknown strategy $strategy"))
-    end
-
-    # check if parameters given in input file for strategy are valid parameters:
-    for key in keys(strategy_config)
-        if  (
-            !(key in keys(OP_STRATS[strategy].strategy_parameters)) &&
-            !(startswith(key, "load_storages")) && 
-            !(startswith(key, "unload_storages")) && 
-            !(startswith(key, "_"))
-            )
-            throw(ArgumentError("Unknown parameter in $strategy: $(key). Must be one of $(keys(OP_STRATS[strategy].strategy_parameters))"))
-        end
-    end
-
-    params = Base.merge(OP_STRATS[strategy].strategy_parameters, strategy_config)
-
-    # load operation profile if path is given in input file
-    if haskey(params, "operation_profile_path")
-        if params["operation_profile_path"]  !== nothing
-            params["operation_profile"] = Profile(params["operation_profile_path"], sim_params)
-        end
-    end
-
-    machine = OP_STRATS[strategy].sm_constructor(params)
-    return Controller(strategy, params, machine, Grouping())
+function load_storages(controller::Controller, medium::Symbol)::Bool
+    return default(controller.parameters, "load_storages " * String(medium), true)
 end
 
-export Condition, TruthTable, StateMachine, link_control_with, controller_for_strategy
+"""
+Returns if the given medium is configured to be allowed to unload storages.
+
+This checks if the corresponding parameter is set and is set to true. The default behaviour
+is to allow storage unloading.
+
+# Arguments
+- `controller::Controller`: The controller of the component
+- `medium::Symbol`: Which medium to check
+# Returns
+- `Bool`: True if the parameter is set and is false, true otherwise
+"""
+function unload_storages(controller::Controller, medium::Symbol)::Bool
+    return default(controller.parameters, "unload_storages " * String(medium), true)
+end
+
+"""
+Update the controller for a timestep, more specifically the control modules.
+
+# Arguments
+- `controller::Controller`: The controller to update
+"""
+function update(controller::Controller)
+    for control_module in controller.modules
+        update(control_module)
+    end
+end
+
+"""
+Returns if the given control module type has a method for the given control module function.
+
+The default is false, as the abstract type ControlModule has no methods for any of the
+control module function (although it would be possible to define one).
+
+# Arguments
+- `mod::ControlModule`: The module to check
+- `func::ControlModuleFunction`: The control module function to check
+# Returns
+- `Bool`: True if the type has a method for the function, false otherwise
+"""
+function has_method_for(mod::ControlModule, func::ControlModuleFunction)::Bool
+    return false # no default implementation
+end
+
+"""
+Aggregate the result for the upper PLR limit of matching control modules.
+
+The aggregation can either be the maximum or minimum over the limits, which leads to two
+behaviours. For example if two modules impose a limit and the aggregation `max` is used,
+then the larger of the two numbers is used, which means the component operates as long any
+of the modules has a limit larger than zero. Conversly if `min` is used all modules must
+have a value larger zero for the component to run.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Float64`: The aggregated upper PLR limit
+"""
+function upper_plr_limit(controller::Controller, sim_params::Dict{String,Any})::Float64
+    limits = collect(upper_plr_limit(mod, sim_params)
+                     for mod in controller.modules
+                     if has_method_for(mod, cmf_upper_plr_limit))
+    if length(limits) == 0
+        return 1.0
+    end
+
+    if controller.parameters["aggregation_plr_limit"] == "max"
+        return Base.maximum(limits)
+    elseif controller.parameters["aggregation_plr_limit"] == "min"
+        return Base.minimum(limits)
+    end
+
+    return 1.0
+end
+
+"""
+Aggregate the result for charge allowance of matching control modules.
+
+The aggregation can be either the union or intersection of the result flags of all modules.
+For example if two modules control the charging of a battery, both modules must return true
+in order for charging to be allowed, assuming aggregation "all" is used. For the aggregation
+method "any" it is sufficient if any one module returns true.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Bool`: The aggregated charging flag with true meaning charging is allowed
+"""
+function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
+    flags = collect(charge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_charge_is_allowed))
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_charge"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_charge"] == "any"
+        return any(flags)
+    end
+
+    return true
+end
+
+"""
+Aggregate the result for discharge allowance of matching control modules.
+
+The aggregation can be either the union or intersection of the result flags of all modules.
+For example if two modules control the discharging of a battery, both modules must return
+true in order for discharging to be allowed, assuming aggregation "all" is used. For the
+aggregation method "any" it is sufficient if any one module returns true.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Bool`: The aggregated charging flag with true meaning discharging is allowed
+"""
+function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
+    flags = collect(discharge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_discharge_is_allowed))
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_discharge"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_discharge"] == "any"
+        return any(flags)
+    end
+
+    return true
+end

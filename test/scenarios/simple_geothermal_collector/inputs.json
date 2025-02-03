@@ -1,0 +1,92 @@
+{
+    "io_settings": {
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/simple_geothermal_collector/auxiliary_info.md",
+        "sankey_plot": "default",
+        "sankey_plot_file": "./test/scenarios/simple_geothermal_collector/sankey_plot.html",
+        "csv_output_keys": "all",
+        "csv_output_file": "./test/scenarios/simple_geothermal_collector/out.csv",
+        "output_plot": "all",
+        "output_plot_file": "./test/scenarios/simple_geothermal_collector/output_plot.html",
+        "auxiliary_plots": false
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes",
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "constant_temperature": 55,
+            "scale": 2500
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_DEM_01"
+            ],
+            "power_th": 225000,
+            "min_power_fraction": 0.0
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+        "TST_GTC_01": {
+            "type": "GeothermalHeatCollector",
+            "m_heat_out": "m_h_w_lt1",
+            "output_refs": ["TST_HP_01"],
+            "model_type": "detailed",
+            "___GENERAL PARAMETER___": "",
+            "temperature_from_global_file": "temp_ambient_air",
+            "global_solar_radiation_from_global_file": "globHorIrr",
+            "infrared_sky_radiation_from_global_file": "longWaveIrr",
+            "accuracy_mode": "normal",
+            "regeneration": false,
+            "max_output_power": 25,
+            "max_input_power": 25,
+            "phase_change_upper_boundary_temperature": -0.25,
+            "phase_change_lower_boundary_temperature": -1.0,
+            "number_of_pipes": 47,
+            "pipe_length": 93,
+            "pipe_spacing": 1.02,
+            "pipe_laying_depth": 2.0,
+            "pipe_radius_outer": 0.02,
+            "considered_soil_depth": 10.0,
+            "soil_specific_heat_capacity": 850,
+            "soil_specific_heat_capacity_frozen": 850,
+            "soil_density": 1900,
+            "soil_heat_conductivity": 2.4,
+            "soil_heat_conductivity_frozen": 2.9,
+            "soil_specific_enthalpy_of_fusion": 90000,
+            "surface_convective_heat_transfer_coefficient": 14.7,
+            "surface_reflection_factor": 0.25,
+            "surface_emissivity": 0.9,
+            "unloading_temperature_spread": 3.0,
+            "loading_temperature_spread": 3.0,
+            "start_temperature_fluid_and_pipe": 15.5,
+            "undisturbed_ground_temperature": 9.0,
+            "___SIMPLIFIED MODEL___": "",
+            "pipe_soil_thermal_resistance": 0.1,
+            "___DETAILED MODEL___": "",
+            "pipe_thickness": 0.0037,
+            "pipe_heat_conductivity": 0.4,
+            "fluid_specific_heat_capacity": 3944,
+            "fluid_heat_conductivity": 0.499,
+            "fluid_density": 1025,
+            "fluid_kinematic_viscosity": 3.6e-6,
+            "fluid_prantl_number": 30
+        }
+    }
+}

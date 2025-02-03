@@ -1,7 +1,7 @@
 """
 Implementation of an electrolyser, turning electricity and pure water into H2, O2 and heat.
 
-At time of writing only pure water hydrolysis electrolysers are supported as they are the
+At time of writing only electrolysers splitting pure water are supported as they are the
 most relevant technology at time of writing. The produced heat has a high temperature output
 (depending on technology 50-65 °C) and an optional low temperature output (25-35 °C), which
 is more difficult to utilise in reality as this is waste heat from cooling power electronics
@@ -65,55 +65,41 @@ mutable struct Electrolyser <: Component
         m_h2_out = Symbol(default(config, "m_h2_out", "m_c_g_h2"))
         m_o2_out = Symbol(default(config, "m_o2_out", "m_c_g_o2"))
         register_media([m_el_in, m_heat_ht_out, m_heat_lt_out, m_h2_out, m_o2_out])
-        interface_list = (
-            Symbol("el_in"), Symbol("heat_ht_out"), Symbol("heat_lt_out"),
-            Symbol("h2_out"), Symbol("o2_out")
-        )
+        interface_list = (Symbol("el_in"),
+                          Symbol("heat_ht_out"),
+                          Symbol("heat_lt_out"),
+                          Symbol("h2_out"),
+                          Symbol("o2_out"))
 
-        linear_interface = Symbol(
-            replace(
-                default(config, "linear_interface", "el_in"),
-                "m_" => ""
-            )
-        )
+        linear_interface = Symbol(replace(default(config, "linear_interface", "el_in"), "m_" => ""))
         if !(linear_interface in interface_list)
             @error "Given unknown interface name $linear_interface designated as linear " *
-                "for component $uac"
+                   "for component $uac"
         end
 
         efficiencies = Dict{Symbol,Function}(
             Symbol("el_in") => parse_efficiency_function(default(config,
-                "efficiency_el_in", "const:1.0"
-            )),
+                                                                 "efficiency_el_in", "const:1.0")),
             Symbol("heat_ht_out") => parse_efficiency_function(default(config,
-                "efficiency_heat_ht_out", "const:0.15"
-            )),
+                                                                       "efficiency_heat_ht_out", "const:0.15")),
             Symbol("heat_lt_out") => parse_efficiency_function(default(config,
-                "efficiency_heat_lt_out", "const:0.07"
-            )),
+                                                                       "efficiency_heat_lt_out", "const:0.07")),
             Symbol("h2_out") => parse_efficiency_function(default(config,
-                "efficiency_h2_out", "const:0.57"
-            )),
+                                                                  "efficiency_h2_out", "const:0.57")),
             Symbol("h2_out_lossless") => parse_efficiency_function(default(config,
-                "efficiency_h2_out_lossless", "const:0.6"
-            )),
+                                                                           "efficiency_h2_out_lossless", "const:0.6")),
             Symbol("o2_out") => parse_efficiency_function(default(config,
-                "efficiency_o2_out", "const:0.6"
-            )),
+                                                                  "efficiency_o2_out", "const:0.6")),
         )
 
-        output_interfaces = InterfaceMap(
-            m_heat_ht_out => nothing,
-            m_h2_out => nothing,
-            m_o2_out => nothing,
-        )
+        output_interfaces = InterfaceMap(m_heat_ht_out => nothing,
+                                         m_h2_out => nothing,
+                                         m_o2_out => nothing)
         if heat_lt_is_usable
             output_interfaces[m_heat_lt_out] = nothing
         else
             # if low temperature heat output is not used, make sure it is not limiting
-            efficiencies[Symbol("heat_lt_out")] => parse_efficiency_function(
-                "const:1.0"
-            )
+            efficiencies[Symbol("heat_lt_out")] => parse_efficiency_function("const:1.0")
         end
 
         nr_units = default(config, "nr_switchable_units", 1)
@@ -125,113 +111,82 @@ mutable struct Electrolyser <: Component
             @error "Unknown dispatch strategy $dispatch_strategy for electrolyser $uac"
         end
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
-            sf_transformer, # sys_function
-            InterfaceMap( # input_interfaces
-                m_el_in => nothing
-            ),
-            output_interfaces,
-            m_el_in,
-            m_heat_ht_out,
-            m_heat_lt_out,
-            m_h2_out,
-            m_o2_out,
-            power,
-            power_total,
-            nr_units,
-            dispatch_strategy,
-            default(config, "optimal_unit_plr", 0.65),
-            linear_interface,
-            default(config, "min_power_fraction", 0.4),
-            default(config, "min_power_fraction_total", 0.2),
-            efficiencies,
-            interface_list,
-            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
-            1.0 / default(config, "nr_discretization_steps", 1), # discretization_step
-            default(config, "min_run_time", 3600),
-            heat_lt_is_usable,
-            default(config, "output_temperature_ht", 55.0),
-            default(config, "output_temperature_lt", 25.0),
-            0.0, # losses
-            0.0, # losses_heat
-            0.0  # losses_hydrogen
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_transformer,                    # sys_function
+                   InterfaceMap(m_el_in => nothing),  # input_interfaces
+                   output_interfaces,
+                   m_el_in,
+                   m_heat_ht_out,
+                   m_heat_lt_out,
+                   m_h2_out,
+                   m_o2_out,
+                   power,
+                   power_total,
+                   nr_units,
+                   dispatch_strategy,
+                   default(config, "optimal_unit_plr", 0.65),
+                   linear_interface,
+                   default(config, "min_power_fraction", 0.4),
+                   default(config, "min_power_fraction_total", 0.2),
+                   efficiencies,
+                   interface_list,
+                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),   # energy_to_plr
+                   1.0 / default(config, "nr_discretization_steps", 1), # discretization_step
+                   default(config, "min_run_time", 3600),
+                   heat_lt_is_usable,
+                   default(config, "output_temperature_ht", 55.0),
+                   default(config, "output_temperature_lt", 25.0),
+                   0.0, # losses
+                   0.0, # losses_heat
+                   0.0) # losses_hydrogen
     end
 end
 
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.m_el_in],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.m_el_in), true
-        )
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.m_el_in],
+                          unload_storages(unit.controller, unit.m_el_in))
 
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_heat_ht_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_heat_ht_out), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.m_heat_ht_out],
+                          load_storages(unit.controller, unit.m_heat_ht_out))
 
     if unit.heat_lt_is_usable
-        set_storage_transfer!(
-            unit.output_interfaces[unit.m_heat_lt_out],
-            default(
-                unit.controller.parameter,
-                "load_storages " * String(unit.m_heat_lt_out),
-                true
-            )
-        )
+        set_storage_transfer!(unit.output_interfaces[unit.m_heat_lt_out],
+                              load_storages(unit.controller, unit.m_heat_lt_out))
     else
-        unit.controller.parameter["consider_m_heat_lt_out"] = false
+        unit.controller.parameters["consider_m_heat_lt_out"] = false
     end
 
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_h2_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_h2_out), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.m_h2_out],
+                          load_storages(unit.controller, unit.m_h2_out))
 
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_o2_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_o2_out), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.m_o2_out],
+                          load_storages(unit.controller, unit.m_o2_out))
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
-function control(
-    unit::Electrolyser,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
-    move_state(unit, components, sim_params)
-    set_temperature!(
-        unit.output_interfaces[unit.m_heat_ht_out],
-        nothing,
-        unit.output_temperature_ht
-    )
+function control(unit::Electrolyser,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
+    update(unit.controller)
+
+    set_temperature!(unit.output_interfaces[unit.m_heat_ht_out],
+                     nothing,
+                     unit.output_temperature_ht)
     if unit.heat_lt_is_usable
-        set_temperature!(
-            unit.output_interfaces[unit.m_heat_lt_out],
-            nothing,
-            unit.output_temperature_lt
-        )
+        set_temperature!(unit.output_interfaces[unit.m_heat_lt_out],
+                         nothing,
+                         unit.output_temperature_lt)
     end
 end
 
-function set_max_energies!(
-    unit::Electrolyser, el_in::Float64, heat_ht_out::Float64, heat_lt_out::Float64,
-    h2_out::Float64, o2_out::Float64
-)
+function set_max_energies!(unit::Electrolyser,
+                           el_in::Float64,
+                           heat_ht_out::Float64,
+                           heat_lt_out::Float64,
+                           h2_out::Float64,
+                           o2_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out)
     if unit.heat_lt_is_usable
@@ -257,37 +212,30 @@ Calculate the number of active units and the PLR for each in order to meet the g
 - `Integer`: Number of active units
 - `Float64`: PLR of each active unit
 """
-function dispatch_units(
-    ely::Electrolyser,
-    plr::Float64,
-    limit_name::Symbol,
-    limit_value::Float64
-)::Tuple{Integer,Float64}
+function dispatch_units(ely::Electrolyser,
+                        plr::Float64,
+                        limit_name::Symbol,
+                        limit_value::Float64,
+                        w2wh::Function)::Tuple{Integer,Float64}
     if limit_value == Inf
         return ely.nr_units, 1.0
     end
 
     if ely.dispatch_strategy == "try_optimal"
-        optimal_val_per_unit = ely.optimal_unit_plr * watt_to_wh(ely.power) *
-            ely.efficiencies[limit_name](ely.optimal_unit_plr)
-        nr_units = max(1, min(
-            ceil(limit_value / optimal_val_per_unit - 0.5),
-            ely.nr_units
-        ))
-        plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+        optimal_val_per_unit = ely.optimal_unit_plr * w2wh(ely.power) *
+                               ely.efficiencies[limit_name](ely.optimal_unit_plr)
+        nr_units = max(1, min(ceil(limit_value / optimal_val_per_unit - 0.5), ely.nr_units))
+        plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units, w2wh)
 
     elseif ely.dispatch_strategy == "equal_with_mpf"
         if plr >= ely.min_power_fraction
             nr_units = ely.nr_units
             plr_per_unit = plr
         else
-            min_val_per_unit = ely.min_power_fraction * watt_to_wh(ely.power) *
-                ely.efficiencies[limit_name](ely.min_power_fraction)
-            nr_units = max(1, min(
-                floor(limit_value / min_val_per_unit),
-                ely.nr_units
-            ))
-            plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units)
+            min_val_per_unit = ely.min_power_fraction * w2wh(ely.power) *
+                               ely.efficiencies[limit_name](ely.min_power_fraction)
+            nr_units = max(1, min(floor(limit_value / min_val_per_unit), ely.nr_units))
+            plr_per_unit = plr_from_energy(ely, limit_name, limit_value / nr_units, w2wh)
         end
 
     elseif ely.dispatch_strategy == "all_equal"
@@ -298,24 +246,9 @@ function dispatch_units(
     return nr_units, plr_per_unit
 end
 
-function calculate_energies(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any},
-)::Tuple{Bool, Vector{Floathing}}
-    # check operational state for strategy storage_driven
-    if (
-        unit.controller.strategy == "storage_driven"
-        && unit.controller.state_machine.state != 2
-    )
-        return (false, [])
-    end
-
-    # get max PLR of external profile, if any
-    max_plr = (
-        unit.controller.parameter["operation_profile_path"] === nothing
-        ? 1.0
-        : value_at_time(unit.controller.parameter["operation_profile"], sim_params["time"])
-    )
+function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
+    # get maximum PLR from control modules
+    max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
         return (false, [])
     end
@@ -339,14 +272,11 @@ function calculate_energies(
         energy = abs(energy)
 
         # limit to total design power
-        energy = min(
-            watt_to_wh(unit.power_total) * unit.efficiencies[name](1.0),
-            energy
-        )
+        energy = min(sim_params["watt_to_wh"](unit.power_total) * unit.efficiencies[name](1.0), energy)
 
         # we can get the total PLR by assuming all units are activated equally, even if
         # dispatch happens differently later
-        plr = plr_from_energy(unit, name, energy / unit.nr_units)
+        plr = plr_from_energy(unit, name, energy / unit.nr_units, sim_params["watt_to_wh"])
         push!(plr_from_nrg, plr)
 
         # keep track which was the limiting interface and how much energy is on that
@@ -361,7 +291,7 @@ function calculate_energies(
 
     # the operation point of the electrolyser is the minimum of the PLR from all inputs or
     # outputs plus additional constraints and full load
-    used_plr = min(minimum(x->x, plr_from_nrg), max_plr, 1.0)
+    used_plr = min(minimum(x -> x, plr_from_nrg), max_plr, 1.0)
 
     # check total minimum PLR before dispatching units, which might have their own minimum
     # PLR which is typically different from the total
@@ -372,33 +302,27 @@ function calculate_energies(
     # we now have the PLR of the entire assembly and the limiting energy (which might be
     # the design power) and need to decide how to dispatch the units to meet the target
     # limiting energy
-    nr_active, plr_of_unit = dispatch_units(
-        unit, used_plr, limiting_interface, limiting_energy
-    )
+    nr_active, plr_of_unit = dispatch_units(unit,
+                                            used_plr,
+                                            limiting_interface,
+                                            limiting_energy,
+                                            sim_params["watt_to_wh"])
 
     # now the total energies can be calculated from the number and PLR of utilised units
     energies = []
     for name in unit.interface_list
-        push!(
-            energies,
-            nr_active * energy_from_plr(unit, name, plr_of_unit)
-        )
+        push!(energies, nr_active * energy_from_plr(unit, name, plr_of_unit, sim_params["watt_to_wh"]))
     end
     return (true, energies)
 end
 
-function potential(
-    unit::Electrolyser,
-    sim_params::Dict{String,Any}
-)
+function potential(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(
-            unit, energies[1], energies[2], energies[3], energies[4], energies[5]
-        )
+        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5])
     end
 end
 
@@ -410,14 +334,12 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
         return
     end
 
-    plr = energies[1] / watt_to_wh(
-        unit.power_total * unit.efficiencies[Symbol("el_in")](1.0)
-    )
+    plr = energies[1] / sim_params["watt_to_wh"](unit.power_total * unit.efficiencies[Symbol("el_in")](1.0))
     h2_out_lossless = energies[1] * unit.efficiencies[Symbol("h2_out_lossless")](plr)
     unit.losses_hydrogen = h2_out_lossless - energies[4]
     unit.losses_heat = energies[1] - energies[2] +
-        (unit.heat_lt_is_usable ? -1 : 0) * energies[3] -
-        h2_out_lossless
+                       (unit.heat_lt_is_usable ? -1 : 0) * energies[3] -
+                       h2_out_lossless
     unit.losses_hydrogen = check_epsilon(unit.losses_hydrogen, sim_params)
     unit.losses_heat = check_epsilon(unit.losses_heat, sim_params)
 
@@ -452,18 +374,16 @@ function reset(unit::Electrolyser)
 end
 
 function output_values(unit::Electrolyser)::Vector{String}
-    channels = [
-        string(unit.m_el_in)*" IN",
-        string(unit.m_h2_out)*" OUT",
-        string(unit.m_o2_out)*" OUT",
-        string(unit.m_heat_ht_out)*" OUT",
-        "Losses",
-        "Losses_heat",
-        "Losses_hydrogen"
-    ]
+    channels = [string(unit.m_el_in) * " IN",
+                string(unit.m_h2_out) * " OUT",
+                string(unit.m_o2_out) * " OUT",
+                string(unit.m_heat_ht_out) * " OUT",
+                "Losses",
+                "Losses_heat",
+                "Losses_hydrogen"]
 
     if unit.heat_lt_is_usable
-        append!(channels, [string(unit.m_heat_lt_out)*" OUT"])
+        append!(channels, [string(unit.m_heat_lt_out) * " OUT"])
         return channels
     else
         return channels

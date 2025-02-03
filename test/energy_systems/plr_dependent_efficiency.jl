@@ -4,14 +4,13 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function get_demand_energy_system_config()
     return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "scale" => 1,
@@ -19,18 +18,13 @@ function get_demand_energy_system_config()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GB_01"],
             "is_source" => true,
         ),
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "power_th" => 4000,
             "linear_interface" => "fuel_in",
             "efficiency_fuel_in" => "const:1.0",
@@ -72,31 +66,28 @@ function test_inverse_efficiency()
     components_config = get_demand_energy_system_config()
     components_config["TST_GB_01"]["nr_discretization_steps"] = 10
     eps = 1e-9
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => eps
-    )
+    simulation_parameters = get_default_sim_params()
+    w2wh = simulation_parameters["watt_to_wh"]
 
     components = Resie.load_components(components_config, simulation_parameters)
     boiler = components["TST_GB_01"]
 
-    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("fuel_in"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("fuel_in"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("fuel_in"), 450.0, w2wh)
     @test plr > 0.45 - eps && plr < 0.45 + eps
 
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0, w2wh)
     @test plr > 0.5614073352582631 - eps && plr < 0.5614073352582631 + eps
 
     boiler.discretization_step = 1.0 / 20
     EnergySystems.initialise!(boiler, simulation_parameters)
 
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0)) < eps
-    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0) - 1.0) < eps
-    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0)
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 0.0, w2wh)) < eps
+    @test abs(plr_from_energy(boiler, Symbol("heat_out"), 1000.0, w2wh) - 1.0) < eps
+    plr = plr_from_energy(boiler, Symbol("heat_out"), 450.0, w2wh)
     @test plr > 0.561969105640274 - eps && plr < 0.561969105640274 + eps
 end
 
@@ -106,11 +97,7 @@ end
 
 function test_gas_boiler_demand_driven_plrd()
     components_config = get_demand_energy_system_config()
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     gasboiler = components["TST_GB_01"]
@@ -126,7 +113,7 @@ function test_gas_boiler_demand_driven_plrd()
         EnergySystems.reset(unit)
     end
 
-    expected_efficiency = 1.0 
+    expected_efficiency = 1.0
 
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(gasboiler, components, simulation_parameters)
@@ -177,7 +164,6 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "BoundedSink",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
             "scale" => 1.0,
@@ -185,7 +171,6 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "FixedSupply",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_GB_01"],
             "is_source" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
@@ -195,23 +180,15 @@ function test_gas_boiler_supply_driven_plrd()
         "TST_GB_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "supply_driven",
-            ),
             "power_th" => 4000,
             "efficiency_fuel_in" => "poly:-0.9117,1.8795,0.0322",
             "nr_discretization_steps" => 20,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
-    
+    simulation_parameters = get_default_sim_params()
+
     components = Resie.load_components(components_config, simulation_parameters)
     gasboiler = components["TST_GB_01"]
     grid = components["TST_GRI_01"]
@@ -233,7 +210,7 @@ function test_gas_boiler_supply_driven_plrd()
     grid.output_interfaces[grid.medium].max_energy.max_energy[1] = grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
-    demand.input_interfaces[demand.medium].max_energy.max_energy[1] =  1000 * 10.0
+    demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 1000 * 10.0
     demand.max_energy = 1000 * 10
 
     EnergySystems.process(grid, simulation_parameters)
@@ -257,7 +234,7 @@ function test_gas_boiler_supply_driven_plrd()
 
     EnergySystems.control(grid, components, simulation_parameters)
     grid.supply = 500 / expected_efficiency
-    grid.output_interfaces[grid.medium].max_energy.max_energy[1] =  grid.supply
+    grid.output_interfaces[grid.medium].max_energy.max_energy[1] = grid.supply
     EnergySystems.control(gasboiler, components, simulation_parameters)
     EnergySystems.control(demand, components, simulation_parameters)
     demand.input_interfaces[demand.medium].max_energy.max_energy[1] = 500 * 10.0
@@ -286,7 +263,6 @@ function test_CHPP_el_eff_plrd()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 1000.0,
@@ -294,43 +270,31 @@ function test_CHPP_el_eff_plrd()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_natgas",
-            "control_refs" => [],
             "output_refs" => ["TST_CHP_01"],
             "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
             "m_fuel_in" => "m_c_g_natgas",
-            "control_refs" => [],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven"
-            ),
-            "output_refs" => [
-                "TST_DEM_01",
-                "TST_GRO_01",
-            ],
+            "output_refs" => ["TST_DEM_01",
+                              "TST_GRO_01"],
             "power_el" => 5000,
             "linear_interface" => "el_out",
             "min_power_fraction" => 0.1,
             "efficiency_fuel_in" => "const:2.5",
             "efficiency_heat_out" => "pwlin:0.8,0.9,1.0,0.8",
             "efficiency_el_out" => "const:1.0",
-            "nr_discretization_steps" => 25
+            "nr_discretization_steps" => 25,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     chpp = components["TST_CHP_01"]
@@ -416,7 +380,6 @@ function test_electrolyser_dispatch_units()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "scale" => 500.0,
@@ -424,70 +387,61 @@ function test_electrolyser_dispatch_units()
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_ELY_01"],
             "is_source" => true,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_h2",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_GRO_02" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_c_g_o2",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
-            "output_refs" => [
-                "TST_DEM_01",
-                "TST_GRO_01",
-                "TST_GRO_02"
-            ],
+            "output_refs" => ["TST_DEM_01",
+                              "TST_GRO_01",
+                              "TST_GRO_02"],
             "power_el" => 4000,
             "heat_lt_is_usable" => false,
             "nr_switchable_units" => 4,
             "dispatch_strategy" => "equal_with_mpf",
             "min_power_fraction_total" => 0.3,
-            "min_power_fraction" => 0.4
+            "min_power_fraction" => 0.4,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
+    w2wh = simulation_parameters["watt_to_wh"]
 
     components = Resie.load_components(components_config, simulation_parameters)
     electrolyser = components["TST_ELY_01"]
 
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.5, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.31, Symbol("el_in"), 310.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.31, Symbol("el_in"), 310.0, w2wh)
     @test nr_units == 3
     @test isapprox(plr, 0.41333333333, atol=1e-9)
 
     electrolyser.dispatch_strategy = "all_equal"
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.5, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0, w2wh)
     @test nr_units == 4
     @test isapprox(plr, 0.3, atol=1e-9)
 
     electrolyser.dispatch_strategy = "try_optimal"
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.5, Symbol("el_in"), 500.0, w2wh)
     @test nr_units == 3
     @test isapprox(plr, 0.66666666666, atol=1e-9)
-    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0)
+    nr_units, plr = EnergySystems.dispatch_units(electrolyser, 0.3, Symbol("el_in"), 300.0, w2wh)
     @test nr_units == 2
     @test isapprox(plr, 0.6, atol=1e-9)
 end

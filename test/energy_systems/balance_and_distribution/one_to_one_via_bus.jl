@@ -4,21 +4,19 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../../test_util.jl")
 
 function test_one_to_one_via_bus()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_TH_01"],
             "is_source" => true,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "constant_demand" => 4000,
             "constant_temperature" => 55,
@@ -26,26 +24,15 @@ function test_one_to_one_via_bus()
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_GRI_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
-                "energy_flow" => [
-                    [1],
-                ],
+                "input_order" => ["TST_GRI_01"],
+                "output_order" => ["TST_DEM_01"],
+                "energy_flow" => [[1]],
             ),
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     grid = components["TST_GRI_01"]

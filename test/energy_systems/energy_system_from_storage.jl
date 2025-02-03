@@ -4,72 +4,56 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function test_run_energy_system_from_storage()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
-            "scale" => 1500
+            "scale" => 1500,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_BFT_01"
-                ],
-                "output_order" => [
-                    "TST_HP_01",
-                    "TST_BFT_01"
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BFT_01"],
+                "output_order" => ["TST_HP_01",
+                                   "TST_BFT_01"],
+            ),
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_01"
-            ],
+            "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 30000,
-            "high_temperature" => 35.0
+            "initial_load" => 0.75,
+            "high_temperature" => 35.0,
         ),
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-                "unload_storages m_e_ac_230v" => true
+            "control_parameters" => Dict{String,Any}(
+                "unload_storages m_e_ac_230v" => true,
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0
+            "min_power_fraction" => 0.0,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -77,8 +61,6 @@ function test_run_energy_system_from_storage()
     power_grid = components["TST_GRI_01"]
     lheat_storage = components["TST_BFT_01"]
     lheat_bus = components["TST_BUS_01"]
-
-    @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump
 
@@ -91,7 +73,7 @@ function test_run_energy_system_from_storage()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.constant_demand = 800*4
+    hheat_demand.constant_demand = 800 * 4
     hheat_demand.constant_temperature = 45.0
     EnergySystems.control(hheat_demand, components, simulation_parameters)
 
@@ -111,22 +93,22 @@ function test_run_energy_system_from_storage()
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 1600
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min ≈ 45.0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max === nothing
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -800/3
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -800 / 3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800*2/3
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800 * 2 / 3
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
     EnergySystems.load(lheat_storage, simulation_parameters)
 
-    @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 800*2/3
-    @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 800*2/3
+    @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 800 * 2 / 3
+    @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 800 * 2 / 3
     @test lheat_storage.output_interfaces[lheat_storage.medium].temperature_max ≈ 35.0
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
-    @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2*800/3
+    @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2 * 800 / 3
     @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
 
     # second step: storage is nearly empty, operation of heatpump is limited
@@ -142,7 +124,7 @@ function test_run_energy_system_from_storage()
     lheat_storage.load = 100.0
     EnergySystems.control(lheat_storage, components, simulation_parameters)
 
-    hheat_demand.constant_demand = 800*4
+    hheat_demand.constant_demand = 800 * 4
     hheat_demand.constant_temperature = 45.0
     EnergySystems.control(hheat_demand, components, simulation_parameters)
 
@@ -158,11 +140,11 @@ function test_run_energy_system_from_storage()
     @test EnergySystems.temp_max_highest(exchanges) === 35.0
 
     EnergySystems.process(heat_pump, simulation_parameters)
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100*3/2
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800+100*3/2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100 * 3 / 2
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800 + 100 * 3 / 2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min ≈ 45.0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max === nothing
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(100*3/2)/3
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(100 * 3 / 2) / 3
     @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -100
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
@@ -177,9 +159,8 @@ function test_run_energy_system_from_storage()
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
-    @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2*(100*3/2)/3
+    @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2 * (100 * 3 / 2) / 3
     @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
-
 end
 
 function test_run_energy_system_from_storage_denied()
@@ -187,65 +168,49 @@ function test_run_energy_system_from_storage_denied()
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
-            "scale" => 1500
+            "scale" => 1500,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_BFT_01"
-                ],
-                "output_order" => [
-                    "TST_HP_01",
-                    "TST_BFT_01"
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BFT_01"],
+                "output_order" => ["TST_HP_01",
+                                   "TST_BFT_01"],
+            ),
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
             "medium" => "m_h_w_lt1",
-            "control_refs" => [],
-            "output_refs" => [
-                "TST_BUS_01"
-            ],
+            "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 30000,
-            "high_temperature" => 35
+            "initial_load" => 0.75,
+            "high_temperature" => 35,
         ),
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => ["TST_DEM_01"],
             "output_refs" => ["TST_DEM_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-                "unload_storages m_h_w_lt1" => false
+            "control_parameters" => Dict{String,Any}(
+                "unload_storages m_h_w_lt1" => false,
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
             "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0
+            "min_power_fraction" => 0.0,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     heat_pump = components["TST_HP_01"]
@@ -253,8 +218,6 @@ function test_run_energy_system_from_storage_denied()
     power_grid = components["TST_GRI_01"]
     lheat_storage = components["TST_BFT_01"]
     lheat_bus = components["TST_BUS_01"]
-
-    @test heat_pump.controller.state_machine.state == 1
 
     # first time step: storage is full to power heatpump, but heatpump unloading storages is test_run_energy_system_from_storage_denied
     # not energy should be transferred at all.
@@ -268,7 +231,7 @@ function test_run_energy_system_from_storage_denied()
     EnergySystems.control(lheat_storage, components, simulation_parameters)
     EnergySystems.control(lheat_bus, components, simulation_parameters)
 
-    hheat_demand.constant_demand = 800*4
+    hheat_demand.constant_demand = 800 * 4
     hheat_demand.constant_temperature = 45.0
     EnergySystems.control(hheat_demand, components, simulation_parameters)
 
@@ -305,7 +268,6 @@ function test_run_energy_system_from_storage_denied()
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 0.0
     @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
-
 end
 
 @testset "run_energy_system_from_storage" begin

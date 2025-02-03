@@ -10,15 +10,16 @@
         "output_plot": "all"
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 603900,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:30",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature": 85,
@@ -27,7 +28,6 @@
         "TST_DEM_02": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "constant_temperature": 90,
@@ -36,7 +36,6 @@
         "TST_SRC_01": {
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -46,7 +45,6 @@
         "TST_SRC_02": {
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_02"
             ],
@@ -56,7 +54,6 @@
         "TST_SRC_03": {
             "type": "BoundedSupply",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH"
             ],
@@ -66,7 +63,6 @@
         "TST_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_EL"
             ],
@@ -76,13 +72,9 @@
             "type": "HeatPump",
             "m_heat_in": "m_h_w_lt1",
             "m_heat_out": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 300,
             "output_temperature": 30,
             "min_power_fraction": 0.0
@@ -91,13 +83,9 @@
             "type": "HeatPump",
             "m_heat_in": "m_h_w_lt1",
             "m_heat_out": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_BUS_TH"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 500,
             "output_temperature": 40,
             "min_power_fraction": 0.0
@@ -106,13 +94,9 @@
             "type": "HeatPump",
             "m_heat_in": "m_h_w_ht1",
             "m_heat_out": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 1000,
             "min_power_fraction": 0.0
         },
@@ -120,20 +104,15 @@
             "type": "HeatPump",
             "m_heat_in": "m_h_w_ht1",
             "m_heat_out": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [
                 "TST_DEM_02"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 500,
             "min_power_fraction": 0.0
         },
         "TST_BUS_EL": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_GRI_01"
@@ -152,7 +131,6 @@
         "TST_BUS_TH": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_HP_01",

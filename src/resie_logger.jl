@@ -27,8 +27,8 @@ Avaiblable logging level:
  Error          | @error        | Logging.LogLevel( 2000)
 """
 struct CustomLogger <: Logging.AbstractLogger
-    io_general::Union{IO, Nothing}
-    io_balanceWarnings::Union{IO, Nothing}
+    io_general::Union{IO,Nothing}
+    io_balanceWarnings::Union{IO,Nothing}
     log_to_console::Bool
     log_to_file::Bool
     min_level::Logging.LogLevel
@@ -92,7 +92,7 @@ function Logging.handle_message(logger::CustomLogger, level, message, _module, g
             default_logger = ConsoleLogger(stderr, logger.min_level)
             Logging.handle_message(default_logger, level, message, _module, group, id, file, line; kwargs...)
         end
-    end   
+    end
 
     # log to file
     if logger.log_to_file
@@ -104,13 +104,13 @@ function Logging.handle_message(logger::CustomLogger, level, message, _module, g
         end
 
         # write log message to file
-        if level.level == BalanceWarning.level           
+        if level.level == BalanceWarning.level
             println(logger.io_balanceWarnings, log_message)
         else
             println(logger.io_general, log_message)
         end
 
-         # flush message to log files if an error occurs
+        # flush message to log files if an error occurs
         if level >= Logging.LogLevel(2000)  # error
             flush(logger.io_general)
             flush(logger.io_balanceWarnings)
@@ -138,7 +138,7 @@ function handle_BalanceWarning_message(level, message)
     stream = stderr
     buf = IOBuffer()
     iob = IOContext(buf, stream)
-    printstyled(iob, prefix, bold=true, color=color)
+    printstyled(iob, prefix; bold=true, color=color)
     print(iob, " ", message, "\n")
     write(stream, take!(buf))
 end
@@ -164,22 +164,20 @@ Starts the general and balance warning loggers and opens the files if requested.
 - `Union{IO,Nothing}`: The general log file, if file logging is requested
 - `Union{IO,Nothing}`: The balance warning log file, if file logging is requested
 """
-function start_logger(
-    log_to_console::Bool,
-    log_to_file::Bool,
-    general_logfile_path::Union{String,Nothing},
-    balanceWarn_logfile_path::Union{String,Nothing},
-    min_log_level::Logging.LogLevel,
-    input_file::Union{String,Nothing}=nothing
-)::Tuple{Union{IO,Nothing},Union{IO,Nothing}}
+function start_logger(log_to_console::Bool,
+                      log_to_file::Bool,
+                      general_logfile_path::Union{String,Nothing},
+                      balanceWarn_logfile_path::Union{String,Nothing},
+                      min_log_level::Logging.LogLevel,
+                      input_file::Union{String,Nothing}=nothing)::Tuple{Union{IO,Nothing},Union{IO,Nothing}}
     if log_to_file
         log_file_general = open(general_logfile_path, "w")
         log_file_balanceWarn = open(balanceWarn_logfile_path, "w")
     else
-        log_file_general  = nothing
-        log_file_balanceWarn  = nothing
+        log_file_general = nothing
+        log_file_balanceWarn = nothing
     end
-    logger = CustomLogger(log_file_general, log_file_balanceWarn, log_to_console, log_to_file, min_log_level)  
+    logger = CustomLogger(log_file_general, log_file_balanceWarn, log_to_console, log_to_file, min_log_level)
     global_logger(logger)
 
     if log_to_file
@@ -209,7 +207,7 @@ Prints final statement and closes the logging file.
     log_file_general::Union{IO, Nothing}            IO handler for general log file (if present), otherwise this should be nothing
     log_file_balanceWarn::Union{IO, Nothing}        IO handler for balanceWarn log file (if present), otherwise this should be nothing
 """
-function close_logger(log_file_general::Union{IO, Nothing}, log_file_balanceWarn::Union{IO, Nothing})
+function close_logger(log_file_general::Union{IO,Nothing}, log_file_balanceWarn::Union{IO,Nothing})
     if log_file_general !== nothing
         @info "general log saved to ./$(match(r"<file (.*?)>", log_file_general.name).captures[1])"
         close(log_file_general)

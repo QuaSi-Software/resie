@@ -1,11 +1,8 @@
 """
 Implementation of a photovoltaic (PV) power plant.
 
-For the moment this remains a simple implementation approximating a PV plant with a sinoid
-function. As the calculation of potential PV power is done outside the simulation by a
-seperate tool, a proper implemention would mostly just load a profile and consider only
-some system losses. The amplitude parameter is a scaling factor, but is not an average
-power value.
+No calculation of power is happening here, this is mostly just a wrapper around a yield
+profile that must be calculated before a simulation and be imported.
 """
 mutable struct PVPlant <: Component
     uac::String
@@ -29,44 +26,30 @@ mutable struct PVPlant <: Component
         # load energy profile from path
         energy_profile = Profile(config["energy_profile_file_path"], sim_params)
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
-            sf_fixed_source, # sys_function
-            InterfaceMap(), # input_interfaces
-            InterfaceMap( # output_interfaces
-                m_el_out => nothing
-            ),
-            m_el_out,
-            energy_profile, # energy_profile
-            config["scale"], # scaling_factor
-            0.0 # supply
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_fixed_source,                   # sys_function
+                   InterfaceMap(),                    # input_interfaces
+                   InterfaceMap(m_el_out => nothing), # output_interfaces
+                   m_el_out,
+                   energy_profile,  # energy_profile
+                   config["scale"], # scaling_factor
+                   0.0)             # supply
     end
 end
 
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_el_out],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.m_el_out), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
+                          load_storages(unit.controller, unit.m_el_out))
 end
 
-function control(
-    unit::PVPlant,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
-    move_state(unit, components, sim_params)
-    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params["time"])
+function control(unit::PVPlant,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
+    update(unit.controller)
+    unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], unit.supply)
-
 end
-
 
 function process(unit::PVPlant, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_el_out]
@@ -74,7 +57,7 @@ function process(unit::PVPlant, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::PVPlant)::Vector{String}
-    return [string(unit.m_el_out)*" OUT",
+    return [string(unit.m_el_out) * " OUT",
             "Supply"]
 end
 

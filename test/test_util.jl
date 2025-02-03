@@ -1,3 +1,5 @@
+using Dates
+
 """
     pwc_units_astr(expected, actual)
 
@@ -64,4 +66,32 @@ function pwc_ooo_astr(expected::Vector, actual::Vector)
     end
 
     return result
+end
+
+"""
+    get_default_sim_params()
+
+Returns default simulation parameters useful for tests.
+
+# Returns
+- `Dict{String,Any}`: Default simulation parameters
+"""
+function get_default_sim_params()::Dict{String,Any}
+    return Dict{String,Any}(
+        "time" => 0,
+        "current_date" => DateTime("01.01.2024 00:00", "dd.mm.yyy HH:MM"),
+        "time_step_seconds" => 900,
+        "number_of_time_steps" => 10,
+        "start_date" => DateTime("01.01.2024 00:00", "dd.mm.yyy HH:MM"),
+        "end_date" => DateTime("01.01.2024 02:15", "dd.mm.yyy HH:MM"),
+        "epsilon" => 1e-9,
+        "latitude" => nothing,
+        "longitude" => nothing,
+        "watt_to_wh" => function (w)
+            return w * 0.25
+        end,
+        "wh_to_watts" => function (w)
+            return w * 4.0
+        end,
+    )
 end

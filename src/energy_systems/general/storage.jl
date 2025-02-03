@@ -16,53 +16,39 @@ mutable struct Storage <: Component
 
     capacity::Float64
     load::Float64
+    load_end_of_last_timestep::Float64
     losses::Float64
 
     function Storage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
-            sf_storage, # sys_function
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            medium,
-            config["capacity"], # capacity
-            config["load"], # load
-            0.0, # losses
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_storage,                      # sys_function
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   medium,
+                   config["capacity"],  # capacity
+                   config["load"],      # load
+                   0.0,                 # load_end_of_last_timestep::Float64
+                   0.0)                 # losses
     end
 end
 
 function initialise!(unit::Storage, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "unload_storages " * String(unit.medium), true
-        )
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.medium],
+                          unload_storages(unit.controller, unit.medium))
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
-function control(
-    unit::Storage,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
-    move_state(unit, components, sim_params)
+function control(unit::Storage,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
+    update(unit.controller)
 
     set_max_energy!(unit.input_interfaces[unit.medium], unit.capacity - unit.load)
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
@@ -70,17 +56,17 @@ end
 
 function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(
-        balance=interface.balance,
-        energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
-        purpose_uac=purpose_uac,
-        temperature_min=interface.temperature_min,
-        temperature_max=interface.temperature_max,
-        pressure=nothing,
-        voltage=nothing,
-    )]
+    return [EnEx(;
+                 balance=interface.balance,
+                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
+                 purpose_uac=purpose_uac,
+                 temperature_min=interface.temperature_min,
+                 temperature_max=interface.temperature_max,
+                 pressure=nothing,
+                 voltage=nothing)]
 end
 
 function process(unit::Storage, sim_params::Dict{String,Any})
@@ -89,7 +75,7 @@ function process(unit::Storage, sim_params::Dict{String,Any})
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)    
+        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
     end
 
@@ -109,6 +95,7 @@ function load(unit::Storage, sim_params::Dict{String,Any})
 
     if energy_available <= 0.0
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+        unit.load_end_of_last_timestep = copy(unit.load)
         return # load is only concerned with receiving energy from the source
     end
 
@@ -120,11 +107,13 @@ function load(unit::Storage, sim_params::Dict{String,Any})
         unit.load = unit.capacity
         sub!(inface, diff)
     end
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function output_values(unit::Storage)::Vector{String}
-    return [string(unit.medium)*" IN",
-            string(unit.medium)*" OUT",
+    return [string(unit.medium) * " IN",
+            string(unit.medium) * " OUT",
             "Load",
             "Load%",
             "Capacity",

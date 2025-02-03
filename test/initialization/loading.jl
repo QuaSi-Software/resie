@@ -3,59 +3,51 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function test_load_from_dict()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
             "medium" => "m_h_w_lt1",
         ),
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
             "medium" => "m_e_ac_230v",
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => ["TST_BT_01"],
             "output_refs" => ["TST_BT_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "storage_driven",
-                "high_threshold" => 0.5,
-                "low_threshold" => 0.1
-            ),
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "storage_driven",
+                                      "high_threshold" => 0.5,
+                                      "low_threshold" => 0.1,
+                                      "storage_uac" => "TST_BT_01",
+                                  )],
             "power_th" => 20000,
-            "constant_cop" => 3.0
+            "constant_cop" => 3.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
-            "control_refs" => [],
             "output_refs" => ["TST_DEM_01"],
             "medium" => "m_h_w_ht1",
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 20000,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
-            "control_refs" => [],
             "output_refs" => [],
             "medium" => "m_h_w_ht1",
             "constant_demand" => 5000,
             "constant_temperature" => 60,
         ),
     )
-    simulation_params = Dict{String,Any}(
-        "time" => 0,
-        "time_step_seconds" => 900,
-        "epsilon" => 1e-9
-    )
+    simulation_params = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_params)
     @test length(keys(components)) == 5
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
@@ -71,76 +63,57 @@ function test_load_custom_medium_categories()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => ["TST_ELY_01"],
             "is_source" => true,
             "medium" => "m_e_dc_1000v",
         ),
         "TST_GRI_02" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
             "medium" => "m_e_dc_1000v",
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "control_refs" => [],
-            "output_refs" => [
-                "TST_HP_01",
-                "TST_GRO_02",
-                "TST_GRO_03"
-            ],
+            "output_refs" => ["TST_HP_01",
+                              "TST_GRO_02",
+                              "TST_GRO_03"],
             "power_el" => 1000,
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_ht_out" => "m_h_w_55c",
             "m_h2_out" => "m_c_g_h2-pure",
             "m_o2_out" => "m_c_g_o2-impure",
             "heat_lt_is_usable" => false,
-            "strategy" => Dict{String,Any}(
-                "name" => "Default"
-            )
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
-            "control_refs" => [],
             "output_refs" => ["TST_GRO_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "demand_driven",
-            ),
             "m_el_in" => "m_e_dc_1000v",
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",
             "power_th" => 12000,
-            "constant_cop" => 3.0
+            "constant_cop" => 3.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
             "medium" => "m_h_w_85c",
         ),
         "TST_GRO_02" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
             "medium" => "m_c_g_h2-pure",
         ),
         "TST_GRO_03" => Dict{String,Any}(
             "type" => "GridConnection",
-            "control_refs" => [],
             "output_refs" => [],
             "is_source" => false,
             "medium" => "m_c_g_o2-impure",
         ),
     )
-    simulation_params = Dict{String,Any}(
-        "time" => 0,
-        "time_step_seconds" => 900,
-        "epsilon" => 1e-9
-    )
+    simulation_params = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_params)
     electrolyser = components["TST_ELY_01"]
     heat_pump = components["TST_HP_01"]

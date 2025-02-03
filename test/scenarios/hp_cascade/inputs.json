@@ -20,15 +20,16 @@
         }
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 604800,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_01_HZG_01_DEM": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -37,7 +38,6 @@
         "TST_01_HZG_02_DEM": {
             "type": "Demand",
             "medium": "m_c_g_h2",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
             "scale": 2000.0
@@ -45,7 +45,6 @@
         "TST_01_ELT_01_BUS": {
             "type": "Bus",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_01_ELT_01_GRI"
@@ -60,7 +59,6 @@
         "TST_01_HZG_01_BUS": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "TST_01_HZG_02_HTP",
@@ -73,15 +71,11 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "control_refs": ["TST_01_HZG_01_HTP", "TST_01_HZG_02_HTP"],
             "output_refs": [
                 "TST_01_HZG_01_HTP",
                 "TST_01_HZG_02_DEM",
                 "TST_01_ELT_01_GRO"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_el": 20000,
             "output_temperature_ht": 25.0,
             "m_heat_ht_out": "m_h_w_lt1",
@@ -100,13 +94,9 @@
         },
         "TST_01_HZG_01_HTP": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_02_HTP"
             ],
-            "strategy": {
-                "name": "supply_driven"
-            },
             "power_th": 10000,
             "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
@@ -114,13 +104,9 @@
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 10000,
             "m_heat_in": "m_h_w_ht2",
             "min_power_fraction" : 0.0
@@ -128,13 +114,9 @@
         "TST_01_HZG_01_GBO": {
             "type": "FuelBoiler",
             "m_fuel_in": "m_c_g_natgas",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 40000,
             "min_power_fraction": 0.0,
             "efficiency_fuel_in": "const:1.0"
@@ -142,7 +124,6 @@
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_HZG_01_GBO"
             ],
@@ -151,7 +132,6 @@
         "TST_01_ELT_01_GRI": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_01_ELT_01_BUS"
             ],
@@ -160,7 +140,6 @@
         "TST_01_ELT_01_GRO": {
             "type": "GridConnection",
             "medium": "m_c_g_o2",
-            "control_refs": [],
             "output_refs": [],
             "is_source": false
         }

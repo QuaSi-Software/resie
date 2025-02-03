@@ -1,6 +1,8 @@
 module Weatherdata
 
 using Resie.Profiles
+using Dates
+using Proj
 
 export WeatherData
 
@@ -13,63 +15,138 @@ mutable struct WeatherData
     """Wind speed, in m/s."""
     wind_speed::Profile
 
-    """Direct horizontal irradiation, in W/m^2."""
+    """Direct horizontal irradiation, in Wh/m^2."""
     dirHorIrr::Profile
 
-    """Diffuse horizontal irradiation, in W/m^2."""
+    """Diffuse horizontal irradiation, in Wh/m^2."""
     difHorIrr::Profile
 
-    """Global horizontal irradiation, in W/m^2."""
+    """Global horizontal irradiation, in Wh/m^2."""
     globHorIrr::Profile
-   
-"""
-get_weather_data(weather_file_path, sim_params)
 
-Function to read in a weather file and hold the data. The data can either be
-a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
+    """Horizontal long wave (infrared) irradiation, in Wh/m^2."""
+    longWaveIrr::Profile
 
-The returned values are of type WeaterData containing profiles of type Profile.
-"""
+    """
+    get_weather_data(weather_file_path, sim_params)
+    
+    Function to read in a weather file and hold the data. The data can either be
+    a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
+    
+    The returned values are of type WeaterData containing profiles of type Profile.
+    """
     function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
         if !isfile(weather_file_path)
-            @error "The DWD weather file could not be found in: \n $weather_file_path"
+            @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
         end
-    
+
+        time_step = Second(3600)  # set fixed time step width for weather data
+        start_year = Dates.value(Year(sim_params["start_date"]))
+        end_year = Dates.value(Year(sim_params["end_date"]))
+        timestamp = remove_leap_days(collect(range(DateTime(start_year, 1, 1, 0, 0, 0);
+                                                   stop=DateTime(end_year, 12, 31, 23, 0, 0),
+                                                   step=time_step)))
+        nr_of_years = end_year - start_year + 1
+
         if endswith(lowercase(weather_file_path), ".dat")
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
-            timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
-            time_step = 900*4 # s, of weatherdata
-    
-            # convert required data to profile
-            temp_ambient_air  = Profile("", sim_params, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", sim_params, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            dirHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["dirHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["difHorIrr"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            globHorIrr        = deepcopy(dirHorIrr)
-            globHorIrr.data   = globHorIrr.data .+ difHorIrr.data
-    
+
+            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
+            #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
+
+            # convert solar radiation data to profile
+            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive")
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive")
+            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
+
+            # calculate latitude and longitude from Hochwert and Rechtswert from header
+            inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
+            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
+            transform = Proj.Transformation(inProj, outProj)
+            latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
+
+            # No shift here, as temperatures are measured half an hour bevor the timestep indicated.
+            shift = Second(0)
+
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
-            timestamp = collect(0:(900*4):(900*4*8759)) # s, of weatherdata
-            time_step = 900*4 # s, of weatherdata   
-            
-            temp_ambient_air  = Profile("", sim_params, given_profile_values=weatherdata_dict["temp_air"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            wind_speed        = Profile("", sim_params, given_profile_values=weatherdata_dict["wind_speed"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=true) 
-            globHorIrr        = Profile("", sim_params, given_profile_values=weatherdata_dict["ghi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            difHorIrr         = Profile("", sim_params, given_profile_values=weatherdata_dict["dhi"], given_timestamps=timestamp, given_time_step=time_step, given_is_power=false) 
-            dirHorIrr         = deepcopy(globHorIrr)
-            dirHorIrr.data    = dirHorIrr.data .- difHorIrr.data
+
+            # convert solar radiation data to profile
+            globHorIrr = Profile(weather_file_path * ":GlobalHorizontalIrradiation",
+                                 sim_params;
+                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
+                                 given_timestamps=timestamp,
+                                 given_time_step=time_step,
+                                 given_data_type="extensive")
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive")
+            dirHorIrr = deepcopy(globHorIrr)
+            dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
+
+            latitude = headerdata["latitude"]
+            longitude = headerdata["longitude"]
+
+            # According to the EPW definition, most non-energy related values are given at the time
+            # stamp indicated. In order to be consistent with DWD-dat and the energy-related values,
+            # that represent the mean or the middle of the timestamp indicated, the values will be 
+            # shifted by 30 minutes for aggregation and (60 min - timestep / 2) for segmentation. 
+            # The interpolation algorithm in Profiles will then shift the data so that the values
+            # are defined as the mean value for the upcomming timestep.
+            # Note that this currently works for intensive values only!
+            shift = Second(max(30 * 60, 60 * 60 - sim_params["time_step_seconds"] / 2))
         end
-    
-        return new(temp_ambient_air, 
-                   wind_speed, 
-                   dirHorIrr, 
-                   difHorIrr, 
-                   globHorIrr)
+
+        # convert long wave radiation data
+        longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
+                              sim_params;
+                              given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
+                              given_timestamps=timestamp,
+                              given_time_step=time_step,
+                              given_data_type="extensive")
+
+        # convert other data to profile
+        temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
+                                   sim_params;
+                                   given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
+                                   given_timestamps=timestamp,
+                                   given_time_step=time_step,
+                                   given_data_type="intensive",
+                                   shift=shift)
+
+        wind_speed = Profile(weather_file_path * ":WindSpeed",
+                             sim_params;
+                             given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
+                             given_timestamps=timestamp,
+                             given_time_step=time_step,
+                             given_data_type="intensive",
+                             shift=shift)
+
+        return new(temp_ambient_air,
+                   wind_speed,
+                   dirHorIrr,
+                   difHorIrr,
+                   globHorIrr,
+                   longWaveIrr),
+               latitude,
+               longitude
     end
 end
-
 
 """
 read_dat_file(weather_file_path)
@@ -116,8 +193,8 @@ IL Qualitaetsbit bezueglich der Auswahlkriterien                           {0;1;
 function read_dat_file(weather_file_path::String)
     local datfile
     expected_length = 8760  # timesteps
-    try 
-        datfile = open(weather_file_path, "r") 
+    try
+        datfile = open(weather_file_path, "r")
     catch e
         @error "Error reading the DWD .dat file in $weather_file_path\n" *
                "Please check the file. The following error occurred: $e"
@@ -127,7 +204,7 @@ function read_dat_file(weather_file_path::String)
     # Read header 
     headerdata = Dict()
     for line in eachline(datfile)
-        row = split(rstrip(line), ":", limit=2)
+        row = split(rstrip(line), ":"; limit=2)
         current_name = rstrip(row[1])
         try
             if current_name == "Rechtswert"
@@ -156,15 +233,15 @@ function read_dat_file(weather_file_path::String)
 
     # read data
     # Define column names of weatherdata_dict
-    colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air", 
-                "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover", 
-                "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr", 
-                "athmospheric_heat_irr", "terrestric_heat_irr", "quality"]
+    colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air",
+                "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover",
+                "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr",
+                "longWaveIrr", "terrestric_heat_irr", "quality"]
 
-    weatherdata_dict = Dict{String, Vector{Any}}()
+    weatherdata_dict = Dict{String,Vector{Any}}()
     for col_name in colnames
         weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
-    end 
+    end
 
     dataline = 1
     for line in eachline(datfile)
@@ -186,7 +263,7 @@ function read_dat_file(weather_file_path::String)
     close(datfile)
 
     # Check length
-    if dataline-1 !== expected_length
+    if dataline - 1 !== expected_length
         @warn "Error reading the .dat weather dataset from $weather_file_path:\n" *
               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
               "Check the file and make sure the data block starts with ***."
@@ -197,7 +274,6 @@ function read_dat_file(weather_file_path::String)
     return weatherdata_dict, headerdata
 end
 
-
 """
 read_epw_file(weather_file_path)
 
@@ -207,8 +283,8 @@ For details, see: https://designbuilder.co.uk/cahelp/Content/EnergyPlusWeatherFi
 function read_epw_file(weather_file_path::String)
     local ewpfile
     expected_length = 8760  # timesteps
-    try 
-        ewpfile = open(weather_file_path, "r") 
+    try
+        ewpfile = open(weather_file_path, "r")
     catch e
         @error "Error reading the DWD .dat file in $weather_file_path. Please check the file.\n" *
                "The following error occurred: $e"
@@ -220,7 +296,7 @@ function read_epw_file(weather_file_path::String)
 
     head = ["loc", "city", "state-prov", "country", "data_type", "WMO_code",
             "latitude", "longitude", "TZ", "altitude"]
-    headerdata = Dict{String, Any}(zip(head, split(chomp(firstline), ",")))
+    headerdata = Dict{String,Any}(zip(head, split(chomp(firstline), ",")))
 
     # convert string values to float where necessary
     for key in ["altitude", "latitude", "longitude", "TZ", "WMO_code"]
@@ -228,10 +304,10 @@ function read_epw_file(weather_file_path::String)
     end
 
     # define data dicts and column names
-    weatherdata_dict = Dict{String, Vector{Any}}()
+    weatherdata_dict = Dict{String,Vector{Any}}()
     colnames = ["year", "month", "day", "hour", "minute", "data_source_unct",
                 "temp_air", "temp_dew", "relative_humidity",
-                "atmospheric_pressure", "etr", "etrn", "ghi_infrared", "ghi",
+                "atmospheric_pressure", "etr", "etrn", "longWaveIrr", "ghi",
                 "dni", "dhi", "global_hor_illum", "direct_normal_illum",
                 "diffuse_horizontal_illum", "zenith_luminance",
                 "wind_direction", "wind_speed", "total_sky_cover",
@@ -243,7 +319,7 @@ function read_epw_file(weather_file_path::String)
 
     for col_name in colnames
         weatherdata_dict[col_name] = Vector{Any}(undef, expected_length)
-    end 
+    end
 
     # skip the next seven lines of the header
     for _ in 1:7
@@ -273,7 +349,7 @@ function read_epw_file(weather_file_path::String)
     close(ewpfile)
 
     # Check length
-    if dataline-1 !== expected_length
+    if dataline - 1 !== expected_length
         @error "Error reading the EPW weather dataset from $weather_file_path\n" *
                "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
                "Check the file for corruption."
@@ -281,9 +357,8 @@ function read_epw_file(weather_file_path::String)
     end
 
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
-   
+
     return weatherdata_dict, headerdata
 end
-
 
 end

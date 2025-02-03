@@ -1,5 +1,43 @@
 module Resie
 
+using UUIDs
+
+"""
+Contains the parameters, instantiated components and the order of operations for a simulation run.
+
+In short, it bundles all the data required to perform a simulation from start to finish.
+Through its fields it contains a lot of complexity in terms of hierarchical data structures.
+However the struct should not be used as argument for complex calculations. Instead it is
+intended to be used for the run registry only.
+
+Because the types used to represent the field are defined in modules that depend upon the
+definition of the struct in the first place, the fields are defined with the generic 'Any'
+type.
+"""
+mutable struct SimulationRun
+    parameters::Dict{String,Any}
+    components::Dict{String,Any}
+    order_of_operations::Vector{Any}
+end
+
+# this registry should be the only global state in the package and contains the state for
+# ongoing or paused simulation runs
+current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
+
+"""
+    get_run(id)
+
+Get the simulation run container for the given ID.
+
+# Args
+- `id::UUID`: The ID of the run
+# Returns
+- `SimulationRun`: The simulation run container
+"""
+function get_run(id::UUID)::SimulationRun
+    return current_runs[id]
+end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -26,7 +64,10 @@ using ColorSchemes
 using Colors
 using Interpolations
 using JSON
+using Dates
 
+const HOURS_PER_SECOND::Float64 = 1.0 / 3600.0
+const SECONDS_PER_HOUR::Float64 = 3600.0
 
 """
     get_simulation_params(project_config)
@@ -39,26 +80,44 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_timestamp, end_timestamp = get_timesteps(
-        project_config["simulation_parameters"]
-    )
-    nr_of_steps = UInt(max(1, (end_timestamp - start_timestamp) / time_step))
+    time_step, start_date, end_date, nr_of_steps = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
-        "time" => start_timestamp,
+        "time" => 0,
+        "current_date" => start_date,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
+        "start_date" => start_date,
+        "end_date" => end_date,
         "epsilon" => 1e-9,
-        "is_first_timestep" => true
+        "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
+        "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
     )
 
-    file_path = default(
-        project_config["simulation_parameters"],
-        "weather_file_path",
-        nothing
-    )
-    if file_path !== nothing
-        sim_params["weather_data"] = WeatherData(file_path, sim_params)
+    # add helper functions to convert power to work and vice-versa. this uses the time step
+    # of the simulation as the duration required for the conversion.
+    sim_params["watt_to_wh"] = function (watts::Float64)
+        return watts * time_step * HOURS_PER_SECOND
+    end
+    sim_params["wh_to_watts"] = function (wh::Float64)
+        return wh * SECONDS_PER_HOUR / time_step
+    end
+
+    weather_file_path = default(project_config["simulation_parameters"],
+                                "weather_file_path",
+                                nothing)
+
+    if weather_file_path !== nothing
+        sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params)
+
+        if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+            sim_params["latitude"] = lat
+            sim_params["longitude"] = long
+        else
+            @info "The coordinates given in the weather file where overwritten by the " *
+                  "ones given in the input file:\n" *
+                  "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+        end
     end
 
     return sim_params
@@ -79,20 +138,10 @@ Construct and prepare parameters, energy system components and the order of oper
 function prepare_inputs(project_config::Dict{AbstractString,Any})
     sim_params = get_simulation_params(project_config)
 
-    # this sets a global variable in the EnergySystems module, which is required for a
-    # utility function to work properly
-    EnergySystems.set_timestep(sim_params["time_step_seconds"])
-
     components = load_components(project_config["components"], sim_params)
 
-    if (
-        haskey(project_config, "order_of_operation")
-        && length(project_config["order_of_operation"]) > 0
-    )
-        step_order = load_order_of_operations(
-            project_config["order_of_operation"],
-            components
-        )
+    if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
+        step_order = load_order_of_operations(project_config["order_of_operation"], components)
         @info "The order of operations was successfully imported from the input file.\n" *
               "Note that the order of operations has a major impact on the simulation " *
               "result and should only be changed by experienced users!"
@@ -114,21 +163,22 @@ Performs the simulation as loop over time steps and records outputs.
 -`components::Grouping`: The energy system components
 -`step_order::StepInstructions`:: Order of operations
 """
-function run_simulation_loop(
-    project_config::Dict{AbstractString,Any},
-    sim_params::Dict{String,Any},
-    components::Grouping,
-    step_order::StepInstructions
-)
+function run_simulation_loop(project_config::Dict{AbstractString,Any},
+                             sim_params::Dict{String,Any},
+                             components::Grouping,
+                             step_order::StepInstructions)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
     do_create_plot = !(output_keys_lineplot === nothing)
     do_write_CSV = !(output_keys_to_csv === nothing)
-    csv_output_file_path = default(
-        project_config["io_settings"],
-        "csv_output_file",
-        "./output/out.csv"
-    )
+    csv_output_file_path = default(project_config["io_settings"],
+                                   "csv_output_file",
+                                   "./output/out.csv")
+    csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
+    if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
+        @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
+        throw(IntputError)
+    end
 
     # Initialize the array for output plots
     if do_create_plot
@@ -136,22 +186,26 @@ function run_simulation_loop(
     end
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_csv)
+        reset_file(csv_output_file_path, output_keys_to_csv, csv_time_unit)
     end
-   
+
     # check if sankey should be plotted
-    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") && project_config["io_settings"]["sankey_plot"] !== "nothing"
+    do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
+                       project_config["io_settings"]["sankey_plot"] !== "nothing"
     if do_create_sankey
         # get infomration about all interfaces for Sankey
-        nr_of_interfaces, medium_of_interfaces, output_sourcenames_sankey, output_targetnames_sankey = get_interface_information(components)
+        nr_of_interfaces,
+        medium_of_interfaces,
+        output_sourcenames_sankey,
+        output_targetnames_sankey = get_interface_information(components)
         # preallocate for speed: Matrix with data of interfaces in every timestep
         output_interface_values = zeros(Float64, sim_params["number_of_time_steps"], nr_of_interfaces)
-    end 
+    end
 
     # export order of operation and other additional info like optional plots
     dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
-    for steps = 1:sim_params["number_of_time_steps"]
+    for steps in 1:sim_params["number_of_time_steps"]
         # perform the simulation
         perform_steps(components, step_order, sim_params)
 
@@ -167,7 +221,7 @@ function run_simulation_loop(
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params["time"])
+            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params, csv_time_unit)
         end
 
         # get the energy transported through each interface in every timestep for Sankey
@@ -182,28 +236,37 @@ function run_simulation_loop(
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
-
-        if steps == 1
-            sim_params["is_first_timestep"] = false
-        end
+        sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
+                                                            Second(sim_params["time_step_seconds"]))
     end
 
-    ### create profile line plot
+    # create profile line plot
     if do_create_plot
-        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config)
+        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config, sim_params)
         @info "Line plot created and saved to .output/output_plot.html"
     end
 
-    ### create Sankey diagram
+    # create Sankey diagram
     if do_create_sankey
-        create_sankey(output_sourcenames_sankey, output_targetnames_sankey, output_interface_values, medium_of_interfaces, nr_of_interfaces, project_config["io_settings"])
+        create_sankey(output_sourcenames_sankey,
+                      output_targetnames_sankey,
+                      output_interface_values,
+                      medium_of_interfaces,
+                      nr_of_interfaces,
+                      project_config["io_settings"])
         @info "Sankey created and saved to .output/output_sankey.html"
     end
-    
+
     if do_write_CSV
         @info "CSV-file with outputs written to $(csv_output_file_path)"
     end
 
+    # plot additional figures potentially available from components after simulation
+    if default(project_config["io_settings"], "auxiliary_plots", false)
+        for component in components
+            plot_optional_figures_end(component[2], sim_params)
+        end
+    end
 end
 
 """
@@ -232,6 +295,10 @@ function load_and_run(filepath::String)
     end
 
     sim_params, components, step_order = prepare_inputs(project_config)
+    run_ID = uuid1()
+    sim_params["run_ID"] = run_ID
+    current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+
     run_simulation_loop(project_config, sim_params, components, step_order)
 end
 

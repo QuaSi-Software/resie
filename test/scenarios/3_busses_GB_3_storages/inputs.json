@@ -94,15 +94,16 @@
         }   
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 86400,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "01.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -111,7 +112,6 @@
         "TST_DEM_02": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -120,7 +120,6 @@
         "ESS_GRI_EG_01": {
             "type": "GridConnection",
             "medium": "m_c_g_natgas",
-            "control_refs": [],
             "output_refs": [
                 "ESS_GBO_01"],
             "is_source": true
@@ -128,13 +127,9 @@
         "ESS_GBO_01": {
             "type": "FuelBoiler",
             "m_fuel_in": "m_c_g_natgas",
-            "control_refs": ["ESS_BUS_TH_01"],
             "output_refs": [
                 "ESS_BUS_TH_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "min_power_fraction": 0,
             "power_th": 1500,
             "efficiency_fuel_in": "const:1.0"
@@ -142,7 +137,6 @@
         "ESS_BUS_TH_01": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "ESS_GBO_01",
@@ -162,7 +156,6 @@
         "ESS_BUS_TH_02": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
@@ -181,7 +174,6 @@
         "ESS_BUS_TH_03": {
             "type": "Bus",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "connections": {
                 "input_order": [
                     "ESS_BUS_TH_01",
@@ -199,45 +191,42 @@
         },
         "TST_BFT_TH_01": {
             "type": "BufferTank",
-            "control_refs": [],
             "output_refs": [
                 "ESS_BUS_TH_02"
             ],
-            "strategy": {
-                "name": "default",
+            "control_parameters": {
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 4000,
-            "load": 2000
+            "initial_load": 0.5
         },
         "TST_BFT_TH_02": {
             "type": "BufferTank",
-            "control_refs": [],
             "output_refs": [
                 "ESS_BUS_TH_03"
             ],
-            "strategy": {
-                "name": "default",
+            "control_parameters": {
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 4000,
-            "load": 2000
+            "initial_load": 0.5
         },
         "TST_BFT_TH_03": {
             "type": "BufferTank",
-            "control_refs": [],
             "output_refs": [
                 "ESS_BUS_TH_01"
             ],
-            "strategy": {
-                "name": "default",
+            "control_parameters": {
                 "load_storages m_h_w_ht1": false
             },
             "medium": "m_h_w_ht1",
+            "model_type": "ideally_stratified",
             "capacity": 15000,
-            "load": 7000
+            "initial_load": 0.46666666666666666666666666666667
         }
 
     }

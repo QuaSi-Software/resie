@@ -34,52 +34,36 @@ mutable struct BoundedSupply <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        return new(
-            uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
-            sf_bounded_source, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            max_power_profile, # max_power_profile
-            temperature_profile, #temperature_profile
-            default(config, "scale", 1.0), # scaling_factor
-            0.0, # max_energy
-            nothing, # temperature
-            default(config, "constant_power", nothing), # constant_power
-            default(config, "constant_temperature", nothing), # constant_temperature
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_bounded_source,   # sys_function
+                   medium,              # medium
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   max_power_profile,               # max_power_profile
+                   temperature_profile,             # temperature_profile
+                   default(config, "scale", 1.0),   # scaling_factor
+                   0.0,                             # max_energy
+                   nothing,                         # temperature
+                   default(config, "constant_power", nothing),       # constant_power
+                   default(config, "constant_temperature", nothing)) # constant_temperature
     end
 end
 
 function initialise!(unit::BoundedSupply, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
-function control(
-    unit::BoundedSupply,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
-    move_state(unit, components, sim_params)
+function control(unit::BoundedSupply,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
+    update(unit.controller)
 
     if unit.constant_power !== nothing
-        unit.max_energy = watt_to_wh(unit.constant_power)
+        unit.max_energy = sim_params["watt_to_wh"](unit.constant_power)
     elseif unit.max_power_profile !== nothing
-        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(
-            unit.max_power_profile, sim_params["time"]
-        )
+        unit.max_energy = unit.scaling_factor * Profiles.work_at_time(unit.max_power_profile, sim_params)
     else
         unit.max_energy = 0.0
     end
@@ -88,15 +72,11 @@ function control(
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(
-            unit.temperature_profile, sim_params["time"]
-        )
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_temperature!(
-        unit.output_interfaces[unit.medium],
-        nothing,
-        unit.temperature
-    )
+    set_temperature!(unit.output_interfaces[unit.medium],
+                     nothing,
+                     unit.temperature)
 end
 
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
@@ -112,11 +92,10 @@ function process(unit::BoundedSupply, sim_params::Dict{String,Any})
         temp_out = temp_min_highest(exchanges)
     else
         e = first(exchanges)
-        if (
-            unit.temperature === nothing ||
+        if (unit.temperature === nothing ||
             (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-            (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
-        )
+            (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
+            # end of condition
             energy_demand = e.balance + e.energy_potential
             temp_out = lowest(e.temperature_min, unit.temperature)
         else
@@ -131,10 +110,10 @@ end
 
 function output_values(unit::BoundedSupply)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Max_Energy"]
     else
-        return [string(unit.medium)*" OUT",
+        return [string(unit.medium) * " OUT",
                 "Max_Energy",
                 "Temperature"]
     end

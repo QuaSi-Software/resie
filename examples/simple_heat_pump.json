@@ -4,6 +4,7 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
+        "csv_time_unit": "date",
         "csv_output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1 IN",
@@ -60,15 +61,16 @@
         }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 603900,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds"
     },
     "components": {
         "TST_DEM_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
             "temperature_profile_file_path": "./profiles/examples/general/dem_heat_temp_var_avg55.prf",
@@ -77,7 +79,6 @@
         "TST_SRC_01": {
             "type": "BoundedSupply",
             "medium": "m_h_w_lt1",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -88,7 +89,6 @@
         "TST_GRI_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01"
             ],
@@ -96,15 +96,9 @@
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [
-                "TST_DEM_01"
-            ],
             "output_refs": [
                 "TST_DEM_01"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 9000,
             "constant_cop": 3.0,
             "min_power_fraction": 0.0

@@ -58,15 +58,16 @@
           }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 86400,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "01.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_ht_01": {
             "type": "Demand",
             "medium": "m_h_w_ht1",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
@@ -75,7 +76,6 @@
         "TST_DEM_H2_01": {
             "type": "Demand",
             "medium": "m_c_g_h2",
-            "control_refs": [],
             "output_refs": [],
             "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
             "scale": 3000
@@ -83,46 +83,35 @@
         "TST_01_ELT_01_GRO": {
             "type": "GridConnection",
             "medium": "m_c_g_o2",
-            "control_refs": [],
             "output_refs": [],
             "is_source": false
         },
         "TST_GRI_EL_01": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": ["TST_HP_01"],
             "is_source": true
         },
         "TST_GRI_EL_02": {
             "type": "GridConnection",
             "medium": "m_e_ac_230v",
-            "control_refs": [],
             "output_refs": ["TST_01_ELT_01_ELY"],
             "is_source": true
         },
         "TST_HP_01": {
             "type": "HeatPump",
-            "control_refs": [  ],
             "output_refs": ["TST_DEM_ht_01" ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_th": 5000,
             "constant_cop": 3.0,
             "min_power_fraction": 0
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "control_refs": [],
             "output_refs": [
                 "TST_HP_01",
                 "TST_DEM_H2_01",
                 "TST_01_ELT_01_GRO"
             ],
-            "strategy": {
-                "name": "demand_driven"
-            },
             "power_el": 4000,
             "output_temperature_ht": 55.0,
             "m_heat_ht_out": "m_h_w_lt1",

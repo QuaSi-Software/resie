@@ -4,6 +4,92 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.10.4
+* Update of buffer tank / STTES model. Now three different models are available, each with and without losses:
+  * ideally stratified: Supplies energy consistently at "high_temperature". Losses reduce energy but do not affect temperature.
+  * ideally mixed: Fully mixed model, with temperature output depending on the current load. Losses decrease both energy and temperature.
+  * balanced: Combines both models. A full tank behaves as ideally stratified, transitioning to ideally mixed as the tank empties.
+* Add workaround for storage_driven control module not recognizing a full storage if losses are activated. This can be done cleaner in the future.
+* Scenario "chpp_two_hyst" now includes losses in buffer tank
+
+### Version 0.10.3
+* Add the possibility to create optional figures at the end of the simulation period
+* Fix balance_on() of storages for direct connections
+* Finalisation of the geothermal collector (successfully validated agains TRNSYS and DELPHIN):
+  * Revision of the entire model, including bug fixed and improvements
+  * Add automatic generation of the numerical grid
+  * Add time-shiftable plot of the temperature distribution (requires GLMakie package, activate with auxiliary_plots)
+  * Add scenario using the geothermal collector
+* Update installation instructions for ReSiE
+
+### Version 0.10.2
+* Internal changes concerning global state in the package scope:
+  * Moving helper functions watt_to_wh and wh_to_watts into the simulation parameters
+  * Providing access to the instances of a run via a package-global registry
+
+### Version 0.10.1
+* Bugfix for order of operation not determining middle busses with grids correctly
+* Bugfix in grid (sink) setting wrong min/max temperature in control
+
+### Version 0.10.0
+* Change handling and definition of timesteps by introducing datetime indexes for profiles and for internal handling:
+  * Profile values in ReSiE are now defined as the mean/sum of the timespan following the current timestep. This affects mainly the weather data from a global weather file. If this is not used, any definition can be used, the provided profiles just have to be consistent.
+  * Simulation start and end time have to be given as datetime now.
+  * Simulation time step can now be given in multiple time formats: seconds, minutes, hours
+  * Profiles now have to be referenced in time and have to cover the simulation start and end time.
+  * Major restructuring of profile definition: Can now be startdate & timestepsize, startdate & timestamp or a datestamp with custom format.
+  * Add parameter "data_type" in profiles and explicitly setting it as "intensive" or "extensive" values. "is_power" is no longer used.
+  * Add parameter "time_shift_seconds" in profiles to manually shift profile data by a given time span
+  * Add parameter "use_linear_segmentation" if linear and not stepwise interpolation should be used for segmentation.
+  * Fix import of weather data to meet new time definition in ReSiE, especially for intensive values of EPW which are defined as values at the time indicated.
+  * Add multi-year usage of weather data files. Weatherdata from weather file can have any year.
+  * Improve segmentation and aggregation algorithms. Segmentation can now be either linear or stepwise (default) interpolation, depending on user input.
+  * Add handling of daylight savings: Internally, ReSiE uses now local standard time. Profiles with a datestamp including DST are converted to local standard time. Output is always local standard time without DST. DST in EWP-Header will not be considered.
+  * Add handling of leap days: They are ignored in all input and output. See documentation for details.
+  * Line plot x-axis is now configurable to show seconds, hours or a datetime index.
+* Removed deprecated internal parameter "is_first_timestep" as this is now indicated by "time" that starts always at zero.
+* Add input of coordinates (optional) and reading and conversion of coordinates given in weather data files (default)
+* Add long wave irradiation as available profile for other components from weather file
+* Add and improve tests to cover profile conversion algorithms
+* Add default simulation parameters for tests
+* Add Julia packages Dates, TimeZones, Proj (for coordinate transformation)
+* For handling of timezones beyond 2038, files for a required recompilation of the package TimeZones and a description in the README has been included.
+
+### Version 0.9.4
+* Improve geothermal probe:
+  * fix interpolation of g-functions
+  * fix error if no regeneration is required
+  * add import of custom g-function via txt file
+  * add temperature limit for loading and unloading
+
+### Version 0.9.3
+* Apply autoformat to all remaining non-formatted files
+  
+### Version 0.9.2
+* Add configuration for YAS code style using JuliaFormatter
+* Add configuration for pre-commit hook to run the formatter automatically before a commit
+* Extend README explaining things about the chosen code style and how to use it
+
+### Version 0.9.1
+* Add temperature layers in the input and output interfaces of components, if they need it. Currently only used by the heat pump, but solarthermal collector will follow.
+* Refactor heat pump to handle temperature layer in the input and output interfaces and add a bypass if the input temperature is higher than the output temperature.
+* Add method to deal with unknown energies at known temperatures for components during the potential step to avoid balance errors due to changed temperatures in process.
+* Add basic functionalites for component-controlled order on busses. The respective control_modules are not included yet.
+* Add two new scenarios "transformer_chain" and "hp_temperature_layer". Set new scenario reference due to bypass and correct calculation of COP for multiple heat layers in the output of heat pumps.
+* Add output channels for temperatures for heat pump ("MixingTemperature_Input", "MixingTemperature_Output"), buffer tank ("CurrentMaxOutTemp") and geothermal probe ("current_input_temperature").
+
+### Version 0.9.0
+* Implement functionality of control modules, that can be added to components and that control the operation of the components via defined callback functions. This replaces the previous implementation of "strategies", as this was too limiting. The currently implemented control module types are:
+  * economical_discharge: Handles the discharging of a battery to only be allowed if sufficient charge is available and a linked PV plant has available power below a given threshold. Mostly used for examplatory purposes.
+  * profile_limited: Sets the maximum PLR of a component to values from a profile. Used to set the operation of a component to a fixed schedule while allowing circumstances to override the schedule in favour of lower values (e.g. the produced energy could not be used up completely).
+  * storage_driven: Controls a component to only operate when the charge of a linked storage component falls below a certain threshold and keep operation until a certain higher threshold is reached. This is often used to avoid components switching on and off rapdily to keep a storage topped up, as realised systems often operate with this kind of hysteresis behaviour.
+* Restructure how the operational strategy is defined in the input file. In particular:
+  * Remove entry "strategy"
+  * Remove entry "control_refs"
+  * Add entry "control_modules" that holds the definitions of control modules active for this component
+  * Add entry "control_parameters" as container for miscellaneous parameters of the control behaviour as well as parameters to configure the storage un-/loading flags and special flags to modify the potential step of transformers to not consider given interfaces in during calculation.
+* Add scenario "chpp_two_hyst" to highlight the operation of a transformer with two storage_driven control modules
+
 ### Version 0.8.11
 * Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
 

@@ -3,44 +3,43 @@ using Test
 using Resie
 using Resie.EnergySystems
 
+include("../test_util.jl")
+
 function energy_system()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
             "type" => "GridConnection",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "is_source" => true,
         ),
         "TST_PVP_01" => Dict{String,Any}(
             "type" => "PVPlant",
-            "control_refs" => [],
             "output_refs" => ["TST_BUS_01"],
             "energy_profile_file_path" => "./profiles/tests/source_power_pv.prf",
-            "scale" => 20000
+            "scale" => 20000,
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
         ),
         "TST_BAT_01" => Dict{String,Any}(
             "type" => "Battery",
-            "control_refs" => ["TST_PVP_01"],
             "output_refs" => ["TST_BUS_01"],
-            "strategy" => Dict{String,Any}(
-                "name" => "economical_discharge",
-                "pv_threshold" => 0.15,
-                "min_charge" => 0.2,
-                "discharge_limit" => 0.05
-            ),
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "economical_discharge",
+                                      "pv_threshold" => 750.0,
+                                      "min_charge" => 0.2,
+                                      "discharge_limit" => 0.05,
+                                      "pv_plant_uac" => "TST_PVP_01",
+                                      "battery_uac" => "TST_BAT_01",
+                                  )],
             "capacity" => 10000,
-            "load" => 5000
+            "load" => 5000,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
-            "control_refs" => [],
             "output_refs" => [],
             "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "scale" => 1,
@@ -52,11 +51,7 @@ end
 function test_load_no_connections()
     components_config = energy_system()
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     exception_occured = false
     try
@@ -85,11 +80,7 @@ function test_load_given_lists_empty()
         "output_order" => [],
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
     exception_occured = false
     try
         components = Resie.load_components(components_config, simulation_parameters)
@@ -113,27 +104,17 @@ end
 function test_fully_specified()
     components_config = energy_system()
     components_config["TST_BUS_01"]["connections"] = Dict{String,Any}(
-        "input_order" => [
-            "TST_PVP_01",
-            "TST_BAT_01",
-            "TST_GRI_01",
-        ],
-        "output_order" => [
-            "TST_DEM_01",
-            "TST_BAT_01"
-        ],
-        "energy_flow" => [
-            [1, 1],
-            [1, 0],
-            [1, 0]
-        ]
+        "input_order" => ["TST_PVP_01",
+                          "TST_BAT_01",
+                          "TST_GRI_01"],
+        "output_order" => ["TST_DEM_01",
+                           "TST_BAT_01"],
+        "energy_flow" => [[1, 1],
+                          [1, 0],
+                          [1, 0]],
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     bus = components["TST_BUS_01"]
