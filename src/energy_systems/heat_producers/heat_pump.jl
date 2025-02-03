@@ -691,7 +691,7 @@ function calculate_slices(unit::HeatPump,
            sum(energies.available_heat_in; init=0.0) < EPS ||
            sum(energies.available_heat_out; init=0.0) < EPS ||
            energies.max_usage_fraction - sum_usage < EPS ||
-           slice_idx > length(energies.in_indices) * length(energies.out_indices)
+           slice_idx > length(plrs)
             # end of condition
             break
         end
