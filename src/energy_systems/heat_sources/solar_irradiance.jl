@@ -1,19 +1,23 @@
 using Dates
 
-function sun_position(dt::DateTime, longitude::Number, latitude::Number, 
+function sun_position(dt::DateTime, time_step_seconds, longitude::Number, latitude::Number, 
                              pressure::Number=1.0, temperature::Number=20.0)
 """
-Calculate solar position in degrees
+Calculate solar position in degrees.
+Time is shifted by a half time_step forward, because it all profiles in Resie are given as 
+sum or mean over the next full time_step.
 Based on Roberto Grena (2012), Five new algorithms for the computation of sun position
 from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.01.024.
 dt must be provided in UTC.
-longitude and latitude should be provided in WGS84
+longitude and latitude should be provided in WGS84.
 pressure and temperature are needed to apply the refraction correction which is relevant
 when the sun is low.
 """
 
     longitude = deg2rad(longitude)
     latitude = deg2rad(latitude)
+
+    dt = dt + Dates.Second(time_step_seconds / 2)
 
     dt2060 = DateTime(2060,1,1)
     t2060 = Int64(Dates.value(dt.instant - dt2060.instant)) / 86400000.0

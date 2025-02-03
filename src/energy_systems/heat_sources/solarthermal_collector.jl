@@ -172,50 +172,48 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         )
     )
     unit.output_temperature = Profiles.value_at_time(
-        unit.ambient_temperature_profile, sim_params["time"]
+        unit.ambient_temperature_profile, sim_params
         )
     unit.average_temperature = Profiles.value_at_time(
-        unit.ambient_temperature_profile, sim_params["time"]
+        unit.ambient_temperature_profile, sim_params
         )
     unit.last_average_temperature = Profiles.value_at_time(
-        unit.ambient_temperature_profile, sim_params["time"]
+        unit.ambient_temperature_profile, sim_params
         )
 
     unit.K_b_itp = init_K_b(unit.K_b_array)
 end
 
-function control(
-    unit::SolarthermalCollector,
+function control(unit::SolarthermalCollectorVal,
     components::Grouping,
-    sim_params::Dict{String,Any}
-    )
-    move_state(unit, components, sim_params)
+   sim_params::Dict{String,Any})
+update(unit.controller)
 
     # get values from profiles
     global_solar_hor_irradiance = Profiles.value_at_time(
-        unit.global_solar_hor_irradiance_profile, sim_params["time"]
+        unit.global_solar_hor_irradiance_profile, sim_params
         )
         
     diffuse_solar_hor_irradiance = Profiles.value_at_time(
-        unit.diffuse_solar_hor_irradiance_profile, sim_params["time"]
+        unit.diffuse_solar_hor_irradiance_profile, sim_params
         )
     unit.diffuse_solar_irradiance_in_plane = diffuse_solar_hor_irradiance * ((1 + cosd(unit.tilt_angle)) / 2) 
 
     unit.ambient_temperature = Profiles.value_at_time(
-        unit.ambient_temperature_profile, sim_params["time"]
+        unit.ambient_temperature_profile, sim_params
         )
 
     unit.reduced_wind_speed = max(
-        Profiles.value_at_time(unit.wind_speed_profile, sim_params["time"]) * unit.wind_speed_reduction - 3, 0)
+        Profiles.value_at_time(unit.wind_speed_profile, sim_params) * unit.wind_speed_reduction - 3, 0)
 
     unit.long_wave_irradiance = Profiles.value_at_time(
-        unit.long_wave_irradiance_profile, sim_params["time"]
+        unit.long_wave_irradiance_profile, sim_params
         )
 
-    start_date = DateTime(Dates.year(Dates.now()), 1, 1, 0, 30, 0) - Dates.Hour(1) # TODO centralise start_date
-    time = start_date + Dates.Second(sim_params["time"])
+    # start_date = DateTime(Dates.year(Dates.now()), 1, 1, 0, 30, 0) - Dates.Hour(1) # TODO centralise start_date
+    # time = start_date + Dates.Second(sim_params["time"])
     
-    solar_zenith, solar_azimuth = sun_position(time, 9.18, 47.67, 1.0, unit.ambient_temperature)
+    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], 9.18, 47.67, 1.0, unit.ambient_temperature)
     
     unit.beam_solar_irradiance_in_plane, unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = beam_irr_in_plane(
         unit.tilt_angle, unit.azimuth_angle, solar_zenith, solar_azimuth, 

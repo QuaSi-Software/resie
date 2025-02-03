@@ -1,5 +1,8 @@
-# time_step;900
-# is_power;true
+# data_type:                 intensive
+# time_definition:           startdate_timestamp
+# profile_start_date:        01.01.2015 00:00
+# profile_start_date_format: dd.mm.yyyy HH:MM
+# timestamp_format:          seconds 
 0;245.745
 900;244.26
 1800;242.76
