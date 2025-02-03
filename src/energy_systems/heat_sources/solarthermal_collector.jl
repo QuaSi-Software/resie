@@ -246,7 +246,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     
     output_temperature_interface = lowest(unit.output_temperature, temp_min_highest(exchanges))
 
-    if sum(energy_demands) > 0.0
+    if sum(energy_demands) > 0 && _sum(collect(values(unit.available_energies))) > 0
         for e in exchanges
             comp_uac = e.purpose_uac
             comp_energy_demand = abs(e.balance + e.energy_potential)
@@ -316,7 +316,7 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
    
     while component_idx <= length(exchanges) && left_energy_factor > 0
         
-        # calcualte specific thermal power depending on control mode; reuse already caluclated values
+        # calculate specific thermal power depending on control mode; reuse already caluclated values if possible
         if target_temperatures[component_idx] in keys(calculated_values)
             p_spec_th, t_avg, t_target = calculated_values[target_temperatures[component_idx]]
 
@@ -394,6 +394,9 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
         runtimes[unit.uac] = 1
     else
         calc_max = false
+        average_temperatures[unit.uac] = nothing
+        output_temperatures[unit.uac] = nothing
+        runtimes[unit.uac] = nothing
     end
 
     return (
@@ -411,8 +414,8 @@ and the angle of irradiance on the plane of the solarthermal collector.
 Table with provided values is mirrored for negative angles.
 """
 function init_K_b(K_b_array)
-    # K_b_array = hcat([0, 1, 1], K_b_array)
-    # K_b_array[:,10] = [90,0,0]
+    K_b_array = hcat([0, 1, 1], K_b_array)
+    K_b_array[:,10] = [90,0,0]
     angle_range = K_b_array[1, 1]:10:K_b_array[1, end]
 
     if any(ismissing, K_b_array) 

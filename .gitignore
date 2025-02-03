@@ -36,3 +36,4 @@ profiles/validation/RSTV/WMZ_flow_rate_m3_h.prf
 profiles/validation/RSTV/WMZ_power_kW.prf
 profiles/validation/RSTV/WMZ_temperature_in.prf
 profiles/validation/RSTV/WMZ_temperature_out.prf
+src/energy_systems/heat_sources/solarthermal_collector_validation.jl
