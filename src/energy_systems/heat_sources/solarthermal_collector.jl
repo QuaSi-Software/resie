@@ -99,14 +99,11 @@ mutable struct SolarthermalCollector <: Component
 
         return new(                                                
             uac, # uac
-            controller_for_strategy( # controller
-                config["strategy"]["name"], config["strategy"], sim_params
-            ),
+            Controller(default(config, "control_parameters", nothing)),
             sf_bounded_source, # sys_function
             InterfaceMap(), # input_interfaces
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
+            InterfaceMap(medium => nothing), # output_interfaces
+
             medium, # medium name of output interface
             
             config["collector_gross_area"], # gross area of collector
@@ -165,12 +162,15 @@ mutable struct SolarthermalCollector <: Component
 end
 
 function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.output_interfaces[unit.medium],
-        default(
-            unit.controller.parameter, "load_storages " * String(unit.medium), true
-        )
-    )
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
+          
+    if sim_params["longitude"] === nothing || sim_params["latitude"] === nothing
+        @error "Longitude and latitude must be provided through a weather file or in the 
+        simulation parameters to calculate the sun position."
+        throw(InputError)
+    end
+
     unit.output_temperature = Profiles.value_at_time(
         unit.ambient_temperature_profile, sim_params
         )
@@ -185,9 +185,9 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
 end
 
 function control(unit::SolarthermalCollectorVal,
-    components::Grouping,
-   sim_params::Dict{String,Any})
-update(unit.controller)
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
+    update(unit.controller)
 
     # get values from profiles
     global_solar_hor_irradiance = Profiles.value_at_time(
@@ -209,11 +209,8 @@ update(unit.controller)
     unit.long_wave_irradiance = Profiles.value_at_time(
         unit.long_wave_irradiance_profile, sim_params
         )
-
-    # start_date = DateTime(Dates.year(Dates.now()), 1, 1, 0, 30, 0) - Dates.Hour(1) # TODO centralise start_date
-    # time = start_date + Dates.Second(sim_params["time"])
     
-    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], 9.18, 47.67, 1.0, unit.ambient_temperature)
+    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], sim_params["longitude"], sim_params["latitude"], 1.0, unit.ambient_temperature)
     
     unit.beam_solar_irradiance_in_plane, unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = beam_irr_in_plane(
         unit.tilt_angle, unit.azimuth_angle, solar_zenith, solar_azimuth, 

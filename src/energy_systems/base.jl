@@ -1230,7 +1230,6 @@ include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
 include("heat_sources/geothermal_heat_collectors.jl")
-include("heat_sources/solarthermal_collector.jl")
 include("heat_sources/generic_heat_source.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
@@ -1239,6 +1238,7 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 #TODO only for validation
+#include("heat_sources/solarthermal_collector.jl")
 include("heat_sources/solarthermal_collector_validation.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the
