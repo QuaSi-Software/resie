@@ -110,11 +110,12 @@ function parse_2dim_function(eff_def::String)::Function
                        params[2] * x +
                        params[3] * y +
                        params[4] * x * x +
-                       params[5] * y * y +
-                       params[6] * x * y +
-                       params[7] * x * x * y +
-                       params[8] * x * y * y +
-                       params[9] * x * x * y * y
+                       params[5] * x * y +
+                       params[6] * y * y +
+                       params[7] * x * x * x +
+                       params[8] * x * x * y +
+                       params[9] * x * y * y +
+                       params[10] * y * y * y
             end
         end
     end

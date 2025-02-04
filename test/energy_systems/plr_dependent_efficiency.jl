@@ -112,18 +112,18 @@ end
 end
 
 function test_2dim_parsing()
-    func_def = "poly-2:1.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0"
+    func_def = "poly-2:1.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0"
     func_2dim = EnergySystems.parse_2dim_function(func_def)
     @test func_2dim(12.0, 99.9) ≈ 7.0
-    func_def = "poly-2:1.0,0.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0"
+    func_def = "poly-2:1.0,0.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0"
     func_2dim = EnergySystems.parse_2dim_function(func_def)
     @test func_2dim(99.0, 16.0) ≈ 9.0
-    func_def = "poly-2:2.0,0.5,0.5,0.0,0.0,0.1,0.0,0.0,0.0"
+    func_def = "poly-2:2.0,0.5,0.5,0.0,0.1,0.0,0.0,0.0,0.0,0.0"
     func_2dim = EnergySystems.parse_2dim_function(func_def)
     @test func_2dim(10.0, 30.0) ≈ 52.0
-    func_def = "poly-2:1.0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1"
+    func_def = "poly-2:1.0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1"
     func_2dim = EnergySystems.parse_2dim_function(func_def)
-    @test func_2dim(2.0, 3.0) ≈ 1.0 + 0.2 + 0.3 + 0.4 + 0.9 + 0.6 + 1.2 + 1.8 + 3.6
+    @test func_2dim(2.0, 3.0) ≈ 1.0 + 0.2 + 0.3 + 0.4 + 0.9 + 0.6 + 0.8 + 1.2 + 1.8 + 2.7
 end
 
 @testset "test_2dim_parsing" begin
