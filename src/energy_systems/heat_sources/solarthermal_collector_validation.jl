@@ -205,9 +205,9 @@ function control(unit::SolarthermalCollectorVal,
     unit.spec_flow_rate = Profiles.value_at_time(
         unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
     # unit.spec_flow_rate = ifelse(unit.spec_flow_rate < 2.78e-5 * 0.8, 2.78e-5, unit.spec_flow_rate)
-    # runtime_percent = 1
-    runtime_percent = (Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
-        ) / unit.spec_flow_rate
+    runtime_percent = 1
+    # runtime_percent = (Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
+    #     ) / unit.spec_flow_rate
 
     unit.input_temp = Profiles.value_at_time(unit.input_temp_profile, sim_params)
 
@@ -247,12 +247,16 @@ function control(unit::SolarthermalCollectorVal,
         unit.K_b = 0
     end
  
-    unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
+    unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, 
+    unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
 
-    unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, _sum(collect(values(unit.available_energies))) * runtime_percent)
+    unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, 
+                             _sum(collect(values(unit.available_energies))) * runtime_percent)
     unit.output_temperature = highest(collect(values(unit.output_temperatures)))
     
-    set_max_energy!(unit.output_interfaces[unit.medium], collect(values(sort(unit.available_energies))) .* runtime_percent, collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
+    set_max_energy!(unit.output_interfaces[unit.medium], 
+                    collect(values(sort(unit.available_energies))) .* runtime_percent, 
+                    collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
     set_temperature!(unit.output_interfaces[unit.medium], nothing, unit.output_temperature)
 end
 
@@ -272,7 +276,7 @@ function process(unit::SolarthermalCollectorVal, sim_params::Dict{String,Any})
             # recalculate the average_temperature if not all energy is used to keep a constant 
             # flow rate
             if unit.delta_T === nothing && unit.spec_flow_rate !== nothing && used_energy_comp < unit.available_energies[comp_uac]
-                unit.average_temperatures[comp_uac] = e.temperature_min - wh_to_watts(used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
+                unit.average_temperatures[comp_uac] = e.temperature_min - sim_params["wh_to_watts"](used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
             end
 
             unit.used_energy += used_energy_comp
@@ -348,7 +352,7 @@ function calculate_energies(unit::SolarthermalCollectorVal, sim_params::Dict{Str
             throw(InputError)
         end
 
-        produced_energy = isnothing(p_spec_th) ? 0.0 : watt_to_wh(p_spec_th * unit.collector_gross_area) * left_energy_factor
+        produced_energy = isnothing(p_spec_th) ? 0.0 : sim_params["watt_to_wh"](p_spec_th * unit.collector_gross_area) * left_energy_factor
         calculated_values[target_temperatures[component_idx]] = (p_spec_th, t_avg, t_target)
 
         # check if more energy can be produced for a certain component than is demanded
@@ -783,11 +787,14 @@ function output_value(unit::SolarthermalCollectorVal, key::OutputKey)::Float64
         if unit.output_temperature == unit.average_temperature # TODO evtl. andere Flag setzen
             return 0
         else 
-            return wh_to_watts(unit.used_energy) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
+            # TODO 600 durch time_step ersetzen -> spec_flow_rate zentral berechnen
+            return (unit.used_energy * 3600.0 / 600) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
         end
     elseif key.value_key == "spec_flow_rate_profile"
         return unit.spec_flow_rate
     end
+    print("key")
+    print(key.value_key)
     throw(KeyError(key.value_key))
 end
 

@@ -184,7 +184,7 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     unit.K_b_itp = init_K_b(unit.K_b_array)
 end
 
-function control(unit::SolarthermalCollectorVal,
+function control(unit::SolarthermalCollector,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
@@ -225,12 +225,16 @@ function control(unit::SolarthermalCollectorVal,
         unit.K_b = 0
     end
  
-    unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
+    unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, 
+    unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
 
-    unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, _sum(collect(values(unit.available_energies))))
+    unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, 
+                             _sum(collect(values(unit.available_energies))))
     unit.output_temperature = highest(collect(values(unit.output_temperatures)))
     
-    set_max_energy!(unit.output_interfaces[unit.medium], collect(values(sort(unit.available_energies))), collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
+    set_max_energy!(unit.output_interfaces[unit.medium], 
+                    collect(values(sort(unit.available_energies))), 
+                    collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
     set_temperature!(unit.output_interfaces[unit.medium], nothing, unit.output_temperature)
 end
 
@@ -638,7 +642,8 @@ function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
         if unit.output_temperature == unit.average_temperature # TODO evtl. andere Flag setzen
             return 0
         else 
-            return wh_to_watts(unit.used_energy) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
+            # TODO 600 durch time_step ersetzen -> spec_flow_rate zentral berechnen
+            return (unit.used_energy * 3600.0 / 600) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
         end
     end
     throw(KeyError(key.value_key))
