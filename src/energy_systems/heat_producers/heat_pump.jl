@@ -43,6 +43,12 @@ mutable struct HeatPump <: Component
     output_temperature::Temperature
     input_temperature::Temperature
 
+    power_losses_factor::Float64
+    heat_losses_factor::Float64
+    losses_power::Float64
+    losses_heat::Float64
+    losses::Float64
+
     cop::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
@@ -99,6 +105,11 @@ mutable struct HeatPump <: Component
                    optimal_plr,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
+                   default(config, "power_losses_factor", 0.03),
+                   default(config, "heat_losses_factor", 0.05),
+                   0.0, # losses_power
+                   0.0, # losses_heat
+                   0.0, # losses
                    0.0, # cop
                    0.0, # mixing temperature in the input interface
                    0.0) # mixing temperature in the output interface
@@ -1015,6 +1026,8 @@ function reset(unit::HeatPump)
     unit.cop = 0.0
     unit.mix_temp_input = 0.0
     unit.mix_temp_output = 0.0
+    unit.losses_heat = 0.0
+    unit.losses_power = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -1023,7 +1036,10 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_out) * " OUT",
             "COP",
             "MixingTemperature_Input",
-            "MixingTemperature_Output"]
+            "MixingTemperature_Output",
+            "Losses_power",
+            "Losses_heat",
+            "Losses"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -1037,6 +1053,12 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"
         return unit.mix_temp_output
+    elseif key.value_key == "Losses_power"
+        return unit.losses_power
+    elseif key.value_key == "Losses_heat"
+        return unit.losses_heat
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end
