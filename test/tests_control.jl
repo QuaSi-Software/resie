@@ -30,6 +30,8 @@ function setup_control_tests()
                                   )],
             "power_th" => 20000,
             "cop_function" => "const:3.0",
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",

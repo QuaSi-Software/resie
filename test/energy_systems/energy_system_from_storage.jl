@@ -49,6 +49,8 @@ function test_run_energy_system_from_storage()
             "power_th" => 12000,
             "cop_function" => "const:3.0",
             "min_power_function" => "const:0.0",
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 
@@ -207,6 +209,8 @@ function test_run_energy_system_from_storage_denied()
             "power_th" => 12000,
             "cop_function" => "const:3.0",
             "min_power_function" => "const:0.0",
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 

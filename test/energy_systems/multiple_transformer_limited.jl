@@ -66,6 +66,8 @@ function test_multiple_transformer_with_limitations()
             "power_th" => 2240,
             "cop_function" => "const:3.5",
             "min_power_function" => "const:0.0",
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 

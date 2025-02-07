@@ -181,7 +181,9 @@
                 }
             ],
             "power_th": 4500,
-            "min_power_function": "const:0.3"
+            "min_power_function": "const:0.3",
+            "power_losses_factor": 0.0,
+            "heat_losses_factor": 0.0
         },
         "TST_TH_HP_02": {
             "type": "HeatPump",
@@ -190,7 +192,9 @@
             ],
             "m_heat_out": "m_h_w_lt2",
             "power_th": 3500,
-            "output_temperature": 40.0
+            "output_temperature": 40.0,
+            "power_losses_factor": 0.0,
+            "heat_losses_factor": 0.0
         },
         "TST_EL_GRI_01": {
             "type": "GridConnection",

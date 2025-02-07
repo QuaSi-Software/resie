@@ -34,6 +34,8 @@ function get_config_heat_pump_1S1D()
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 12000,
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 end
@@ -241,6 +243,8 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 2500 * 4,
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 
@@ -423,6 +427,8 @@ function get_config_heat_pump_2S2D()
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_02"],
             "power_th" => 12000,
+            "power_losses_factor" => 0.0,
+            "heat_losses_factor" => 0.0,
         ),
     )
 end
