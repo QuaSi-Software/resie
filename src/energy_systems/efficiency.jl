@@ -234,6 +234,12 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                        return plr -> (plr_func(plr) * c * (273.15 + snk) / (snk - src))
                    end
 
+        elseif method_cop == "poly-2"
+            poly = parse_2dim_function(method_cop * ":" * data_cop)
+            return nothing, function (src, snk)
+                       return plr -> poly(src, snk) * plr_func(plr)
+                   end
+
         elseif method_cop == "field"
             rows = split(data_cop, ';')
             cells = [parse.(Float64, split(row, ",")) for row in rows]

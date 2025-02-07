@@ -105,6 +105,13 @@ function test_cop_parsing()
     const_val, cop_func = EnergySystems.parse_cop_function(field_def)
     @test const_val === nothing
     @test cop_func(12.5, 26.9)(1.0) ≈ 17.15
+
+    func_def = "poly-2:1.52e+1,1.44e-1,-6.45e-1,1.07e-3,-1.51e-3,1.19e-2,-8.20e-5," *
+               "2.13e-5,-6.04e-7,-7.60e-5:poly:1.0,0.0"
+    const_val, cop_func = EnergySystems.parse_cop_function(func_def)
+    @test const_val === nothing
+    @test cop_func(20, 60)(1.0) ≈ 4.231712
+    @test cop_func(10, 50)(0.5) ≈ 2.0007
 end
 
 @testset "test_cop_parsing" begin
