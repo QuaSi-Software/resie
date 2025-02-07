@@ -181,9 +181,11 @@ formatted accordingly. This function then turns the PLF for the given PLR, which
 scaling factor for the COP calculation. If no second function is given, assumes a PLF of
 1.0, which has no effect.
 
-Three different function prototypes are implemented:
+Four different function prototypes are implemented:
     * const: Takes one number and uses it as a constant COP.
     * carnot: Takes one number as uses it as the scaling factor for the Carnot-COP.
+    * poly-2: Uses the same functionality for 2D polynomials of order 3 as described in
+        function `parse_2dim_function`.
     * field: Takes a 2D array of values and performs bilinear interpolation between the
         surrounding four support values. An example with additional line breaks and spaces
         added for clarity:
