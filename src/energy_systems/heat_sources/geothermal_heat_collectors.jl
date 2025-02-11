@@ -23,8 +23,11 @@ mutable struct GeothermalHeatCollector <: Component
     m_heat_out::Symbol
 
     ambient_temperature_profile::Union{Profile,Nothing}
+    constant_ambient_temperature::Temperature
     global_radiation_profile::Union{Profile,Nothing}
+    constant_global_radiation::Union{Float64,Nothing}
     infrared_sky_radiation_profile::Union{Profile,Nothing}
+    constant_infrared_sky_radiation::Union{Float64,Nothing}
     unloading_temperature_spread::Temperature
     fluid_min_output_temperature::Temperature
     fluid_max_input_temperature::Temperature
@@ -117,9 +120,35 @@ mutable struct GeothermalHeatCollector <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
         register_media([m_heat_in, m_heat_out])
 
-        ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
-        global_radiation_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
-        infrared_sky_radiation_profile = get_infrared_sky_radiation_profile_from_config(config, sim_params, uac) # W/m^2
+        constant_ambient_temperature,
+        ambient_temperature_profile = get_parameter_profile_from_config(config,
+                                                                        sim_params,
+                                                                        "ambient_temperature",
+                                                                        "ambient_temperature_profile_file_path",
+                                                                        "ambient_temperature_from_global_file",
+                                                                        "constant_ambient_temperature",
+                                                                        uac;
+                                                                        required=true)
+
+        constant_global_radiation,
+        global_radiation_profile = get_parameter_profile_from_config(config,
+                                                                     sim_params,
+                                                                     "global_solar_radiation",
+                                                                     "global_solar_radiation_profile_file_path",
+                                                                     "global_solar_radiation_from_global_file",
+                                                                     "constant_global_solar_radiation",
+                                                                     uac;
+                                                                     required=true) # Wh/m^2
+
+        constant_infrared_sky_radiation,
+        infrared_sky_radiation_profile = get_parameter_profile_from_config(config,
+                                                                           sim_params,
+                                                                           "infrared_sky_radiation",
+                                                                           "infrared_sky_radiation_profile_file_path",
+                                                                           "infrared_sky_radiation_from_global_file",
+                                                                           "constant_infrared_sky_radiation",
+                                                                           uac;
+                                                                           required=true)  # Wh/m^2
 
         # get model type from input file
         model_type = default(config, "model_type", "simplified")
@@ -137,8 +166,11 @@ mutable struct GeothermalHeatCollector <: Component
                    m_heat_in,                                            # medium name of input interface
                    m_heat_out,                                           # medium name of output interface
                    ambient_temperature_profile,                          # [°C] ambient temperature profile
+                   constant_ambient_temperature,                         # [°C] constant ambient temperature
                    global_radiation_profile,                             # [Wh/m^2]
+                   constant_global_radiation,                            # [Wh/m^2]
                    infrared_sky_radiation_profile,                       # [Wh/m^2]
+                   constant_infrared_sky_radiation,                      # [Wh/m^2]
                    default(config, "unloading_temperature_spread", 3.0), # [K] temperature spread between forward and return flow during unloading            
                    default(config, "fluid_min_output_temperature", nothing),   # [°C] minimum output temperature of the fluid for unloading
                    default(config, "fluid_max_input_temperature", nothing),    # [°C] maximum input temperature of the fluid for loading
@@ -320,8 +352,12 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     n_nodes_pipe_surrounding_to_ground = n_nodes_y - n_nodes_surface_to_pipe_surrounding - 5
 
     # set temperatures from surface to pipe surroundings with linear interpolation
-    average_ambient_temperature = sum(values(unit.ambient_temperature_profile.data)) /
-                                  length(values(unit.ambient_temperature_profile.data))
+    if unit.constant_ambient_temperature !== nothing
+        average_ambient_temperature = unit.constant_ambient_temperature
+    else
+        average_ambient_temperature = sum(values(unit.ambient_temperature_profile.data)) /
+                                      length(values(unit.ambient_temperature_profile.data))
+    end
     step = (unit.average_temperature_adjacent_to_pipe - average_ambient_temperature) /
            sum(unit.dy_mesh[1:n_nodes_surface_to_pipe_surrounding])
     for i in 1:n_nodes_surface_to_pipe_surrounding
@@ -521,8 +557,16 @@ function control(unit::GeothermalHeatCollector,
     unit.collector_total_heat_energy_in_out = 0.0
 
     # get ambient temperature and global radiation from profile for current time step if needed
-    unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-    unit.global_radiation_power = Profiles.power_at_time(unit.global_radiation_profile, sim_params) # W/m^2
+    if unit.constant_ambient_temperature !== nothing
+        unit.ambient_temperature = unit.constant_ambient_temperature
+    else
+        unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    end
+    if unit.constant_global_radiation !== nothing
+        unit.global_radiation_power = unit.constant_global_radiation  # W/m^2
+    else
+        unit.global_radiation_power = Profiles.power_at_time(unit.global_radiation_profile, sim_params) # W/m^2
+    end
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
@@ -610,8 +654,12 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
 
     # calculate effective mean sky temperature (sky radiative temperature) according to Stefan-Boltzmann law assuming 
     # the sky being a black body for the current time step:
-    sky_temperature = (Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params) /
-                       unit.boltzmann_constant)^0.25  # [K]
+    if unit.constant_infrared_sky_radiation !== nothing
+        infrared_sky_radiation = unit.constant_infrared_sky_radiation
+    else
+        infrared_sky_radiation = Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params)
+    end
+    sky_temperature = (infrared_sky_radiation / unit.boltzmann_constant)^0.25  # [K]
 
     # loop over internal timesteps
     for _ in 1:(unit.n_internal_timesteps)
