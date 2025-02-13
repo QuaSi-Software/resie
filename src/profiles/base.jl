@@ -16,7 +16,7 @@ This function can handle either a path to a .prf file, or the profile data can b
 handed over as vectors. Then, the profile with the corresponding timestamps, the time step
 and the data_type (intensive/extensive) has to be provided as optional arguments. 
 
-The data_type is essential to make sure that the profile data is converted correcty.
+The data_type is essential to make sure that the profile data is converted correctly.
 It has to be set to "intensive" for values like temperatures, power, wind speed or
 for profiles containting states. Only for energies, data_type has to be set to "extensive".
 """

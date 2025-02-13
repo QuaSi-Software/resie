@@ -243,7 +243,10 @@ reset_file(filepath, output_keys)
 
 Reset the output file and add headers for the given outputs.
 """
-function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKey}, csv_time_unit::String)
+function reset_file(filepath::String,
+                    output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                    weather_data_keys::Union{Nothing,Vector{String}},
+                    csv_time_unit::String)
     open(abspath(filepath), "w") do file_handle
         if csv_time_unit == "seconds"
             time_unit = "[s]"
@@ -257,13 +260,20 @@ function reset_file(filepath::String, output_keys::Vector{EnergySystems.OutputKe
 
         write(file_handle, "Time $time_unit")
 
-        for outkey in output_keys
-            if outkey.medium === nothing
-                header = "$(outkey.unit.uac) $(outkey.value_key)"
-            else
-                header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+        if output_keys !== nothing
+            for outkey in output_keys
+                if outkey.medium === nothing
+                    header = "$(outkey.unit.uac) $(outkey.value_key)"
+                else
+                    header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+                end
+                write(file_handle, ";$header")
             end
-            write(file_handle, ";$header")
+        end
+        if weather_data_keys !== nothing
+            for key in weather_data_keys
+                write(file_handle, ";Weather $key")
+            end
         end
 
         write(file_handle, "\n")
@@ -276,7 +286,8 @@ write_to_file(filepath, output_keys, time)
 Write the given outputs for the given time to file.
 """
 function write_to_file(filepath::String,
-                       output_keys::Vector{EnergySystems.OutputKey},
+                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                       weather_data_keys::Union{Nothing,Vector{String}},
                        sim_params::Dict{String,Any},
                        csv_time_unit::String)
     open(abspath(filepath), "a") do file_handle
@@ -292,10 +303,19 @@ function write_to_file(filepath::String,
 
         write(file_handle, "$time")
 
-        for outkey in output_keys
-            value = output_value(outkey.unit, outkey)
-            value = replace("$value", "." => ",")
-            write(file_handle, ";$value")
+        if output_keys !== nothing
+            for outkey in output_keys
+                value = output_value(outkey.unit, outkey)
+                value = replace("$value", "." => ",")
+                write(file_handle, ";$value")
+            end
+        end
+        if weather_data_keys !== nothing
+            for key in weather_data_keys
+                value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
+                value = replace("$value", "." => ",")
+                write(file_handle, ";$value")
+            end
         end
 
         write(file_handle, "\n")
@@ -370,11 +390,15 @@ create_profile_line_plots(data, keys, user_input)
 
 create a line plot with data and label. user_input is dict from input file
 """
-function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
-                                   outputs_plot_keys::Vector{EnergySystems.OutputKey},
+function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float64}},
+                                   outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                   outputs_plot_weather::Union{Nothing,Matrix{Float64}},
+                                   outputs_plot_weather_keys::Union{Nothing,Vector{String}},
                                    project_config::Dict{AbstractString,Any},
                                    sim_params::Dict{String,Any})
     plot_all = project_config["io_settings"]["output_plot"] == "all"
+    plot_data = outputs_plot_data !== nothing
+    plot_weather = outputs_plot_weather !== nothing
 
     # set Axis, unit and scale factor if given
     if plot_all  # plot all outputs. Here no units or scaling factors are available.
@@ -388,31 +412,56 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
             end
             n += 1
         end
+        if plot_weather
+            for outkey in outputs_plot_weather_keys
+                push!(labels, string("Weather $(outkey)"))
+            end
+        end
     else # plot only defined outputs. Here units and scaling factors are available.
         axis = String[]
         unit = String[]
         scale_fact = Float64[]
-        for plot in project_config["io_settings"]["output_plot"]
-            push!(axis, string(plot[2]["axis"]))
-            push!(unit, string(plot[2]["unit"]))
-            push!(scale_fact, plot[2]["scale_factor"])
+        if plot_data
+            for plot in project_config["io_settings"]["output_plot"]
+                push!(axis, string(plot[2]["axis"]))
+                push!(unit, string(plot[2]["unit"]))
+                push!(scale_fact, plot[2]["scale_factor"])
+            end
+        end
+        if plot_weather
+            for _ in outputs_plot_weather_keys
+                push!(axis, "left")
+                push!(scale_fact, 1.0)
+            end
         end
 
         # create legend entries
         labels = String[]
         n = 1
-        for outkey in outputs_plot_keys
-            if outkey.medium === nothing
-                push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
-            else
-                push!(labels,
-                      string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+        if plot_data
+            for outkey in outputs_plot_keys
+                if outkey.medium === nothing
+                    push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+                else
+                    push!(labels,
+                          string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+                end
+                n += 1
             end
-            n += 1
+        end
+        if plot_weather
+            for outkey in outputs_plot_weather_keys
+                push!(labels, string("Weather $(outkey) [($(axis[n]))"))
+            end
         end
     end
 
     # create plot
+    if plot_data
+        time_x = outputs_plot_data[:, 1]
+    else
+        time_x = outputs_plot_weather[:, 1]
+    end
     output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
                             project_config["io_settings"]["output_plot_time_unit"] : "date"
     if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
@@ -421,11 +470,11 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
         output_plot_time_unit = "date"
     end
     if output_plot_time_unit == "seconds"
-        x = outputs_plot_data[:, 1]
+        x = time_x
     elseif output_plot_time_unit == "minutes"
-        x = outputs_plot_data[:, 1] / 60
+        x = time_x / 60
     elseif output_plot_time_unit == "hours"
-        x = outputs_plot_data[:, 1] / 60 / 60
+        x = time_x / 60 / 60
     else
         if sim_params["start_date"] === nothing
             start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
@@ -433,10 +482,11 @@ function create_profile_line_plots(outputs_plot_data::Matrix{Float64},
         else
             start_date = sim_params["start_date"]
         end
-        x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in outputs_plot_data[:, 1]]
+        x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in time_x]
     end
 
-    y = outputs_plot_data[:, 2:end]
+    y = hcat(plot_data ? outputs_plot_data[:, 2:end] : zeros(Float64, size(outputs_plot_weather, 1), 0),
+             plot_weather ? outputs_plot_weather[:, 2:end] : zeros(Float64, size(outputs_plot_data, 1), 0))
     traces = GenericTrace[]
     for i in axes(y, 2)
         if plot_all

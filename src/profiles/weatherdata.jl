@@ -4,7 +4,7 @@ using Resie.Profiles
 using Dates
 using Proj
 
-export WeatherData
+export WeatherData, gather_weather_data, get_weather_data_keys
 
 """
 """
@@ -359,6 +359,25 @@ function read_epw_file(weather_file_path::String)
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
 
     return weatherdata_dict, headerdata
+end
+
+function get_weather_data_keys(sim_params::Dict{String,Any})
+    if haskey(sim_params, "weather_data")
+        return collect(String.(fieldnames(typeof(sim_params["weather_data"]))))
+    else
+        return nothing
+    end
+end
+
+function gather_weather_data(weather_data_keys, sim_params)
+    return_values = Vector{Any}()
+    append!(return_values, sim_params["time"])
+
+    for weather_data_key in weather_data_keys
+        append!(return_values,
+                Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)), sim_params))
+    end
+    return return_values
 end
 
 end

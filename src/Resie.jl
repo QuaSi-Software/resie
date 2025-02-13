@@ -168,25 +168,35 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                              components::Grouping,
                              step_order::StepInstructions)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_csv = get_output_keys(project_config["io_settings"], components)
-    do_create_plot = !(output_keys_lineplot === nothing)
-    do_write_CSV = !(output_keys_to_csv === nothing)
+    output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
+    weather_data_keys = get_weather_data_keys(sim_params)
+    do_create_plot_data = output_keys_lineplot !== nothing
+    do_create_plot_weather = weather_data_keys !== nothing &&
+                             default(project_config["io_settings"], "plot_weather_data", false)
+    do_write_CSV_weather = weather_data_keys !== nothing &&
+                           default(project_config["io_settings"], "csv_output_weather", false)
+    weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
+    do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
     csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
     if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(IntputError)
+        throw(InputError)
     end
 
     # Initialize the array for output plots
-    if do_create_plot
-        output_data_lineplot = zeros(Float64, sim_params["number_of_time_steps"], 1 + length(output_keys_lineplot))
-    end
+    output_data_lineplot = do_create_plot_data ?
+                           zeros(Float64, sim_params["number_of_time_steps"], 1 + length(output_keys_lineplot)) :
+                           nothing
+    output_weather_lineplot = do_create_plot_weather ?
+                              zeros(Float64, sim_params["number_of_time_steps"], 1 + length(weather_data_keys)) :
+                              nothing
+
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_csv, csv_time_unit)
+        reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -221,7 +231,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         # This is currently done in every time step to keep data even if 
         # an error occurs.
         if do_write_CSV
-            write_to_file(csv_output_file_path, output_keys_to_csv, sim_params, csv_time_unit)
+            write_to_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, sim_params, csv_time_unit)
         end
 
         # get the energy transported through each interface in every timestep for Sankey
@@ -230,8 +240,11 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         end
 
         # gather output data of each component for line plot
-        if do_create_plot
+        if do_create_plot_data
             output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, sim_params["time"])
+        end
+        if do_create_plot_weather
+            output_weather_lineplot[steps, :] = gather_weather_data(weather_data_keys, sim_params)
         end
 
         # simulation update
@@ -241,8 +254,13 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     end
 
     # create profile line plot
-    if do_create_plot
-        create_profile_line_plots(output_data_lineplot, output_keys_lineplot, project_config, sim_params)
+    if do_create_plot_data || do_create_plot_weather
+        create_profile_line_plots(output_data_lineplot,
+                                  output_keys_lineplot,
+                                  output_weather_lineplot,
+                                  weather_data_keys,
+                                  project_config,
+                                  sim_params)
         @info "Line plot created and saved to .output/output_plot.html"
     end
 
