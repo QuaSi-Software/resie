@@ -211,18 +211,27 @@ mutable struct Profile
             profile_timestamps_date = given_timestamps
             data_type = given_data_type
             time_zone = nothing
-            use_linear_segmentation = false
+            use_linear_segmentation = true
         end
 
         # remove leap days and daiylight savings from profile
         profile_timestamps_date, profile_values = remove_leap_days(profile_timestamps_date, profile_values, file_path)
         profile_timestamps_date = remove_day_light_saving(profile_timestamps_date, time_zone, file_path)
+
+        # shift the profile timestep according to the given shift to get the correct definition:
+        # Values are given as the mean/sum over the upcoming time step.
         if shift > Second(0)
             profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
         elseif shift < Second(0)
             profile_timestamps_date = sub_ignoring_leap_days.(profile_timestamps_date, -shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
+        end
+
+        if use_linear_segmentation == true && profile_time_step > sim_params["time_step_seconds"]
+            # shift data by half the original time step to make the values be measured at the time indicated. 
+            # This is required for correct linear interpolation during segmentation and will be reversed afterwards.
+            profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, Second(profile_time_step / 2))
         end
 
         # add first or last entry if only one time step is missing. copy first or last value.
@@ -233,10 +242,10 @@ mutable struct Profile
             profile_values = vcat(profile_values[1], profile_values)
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the fist value."
         end
-        time_diff = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
-        if profile_timestamps_date[end] < sim_params["end_date"] + time_diff &&
-           profile_timestamps_date[end] + time_diff >= sim_params["end_date"]
-            while profile_timestamps_date[end] < sim_params["end_date"] + time_diff
+        temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
+        if profile_timestamps_date[end] < sim_params["end_date"] &&
+           profile_timestamps_date[end] + temp_diff >= sim_params["end_date"]
+            while profile_timestamps_date[end] < sim_params["end_date"]
                 profile_timestamps_date = vcat(profile_timestamps_date,
                                                profile_timestamps_date[end] + Second(profile_time_step))
                 profile_values = vcat(profile_values, profile_values[end])
@@ -709,8 +718,13 @@ function convert_profile(values::Vector{Float64},
             values, timestamps = profile_linear_interpolation(values,
                                                               timestamps,
                                                               original_time_step,
-                                                              new_time_step,
+                                                              new_time_step / 2,
                                                               sim_params)
+            # remove every second timestamp and value to match the definition of values representing
+            # the mean/sum of the following time step
+            deleteat!(values, 1:2:(length(values) - 1))
+            deleteat!(timestamps, 2:2:length(timestamps))
+
             if !time_is_aligned
                 info_message *= "was shifted to fit the simulation start time and "
             end
@@ -722,7 +736,7 @@ function convert_profile(values::Vector{Float64},
                                                             original_time_step,
                                                             new_time_step,
                                                             sim_params)
-            if !time_is_aligned  # do time shift
+            if !time_is_aligned   # do time shift if not aligned
                 values, timestamps = profile_linear_interpolation(values,
                                                                   timestamps,
                                                                   new_time_step,
