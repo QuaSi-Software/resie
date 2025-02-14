@@ -38,7 +38,14 @@ mutable struct GenericHeatSource <: Component
                             Profile(config["max_power_profile_file_path"], sim_params) :
                             nothing
 
-        temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "temperature",
+                                                                "temperature_profile_file_path",
+                                                                "temperature_from_global_file",
+                                                                "constant_temperature",
+                                                                uac)
 
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -53,7 +60,7 @@ mutable struct GenericHeatSource <: Component
                    temperature_profile,
                    default(config, "scale", 1.0),   # scaling_factor
                    default(config, "constant_power", nothing),
-                   default(config, "constant_temperature", nothing),
+                   constant_temperature,
                    default(config, "temperature_reduction_model", "none"),
                    default(config, "min_source_in_temperature", nothing),
                    default(config, "max_source_in_temperature", nothing),
