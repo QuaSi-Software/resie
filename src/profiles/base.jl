@@ -19,6 +19,10 @@ and the data_type (intensive/extensive) has to be provided as optional arguments
 The data_type is essential to make sure that the profile data is converted correctly.
 It has to be set to "intensive" for values like temperatures, power, wind speed or
 for profiles containting states. Only for energies, data_type has to be set to "extensive".
+
+Data should represent the time step following the time indicated /mean/sum). The shift parameter
+can be used to shift the timestamp to the correct time. A positive shift will add to the timestamp,
+which means the value is later. 
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
@@ -41,8 +45,10 @@ mutable struct Profile
                      #                                                            timestep in seconds of the given data
                      given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, shoule be "intensive" or
                      #                                                            "extensive"
-                     shift::Dates.Second=Second(0))                   # optional: timeshift for data. A positive shift 
-        #                                                                         adds to the timestamp = value is earlier
+                     shift::Dates.Second=Second(0),                   # optional: timeshift for data. A positive shift 
+                     #                                                            adds to the timestamp = value is later
+                     use_linear_segmentation::Bool=false)             # optional: flag if a linear (true) or stepwise 
+        #                                                                         interpolation for segmentation should be used
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -211,7 +217,6 @@ mutable struct Profile
             profile_timestamps_date = given_timestamps
             data_type = given_data_type
             time_zone = nothing
-            use_linear_segmentation = true
         end
 
         # remove leap days and daiylight savings from profile

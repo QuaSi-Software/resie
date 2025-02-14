@@ -43,7 +43,7 @@ mutable struct WeatherData
     accordingly.
 
     """
-    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
+    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any}, use_linear_segmentation::Bool)
         if !isfile(weather_file_path)
             @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
@@ -72,14 +72,16 @@ mutable struct WeatherData
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
                                 given_data_type="extensive",
-                                shift=Second(0))
+                                shift=Second(0),
+                                use_linear_segmentation=use_linear_segmentation)
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
                                 given_data_type="extensive",
-                                shift=Second(0))
+                                shift=Second(0),
+                                use_linear_segmentation=use_linear_segmentation)
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
@@ -90,7 +92,8 @@ mutable struct WeatherData
                                  given_timestamps=timestamp,
                                  given_time_step=time_step,
                                  given_data_type="intensive",
-                                 shift=Second(25 * 60))
+                                 shift=Second(25 * 60),
+                                 use_linear_segmentation=use_linear_segmentation)
 
             # Values measured at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
@@ -99,7 +102,8 @@ mutable struct WeatherData
                                   given_timestamps=timestamp,
                                   given_time_step=time_step,
                                   given_data_type="extensive",
-                                  shift=Second(30 * 60))
+                                  shift=Second(30 * 60),
+                                  use_linear_segmentation=use_linear_segmentation)
 
             # Temperatures are measured half an hour bevor the timestep indicated (hour 1 => 00:00).
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -108,7 +112,8 @@ mutable struct WeatherData
                                        given_timestamps=timestamp,
                                        given_time_step=time_step,
                                        given_data_type="intensive",
-                                       shift=Second(0))
+                                       shift=Second(0),
+                                       use_linear_segmentation=use_linear_segmentation)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
@@ -127,14 +132,16 @@ mutable struct WeatherData
                                  given_timestamps=timestamp,
                                  given_time_step=time_step,
                                  given_data_type="extensive",
-                                 shift=Second(0))
+                                 shift=Second(0),
+                                 use_linear_segmentation=use_linear_segmentation)
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
                                 given_data_type="extensive",
-                                shift=Second(0))
+                                shift=Second(0),
+                                use_linear_segmentation=use_linear_segmentation)
             dirHorIrr = deepcopy(globHorIrr)
             dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
@@ -145,7 +152,8 @@ mutable struct WeatherData
                                   given_timestamps=timestamp,
                                   given_time_step=time_step,
                                   given_data_type="extensive",
-                                  shift=Second(30 * 60))
+                                  shift=Second(30 * 60),
+                                  use_linear_segmentation=use_linear_segmentation)
 
             # Temperature is given as value at the time indicated. (Hour1 = 00:00)
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -154,7 +162,8 @@ mutable struct WeatherData
                                        given_timestamps=timestamp,
                                        given_time_step=time_step,
                                        given_data_type="intensive",
-                                       shift=Second(30 * 60))
+                                       shift=Second(30 * 60),
+                                       use_linear_segmentation=use_linear_segmentation)
 
             # Wind speed is given as value at the time indicated. (Hour1 = 00:00)
             wind_speed = Profile(weather_file_path * ":WindSpeed",
@@ -163,7 +172,8 @@ mutable struct WeatherData
                                  given_timestamps=timestamp,
                                  given_time_step=time_step,
                                  given_data_type="intensive",
-                                 shift=Second(30 * 60))
+                                 shift=Second(30 * 60),
+                                 use_linear_segmentation=use_linear_segmentation)
 
             latitude = headerdata["latitude"]
             longitude = headerdata["longitude"]

@@ -108,7 +108,10 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
                                 nothing)
 
     if weather_file_path !== nothing
-        sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params)
+        use_linear_segmentation = default(project_config["io_settings"],
+                                          "use_linear_weather_interpolation",
+                                          false)
+        sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params, use_linear_segmentation)
 
         if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
             sim_params["latitude"] = lat
