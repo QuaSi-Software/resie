@@ -50,6 +50,7 @@ mutable struct HeatPump <: Component
     losses::Float64
 
     cop::Float64
+    effective_cop::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
 
@@ -111,6 +112,7 @@ mutable struct HeatPump <: Component
                    0.0, # losses_heat
                    0.0, # losses
                    0.0, # cop
+                   0.0, # effective_cop
                    0.0, # mixing temperature in the input interface
                    0.0) # mixing temperature in the output interface
     end
@@ -963,15 +965,33 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies = copy_temp_to_slices!(energies)
     end
 
+    # calculate average cop before losses
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
+    if el_in > sim_params["epsilon"]
+        unit.cop = heat_out / el_in
+    end
+
     # now set losses of the heat pump and add the losses to the actually consumed
     # power / heat for the slices
-    unit.losses_power = -1.0 * sum(energies.slices_el_in; init=0.0)
-    unit.losses_heat = -1.0 * sum(energies.slices_heat_in; init=0.0)
+    unit.losses_power = -1.0 * el_in
+    unit.losses_heat = -1.0 * heat_in
     energies.slices_el_in ./= unit.power_losses_factor
     energies.slices_heat_in ./= unit.heat_losses_factor
-    unit.losses_power += sum(energies.slices_el_in; init=0.0)
-    unit.losses_heat += sum(energies.slices_heat_in; init=0.0)
+
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
+
+    unit.losses_power += el_in
+    unit.losses_heat += heat_in
     unit.losses = unit.losses_power + unit.losses_heat
+
+    # calculate effective cop after losses
+    if el_in > sim_params["epsilon"]
+        unit.effective_cop = heat_out / el_in
+    end
 
     return true, energies
 end
@@ -1015,10 +1035,6 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    # calculate average cop of current time step
-    if el_in > sim_params["epsilon"]
-        unit.cop = heat_out / el_in
-    end
     unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
     unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
 
@@ -1040,6 +1056,7 @@ function reset(unit::HeatPump)
 
     # reset other parameter
     unit.cop = 0.0
+    unit.effective_cop = 0.0
     unit.mix_temp_input = 0.0
     unit.mix_temp_output = 0.0
     unit.losses_heat = 0.0
@@ -1051,6 +1068,7 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_in) * " IN",
             string(unit.m_heat_out) * " OUT",
             "COP",
+            "Effective_COP",
             "MixingTemperature_Input",
             "MixingTemperature_Output",
             "Losses_power",
@@ -1065,6 +1083,8 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"
         return unit.cop
+    elseif key.value_key == "Effective_COP"
+        return unit.effective_cop
     elseif key.value_key == "MixingTemperature_Input"
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"

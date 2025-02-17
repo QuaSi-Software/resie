@@ -366,12 +366,12 @@ function test_heat_pump_1S1D_losses()
     el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
     heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    effective_cop = heat_out / el_in
 
     @test el_in ≈ 56.25 / 0.97
     @test heat_in ≈ 56.25 / 0.95
     @test heat_out ≈ 112.5
-    @test effective_cop ≈ 112.5 / (56.25 / 0.97)
+    @test heat_pump.cop ≈ 2.0
+    @test heat_pump.effective_cop ≈ 112.5 / (56.25 / 0.97)
     @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 56.25
     @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 56.25
     @test heat_pump.losses ≈ (1.0 / 0.97 - 1.0) * 56.25 + (1.0 / 0.95 - 1.0) * 56.25
@@ -401,14 +401,14 @@ function test_heat_pump_1S1D_losses()
     heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
     heat_out_balance = heat_pump.output_interfaces[heat_pump.m_heat_out].balance
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change - 112.5
-    effective_cop = heat_out / el_in
 
     # source can only produce 57.75 Wh, which is 54.8625 after losses
     @test el_in ≈ 54.8625 / 0.97
     @test heat_in ≈ 54.8625 / 0.95
     @test heat_out ≈ 54.8625 * 2.0
     @test heat_out_balance ≈ -(112.5 - 54.8625 * 2.0)
-    @test effective_cop ≈ (54.8625 * 2.0) / (54.8625 / 0.97)
+    @test heat_pump.cop ≈ 2.0
+    @test heat_pump.effective_cop ≈ (54.8625 * 2.0) / (54.8625 / 0.97)
     @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 54.8625
     @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 54.8625
     @test heat_pump.losses ≈ (1.0 / 0.95 - 1.0) * 54.8625 + (1.0 / 0.97 - 1.0) * 54.8625
@@ -632,17 +632,18 @@ function test_heat_pump_2S2D_losses()
     el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
     heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    effective_cop = heat_out / el_in
 
     # without losses:
     # el_in = 774,1719281944598
     # heat_in = 2225,82807180554
     # heat_out = 3000
-    # effective_cop = 3,87510821659042
+    # cop = effective_cop = 3,87510821659042
+    #
     # with losses:
     # el_in 807,7268744618796 (+4,334301599604284 %)
     # heat_in 2333,163086075765 (+4,8222509020275 %)
     # heat_out = 3000
+    # cop = 3,8289966608020816 (-1,189942401890145 %)
     # effective_cop = 3,714126760978019 (-4,15424412983344442 %)
     # losses_power (actual) = 24,231806233856332
     # losses_heat (actual) = 116,6581543037887
@@ -653,11 +654,13 @@ function test_heat_pump_2S2D_losses()
     # efficiency, including losses shifts the actually processed energy slightly towards the
     # other slices. namely, it requires a bit less power and utilises more lower temperature
     # heat. the COP however is calculated based on the unchanged heat output, which is why
-    # it is lower when losses are included.
+    # it is lower when losses are included. the inner COP with losses is also smaller than
+    # the effective COP without losses, but larger than the effective COP with losses.
     @test el_in ≈ 807.7268744618796
     @test heat_in ≈ 2333.163086075765
     @test heat_out ≈ 3000
-    @test effective_cop ≈ 3.714126760978019
+    @test heat_pump.cop > 3.714126760978019 && heat_pump.cop < 3.87510821659042
+    @test heat_pump.effective_cop ≈ 3.714126760978019
     @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
     @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
 end
