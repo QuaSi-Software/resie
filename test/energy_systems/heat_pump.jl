@@ -596,6 +596,9 @@ end
 function test_heat_pump_2S2D_losses()
     components_config = get_config_heat_pump_2S2D()
     simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["power_losses_factor"] = 0.97
+    components_config["TST_HP_01"]["heat_losses_factor"] = 0.95
+    components_config["TST_HP_01"]["power_th"] = 16000
 
     components = Resie.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
@@ -608,9 +611,6 @@ function test_heat_pump_2S2D_losses()
     grid = components["TST_GRI_01"]
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
-
-    heat_pump.power_losses_factor = 0.97
-    heat_pump.heat_losses_factor = 0.95
 
     for unit in values(components)
         EnergySystems.reset(unit)
@@ -663,6 +663,8 @@ function test_heat_pump_2S2D_losses()
     @test heat_pump.effective_cop ≈ 3.714126760978019
     @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
     @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
+    @test heat_pump.time_active ≈ 0.75
+    @test heat_pump.avg_plr ≈ 1.0
 end
 
 @testset "heat_pump_2S2D_losses" begin
@@ -953,6 +955,9 @@ function test_heat_pump_2S2D_optimising_slices()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 < 1403.5371253472942 - eps
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 > 1596.4628746527055 + eps
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 3000.0
+    # fully optimal would be 1.0 for time_active and 0.4 for plr
+    @test heat_pump.time_active ≈ 0.9222481721394582
+    @test heat_pump.avg_plr ≈ 0.4653057040302939
 end
 
 @testset "heat_pump_2S2D_optimising_slices" begin

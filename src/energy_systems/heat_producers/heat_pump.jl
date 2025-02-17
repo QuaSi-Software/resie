@@ -53,6 +53,8 @@ mutable struct HeatPump <: Component
     effective_cop::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
+    avg_plr::Float64
+    time_active::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
@@ -114,7 +116,9 @@ mutable struct HeatPump <: Component
                    0.0, # cop
                    0.0, # effective_cop
                    0.0, # mixing temperature in the input interface
-                   0.0) # mixing temperature in the output interface
+                   0.0, # mixing temperature in the output interface
+                   0.0, # avg_plr
+                   0.0) # time_active
     end
 end
 
@@ -861,6 +865,18 @@ function calculate_energies_heatpump(unit::HeatPump,
         end
     end
 
+    # calculate average PLR, from active slices, and weighted by heat produced
+    # we have to use the temp slices as the actually utilised slices have not been set yet
+    weights = 0
+    for (slice_idx, indexes) in pairs(energies.slices_idx_to_plr)
+        unit.avg_plr += plrs[indexes[1], indexes[2]] * energies.slices_heat_out_temp[slice_idx]
+        weights += energies.slices_heat_out_temp[slice_idx]
+    end
+    unit.avg_plr /= weights
+
+    # calculate active time as fraction of the simulation time step
+    unit.time_active = sum(times; init=0.0) / sim_params["time_step_seconds"]
+
     return energies
 end
 
@@ -1061,6 +1077,8 @@ function reset(unit::HeatPump)
     unit.mix_temp_output = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
+    unit.avg_plr = 0.0
+    unit.time_active = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -1069,6 +1087,8 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_out) * " OUT",
             "COP",
             "Effective_COP",
+            "Avg_PLR",
+            "Time_active",
             "MixingTemperature_Input",
             "MixingTemperature_Output",
             "Losses_power",
@@ -1085,6 +1105,10 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return unit.cop
     elseif key.value_key == "Effective_COP"
         return unit.effective_cop
+    elseif key.value_key == "Avg_PLR"
+        return unit.avg_plr
+    elseif key.value_key == "Time_active"
+        return unit.time_active
     elseif key.value_key == "MixingTemperature_Input"
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"
