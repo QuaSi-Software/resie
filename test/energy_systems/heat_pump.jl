@@ -34,8 +34,9 @@ function get_config_heat_pump_1S1D()
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 12000,
-            "power_losses_factor" => 0.0,
-            "heat_losses_factor" => 0.0,
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
+            "min_power_function" => "const:0.0",
         ),
     )
 end
@@ -243,8 +244,8 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 2500 * 4,
-            "power_losses_factor" => 0.0,
-            "heat_losses_factor" => 0.0,
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
@@ -327,6 +328,94 @@ end
 
 @testset "test_heat_pump_1S1D_infinite_output" begin
     test_heat_pump_1S1D_infinite_input()
+end
+
+function test_heat_pump_1S1D_losses()
+    components_config = get_config_heat_pump_1S1D()
+    simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["cop_function"] = "const:2.0"
+    delete!(components_config["TST_SRC_01"], "max_power_profile_file_path")
+    components_config["TST_SRC_01"]["constant_power"] = 400
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    heat_pump.power_losses_factor = 0.97
+    heat_pump.heat_losses_factor = 0.95
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    # first timestep, demand is well below max power of source
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    effective_cop = heat_out / el_in
+
+    @test el_in ≈ 56.25 / 0.97
+    @test heat_in ≈ 56.25 / 0.95
+    @test heat_out ≈ 112.5
+    @test effective_cop ≈ 112.5 / (56.25 / 0.97)
+    @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 56.25
+    @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 56.25
+    @test heat_pump.losses ≈ (1.0 / 0.97 - 1.0) * 56.25 + (1.0 / 0.95 - 1.0) * 56.25
+
+    # second timestep, max power of source is just above what heat input would be without
+    # considering losses, but just below the required heat input including losses
+    EnergySystems.reset(heat_pump)
+    @test heat_pump.losses == 0.0
+    @test heat_pump.losses_heat == 0.0
+    @test heat_pump.losses_power == 0.0
+    EnergySystems.reset(demand)
+    EnergySystems.reset(source)
+    EnergySystems.reset(grid)
+
+    source.constant_power = 57.75 * 4
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out_balance = heat_pump.output_interfaces[heat_pump.m_heat_out].balance
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change - 112.5
+    effective_cop = heat_out / el_in
+
+    # source can only produce 57.75 Wh, which is 54.8625 after losses
+    @test el_in ≈ 54.8625 / 0.97
+    @test heat_in ≈ 54.8625 / 0.95
+    @test heat_out ≈ 54.8625 * 2.0
+    @test heat_out_balance ≈ -(112.5 - 54.8625 * 2.0)
+    @test effective_cop ≈ (54.8625 * 2.0) / (54.8625 / 0.97)
+    @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 54.8625
+    @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 54.8625
+    @test heat_pump.losses ≈ (1.0 / 0.95 - 1.0) * 54.8625 + (1.0 / 0.97 - 1.0) * 54.8625
+end
+
+@testset "test_heat_pump_1S1D_losses" begin
+    test_heat_pump_1S1D_losses()
 end
 
 function test_heat_pump_1S1D_infinite_output()
@@ -427,8 +516,8 @@ function get_config_heat_pump_2S2D()
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_02"],
             "power_th" => 12000,
-            "power_losses_factor" => 0.0,
-            "heat_losses_factor" => 0.0,
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 end
@@ -502,6 +591,79 @@ end
 
 @testset "heat_pump_2S2D_constant_cop" begin
     test_heat_pump_2S2D_constant_cop()
+end
+
+function test_heat_pump_2S2D_losses()
+    components_config = get_config_heat_pump_2S2D()
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    heat_pump.power_losses_factor = 0.97
+    heat_pump.heat_losses_factor = 0.95
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+    for unit in values(components)
+        EnergySystems.control(unit, components, simulation_parameters)
+    end
+
+    EnergySystems.process(demand_1, simulation_parameters)
+    EnergySystems.process(demand_2, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source_1, simulation_parameters)
+    EnergySystems.process(source_2, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    EnergySystems.distribute!(bus_1)
+    EnergySystems.distribute!(bus_2)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    effective_cop = heat_out / el_in
+
+    # without losses:
+    # el_in = 774,1719281944598
+    # heat_in = 2225,82807180554
+    # heat_out = 3000
+    # effective_cop = 3,87510821659042
+    # with losses:
+    # el_in 807,7268744618796 (+4,334301599604284 %)
+    # heat_in 2333,163086075765 (+4,8222509020275 %)
+    # heat_out = 3000
+    # effective_cop = 3,714126760978019 (-4,15424412983344442 %)
+    # losses_power (actual) = 24,231806233856332
+    # losses_heat (actual) = 116,6581543037887
+    # losses_power (as diff) = 33,55494626741972
+    # losses_heat (as diff) = 107,3350142702252
+    #
+    # what we suspect happens here is that, because the three slices are different in
+    # efficiency, including losses shifts the actually processed energy slightly towards the
+    # other slices. namely, it requires a bit less power and utilises more lower temperature
+    # heat. the COP however is calculated based on the unchanged heat output, which is why
+    # it is lower when losses are included.
+    @test el_in ≈ 807.7268744618796
+    @test heat_in ≈ 2333.163086075765
+    @test heat_out ≈ 3000
+    @test effective_cop ≈ 3.714126760978019
+    @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
+    @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
+end
+
+@testset "heat_pump_2S2D_losses" begin
+    test_heat_pump_2S2D_losses()
 end
 
 function test_heat_pump_2S2D_dynamic_cop()
