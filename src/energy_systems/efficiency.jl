@@ -29,6 +29,19 @@ Three different function prototypes are implemented:
         the values for a PLR of 0.0 and 1.0 respectively. E.g. `pwlin:0.6,0.8,0.9` means
         two sections of step size 0.5 with a value of e(0.0)==0.6, e(0.5)==0.8, e(1.0)=0.9
         and linear interpolation inbetween.
+    * offset_lin: Takes one number and uses as the slope of a linear function with an offset
+        of its complement (in regards to 1.0). E.g. `offset_lin:0.5` means
+        e(x)=1.0-0.5*(1.0-x)
+    * logarithmic: Takes two numbers and uses them as the coefficients of a
+        quasi-logarithmic function. E.g. `logarithmic:0.5,0.3` means
+        e(x)=0.5x/(0.3x+(1-0.3))
+    * inv_poly: Takes a list of numbers and uses them as the coefficients of a polynomial
+        with order n-1 where n is the length of coefficients. The list starts with
+        coefficients of the highest order. The inverse of the polynomial multiplied with the
+        PLR is used as the efficiency function. E.g. `inv_poly:0.5,2.0,0.1`
+        means e(x)=x/(0.5x²+2x+0.1)
+    * exp: Takes three numbers and uses them as the coefficients of an exponential function.
+        E.g. `exp:0.1,0.2,0.3` means e(x)=0.1+0.2*exp(0.3x)
 
 # Arguments
 - `eff_def::String`: The efficiency definition as described above
@@ -62,6 +75,22 @@ function parse_efficiency_function(eff_def::String)::Function
                 upper_bound = params[min(bracket_nr + 1, length(params))]
                 return lower_bound + (upper_bound - lower_bound) * (plr % step) / step
             end
+
+        elseif method == "offset_lin"
+            c = parse(Float64, data)
+            return plr -> 1.0 - c * (1.0 - plr)
+
+        elseif method == "logarithmic"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> params[1] * plr / (params[2] * plr + (1 - params[2]))
+
+        elseif method == "inv_poly"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> plr / sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
+
+        elseif method == "exp"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> params[1] + params[2] * exp(params[3] * plr)
         end
     end
 

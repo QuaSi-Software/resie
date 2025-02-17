@@ -56,6 +56,38 @@ function test_efficiency_parsing()
     @test efficiency(0.5) ≈ 0.9
     @test efficiency(0.8) ≈ 0.96
     @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("offset_lin:0.25")
+    @test efficiency(0.0) ≈ 0.75
+    @test efficiency(0.5) ≈ 0.875
+    @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("logarithmic:1.25,0.95")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.8620689655172411
+    @test efficiency(0.5) ≈ 1.1904761904761905
+    @test efficiency(0.75) ≈ 1.2295081967213115
+    @test efficiency(0.9) ≈ 1.2430939226519337
+    @test efficiency(1.0) ≈ 1.25
+
+    efficiency = EnergySystems.parse_efficiency_function("inv_poly:0.5,-0.2,0.815,0.01")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.05) ≈ 0.9937888198757764
+    @test efficiency(0.1) ≈ 1.111111111111111
+    @test efficiency(0.2) ≈ 1.183431952662722
+    @test efficiency(0.3) ≈ 1.2
+    @test efficiency(0.4) ≈ 1.1904761904761905
+    @test efficiency(0.5) ≈ 1.1627906976744187
+    @test efficiency(0.75) ≈ 1.0421189752496745
+    @test efficiency(1.0) ≈ 0.8888888888888888
+
+    efficiency = EnergySystems.parse_efficiency_function("exp:1.25,-1.25,-5.7")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.5430932016255786
+    @test efficiency(0.25) ≈ 0.9493644209895724
+    @test efficiency(0.5) ≈ 1.177694598906452
+    @test efficiency(0.75) ≈ 1.2326099391013279
+    @test efficiency(1.0) ≈ 1.2458175431781608
 end
 
 @testset "test_efficiency_parsing" begin
