@@ -193,8 +193,8 @@
             ],
             "power_th": 20000,
             "cop_function": "const:3.0",
-            "power_losses_factor": 0.0,
-            "heat_losses_factor": 0.0
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_01_HZG_01_BFT": {
             "type": "BufferTank",

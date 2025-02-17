@@ -30,8 +30,8 @@ function test_load_from_dict()
                                   )],
             "power_th" => 20000,
             "cop_function" => "const:3.0",
-            "power_losses_factor" => 0.0,
-            "heat_losses_factor" => 0.0,
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -94,8 +94,8 @@ function test_load_custom_medium_categories()
             "m_heat_out" => "m_h_w_85c",
             "power_th" => 12000,
             "cop_function" => "const:3.0",
-            "power_losses_factor" => 0.0,
-            "heat_losses_factor" => 0.0,
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",

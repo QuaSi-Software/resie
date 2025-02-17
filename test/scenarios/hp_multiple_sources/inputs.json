@@ -235,8 +235,8 @@
             ],
             "power_th": 9000,
             "min_power_function": "const:0.0",
-            "power_losses_factor": 0.0,
-            "heat_losses_factor": 0.0
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         }
     }
 }
