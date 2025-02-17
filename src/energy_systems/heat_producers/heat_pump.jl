@@ -909,6 +909,12 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies.potentials_energies_heat_in = abs.(energies.potentials_energies_heat_in)
     energies.potentials_energies_heat_out = abs.(energies.potentials_energies_heat_out)
 
+    # reduce available input energies by the power/heat losses that would occur if the
+    # sources would be fully utilised. since the actual usage is equal or less than that,
+    # it works out even if the PLR for that source is not 1.0
+    energies.potentials_energies_heat_in .*= unit.heat_losses_factor
+    energies.potential_energy_el *= unit.power_losses_factor
+
     # reorder inputs and outputs according to control modules
     index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
     energies.in_temps_min = energies.in_temps_min[index]
@@ -956,6 +962,16 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies = calculate_energies_heatpump(unit, sim_params, energies, unit.optimise_slice_dispatch)
         energies = copy_temp_to_slices!(energies)
     end
+
+    # now set losses of the heat pump and add the losses to the actually consumed
+    # power / heat for the slices
+    unit.losses_power = -1.0 * sum(energies.slices_el_in; init=0.0)
+    unit.losses_heat = -1.0 * sum(energies.slices_heat_in; init=0.0)
+    energies.slices_el_in ./= unit.power_losses_factor
+    energies.slices_heat_in ./= unit.heat_losses_factor
+    unit.losses_power += sum(energies.slices_el_in; init=0.0)
+    unit.losses_heat += sum(energies.slices_heat_in; init=0.0)
+    unit.losses = unit.losses_power + unit.losses_heat
 
     return true, energies
 end
