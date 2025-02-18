@@ -60,6 +60,21 @@ mutable struct WeatherData
         if endswith(lowercase(weather_file_path), ".dat")
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
 
+            # calculate latitude and longitude from Hochwert and Rechtswert from header
+            inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
+            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
+            transform = Proj.Transformation(inProj, outProj)
+            latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
+
+            if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+                sim_params["latitude"] = latitude
+                sim_params["longitude"] = longitude
+            else
+                @info "The coordinates given in the weather file where overwritten by the " *
+                      "ones given in the input file:\n" *
+                      "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+            end
+
             # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
             #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
 
@@ -73,7 +88,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=weather_interpolation_type)
+                                interpolation_type="linear_solar_radiation")
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
@@ -81,7 +96,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=weather_interpolation_type)
+                                interpolation_type="linear_solar_radiation")
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
@@ -115,14 +130,19 @@ mutable struct WeatherData
                                        shift=Second(0),
                                        interpolation_type=weather_interpolation_type)
 
-            # calculate latitude and longitude from Hochwert and Rechtswert from header
-            inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
-            outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
-            transform = Proj.Transformation(inProj, outProj)
-            latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
-
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
+
+            latitude = headerdata["latitude"]
+            longitude = headerdata["longitude"]
+            if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+                sim_params["latitude"] = latitude
+                sim_params["longitude"] = longitude
+            else
+                @info "The coordinates given in the weather file where overwritten by the " *
+                      "ones given in the input file:\n" *
+                      "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+            end
 
             # convert solar radiation data to profile
             # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
@@ -133,7 +153,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="extensive",
                                  shift=Second(0),
-                                 interpolation_type=weather_interpolation_type)
+                                 interpolation_type="linear_solar_radiation")
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
@@ -141,7 +161,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=weather_interpolation_type)
+                                interpolation_type="linear_solar_radiation")
             dirHorIrr = deepcopy(globHorIrr)
             dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
@@ -174,9 +194,6 @@ mutable struct WeatherData
                                  given_data_type="intensive",
                                  shift=Second(30 * 60),
                                  interpolation_type=weather_interpolation_type)
-
-            latitude = headerdata["latitude"]
-            longitude = headerdata["longitude"]
         end
 
         return new(temp_ambient_air,
@@ -184,9 +201,7 @@ mutable struct WeatherData
                    dirHorIrr,
                    difHorIrr,
                    globHorIrr,
-                   longWaveIrr),
-               latitude,
-               longitude
+                   longWaveIrr)
     end
 end
 

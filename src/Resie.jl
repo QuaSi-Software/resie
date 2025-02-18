@@ -111,16 +111,8 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         weather_interpolation_type = default(project_config["io_settings"],
                                              "weather_interpolation_type",
                                              "stepwise")
-        sim_params["weather_data"], lat, long = WeatherData(weather_file_path, sim_params, weather_interpolation_type)
-
-        if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
-            sim_params["latitude"] = lat
-            sim_params["longitude"] = long
-        else
-            @info "The coordinates given in the weather file where overwritten by the " *
-                  "ones given in the input file:\n" *
-                  "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
-        end
+        # WeatherData() writes the lat and long to sim_params if they are not given in the input file
+        sim_params["weather_data"] = WeatherData(weather_file_path, sim_params, weather_interpolation_type)
     end
 
     return sim_params
