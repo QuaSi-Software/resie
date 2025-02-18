@@ -248,9 +248,10 @@ mutable struct Profile
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the fist value."
         end
         temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
-        if profile_timestamps_date[end] < sim_params["end_date"] &&
+        time_diff_timesteps = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
+        if profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps &&
            profile_timestamps_date[end] + temp_diff >= sim_params["end_date"]
-            while profile_timestamps_date[end] < sim_params["end_date"]
+            while profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps
                 profile_timestamps_date = vcat(profile_timestamps_date,
                                                profile_timestamps_date[end] + Second(profile_time_step))
                 profile_values = vcat(profile_values, profile_values[end])
@@ -308,8 +309,8 @@ mutable struct Profile
         values_converted,
         profile_timestamps_date_converted = convert_profile(profile_values,
                                                             profile_timestamps_date,
-                                                            Second(Int(profile_time_step)),
-                                                            Second(sim_params["time_step_seconds"]),
+                                                            Millisecond(Int(1000 * profile_time_step)),
+                                                            Millisecond(1000 * sim_params["time_step_seconds"]),
                                                             data_type,
                                                             file_path,
                                                             sim_params,
@@ -710,7 +711,7 @@ function convert_profile(values::Vector{Float64},
                                                      original_time_step,
                                                      new_time_step,
                                                      sim_params)
-        info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+        info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                         "timestep of $(new_time_step)."
     elseif original_time_step > new_time_step                   # segmentation
         if profile_type == :extensive
@@ -733,7 +734,7 @@ function convert_profile(values::Vector{Float64},
             if !time_is_aligned
                 info_message *= "was shifted to fit the simulation start time and "
             end
-            info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+            info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                             "timestep of $(new_time_step) using linear interpolation."
         else # stepwise conversion
             values, timestamps = profile_spread_to_segments(values,
@@ -749,7 +750,7 @@ function convert_profile(values::Vector{Float64},
                                                                   sim_params)
                 info_message *= "was shifted using linear interpolation to fit the simulation start time and "
             end
-            info_message *= "was converted from the profile timestep $(original_time_step) to the simulation " *
+            info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                             "timestep of $(new_time_step) using stepwise segmentation."
         end
     end
@@ -774,12 +775,12 @@ function profile_linear_interpolation(values::Vector{Float64},
                                       new_time_step::Period,
                                       sim_params::Dict{String,Any})
     ref_time = sim_params["start_date"]
-    numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
+    numeric_timestamps = [Dates.value(Millisecond(sub_ignoring_leap_days(dt, ref_time))) for dt in timestamps]
     interp = interpolate((numeric_timestamps,), values, Gridded(Linear()))
     new_timestamps = remove_leap_days(collect(range(sim_params["start_date"];
                                                     stop=sim_params["end_date"],
                                                     step=new_time_step)))
-    new_numeric_timestamps = [Dates.value(Second(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
+    new_numeric_timestamps = [Dates.value(Millisecond(sub_ignoring_leap_days(dt, ref_time))) for dt in new_timestamps]
     converted_profile = [interp(t) for t in new_numeric_timestamps]
 
     # add missing entries by coping the last entry
