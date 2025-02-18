@@ -20,9 +20,19 @@ The data_type is essential to make sure that the profile data is converted corre
 It has to be set to "intensive" for values like temperatures, power, wind speed or
 for profiles containting states. Only for energies, data_type has to be set to "extensive".
 
-Data should represent the time step following the time indicated /mean/sum). The shift parameter
+Data should represent the time step following the time indicated (mean/sum). The shift parameter
 can be used to shift the timestamp to the correct time. A positive shift will add to the timestamp,
-which means the value is later. 
+which means a value is later in time. 
+
+The interpolation type can be one of "stepwise", "linear_classic" or "linear_time_preserving".
+Stepwise means, the value given at a timestamp is spread/copied over the new finer timestamps. 
+Linear classic interpolates the given values from the original timestamps linearly to the new timestamps.
+Linear time preserving interpolates the data by first shifting the data by half the original 
+time step to make the values be measured at the time indicated. After the interpolation to a 
+finer time step, the data is shifted back by 1/2 a time step to meet the required definition 
+of the values representing the following time step. This should be used for time-critic data 
+like solar radiation. But, this method will cut peaks and valleys in the data more than the 
+classic interpolation.
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
@@ -47,8 +57,8 @@ mutable struct Profile
                      #                                                            "extensive"
                      shift::Dates.Second=Second(0),                   # optional: timeshift for data. A positive shift 
                      #                                                            adds to the timestamp = value is later
-                     use_linear_segmentation::Bool=false)             # optional: flag if a linear (true) or stepwise 
-        #                                                                         interpolation for segmentation should be used
+                     interpolation_type::String="stepwise")           # optional: interpolation type. Can be one of: "stepwise",
+        #                                                                         "linear_classic", "linear_time_preserving"
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -61,7 +71,7 @@ mutable struct Profile
             profile_start_date_format = nothing
             time_zone = nothing
             time_shift_seconds = nothing
-            use_linear_segmentation = false
+            interpolation_type = "stepwise"
 
             file_handle = nothing
 
@@ -90,8 +100,14 @@ mutable struct Profile
                             time_zone = String(strip(splitted[2]))
                         elseif strip(splitted[1]) == "time_shift_seconds"
                             time_shift_seconds = parse(Int, String(strip(splitted[2])))
-                        elseif strip(splitted[1]) == "use_linear_segmentation"
-                            use_linear_segmentation = parse(Bool, String(strip(splitted[2])))
+                        elseif strip(splitted[1]) == "interpolation_type"
+                            interpolation_type = String(strip(splitted[2]))
+                            if !(interpolation_type in ["stepwise", "linear_classic", "linear_time_preserving"])
+                                @error "The interpolation type of the profile at $(file_path) has to be one of " *
+                                       "'stepwise', 'linear_classic' or 'linear_time_preserving'! " *
+                                       "The given interpolation type is '$interpolation_type'."
+                                throw(InputError)
+                            end
                         end
                     else
                         splitted = split(line, ';')
@@ -233,7 +249,7 @@ mutable struct Profile
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
         end
 
-        if use_linear_segmentation == true && profile_time_step > sim_params["time_step_seconds"]
+        if interpolation_type == "linear_time_preserving" && profile_time_step > sim_params["time_step_seconds"]
             # shift data by half the original time step to make the values be measured at the time indicated. 
             # This is required for correct linear interpolation during segmentation and will be reversed afterwards.
             profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, Second(profile_time_step / 2))
@@ -314,7 +330,7 @@ mutable struct Profile
                                                             data_type,
                                                             file_path,
                                                             sim_params,
-                                                            use_linear_segmentation)
+                                                            interpolation_type)
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
@@ -659,8 +675,8 @@ Inputs:
     profile_type::Symbol            the profile type, can be :extensive (e.g. energies) or :intensive (e.g. temperatures)        
     file_path::String               the file path of the profile, for error messages only
     sim_params::Dict{String,Any}    simulation parameters
-    use_linear_segmentation::Bool   flag if a linear (true) or stepwise (false) interpolation should 
-                                    be used for segmentation.
+    interpolation_type::String      interpolation type. Can be one of "stepwise", "linear_classic" or "linear_time_preserving"
+                                    For time-critic data like solar radiation, use "linear_time_preserving".
 
 Outputs:
     values::Vector{Float64}         values of the converted profile in the `new_time_step`
@@ -675,7 +691,7 @@ function convert_profile(values::Vector{Float64},
                          profile_type::Symbol,
                          file_path::String,
                          sim_params::Dict{String,Any},
-                         use_linear_segmentation::Bool)
+                         interpolation_type::String)
 
     # construct info message
     info_message = "The profile at $(file_path) "
@@ -684,6 +700,7 @@ function convert_profile(values::Vector{Float64},
 
     if original_time_step == new_time_step && time_is_aligned   # do nothing
         return values, timestamps
+
     elseif original_time_step == new_time_step                  # time shift only
         values, timestamps = profile_linear_interpolation(values,
                                                           timestamps,
@@ -691,6 +708,7 @@ function convert_profile(values::Vector{Float64},
                                                           new_time_step,
                                                           sim_params)
         info_message *= "was shifted using linear interpolation to fit the simulation start time. "
+
     elseif original_time_step < new_time_step                   # aggregation
         if profile_type == :extensive
             values .*= new_time_step / original_time_step
@@ -698,6 +716,7 @@ function convert_profile(values::Vector{Float64},
         else
             info_message *= "(intensive profile) "
         end
+
         if !time_is_aligned  # do time shift
             values, timestamps = profile_linear_interpolation(values,
                                                               timestamps,
@@ -706,6 +725,7 @@ function convert_profile(values::Vector{Float64},
                                                               sim_params)
             info_message *= "was shifted using linear interpolation to fit the simulation start time and "
         end
+
         values, timestamps = profile_calculate_means(values,
                                                      timestamps,
                                                      original_time_step,
@@ -713,6 +733,7 @@ function convert_profile(values::Vector{Float64},
                                                      sim_params)
         info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                         "timestep of $(new_time_step)."
+
     elseif original_time_step > new_time_step                   # segmentation
         if profile_type == :extensive
             values .*= new_time_step / original_time_step
@@ -720,7 +741,15 @@ function convert_profile(values::Vector{Float64},
         else
             info_message *= "(intensive profile) "
         end
-        if use_linear_segmentation
+
+        if interpolation_type == "linear_classic"
+            values, timestamps = profile_linear_interpolation(values,
+                                                              timestamps,
+                                                              original_time_step,
+                                                              new_time_step,
+                                                              sim_params)
+
+        elseif interpolation_type == "linear_time_preserving"
             values, timestamps = profile_linear_interpolation(values,
                                                               timestamps,
                                                               original_time_step,
@@ -731,11 +760,6 @@ function convert_profile(values::Vector{Float64},
             deleteat!(values, 1:2:(length(values) - 1))
             deleteat!(timestamps, 2:2:length(timestamps))
 
-            if !time_is_aligned
-                info_message *= "was shifted to fit the simulation start time and "
-            end
-            info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
-                            "timestep of $(new_time_step) using linear interpolation."
         else # stepwise conversion
             values, timestamps = profile_spread_to_segments(values,
                                                             timestamps,
@@ -748,11 +772,15 @@ function convert_profile(values::Vector{Float64},
                                                                   new_time_step,
                                                                   new_time_step,
                                                                   sim_params)
-                info_message *= "was shifted using linear interpolation to fit the simulation start time and "
             end
-            info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
-                            "timestep of $(new_time_step) using stepwise segmentation."
         end
+
+        if !time_is_aligned
+            info_message *= "was shifted to fit the simulation start time and "
+        end
+
+        info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
+                        "timestep of $(Second(new_time_step)) using $(interpolation_type) interpolation."
     end
 
     @info info_message

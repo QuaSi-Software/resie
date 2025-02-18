@@ -43,7 +43,7 @@ mutable struct WeatherData
     accordingly.
 
     """
-    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any}, use_linear_segmentation::Bool)
+    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any}, weather_interpolation_type::String)
         if !isfile(weather_file_path)
             @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
@@ -73,7 +73,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                use_linear_segmentation=use_linear_segmentation)
+                                interpolation_type=weather_interpolation_type)
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
@@ -81,7 +81,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                use_linear_segmentation=use_linear_segmentation)
+                                interpolation_type=weather_interpolation_type)
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
@@ -93,7 +93,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(25 * 60),
-                                 use_linear_segmentation=use_linear_segmentation)
+                                 interpolation_type=weather_interpolation_type)
 
             # Values measured at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
@@ -103,7 +103,7 @@ mutable struct WeatherData
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
-                                  use_linear_segmentation=use_linear_segmentation)
+                                  interpolation_type=weather_interpolation_type)
 
             # Temperatures are measured half an hour bevor the timestep indicated (hour 1 => 00:00).
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -113,7 +113,7 @@ mutable struct WeatherData
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(0),
-                                       use_linear_segmentation=use_linear_segmentation)
+                                       interpolation_type=weather_interpolation_type)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
@@ -133,7 +133,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="extensive",
                                  shift=Second(0),
-                                 use_linear_segmentation=use_linear_segmentation)
+                                 interpolation_type=weather_interpolation_type)
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
@@ -141,7 +141,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                use_linear_segmentation=use_linear_segmentation)
+                                interpolation_type=weather_interpolation_type)
             dirHorIrr = deepcopy(globHorIrr)
             dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
@@ -153,7 +153,7 @@ mutable struct WeatherData
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
-                                  use_linear_segmentation=use_linear_segmentation)
+                                  interpolation_type=weather_interpolation_type)
 
             # Temperature is given as value at the time indicated. (Hour1 = 00:00)
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -163,7 +163,7 @@ mutable struct WeatherData
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(30 * 60),
-                                       use_linear_segmentation=use_linear_segmentation)
+                                       interpolation_type=weather_interpolation_type)
 
             # Wind speed is given as value at the time indicated. (Hour1 = 00:00)
             wind_speed = Profile(weather_file_path * ":WindSpeed",
@@ -173,7 +173,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(30 * 60),
-                                 use_linear_segmentation=use_linear_segmentation)
+                                 interpolation_type=weather_interpolation_type)
 
             latitude = headerdata["latitude"]
             longitude = headerdata["longitude"]
