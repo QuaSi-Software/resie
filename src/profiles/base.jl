@@ -864,7 +864,7 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
 
     # 5. Compute the midpoint value (G_mid) over the effective region.
     if N_eff == 1
-        G_mid = Hn / dt_eff
+        G_mid = Hn / dt_h
     else
         N_mid = Int(floor(N_eff / 2))
         G_mid = (2 * Hn / (N_eff * dt_h)) - (N_mid * G_start) / N_eff - ((N_eff - N_mid) * effective_G_end) / N_eff
@@ -886,7 +886,7 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
             boundaries[j + 1] = G_start + (j / N_mid) * (G_mid - G_start)
         end
         # Second part: interpolate from G_mid to effective_G_end over the remaining subintervals.
-        #              effective_G_end is considered to be the first value of the previous interval.
+        #              effective_G_end is considered to be the first value of the next interval.
         M = N_eff - N_mid
         for k in 1:M
             boundaries[N_mid + 1 + k] = G_mid + (k / M) * (effective_G_end - G_mid)
@@ -907,6 +907,9 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
             effective_irr = vcat(effective_irr, zeros(Float64, N_total - N_eff))
         end
     end
+
+    # 9. Scale irradiation to get energy
+    effective_irr *= dt_h
 
     return t_blocks, effective_irr, effective_G_end
 end

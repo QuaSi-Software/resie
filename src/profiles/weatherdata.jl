@@ -146,14 +146,14 @@ mutable struct WeatherData
 
             # convert solar radiation data to profile
             # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
-            globHorIrr = Profile(weather_file_path * ":GlobalHorizontalIrradiation",
-                                 sim_params;
-                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
-                                 given_timestamps=timestamp,
-                                 given_time_step=time_step,
-                                 given_data_type="extensive",
-                                 shift=Second(0),
-                                 interpolation_type="linear_solar_radiation")
+            # globHorIrr = Profile(weather_file_path * ":GlobalHorizontalIrradiation",
+            #                      sim_params;
+            #                      given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
+            #                      given_timestamps=timestamp,
+            #                      given_time_step=time_step,
+            #                      given_data_type="extensive",
+            #                      shift=Second(0),
+            #                      interpolation_type="linear_solar_radiation")
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
@@ -162,8 +162,17 @@ mutable struct WeatherData
                                 given_data_type="extensive",
                                 shift=Second(0),
                                 interpolation_type="linear_solar_radiation")
-            dirHorIrr = deepcopy(globHorIrr)
-            dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
+            dirHorIrr = Profile(weather_file_path * ":DirHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
+                                                            nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type="linear_solar_radiation")
+            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
             # Long wave irradiation is probabely(?) given at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
