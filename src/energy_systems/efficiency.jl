@@ -203,13 +203,6 @@ The definition looks like this: `function_prototype:list_of_numbers` with
 seperated list of numbers with a period as decimal seperator and no thousands-seperator and
 semicolon as row seperator. The meaning of the numbers depends on the function prototype.
 
-Optionally second function can be given also seperated with a colon, e.g.:
-`function_prototype_1:list_of_numbers_1:function_prototype_2:list_of_numbers_2`
-The second function definition is parsed by parse_efficiency_function and should be
-formatted accordingly. This function then turns the PLF for the given PLR, which is a
-scaling factor for the COP calculation. If no second function is given, assumes a PLF of
-1.0, which has no effect.
-
 Four different function prototypes are implemented:
     * const: Takes one number and uses it as a constant COP.
     * carnot: Takes one number as uses it as the scaling factor for the Carnot-COP.
@@ -235,8 +228,7 @@ Four different function prototypes are implemented:
 # Returns
 - `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
 - `Function`: A callable function which, when called with the input and output temperatures
-    as arguments, returns another function. The second function returns a scalar value as
-    the COP when given a PLR (which is a value between 0.0 and 1.0) as input.
+    as arguments, returns the COP value at a PLR of 1.0.
 """
 function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
     splitted = split(eff_def, ":")
@@ -245,31 +237,24 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
         method_cop = lowercase(splitted[1])
         data_cop = splitted[2]
 
-        plr_func = plr -> 1.0
-        if length(splitted) == 4
-            plr_func = parse_efficiency_function("$(splitted[3]):$(splitted[4])")
-        end
-
         if method_cop == "const"
             c = parse(Float64, data_cop)
             return c, function (src, snk)
-                       return plr -> c
+                       return c
                    end
 
         elseif method_cop == "carnot"
             c = parse(Float64, data_cop)
             return nothing, function (src, snk)
                        if src === nothing || snk === nothing
-                           return plr -> nothing
+                           return nothing
                        end
-                       return plr -> (plr_func(plr) * c * (273.15 + snk) / (snk - src))
+                       return c * (273.15 + snk) / (snk - src)
                    end
 
         elseif method_cop == "poly-2"
             poly = parse_2dim_function(method_cop * ":" * data_cop)
-            return nothing, function (src, snk)
-                       return plr -> poly(src, snk) * plr_func(plr)
-                   end
+            return nothing, poly
 
         elseif method_cop == "field"
             rows = split(data_cop, ';')
@@ -304,25 +289,22 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                            @error "Given temperatures $src and $snk outside of COP field."
                            throw(BoundsError(values, (src_idx, snk_idx)))
                        end
-                       return function (plr)
-                           factor = plr_func(plr)
-                           return bilinear_interpolate(values[1, snk_idx],
-                                                       snk,
-                                                       values[1, snk_idx + 1],
-                                                       values[src_idx, 1],
-                                                       src,
-                                                       values[src_idx + 1, 1],
-                                                       factor * values[src_idx, snk_idx],
-                                                       factor * values[src_idx, snk_idx + 1],
-                                                       factor * values[src_idx + 1, snk_idx],
-                                                       factor * values[src_idx + 1, snk_idx + 1])
-                       end
+                       return bilinear_interpolate(values[1, snk_idx],
+                                                   snk,
+                                                   values[1, snk_idx + 1],
+                                                   values[src_idx, 1],
+                                                   src,
+                                                   values[src_idx + 1, 1],
+                                                   values[src_idx, snk_idx],
+                                                   values[src_idx, snk_idx + 1],
+                                                   values[src_idx + 1, snk_idx],
+                                                   values[src_idx + 1, snk_idx + 1])
                    end
         end
     end
 
     @error "Cannot parse COP function from: $eff_def"
-    return nothing, (plr -> plr)
+    return nothing, ((x, y) -> 0.0)
 end
 
 """

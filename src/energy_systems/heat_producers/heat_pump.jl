@@ -31,6 +31,7 @@ mutable struct HeatPump <: Component
     design_power_th::Float64
     max_power_function::Function
     min_power_function::Function
+    plf_function::Function
     constant_cop::Floathing
     dynamic_cop::Function
     bypass_cop::Float64
@@ -65,6 +66,9 @@ mutable struct HeatPump <: Component
         func_def = default(config, "cop_function", "carnot:0.4")
         constant_cop, cop_function = parse_cop_function(func_def)
 
+        func_def = default(config, "plf_function", "const:1.0")
+        plf_function = parse_efficiency_function(func_def)
+
         func_def = default(config, "max_power_function", "const:1.0")
         max_power_function = parse_2dim_function(func_def)
 
@@ -98,6 +102,7 @@ mutable struct HeatPump <: Component
                    config["power_th"],
                    max_power_function,
                    min_power_function,
+                   plf_function,
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),
@@ -606,21 +611,23 @@ function handle_slice(unit::HeatPump,
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
     do_bypass = false
     if unit.constant_cop !== nothing
-        cop = unit.constant_cop
+        cop = unit.constant_cop * unit.plf_function(plr)
     elseif in_temp >= out_temp
         cop = unit.bypass_cop
         do_bypass = true
     else
-        cop = unit.dynamic_cop(in_temp, out_temp)(plr)
+        cop = unit.dynamic_cop(in_temp, out_temp)
+        if cop === nothing
+            @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
+                    "given. Provide temperatures or fixed cop.")
+            throw(InputError)
+        end
+        cop *= unit.plf_function(plr)
         if unit.consider_icing
             cop = icing_correction(unit, cop, in_temp)
         end
     end
-    if cop === nothing
-        @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
-                "given. Provide temperatures or fixed cop.")
-        throw(InputError)
-    end
+
     if cop < 1.0
         cop = 1.0
         @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
