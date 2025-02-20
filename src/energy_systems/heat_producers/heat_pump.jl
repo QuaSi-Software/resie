@@ -1,3 +1,4 @@
+using Optim: optimize, minimizer
 using ..Resie: get_run
 
 """
@@ -79,7 +80,13 @@ mutable struct HeatPump <: Component
         icing_coefficients = parse.(Float64, split(coeff_def, ","))
 
         optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
-        optimal_plr = default(config, "optimal_plr", 1.0)
+        optimal_plr = default(config, "optimal_plr", nothing)
+        if optimise_slice_dispatch && optimal_plr === nothing
+            results = optimize(x -> -plf_function(first(x)), [0.5]) # minus because we actually want
+            optimal_plr = first(minimizer(results))                 # the maximum of the function
+        elseif !optimise_slice_dispatch
+            optimal_plr = 1.0
+        end
         if optimise_slice_dispatch && 1.0 - optimal_plr < sim_params["epsilon"]
             @warn "Heat pump $(uac) is configured to optimise slice dispatch but has an " *
                   "optimal PLR of 1.0. Consider toggling optimisation off as it has no effect."
