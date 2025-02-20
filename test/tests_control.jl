@@ -37,8 +37,9 @@ function setup_control_tests()
             "type" => "BufferTank",
             "output_refs" => ["TST_DEM_01"],
             "medium" => "m_h_w_ht1",
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 20000,
+            "initial_load" => 0.5,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -61,10 +62,10 @@ function test_move_state_storage_driven_hp()
     buffer_tank = components["TST_BT_01"]
     heat_pump = components["TST_HP_01"]
 
-    buffer_tank.load = 20000
+    buffer_tank.load_end_of_last_timestep = 20000
     EnergySystems.update(heat_pump.controller)
     @test heat_pump.controller.modules[1].state_machine.state == 1
-    buffer_tank.load = 0
+    buffer_tank.load_end_of_last_timestep = 0
     EnergySystems.update(heat_pump.controller)
     @test heat_pump.controller.modules[1].state_machine.state == 2
 end

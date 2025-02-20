@@ -49,9 +49,23 @@
             "output_refs": [
                 "TST_BUS_01"
             ],
+            "___GENERAL PARAMETER___": "",
+            "model_type": "balanced",
             "capacity": 7000,
-            "load": 3500,
-            "high_temperature": 60.0
+            "initial_load": 0.5,
+            "high_temperature": 60.0,
+            "max_load_rate": 1.0,
+            "max_unload_rate": 1.0,
+            "___BALANCED MODEL___": "",
+            "switch_point": 0.20,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 0.9,
+            "thermal_transmission_barrel": 1.2,
+            "thermal_transmission_bottom": 1.5
         },
         "TST_BAT_01": {
             "type": "Battery",

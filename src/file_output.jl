@@ -339,7 +339,7 @@ function dump_auxiliary_outputs(project_config::Dict{AbstractString,Any},
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
         component_list = []
         for component in components
-            if plot_optional_figures(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
+            if plot_optional_figures_begin(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
                 push!(component_list, component[2].uac)
             end
         end

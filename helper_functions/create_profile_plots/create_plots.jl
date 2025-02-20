@@ -15,7 +15,7 @@ using Dates
 using Statistics
 
 function plot_data(x, profiles::Array, legends::Array{String,1}, colors::Array, title::String, output_name::String,
-                   file_formats::Array, x_label::String, y_label::String, showplots::Bool)
+                   file_formats::Array, x_label::String, y_label::String, showplots::Bool, linestyle::Array{Symbol})
     x_min, x_max = minimum(x), maximum(x)
     custom_y_min = 0 / 1.1  # set to zero if no custom ymin should be set as lower limit
     custom_y_max = 0 / 1.1  # set to zero if no custom ymax should be set as upper limit
@@ -38,6 +38,8 @@ function plot_data(x, profiles::Array, legends::Array{String,1}, colors::Array, 
               ylims=(y_min, y_max),
               legend=true,
               linewidth=8,
+              linestyle=linestyle[i],
+              #   xticks=false,
               gridlinewidth=1,
               size=(1800, 1200),
               titlefontsize=30,
@@ -150,7 +152,7 @@ function mean_differences(data::Matrix, compares, labels)
 end
 
 # enter link to file, first column is y axis in datetime format
-path = "helper_create_plots/example_input_plot.txt"
+path = "helper_functions/create_profile_plots/example_input_plot.txt"
 data_matrix = CSV.Tables.matrix(CSV.File(path; delim=';'))
 
 # strip data to specific time frame if needed
@@ -162,8 +164,15 @@ x_vals_date = DateTime.(String.(strip.(data_matrix[:, 1])), "dd.mm.yyyy HH:MM")
 # select columns containing the profiles to plot and set corresponding labels and colors
 data = data_matrix[:, 2:4]
 labels = ["Measurement", "EED", "ReSiE"]
+linestyle = [:solid, :solid, :solid]  # :solid, :dash or :dot
 colors = ["#004488", "#DDAA33", "#BB5566"]
 #          blue        yellow     red          from Paul Tol's Colour Schemes: high contrast
+
+# Sunset: ["#364B9A", "#6EA6CD", "#C2E4EF", "#FEDA8B", "#F67E4B", "#A50026"]
+# yellow: #ddaa33
+# blue: #004488
+# red: #bb5566
+# greed: #117733
 
 # calculate profile metrix. The second argument is an array of tuples reffering to the column numbers 
 # of data that should be compared.
@@ -188,4 +197,4 @@ showplots = false
 
 x_vals_date, data = aggregate_profiles_with_datetime(x_vals_date, data, number_of_datapoints_to_aggregate,
                                                      aggregation_methods, time_stamp_aggregation)
-plot_data(x_vals_date, data, labels, colors, title, filename, file_formats, x_label, y_label, showplots)
+plot_data(x_vals_date, data, labels, colors, title, filename, file_formats, x_label, y_label, showplots, linestyle)

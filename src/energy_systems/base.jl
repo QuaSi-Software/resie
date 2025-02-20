@@ -22,7 +22,7 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_steps,
        output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-       highest, default, plot_optional_figures
+       highest, default, plot_optional_figures_begin, plot_optional_figures_end
 
 using ..Profiles
 
@@ -1111,9 +1111,9 @@ function distribute!(unit::Component)
 end
 
 """
-    plot_optional_figures(unit, output_path, output_formats, sim_params)
+    plot_optional_figures_begin(unit, output_path, output_formats, sim_params)
 
-Plot otpional figures that are potentially created after initialisation of each 
+Plot optional figures that are potentially created after initialisation of each 
 component. Saves all figures to "output_path" for each specified "output_formats".
 Possible output formats are:
     - html
@@ -1126,15 +1126,34 @@ Possible output formats are:
 - `unit::Component`: The unit that plots additional figures
 - `output_path::String`: The output folder as string (absolute/relative) for the additional plots
 - `output_formats::Vector{Any}`: A Vector of output file formats, each as string without dot
-- `sim_params::Dict{String,Any}`: simulation parameters of ReiSiE
+- `sim_params::Dict{String,Any}`: Simulation parameters of ReSiE
  
 # Returns:
-- Bool: true if a figure was created, false if no figure was created.
+- Bool: True if a figure was created, false if no figure was created
 """
-function plot_optional_figures(unit::Component,
-                               output_path::String,
-                               output_formats::Vector{String},
-                               sim_params::Dict{String,Any})
+function plot_optional_figures_begin(unit::Component,
+                                     output_path::String,
+                                     output_formats::Vector{String},
+                                     sim_params::Dict{String,Any})
+    # default implementation is to do nothing
+    return false
+end
+
+"""
+    plot_optional_figures_end(unit, sim_params)
+
+Plot optional figures that are potentially created at the end of the simulation for each 
+component.
+
+# Arguments
+- `unit::Component`: The unit that plots additional figures
+- `sim_params::Dict{String,Any}`: Simulation parameters of ReSiE
+ 
+# Returns:
+- Bool: True if a figure was created, false if no figure was created
+"""
+function plot_optional_figures_end(unit::Component,
+                                   sim_params::Dict{String,Any})
     # default implementation is to do nothing
     return false
 end
@@ -1210,7 +1229,7 @@ include("storage/battery.jl")
 include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
-# include("heat_sources/geothermal_heat_collectors.jl")
+include("heat_sources/geothermal_heat_collectors.jl")
 include("heat_sources/generic_heat_source.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
@@ -1421,81 +1440,90 @@ function perform_steps(components::Grouping,
 end
 
 """
-get_temperature_profile_from_config(config, simulation_parameter, uac)
+    get_parameter_profile_from_config(config,
+                                      sim_params,
+                                      param_symbol,
+                                      profile_file_key,
+                                      from_global_file_key,
+                                      constant_key,
+                                      uac;
+                                      required=false)
 
-Function to determine the source of the temperature profile for fixed and bouded sinks and sources.
-If no information is given, nothing will be returned.
-If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
-If a constant_temperature is set, this will be used.
-If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
+Function to get specified data, either from a given constant value, a user-defined profile or from the global weather file:
+* If no information is given: If required=false, nothing will be returned and an info message is logged. 
+                              If required=true, an error message will be thrown                              
+* If a constant value is set, this will be used as first argument
+* If a profile_file_key is given, the data will be read from the user-defined profile.
+* If 'from_global_file_key' is set to a valid entry of the global weather file, this will be used.
 
-The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
+Inputs:
+- config::Dict{String, Any}: input file config
+- sim_params::Dict{String, Any}: Project-wide simulation parameters
+- param_symbol::Union{Symbol, String}: will be used for info/warning messages (e.g., `:temperature`, `"temperature"`, etc.).
+- profile_file_key::String: The configuration key in `config` that points to a `.prf` file path (e.g. `"temperature_profile_file_path"`).
+- from_global_file_key::String: The configuration key in `config` that names a field in `weather_data` (e.g. `"temperature_from_global_file"`).
+- constant_key::String: The configuration key in `config` for a constant parameter value (e.g. `"constant_temperature"`).
+- uac::String: The calling unit uac as string for log/info/error messages
+- required:Bool=false: flag if an error (true) or info (false) should be thrown in case no data is given
+
+Returns:
+- constant_value::Floathing: If a constant value is set, this will be returned as first return value
+- profile_values::Union{Profile,Nothing}: If a profile is read out, it will be returned as second argument.
+
 """
-function get_temperature_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
-    # check input
-    if (haskey(config, "temperature_profile_file_path") +
-        haskey(config, "temperature_from_global_file") +
-        haskey(config, "constant_temperature")) > 1
-        # end of condition
-        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
+function get_parameter_profile_from_config(config::Dict{String,Any},
+                                           sim_params::Dict{String,Any},
+                                           param_symbol::Union{Symbol,String},
+                                           profile_file_key::String,
+                                           from_global_file_key::String,
+                                           constant_key::String,
+                                           uac::String;
+                                           required::Bool=false)
+    # Count how many sources are specified 
+    sources_specified = (haskey(config, profile_file_key) ? 1 : 0) +
+                        (haskey(config, from_global_file_key) ? 1 : 0) +
+                        (haskey(config, constant_key) ? 1 : 0)
+    if sources_specified > 1
+        @warn "For '$uac', the '$param_symbol' is specified with two or more sources in the input file!"
     end
 
-    # determine temperature
-    if haskey(config, "temperature_profile_file_path")
-        @info "For '$uac', the temperature profile is taken from the user-defined .prf file."
-        return Profile(config["temperature_profile_file_path"], sim_params)
-    elseif haskey(config, "constant_temperature") && config["constant_temperature"] isa Number
-        @info "For '$uac', a constant temperature of $(config["constant_temperature"]) °C is set."
-        return nothing
-    elseif haskey(config, "temperature_from_global_file") && haskey(sim_params, "weather_data")
-        if any(occursin(config["temperature_from_global_file"], string(field_name))
-               for field_name in fieldnames(typeof(sim_params["weather_data"])))
-            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["temperature_from_global_file"])"
-            return getfield(sim_params["weather_data"], Symbol(config["temperature_from_global_file"]))
+    # 1. If a constant value is specified
+    if haskey(config, constant_key) && config[constant_key] isa Number
+        val = config[constant_key]
+        @info "For '$uac', the '$param_symbol' is set to the constant value of $val."
+        return val, nothing
+    end
+
+    # 2. If a `.prf` file path is specified
+    if haskey(config, profile_file_key)
+        path = config[profile_file_key]
+        @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file located at: $path"
+        return nothing, Profile(path, sim_params)
+    end
+
+    # 3. If the config says to read from the global weather data
+    if haskey(config, from_global_file_key) && haskey(sim_params, "weather_data")
+        field_name_str = config[from_global_file_key]
+        # Check if it matches a field in weather_data
+        wd = sim_params["weather_data"]
+        field_symbols = fieldnames(typeof(wd))
+        if any(occursin(field_name_str, string(sym)) for sym in field_symbols)
+            @info "For '$uac', the '$param_symbol' is taken from the project-wide weather file: $field_name_str"
+            return nothing, getfield(wd, Symbol(field_name_str))
         else
-            @error "For '$uac', the'temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
+            @error "In '$uac', the '$param_symbol' given as '$field_name_str' must be one of: " *
+                   "$(join(string.(field_symbols), ", "))."
             throw(InputError)
         end
-    else
-        @info "For '$uac', no temperature is set."
-        return nothing
-    end
-end
-
-"""
-get_ambient_temperature_profile_from_config(config, simulation_parameter, uac)
-
-Function to determine the source of the ambient temperature profile for geothermal sources.
-If a temperature_profile_file_path is given, the temperature will be read from the user-defined profile.
-If a constant_temperature is set, this will be used.
-If temperature_from_global_file is set to a valid entry of the global weather file, this will be used.
-
-The function also checks whether more than one temperature source is specified and throws a warning if this is the case.
-"""
-function get_ambient_temperature_profile_from_config(config::Dict{String,Any},
-                                                     sim_params::Dict{String,Any},
-                                                     uac::String)
-    # check input
-    if (haskey(config, "ambient_temperature_profile_path") + haskey(config, "ambient_temperature_from_global_file")) > 1
-        @warn "Two or more temperature profile sources for $(uac) have been specified in the input file!"
     end
 
-    # determine temperature
-    if haskey(config, "ambient_temperature_profile_path")
-        @info "For '$uac', the given ambient temperature profile is chosen."
-        return Profile(config["ambient_temperature_profile_path"], sim_params)
-    elseif haskey(config, "ambient_temperature_from_global_file") && haskey(sim_params, "weather_data")
-        if any(occursin(config["ambient_temperature_from_global_file"], string(field_name))
-               for field_name in fieldnames(typeof(sim_params["weather_data"])))
-            @info "For '$uac', the temperature profile is taken from the project-wide weather file: $(config["ambient_temperature_from_global_file"])"
-            return getfield(sim_params["weather_data"], Symbol(config["ambient_temperature_from_global_file"]))
-        else
-            @error "For '$uac', the'ambient_temperature_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            throw(InputError)
-        end
-    else
-        @error "No ambient temperature profile is given for '$uac'"
+    # 4. Otherwise, nothing is set
+    if required
+        @error "For '$uac', no '$param_symbol' is set, but it is required."
         throw(InputError)
+    else
+        @info "For '$uac', no '$param_symbol' is set."
+        return nothing, nothing
     end
 end
 

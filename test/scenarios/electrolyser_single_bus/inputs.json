@@ -232,8 +232,9 @@
             "output_refs": [
                 "TST_01_HZG_00_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 40000,
-            "load": 20000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_BFT": {
@@ -241,8 +242,9 @@
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 20000,
-            "load": 10000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_02_BFT": {
@@ -250,8 +252,9 @@
             "output_refs": [
                 "TST_01_HZG_02_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 20000,
-            "load": 10000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_GBO": {

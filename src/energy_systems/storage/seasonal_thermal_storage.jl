@@ -17,6 +17,7 @@ mutable struct SeasonalThermalStorage <: Component
 
     capacity::Float64
     load::Float64
+    load_end_of_last_timestep::Float64
     losses::Float64
 
     use_adaptive_temperature::Bool
@@ -38,6 +39,7 @@ mutable struct SeasonalThermalStorage <: Component
                    m_heat_out,
                    config["capacity"], # capacity
                    config["load"],     # load
+                   0.0,                # load_end_of_last_timestep
                    0.0,                # losses
                    default(config, "use_adaptive_temperature", false),
                    default(config, "switch_point", 0.25),
@@ -51,6 +53,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.m_heat_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function control(unit::SeasonalThermalStorage,
@@ -81,11 +85,12 @@ end
 function balance_on(interface::SystemInterface,
                     unit::SeasonalThermalStorage)::Vector{EnergyExchange}
     caller_is_input = unit.uac == interface.target.uac
+    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     return [EnEx(;
                  balance=interface.balance,
-                 energy_potential=caller_is_input ? -(unit.capacity - unit.load) : unit.load,
+                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
                  purpose_uac=purpose_uac,
                  temperature_min=interface.temperature_min,
                  temperature_max=interface.temperature_max,
@@ -141,6 +146,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+        unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
 
@@ -174,6 +180,8 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
             energy_available -= diff
         end
     end
+
+    unit.load_end_of_last_timestep = copy(unit.load)
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
