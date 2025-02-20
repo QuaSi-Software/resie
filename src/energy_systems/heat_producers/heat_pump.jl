@@ -108,8 +108,8 @@ mutable struct HeatPump <: Component
                    optimal_plr,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
-                   default(config, "power_losses_factor", 0.03),
-                   default(config, "heat_losses_factor", 0.05),
+                   default(config, "power_losses_factor", 0.97),
+                   default(config, "heat_losses_factor", 0.95),
                    0.0, # losses_power
                    0.0, # losses_heat
                    0.0, # losses
