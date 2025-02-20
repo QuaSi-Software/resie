@@ -127,9 +127,9 @@ meaning of the numbers depends on the function prototype.
 Two different function prototypes are implemented:
     * const: Takes one number and uses it as a constant value.
     * poly-2: Takes a list of numbers and uses them as the coefficients of a 2D polynomial
-        with order two. The coefficients are the numbered constants in the following
-        formula: f(x,y) = c_1 + c_2*x + c_3*y + c_4*x² + c_5*y² + c_6*x*y
-            + c_7*x²y + c_8*x*y² + c_9*x²*y²
+        with order three. The coefficients are the numbered constants in the following
+        formula: f(x,y) = c_1 + c_2*x + c_3*y + c_4*x² + c_5*x*y + c_6*y²
+            + c_7*x³ + c_8*x²*y + c_9*x*y² + c_10*y³
 
 # Arguments
 - `eff_def::String`: The function definition as described above
