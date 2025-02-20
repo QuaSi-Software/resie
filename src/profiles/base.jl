@@ -80,7 +80,7 @@ mutable struct Profile
                 for (line_idx, line) in enumerate(readlines(file_handle))
                     line = strip(line)
 
-                    if isempty(line) || length(line) < 2 # handle empty lines
+                    if isempty(line) || length(line) < 1 # handle empty lines
                         continue
                     elseif line[1] == '#'
                         splitted = split(strip(line, '#'), ':'; limit=2)
