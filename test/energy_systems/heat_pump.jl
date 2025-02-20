@@ -911,7 +911,8 @@ function test_heat_pump_2S2D_optimising_slices()
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
     components_config["TST_HP_01"]["min_power_fraction"] = 0.2
-    components_config["TST_HP_01"]["cop_function"] = "carnot:0.4:poly:-1.93407,1.53407,0.9"
+    components_config["TST_HP_01"]["plf_function"] = "poly:-1.93407,1.53407,0.9"
+    components_config["TST_HP_01"]["cop_function"] = "carnot:0.4"
     components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
     components_config["TST_HP_01"]["optimal_plr"] = 0.4
 

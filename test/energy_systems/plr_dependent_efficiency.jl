@@ -97,17 +97,13 @@ end
 function test_cop_parsing()
     const_val, cop_func = EnergySystems.parse_cop_function("const:0.314")
     @test const_val == 0.314
-    plr_func = cop_func(30.0, 50.0)
-    @test plr_func(1.0) ≈ 0.314
-    plr_func = cop_func(10.0, 70.0)
-    @test plr_func(1.0) ≈ 0.314
+    @test cop_func(30.0, 50.0) ≈ 0.314
+    @test cop_func(10.0, 70.0) ≈ 0.314
 
     const_val, cop_func = EnergySystems.parse_cop_function("carnot:0.4")
     @test const_val === nothing
-    plr_func = cop_func(30.0, 50.0)
-    @test plr_func(1.0) ≈ 6.463
-    plr_func = cop_func(10.0, 70.0)
-    @test plr_func(1.0) ≈ 2.2876666666666
+    @test cop_func(30.0, 50.0) ≈ 6.463
+    @test cop_func(10.0, 70.0) ≈ 2.2876666666666
 
     field_def = "field:" *
                 " 0, 0,10,20,30;" *
@@ -116,14 +112,14 @@ function test_cop_parsing()
                 "20,30,30,30,20"
     const_val, cop_func = EnergySystems.parse_cop_function(field_def)
     @test const_val === nothing
-    @test cop_func(5.0, 5.0)(1.0) ≈ 30.0
-    @test cop_func(10.0, 5.0)(1.0) ≈ 30.0
-    @test cop_func(5.0, 10.0)(1.0) ≈ 25.0
-    @test cop_func(12.5, 26.9)(1.0) ≈ 15.6
+    @test cop_func(5.0, 5.0) ≈ 30.0
+    @test cop_func(10.0, 5.0) ≈ 30.0
+    @test cop_func(5.0, 10.0) ≈ 25.0
+    @test cop_func(12.5, 26.9) ≈ 15.6
 
     error_occured = false
     try
-        cop_func(9.0, 31.0)(1.0) # ≈ 5.0
+        cop_func(9.0, 31.0) # ≈ 5.0
     catch BoundsError
         error_occured = true
     end
@@ -136,14 +132,15 @@ function test_cop_parsing()
                 "20,30,30,30,20"
     const_val, cop_func = EnergySystems.parse_cop_function(field_def)
     @test const_val === nothing
-    @test cop_func(12.5, 26.9)(1.0) ≈ 17.15
+    @test cop_func(12.5, 26.9) ≈ 17.15
 
     func_def = "poly-2:1.52e+1,1.44e-1,-6.45e-1,1.07e-3,-1.51e-3,1.19e-2,-8.20e-5," *
-               "2.13e-5,-6.04e-7,-7.60e-5:poly:1.0,0.0"
+               "2.13e-5,-6.04e-7,-7.60e-5"
     const_val, cop_func = EnergySystems.parse_cop_function(func_def)
+    plf_func = EnergySystems.parse_efficiency_function("poly:1.0,0.0")
     @test const_val === nothing
-    @test cop_func(20, 60)(1.0) ≈ 4.231712
-    @test cop_func(10, 50)(0.5) ≈ 2.0007
+    @test cop_func(20, 60) * plf_func(1.0) ≈ 4.231712
+    @test cop_func(10, 50) * plf_func(0.5) ≈ 2.0007
 end
 
 @testset "test_cop_parsing" begin
