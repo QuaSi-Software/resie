@@ -24,15 +24,22 @@ Data should represent the time step following the time indicated (mean/sum). The
 can be used to shift the timestamp to the correct time. A positive shift will add to the timestamp,
 which means a value is later in time. 
 
-The interpolation type can be one of "stepwise", "linear_classic" or "linear_time_preserving".
-Stepwise means, the value given at a timestamp is spread/copied over the new finer timestamps. 
-Linear classic interpolates the given values from the original timestamps linearly to the new timestamps.
-Linear time preserving interpolates the data by first shifting the data by half the original 
+The interpolation type can be one of "stepwise", "linear_classic", "linear_time_preserving" or 
+"linear_solar_radiation".
+- "stepwise" means, the value given at a timestamp is spread/copied over the new finer timestamps. 
+- "linear_classic" interpolates the given values from the original timestamps linearly to the new timestamps.
+- "linear_time_preserving" interpolates the data by first shifting the data by half the original 
 time step to make the values be measured at the time indicated. After the interpolation to a 
 finer time step, the data is shifted back by 1/2 a time step to meet the required definition 
 of the values representing the following time step. This should be used for time-critic data 
 like solar radiation. But, this method will cut peaks and valleys in the data more than the 
 classic interpolation.
+- "linear_solar_radiation" interpolation uses a method described in the paper "A new method for
+interpolating hourly solar radiation data" by M. A. S. Mohandes, A. Halawani, and A. Rehman.
+It is a linear interpolation with a correction factor to keep the sum of the interpolated values
+equal to the sum of the original values. This is also used in TRNSYS 18, but shows "wavy" curves
+as result.
+
 """
 mutable struct Profile
     """Time step, in seconds, of the profile."""
@@ -71,7 +78,6 @@ mutable struct Profile
             profile_start_date_format = nothing
             time_zone = nothing
             time_shift_seconds = nothing
-            interpolation_type = "stepwise"
 
             file_handle = nothing
 
@@ -102,12 +108,6 @@ mutable struct Profile
                             time_shift_seconds = parse(Int, String(strip(splitted[2])))
                         elseif strip(splitted[1]) == "interpolation_type"
                             interpolation_type = String(strip(splitted[2]))
-                            if !(interpolation_type in ["stepwise", "linear_classic", "linear_time_preserving"])
-                                @error "The interpolation type of the profile at $(file_path) has to be one of " *
-                                       "'stepwise', 'linear_classic' or 'linear_time_preserving'! " *
-                                       "The given interpolation type is '$interpolation_type'."
-                                throw(InputError)
-                            end
                         end
                     else
                         splitted = split(line, ';')
@@ -233,6 +233,14 @@ mutable struct Profile
             profile_timestamps_date = given_timestamps
             data_type = given_data_type
             time_zone = nothing
+        end
+
+        # check interpolation_type
+        if !(interpolation_type in ["stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"])
+            @error "The interpolation type of the profile at $(file_path) has to be one of " *
+                   "'stepwise', 'linear_classic', 'linear_time_preserving' or 'linear_solar_radiation'! " *
+                   "The given interpolation type is '$interpolation_type'."
+            throw(InputError)
         end
 
         # remove leap days and daiylight savings from profile
@@ -734,24 +742,7 @@ function convert_profile(values::Vector{Float64},
         info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
                         "timestep of $(new_time_step)."
 
-    elseif original_time_step > new_time_step && interpolation_type == "linear_solar_radiation"   # segmentation of solar radiation data
-        if original_time_step !== Millisecond(1000 * 60 * 60)
-            @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
-                   "1 hour (3600 seconds) to use the linear_solar_radiation method for interpolation!"
-            throw(InputError)
-        end
-
-        values, timestamps = segment_profile(timestamps[1],
-                                             timestamps[end],
-                                             values,
-                                             new_time_step,
-                                             sim_params)
-
-        info_message *= "(solar radiation data) "
-        info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
-                        "timestep of $(Second(new_time_step)) using $(interpolation_type) interpolation."
-
-    elseif original_time_step > new_time_step              # segmentation of other data
+    elseif original_time_step > new_time_step              # segmentation
         if profile_type == :extensive
             values .*= new_time_step / original_time_step
             info_message *= "(extensive profile) "
@@ -759,7 +750,25 @@ function convert_profile(values::Vector{Float64},
             info_message *= "(intensive profile) "
         end
 
-        if interpolation_type == "linear_classic"
+        if interpolation_type == "linear_solar_radiation"   # segmentation of solar radiation data
+            if original_time_step !== Millisecond(1000 * 60 * 60)
+                @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
+                       "1 hour (3600 seconds) to use the linear_solar_radiation method for interpolation!"
+                throw(InputError)
+            end
+            if !time_is_aligned
+                @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
+                       "aligned to the simulation start time to use the linear_solar_radiation method for interpolation!"
+                throw(InputError)
+            end
+
+            values, timestamps = segment_profile(timestamps[1],
+                                                 timestamps[end],
+                                                 values,
+                                                 new_time_step,
+                                                 sim_params)
+
+        elseif interpolation_type == "linear_classic"
             values, timestamps = profile_linear_interpolation(values,
                                                               timestamps,
                                                               original_time_step,
@@ -869,7 +878,7 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
         N_mid = Int(floor(N_eff / 2))
         G_mid = (2 * Hn / (N_eff * dt_h)) - (N_mid * G_start) / N_eff - ((N_eff - N_mid) * effective_G_end) / N_eff
         if G_mid < 0
-            G_mid = (2 * Hn / dt_eff - (G_start + effective_G_end)) / (2 * (N_eff - 1))
+            G_mid = (2 * Hn / dt_h - (G_start + effective_G_end)) / (2 * (N_eff - 1))
         end
         if G_mid < 0
             G_mid = 0
@@ -907,9 +916,6 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
             effective_irr = vcat(effective_irr, zeros(Float64, N_total - N_eff))
         end
     end
-
-    # 9. Scale irradiation to get energy
-    effective_irr *= dt_h
 
     return t_blocks, effective_irr, effective_G_end
 end
