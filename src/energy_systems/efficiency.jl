@@ -42,6 +42,11 @@ Three different function prototypes are implemented:
         means e(x)=x/(0.5x²+2x+0.1)
     * exp: Takes three numbers and uses them as the coefficients of an exponential function.
         E.g. `exp:0.1,0.2,0.3` means e(x)=0.1+0.2*exp(0.3x)
+    * unified_plf: Takes four numbers and uses them as the coefficients of a composite
+        function of a logarithmic and linear function as described in the documentation on
+        the unified formulation for PLR-dependent efficiencies of heat pumps. The first two
+        numbers are the optimal PLR and the PLF at that PLR. The third number is a scaling
+        factor for the logarithmic part and the fourth number is the PLF at PLR=1.0.
 
 # Arguments
 - `eff_def::String`: The efficiency definition as described above
@@ -91,6 +96,17 @@ function parse_efficiency_function(eff_def::String)::Function
         elseif method == "exp"
             params = map(x -> parse(Float64, x), split(data, ","))
             return plr -> params[1] + params[2] * exp(params[3] * plr)
+
+        elseif method == "unified_plf"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return function (plr)
+                if plr < params[1]
+                    a = params[2] * (params[3] * (params[1] - 1) + 1) / params[1]
+                    return a * plr / (params[3] * plr + 1 - params[3])
+                else
+                    return (params[4] - params[2]) * (plr - params[1]) / (1 - params[1]) + params[2]
+                end
+            end
         end
     end
 

@@ -88,6 +88,19 @@ function test_efficiency_parsing()
     @test efficiency(0.5) ≈ 1.177694598906452
     @test efficiency(0.75) ≈ 1.2326099391013279
     @test efficiency(1.0) ≈ 1.2458175431781608
+
+    efficiency = EnergySystems.parse_efficiency_function("unified_plf:0.4,1.2,0.5,1.0")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.3818181818181817
+    @test efficiency(0.2) ≈ 0.7
+    @test efficiency(0.3) ≈ 0.9692307692307692
+    @test efficiency(0.4) ≈ 1.2
+    @test efficiency(0.5) ≈ 1.1666666666666667
+    @test efficiency(0.6) ≈ 1.1333333333333333
+    @test efficiency(0.7) ≈ 1.1
+    @test efficiency(0.8) ≈ 1.0666666666666667
+    @test efficiency(0.9) ≈ 1.0333333333333332
+    @test efficiency(1.0) ≈ 1.0
 end
 
 @testset "test_efficiency_parsing" begin
