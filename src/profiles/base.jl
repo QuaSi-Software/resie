@@ -873,6 +873,9 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
     end
 
     # 5. Compute the midpoint value (G_mid) over the effective region.
+    g_mid_is_zero = false
+    g_mid_is_still_zero = false
+
     if N_eff == 1
         G_mid = Hn / dt_h
     else
@@ -880,29 +883,39 @@ function segment_interval(Hn::Float64, Hnp1::Float64,
         G_mid = (2 * Hn / (N_eff * dt_h)) - (N_mid * G_start) / N_eff - ((N_eff - N_mid) * effective_G_end) / N_eff
         if G_mid < 0
             G_mid = (2 * Hn / dt_h - (G_start + effective_G_end)) / (2 * (N_eff - 1))
+            g_mid_is_zero = true
         end
         if G_mid < 0
             G_mid = 0
+            g_mid_is_still_zero = true
+            g_mid_is_zero = false
         end
     end
 
     # 6. Build the piecewise–linear boundaries over the effective region.
-    boundaries = zeros(Float64, N_eff + 1)
-    boundaries[1] = G_start
-    if N_eff > 1
-        N_mid = Int(floor(N_eff / 2))
-        # First part: interpolate from G_start to G_mid over N_mid subintervals.
-        for j in 1:N_mid
-            boundaries[j + 1] = G_start + (j / N_mid) * (G_mid - G_start)
-        end
-        # Second part: interpolate from G_mid to effective_G_end over the remaining subintervals.
-        #              effective_G_end is considered to be the first value of the next interval.
-        M = N_eff - N_mid
-        for k in 1:M
-            boundaries[N_mid + 1 + k] = G_mid + (k / M) * (effective_G_end - G_mid)
-        end
+    if g_mid_is_zero
+        boundaries = vcat(G_start, fill(G_mid, N_eff))
     else
-        boundaries[2] = G_mid
+        boundaries = zeros(Float64, N_eff + 1)
+        boundaries[1] = G_start
+        if N_eff > 1
+            N_mid = Int(floor(N_eff / 2))
+            # First part: interpolate from G_start to G_mid over N_mid subintervals.
+            for j in 1:N_mid
+                boundaries[j + 1] = G_start + (j / N_mid) * (G_mid - G_start)
+                if g_mid_is_still_zero # the radiation drops to zero at the end of the second step
+                    break
+                end
+            end
+            # Second part: interpolate from G_mid to effective_G_end over the remaining subintervals.
+            #              effective_G_end is considered to be the first value of the next interval.
+            M = g_mid_is_still_zero ? 0 : N_eff - N_mid
+            for k in 1:M
+                boundaries[N_mid + 1 + k] = G_mid + (k / M) * (effective_G_end - G_mid)
+            end
+        else
+            boundaries[2] = G_mid
+        end
     end
 
     # 7. Compute the effective irradiance values (midpoints) over the effective region.
