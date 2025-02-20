@@ -43,7 +43,10 @@ mutable struct WeatherData
     accordingly.
 
     """
-    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any}, weather_interpolation_type::String)
+    function WeatherData(weather_file_path::String,
+                         sim_params::Dict{String,Any},
+                         weather_interpolation_type_solar::String,
+                         weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
             @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
@@ -56,10 +59,6 @@ mutable struct WeatherData
                                                    stop=DateTime(end_year, 12, 31, 23, 0, 0),
                                                    step=time_step)))
         nr_of_years = end_year - start_year + 1
-
-        splitted = split(weather_interpolation_type, ':'; limit=2)
-        general_interpolation_type = String(splitted[1])
-        solar_radiation_interpolation_type = String(splitted[2])
 
         if endswith(lowercase(weather_file_path), ".dat")
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
@@ -92,7 +91,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=solar_radiation_interpolation_type)
+                                interpolation_type=weather_interpolation_type_solar)
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
@@ -100,7 +99,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=solar_radiation_interpolation_type)
+                                interpolation_type=weather_interpolation_type_solar)
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
@@ -112,7 +111,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(25 * 60),
-                                 interpolation_type=general_interpolation_type)
+                                 interpolation_type=weather_interpolation_type_general)
 
             # Values measured at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
@@ -122,7 +121,7 @@ mutable struct WeatherData
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
-                                  interpolation_type=general_interpolation_type)
+                                  interpolation_type=weather_interpolation_type_general)
 
             # Temperatures are measured half an hour bevor the timestep indicated (hour 1 => 00:00).
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -132,7 +131,7 @@ mutable struct WeatherData
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(0),
-                                       interpolation_type=general_interpolation_type)
+                                       interpolation_type=weather_interpolation_type_general)
 
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
@@ -157,7 +156,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=solar_radiation_interpolation_type)
+                                interpolation_type=weather_interpolation_type_solar)
             dirHorIrr = Profile(weather_file_path * ":DirHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
@@ -166,7 +165,7 @@ mutable struct WeatherData
                                 given_time_step=time_step,
                                 given_data_type="extensive",
                                 shift=Second(0),
-                                interpolation_type=solar_radiation_interpolation_type)
+                                interpolation_type=weather_interpolation_type_solar)
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
@@ -178,7 +177,7 @@ mutable struct WeatherData
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
-                                  interpolation_type=general_interpolation_type)
+                                  interpolation_type=weather_interpolation_type_general)
 
             # Temperature is given as value at the time indicated. (Hour1 = 00:00)
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
@@ -188,7 +187,7 @@ mutable struct WeatherData
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(30 * 60),
-                                       interpolation_type=general_interpolation_type)
+                                       interpolation_type=weather_interpolation_type_general)
 
             # Wind speed is given as value at the time indicated. (Hour1 = 00:00)
             wind_speed = Profile(weather_file_path * ":WindSpeed",
@@ -198,7 +197,7 @@ mutable struct WeatherData
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(30 * 60),
-                                 interpolation_type=general_interpolation_type)
+                                 interpolation_type=weather_interpolation_type_general)
         end
 
         return new(temp_ambient_air,
