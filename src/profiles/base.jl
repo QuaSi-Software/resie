@@ -34,8 +34,9 @@ finer time step, the data is shifted back by 1/2 a time step to meet the require
 of the values representing the following time step. This should be used for time-critic data 
 like solar radiation. But, this method will cut peaks and valleys in the data more than the 
 classic interpolation.
-- "linear_solar_radiation" interpolation uses a method described in the paper "A new method for
-interpolating hourly solar radiation data" by M. A. S. Mohandes, A. Halawani, and A. Rehman.
+- "linear_solar_radiation" interpolation uses a method described in the paper 
+     T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
+    "A New Method for Determining Sub-hourly Solar Radiation from Hourly Data" 
 It is a linear interpolation with a correction factor to keep the sum of the interpolated values
 equal to the sum of the original values. This is also used in TRNSYS 18, but shows "wavy" curves
 as result.
@@ -818,8 +819,8 @@ end
     segment_interval() 
 segments one hourly interval given as fractional times (relative to midnight) using the 
 algorithm of TRNSYS 18, described in:
-    Letellier-Duchesne, Samuel & McDowell, Timothy & Kummert, Michael. (2018). 
-    A New Method for Determining Sub-hourly Solar Radiation from Hourly Data. 
+    T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
+    "A New Method for Determining Sub-hourly Solar Radiation from Hourly Data" 
 
 Parameters:
   • Hn       : hourly integrated irradiation for the current hour [Wh/m²]
