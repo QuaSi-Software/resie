@@ -860,6 +860,8 @@ function calculate_energies_heatpump(unit::HeatPump,
 
     # first pass with full power (or only pass if no optimisation is used)
     energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+    best_plrs = copy(plrs)
+    best_times = copy(times)
 
     # as long as the sum of times with minimum power per slice is larger than the time step
     # and the sum of times with chosen power per slice is smaller or equal to the time step
@@ -888,14 +890,20 @@ function calculate_energies_heatpump(unit::HeatPump,
             # check if the new PLRs actually lead to an improvement
             if accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
                 energies = copy_temp_to_slices!(energies)
+                best_plrs = copy(plrs)
+                best_times = copy(times)
             else
                 # if the pass is rejected we need to set the temp slices to the best guess,
                 # which has been recorded in the actual slices, because the calling function
-                # then copies the temp slices to the actual slices. this is a bit circular,
-                # but only necessary for the slice optimisation
+                # calculate_energies then copies the temp slices to the actual slices. this
+                # is a bit circular, but only necessary for the slice optimisation
                 energies.slices_el_in_temp = energies.slices_el_in
                 energies.slices_heat_in_temp = energies.slices_heat_in
                 energies.slices_heat_out_temp = energies.slices_heat_out
+                energies.slices_heat_in_temperature_temp = energies.slices_heat_in_temperature
+                energies.slices_heat_out_temperature_temp = energies.slices_heat_out_temperature
+                energies.slices_heat_in_uac_temp = energies.slices_heat_in_uac
+                energies.slices_heat_out_uac_temp = energies.slices_heat_out_uac
             end
         end
     end
@@ -904,13 +912,16 @@ function calculate_energies_heatpump(unit::HeatPump,
     # we have to use the temp slices as the actually utilised slices have not been set yet
     weights = 0
     for (slice_idx, indexes) in pairs(energies.slices_idx_to_plr)
-        unit.avg_plr += plrs[indexes[1], indexes[2]] * energies.slices_heat_out_temp[slice_idx]
+        if best_plrs[indexes[1], indexes[2]] === nothing
+            continue
+        end
+        unit.avg_plr += best_plrs[indexes[1], indexes[2]] * energies.slices_heat_out_temp[slice_idx]
         weights += energies.slices_heat_out_temp[slice_idx]
     end
     unit.avg_plr /= weights
 
     # calculate active time as fraction of the simulation time step
-    unit.time_active = sum(times; init=0.0) / sim_params["time_step_seconds"]
+    unit.time_active = sum(best_times; init=0.0) / sim_params["time_step_seconds"]
 
     return energies
 end
