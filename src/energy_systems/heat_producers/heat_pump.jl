@@ -707,12 +707,22 @@ function calculate_slices(unit::HeatPump,
     times = Vector{Float64}()
 
     sum_usage = 0.0
-    slice_idx::Int = 1
+    slice_idx::Int = 0
     current_in_idx::Int = 0
     current_out_idx::Int = 0
     EPS = sim_params["epsilon"]
 
     while (true)
+        # we continue for as long as there is energy to be distributed and max power has
+        # not been reached
+        if energies.available_el_in < EPS ||
+           sum(energies.available_heat_in; init=0.0) < EPS ||
+           sum(energies.available_heat_out; init=0.0) < EPS ||
+           energies.max_usage_fraction - sum_usage < EPS
+            # end of condition
+            break
+        end
+
         try
             current_in_idx = first(energies.in_indices)
             current_out_idx = first(energies.out_indices)
@@ -720,18 +730,8 @@ function calculate_slices(unit::HeatPump,
             break
         end
 
-        # we continue for as long as there is energy to be distributed and max power has
-        # not been reached. during slice dispatch optimisation it might also be the case
-        # that extra slices appear, with the same input and output as the previous slice,
-        # because the target PLR is too low for full operation. we need to catch that too
-        if energies.available_el_in < EPS ||
-           sum(energies.available_heat_in; init=0.0) < EPS ||
-           sum(energies.available_heat_out; init=0.0) < EPS ||
-           energies.max_usage_fraction - sum_usage < EPS ||
-           slice_idx > length(plrs)
-            # end of condition
-            break
-        end
+        slice_idx += 1
+        energies.slices_idx_to_plr[slice_idx] = (current_in_idx, current_out_idx)
 
         # skip layers with zero energy remaining
         if energies.available_heat_in[current_in_idx] < EPS
@@ -807,8 +807,23 @@ function calculate_slices(unit::HeatPump,
         push!(times_min, used_heat_out * 3600 / min_power)
         push!(times, used_heat_out * 3600 / used_power)
 
-        energies.slices_idx_to_plr[slice_idx] = (current_in_idx, current_out_idx)
-        slice_idx += 1
+        # go to the next slice if input and/or output has been used up. if instead both
+        # layers have energy left, this was caused by the PLR of the slice being too low or
+        # the heat pump being undersized. in either case we need to advance both indices so
+        # we don't recalculate the same slice twice
+        if energies.available_heat_in[current_in_idx] >= EPS &&
+           energies.available_heat_out[current_out_idx] >= EPS
+            # end of condition
+            current_in_idx = popfirst!(energies.in_indices)
+            current_out_idx = popfirst!(energies.out_indices)
+        else
+            if energies.available_heat_in[current_in_idx] < EPS
+                current_in_idx = popfirst!(energies.in_indices)
+            end
+            if energies.available_heat_out[current_out_idx] < EPS
+                current_out_idx = popfirst!(energies.out_indices)
+            end
+        end
     end
 
     return energies, times_min, times, plrs
