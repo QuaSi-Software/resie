@@ -82,8 +82,10 @@ mutable struct HeatPump <: Component
         optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
         optimal_plr = default(config, "optimal_plr", nothing)
         if optimise_slice_dispatch && optimal_plr === nothing
-            results = optimize(x -> -plf_function(first(x)), [0.5]) # minus because we actually want
-            optimal_plr = first(minimizer(results))                 # the maximum of the function
+            results = optimize(x -> -plf_function(x), # minus because we actually want
+                               0.0,                   # the maximum of the function
+                               1.0)
+            optimal_plr = first(minimizer(results))
         elseif !optimise_slice_dispatch
             optimal_plr = 1.0
         end
