@@ -982,8 +982,10 @@ function segment_profile(begin_dt::DateTime,
         interval_end = (i == n_hours) ? fractional_hour(end_dt) : end_of_hour
 
         # Get sunrise and sunset for current_date.
-        tz = +1.0  # TODO
-        sunrise, sunset = get_sunset_sunrise(current_date, sim_params["latitude"], sim_params["longitude"], tz)
+        sunrise, sunset = get_sunset_sunrise(current_date,
+                                             sim_params["latitude"],
+                                             sim_params["longitude"],
+                                             sim_params["timezone"])
 
         # Retrieve current and next hourly integrated irradiation.
         hn = hourly_H[i]

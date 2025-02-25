@@ -92,6 +92,7 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "epsilon" => 1e-9,
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
+        "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
     )
 
     # add helper functions to convert power to work and vice-versa. this uses the time step

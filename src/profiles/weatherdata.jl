@@ -77,6 +77,14 @@ mutable struct WeatherData
                       "ones given in the input file:\n" *
                       "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
             end
+            if sim_params["timezone"] === nothing
+                sim_params["timezone"] = 1.0  # MEZ
+                @info "The timezone was set to MEZ (GMT+1) as it is the standard for DWD .dat files."
+            else
+                sim_params["timezone"] = Float64(sim_params["timezone"])
+                @info "The timezone given in the DWD .dat file was overwritten by the " *
+                      "one given in the input file: $(sim_params["timezone"])"
+            end
 
             # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
             #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
@@ -145,6 +153,13 @@ mutable struct WeatherData
                 @info "The coordinates given in the weather file where overwritten by the " *
                       "ones given in the input file:\n" *
                       "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+            end
+            if sim_params["timezone"] === nothing
+                sim_params["timezone"] = Float64(headerdata["TZ"])
+            else
+                sim_params["timezone"] = Float64(sim_params["timezone"])
+                @info "The timezone given in the EPW weather file was overwritten by the " *
+                      "one given in the input file: $(sim_params["timezone"])"
             end
 
             # convert solar radiation data to profile
