@@ -453,9 +453,9 @@ is a tuple with flags of which remaining energies of in- or outputs are non-zero
 checked because the optimisation should not change how the heat pump operates, it should
 only improve the efficiency of the selected slices.
 
-If all three inputs/output are non-zero, this indicates that the PLRs were set too low and
-the heat pump can not provide requested energy at these PLRs, which causes the pass to
-not be accepted.
+If all three inputs/output are non-zero, this either indicates that the PLRs were set too low
+and the heat pump can not provide requested energy at these PLRs, or the heat pump is under-
+sized. In either case we need to reject the pass.
 
 # Arguments
 - `energies::HPEnergies`: The energies container.
@@ -472,8 +472,11 @@ function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::D
     EPS = sim_params["epsilon"]
     signature_given = (energies.available_el_in > EPS,
                        sum(energies.available_heat_in; init=0.0) > EPS,
-                       sum(energies.available_heat_out; init=0.0) > EPS)
-    if signature_given == (true, true, true)
+                       sum(energies.available_heat_out; init=0.0) > EPS,
+                       length(energies.slices_el_in_temp),
+                       length(energies.slices_heat_in_temp),
+                       length(energies.slices_heat_out_temp))
+    if signature_given[1] && signature_given[2] && signature_given[3]
         return false
     end
 
@@ -487,7 +490,10 @@ function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::D
                       -
                       sum(energies.slices_heat_out; init=0.0)
                       >
-                      EPS)
+                      EPS,
+                      length(energies.slices_el_in),
+                      length(energies.slices_heat_in),
+                      length(energies.slices_heat_out))
     return signature_given == signature_best
 end
 
