@@ -753,6 +753,10 @@ function test_heat_pump_2S2D_reorder_inputs()
 
     components_config["TST_HP_01"]["control_modules"] = [Dict{String,Any}(
                                                              "name" => "temperature_sorting",
+                                                             "input_temps" => "max",
+                                                             "input_order" => "desc",
+                                                             "output_temps" => "min",
+                                                             "output_order" => "none",
                                                          )]
     simulation_parameters = get_default_sim_params()
 

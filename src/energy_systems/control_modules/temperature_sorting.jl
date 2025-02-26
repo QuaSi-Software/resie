@@ -1,9 +1,8 @@
 """
 Control module for reordering the inputs and outputs of a component to be most beneficial
-in terms of temperature levels. Usually this means that inputs are sorted by descending
-maximum temperatures and outputs by ascending minimum temperatures. This is also the default
-configuration of the module and used for heat pumps because a minimum temperature difference
-is optimal.
+in terms of temperature levels. This could mean that inputs are sorted by descending
+maximum temperatures and outputs by ascending minimum temperatures, as well as other
+combinations.
 """
 mutable struct CM_Temperature_Sorting <: ControlModule
     name::String
@@ -57,6 +56,9 @@ function reorder_inputs(mod::CM_Temperature_Sorting,
                         temps_max::Vector{<:Temperature})::Vector{Integer}
     temps = mod.parameters["input_temps"] == "max" ? temps_max : temps_min
     do_reverse = mod.parameters["input_order"] == "asc"
+    if mod.parameters["input_order"] == "none"
+        return 1:length(temps)
+    end
     return sortperm(temps; by=x -> x, lt=coalesce_greater, rev=do_reverse)
 end
 
@@ -65,5 +67,8 @@ function reorder_outputs(mod::CM_Temperature_Sorting,
                          temps_max::Vector{<:Temperature})::Vector{Integer}
     temps = mod.parameters["output_temps"] == "max" ? temps_max : temps_min
     do_reverse = mod.parameters["output_order"] == "asc"
+    if mod.parameters["output_order"] == "none"
+        return 1:length(temps)
+    end
     return sortperm(temps; by=x -> x, lt=coalesce_greater, rev=do_reverse)
 end
