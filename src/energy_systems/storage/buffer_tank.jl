@@ -79,11 +79,20 @@ mutable struct BufferTank <: Component
             throw(InputError)
         end
 
-        constant_ambient_temperature = default(config, "constant_ambient_temperature", nothing)
         consider_losses = default(config, "consider_losses", false)
-        if constant_ambient_temperature === nothing && consider_losses
-            ambient_temperature_profile = get_ambient_temperature_profile_from_config(config, sim_params, uac)
+        if consider_losses
+            constant_ambient_temperature,
+            ambient_temperature_profile = get_parameter_profile_from_config(config,
+                                                                            sim_params,
+                                                                            "ambient_temperature",
+                                                                            "ambient_temperature_profile_file_path",
+                                                                            "ambient_temperature_from_global_file",
+                                                                            "constant_ambient_temperature",
+                                                                            uac;
+                                                                            required=true)
+
         else
+            constant_ambient_temperature = nothing
             ambient_temperature_profile = nothing
         end
 

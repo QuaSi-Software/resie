@@ -4,7 +4,7 @@ using Resie.Profiles
 using Dates
 using Proj
 
-export WeatherData
+export WeatherData, gather_weather_data, get_weather_data_keys
 
 """
 """
@@ -34,8 +34,19 @@ mutable struct WeatherData
     a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
     
     The returned values are of type WeaterData containing profiles of type Profile.
+
+    **Definition of time:**
+    The weather data returned from this function corresponds to the timestep following
+    the time indicated. While the ambient temperature is an instantaneous value from half the 
+    timestep ahead of the current timestamp, the solar radiation data is the mean/sum of the 
+    timestep ahead of the current timestamp. Data from EWP and DWD-dat files are converted
+    accordingly.
+
     """
-    function WeatherData(weather_file_path::String, sim_params::Dict{String,Any})
+    function WeatherData(weather_file_path::String,
+                         sim_params::Dict{String,Any},
+                         weather_interpolation_type_solar::String,
+                         weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
             @error "The weather file could not be found in: \n $weather_file_path"
             throw(InputError)
@@ -52,99 +63,164 @@ mutable struct WeatherData
         if endswith(lowercase(weather_file_path), ".dat")
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
 
-            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
-            #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
-
-            # convert solar radiation data to profile
-            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive")
-            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive")
-            globHorIrr = deepcopy(dirHorIrr)
-            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
-
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
             outProj = "EPSG:4326"  # Output Projection: World Geodetic System 1984 (WGS 84) 
             transform = Proj.Transformation(inProj, outProj)
             latitude, longitude = transform(headerdata["northing"], headerdata["easting"])
 
-            # No shift here, as temperatures are measured half an hour bevor the timestep indicated.
-            shift = Second(0)
+            if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+                sim_params["latitude"] = latitude
+                sim_params["longitude"] = longitude
+            else
+                @info "The coordinates given in the weather file where overwritten by the " *
+                      "ones given in the input file:\n" *
+                      "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+            end
+            if sim_params["timezone"] === nothing
+                sim_params["timezone"] = 1.0  # MEZ
+                @info "The timezone was set to MEZ (GMT+1) as it is the standard for DWD .dat files."
+            else
+                sim_params["timezone"] = Float64(sim_params["timezone"])
+                @info "The timezone given in the DWD .dat file was overwritten by the " *
+                      "one given in the input file: $(sim_params["timezone"])"
+            end
+
+            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
+            #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
+
+            # convert solar radiation data to profile. In DWD-dat, solar radiation is given as 
+            # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00. 
+            # Therefore the data is the mean of the hour ahead of the current time step.
+            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar)
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar)
+            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
+
+            # Wind speed is measured as mean over the 10 Minutes ahead of the full hour 
+            wind_speed = Profile(weather_file_path * ":WindSpeed",
+                                 sim_params;
+                                 given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
+                                 given_timestamps=timestamp,
+                                 given_time_step=time_step,
+                                 given_data_type="intensive",
+                                 shift=Second(25 * 60),
+                                 interpolation_type=weather_interpolation_type_general)
+
+            # Values measured at full hours
+            longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
+                                  sim_params;
+                                  given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
+                                  given_timestamps=timestamp,
+                                  given_time_step=time_step,
+                                  given_data_type="extensive",
+                                  shift=Second(30 * 60),
+                                  interpolation_type=weather_interpolation_type_general)
+
+            # Temperatures are measured half an hour bevor the timestep indicated (hour 1 => 00:00).
+            temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
+                                       sim_params;
+                                       given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
+                                       given_timestamps=timestamp,
+                                       given_time_step=time_step,
+                                       given_data_type="intensive",
+                                       shift=Second(0),
+                                       interpolation_type=weather_interpolation_type_general)
 
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
 
+            latitude = headerdata["latitude"]
+            longitude = headerdata["longitude"]
+            if sim_params["latitude"] === nothing || sim_params["longitude"] === nothing
+                sim_params["latitude"] = latitude
+                sim_params["longitude"] = longitude
+            else
+                @info "The coordinates given in the weather file where overwritten by the " *
+                      "ones given in the input file:\n" *
+                      "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+            end
+            if sim_params["timezone"] === nothing
+                sim_params["timezone"] = Float64(headerdata["TZ"])
+            else
+                sim_params["timezone"] = Float64(sim_params["timezone"])
+                @info "The timezone given in the EPW weather file was overwritten by the " *
+                      "one given in the input file: $(sim_params["timezone"])"
+            end
+
             # convert solar radiation data to profile
-            globHorIrr = Profile(weather_file_path * ":GlobalHorizontalIrradiation",
-                                 sim_params;
-                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"]), nr_of_years),
-                                 given_timestamps=timestamp,
-                                 given_time_step=time_step,
-                                 given_data_type="extensive")
+            # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
             difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
                                 given_timestamps=timestamp,
                                 given_time_step=time_step,
-                                given_data_type="extensive")
-            dirHorIrr = deepcopy(globHorIrr)
-            dirHorIrr.data = Dict(key => dirHorIrr.data[key] - difHorIrr.data[key] for key in keys(dirHorIrr.data))
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar)
+            dirHorIrr = Profile(weather_file_path * ":DirHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
+                                                            nr_of_years),
+                                given_timestamps=timestamp,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar)
+            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
-            latitude = headerdata["latitude"]
-            longitude = headerdata["longitude"]
+            # Long wave irradiation is probably(?) given at full hours
+            longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
+                                  sim_params;
+                                  given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
+                                  given_timestamps=timestamp,
+                                  given_time_step=time_step,
+                                  given_data_type="extensive",
+                                  shift=Second(30 * 60),
+                                  interpolation_type=weather_interpolation_type_general)
 
-            # According to the EPW definition, most non-energy related values are given at the time
-            # stamp indicated. In order to be consistent with DWD-dat and the energy-related values,
-            # that represent the mean or the middle of the timestamp indicated, the values will be 
-            # shifted by 30 minutes for aggregation and (60 min - timestep / 2) for segmentation. 
-            # The interpolation algorithm in Profiles will then shift the data so that the values
-            # are defined as the mean value for the upcomming timestep.
-            # Note that this currently works for intensive values only!
-            shift = Second(max(30 * 60, 60 * 60 - sim_params["time_step_seconds"] / 2))
+            # Temperature is given as value at the time indicated. (Hour1 = 00:00)
+            temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
+                                       sim_params;
+                                       given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
+                                       given_timestamps=timestamp,
+                                       given_time_step=time_step,
+                                       given_data_type="intensive",
+                                       shift=Second(30 * 60),
+                                       interpolation_type=weather_interpolation_type_general)
+
+            # Wind speed is given as value at the time indicated. (Hour1 = 00:00)
+            wind_speed = Profile(weather_file_path * ":WindSpeed",
+                                 sim_params;
+                                 given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
+                                 given_timestamps=timestamp,
+                                 given_time_step=time_step,
+                                 given_data_type="intensive",
+                                 shift=Second(30 * 60),
+                                 interpolation_type=weather_interpolation_type_general)
         end
-
-        # convert long wave radiation data
-        longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
-                              sim_params;
-                              given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
-                              given_timestamps=timestamp,
-                              given_time_step=time_step,
-                              given_data_type="extensive")
-
-        # convert other data to profile
-        temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
-                                   sim_params;
-                                   given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
-                                   given_timestamps=timestamp,
-                                   given_time_step=time_step,
-                                   given_data_type="intensive",
-                                   shift=shift)
-
-        wind_speed = Profile(weather_file_path * ":WindSpeed",
-                             sim_params;
-                             given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
-                             given_timestamps=timestamp,
-                             given_time_step=time_step,
-                             given_data_type="intensive",
-                             shift=shift)
 
         return new(temp_ambient_air,
                    wind_speed,
                    dirHorIrr,
                    difHorIrr,
                    globHorIrr,
-                   longWaveIrr),
-               latitude,
-               longitude
+                   longWaveIrr)
     end
 end
 
@@ -359,6 +435,25 @@ function read_epw_file(weather_file_path::String)
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."
 
     return weatherdata_dict, headerdata
+end
+
+function get_weather_data_keys(sim_params::Dict{String,Any})
+    if haskey(sim_params, "weather_data")
+        return collect(String.(fieldnames(typeof(sim_params["weather_data"]))))
+    else
+        return nothing
+    end
+end
+
+function gather_weather_data(weather_data_keys, sim_params)
+    return_values = Vector{Any}()
+    append!(return_values, sim_params["time"])
+
+    for weather_data_key in weather_data_keys
+        append!(return_values,
+                Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)), sim_params))
+    end
+    return return_values
 end
 
 end

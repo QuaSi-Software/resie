@@ -32,8 +32,14 @@ mutable struct FixedSink <: Component
                          Profile(config["energy_profile_file_path"], sim_params) :
                          nothing
 
-        temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
-
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "temperature",
+                                                                "temperature_profile_file_path",
+                                                                "temperature_from_global_file",
+                                                                "constant_temperature",
+                                                                uac)
         medium = Symbol(config["medium"])
         register_media([medium])
 
@@ -49,7 +55,7 @@ mutable struct FixedSink <: Component
                    0.0,     # demand
                    nothing, # temperature
                    default(config, "constant_demand", nothing),       # constant_demand (power, not work!)
-                   default(config, "constant_temperature", nothing))  # constant_temperature
+                   constant_temperature)   # constant_temperature
     end
 end
 

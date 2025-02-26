@@ -29,7 +29,14 @@ mutable struct GridConnection <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "temperature",
+                                                                "temperature_profile_file_path",
+                                                                "temperature_from_global_file",
+                                                                "constant_temperature",
+                                                                uac)
 
         return new(uac,         # uac
                    Controller(default(config, "control_parameters", nothing)),
@@ -42,7 +49,7 @@ mutable struct GridConnection <: Component
                    InterfaceMap(medium => nothing), # input_interfaces
                    InterfaceMap(medium => nothing), # output_interfaces
                    temperature_profile,    # temperature_profile
-                   default(config, "constant_temperature", nothing), # constant_temperature
+                   constant_temperature,   # constant_temperature
                    nothing,     # temperature
                    0.0,         # output_sum,
                    0.0)         # input_sum
