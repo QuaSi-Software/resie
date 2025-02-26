@@ -9,7 +9,7 @@ export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
 Holds values from a file so they can be retrieved later and indexed by time.
 
 Profiles are automatically aggregated or segmentated to fit the simulation time step.
-Currtently, this only works, if the time step of the profile is a multiple or a divisor 
+Currently, this only works if the time step of the profile is a multiple or a divisor 
 of the requested simulation timestep. Otherwise, an error will arise.
 
 This function can handle either a path to a .prf file, or the profile data can be
@@ -18,7 +18,7 @@ and the data_type (intensive/extensive) has to be provided as optional arguments
 
 The data_type is essential to make sure that the profile data is converted correctly.
 It has to be set to "intensive" for values like temperatures, power, wind speed or
-for profiles containting states. Only for energies, data_type has to be set to "extensive".
+for profiles containing states. Only for energies the data_type has to be set to "extensive".
 
 Data should represent the time step following the time indicated (mean/sum). The shift parameter
 can be used to shift the timestamp to the correct time. A positive shift will add to the timestamp,
@@ -31,9 +31,9 @@ The interpolation type can be one of "stepwise", "linear_classic", "linear_time_
 - "linear_time_preserving" interpolates the data by first shifting the data by half the original 
 time step to make the values be measured at the time indicated. After the interpolation to a 
 finer time step, the data is shifted back by 1/2 a time step to meet the required definition 
-of the values representing the following time step. This should be used for time-critic data 
-like solar radiation. But, this method will cut peaks and valleys in the data more than the 
-classic interpolation.
+of the values representing the following time step. This should be used for time-critical data 
+like solar radiation. But, this method will strengthen peaks and drops in the data more than
+the classic interpolation.
 - "linear_solar_radiation" interpolation uses a method described in the paper 
      T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
     "A New Method for Determining Sub-hourly Solar Radiation from Hourly Data" 
@@ -244,7 +244,7 @@ mutable struct Profile
             throw(InputError)
         end
 
-        # remove leap days and daiylight savings from profile
+        # remove leap days and daylight savings from profile
         profile_timestamps_date, profile_values = remove_leap_days(profile_timestamps_date, profile_values, file_path)
         profile_timestamps_date = remove_day_light_saving(profile_timestamps_date, time_zone, file_path)
 
@@ -270,7 +270,7 @@ mutable struct Profile
             profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
                                            profile_timestamps_date)
             profile_values = vcat(profile_values[1], profile_values)
-            @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the fist value."
+            @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the first value."
         end
         temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
         time_diff_timesteps = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
@@ -353,7 +353,7 @@ end
 """
     convert_String_to_DateFormat()
 
-function to pase a string to a a DateFormat.
+function to parse a string to a a DateFormat.
     datetime_str::String      A DateFormat as string
     file_path::String         File path of the profile for error handling, for error message.
 
@@ -365,7 +365,7 @@ function convert_String_to_DateFormat(datetime_str::String, file_path::String)::
         return DateFormat(datetime_str)
     catch e
         @error "Time given date specifier '$(datetime_str)' of profile at $(file_path) could not be converted " *
-               "to a DateFormat. Make shure, is matches the format specification of the Julia Dates package. " *
+               "to a DateFormat. Make sure it matches the format specification of the Julia Dates package. " *
                "The following error occured: $e"
         throw(InputError)
     end
@@ -374,9 +374,9 @@ end
 """
     parse_datestamp()
 
-function to pase a datestamp from a string to a given date format.
+function to parse a datestamp from a string to a given date format.
     datetime_str::String        Timestamp read from the profile file. Should be a specified DateTime format as string.
-    time_format::DateFormat     Format of datetime_str. Shoule be a DateTime format, like "dd-mm-yyyy HH:MM:SS"
+    time_format::DateFormat     Format of datetime_str. Should be a DateTime format, like "dd-mm-yyyy HH:MM:SS"
     file_path::String           File path of the profile for error handling, for error message.
     time_format_variable_name::String   The variable name of the time format, for error message.
 
@@ -428,7 +428,7 @@ end
     add_ignoring_leap_days(timestamp::DateTime, diff::DateTime.Period)
 
 Adds diff to the timestamp. If the result is a leap day, skip to the next day.
-If a leap day is in between, do not count it!
+If a leap day is in between, it is not counted!
 """
 function add_ignoring_leap_days(timestamp::DateTime, diff::Period)
     new_time = timestamp + diff
@@ -448,8 +448,8 @@ end
 """
     sub_ignoring_leap_days(timestamp::DateTime, diff::DateTime.Period)
 
-Subs diff of the timestamp. If the result is a leap day, skip to the previous day.
-If a leap day is in between, do not count it!
+Subtracts diff from the timestamp. If the result is a leap day, skip to the previous day.
+If a leap day is in between, it is not counted!
 """
 function sub_ignoring_leap_days(timestamp::DateTime, diff::Period)
     new_time = timestamp - diff
@@ -469,9 +469,9 @@ end
 """
     sub_ignoring_leap_days(end_date::DateTime, begin_date::DateTime)
 
-Substract: DateTime.Period = end_date - begin_date
-If the result is a leap day, skip to the next day.
-If a leap day is in between, do not count it!
+Subtract: DateTime.Period = end_date - begin_date
+If the result is a leap day, skips to the next day.
+If a leap day is in between, it is not counted!
 """
 function sub_ignoring_leap_days(end_date::DateTime, begin_date::DateTime)
     time_span = end_date - begin_date
@@ -516,7 +516,7 @@ end
 """
     remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Stringing, file_path::String)
 
-If DST is present in the timestamp, shift it to local standard time.
+If DST is present in the timestamp, shifts it to local standard time.
 
 This may require a recompilation of the TZData of the Julia package TimeZones. From first installation,
 if only covers DST shifts until the year 2037. 

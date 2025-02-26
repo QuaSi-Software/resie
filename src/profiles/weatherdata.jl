@@ -75,7 +75,7 @@ mutable struct WeatherData
             else
                 @info "The coordinates given in the weather file where overwritten by the " *
                       "ones given in the input file:\n" *
-                      "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+                      "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
             end
             if sim_params["timezone"] === nothing
                 sim_params["timezone"] = 1.0  # MEZ
@@ -152,7 +152,7 @@ mutable struct WeatherData
             else
                 @info "The coordinates given in the weather file where overwritten by the " *
                       "ones given in the input file:\n" *
-                      "Latidude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
+                      "Latitude: $(sim_params["latitude"]); Longitude: $(sim_params["longitude"])"
             end
             if sim_params["timezone"] === nothing
                 sim_params["timezone"] = Float64(headerdata["TZ"])
@@ -184,7 +184,7 @@ mutable struct WeatherData
             globHorIrr = deepcopy(dirHorIrr)
             globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
 
-            # Long wave irradiation is probabely(?) given at full hours
+            # Long wave irradiation is probably(?) given at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
                                   sim_params;
                                   given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
