@@ -32,7 +32,7 @@ The interpolation type can be one of "stepwise", "linear_classic", "linear_time_
 time step to make the values be measured at the time indicated. After the interpolation to a 
 finer time step, the data is shifted back by 1/2 a time step to meet the required definition 
 of the values representing the following time step. This should be used for time-critical data 
-like solar radiation. But, this method will strengthen peaks and drops in the data more than
+like solar radiation. But, this method will reduce the amplitude of peaks and drops in the data more than
 the classic interpolation.
 - "linear_solar_radiation" interpolation uses a method described in the paper 
      T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
