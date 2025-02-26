@@ -4,6 +4,13 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.10.6
+* add the possibility to output the weather data from EPW and dat-files to the lineplot and CSV output
+* add two more interpolation methods for segmentation of data: "stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"
+* the time zone can now be specified in the simulation_parameters to overwrite the time zone provided by the weather file
+* change the internal handling of profile time step during segmentation and aggregation from seconds to milliseconds
+* add tests for segmentation algorithms
+
 ### Version 0.10.5
 * restructur import of profiles (constant value, custom profile, from weather file) to a generalised function
 * correct input variable naming for ambient temperature in buffer tank and geothermal collector
