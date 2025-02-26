@@ -73,26 +73,12 @@ mutable struct SolarthermalCollector <: Component
 
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        ambient_temperature_profile = 
-            "ambient_temperature_profile_file_path" in keys(config) ?
-            Profile(config["ambient_temperature_profile_file_path"], sim_params) :
-            nothing
-        global_solar_hor_irradiance_profile = 
-            "global_solar_hor_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["global_solar_hor_irradiance_profile_file_path"], sim_params) :
-            nothing
-        diffuse_solar_hor_irradiance_profile = 
-            "diffuse_solar_hor_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["diffuse_solar_hor_irradiance_profile_file_path"], sim_params) :
-            nothing
-        long_wave_irradiance_profile = 
-            "long_wave_irradiance_profile_file_path" in keys(config) ?
-            Profile(config["long_wave_irradiance_profile_file_path"], sim_params) :
-            nothing
-        wind_speed_profile = 
-            "wind_speed_profile_file_path" in keys(config) ?
-            Profile(config["wind_speed_profile_file_path"], sim_params) :
-            nothing
+
+        ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
+        global_solar_hor_irradiance_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
+        long_wave_irradiance_profile = get_infrared_sky_radiation_profile_from_config(config, sim_params, uac) # W/m^2
+        diffuse_solar_hor_irradiance_profile = get_diff_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
+        wind_speed_profile = get_wind_speed_profile_from_config(config, sim_params, uac) # m/s
 
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
@@ -197,7 +183,6 @@ function control(unit::SolarthermalCollector,
     diffuse_solar_hor_irradiance = Profiles.value_at_time(
         unit.diffuse_solar_hor_irradiance_profile, sim_params
         )
-    unit.diffuse_solar_irradiance_in_plane = diffuse_solar_hor_irradiance * ((1 + cosd(unit.tilt_angle)) / 2) 
 
     unit.ambient_temperature = Profiles.value_at_time(
         unit.ambient_temperature_profile, sim_params
@@ -210,12 +195,12 @@ function control(unit::SolarthermalCollector,
         unit.long_wave_irradiance_profile, sim_params
         )
     
-    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], sim_params["longitude"], sim_params["latitude"], 1.0, unit.ambient_temperature)
-    
-    unit.beam_solar_irradiance_in_plane, unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = beam_irr_in_plane(
-        unit.tilt_angle, unit.azimuth_angle, solar_zenith, solar_azimuth, 
-        global_solar_hor_irradiance, diffuse_solar_hor_irradiance
-        )
+    unit.beam_solar_irradiance_in_plane, unit.diffuse_solar_irradiance_in_plane, 
+    unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = 
+    irr_in_plane(sim_params, unit.tilt_angle, unit.azimuth_angle, global_solar_hor_irradiance, 
+    diffuse_solar_hor_irradiance, nothing, unit.time_zone, 1.0, unit.ambient_temperature, 
+    unit.ground_reflectance
+    )
     
     # Calculate K_b based on a table with provided values for longitudinal and transversal angles.
     # Table with provided values is mirrored for negative angles.
@@ -254,7 +239,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
             # recalculate the average_temperature if not all energy is used to keep a constant 
             # flow rate
             if unit.delta_T === nothing && unit.spec_flow_rate !== nothing && used_energy_comp < unit.available_energies[comp_uac]
-                unit.average_temperatures[comp_uac] = e.temperature_min - wh_to_watts(used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
+                unit.average_temperatures[comp_uac] = e.temperature_min - sim_params["wh_to_watts"](used_energy_comp) / unit.collector_gross_area / (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
             end
 
             unit.used_energy += used_energy_comp
@@ -330,7 +315,7 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
             throw(InputError)
         end
 
-        produced_energy = isnothing(p_spec_th) ? 0.0 : watt_to_wh(p_spec_th * unit.collector_gross_area) * left_energy_factor
+        produced_energy = isnothing(p_spec_th) ? 0.0 : sim_params["watt_to_wh"](p_spec_th * unit.collector_gross_area) * left_energy_factor
         calculated_values[target_temperatures[component_idx]] = (p_spec_th, t_avg, t_target)
 
         # check if more energy can be produced for a certain component than is demanded

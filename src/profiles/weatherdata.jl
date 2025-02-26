@@ -53,7 +53,7 @@ mutable struct WeatherData
             weatherdata_dict, headerdata = read_dat_file(weather_file_path)
 
             # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
-            #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
+            #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
 
             # convert solar radiation data to profile
             dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",

@@ -1,14 +1,15 @@
 using Dates
 
 function sun_position(dt::DateTime, time_step_seconds, longitude::Number, latitude::Number, 
-                             pressure::Number=1.0, temperature::Number=20.0)
+                      time_zone::Int32=0, pressure::Number=1.0, temperature::Number=20.0)
 """
 Calculate solar position in degrees.
 Time is shifted by a half time_step forward, because it all profiles in Resie are given as 
 sum or mean over the next full time_step.
 Based on Roberto Grena (2012), Five new algorithms for the computation of sun position
 from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.01.024.
-dt must be provided in UTC.
+dt must be provided in UTC, if no time_zone is provided.
+time_zone is the time difference to UTC as INT in hours.
 longitude and latitude should be provided in WGS84.
 pressure and temperature are needed to apply the refraction correction which is relevant
 when the sun is low.
@@ -17,7 +18,9 @@ when the sun is low.
     longitude = deg2rad(longitude)
     latitude = deg2rad(latitude)
 
-    dt = dt + Dates.Second(time_step_seconds / 2)
+    # for validation
+    # dt = dt - Dates.Second(time_step_seconds / 2)
+    dt = dt + Dates.Second(time_step_seconds / 2) - Dates.Hour(time_zone)
 
     dt2060 = DateTime(2060,1,1)
     t2060 = Int64(Dates.value(dt.instant - dt2060.instant)) / 86400000.0
@@ -125,4 +128,81 @@ function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zeni
     return beam_solar_irradiance_in_plane, direct_normal_irradiance, aoi, aoi_l, aoi_t
 end
 
-export sun_position, beam_irr_in_plane
+
+function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number, 
+    global_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
+    time_zone::Int32=0, pressure::Number=1.0, temperature::Number=20.0, 
+    ground_reflectance::Number=0.2, zenith_threshold_for_zero_dni::Number=89.5)
+    """
+    Calculate beam irradiance in collector plane and direct_normal_irradiance
+    All angles are in degrees and irradiances in W/m²
+    """
+    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], 
+                                               sim_params["longitude"], sim_params["latitude"], 
+                                               time_zone, pressure, temperature)
+
+    # calculate angle of incidence in degrees on the collector plane
+    aoi = acosd(
+    cosd(tilt_angle) * cosd(solar_zenith) + sind(tilt_angle) * sind(solar_zenith) * 
+    cosd(solar_azimuth - azimuth_angle)
+    )
+
+    # calculate longitudinal and transversal projections of the incidence angle
+    aoi_t = atand(sind(solar_zenith) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
+    aoi_t_iso = atand(sind(aoi) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
+    aoi_l = abs(tilt_angle - atand(tand(solar_zenith) * cosd(azimuth_angle - solar_azimuth)))
+    aoi_l_iso = atand(sind(aoi) * cosd(azimuth_angle - solar_azimuth) / cosd(aoi))
+
+    # calculate direct normal irradiance from global horrizontal irradiance (GHI) and 
+    # diffuse horrizontal irradiance (DHI)
+    if isnothing(dni)
+        if solar_zenith >= zenith_threshold_for_zero_dni
+            direct_normal_irradiance = 0
+        else
+            direct_normal_irradiance = max(
+                (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
+                )
+        end
+    else
+        direct_normal_irradiance = dni
+    end
+
+    # calculate the beam irradiance on the collector plane
+    beam_solar_irradiance_in_plane = max(direct_normal_irradiance * cosd(aoi), 0)
+
+    # calculate the diffuse irradiance on the collector plane from the sky with the Hay model see:
+    # J. E. Hay, Calculation of monthly mean solar radiation for horizontal and inclined surfaces, 
+    # Solar Energy, Jg. 23, Nr. 4, S. 301–307, 1979. doi: 10.1016/0038-092X(79)90123-3. 
+    ext_terr_normal_irr = extraterrestrial_normal_irradiance(dayofyear(sim_params["current_date"]))
+    ext_terr_irr = ext_terr_normal_irr * cosd(solar_zenith) 
+    anisotropy_index = (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / ext_terr_irr
+
+    diffuse_sky_irradiance_in_plane = diffuse_solar_hor_irradiance * (
+                                        (1 - anisotropy_index) * (1 + cosd(tilt_angle)) / 2 + 
+                                        anisotropy_index * cosd(aoi)/sind(solar_zenith)
+                                        )
+
+    # calculate the diffuse irradiance on the collector plane from the ground
+    diffuse_ground_irradiance_in_plane = ground_reflectance * global_solar_hor_irradiance * (1 - cosd(tilt_angle)) / 2 
+
+    diffuse_solar_irradiance_in_plane = diffuse_sky_irradiance_in_plane + diffuse_ground_irradiance_in_plane
+
+    return beam_solar_irradiance_in_plane, diffuse_solar_irradiance_in_plane, 
+           direct_normal_irradiance, aoi, aoi_l, aoi_t
+end
+
+function extraterrestrial_normal_irradiance(day_of_year::Int)
+    """
+    Calculate the extraterrestrial normal irradiance in W/m².
+    Based on J. W. Spencer, "Fourier series representation of the sun," Search, vol. 2, p. 172, 1971.
+    day_of_year is the day of the year starting with 1 for 01. January.
+    """
+    day_angle = 2*pi*(day_of_year-1) / 365
+    solar_constant = 1361 # new solar constant since 2015
+    etrn = solar_constant * 1.000110 + 0.034221 * cos(day_angle) + 0.001280 * sin(day_angle) + 
+           0.000719 * cos(2*day_angle) + 0.000077 * sin(2*day_angle) 
+    return etrn
+end
+
+
+export sun_position, beam_irr_in_plane, irr_in_plane

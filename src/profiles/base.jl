@@ -34,15 +34,15 @@ mutable struct Profile
     function Profile(file_path::String,                               # file path to a .prf file
                      sim_params::Dict{String,Any};                    # general simulation parameters
                      given_profile_values::Vector{Float64}=Float64[], # optional: Vector{Float64} that holds values of 
-                     #                                                            the profile
+                                                                      # the profile
                      given_timestamps::Vector{DateTime}=DateTime[],   # optional: Vector{DateTime} that holds the 
-                     #                                                            time step as DateTime
+                                                                      # time step as DateTime
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the 
-                     #                                                            timestep in seconds of the given data
+                                                                      # timestep in seconds of the given data
                      given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, shoule be "intensive" or
-                     #                                                            "extensive"
+                                                                      # "extensive"
                      shift::Dates.Second=Second(0))                   # optional: timeshift for data. A positive shift 
-        #                                                                         adds to the timestamp = value is earlier
+                                                                      # adds to the timestamp = value is earlier
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
