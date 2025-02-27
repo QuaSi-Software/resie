@@ -716,11 +716,12 @@ function calculate_slices(unit::HeatPump,
 
     while (true)
         # we continue for as long as there is energy to be distributed and max power has
-        # not been reached
+        # not been reached and the time step has not been fully utilised
         if energies.available_el_in < EPS ||
            sum(energies.available_heat_in; init=0.0) < EPS ||
            sum(energies.available_heat_out; init=0.0) < EPS ||
-           energies.max_usage_fraction - sum_usage < EPS
+           energies.max_usage_fraction - sum_usage < EPS ||
+           sum(times; init=0.0) >= sim_params["time_step_seconds"] - EPS
             # end of condition
             break
         end
@@ -771,14 +772,20 @@ function calculate_slices(unit::HeatPump,
             plrs[current_in_idx, current_out_idx] = 1.0
         end
 
+        # there are four factors that decide the power of the heat pump:
+        # 1. the minimum power for the given temperatures
+        # 2. the maximum power for the given temperatures
+        # 3. how much of the maximum usage fraction is left
+        # 4. how much time is left in the time step
         min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
-        min_power = max(EPS, unit.design_power_th * min_power_frac)
-        used_power_frac = min(plrs[current_in_idx, current_out_idx],
-                              unit.max_power_function(current_in_temp, current_out_temp))
+        min_power = max(0.0, unit.design_power_th * min_power_frac)
+        max_power_frac = max(0.0, min(1.0, unit.max_power_function(current_in_temp, current_out_temp)))
+        used_power_frac = min(plrs[current_in_idx, current_out_idx], max_power_frac)
         used_power = max(min_power, unit.design_power_th * used_power_frac)
 
         remaining_heat_out = min(energies.available_heat_out[current_out_idx],
-                                 (energies.max_usage_fraction - sum_usage) * sim_params["watt_to_wh"](used_power))
+                                 (energies.max_usage_fraction - sum_usage) * sim_params["watt_to_wh"](used_power),
+                                 used_power * (sim_params["time_step_seconds"] - sum(times; init=0.0)) / 3600.0)
 
         used_heat_in,
         used_el_in,
