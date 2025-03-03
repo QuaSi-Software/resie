@@ -36,7 +36,6 @@ mutable struct SeasonalThermalStorage <: Component
     radius_large::Float64
     number_of_layer_total::Int64
     number_of_layer_above_ground::Int64
-    input_layer_from_bottom::Int64
     output_layer_from_top::Int64
     dz::Vector{Float64}
     dz_normalized::Vector{Float64}
@@ -112,7 +111,6 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # radius_large, large (upper) radius of the STES [m]
                    default(config, "number_of_layer_total", 25),   # number of layers in the STES
                    default(config, "number_of_layer_above_ground", 5), # number of layers above ground in the STES
-                   default(config, "input_layer_from_bottom", 1),  # layer number of the input layer, counted from the bottom
                    default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
                    [],                                             # dz, thickness of the layers of the STES [m]
                    [],                                             # dz_normalized, normalized dz with respect to to the volume of each section
@@ -366,8 +364,8 @@ The method is based on:
 Lago, J. et al. (2019): A 1-dimensional continuous and smooth model for thermally stratified storage tanks including 
                         mixing and buoyancy, Applied Energy 248, S. 640-655: doi: 10.1016/j.apenergy.2019.04.139                   
 Steinacker, H. (2022): Entwicklung eines dynamischen Simulationsmodells zur Optimierung von wärmegekoppelten 
-                      Wasserstoffkonzepten für die klimaneutrale Quartiersversorgung, unpublished master thesis, 
-                      University of Stuttgart.
+                       Wasserstoffkonzepten für die klimaneutrale Quartiersversorgung, unpublished master thesis, 
+                       University of Stuttgart.
 
 # Arguments
 - `unit::SeasonalThermalStorage`: The STES unit to be updated
@@ -375,29 +373,70 @@ Steinacker, H. (2022): Entwicklung eines dynamischen Simulationsmodells zur Opti
 
 """
 function update_STES!(unit::SeasonalThermalStorage, sim_params)
+    # set alias for better readability
     t_old = unit.temperature_segments
-    t_new = zeros(unit.number_of_layer_total)
     dt = sim_params["time_step_seconds"] / 60 / 60  # [h]
+    t_new = zeros(unit.number_of_layer_total)
+
+    # set lower node always to 1 for charging and discharging to always use the whole storage
+    lower_node = 1
+
+    # find index of highest layer that is below the temperature of the charging input temperature
+    # This represents a ideal charging system (lance e.g.)
+    upper_node_charging = unit.number_of_layer_total
+    for i in length(t_old):-1:1
+        if t_old[i] < temp_charging_in
+            upper_node_charging = i
+            break
+        end
+    end
+
+    # index of layer for discharging, currently only one is supported
+    upper_node_discharging = unit.number_of_layer_total - unit.output_layer_from_top + 1
+
+    # mass_in and mass_out are both positive here! TODO
+    # temp_charging_in = 
+    # mass_in = 
+    # temp_discharging_out =
+    # mass_out =
+
+    # mass flow and temperatures for charging
+    mass_in_temp = vcat(zeros(lower_node - 1),
+                        t_old[(lower_node + 1):upper_node_charging],
+                        [temp_charging_in],
+                        zeros(unit.number_of_layer_total - upper_node_charging))
+    mass_in_vec = [((lower_node <= n <= upper_node_charging) ? mass_in : 0.0) for n in 1:(unit.number_of_layer_total)]
+    # mass flow and temperatures for discharging
+    mass_out_temp = vcat(zeros(lower_node - 1),
+                         [temp_discharging_out],
+                         t_old[lower_node:(upper_node_discharging - 1)],
+                         zeros(unit.number_of_layer_total - upper_node_discharging))
+    mass_out_vec = [((lower_node <= n <= upper_node_discharging) ? mass_out : 0.0)
+                    for n in 1:(unit.number_of_layer_total)]
 
     for n in unit.number_of_layer_total
         if n == 0                # bottom layer, single-side
             t_new[n] = t_old[n] +
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
                         unit.beta[n] * (unit.effective_ambient_temperature[n] - t_old[n]) +                              # losses through bottom and side walls
-                        unit.lamda[n] * (Q_in_out)[n] +                                                                  # thermal input and output
-                        unit.phi[n] * Mass_in_out[n] * (Mass_in_out_temp[n] - t_old[n])) * dt                            # mass input and output
+                        # unit.lamda[n] * (Q_in_out)[n] +                                                                # thermal input and output
+                        unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
+                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])) * dt                              # mass output
         elseif n == n_sec - 1    # top layer, single-side
             t_new[n] = t_old[n] +
-                       (60 * 60 * diffusivity * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +                    # thermal diffusion
+                       (60 * 60 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
                         unit.beta[n] * (unit.effective_ambient_temperature[n] - t_old[n]) +                              # losses through lid and side walls
-                        unit.lamda[n] * Q_in_out[n] +                                                                    # thermal input and output
-                        unit.phi[n] * Mass_in_out[n] * (Mass_in_out_temp[n] - t_old[n])) * dt                            # mass input and output
+                        # unit.lamda[n] * Q_in_out[n] +                                                                  # thermal input and output
+                        unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
+                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])) * dt                              # mass output
         else                     # mid layer
             t_new[n] = t_old[n] +
-                       (60 * 60 * diffusivity * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) / unit.dz_normalized[n]^2 + # thermal diffusion
+                       (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
+                        unit.dz_normalized[n]^2 +                                                                        # thermal diffusion
                         unit.beta[n] * (unit.effective_ambient_temperature[n] - t_old[n]) +                              # losses through side walls
-                        unit.lamda[n] * Q_in_out[n] +                                                                    # thermal input and output
-                        unit.phi[n] * Mass_in_out[n] * (Mass_in_out_temp[n] - T_old[n])) * dt                            # mass input and output
+                        # unit.lamda[n] * Q_in_out[n] +                                                                  # thermal input and output
+                        unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
+                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])) * dt                              # mass output
         end
 
         if n > 0   # mixing due to buoancy effecs, if temperature gradient is present
