@@ -546,10 +546,14 @@ function update_plrs!(unit::HeatPump,
             continue
         end
 
-        val = (plrs[idx_src, idx_snk] - unit.optimal_plr) * energies.slices_el_in[slice_idx]
-        if val > best_val
-            best_idx = (idx_src, idx_snk)
-            best_val = val
+        try
+            val = (plrs[idx_src, idx_snk] - unit.optimal_plr) * energies.slices_el_in[slice_idx]
+            if val > best_val
+                best_idx = (idx_src, idx_snk)
+                best_val = val
+            end
+        catch BoundsError
+            return (-1, -1)
         end
     end
 
@@ -708,6 +712,7 @@ function calculate_slices(unit::HeatPump,
     times_min = Vector{Float64}()
     times = Vector{Float64}()
 
+    energies.slices_idx_to_plr = Dict{Integer,Tuple{Integer,Integer}}()
     sum_usage = 0.0
     slice_idx::Int = 0
     current_in_idx::Int = 0
@@ -888,12 +893,19 @@ function calculate_energies_heatpump(unit::HeatPump,
         energies = copy_temp_to_slices!(energies)
         last_updated = (0, 0)
 
-        for _ in 1:(unit.nr_optimisation_passes)
+        no_change_in = 0
+        for pass_nr in 1:(unit.nr_optimisation_passes)
             energies = reset_temp_slices!(energies)
             energies = reset_available!(energies)
 
             # update target PLR of one slice
             last_updated = update_plrs!(unit, energies, plrs, last_updated)
+            if last_updated == (-1, -1)
+                plrs = best_plrs
+                @debug "Optimisation of heat pump $(unit.uac) could not update PLRs in" *
+                       "timestep $(sim_params["time"]) and pass $(pass_nr)."
+                break
+            end
             # calculate slices with updated PLRs
             energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
             # check if the new PLRs actually lead to an improvement
@@ -901,6 +913,7 @@ function calculate_energies_heatpump(unit::HeatPump,
                 energies = copy_temp_to_slices!(energies)
                 best_plrs = copy(plrs)
                 best_times = copy(times)
+                no_change_in = 0
             else
                 # if the pass is rejected we need to set the temp slices to the best guess,
                 # which has been recorded in the actual slices, because the calling function
@@ -913,21 +926,38 @@ function calculate_energies_heatpump(unit::HeatPump,
                 energies.slices_heat_out_temperature_temp = energies.slices_heat_out_temperature
                 energies.slices_heat_in_uac_temp = energies.slices_heat_in_uac
                 energies.slices_heat_out_uac_temp = energies.slices_heat_out_uac
+
+                # we also need to reset the PLRs, as they might have added or removed slices
+                # compared to the best guess. however if no change was made in a number of
+                # tries greater or equal than the number of slices, we know that the opti-
+                # misation is stuck and we can break out of the loop for a performance gain
+                plrs = best_plrs
+                no_change_in += 1
+                if no_change_in >= length(plrs)
+                    break
+                end
             end
         end
     end
 
     # calculate average PLR, from active slices, and weighted by heat produced
-    # we have to use the temp slices as the actually utilised slices have not been set yet
     weights = 0
     for (slice_idx, indexes) in pairs(energies.slices_idx_to_plr)
-        if best_plrs[indexes[1], indexes[2]] === nothing
+        try
+            if best_plrs[indexes[1], indexes[2]] === nothing
+                continue
+            end
+            unit.avg_plr += best_plrs[indexes[1], indexes[2]] * energies.slices_heat_out[slice_idx]
+            weights += energies.slices_heat_out[slice_idx]
+        catch BoundsError
             continue
         end
-        unit.avg_plr += best_plrs[indexes[1], indexes[2]] * energies.slices_heat_out_temp[slice_idx]
-        weights += energies.slices_heat_out_temp[slice_idx]
     end
-    unit.avg_plr /= weights
+    if weights > 0
+        unit.avg_plr /= weights
+    else
+        unit.avg_plr = 0.0
+    end
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(best_times; init=0.0) / sim_params["time_step_seconds"]
