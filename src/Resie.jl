@@ -281,8 +281,9 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     # plot additional figures potentially available from components after simulation
     if default(project_config["io_settings"], "auxiliary_plots", false)
+        output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
         for component in components
-            plot_optional_figures_end(component[2], sim_params)
+            plot_optional_figures_end(component[2], sim_params, output_path)
         end
     end
 end

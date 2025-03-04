@@ -5,8 +5,9 @@ This is a simplified model, which mostly deals with amounts of energy and consid
 temperatures only for the available temperature as the tank is depleted.
 """
 
-using Plots: plot!, plot, savefig
-using Plots: Plots
+using Plots
+using Dates
+using PlotlyJS
 
 mutable struct SeasonalThermalStorage <: Component
     # general
@@ -334,85 +335,57 @@ end
 function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::String, output_formats::Vector{String},
                                      sim_params::Dict{String,Any})
     # Plot geometry of STES
-    plt = plot()
-    plot!([-unit.radius_large, unit.radius_large], [unit.height, unit.height]; color=:blue, lw=6, label="")  # Top
-    plot!([-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
-    plot!([unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    plot!([-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    plot!(; title="Cross section of the STES $(unit.uac)",
-          xlabel="x-coordinate [m]",
-          ylabel="height [m]",
-          legend=false,
-          aspect_ratio=:equal,
-          size=(1800, 1200),
-          titlefontsize=30,
-          guidefontsize=24,
-          tickfontsize=24,
-          grid=true,
-          minorgrid=true,
-          gridlinewidth=1,
-          margin=15Plots.mm)
+    plt = Plots.plot()
+    Plots.plot!([-unit.radius_large, unit.radius_large], [unit.height, unit.height]; color=:blue, lw=6, label="")  # Top
+    Plots.plot!([-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
+    Plots.plot!([unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
+    Plots.plot!([-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
+    Plots.plot!(; title="Cross section of the STES $(unit.uac)",
+                xlabel="x-coordinate [m]",
+                ylabel="height [m]",
+                legend=false,
+                aspect_ratio=:equal,
+                size=(1800, 1200),
+                titlefontsize=30,
+                guidefontsize=24,
+                tickfontsize=24,
+                grid=true,
+                minorgrid=true,
+                gridlinewidth=1,
+                margin=15Plots.mm)
     fig_name = "STES_cross_section_$(unit.uac)"
     for output_format in output_formats
-        savefig(output_path * "/" * fig_name * "." * output_format)
+        Plots.savefig(output_path * "/" * fig_name * "." * output_format)
     end
 
     return true
 end
 
-function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    unit.temp_distribution_output
-    plt = plot(unit.temp_distribution_output;
-               title="Temperature distribution in the STES $(unit.uac)",
-               xlabel="Time step",
-               ylabel="Temperature [°C]",
-               legend=false,
-               size=(1800, 1200),
-               titlefontsize=30,
-               guidefontsize=24,
-               tickfontsize=24,
-               grid=true,
-               minorgrid=true,
-               gridlinewidth=1,
-               margin=15Plots.mm)
-    fig_name = "STES_temperature_distribution_$(unit.uac)"
-    savefig("output/" * fig_name * "." * "png")
+function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}, output_path::String)
+    # Plot temperature distribution over time    
+    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date"],
+                                              Dates.Second((s - 1) * sim_params["time_step_seconds"]))
+                       for s in 1:sim_params["number_of_time_steps"]]
+    layers_to_plot = (unit.number_of_layer_total):-1:1
+    traces = PlotlyJS.GenericTrace[]
+    for i in layers_to_plot
+        plot_label = "Layer $(i)"
+        if i == 1
+            plot_label = "Bottom layer"
+        elseif i == unit.number_of_layer_total
+            plot_label = "Top layer"
+        end
+        trace = PlotlyJS.scatter(; x=x_vals_datetime, y=unit.temp_distribution_output[:, i], mode="lines",
+                                 name=plot_label)
+        push!(traces, trace)
+    end
+    layout = PlotlyJS.Layout(; title_text="Temperature distribution over time in STES $(unit.uac)",
+                             xaxis_title_text="Date",
+                             yaxis_title_text="Temperature [°C]")
+    p = PlotlyJS.plot(traces, layout)
 
-    # TODO
-    # function create_simple_profile_plot(plot_data::Matrix{Float64},
-    #                                     plot_label::String,
-    #                                     project_config::Dict{AbstractString,Any},
-    #                                     sim_params::Dict{String,Any})
-    #     # Extract time values
-    #     time_x = plot_data[:, 1]
-    #     output_plot_time_unit = get(project_config["io_settings"], "output_plot_time_unit", "date")
-
-    #     # Convert time unit
-    #     if output_plot_time_unit == "seconds"
-    #         x = time_x
-    #     elseif output_plot_time_unit == "minutes"
-    #         x = time_x / 60
-    #     elseif output_plot_time_unit == "hours"
-    #         x = time_x / 3600
-    #     else
-    #         start_date = get(sim_params, "start_date", Dates.DateTime("2015-01-01T00:00:00"))
-    #         x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in time_x]
-    #     end
-
-    #     # Extract y values (assumes one data column after time)
-    #     y = plot_data[:, 2]
-
-    #     # Create the plot
-    #     trace = scatter(; x=x, y=y, mode="lines", name=plot_label)
-    #     layout = Layout(; title_text="Output Plot",
-    #                     xaxis_title_text="Time [$(output_plot_time_unit)]",
-    #                     yaxis_title_text="Value")
-    #     p = plot([trace], layout)
-
-    #     # Save the plot
-    #     file_path = get(project_config["io_settings"], "output_plot_file", "./output/output_plot.html")
-    #     savefig(p, file_path)
-    # end
+    fig_name = "temperature_distribution_STES_$(unit.uac).html"
+    PlotlyJS.savefig(p, output_path * "/" * fig_name)
 end
 
 function control(unit::SeasonalThermalStorage,
@@ -513,7 +486,7 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
     # mass_out and the corresponding temperature are single values that will always be drawn from the top layer
     mass_in = convert_energy_in_mass.(unit.current_energy_input, t_old[lower_node], unit.current_temperature_input,
                                       unit.cp_medium)
-    mass_out = convert_energy_in_mass(unit.current_energy_output, t_old[lower_node], unit.current_temperature_output,
+    mass_out = convert_energy_in_mass(unit.current_energy_output, unit.low_temperature, unit.current_temperature_output,
                                       unit.cp_medium)
 
     # mass flow and temperatures for charging
@@ -553,23 +526,23 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
             t_new[n] = t_old[n] +
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through bottom and side walls
-                       # unit.lamda[n] * (Q_in_out)[n] +                                                                # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever layer
+                       # unit.lambda[n] * (Q_in_out)[n] +                                                                # thermal input and output
+                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         elseif n == unit.number_of_layer_total  # top layer, single-side
             t_new[n] = t_old[n] +
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through lid and side walls
-                       # unit.lamda[n] * Q_in_out[n] +                                                                  # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever layer
+                       # unit.lambda[n] * Q_in_out[n] +                                                                  # thermal input and output
+                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         else       # mid layer
             t_new[n] = t_old[n] +
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
                         unit.dz_normalized[n]^2 +                                                                       # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through side walls
-                       # unit.lamda[n] * Q_in_out[n] +                                                                  # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever layer
+                       # unit.lambda[n] * Q_in_out[n] +                                                                  # thermal input and output
+                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         end
 

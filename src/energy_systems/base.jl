@@ -1140,7 +1140,7 @@ function plot_optional_figures_begin(unit::Component,
 end
 
 """
-    plot_optional_figures_end(unit, sim_params)
+    plot_optional_figures_end(unit, sim_params, output_path)
 
 Plot optional figures that are potentially created at the end of the simulation for each 
 component.
@@ -1148,12 +1148,12 @@ component.
 # Arguments
 - `unit::Component`: The unit that plots additional figures
 - `sim_params::Dict{String,Any}`: Simulation parameters of ReSiE
+- `output_path::String`: The output folder as string (absolute/relative) for the additional plots
  
 # Returns:
 - Bool: True if a figure was created, false if no figure was created
 """
-function plot_optional_figures_end(unit::Component,
-                                   sim_params::Dict{String,Any})
+function plot_optional_figures_end(unit::Component, sim_params::Dict{String,Any}, output_path::String)
     # default implementation is to do nothing
     return false
 end

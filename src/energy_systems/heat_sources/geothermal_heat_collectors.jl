@@ -849,8 +849,7 @@ function plot_optional_figures_begin(unit::GeothermalHeatCollector,
     return true
 end
 
-function plot_optional_figures_end(unit::GeothermalHeatCollector,
-                                   sim_params::Dict{String,Any})
+function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}, output_path::String)
     # plot temperature field as 3D mesh with time-slider
     @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
           "Close figure to continue..."
