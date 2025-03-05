@@ -261,7 +261,10 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                                   weather_data_keys,
                                   project_config,
                                   sim_params)
-        @info "Line plot created and saved to .output/output_plot.html"
+        filepath = default(project_config["io_settings"],
+                           "output_plot_file",
+                           "./output/output_plot.html")
+        @info "Line plot created and saved to $(filepath)"
     end
 
     # create Sankey diagram
@@ -272,7 +275,10 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                       medium_of_interfaces,
                       nr_of_interfaces,
                       project_config["io_settings"])
-        @info "Sankey created and saved to .output/output_sankey.html"
+        filepath = default(project_config["io_settings"],
+                           "output_plot_file",
+                           "./output/output_plot.html")
+        @info "Sankey created and saved to $(filepath)"
     end
 
     if do_write_CSV
