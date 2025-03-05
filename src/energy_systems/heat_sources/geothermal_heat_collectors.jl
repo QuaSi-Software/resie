@@ -1,6 +1,7 @@
 using GLMakie
 using Roots
-using Plots
+using Plots: plot, savefig
+using Plots: Plots
 
 """
 Implementation of a geothermal heat collector.
