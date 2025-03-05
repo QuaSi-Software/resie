@@ -294,6 +294,8 @@ Load a project from the given file and run the simulation with it.
 
 # Arguments
 - `filepath::String`: Filepath to the project config file.
+# Returns
+- `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
 function load_and_run(filepath::String)
     project_config = nothing
@@ -303,13 +305,13 @@ function load_and_run(filepath::String)
     catch exc
         if isa(exc, MethodError)
             @error "Could not parse project config file at $(filepath)"
-            return
+            return false
         end
     end
 
     if project_config === nothing
         @error "Could not find or parse project config file at $(filepath)"
-        return
+        return false
     end
 
     sim_params, components, step_order = prepare_inputs(project_config)
@@ -318,6 +320,7 @@ function load_and_run(filepath::String)
     current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
 
     run_simulation_loop(project_config, sim_params, components, step_order)
+    return true
 end
 
 end # module

@@ -33,9 +33,9 @@ function run_cli_loop()
                 continue
             end
 
-            println("Running simulation...")
+            success = false
             try
-                run(parts[2:end])
+                success = run(parts[2:end])
             catch
                 println("An error occurred while running the simulation:")
                 for (exception, backtrace) in current_exceptions()
@@ -45,7 +45,10 @@ function run_cli_loop()
                 println("")
                 continue
             end
-            println("Simulation complete.")
+
+            if !success
+                println("Simulation was not successful. Check logs for details.")
+            end
             println("")
             continue
         end
@@ -67,17 +70,19 @@ a path relative to the CWD of the caller.
 
 # Args
 - `arguments::Array{String}`: Array of CLI-like arguments. See above for details.
+# Returns
+- `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
 function run(arguments)
     if length(arguments) < 1
         @error "No project config file argument given."
-        return
+        return false
     end
 
     input_filepath = string(arguments[1])
     if input_filepath === nothing || strip(input_filepath) == ""
         @error "Given project config file argument is empty."
-        return
+        return false
     end
 
     log_to_console = true
@@ -92,10 +97,10 @@ function run(arguments)
                                                                        min_log_level,
                                                                        input_filepath)
 
-    Resie.load_and_run(input_filepath)
+    success = Resie.load_and_run(input_filepath)
 
     Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
-    return
+    return success
 end
 
 run_cli_loop()
