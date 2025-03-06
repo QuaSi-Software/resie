@@ -6,10 +6,26 @@ using .Resie_Logger
 function run_cli_loop()
     """
     Main loop for the CLI. This function will run the CLI until the user exits.
+
+    If there are additional arguments passed to the script, they will be used as the first
+    command to run with the arguments following that as arguments to the command. If no
+    additional arguments are passed, the user will be prompted to enter a command.
     """
+    is_first = true
     while true
-        println("Enter command or 'exit' to quit or 'help' for more info:")
-        parts = split(strip(readline()), " ")
+        parts = []
+        if is_first
+            is_first = false
+            if length(ARGS) > 0
+                parts = ARGS
+            end
+        end
+
+        if length(parts) == 0
+            println("Enter command or 'exit' to quit or 'help' for more info:")
+            parts = split(strip(readline()), " ")
+        end
+
         command_input = lowercase(parts[1])
 
         if command_input == "exit"
