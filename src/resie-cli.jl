@@ -3,14 +3,36 @@ using Resie
 include("resie_logger.jl")
 using .Resie_Logger
 
-function run_cli_loop()
-    """
-    Main loop for the CLI. This function will run the CLI until the user exits.
+"""
+    parse_arguments(input)
 
-    If there are additional arguments passed to the script, they will be used as the first
-    command to run with the arguments following that as arguments to the command. If no
-    additional arguments are passed, the user will be prompted to enter a command.
-    """
+Parses a string into a vector of strings.
+
+The input string is split by spaces, but strings enclosed in double quotes are treated as a
+single argument. For example, the string `run "some file"` is parsed as
+`["run", "some file"]`. Note that the double quotes are removed from the resulting strings.
+
+# Args
+- `input::String`: The string to parse.
+# Returns
+- `Vector{String}`: The parsed arguments.
+"""
+function parse_arguments(input::String)::Vector{String}
+    arguments = []
+    for match in eachmatch(r"\"[^\"]*\"|[^\s]+", input)
+        push!(arguments, string(strip(match.match, '"')))
+    end
+    return arguments
+end
+
+"""
+Main loop for the CLI. This function will run the CLI until the user exits.
+
+If there are additional arguments passed to the script, they will be used as the first
+command to run with the arguments following that as arguments to the command. If no
+additional arguments are passed, the user will be prompted to enter a command.
+"""
+function run_cli_loop()
     is_first = true
     while true
         parts = []
@@ -23,7 +45,8 @@ function run_cli_loop()
 
         if length(parts) == 0
             println("Enter command or 'exit' to quit or 'help' for more info:")
-            parts = split(strip(readline()), " ")
+            input = string(strip(readline()))
+            parts = parse_arguments(input)
         end
 
         command_input = lowercase(parts[1])
@@ -51,7 +74,7 @@ function run_cli_loop()
 
             success = false
             try
-                success = run(parts[2:end])
+                success = run(map(string, parts[2:end]))
             catch
                 println("An error occurred while running the simulation:")
                 for (exception, backtrace) in current_exceptions()
@@ -89,7 +112,7 @@ a path relative to the CWD of the caller.
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function run(arguments)
+function run(arguments::Array{String})::Bool
     if length(arguments) < 1
         @error "No project config file argument given."
         return false
