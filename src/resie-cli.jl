@@ -47,9 +47,13 @@ function run_cli_loop()
             println("Enter command or 'exit' to quit or 'help' for more info:")
             input = string(strip(readline()))
             parts = parse_arguments(input)
+            if length(parts) == 0
+                continue
+            end
         end
 
         command_input = lowercase(parts[1])
+        deleteat!(parts, 1)
 
         if command_input == "exit"
             break
@@ -61,34 +65,33 @@ function run_cli_loop()
             println("  - 'help': Display this help message.")
             println("  - 'run': Run the simulation with arguments:")
             println("    - <file_path>: Project config file")
+            println("    - --exit-after-run: (Optional) Exit the CLI after running the simulation")
             println("")
             continue
         end
 
         if command_input == "run"
-            if length(parts) < 2
-                println("Insufficient arguments. Type 'help' for more info.")
-                println("")
-                continue
-            end
-
             success = false
+            exit_after_run = false
+
             try
-                success = run(map(string, parts[2:end]))
+                success, exit_after_run = run(map(string, parts))
             catch
                 println("An error occurred while running the simulation:")
                 for (exception, backtrace) in current_exceptions()
                     showerror(stdout, exception, backtrace)
                     println(stdout)
                 end
-                println("")
-                continue
             end
 
             if !success
                 println("Simulation was not successful. Check logs for details.")
             end
             println("")
+
+            if exit_after_run
+                break
+            end
             continue
         end
 
@@ -107,21 +110,34 @@ arguments are as follows:
 - `String`: Filepath to the project config file (see documentation on file format). Can be
 a path relative to the CWD of the caller.
 
+Keyword arguments:
+- `--exit-after-run`: If this argument is present, the CLI will exit after running the
+simulation.
+
 # Args
 - `arguments::Array{String}`: Array of CLI-like arguments. See above for details.
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
+- `Bool`: `true` if the CLI should be quit after running the simulation, `false` otherwise.
 """
-function run(arguments::Array{String})::Bool
+function run(arguments::Array{String})::Tuple{Bool,Bool}
+    exit_after_run = false
+    for (idx, arg) in enumerate(arguments)
+        if lowercase(arg) == "--exit-after-run"
+            exit_after_run = true
+            deleteat!(arguments, idx)
+        end
+    end
+
     if length(arguments) < 1
         @error "No project config file argument given."
-        return false
+        return false, exit_after_run
     end
 
     input_filepath = string(arguments[1])
     if input_filepath === nothing || strip(input_filepath) == ""
         @error "Given project config file argument is empty."
-        return false
+        return false, exit_after_run
     end
 
     log_to_console = true
@@ -139,7 +155,7 @@ function run(arguments::Array{String})::Bool
     success = Resie.load_and_run(input_filepath)
 
     Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
-    return success
+    return success, exit_after_run
 end
 
 run_cli_loop()
