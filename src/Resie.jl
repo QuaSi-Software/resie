@@ -95,7 +95,7 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
         "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
-        "step_info_interval" => default(project_config["simulation_parameters"],
+        "step_info_interval" => default(project_config["io_settings"],
                                         "step_info_interval",
                                         Integer(floor(nr_of_steps / 20))),
     )
