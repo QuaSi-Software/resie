@@ -480,10 +480,17 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
     # set alias for better readability
     t_old = unit.temperature_segments
     dt = sim_params["time_step_seconds"] / 60 / 60  # [h]
+    number_of_internal_timesteps = 1  # number of internal time steps for the explicit Euler method
     t_new = zeros(unit.number_of_layer_total)
+
+    # write old temperature field for output
+    unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(t_old)
 
     # set lower node always to 1 for charging and discharging to always use the whole storage
     lower_node = 1
+
+    # define input temperature for discharging
+    return_temperature_input = unit.low_temperature
 
     # mass_in and mass_out shoud be both posivive! 
     # mass_in and the corresponding temperature can be a vector and will be fitted to the most suitable layer.
@@ -495,44 +502,65 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
                                       unit.cp_medium)
     mass_out = mass_out == [] ? [0.0] : mass_out
 
-    # mass flow and temperatures for charging
-    mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old, mass_in, lower_node, sim_params)
+    mass_out_sum = sum(mass_out)
+    mass_in_sum = sum(mass_in)
+    mass_of_smallest_segment = minimum(unit.volume_segments) * unit.rho_medium
+    factor = 1.5
+    if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && mass_out_sum > 0.0 && mass_in_sum > 0.0
+        number_of_internal_timesteps = ceil(max(mass_out_sum, mass_in_sum) / (mass_of_smallest_segment / factor))
+        dt = dt / number_of_internal_timesteps
+    else
+        # mass flow and temperatures for charging
+        mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old, mass_in, lower_node, sim_params)
+        # mass flow and corresponding temperatures into each layer during discharging
+        mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old, mass_out,
+                                                                            return_temperature_input,
+                                                                            lower_node, sim_params)
+    end
 
-    # mass flow and corresponding temperatures into each layer during discharging
-    return_temperature_input = unit.low_temperature  # return (input) temperature from discharging? TODO
-    mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old, mass_out, return_temperature_input,
-                                                                        lower_node, sim_params)
-
-    for n in 1:(unit.number_of_layer_total)
-        if n == 1  # bottom layer, single-side
-            t_new[n] = t_old[n] +
-                       (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                        unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through bottom and side walls
-                       # unit.lambda[n] * (Q_in_out)[n] +                                                               # thermal input and output
-                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
-                       unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
-        elseif n == unit.number_of_layer_total  # top layer, single-side
-            t_new[n] = t_old[n] +
-                       (60 * 60 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                        unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through lid and side walls
-                       # unit.lambda[n] * Q_in_out[n] +                                                                 # thermal input and output
-                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
-                       unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
-        else       # mid layer
-            t_new[n] = t_old[n] +
-                       (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
-                        unit.dz_normalized[n]^2 +                                                                       # thermal diffusion
-                        unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through side walls
-                       # unit.lambda[n] * Q_in_out[n] +                                                                 # thermal input and output
-                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
-                       unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
+    for _ in 1:number_of_internal_timesteps
+        if number_of_internal_timesteps > 1
+            mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old,
+                                                                           mass_in ./ number_of_internal_timesteps,
+                                                                           lower_node, sim_params)
+            mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old,
+                                                                                mass_out ./
+                                                                                number_of_internal_timesteps,
+                                                                                return_temperature_input,
+                                                                                lower_node, sim_params)
         end
+        for n in 1:(unit.number_of_layer_total)
+            if n == 1  # bottom layer, single-side
+                t_new[n] = t_old[n] +
+                           (3600 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +  # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                  # losses through bottom and side walls
+                           # unit.lambda[n] * (Q_in_out)[n] +                                                           # thermal input and output
+                           unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                # mass input
+                           unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                # mass output
+            elseif n == unit.number_of_layer_total  # top layer, single-side
+                t_new[n] = t_old[n] +
+                           (3600 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +  # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                  # losses through lid and side walls
+                           # unit.lambda[n] * Q_in_out[n] +                                                             # thermal input and output
+                           unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                # mass input
+                           unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                # mass output
+            else       # mid layer
+                t_new[n] = t_old[n] +
+                           (3600 * unit.diffussion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
+                            unit.dz_normalized[n]^2 +                                                                   # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                  # losses through side walls
+                           # unit.lambda[n] * Q_in_out[n] +                                                             # thermal input and output
+                           unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                # mass input
+                           unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                # mass output
+            end
 
-        if n > 1   # mixing due to buoancy effecs, if temperature gradient is present
-            adjust_temp = max(0, t_new[n - 1] - t_new[n])
-            t_new[n] = t_new[n] + unit.theta[n] * adjust_temp
-            t_new[n - 1] = t_new[n - 1] - (1 - unit.theta[n]) * adjust_temp
+            if n > 1   # mixing due to buoancy effecs, if temperature gradient is present
+                adjust_temp = max(0, t_new[n - 1] - t_new[n])
+                t_new[n] = t_new[n] + unit.theta[n] * adjust_temp
+                t_new[n - 1] = t_new[n - 1] - (1 - unit.theta[n]) * adjust_temp
+            end
         end
+        t_old = Vector{Union{Nothing,Float64}}(copy(t_new))
     end
 
     load_new = (weighted_mean(t_new, unit.volume_segments, sim_params) - unit.low_temperature) /
@@ -544,9 +572,6 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
     unit.load = load_new
 
     unit.temperature_segments = t_new
-
-    # write old temperature field for output
-    unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(t_old)
 end
 
 """
