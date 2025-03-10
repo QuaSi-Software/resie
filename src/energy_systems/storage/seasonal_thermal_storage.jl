@@ -183,11 +183,11 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.volume_segments,
     unit.height,
     unit.radius_small,
-    unit.radius_large = calc_cylinder_geometry(unit.uac,
-                                               unit.volume,
-                                               unit.sidewall_angle,
-                                               unit.hr_ratio,
-                                               unit.number_of_layer_total)
+    unit.radius_large = calc_STES_geometry(unit.uac,
+                                           unit.volume,
+                                           unit.sidewall_angle,
+                                           unit.hr_ratio,
+                                           unit.number_of_layer_total)
 
     # calculate the mass of the medium in each layer
     unit.layer_masses = unit.rho_medium .* unit.volume_segments
@@ -261,7 +261,7 @@ function weighted_mean(values::Vector{Float64}, weights::Vector{Float64}, sim_pa
 end
 
 """
-    calc_cylinder_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
+    calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
 
 Calculate the geometry of a seasonal thermal energy storage (STES) system, either as a cylinder or a truncated cone.
 
@@ -283,7 +283,7 @@ Calculate the geometry of a seasonal thermal energy storage (STES) system, eithe
 - `radius_large::Float64`: Radius of the larger base (for truncated cone) [m]
 
 """
-function calc_cylinder_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
+function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
     a_barrel = zeros(n_segments)
     v_section = zeros(n_segments)
 
@@ -415,11 +415,8 @@ function control(unit::SeasonalThermalStorage,
     # calculate maximum eneries: Currently, the maximum energy is limited also by the volume of the 
     # bottom layer, as the internal mass flow in the STES within one time step has to be smaller than
     # the smallest layer.
-    mass_in_smallest_layer = unit.volume_segments[1] * unit.rho_medium   # kg
-    max_energy_input = mass_in_smallest_layer * convert_kJ_in_Wh(unit.cp_medium) *
-                       (unit.high_temperature - unit.temperature_segments[1])
     unit.current_max_output_energy = min(unit.load, unit.max_output_energy)
-    unit.current_max_input_energy = min(min(unit.capacity - unit.load, unit.max_input_energy), max_energy_input)
+    unit.current_max_input_energy = min(unit.capacity - unit.load, unit.max_input_energy)
 
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
@@ -499,31 +496,12 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
     mass_out = mass_out == [] ? [0.0] : mass_out
 
     # mass flow and temperatures for charging
-    number_of_inputs = length(unit.current_energy_input)
-    mass_in_temp = zeros(number_of_inputs, unit.number_of_layer_total)
-    mass_in_vec = zeros(number_of_inputs, unit.number_of_layer_total)
-    for n in 1:number_of_inputs
-        # find index of highest layer that is below the temperature of the charging input temperature
-        # This represents a ideal charging system (lance e.g.)
-        upper_node_charging = unit.number_of_layer_total
-        for i in length(t_old):-1:1
-            if t_old[i] < unit.current_temperature_input[n]
-                upper_node_charging = i
-                break
-            end
-        end
-        mass_in_temp[n, :] = vcat(zeros(lower_node - 1),
-                                  t_old[(lower_node + 1):upper_node_charging],
-                                  [unit.current_temperature_input[n]],
-                                  zeros(unit.number_of_layer_total - upper_node_charging))
+    mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old, mass_in, lower_node, sim_params)
 
-        mass_in_vec[n, :] = [((lower_node <= i <= upper_node_charging) ? mass_in[n] : 0.0)
-                             for i in 1:(unit.number_of_layer_total)]
-    end
     # mass flow and corresponding temperatures into each layer during discharging
-    return_temperature_input = unit.low_temperature # return (input) temperature from discharging? TODO
-    mass_out_temp, mass_out_vec = calculate_mass_temperatur_dischargin(unit, t_old, mass_out, return_temperature_input,
-                                                                       lower_node, sim_params)
+    return_temperature_input = unit.low_temperature  # return (input) temperature from discharging? TODO
+    mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old, mass_out, return_temperature_input,
+                                                                        lower_node, sim_params)
 
     for n in 1:(unit.number_of_layer_total)
         if n == 1  # bottom layer, single-side
@@ -531,14 +509,14 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through bottom and side walls
                        # unit.lambda[n] * (Q_in_out)[n] +                                                               # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
+                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         elseif n == unit.number_of_layer_total  # top layer, single-side
             t_new[n] = t_old[n] +
                        (60 * 60 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through lid and side walls
                        # unit.lambda[n] * Q_in_out[n] +                                                                 # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
+                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         else       # mid layer
             t_new[n] = t_old[n] +
@@ -546,7 +524,7 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
                         unit.dz_normalized[n]^2 +                                                                       # thermal diffusion
                         unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                      # losses through side walls
                        # unit.lambda[n] * Q_in_out[n] +                                                                 # thermal input and output
-                       unit.phi[n] * sum(mass_in_vec[:, n] .* (mass_in_temp[:, n] .- t_old[n])) +                       # mass input for ever input
+                       unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                    # mass input
                        unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                    # mass output
         end
 
@@ -572,7 +550,95 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
 end
 
 """
-    calculate_mass_temperatur_dischargin(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+    calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+                                       mass_in::Vector{Float64}, lower_node::Int, sim_params::Dict{String,Any})
+
+Calculate the mass flow and its temperature into each single layer of a Seasonal Thermal Energy Storage (STES) during charging.
+It handles cases where the mass flow into a layer is greater than the volume of the layer as well as multiple inputs
+with different temperatures. The function is based on the ideal charging system where the mass flow is put into the
+lowest layer that is below the temperature of the input (e.g. lance)
+
+# Arguments
+- `unit::SeasonalThermalStorage`: The seasonal thermal storage unit.
+- `t_old::Vector{Temperature}`: Vector of temperatures in each layer before charging.
+- `mass_in::Vector{Float64}`: Vector of mass inputs for each input source.
+- `lower_node::Int`: The index of the lowest layer to consider for charging.
+- `sim_params::Dict{String,Any}`: Dictionary of simulation parameters.
+
+# Returns
+- `mass_in_temp::Vector{Float64}`: Vector of temperatures of the mass flow into each layer.
+- `mass_in_vec::Vector{Float64}`: Vector of mass flow into each layer.
+"""
+function calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+                                            mass_in::Vector{Float64}, lower_node::Int, sim_params::Dict{String,Any})
+    number_of_inputs = length(unit.current_energy_input)
+    mass_in_temp = zeros(unit.number_of_layer_total)
+    mass_in_vec = zeros(unit.number_of_layer_total)
+    upper_node_charging = Int[]
+    mass_input = zeros(unit.number_of_layer_total, number_of_inputs)
+    temperature_input = zeros(unit.number_of_layer_total, number_of_inputs)
+
+    # find index of uppermost layer that is below the temperature, for each input
+    # This represents a ideal charging system (lance e.g.)
+    for input in 1:number_of_inputs
+        for layer in (unit.number_of_layer_total):-1:1
+            if t_old[layer] < unit.current_temperature_input[input]
+                push!(upper_node_charging, layer)
+                mass_input[layer, input] = mass_in[input]
+                temperature_input[layer, input] = unit.current_temperature_input[input]
+                break
+            end
+        end
+    end
+
+    # calculate masses and corresponding temperatures flowing into each layer during charging
+    mass_in_layer = Float64[]
+    temperature_in_layer = Float64[]
+    for layer in (unit.number_of_layer_total):-1:lower_node
+        # add external mass and temperature input to the upcoming layer
+        if layer in upper_node_charging
+            append!(mass_in_layer, mass_input[layer, :])
+            append!(temperature_in_layer, temperature_input[layer, :])
+        end
+
+        # write mass input to vector
+        mass_in_vec[layer] = min(sum(mass_in_layer), unit.layer_masses[layer])
+
+        # calculate tempearture of mass flow into the layer due to discharging
+        if sum(mass_in_layer) <= unit.layer_masses[layer]  # all input mass can be hold in current layer
+            mass_in_temp[layer] = weighted_mean(temperature_in_layer, mass_in_layer, sim_params)
+
+            # set input for next layer
+            temperature_in_layer = [t_old[layer]]
+            mass_in_layer = [sum(mass_in_layer)]
+        else # here, the mass put into the layer is bigger than the volume of the layer
+            mass_to_keep = Float64[]
+            temperature_to_keep = Float64[]
+            while sum(mass_to_keep) < unit.layer_masses[layer]
+                needed = unit.layer_masses[layer] - sum(mass_to_keep)
+                if mass_in_layer[end] < needed
+                    push!(mass_to_keep, mass_in_layer[end])
+                    push!(temperature_to_keep, temperature_in_layer[end])
+                    pop!(mass_in_layer)
+                    pop!(temperature_in_layer)
+                else
+                    push!(mass_to_keep, needed)
+                    push!(temperature_to_keep, temperature_in_layer[end])
+                    mass_in_layer[end] -= needed
+                end
+            end
+            mass_in_temp[layer] = weighted_mean(temperature_to_keep, mass_to_keep, sim_params)
+
+            # add volume of layer as input for next layer
+            pushfirst!(mass_in_layer, unit.layer_masses[layer])
+            pushfirst!(temperature_in_layer, t_old[layer])
+        end
+    end
+    return mass_in_temp, mass_in_vec
+end
+
+"""
+    calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
                                          mass_out::Float64, return_temperature_input::Temperature, lower_node::Int,
                                          sim_params::Dict{String,Any})
 
@@ -592,9 +658,9 @@ It handles cases where the mass flow into a layer is greater than the volume of 
 - `mass_out_vec::Vector{Float64}`: Vector of mass flow rates into each layer during discharging
 
 """
-function calculate_mass_temperatur_dischargin(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-                                              mass_out::Float64, return_temperature_input::Temperature, lower_node::Int,
-                                              sim_params::Dict{String,Any})
+function calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+                                               mass_out::Float64, return_temperature_input::Temperature,
+                                               lower_node::Int, sim_params::Dict{String,Any})
     upper_node_discharging = unit.number_of_layer_total - unit.output_layer_from_top + 1
     mass_out_temp = zeros(unit.number_of_layer_total)
     mass_in_layer = [mass_out]
@@ -602,7 +668,7 @@ function calculate_mass_temperatur_dischargin(unit::SeasonalThermalStorage, t_ol
     for layer in lower_node:upper_node_discharging
         # calculate tempearture of mass flow into the layer due to discharging
         if sum(mass_in_layer) <= unit.layer_masses[layer]
-            if layer == 1
+            if layer == lower_node
                 mass_out_temp[layer] = return_temperature_input
             else
                 mass_out_temp[layer] = weighted_mean(temperature_in_layer, mass_in_layer, sim_params)
@@ -611,15 +677,11 @@ function calculate_mass_temperatur_dischargin(unit::SeasonalThermalStorage, t_ol
             temperature_in_layer = [t_old[layer]]
             mass_in_layer = [mass_out]
         else # here, the mass put into the layer is bigger than the volume of the layer
-            if layer == 1
+            if layer == lower_node
                 mass_out_temp[layer] = return_temperature_input
                 # set input for next layer
                 mass_in_layer = [unit.layer_masses[layer], mass_in_layer[1] - unit.layer_masses[layer]]
                 temperature_in_layer = [t_old[layer], temperature_in_layer[1]]
-
-                if sum(mass_in_layer) !== mass_out
-                    @warn "This should not happen" # TODO: remove
-                end
             else
                 mass_to_keep = Float64[]
                 temperature_to_keep = Float64[]
@@ -641,10 +703,6 @@ function calculate_mass_temperatur_dischargin(unit::SeasonalThermalStorage, t_ol
                 # set input for next layer
                 pushfirst!(mass_in_layer, unit.layer_masses[layer])
                 pushfirst!(temperature_in_layer, t_old[layer])
-
-                if sum(mass_in_layer) !== mass_out
-                    @warn "This should not happen" # TODO: remove
-                end
             end
         end
     end
