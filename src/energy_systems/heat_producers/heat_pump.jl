@@ -955,8 +955,13 @@ function calculate_energies_heatpump(unit::HeatPump,
             if best_plrs[indexes[1], indexes[2]] === nothing
                 continue
             end
-            unit.avg_plr += best_plrs[indexes[1], indexes[2]] * energies.slices_heat_out[slice_idx]
-            weights += energies.slices_heat_out[slice_idx]
+            if optimise_slice_dispatch
+                weight = energies.slices_heat_out[slice_idx]
+            else
+                weight = energies.slices_heat_out_temp[slice_idx]
+            end
+            unit.avg_plr += best_plrs[indexes[1], indexes[2]] * weight
+            weights += weights
         catch BoundsError
             continue
         end
