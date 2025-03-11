@@ -1,7 +1,6 @@
 using Interpolations
 using Roots
-
-include("solar_irradiance.jl")
+using Resie.SolarIrradiance
 
 """
 Implementation of a solarthermal collector.
@@ -25,7 +24,6 @@ mutable struct SolarthermalCollectorVal <: Component
 
     medium::Symbol
 
-    time_zone::Int32
     collector_gross_area::Float64
     tilt_angle::Float32
     azimuth_angle::Float32
@@ -79,14 +77,13 @@ mutable struct SolarthermalCollectorVal <: Component
     input_temp::Float32
     zenith_angle::Float32
     angle_of_incidence::Float32
-    global_solar_hor_irr::Float64
 
     function SolarthermalCollectorVal(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        ambient_temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
-        global_solar_hor_irradiance_profile = get_glob_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
-        long_wave_irradiance_profile = get_infrared_sky_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
-        diffuse_solar_hor_irradiance_profile = get_diff_solar_radiation_profile_from_config(config, sim_params, uac) # Wh/m^2
-        wind_speed_profile = get_wind_speed_profile_from_config(config, sim_params, uac) # m/s
+        _, ambient_temperature_profile = get_parameter_profile_from_config(config, sim_params, :temperature, "temperature_profile_file_path", "temperature_from_global_file", "constant_temperature", uac, required=true)
+        _, global_solar_hor_irradiance_profile = get_parameter_profile_from_config(config, sim_params, "global_solar_radiation", "global_solar_radiation_file_path", "global_solar_radiation_from_global_file", "constant_global_solar_radiation", uac, required=true) # Wh/m^2
+        _, long_wave_irradiance_profile = get_parameter_profile_from_config(config, sim_params, "infrared_sky_radiation", "infrared_sky_radiation_file_path", "infrared_sky_radiation_from_global_file", "constant_infrared_sky_radiation_from_global_file", uac, required=true) # Wh/m^2
+        _, diffuse_solar_hor_irradiance_profile = get_parameter_profile_from_config(config, sim_params, "diffuse_solar_radiation", "diffuse_solar_radiation_file_path", "diffuse_solar_radiation_from_global_file", "constant_diffuse_solar_radiation", uac, required=true) # Wh/m^2
+        _, wind_speed_profile = get_parameter_profile_from_config(config, sim_params, "wind_speed", "wind_speed_file_path", "wind_speed_from_global_file", "constant_wind_speed", uac, required=true) # m/s
 
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
         register_media([medium])
@@ -99,7 +96,6 @@ mutable struct SolarthermalCollectorVal <: Component
             InterfaceMap(medium => nothing), # output_interfaces
             medium, # medium name of output interface
             
-            config["time_zone"], # time zone of the irradiance data
             config["collector_gross_area"], # gross area of collector
             config["tilt_angle"], # tilt angle
             config["azimuth_angle"], # azimuth angle or orientation angle
@@ -158,7 +154,6 @@ mutable struct SolarthermalCollectorVal <: Component
             nothing,
             -1.5,
             0.0,
-            0.0,
             0.0
             )
     end
@@ -207,17 +202,15 @@ function control(unit::SolarthermalCollectorVal,
     global_solar_hor_irradiance = sim_params["wh_to_watts"](Profiles.value_at_time(
         unit.global_solar_hor_irradiance_profile, sim_params
         ))
-    unit.global_solar_hor_irr = global_solar_hor_irradiance
         
     diffuse_solar_hor_irradiance = sim_params["wh_to_watts"](Profiles.value_at_time(
         unit.diffuse_solar_hor_irradiance_profile, sim_params
         ))
-    # calculate the diffuse solar irradiance in the collector plane with with simple isotropic sky model
-    # unit.diffuse_solar_irradiance_in_plane = diffuse_solar_hor_irradiance * ((1 + cosd(unit.tilt_angle)) / 2)
 
     unit.ambient_temperature = Profiles.value_at_time(
         unit.ambient_temperature_profile, sim_params
         )
+    mean_ambient_temperature = Base.sum((values(unit.ambient_temperature_profile.data))) / length(unit.ambient_temperature_profile.data)
 
     unit.reduced_wind_speed = max(
         Profiles.value_at_time(unit.wind_speed_profile, sim_params) * unit.wind_speed_reduction - 3, 0)
@@ -238,16 +231,12 @@ function control(unit::SolarthermalCollectorVal,
     #     unit.tilt_angle, unit.azimuth_angle, solar_zenith, solar_azimuth, 
     #     global_solar_hor_irradiance, diffuse_solar_hor_irradiance
     #     )
-                                        
-    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], 
-                                               sim_params["time_step_seconds"], 
-                                               sim_params["longitude"], sim_params["latitude"], 
-                                               unit.time_zone, 1.0, unit.ambient_temperature)
     
     unit.beam_solar_irradiance_in_plane, unit.diffuse_solar_irradiance_in_plane, 
-    unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle = 
+    unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle, 
+    solar_zenith, solar_azimuth = 
     irr_in_plane(sim_params, unit.tilt_angle, unit.azimuth_angle, global_solar_hor_irradiance, 
-                 diffuse_solar_hor_irradiance, dni, unit.time_zone, 1.0, unit.ambient_temperature, 
+                 diffuse_solar_hor_irradiance, nothing, 1.0, mean_ambient_temperature, 
                  unit.ground_reflectance
                  )
     
@@ -783,8 +772,7 @@ function output_values(unit::SolarthermalCollectorVal)::Vector{String}
             "spec_flow_rate",
             "spec_flow_rate_profile",
             "zenith_angle",
-            "angle_of_incidence",
-            "global_solar_hor_irr"
+            "angle_of_incidence"
             ]
 end
 
@@ -822,8 +810,6 @@ function output_value(unit::SolarthermalCollectorVal, key::OutputKey)::Float64
         return unit.zenith_angle
     elseif key.value_key == "angle_of_incidence"
         return unit.angle_of_incidence
-    elseif key.value_key == "global_solar_hor_irr"
-        return unit.global_solar_hor_irr
     end
     throw(KeyError(key.value_key))
 end

@@ -1,8 +1,6 @@
 using Interpolations
 using Roots
 
-include("solar_irradiance.jl")
-
 """
 Implementation of a solarthermal collector.
 Works for flat plate collectors, vacuum tube collectors and PVT modules.

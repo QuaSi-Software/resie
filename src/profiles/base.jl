@@ -62,11 +62,13 @@ mutable struct Profile
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the 
                                                                       # timestep in seconds of the given data
                      given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, shoule be "intensive" or
-                     #                                                            "extensive"
+                                                                      # "extensive"
                      shift::Dates.Second=Second(0),                   # optional: timeshift for data. A positive shift 
-                     #                                                            adds to the timestamp = value is later
-                     interpolation_type::String="stepwise")           # optional: interpolation type. Can be one of: "stepwise",
-        #                                                                         "linear_classic", "linear_time_preserving"
+                                                                      # adds to the timestamp = value is later
+                     interpolation_type::String="stepwise",           # optional: interpolation type. Can be one of: "stepwise",
+                                                                      # "linear_classic", "linear_time_preserving", "linear_solar_radiation"
+                     sunrise_sunset::Vector{Profile}=Vector{Profile}() # optional: sunrise and sunset times for solar radiation interpolation
+                     )           
         if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
@@ -339,7 +341,8 @@ mutable struct Profile
                                                             data_type,
                                                             file_path,
                                                             sim_params,
-                                                            interpolation_type)
+                                                            interpolation_type,
+                                                            sunrise_sunset=sunrise_sunset)
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
 
@@ -700,7 +703,8 @@ function convert_profile(values::Vector{Float64},
                          profile_type::Symbol,
                          file_path::String,
                          sim_params::Dict{String,Any},
-                         interpolation_type::String)
+                         interpolation_type::String;
+                         sunrise_sunset::Vector{Profile}=Vector{Profile}())
 
     # construct info message
     info_message = "The profile at $(file_path) "
@@ -767,7 +771,8 @@ function convert_profile(values::Vector{Float64},
                                                  timestamps[end],
                                                  values,
                                                  new_time_step,
-                                                 sim_params)
+                                                 sim_params,
+                                                 sunrise_sunset=sunrise_sunset)
 
         elseif interpolation_type == "linear_classic"
             values, timestamps = profile_linear_interpolation(values,
@@ -836,7 +841,7 @@ Returns (t_sub, irr_sub, G_end) where:
   • irr_sub is the average irradiance (W/m²) for each subinterval,
   • G_end is the endpoint to carry over.
 """
-function segment_interval(hn::Float64, hnp1::Float64,
+function segment_interval_old(hn::Float64, hnp1::Float64,
                           interval_start::Float64, interval_end::Float64,
                           dt_h::Float64, g_start::Float64,
                           sunrise::Float64, sunset::Float64)
@@ -847,7 +852,7 @@ function segment_interval(hn::Float64, hnp1::Float64,
     # 2. Define the effective daylight region.
     eff_start = max(interval_start, sunrise)
     eff_end = min(interval_end, sunset)
-    if eff_end <= eff_start
+    if eff_end <= eff_start || hn <= 0.0
         # No daylight: all dt blocks get zero irradiance.
         return t_blocks, zeros(Float64, n_total), 0.0
     end
@@ -865,7 +870,7 @@ function segment_interval(hn::Float64, hnp1::Float64,
     else
         if hnp1 > hn && is_sunrise
             effective_G_end = (2 * hn) / dt_eff
-        elseif hnp1 < hn && is_sunset
+        elseif hnp1 < hn && is_sunrise
             effective_G_end = (0.25 * hn + 0.75 * hnp1) / dt_eff
         else
             effective_G_end = (0.5 * hn + 0.5 * hnp1) / dt_eff
@@ -928,6 +933,136 @@ function segment_interval(hn::Float64, hnp1::Float64,
 end
 
 """
+    segment_interval() 
+segments one hourly interval given as fractional times (relative to midnight) using the 
+algorithm of TRNSYS 18, described in:
+    T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
+    "A New Method for Determining Sub-hourly Solar Radiation from Hourly Data" 
+
+Parameters:
+  • hn       : hourly integrated irradiation for the current hour [Wh/m²]
+  • hnp1     : hourly integrated irradiation for the next hour [Wh/m²]
+  • interval_start, interval_end : start and end of the current hourly interval
+      (in fractional hours, e.g., 7.24 or 8.0)
+  • dt_h     : required simulation timestep (in hours)
+  • g_start  : carry-over instantaneous radiation from the previous interval (W/m²)
+  • sunrise, sunset : daylight bounds (fractional hours)
+
+Returns (t_sub, irr_sub, G_end) where:
+  • t_sub is a vector of fractional hour values (currently computed as startpoints)
+  • irr_sub is the average irradiance (W/m²) for each subinterval,
+  • G_end is the endpoint to carry over.
+"""
+function segment_interval(hn::Float64, hnp1::Float64,
+                          interval_start::Float64, interval_end::Float64,
+                          dt_h::Float64, g_start::Float64,
+                          sunrise::Float64, sunset::Float64)
+    # 1. Divide the full hourly interval into dt blocks (using ceil to ensure full coverage)
+    n_total = max(Int(ceil((interval_end - interval_start) / dt_h)), 1)
+    t_blocks = [interval_start + (j - 1) * dt_h for j in 1:n_total]
+
+    # 2. Define the effective daylight region.
+    eff_start = max(interval_start, sunrise)
+    eff_end = min(interval_end, sunset)
+    if eff_end <= eff_start || hn <= 0.0
+        # No daylight: all dt blocks get zero irradiance.
+        return t_blocks, zeros(Float64, n_total), 0.0
+    end
+    dt_eff = eff_end - eff_start
+    is_sunrise = eff_start == sunrise
+    is_sunset = eff_end == sunset
+
+    # 3. Subdivide the effective region into dt blocks (again using ceil)
+    n_eff = max(Int(ceil(dt_eff / dt_h)), 1)
+
+    # 4. Compute the effective endpoint.
+    # If the hour includes sunset or next step doesn't have irradiance, force the endpoint to zero.
+    if is_sunset || hnp1 == 0.0
+        effective_G_end = 0.0
+    else
+        if hnp1 > hn && g_start == 0.0
+            effective_G_end = (2 * hn) / dt_eff
+        elseif hnp1 <= hn && g_start == 0.0
+            effective_G_end = (0.25 * hn + 0.75 * hnp1) / dt_eff
+        else
+            effective_G_end = (0.5 * hn + 0.5 * hnp1) / dt_eff
+        end
+    end
+
+    # 5. Compute the midpoint value (g_mid) and build the piecewise–linear boundaries over the effective region.
+    boundaries = Array{Float64}(undef, n_eff + 1)
+    boundaries[1] = g_start
+
+    if n_eff == 1
+        g_mid = hn / dt_h
+        boundaries[end] = g_mid
+    # elseif g_start == 0.0
+    #     g_mid = 2 * hn / (n_eff * dt_h) - ((n_eff - n_mid) * effective_G_end) / n_eff
+    #     if n_eff <= 3
+    #         boundaries[2] = g_mid
+    #     else
+    #         boundaries[2] = (g_start + g_mid) / 2
+    #         boundaries[end-1] = (g_mid + effective_G_end) / 2
+    #         boundaries[3:end-2] = fill(g_mid, n_eff - 3)
+    #     end
+    
+    else
+        n_mid = Int(floor(n_eff / 2))
+        g_mid = 2 * hn / (n_eff * dt_h) - (n_mid * g_start) / n_eff - ((n_eff - n_mid) * effective_G_end) / n_eff
+        if g_start == 0.0
+            n_mid += 1
+        end
+        if g_mid >= 0 
+            # First part: interpolate from g_start to g_mid over n_mid subintervals.
+            for j in 1:n_mid
+                boundaries[j + 1] = g_start + (j / n_mid) * (g_mid - g_start)
+            end
+            # Second part: interpolate from g_mid to effective_G_end over the remaining subintervals.
+            #              effective_G_end is considered to be the first value of the next interval.
+            m = n_eff - n_mid
+            for k in 1:m
+                boundaries[n_mid + 1 + k] = g_mid + (k / m) * (effective_G_end - g_mid)
+            end 
+
+        else # g_mid smaller zero?
+            g_mid = (2 * hn / dt_h - (g_start + effective_G_end)) / (2 * (n_eff - 1))
+            if g_mid >= 0 
+                # only interpolate second and second to last boundary and fill rest with g_mid
+                if n_eff <= 3
+                    boundaries[2] = g_mid
+                else
+                    boundaries[2] = (g_start + g_mid) / 2
+                    boundaries[end-1] = (g_mid + effective_G_end) / 2
+                    boundaries[3:end-2] = fill(g_mid, n_eff - 3)
+                end
+
+            else # g_mid still smaller zero?
+                g_mid = g_start / 2
+                # set second boundary to g_mid and fill rest with effective_G_end
+                boundaries[2] = g_mid
+                boundaries[3:end-1] = fill(effective_G_end, n_eff - 2)
+            end
+        end
+        boundaries[end] = effective_G_end    
+    end    
+
+    # 6. Compute the effective irradiance values (midpoints) over the effective region.
+    effective_irr = [(boundaries[i] + boundaries[i + 1]) / 2 for i in 1:(length(boundaries) - 1)]
+
+    # 7. fill effective_irr with zeros at the beginning or end, depending if we are during 
+    #    sunset or sunrise
+    if n_eff < n_total
+        if is_sunrise
+            effective_irr = vcat(zeros(Float64, n_total - n_eff), effective_irr)
+        elseif is_sunset
+            effective_irr = vcat(effective_irr, zeros(Float64, n_total - n_eff))
+        end
+    end
+
+    return t_blocks, effective_irr, effective_G_end
+end
+
+"""
  segment_profile() processes a long period (e.g. a full year) given:
  
    • begin_dt, end_dt : DateTime objects defining the overall period.
@@ -949,7 +1084,8 @@ function segment_profile(begin_dt::DateTime,
                          end_dt::DateTime,
                          hourly_H::Vector{Float64},
                          dt::Millisecond,
-                         sim_params::Dict{String,Any})
+                         sim_params::Dict{String,Any};
+                         sunrise_sunset::Vector{Profile}=Vector{Profile}())
     dt_h = dt / Hour(1)  # Convert dt to hours (Float64)
 
     # Prepare containers for results.
@@ -969,11 +1105,9 @@ function segment_profile(begin_dt::DateTime,
     for i in 1:n_hours
         current_hour_dt = add_ignoring_leap_days(begin_dt, Hour(i - 1))
         current_date = Date(current_hour_dt)
-        # Reset g_start at the beginning of a new day.
-        if i == 1 || (i > 1 && Date(add_ignoring_leap_days(begin_dt, Hour(i - 2))) != current_date)
+        if i == 1
             g_start = 0.0
         end
-
         # Compute the boundaries of this hourly interval (in fractional hours).
         start_of_hour = fractional_hour(current_hour_dt)
         end_of_hour = fractional_hour(current_hour_dt + Hour(1)) == 0.0 ? 24.0 :
@@ -982,10 +1116,8 @@ function segment_profile(begin_dt::DateTime,
         interval_end = (i == n_hours) ? fractional_hour(end_dt) : end_of_hour
 
         # Get sunrise and sunset for current_date.
-        sunrise, sunset = get_sunset_sunrise(current_date,
-                                             sim_params["latitude"],
-                                             sim_params["longitude"],
-                                             sim_params["timezone"])
+        sunrise = sunrise_sunset[1].data[current_hour_dt]
+        sunset = sunrise_sunset[2].data[current_hour_dt]
 
         # Retrieve current and next hourly integrated irradiation.
         hn = hourly_H[i]
@@ -1010,39 +1142,6 @@ function segment_profile(begin_dt::DateTime,
     end
 
     return irr_total, times_total
-end
-
-# -----------------------------------------------------------------
-# get_sunset_sunrise computes sunrise and sunset (in fractional hours)
-# for a given Date and location.
-#
-# (This is one common NOAA‐based implementation.)
-# -----------------------------------------------------------------
-function get_sunset_sunrise(date::Date, lat::Float64, lon::Float64, tz::Float64)
-    # Helper functions for degree–radian conversion (used in sunrise/sunset)
-    deg2rad(deg) = deg * (π / 180)
-    rad2deg(rad) = rad * (180 / π)
-
-    n = dayofyear(date)
-    lat_rad = deg2rad(lat)
-    g = 2π / 365 * (n - 1)
-    decl = 0.006918 - 0.399912 * cos(g) + 0.070257 * sin(g) - 0.006758 * cos(2 * g) +
-           0.000907 * sin(2 * g) - 0.002697 * cos(3 * g) + 0.00148 * sin(3 * g)
-    E = 229.18 * (0.000075 + 0.001868 * cos(g) - 0.032077 * sin(g) -
-                  0.014615 * cos(2 * g) - 0.040849 * sin(2 * g))
-    zenith = deg2rad(90.833)  # accounts for refraction
-    cos_omega = (cos(zenith) - sin(lat_rad) * sin(decl)) / (cos(lat_rad) * cos(decl))
-    if cos_omega > 1
-        return (NaN, NaN)   # sun never rises
-    elseif cos_omega < -1
-        return (NaN, NaN)   # sun never sets
-    end
-    omega = acos(cos_omega)
-    delta_minutes = rad2deg(omega) * 4
-    solar_noon = 720 - 4 * lon - E + tz * 60   # in minutes
-    sunrise_min = solar_noon - delta_minutes
-    sunset_min = solar_noon + delta_minutes
-    return sunrise_min / 60, sunset_min / 60  # fractional hours
 end
 
 """

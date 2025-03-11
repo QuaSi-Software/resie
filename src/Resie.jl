@@ -47,6 +47,8 @@ end
 
 include("profiles/base.jl")
 using .Profiles
+include("profiles/solar_irradiance.jl")
+using .SolarIrradiance
 include("profiles/weatherdata.jl")
 using .Weatherdata
 

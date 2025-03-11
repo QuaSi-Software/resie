@@ -1,7 +1,13 @@
+module SolarIrradiance
+
 using Dates
+using Roots
+using Resie.Profiles
+
+export sun_position, irr_in_plane, get_sunrise_sunset
 
 function sun_position(dt::DateTime, time_step_seconds, longitude::Number, latitude::Number, 
-                      time_zone::Int32=0, pressure::Number=1.0, temperature::Number=20.0)
+                      time_zone::Number=0, pressure::Number=1.0, temperature::Number=10.9)
 """
 Calculate solar position in degrees.
 Time is shifted by a half time_step forward, because it all profiles in Resie are given as 
@@ -11,19 +17,17 @@ from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.0
 dt must be provided in UTC, if no time_zone is provided.
 time_zone is the time difference to UTC as INT in hours.
 longitude and latitude should be provided in WGS84.
-pressure and temperature are needed to apply the refraction correction which is relevant
+pressure in atm and temperature in °C are needed to apply the refraction correction which is relevant
 when the sun is low.
 """
 
     longitude = deg2rad(longitude)
     latitude = deg2rad(latitude)
 
-    # for validation
-    # dt = dt - Dates.Second(time_step_seconds / 2)
-    dt = dt + Dates.Second(time_step_seconds / 2) - Dates.Hour(time_zone)
+    dt_utc = dt - Hour(time_zone) + Second(round(time_step_seconds / 2))
 
     dt2060 = DateTime(2060,1,1)
-    t2060 = Int64(Dates.value(dt.instant - dt2060.instant)) / 86400000.0
+    t2060 = Int64(Dates.value(dt_utc.instant - dt2060.instant)) / 86400000.0
     tt = t2060 + 1.1574e-5 * (96.4 + 0.00158 * t2060)
 
     rightAscension, declination, hourAngle = alg5(t2060, tt, longitude)
@@ -39,11 +43,13 @@ when the sun is low.
 
     azimuth = atan(sH, cH * sp - sd * cp / cd)
 
-    zenith  = pi/2 - ep
-    if ep > 0.0
-        zenith -= (0.08422*pressure)/((273.0+temperature)*tan(ep + 0.003138/(ep + 0.08919)))
-    end
-
+    epr = max((0.08422*pressure)/((273.0+temperature)*tan(ep + 0.003138/(ep + 0.08919))),0)
+    # if epr > 0.0
+    #     zenith = pi/2 - ep - epr
+    # else
+    #     zenith = pi/2 - ep
+    # end
+    zenith = pi/2 - ep - epr
     return rad2deg(zenith), rad2deg(azimuth)
 end
 
@@ -88,58 +94,32 @@ function alg5(t2060::Number, tt::Number, longitude::Number)
     return rightAscension, declination, hourAngle
 end
 
-
-function beam_irr_in_plane(tilt_angle::Number, azimuth_angle::Number, solar_zenith::Number, solar_azimuth::Number, 
-                           global_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
-                           zenith_threshold_for_zero_dni::Number=89.5)
-    """
-    Calculate beam irradiance in collector plane and direct_normal_irradiance
-    All angles are in degrees and irradiances in W/m²
-    """
-    # calculate angle of incidence in degrees on the collector plane
-    aoi = acosd(
-        cosd(tilt_angle) * cosd(solar_zenith) + sind(tilt_angle) * sind(solar_zenith) * 
-        cosd(solar_azimuth - azimuth_angle)
-        )
-
-    # calculate longitudinal and transversal projections of the incidence angle
-    aoi_t = atand(sind(solar_zenith) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
-    aoi_t_iso = atand(sind(aoi) * sind(azimuth_angle - solar_azimuth) / cosd(aoi))
-    aoi_l = abs(tilt_angle - atand(tand(solar_zenith) * cosd(azimuth_angle - solar_azimuth)))
-    aoi_l_iso = atand(sind(aoi) * cosd(azimuth_angle - solar_azimuth) / cosd(aoi))
-
-    # calculate direct normal irradiance from global horrizontal irradiance (GHI) and 
-    # diffuse horrizontal irradiance (DHI)
-    if isnothing(dni)
-        if solar_zenith >= zenith_threshold_for_zero_dni
-            direct_normal_irradiance = 0
-        else
-            direct_normal_irradiance = max(
-                (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
-                )
-        end
-    else
-        direct_normal_irradiance = dni
-    end
-
-    # calculate the beam irradiance on the collector plane
-    beam_solar_irradiance_in_plane = max(direct_normal_irradiance * cosd(aoi), 0)
-
-    return beam_solar_irradiance_in_plane, direct_normal_irradiance, aoi, aoi_l, aoi_t
-end
-
-
 function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number, 
     global_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
-    time_zone::Int32=0, pressure::Number=1.0, temperature::Number=20.0, 
-    ground_reflectance::Number=0.2, zenith_threshold_for_zero_dni::Number=89.5)
+    pressure::Number=1.0, temperature::Number=20.0, ground_reflectance::Number=0.2, 
+    zenith_threshold_for_zero_dni::Number=89.5)
     """
     Calculate beam irradiance in collector plane and direct_normal_irradiance
     All angles are in degrees and irradiances in W/m²
     """
-    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], sim_params["time_step_seconds"], 
-                                               sim_params["longitude"], sim_params["latitude"], 
-                                               time_zone, pressure, temperature)
+    # get sunrise and senset to adjust time_step length from sunrise to end of time_step and start of time_step to sunset
+    sr = Profiles.value_at_time(sim_params["weather_data"].sunrise, sim_params)
+    ss = Profiles.value_at_time(sim_params["weather_data"].sunset, sim_params)
+    sr = convert_decimal_time_to_datetime(sim_params["current_date"], sr)
+    ss = convert_decimal_time_to_datetime(sim_params["current_date"], ss)
+    dt_start = sim_params["current_date"]
+    dt_end = dt_start + Second(sim_params["time_step_seconds"]) 
+    if sr >= dt_start && sr <= dt_end
+        new_time_step = round(dt_end-sr, Second).value
+    elseif ss >= dt_start && ss <= dt_end 
+        new_time_step = round(ss-dt_start, Second).value
+    else
+        new_time_step = sim_params["time_step_seconds"]
+    end
+
+    solar_zenith, solar_azimuth = sun_position(sim_params["current_date"], new_time_step, 
+                                                sim_params["longitude"], sim_params["latitude"], 
+                                                sim_params["timezone"], pressure, temperature)
 
     # calculate angle of incidence in degrees on the collector plane
     aoi = acosd(
@@ -188,7 +168,7 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     diffuse_solar_irradiance_in_plane = diffuse_sky_irradiance_in_plane + diffuse_ground_irradiance_in_plane
 
     return beam_solar_irradiance_in_plane, diffuse_solar_irradiance_in_plane, 
-           direct_normal_irradiance, aoi, aoi_l, aoi_t
+           direct_normal_irradiance, aoi, aoi_l, aoi_t, solar_zenith, solar_azimuth
 end
 
 function extraterrestrial_normal_irradiance(day_of_year::Int)
@@ -204,5 +184,44 @@ function extraterrestrial_normal_irradiance(day_of_year::Int)
     return etrn
 end
 
+function get_sunrise_sunset(dt::DateTime, latitude::Number, longitude::Number, time_zone::Number, pressure::Number=1.0, temperature::Number=10.9)
+    """
+    get_sunset_sunrise computes sunrise and sunset (in fractional hours) for a given Date and location.
+    """
+    sunrise_decimal = try
+        find_zero(time_decimal->sun_position_itt(dt, time_decimal, longitude, latitude, time_zone, 90, pressure, temperature), 
+                                    (0, 12),
+                                    Bisection()
+                                    )
+        catch
+            0.0
+        end
+    sunset_decimal = try
+        find_zero(time_decimal->sun_position_itt(dt, time_decimal, longitude, latitude, time_zone, 90, pressure, temperature), 
+                                   (12, 24),
+                                   Bisection()
+                                   ) 
+        catch
+            24.0
+        end
 
-export sun_position, beam_irr_in_plane, irr_in_plane
+    return sunrise_decimal, sunset_decimal
+end
+
+function sun_position_itt(dt::DateTime, time_decimal::Number, longitude::Number, latitude::Number, 
+                          time_zone::Number=0, target_zenith::Number=90, pressure::Number=1.0, temperature::Number=10.9)
+    
+    dt = convert_decimal_time_to_datetime(dt, time_decimal)
+    solar_zenith, _ = sun_position(dt, 0, longitude, latitude, time_zone, pressure, temperature)    
+    return solar_zenith - target_zenith   
+end
+
+function convert_decimal_time_to_datetime(dt::DateTime, time_decimal::Number)
+    h = floor(time_decimal)
+    m = floor((time_decimal - h)*60)
+    s = floor(((time_decimal - h)*60 - m)*60)
+    ns = floor((((time_decimal - h)*60 - m)*60 - s)*1000000000)
+    return DateTime(year(dt), month(dt), day(dt), h, m, s) + Nanosecond(ns)
+end
+
+end
