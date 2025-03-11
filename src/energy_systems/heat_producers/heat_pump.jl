@@ -57,6 +57,7 @@ mutable struct HeatPump <: Component
     mix_temp_output::Float64
     avg_plr::Float64
     time_active::Float64
+    time_active_min::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
@@ -132,7 +133,8 @@ mutable struct HeatPump <: Component
                    0.0, # mixing temperature in the input interface
                    0.0, # mixing temperature in the output interface
                    0.0, # avg_plr
-                   0.0) # time_active
+                   0.0, # time_active
+                   0.0) # time_active_min
     end
 end
 
@@ -876,6 +878,7 @@ function calculate_energies_heatpump(unit::HeatPump,
     energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
     best_plrs = copy(plrs)
     best_times = copy(times)
+    best_times_min = copy(times_min)
 
     # as long as the sum of times with minimum power per slice is larger than the time step
     # and the sum of times with chosen power per slice is smaller or equal to the time step
@@ -885,7 +888,11 @@ function calculate_energies_heatpump(unit::HeatPump,
     # cannot be observed, the heat pump should not run at all
     if sum(times_min; init=0.0) < sim_params["time_step_seconds"]
         energies = reset_temp_slices!(energies)
-        return energies
+        best_plrs = []
+        best_times = []
+        # we do not reset best_times_min as we want that information even when the heat pump
+        # did not run
+        optimise_slice_dispatch = false
     end
 
     # warning: this optimisation is janky and doesn't work as well as it could
@@ -913,6 +920,7 @@ function calculate_energies_heatpump(unit::HeatPump,
                 energies = copy_temp_to_slices!(energies)
                 best_plrs = copy(plrs)
                 best_times = copy(times)
+                best_times_min = copy(times_min)
                 no_change_in = 0
             else
                 # if the pass is rejected we need to set the temp slices to the best guess,
@@ -961,6 +969,7 @@ function calculate_energies_heatpump(unit::HeatPump,
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(best_times; init=0.0) / sim_params["time_step_seconds"]
+    unit.time_active_min = sum(best_times_min; init=0.0) / sim_params["time_step_seconds"]
 
     return energies
 end
@@ -1164,6 +1173,7 @@ function reset(unit::HeatPump)
     unit.losses_power = 0.0
     unit.avg_plr = 0.0
     unit.time_active = 0.0
+    unit.time_active_min = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -1174,6 +1184,7 @@ function output_values(unit::HeatPump)::Vector{String}
             "Effective_COP",
             "Avg_PLR",
             "Time_active",
+            "Time_active_min",
             "MixingTemperature_Input",
             "MixingTemperature_Output",
             "Losses_power",
@@ -1194,6 +1205,8 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return unit.avg_plr
     elseif key.value_key == "Time_active"
         return unit.time_active
+    elseif key.value_key == "Time_active_min"
+        return unit.time_active_min
     elseif key.value_key == "MixingTemperature_Input"
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"
