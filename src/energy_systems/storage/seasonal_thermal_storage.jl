@@ -410,11 +410,15 @@ function control(unit::SeasonalThermalStorage,
                      unit.current_max_output_temperature)
     set_temperature!(unit.input_interfaces[unit.m_heat_in],
                      unit.current_min_input_temperature,
-                     unit.high_temperature)
+                     nothing)
 
-    # calculate maximum eneries: Currently, the maximum energy is limited also by the volume of the 
-    # bottom layer, as the internal mass flow in the STES within one time step has to be smaller than
-    # the smallest layer.
+    # calculate maximum eneries for input and output
+    # actual_input_temp = #???
+    # max_input_energy = sum(convert_mass_in_energy(volume * unit.rho_medium,
+    #                                                                  unit.temperature_segments[layer],
+    #                                                                  actual_input_temp, unit.cp_medium)
+    #                                           for (layer, volume) in enumerate(unit.volume_segments)
+    #                                           if unit.temperature_segments[layer] < actual_input_temp)
     unit.current_max_output_energy = min(unit.load, unit.max_output_energy)
     unit.current_max_input_energy = min(unit.capacity - unit.load, unit.max_input_energy)
 
@@ -457,6 +461,22 @@ function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_hig
 end
 
 """
+    convert_mass_in_energy(mass, temp_low, temp_high, cp, roh)
+
+ calculates energy [Wh] from mass [kg] 
+
+ # Arguments
+- `mass::Float64`: mass to convert [kg]
+- `temp_low::Temperature`: lower temperatue [°C]
+- `temp_high::Temperature`: upper temperatur [°C]
+- `cp::Float64`: sppecific heat capacity [kJ/KgK]
+
+"""
+function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)
+    return mass * convert_kJ_in_Wh(cp) * (temp_high - temp_low)
+end
+
+"""
     update_STES!(unit::SeasonalThermalStorage, sim_params)
 
 This function updates the temperature segments of the STES unit by calculating the new temperatures 
@@ -492,43 +512,49 @@ function update_STES!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}
     # define input temperature for discharging
     return_temperature_input = unit.low_temperature
 
+    # sort input by temperature, starting with the lowest, to avoid that energy can not be used for charging
+    unit.current_energy_input = unit.current_energy_input[sortperm(unit.current_temperature_input)]
+    sort!(unit.current_temperature_input)
+
     # mass_in and mass_out shoud be both posivive! 
     # mass_in and the corresponding temperature can be a vector and will be fitted to the most suitable layer.
     # mass_out and the corresponding temperature are single values that will always be drawn from the top layer
     mass_in = convert_energy_in_mass.(unit.current_energy_input, t_old[lower_node], unit.current_temperature_input,
                                       unit.cp_medium)
-    mass_in = mass_in == [] ? [0.0] : mass_in
     mass_out = convert_energy_in_mass(unit.current_energy_output, unit.low_temperature, unit.current_temperature_output,
                                       unit.cp_medium)
-    mass_out = mass_out == [] ? [0.0] : mass_out
 
-    mass_out_sum = sum(mass_out)
-    mass_in_sum = sum(mass_in)
+    # Check if the mass flow is greater than the volume of the smallest segment. 
+    # If yes, the internal time step is reduced to avoid numerical instabilities.
+    mass_out_sum = mass_out == [] ? 0.0 : sum(mass_out)
+    mass_in_sum = mass_in == [] ? 0.0 : sum(mass_in)
     mass_of_smallest_segment = minimum(unit.volume_segments) * unit.rho_medium
-    factor = 1.5
+    factor = 5
     if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && mass_out_sum > 0.0 && mass_in_sum > 0.0
         number_of_internal_timesteps = ceil(max(mass_out_sum, mass_in_sum) / (mass_of_smallest_segment / factor))
         dt = dt / number_of_internal_timesteps
-    else
-        # mass flow and temperatures for charging
-        mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old, mass_in, lower_node, sim_params)
-        # mass flow and corresponding temperatures into each layer during discharging
-        mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old, mass_out,
-                                                                            return_temperature_input,
-                                                                            lower_node, sim_params)
     end
 
-    for _ in 1:number_of_internal_timesteps
-        if number_of_internal_timesteps > 1
-            mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old,
-                                                                           mass_in ./ number_of_internal_timesteps,
-                                                                           lower_node, sim_params)
-            mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old,
-                                                                                mass_out ./
-                                                                                number_of_internal_timesteps,
-                                                                                return_temperature_input,
-                                                                                lower_node, sim_params)
+    for internal_timestep in 1:number_of_internal_timesteps
+        if internal_timestep > 1
+            # recalculate masses as the temperatures of the layers may have changed
+            mass_in = convert_energy_in_mass.(unit.current_energy_input, t_old[lower_node],
+                                              unit.current_temperature_input,
+                                              unit.cp_medium)
+            mass_out = convert_energy_in_mass(unit.current_energy_output, unit.low_temperature,
+                                              t_old[unit.number_of_layer_total - unit.output_layer_from_top + 1],
+                                              unit.cp_medium)
         end
+        # mass flow and temperatures for charging
+        mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old,
+                                                                       mass_in ./ number_of_internal_timesteps,
+                                                                       lower_node, sim_params)
+        # mass flow and corresponding temperatures into each layer during discharging
+        mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old,
+                                                                            mass_out ./
+                                                                            number_of_internal_timesteps,
+                                                                            return_temperature_input,
+                                                                            lower_node, sim_params)
         for n in 1:(unit.number_of_layer_total)
             if n == 1  # bottom layer, single-side
                 t_new[n] = t_old[n] +
