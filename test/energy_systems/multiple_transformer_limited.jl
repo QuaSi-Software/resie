@@ -59,20 +59,22 @@ function test_multiple_transformer_with_limitations()
             "efficiency_h2_out_lossless" => "const:0.6",
             "efficiency_o2_out" => "const:0.6",
             "efficiency_heat_ht_out" => "const:0.4",
-            "min_run_time" => 0.0,
         ),
         "TST_HP_01" => Dict{String,Any}(
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_heat_01"],
             "power_th" => 2240,
-            "constant_cop" => 3.5,
-            "min_power_fraction" => 0.0,
+            "cop_function" => "const:3.5",
+            "min_power_function" => "const:0.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
     simulation_parameters = get_default_sim_params()
-
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     electrolyser = components["TST_ELY_01"]
     grid_el1 = components["TST_GRI_el_01"]

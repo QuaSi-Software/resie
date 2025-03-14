@@ -48,14 +48,18 @@ function test_run_energy_system_from_storage()
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
-            "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0,
+            "cop_function" => "const:3.0",
+            "min_power_function" => "const:0.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]
@@ -205,14 +209,18 @@ function test_run_energy_system_from_storage_denied()
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
-            "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0,
+            "cop_function" => "const:3.0",
+            "min_power_function" => "const:0.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]

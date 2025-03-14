@@ -75,7 +75,7 @@ function test_base_order()
                                       "low_threshold" => 0.2,
                                   )],
             "power_th" => 20000,
-            "constant_cop" => 3.0,
+            "cop_function" => "const:3.0",
         ),
         "TST_01_HZG_01_BFT" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -231,7 +231,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 1200,
             "output_temperature" => 10,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -240,7 +239,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
             "output_temperature" => 25,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -249,7 +247,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 1200,
             "output_temperature" => 20,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -258,7 +255,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
             "output_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -267,7 +263,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_HP_06"],
             "power_th" => 1200,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_06" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -275,7 +270,6 @@ function test_ooo_middle_bus()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_07" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -284,7 +278,6 @@ function test_ooo_middle_bus()
             "output_refs" => ["TST_HP_08"],
             "power_th" => 1200,
             "output_temperature" => 70,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_08" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -292,7 +285,6 @@ function test_ooo_middle_bus()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_02"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -438,7 +430,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 1200,
             "output_temperature" => 10,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -447,7 +438,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
             "output_temperature" => 25,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -456,7 +446,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 1200,
             "output_temperature" => 20,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -465,7 +454,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
             "output_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -474,7 +462,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_HP_06"],
             "power_th" => 1200,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_06" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -482,7 +469,6 @@ function test_ooo_middle_bus_different_order()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_07" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -491,7 +477,6 @@ function test_ooo_middle_bus_different_order()
             "output_refs" => ["TST_HP_08"],
             "power_th" => 1200,
             "output_temperature" => 70,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_08" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -499,7 +484,6 @@ function test_ooo_middle_bus_different_order()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_02"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -639,13 +623,11 @@ function test_ooo_middle_transformer()
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
@@ -784,7 +766,6 @@ function test_ooo_parallels()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 500,
             "output_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -792,7 +773,6 @@ function test_ooo_parallels()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -801,7 +781,6 @@ function test_ooo_parallels()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 500,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -809,7 +788,6 @@ function test_ooo_parallels()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 600,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -817,7 +795,6 @@ function test_ooo_parallels()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 1500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -942,7 +919,6 @@ function test_ooo_parallels_different_order()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 500,
             "output_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -950,7 +926,6 @@ function test_ooo_parallels_different_order()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -959,7 +934,6 @@ function test_ooo_parallels_different_order()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 500,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -967,7 +941,6 @@ function test_ooo_parallels_different_order()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 600,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -975,7 +948,6 @@ function test_ooo_parallels_different_order()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 1500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -1157,28 +1129,24 @@ function test_ooo_parallels_in_chain()
             "output_refs" => ["TST_HP_01b"],
             "power_th" => 1200,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_01b" => Dict{String,Any}(
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
             "input_temperature" => 60,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_01"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_02"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
             "input_temperature" => 70,
         ),
         "TST_HP_04" => Dict{String,Any}(
@@ -1186,7 +1154,6 @@ function test_ooo_parallels_in_chain()
             "m_heat_in" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_03"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
             "input_temperature" => 70,
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
@@ -1341,7 +1308,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 500,
             "output_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1350,7 +1316,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 500,
             "output_temperature" => 40,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1359,7 +1324,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 500,
             "output_temperature" => 35,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1368,7 +1332,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 600,
             "output_temperature" => 45,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1377,7 +1340,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_HP_06"],
             "power_th" => 600,
             "output_temperature" => 65,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_06" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1385,7 +1347,6 @@ function test_ooo_parallels_in_a_row()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH3"],
             "power_th" => 600,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_07" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1394,7 +1355,6 @@ function test_ooo_parallels_in_a_row()
             "output_refs" => ["TST_HP_08"],
             "power_th" => 600,
             "output_temperature" => 75,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_08" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1402,7 +1362,6 @@ function test_ooo_parallels_in_a_row()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH3"],
             "power_th" => 600,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -1581,7 +1540,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 1200,
             "output_temperature" => 10,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1590,7 +1548,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_BUS_TH_01"],
             "power_th" => 1200,
             "output_temperature" => 25,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1599,7 +1556,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_04"],
             "power_th" => 1200,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_04" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1607,7 +1563,6 @@ function test_ooo_connected_middle_busses()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_05" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1616,7 +1571,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_06"],
             "power_th" => 1200,
             "output_temperature" => 45,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_06" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1625,7 +1579,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_BUS_TH_02"],
             "power_th" => 1200,
             "output_temperature" => 55,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_07" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1634,7 +1587,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_08"],
             "power_th" => 1200,
             "output_temperature" => 35,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_08" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1643,7 +1595,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_BUS_TH_02"],
             "power_th" => 1200,
             "output_temperature" => 60,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_09" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1652,7 +1603,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_10"],
             "power_th" => 1200,
             "output_temperature" => 80,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_10" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1660,7 +1610,6 @@ function test_ooo_connected_middle_busses()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_02"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_11" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1669,7 +1618,6 @@ function test_ooo_connected_middle_busses()
             "output_refs" => ["TST_HP_12"],
             "power_th" => 1200,
             "output_temperature" => 90,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_12" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -1677,7 +1625,6 @@ function test_ooo_connected_middle_busses()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_03"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_BUS_EL" => Dict{String,Any}(
             "type" => "Bus",
@@ -1870,7 +1817,6 @@ function test_ooo_connected_middle_transformer()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
@@ -2054,7 +2000,6 @@ function test_ooo_connected_middle_transformer_variant()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 1200,
             "output_temperature" => 50,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2062,7 +2007,6 @@ function test_ooo_connected_middle_transformer_variant()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2070,7 +2014,6 @@ function test_ooo_connected_middle_transformer_variant()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH2"],
             "power_th" => 9000,
-            "min_power_fraction" => 0.0,
         ),
         "TST_01_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
@@ -2264,7 +2207,6 @@ function test_ooo_circle_grid_input_denied()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
@@ -2384,7 +2326,6 @@ function test_ooo_circle_grid_input_allowed()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
@@ -2505,7 +2446,6 @@ function test_ooo_circle_middle_transformer_input()
             "output_refs" => ["TST_HP_02"],
             "power_th" => 500,
             "output_temperature" => 65,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2513,7 +2453,6 @@ function test_ooo_circle_middle_transformer_input()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
@@ -2643,7 +2582,6 @@ function test_ooo_circle_variant()
             "m_heat_out" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 500,
-            "min_power_fraction" => 0.0,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
@@ -2789,7 +2727,6 @@ function test_ooo_circle_middle_transformer_interconnections()
             "type" => "HeatPump",
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 1200,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_02" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2798,7 +2735,6 @@ function test_ooo_circle_middle_transformer_interconnections()
             "output_refs" => ["TST_BUS_TH"],
             "power_th" => 9000,
             "input_temperature" => 30,
-            "min_power_fraction" => 0.0,
         ),
         "TST_HP_03" => Dict{String,Any}(
             "type" => "HeatPump",
@@ -2807,7 +2743,6 @@ function test_ooo_circle_middle_transformer_interconnections()
             "output_refs" => ["TST_DEM_01"],
             "power_th" => 9000,
             "input_temperature" => 50,
-            "min_power_fraction" => 0.0,
         ),
         "TST_CHP_01" => Dict{String,Any}(
             "type" => "CHPP",
