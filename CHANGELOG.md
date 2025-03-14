@@ -4,6 +4,16 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.11.0
+* Restructure the CLI and how simulations are performed with it.
+  * Instead of a single call to the CLI script, that runs the simulation and then returns to the shell, it now puts the user into an interactive CLI that keeps prompting for commands until exited. This has the advantage that performing multiple runs without changing the code results in a significant performance boost for runs after the first one, as the code does not have be compiled again and is reused.
+  * The interactive part can be circumvented by adding the command and associated arguments to the call starting the CLI. An optional argument `--exit-after-run` will exit the CLI after the simulation is done.
+  * **Note:** **This is a breaking change**, as the previous command to run a simulation, e.g. `julia --project=. src/resie-cli.jl examples/simple_heat_pump.json`, no longer works. With the new CLI a single simulation run with no interactive part now looks like this: `julia --project=. src/resie-cli.jl run --exit-after-run examples/simple_heat_pump.json`. Please update any scripts or automated processes to reflect these changes.
+* Add additional output of simulation progress/status
+* Minor fixes:
+  * Remove spurious warning during precompilation due to overly general import
+  * Fix hardcoded path of output files in info log message
+
 ### Version 0.10.7
 * Update HeatPump to implement the detailed model as described in the documentation. This includes:
   * Calculation of the COP as a customisable function of the source and sink temperatures
