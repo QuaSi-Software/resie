@@ -72,7 +72,9 @@
                 "TST_BUS_TH"
             ],
             "power_th": 1200,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_HP_02": {
             "type": "HeatPump",
@@ -83,7 +85,9 @@
             ],
             "power_th": 9000,
             "input_temperature": 30,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_HP_03": {
             "type": "HeatPump",
@@ -94,7 +98,9 @@
             ],
             "power_th": 9000,
             "input_temperature": 50,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_CHP_01": {
             "type": "CHPP",

@@ -1,0 +1,7 @@
+# ignore certain files, identified by extension, for language statistics
+# this includes: HTML (for scenarios), data files, configs, project files, etc.
+*.html linguist-vendored
+*.csv linguist-vendored
+*.xlsx linguist-vendored
+*.json linguist-vendored
+*.prf linguist-vendored
