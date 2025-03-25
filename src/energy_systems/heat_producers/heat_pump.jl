@@ -1,9 +1,21 @@
-"""
-Implementation of a heat pump component.
+using Optim: optimize, minimizer
+using ..Resie: get_run
 
-Can be given fixed input and output temperatures instead of checking the temperature
-potentials of other components. Can also be given a fixed COP instead of dynamically
-calculating it as a Carnot-COP by input/output temperatures.
+"""
+Implementation of a heat pump component, elevating heat to a higher temperature using
+electricity.
+
+This models includes several effects that complicate the calculation of efficiency (as COP),
+some of which involve the temperatures at which the heat input is provided and heat output
+is requested. While this is similar to the calculation of efficiencies in other transformers
+such as a CHPP, the implementation does not numerically inverse the given input functions
+and determine energies from those. Instead the efficiencies are calculated "forward", which
+has problems in reaching the equilibrium point if kappa_opt != 1.0. This might be improved
+in the future, but was deemed to difficult to implement at time of writing.
+
+The heat pump can also be configured to skip most complicated calculations and use a
+constant or Carnot-based COP and no PLRDE, etc. This too can be improved for heat pumps with
+exactly one input and exactly one output, since the slicing algorithm is not required then.
 """
 mutable struct HeatPump <: Component
     uac::String
@@ -17,17 +29,35 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_in::Symbol
 
-    power_th::Float64
-    min_power_fraction::Float64
-    min_run_time::UInt
-    constant_cop::Any
+    design_power_th::Float64
+    max_power_function::Function
+    min_power_function::Function
+    plf_function::Function
+    constant_cop::Floathing
+    dynamic_cop::Function
+    bypass_cop::Float64
+
+    consider_icing::Bool
+    icing_coefficients::Vector{Float64}
+    optimise_slice_dispatch::Bool
+    nr_optimisation_passes::UInt
+    optimal_plr::Float64
     output_temperature::Temperature
     input_temperature::Temperature
-    cop::Float64
 
+    power_losses_factor::Float64
+    heat_losses_factor::Float64
+    losses_power::Float64
+    losses_heat::Float64
     losses::Float64
+
+    cop::Float64
+    effective_cop::Float64
     mix_temp_input::Float64
     mix_temp_output::Float64
+    avg_plr::Float64
+    time_active::Float64
+    time_active_min::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
@@ -35,26 +65,277 @@ mutable struct HeatPump <: Component
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in])
 
-        return new(uac, # uac
+        func_def = default(config, "cop_function", "carnot:0.4")
+        constant_cop, cop_function = parse_cop_function(func_def)
+
+        func_def = default(config, "plf_function", "const:1.0")
+        plf_function = parse_efficiency_function(func_def)
+
+        func_def = default(config, "max_power_function", "const:1.0")
+        max_power_function = parse_2dim_function(func_def)
+
+        func_def = default(config, "min_power_function", "const:0.2")
+        min_power_function = parse_2dim_function(func_def)
+
+        coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
+        icing_coefficients = parse.(Float64, split(coeff_def, ","))
+
+        optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
+        optimal_plr = default(config, "optimal_plr", nothing)
+        if optimise_slice_dispatch && optimal_plr === nothing
+            results = optimize(x -> -plf_function(x), # minus because we actually want
+                               0.0,                   # the maximum of the function
+                               1.0)
+            optimal_plr = first(minimizer(results))
+        elseif !optimise_slice_dispatch
+            optimal_plr = 1.0
+        end
+        if optimise_slice_dispatch && 1.0 - optimal_plr < sim_params["epsilon"]
+            @warn "Heat pump $(uac) is configured to optimise slice dispatch but has an " *
+                  "optimal PLR of 1.0. Consider toggling optimisation off as it has no effect."
+        end
+        if optimise_slice_dispatch && constant_cop !== nothing
+            @error "Heat pump $(uac) is configured to optimise slice dispatch but has " *
+                   "a constant COP. Toggle optimisation off as the algorithm is unstable " *
+                   "in this case."
+        end
+
+        return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer, # sys_function
-                   InterfaceMap(m_heat_in => nothing, # input_interfaces
+                   sf_transformer,
+                   InterfaceMap(m_heat_in => nothing,
                                 m_el_in => nothing),
-                   InterfaceMap(m_heat_out => nothing), # output_interfaces
+                   InterfaceMap(m_heat_out => nothing),
                    m_el_in,
                    m_heat_out,
                    m_heat_in,
-                   config["power_th"], # power_th
-                   default(config, "min_power_fraction", 0.2),
-                   default(config, "min_run_time", 0),
-                   default(config, "constant_cop", nothing),
+                   config["power_th"],
+                   max_power_function,
+                   min_power_function,
+                   plf_function,
+                   constant_cop,
+                   cop_function,
+                   default(config, "bypass_cop", 15.0),
+                   default(config, "consider_icing", false),
+                   icing_coefficients,
+                   optimise_slice_dispatch,
+                   UInt(default(config, "nr_optimisation_passes", 10)),
+                   optimal_plr,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
-                   0.0, # cop
+                   default(config, "power_losses_factor", 0.97),
+                   default(config, "heat_losses_factor", 0.95),
+                   0.0, # losses_power
+                   0.0, # losses_heat
                    0.0, # losses
+                   0.0, # cop
+                   0.0, # effective_cop
                    0.0, # mixing temperature in the input interface
-                   0.0) # mixing temperature in the output interface
+                   0.0, # mixing temperature in the output interface
+                   0.0, # avg_plr
+                   0.0, # time_active
+                   0.0) # time_active_min
     end
+end
+
+"""
+A struct containing lots of temporary values for internal calculations of the heat pump.
+This is used to avoid excessively long argument and return lists and to improve readability.
+Unless you're changing the code for heat pumps, this can be ignored entirely.
+"""
+mutable struct HPEnergies
+    potential_energy_el::Floathing
+    potentials_energies_heat_in::Vector{<:Floathing}
+    potentials_energies_heat_out::Vector{<:Floathing}
+    available_el_in::Float64
+    available_heat_in::Vector{<:Floathing}
+    available_heat_out::Vector{<:Floathing}
+    max_usage_fraction::Float64
+    in_indices::Vector{Integer}
+    in_temps_min::Vector{<:Temperature}
+    in_temps_max::Vector{<:Temperature}
+    in_uacs::Vector{<:Stringing}
+    out_indices::Vector{Integer}
+    out_temps_min::Vector{<:Temperature}
+    out_temps_max::Vector{<:Temperature}
+    out_uacs::Vector{<:Stringing}
+    heat_in_has_inf_energy::Bool
+    heat_out_has_inf_energy::Bool
+    slices_idx_to_plr::Dict{Integer,Tuple{Integer,Integer}}
+    slices_el_in::Vector{Floathing}
+    slices_heat_in::Vector{Floathing}
+    slices_heat_in_temperature::Vector{Temperature}
+    slices_heat_in_uac::Vector{Stringing}
+    slices_heat_out::Vector{Floathing}
+    slices_heat_out_temperature::Vector{Temperature}
+    slices_heat_out_uac::Vector{Stringing}
+    slices_el_in_temp::Vector{Floathing}
+    slices_heat_in_temp::Vector{Floathing}
+    slices_heat_in_temperature_temp::Vector{Temperature}
+    slices_heat_in_uac_temp::Vector{Stringing}
+    slices_heat_out_temp::Vector{Floathing}
+    slices_heat_out_temperature_temp::Vector{Temperature}
+    slices_heat_out_uac_temp::Vector{Stringing}
+
+    function HPEnergies()
+        return new(0.0,
+                   Vector{Floathing}(),
+                   Vector{Floathing}(),
+                   0.0,
+                   Vector{Floathing}(),
+                   Vector{Floathing}(),
+                   0.0,
+                   Vector{Integer}(),
+                   Vector{Temperature}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}(),
+                   Vector{Integer}(),
+                   Vector{Temperature}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}(),
+                   false,
+                   false,
+                   Dict{Integer,Tuple{Integer,Integer}}(),
+                   Vector{Floathing}(),
+                   Vector{Floathing}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}(),
+                   Vector{Floathing}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}(),
+                   Vector{Floathing}(),
+                   Vector{Floathing}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}(),
+                   Vector{Floathing}(),
+                   Vector{Temperature}(),
+                   Vector{Stringing}())
+    end
+end
+
+"""
+Reset the temp slices of an energies container.
+"""
+function reset_temp_slices!(energies::HPEnergies)::HPEnergies
+    energies.slices_el_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temp = Vector{Floathing}()
+    energies.slices_heat_in_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_in_uac_temp = Vector{Stringing}()
+    energies.slices_heat_out_temp = Vector{Floathing}()
+    energies.slices_heat_out_temperature_temp = Vector{Temperature}()
+    energies.slices_heat_out_uac_temp = Vector{Stringing}()
+    return energies
+end
+
+"""
+Copies the temp slices of an energies container to the slices output fields and overwrites
+existing values.
+"""
+function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
+    energies.slices_el_in = energies.slices_el_in_temp
+    energies.slices_heat_in = energies.slices_heat_in_temp
+    energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+    energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+    energies.slices_heat_out = energies.slices_heat_out_temp
+    energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+    energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
+    return energies
+end
+
+"""
+Resets the available energies of an energies container based on the potentials.
+If an specific input or output layer index is given, that layer will be set as infinite and
+the calculation will be done with only that layer on the input or output side.
+
+# Arguments
+- `energies::HPEnergies`: The energies container
+- `as_inf::Integer`: If 1, sets the given input layer as infinite. If 2, the outputs.
+    Defaults to 0, which does nothing.
+- `idx::Integer`: The index of the layer to set as infinte. Defaults to 0, which does
+    nothing.
+# Returns
+- `HPEnergies`: The energies container
+"""
+function reset_available!(energies::HPEnergies; as_inf::Integer=0, idx::Integer=0)::HPEnergies
+    energies.available_el_in = copy(energies.potential_energy_el)
+    energies.available_heat_in = copy(energies.potentials_energies_heat_in)
+    energies.available_heat_out = copy(energies.potentials_energies_heat_out)
+    if as_inf == 1
+        energies.available_heat_in[idx] = Inf
+    elseif as_inf == 2
+        energies.available_heat_out[idx] = Inf
+    end
+    energies.in_indices = as_inf == 1 ? [idx] : [Int(i) for i in eachindex(energies.available_heat_in)]
+    energies.out_indices = as_inf == 2 ? [idx] : [Int(i) for i in eachindex(energies.available_heat_out)]
+    return energies
+end
+
+"""
+Adds the heat_in temp slices to the existing slices output fields.
+"""
+function add_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
+    append!(energies.slices_heat_in, energies.slices_heat_in_temp)
+    append!(energies.slices_heat_in_temperature, energies.slices_heat_in_temperature_temp)
+    append!(energies.slices_heat_in_uac, energies.slices_heat_in_uac_temp)
+    return energies
+end
+
+"""
+Adds the heat_out temp slices to the existing slices output fields.
+"""
+function add_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
+    append!(energies.slices_heat_out, energies.slices_heat_out_temp)
+    append!(energies.slices_heat_out_temperature, energies.slices_heat_out_temperature_temp)
+    append!(energies.slices_heat_out_uac, energies.slices_heat_out_uac_temp)
+    return energies
+end
+
+"""
+Copies the electricity and heat_in temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
+function copy_heat_in_temp_to_slices(energies::HPEnergies)::HPEnergies
+    if length(energies.slices_heat_in) == 0
+        energies.slices_el_in = copy(energies.slices_el_in_temp)
+        energies.slices_heat_in = copy(energies.slices_heat_in_temp)
+        energies.slices_heat_in_temperature = copy(energies.slices_heat_in_temperature_temp)
+        energies.slices_heat_in_uac = copy(energies.slices_heat_in_uac_temp)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+            energies.slices_el_in = energies.slices_el_in_temp
+        end
+        if _isless(_sum(energies.slices_heat_in), _sum(energies.slices_heat_in_temp))
+            energies.slices_heat_in = energies.slices_heat_in_temp
+            energies.slices_heat_in_temperature = energies.slices_heat_in_temperature_temp
+            energies.slices_heat_in_uac = energies.slices_heat_in_uac_temp
+        end
+    end
+    return energies
+end
+
+"""
+Copies the electricity and heat_out temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
+function copy_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
+    if length(energies.slices_heat_out) == 0
+        energies.slices_el_in = copy(energies.slices_el_in_temp)
+        energies.slices_heat_out = copy(energies.slices_heat_out_temp)
+        energies.slices_heat_out_temperature = copy(energies.slices_heat_out_temperature_temp)
+        energies.slices_heat_out_uac = copy(energies.slices_heat_out_uac_temp)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_el_in_temp))
+            energies.slices_el_in = energies.slices_el_in_temp
+        end
+        if _isless(_sum(energies.slices_heat_out), _sum(energies.slices_heat_out_temp))
+            energies.slices_heat_out = energies.slices_heat_out_temp
+            energies.slices_heat_out_temperature = energies.slices_heat_out_temperature_temp
+            energies.slices_heat_out_uac = energies.slices_heat_out_uac_temp
+        end
+    end
+    return energies
 end
 
 function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
@@ -68,7 +349,6 @@ end
 
 function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,Any})
     update(unit.controller)
-
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
     if unit.output_temperature !== nothing
@@ -98,462 +378,737 @@ function set_max_energies!(unit::HeatPump,
                     has_calculated_all_maxima_heat_out)
 end
 
-function dynamic_cop(in_temp::Temperature, out_temp::Temperature)::Union{Nothing,Float64}
-    if (in_temp === nothing || out_temp === nothing)
+"""
+Determines the temperature of the input/output layer and if it should be skipped.
+
+Layers are skipped if they have a temperature, but it does fall into the temperature band
+defined by the heat pump input/output temperatures (if any).
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `current_idx::Integer`: The index of the layer.
+- `temps_min::Vector{<:Temperature}`: The minimum temperatures of all layers.
+- `temps_max::Vector{<:Temperature}`: The maximum temperatures of all layers.
+- `input::Bool`: If the layer is an input or not. Defaults to true.
+# Returns
+- `Bool`: If the layer should be skipped.
+- `Temperature`: The layer temperature.
+"""
+function get_layer_temperature(unit::HeatPump,
+                               current_idx::Integer,
+                               temps_min::Vector{<:Temperature},
+                               temps_max::Vector{<:Temperature};
+                               input::Bool=true)::Tuple{Bool,Temperature}
+    static_temperature = input ? unit.input_temperature : unit.output_temperature
+    if static_temperature === nothing
+        layer_temp = highest(temps_min[current_idx], temps_max[current_idx])
+        if layer_temp === nothing && unit.constant_cop === nothing
+            term = input ? "input" : "output"
+            @error "Error: The $(term) temperature for $(unit.uac) could not be detected. " *
+                   "Please specify one with the parameter '$(term)_temperature' or check " *
+                   "the connected components."
+            throw(InputError)
+        end
+        return false, layer_temp
+    end
+
+    # skip slice if given static temperature is not within the temperature band of the layer
+    if (temps_min[current_idx] !== nothing && temps_min[current_idx] > static_temperature
+        ||
+        temps_max[current_idx] !== nothing && temps_max[current_idx] < static_temperature)
+        # end of condition
+        return true, nothing
+    else
+        return false, static_temperature
+    end
+end
+
+"""
+Calculates the new COP due to icing losses.
+
+# Arguments
+`unit::HeatPump`: The heat pump.
+`cop::Floathing`: The COP without icing losses.
+`in_temp::Temperature`: The input temperature of the current layer.
+# Returns
+- `Floathing`: The COP corrected due to icing losses. Returns nothing if the input COP is
+    nothing.
+"""
+function icing_correction(unit::HeatPump, cop::Floathing, in_temp::Temperature)::Floathing
+    if cop === nothing
         return nothing
     end
 
-    # Carnot-COP with 40 % efficiency
-    return 0.4 * (273.15 + out_temp) / (out_temp - in_temp)
+    lin_factor = unit.icing_coefficients[1] + unit.icing_coefficients[2] * in_temp
+    exp_factor = unit.icing_coefficients[3] * exp(-1.0
+                                                  * (in_temp - unit.icing_coefficients[4])^2
+                                                  /
+                                                  unit.icing_coefficients[5])
+    return cop * (1 - 0.01 * (max(0.0, lin_factor) + exp_factor))
 end
 
-function check_el_in(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_el_in"] == true
-        if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy))
-            # end of condition
-            return (Inf)
-        else
-            exchanges = balance_on(unit.input_interfaces[unit.m_el_in],
-                                   unit.input_interfaces[unit.m_el_in].source)
-            potential_energy_el = balance(exchanges) + energy_potential(exchanges)
-            if potential_energy_el <= sim_params["epsilon"]
-                return (0.0)
+"""
+Determines if the optimisation pass is accepted.
+
+The optimisation might calculate a pass that would lead to implausible results, which is why
+this check must be done. The pass is accepted if the "signature" of the given pass is the
+same as that of the best pass and the timestep hasn't been more than used up. The signature
+is a tuple with flags of which remaining energies of in- or outputs are non-zero. This is
+checked because the optimisation should not change how the heat pump operates, it should
+only improve the efficiency of the selected slices.
+
+If all three inputs/output are non-zero, this either indicates that the PLRs were set too low
+and the heat pump can not provide requested energy at these PLRs, or the heat pump is under-
+sized. In either case we need to reject the pass.
+
+# Arguments
+- `energies::HPEnergies`: The energies container.
+- `times::Vector{Float64}`: The times of the slices.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If the pass is accepted or not.
+"""
+function accept_pass(energies::HPEnergies, times::Vector{Float64}, sim_params::Dict{String,Any})::Bool
+    if sum(times; init=0.0) > sim_params["time_step_seconds"]
+        return false
+    end
+
+    EPS = sim_params["epsilon"]
+    signature_given = (energies.available_el_in > EPS,
+                       sum(energies.available_heat_in; init=0.0) > EPS,
+                       sum(energies.available_heat_out; init=0.0) > EPS,
+                       length(energies.slices_el_in_temp),
+                       length(energies.slices_heat_in_temp),
+                       length(energies.slices_heat_out_temp))
+    if signature_given[1] && signature_given[2] && signature_given[3]
+        return false
+    end
+
+    signature_best = (energies.potential_energy_el - sum(energies.slices_el_in; init=0.0) > EPS,
+                      sum(energies.potentials_energies_heat_in; init=0.0)
+                      -
+                      sum(energies.slices_heat_in; init=0.0)
+                      >
+                      EPS,
+                      sum(energies.potentials_energies_heat_out; init=0.0)
+                      -
+                      sum(energies.slices_heat_out; init=0.0)
+                      >
+                      EPS,
+                      length(energies.slices_el_in),
+                      length(energies.slices_heat_in),
+                      length(energies.slices_heat_out))
+    return signature_given == signature_best
+end
+
+"""
+Determines if the optimisation pass is better than the currently best pass.
+
+# Arguments
+- `energies::HPEnergies`: The energies container.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If the pass is better or not.
+"""
+function pass_is_better(energies::HPEnergies, sim_params::Dict{String,Any})::Bool
+    return sum(energies.slices_el_in_temp; init=0.0) < sum(energies.slices_el_in; init=0.0)
+end
+
+"""
+Updates the PLRs chosen for each slices as input for the next optimisation pass.
+
+This is essentially how the optimisation is performed, by iteratively adjusting the PLRs for
+slices according to a heuristic, which approaches a local optimum if iterated long enough.
+
+The heuristic determines the most promising slice by its distance to the optimal PLR of the
+heat pump multiplies with the amount of electricity that the slice requires, then halves its
+distance to the optimal PLR.
+
+Can be given a slice to ignore, which is used to avoid trying to update the same slice twice
+in a row, which avoids some but not all problems with the algorithm getting "stuck".
+
+# Arguments
+`unit::HeatPump`: The heat pump.
+`energies::HPEnergies`: The energies container.
+`plrs::Array{<:Floathing,2}`: Current selection of PLRs of the slices.
+`ignore_idx::Tuple{Integer,Integer}`: Index of the slice to ignore.
+# Returns
+- `Tuple{Integer,Integer}`: The index of the updated slice.
+"""
+function update_plrs!(unit::HeatPump,
+                      energies::HPEnergies,
+                      plrs::Array{<:Floathing,2},
+                      ignore_idx::Tuple{Integer,Integer})::Tuple{Integer,Integer}
+    best_idx = (0, 0)
+    best_val = 0.0
+
+    for (slice_idx, idxs) in pairs(energies.slices_idx_to_plr)
+        idx_src, idx_snk = idxs
+        if idx_src == ignore_idx[1] && idx_snk == ignore_idx[2]
+            continue
+        end
+
+        try
+            val = (plrs[idx_src, idx_snk] - unit.optimal_plr) * energies.slices_el_in[slice_idx]
+            if val > best_val
+                best_idx = (idx_src, idx_snk)
+                best_val = val
             end
-            return (potential_energy_el)
+        catch BoundsError
+            return (-1, -1)
         end
-    else
-        return (Inf)
     end
+
+    if best_idx != (0, 0)
+        plrs[best_idx[1], best_idx[2]] -= 0.5 * (plrs[best_idx[1], best_idx[2]] - unit.optimal_plr)
+    end
+
+    return best_idx
 end
 
-function check_heat_in(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_heat_in"] == true
-        if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer  # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
+"""
+    filter_by_transformer(energies, sim_param; heat_in=true)
+
+Filters the heat input or heat output potentials by system function so only transformers are
+listed.
+
+# Args
+- `energie::HPEnergies`: The energies container
+- `sim_params::Dict{String,Any}`: Simulation parameters
+- `heat_in::Bool`: (Optional) If true, filters the inputs. Otherwise the outputs. Defaults
+    to true.
+# Returns
+- `Vector{Floathing}`: The filtered input or output potentials.
+"""
+function filter_by_transformer(energies::HPEnergies,
+                               sim_params::Dict{String,Any};
+                               heat_in::Bool=true)::Vector{Floathing}
+    components = get_run(sim_params["run_ID"]).components
+    filtered = []
+    for (idx, uac) in enumerate(heat_in ? energies.in_uacs : energies.out_uacs)
+        if uac !== nothing && components[uac].sys_function === sf_transformer
+            if heat_in
+                push!(filtered, energies.potentials_energies_heat_in[idx])
+            else
+                push!(filtered, energies.potentials_energies_heat_out[idx])
+            end
+        end
+    end
+    return filtered
+end
+
+"""
+Calculate the energies for the given slice.
+
+This is essentially how the heat pump would be calculated in the 1:1 case. The COP is
+determined first, then the available energies on all three inputs/outputs are checked as
+limiting factors. Bypass operation and icing losses are also considered. The function
+specifically does not determine the PLR. For the 1:1 case this could be done here too, but
+for the overarching slicing algorithm the PLR must be a required input.
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `available_el_in::Float64`: Available electricity.
+- `available_heat_in::Floathing`: Available heat input.
+- `available_heat_out::Floathing`: Available heat output.
+- `in_temp::Temperature`: Input temperature.
+- `out_temp::Temperature`: Output temperature.
+- `plr::Float64`: The PLR of the slice.
+# Returns
+- `Floathing`: Used input heat.
+- `Floathing`: Used electricity.
+- `Floathing`: Used output heat.
+- `Temperature`: Temperature of input heat. Same as input argument.
+- `Temperature`: Temperature of output heat. Same as output argument unless in bypass
+    operation, when it's equal to the input temperature.
+"""
+function handle_slice(unit::HeatPump,
+                      available_el_in::Float64,
+                      available_heat_in::Floathing,
+                      available_heat_out::Floathing,
+                      in_temp::Temperature,
+                      out_temp::Temperature,
+                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
+    # determine COP depending on three cases. a constant COP precludes the use of a bypass
+    do_bypass = false
+    if unit.constant_cop !== nothing
+        cop = unit.constant_cop * unit.plf_function(plr)
+    elseif in_temp >= out_temp
+        cop = unit.bypass_cop
+        do_bypass = true
+    else
+        cop = unit.dynamic_cop(in_temp, out_temp)
+        if cop === nothing
+            @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
+                    "given. Provide temperatures or fixed cop.")
+            throw(InputError)
+        end
+        cop *= unit.plf_function(plr)
+        if unit.consider_icing
+            cop = icing_correction(unit, cop, in_temp)
+        end
+    end
+
+    if cop < 1.0
+        cop = 1.0
+        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
+               "input for mistakes as this should not happen. COP was set to 1.0")
+    end
+
+    # calculate energies with the current cop
+    # energies for current slice with potential heat in as basis
+    used_heat_in = available_heat_in
+    used_el_in = used_heat_in / (cop - 1.0)
+    used_heat_out = used_heat_in + used_el_in
+
+    # check heat out as limiter
+    if used_heat_out > available_heat_out
+        used_heat_out = available_heat_out
+        used_el_in = used_heat_out / cop
+        used_heat_in = used_el_in * (cop - 1.0)
+    end
+
+    # check electricity in as limiter
+    if used_el_in > available_el_in
+        used_el_in = available_el_in
+        used_heat_in = used_el_in * (cop - 1.0)
+        used_heat_out = used_heat_in + used_el_in
+    end
+
+    return (used_heat_in,
+            used_el_in,
+            used_heat_out,
+            in_temp,
+            do_bypass ? in_temp : out_temp)
+end
+
+"""
+Performs the slicing algorithm given a set list of PLRs for each possible slice (each
+combination input and output layer). If the PLR for a slice is nothing, sets it to 1.0 and
+calculates the slice based on that.
+
+Note the difference in indexing between the PLRs, where all possible slices are listed via
+their input layer and output layer indices, and the return values, where the selected slices
+are listed linearly and doesn't necessarily list all slices.
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+- `energies::HPEnergies`: The energies container.
+- `plrs::Array{<:Floathing,2}`: The PLRs for each slice (may be nothing). Will be modified.
+# Returns
+- `HPEnergies`: The energies container.
+- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
+    minimal power for that slice.
+- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
+    the selected PLR for that slice.
+- `Array{<:Floathing,2}`: The PLRs for each slice.
+"""
+function calculate_slices(unit::HeatPump,
+                          sim_params::Dict{String,Any},
+                          energies::HPEnergies,
+                          plrs::Array{<:Floathing,2})::Tuple{HPEnergies,Vector{Float64},Vector{Float64},
+                                                             Array{<:Floathing,2}}
+    # times are the timespans each slice takes. times_min means the time slice assuming
+    # minimum power. times_min are actually larger than times
+    times_min = Vector{Float64}()
+    times = Vector{Float64}()
+
+    energies.slices_idx_to_plr = Dict{Integer,Tuple{Integer,Integer}}()
+    sum_usage = 0.0
+    slice_idx::Int = 0
+    current_in_idx::Int = 0
+    current_out_idx::Int = 0
+    EPS = sim_params["epsilon"]
+
+    while (true)
+        # we continue for as long as there is energy to be distributed and max power has
+        # not been reached and the time step has not been fully utilised
+        if energies.available_el_in < EPS ||
+           sum(energies.available_heat_in; init=0.0) < EPS ||
+           sum(energies.available_heat_out; init=0.0) < EPS ||
+           energies.max_usage_fraction - sum_usage < EPS ||
+           sum(times; init=0.0) >= sim_params["time_step_seconds"] - EPS
             # end of condition
-            return ([Inf],
-                    [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                    [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                    [unit.input_interfaces[unit.m_heat_in].source.uac])
-        else
-            exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
-                                   unit.input_interfaces[unit.m_heat_in].source)
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
+            break
         end
-    else
-        return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                [unit.input_interfaces[unit.m_heat_in].source.uac])
-    end
-end
 
-function check_heat_out(unit::HeatPump, sim_params::Dict{String,Any})
-    if unit.controller.parameters["consider_m_heat_out"] == true
-        if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer   # HP has direct connection to a transfomer...
-            &&
-            is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        try
+            current_in_idx = first(energies.in_indices)
+            current_out_idx = first(energies.out_indices)
+        catch BoundsError
+            break
+        end
+
+        slice_idx += 1
+        energies.slices_idx_to_plr[slice_idx] = (current_in_idx, current_out_idx)
+
+        # skip layers with zero energy remaining
+        if energies.available_heat_in[current_in_idx] < EPS
+            current_in_idx = popfirst!(energies.in_indices)
+            continue
+        end
+        if energies.available_heat_out[current_out_idx] < EPS
+            current_out_idx = popfirst!(energies.out_indices)
+            continue
+        end
+
+        # check and determine input temperature of layer
+        skip_slice, current_in_temp = get_layer_temperature(unit, current_in_idx,
+                                                            energies.in_temps_min,
+                                                            energies.in_temps_max;
+                                                            input=true)
+        if skip_slice
+            energies.available_heat_in[current_in_idx] = 0.0
+            current_in_idx = popfirst!(energies.in_indices)
+            continue
+        end
+
+        # check and determine output temperature of layer
+        skip_slice, current_out_temp = get_layer_temperature(unit, current_out_idx,
+                                                             energies.out_temps_min,
+                                                             energies.out_temps_max;
+                                                             input=false)
+        if skip_slice
+            energies.available_heat_out[current_out_idx] = 0.0
+            current_out_idx = popfirst!(energies.out_indices)
+            continue
+        end
+
+        if plrs[current_in_idx, current_out_idx] === nothing
+            plrs[current_in_idx, current_out_idx] = 1.0
+        end
+
+        # there are four factors that decide the power of the heat pump:
+        # 1. the minimum power for the given temperatures
+        # 2. the maximum power for the given temperatures
+        # 3. how much of the maximum usage fraction is left
+        # 4. how much time is left in the time step
+        min_power_frac = min(1.0, unit.min_power_function(current_in_temp, current_out_temp))
+        min_power = max(0.0, unit.design_power_th * min_power_frac)
+        max_power_frac = max(0.0, min(1.0, unit.max_power_function(current_in_temp, current_out_temp)))
+        used_power_frac = min(plrs[current_in_idx, current_out_idx], max_power_frac)
+        used_power = max(min_power, unit.design_power_th * used_power_frac)
+
+        remaining_heat_out = min(energies.available_heat_out[current_out_idx],
+                                 (energies.max_usage_fraction - sum_usage) * sim_params["watt_to_wh"](used_power),
+                                 used_power * (sim_params["time_step_seconds"] - sum(times; init=0.0)) / 3600.0)
+
+        used_heat_in,
+        used_el_in,
+        used_heat_out,
+        current_in_temp,
+        current_out_temp = handle_slice(unit,
+                                        energies.available_el_in,
+                                        energies.available_heat_in[current_in_idx],
+                                        remaining_heat_out,
+                                        current_in_temp,
+                                        current_out_temp,
+                                        plrs[current_in_idx, current_out_idx])
+
+        # finally all checks done, we add the slice and update remaining energies
+        push!(energies.slices_el_in_temp, used_el_in)
+        push!(energies.slices_heat_in_temp, used_heat_in)
+        push!(energies.slices_heat_in_temperature_temp, current_in_temp)
+        push!(energies.slices_heat_in_uac_temp, energies.in_uacs[current_in_idx])
+        push!(energies.slices_heat_out_temp, used_heat_out)
+        push!(energies.slices_heat_out_temperature_temp, current_out_temp)
+        push!(energies.slices_heat_out_uac_temp, energies.out_uacs[current_out_idx])
+
+        energies.available_el_in -= used_el_in
+        energies.available_heat_in[current_in_idx] -= used_heat_in
+        energies.available_heat_out[current_out_idx] -= used_heat_out
+
+        sum_usage += used_heat_out / sim_params["watt_to_wh"](unit.design_power_th)
+        push!(times_min, used_heat_out * 3600 / min_power)
+        push!(times, used_heat_out * 3600 / used_power)
+
+        # go to the next slice if input and/or output has been used up. if instead both
+        # layers have energy left, this was caused by the PLR of the slice being too low or
+        # the heat pump being undersized. in either case we need to advance both indices so
+        # we don't recalculate the same slice twice
+        if energies.available_heat_in[current_in_idx] >= EPS &&
+           energies.available_heat_out[current_out_idx] >= EPS
             # end of condition
-            return ([-Inf],
-                    [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                    [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                    [unit.output_interfaces[unit.m_heat_out].target.uac])
+            current_in_idx = popfirst!(energies.in_indices)
+            current_out_idx = popfirst!(energies.out_indices)
         else
-            exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
-                                   unit.output_interfaces[unit.m_heat_out].target)
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
+            if energies.available_heat_in[current_in_idx] < EPS
+                current_in_idx = popfirst!(energies.in_indices)
+            end
+            if energies.available_heat_out[current_out_idx] < EPS
+                current_out_idx = popfirst!(energies.out_indices)
+            end
         end
-    else
-        return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                [unit.output_interfaces[unit.m_heat_out].target.uac])
     end
+
+    return energies, times_min, times, plrs
 end
 
+"""
+The inner part of the calculate_energies function.
+
+The steps are:
+1. Initialises the PLRs for all possible slices as nothing (they will be set as 1.0 upon
+    selection)
+2. Performs the slicing algorithm with the assumption of full power
+3. Checks if minimum power restrictions were observed.
+4. Optionally performs optimisation of the PLRs
+
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+- `energies::HPEnergies`: The energies container.
+- `optimise_slice_dispatch::Bool`: Defaults to false.
+# Returns
+- `HPEnergies`: The energies container.
+"""
 function calculate_energies_heatpump(unit::HeatPump,
                                      sim_params::Dict{String,Any},
-                                     available_el_in,
-                                     available_heat_in,
-                                     available_heat_out,
-                                     max_usage_fraction,
-                                     in_temps_min,
-                                     in_temps_max,
-                                     in_uacs,
-                                     out_temps_min,
-                                     out_temps_max,
-                                     out_uacs)
-    layers_el_in = Vector{Floathing}()
-    layers_heat_in = Vector{Floathing}()
-    layers_heat_in_temperature = Vector{Temperature}()
-    layers_heat_in_uac = Vector{Stringing}()
-    layers_heat_out = Vector{Floathing}()
-    layers_heat_out_temperature = Vector{Temperature}()
-    layers_heat_out_uac = Vector{Stringing}()
+                                     energies::HPEnergies,
+                                     optimise_slice_dispatch::Bool=false)::HPEnergies
+    energies = reset_temp_slices!(energies)
 
-    current_in_idx = 1
-    current_out_idx = 1
-    while (sum(available_el_in; init=0.0) > sim_params["epsilon"]
-           && sum(available_heat_in; init=0.0) > sim_params["epsilon"]
-           && sum(available_heat_out; init=0.0) > sim_params["epsilon"]
-           &&
-           max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
-           -
-           sum(layers_heat_out; init=0.0) > sim_params["epsilon"])
-        # find first non-zero index
-        while available_heat_in[current_in_idx] <= sim_params["epsilon"]
-            current_in_idx += 1
-        end
-        while available_heat_out[current_out_idx] <= sim_params["epsilon"]
-            current_out_idx += 1
-        end
+    # initial PLRs are nothing, as we do not yet know which slices are used and which aren't
+    plrs = Array{Floathing,2}(nothing,
+                              length(energies.available_heat_in),
+                              length(energies.available_heat_out))
 
-        # detect and check temperatures. If a input or an output temperature is given, this will be set!
-        if unit.input_temperature === nothing
-            current_in_temp = highest(in_temps_min[current_in_idx], in_temps_max[current_in_idx])
-            if current_in_temp === nothing && unit.constant_cop === nothing
-                @error "Error: The input temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'input_temperature' or check the connected components."
-                throw(InputError)
-            end
-        else
-            # skip layer if given fixed input temperature is not within the temperature band of the layer
-            if (in_temps_min[current_in_idx] !== nothing
-                &&
-                in_temps_min[current_in_idx] > unit.input_temperature
-                ||
-                in_temps_max[current_in_idx] !== nothing
-                &&
-                in_temps_max[current_in_idx] < unit.input_temperature)
-                # end of condition
-                available_heat_in[current_in_idx] = 0.0
-                current_in_idx += 1
-                continue
-            else
-                current_in_temp = unit.input_temperature
-            end
-        end
+    # first pass with full power (or only pass if no optimisation is used)
+    energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+    best_plrs = copy(plrs)
+    best_times = copy(times)
+    best_times_min = copy(times_min)
 
-        if unit.output_temperature === nothing
-            current_out_temp = lowest(out_temps_min[current_out_idx], out_temps_max[current_out_idx])
-            if current_out_temp === nothing && unit.constant_cop === nothing
-                @error "Error: The output temperature for $(unit.uac) could not be detected. Please specify one with the parameter 'output_temperature' or check the connected components."
-                throw(InputError)
-            end
-        else
-            # skip layer if given fixed output temperature is not within the temperature band of the layer
-            if (out_temps_min[current_out_idx] !== nothing
-                &&
-                out_temps_min[current_out_idx] > unit.output_temperature
-                ||
-                out_temps_max[current_out_idx] !== nothing
-                &&
-                out_temps_max[current_out_idx] < unit.output_temperature)
-                # end of condition
-                available_heat_out[current_out_idx] = 0.0
-                current_out_idx += 1
-                continue
-            else
-                current_out_temp = unit.output_temperature
-            end
-        end
-
-        if current_in_temp >= current_out_temp && unit.constant_cop === nothing
-            # bypass only if no constant cop is given
-            heat_transfer = minimum([available_heat_in[current_in_idx],
-                                     available_heat_out[current_out_idx],
-                                     max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
-                                     -
-                                     sum(layers_heat_out; init=0.0)])
-            used_heat_in = heat_transfer
-            used_heat_out = heat_transfer
-            # The el. energy can not be zero as this would lead to problems in process step
-            # as then it seems that no electrical energy is available!
-            used_el_in = 0.01 # TODO
-            current_out_temp = current_in_temp
-            # TODO: Whats about the usage_fraction, should the bypass be kept included in the usage_fraction calculation?
-            # Or should we deny the bypass and force users to implement heat pumps in parallel if they want a bypass?
-            # TODO: Whats about a constant COP? Should this be still be valid even during bypass?
-        else
-            # calculate cop
-            cop = unit.constant_cop === nothing ?
-                  dynamic_cop(current_in_temp, current_out_temp) :
-                  unit.constant_cop
-            if cop === nothing
-                @error ("Input and/or output temperature for heatpump $(unit.uac) is not given. Provide temperatures or fixed cop.")
-                throw(InputError)
-            end
-
-            # calculate energies with the current cop
-            # energies for current layer with potential heat in as basis
-            used_heat_in = copy(available_heat_in[current_in_idx])
-            used_el_in = used_heat_in / (cop - 1.0)
-            used_heat_out = used_heat_in + used_el_in
-
-            # check heat out as limiter, also checking for limit of heat pump
-            max_heat_out = min(available_heat_out[current_out_idx],
-                               max_usage_fraction * sim_params["watt_to_wh"](unit.power_th)
-                               -
-                               sum(layers_heat_out; init=0.0))
-            if used_heat_out > max_heat_out
-                used_heat_out = max_heat_out
-                used_el_in = used_heat_out / cop
-                used_heat_in = used_el_in * (cop - 1.0)
-            end
-
-            # check electricity in as limiter
-            if used_el_in > available_el_in
-                used_el_in = available_el_in
-                used_heat_in = used_el_in * (cop - 1.0)
-                used_heat_out = used_heat_in + used_el_in
-            end
-        end
-
-        # finally all checks done, we add the layer and update remaining energies
-        push!(layers_el_in, used_el_in)
-        push!(layers_heat_in, used_heat_in)
-        push!(layers_heat_in_temperature, current_in_temp)
-        push!(layers_heat_in_uac, in_uacs[current_in_idx])
-        push!(layers_heat_out, used_heat_out)
-        push!(layers_heat_out_temperature, current_out_temp)
-        push!(layers_heat_out_uac, out_uacs[current_out_idx])
-
-        available_el_in -= used_el_in
-        available_heat_in[current_in_idx] -= used_heat_in
-        available_heat_out[current_out_idx] -= used_heat_out
+    # as long as the sum of times with minimum power per slice is larger than the time step
+    # and the sum of times with chosen power per slice is smaller or equal to the time step
+    # (which is implicit in the calculation), we can find a dispatch of each slice by
+    # "slowing them down" from the minimum power up to the chosen power, so the sum works
+    # out. we don't have to calculate this dispatch, it is theoretical. if the minimum power
+    # cannot be observed, the heat pump should not run at all
+    if sum(times_min; init=0.0) < sim_params["time_step_seconds"]
+        energies = reset_temp_slices!(energies)
+        best_plrs = []
+        best_times = []
+        # we do not reset best_times_min as we want that information even when the heat pump
+        # did not run
+        optimise_slice_dispatch = false
     end
 
-    return layers_el_in,
-           layers_heat_in,
-           layers_heat_in_temperature,
-           layers_heat_in_uac,
-           layers_heat_out,
-           layers_heat_out_temperature,
-           layers_heat_out_uac
+    # warning: this optimisation is janky and doesn't work as well as it could
+    if optimise_slice_dispatch
+        energies = copy_temp_to_slices!(energies)
+        last_updated = (0, 0)
+
+        no_change_in = 0
+        for pass_nr in 1:(unit.nr_optimisation_passes)
+            energies = reset_temp_slices!(energies)
+            energies = reset_available!(energies)
+
+            # update target PLR of one slice
+            last_updated = update_plrs!(unit, energies, plrs, last_updated)
+            if last_updated == (-1, -1)
+                plrs = best_plrs
+                @debug "Optimisation of heat pump $(unit.uac) could not update PLRs in" *
+                       "timestep $(sim_params["time"]) and pass $(pass_nr)."
+                break
+            end
+            # calculate slices with updated PLRs
+            energies, times_min, times, plrs = calculate_slices(unit, sim_params, energies, plrs)
+            # check if the new PLRs actually lead to an improvement
+            if accept_pass(energies, times, sim_params) && pass_is_better(energies, sim_params)
+                energies = copy_temp_to_slices!(energies)
+                best_plrs = copy(plrs)
+                best_times = copy(times)
+                best_times_min = copy(times_min)
+                no_change_in = 0
+            else
+                # if the pass is rejected we need to set the temp slices to the best guess,
+                # which has been recorded in the actual slices, because the calling function
+                # calculate_energies then copies the temp slices to the actual slices. this
+                # is a bit circular, but only necessary for the slice optimisation
+                energies.slices_el_in_temp = energies.slices_el_in
+                energies.slices_heat_in_temp = energies.slices_heat_in
+                energies.slices_heat_out_temp = energies.slices_heat_out
+                energies.slices_heat_in_temperature_temp = energies.slices_heat_in_temperature
+                energies.slices_heat_out_temperature_temp = energies.slices_heat_out_temperature
+                energies.slices_heat_in_uac_temp = energies.slices_heat_in_uac
+                energies.slices_heat_out_uac_temp = energies.slices_heat_out_uac
+
+                # we also need to reset the PLRs, as they might have added or removed slices
+                # compared to the best guess. however if no change was made in a number of
+                # tries greater or equal than the number of slices, we know that the opti-
+                # misation is stuck and we can break out of the loop for a performance gain
+                plrs = best_plrs
+                no_change_in += 1
+                if no_change_in >= length(plrs)
+                    break
+                end
+            end
+        end
+    end
+
+    # calculate average PLR, from active slices, and weighted by heat produced
+    weights = 0
+    for (slice_idx, indexes) in pairs(energies.slices_idx_to_plr)
+        try
+            if best_plrs[indexes[1], indexes[2]] === nothing
+                continue
+            end
+            if optimise_slice_dispatch
+                weight = energies.slices_heat_out[slice_idx]
+            else
+                weight = energies.slices_heat_out_temp[slice_idx]
+            end
+            unit.avg_plr += best_plrs[indexes[1], indexes[2]] * weight
+            weights += weights
+        catch BoundsError
+            continue
+        end
+    end
+    if weights > 0
+        unit.avg_plr /= weights
+    else
+        unit.avg_plr = 0.0
+    end
+
+    # calculate active time as fraction of the simulation time step
+    unit.time_active = sum(best_times; init=0.0) / sim_params["time_step_seconds"]
+    unit.time_active_min = sum(best_times_min; init=0.0) / sim_params["time_step_seconds"]
+
+    return energies
 end
 
-function reorder_energies(unit,
-                          order,
-                          energies,
-                          temps_min,
-                          temps_max,
-                          uacs)
-    function highest_first_with_nothing(a, b)
-        if a === nothing
-            return false
-        elseif b === nothing
-            return true
-        else
-            return a > b
-        end
-    end
+"""
+Calculates the energies the heat pump can process in the timestep.
 
-    # TODO: Implement contol module!    
-    if order == "highest_in_temps_max_first"
-        order_idx = sortperm(temps_max; by=x -> x, lt=highest_first_with_nothing)
-        energies = energies[order_idx]
-        temps_min = temps_min[order_idx]
-        temps_max = temps_max[order_idx]
-        uacs = uacs[order_idx]
-    elseif order == "smallest_out_temps_min_first"
-        order_idx = reverse(sortperm(temps_min; by=x -> x, lt=highest_first_with_nothing))
-        energies = energies[order_idx]
-        temps_min = temps_min[order_idx]
-        temps_max = temps_max[order_idx]
-        uacs = uacs[order_idx]
-    end
-    return energies, temps_min, temps_max, uacs
-end
+This is split in an inner function (see calculate_energies_heatpump) and this outer
+function, because the calculation happens differently depending on whether there are other
+transformers in the input exchanges, outputs, both or neither.
 
+# Arguments
+- `unit::HeatPump`: The heat pump.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+# Returns
+- `Bool`: If false the heat pump cannot process any energy for one of several reasons. The
+    values might still be zero even if this flag is true, but a value of false definitely
+    means no operation.
+- `HPEnergies`: The energies container.
+"""
 function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
+    energies = HPEnergies()
+
     # get usage fraction from control modules
-    max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
-    if max_usage_fraction <= 0.0
-        return false, (nothing, nothing, nothing)
+    energies.max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
+    if energies.max_usage_fraction <= 0.0
+        return false, (nothing)
     end
 
     # get potentials from inputs/outputs. The heat input and output are calculated as 
-    # vectors to allow for temperautre layers, while the electricity input is a scalar
-    potential_energy_el = check_el_in(unit, sim_params)
-    potentials_energies_heat_in,
-    in_temps_min,
-    in_temps_max,
-    in_uacs = check_heat_in(unit, sim_params)
-    potentials_energies_heat_out,
-    out_temps_min,
-    out_temps_max,
-    out_uacs = check_heat_out(unit, sim_params)
+    # vectors to allow for temperature layers, while the electricity input is a scalar
+    energies.potential_energy_el = check_el_in(unit, sim_params)
+    if energies.potential_energy_el === nothing
+        # shortcut if we're limited by zero input electricity
+        return false, (nothing)
+    end
+
+    energies.potentials_energies_heat_in,
+    energies.in_temps_min,
+    energies.in_temps_max,
+    energies.in_uacs = check_heat_in_layered(unit, sim_params)
+
+    energies.potentials_energies_heat_out,
+    energies.out_temps_min,
+    energies.out_temps_max,
+    energies.out_uacs = check_heat_out_layered(unit, sim_params)
 
     # in the following we want to work with positive values as it is easier
-    potentials_energies_heat_in = abs.(potentials_energies_heat_in)
-    potentials_energies_heat_out = abs.(potentials_energies_heat_out)
+    energies.potentials_energies_heat_in = abs.(energies.potentials_energies_heat_in)
+    energies.potentials_energies_heat_out = abs.(energies.potentials_energies_heat_out)
 
-    # exemplary control function that orders the available input sources by their
-    # temperaturue. This overwrites the order in potentially connected busses!
-    # TODO: Implement in control modules!
-    # potentials_energies_heat_in,
-    #     in_temps_min,
-    #     in_temps_max,
-    #     in_uacs = reorder_energies(unit,
-    #                                "highest_in_temps_max_first",
-    #                                potentials_energies_heat_in,
-    #                                in_temps_min,
-    #                                in_temps_max,
-    #                                in_uacs)
-    # potentials_energies_heat_out,
-    #     out_temps_min,
-    #     out_temps_max,
-    #     out_uacs = reorder_energies(unit,
-    #                                 "smallest_out_temps_min_first",
-    #                                 potentials_energies_heat_out,
-    #                                 out_temps_min,
-    #                                 out_temps_max,
-    #                                 out_uacs)
+    # reduce available input energies by the power/heat losses that would occur if the
+    # sources would be fully utilised. since the actual usage is equal or less than that,
+    # it works out even if the PLR for that source is not 1.0
+    energies.potentials_energies_heat_in .*= unit.heat_losses_factor
+    energies.potential_energy_el *= unit.power_losses_factor
 
-    heat_in_has_inf_energy = any(isinf, potentials_energies_heat_in)
-    heat_out_has_inf_energy = any(isinf, potentials_energies_heat_out)
+    # reorder inputs and outputs according to control modules
+    index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
+    energies.in_temps_min = energies.in_temps_min[index]
+    energies.in_temps_max = energies.in_temps_max[index]
+    energies.in_uacs = energies.in_uacs[index]
+    energies.potentials_energies_heat_in = energies.potentials_energies_heat_in[index]
 
-    layers_el_in = Vector{Floathing}()
-    layers_heat_in = Vector{Floathing}()
-    layers_heat_in_temperature = Vector{Temperature}()
-    layers_heat_in_uac = Vector{Stringing}()
-    layers_heat_out = Vector{Floathing}()
-    layers_heat_out_temperature = Vector{Temperature}()
-    layers_heat_out_uac = Vector{Stringing}()
+    index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
+    energies.out_temps_min = energies.out_temps_min[index]
+    energies.out_temps_max = energies.out_temps_max[index]
+    energies.out_uacs = energies.out_uacs[index]
+    energies.potentials_energies_heat_out = energies.potentials_energies_heat_out[index]
 
-    if heat_in_has_inf_energy && heat_out_has_inf_energy
-        # can not perform calculation if both inputs and outputs have inf energies
-        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and outputs. This cannot be resolved. " *
-              "Please check the order of operation and make sure that either the inputs or the outputs have been fully calculated " *
+    # there are three different cases of how to handle the layered approach of operating the
+    # heat pump, depending on wether or not any input heat or output heat transformer has a
+    # value of infinite as the potential. if this is the case for both the input and output,
+    # the calculation cannot be resolved.
+    energies.heat_in_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=true))
+    energies.heat_out_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=false))
+
+    if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
+        @warn "The heat pump $(unit.uac) has unknown energies in both its inputs and " *
+              "outputs. This cannot be resolved. Please check the order of operation and " *
+              "make sure that either the inputs or the outputs have been fully calculated " *
               "before the heat pump $(unit.uac) has its potential step."
-    elseif heat_in_has_inf_energy
-        for heat_in_idx in eachindex(potentials_energies_heat_in)
-            layers_el_in_temp,
-            layers_heat_in_temp,
-            layers_heat_in_temperature_temp,
-            layers_heat_in_uac_temp,
-            layers_heat_out_temp,
-            layers_heat_out_temperature_temp,
-            layers_heat_out_uac_temp = calculate_energies_heatpump(unit,
-                                                                   sim_params,
-                                                                   copy(potential_energy_el),
-                                                                   [Inf],
-                                                                   copy(potentials_energies_heat_out),
-                                                                   max_usage_fraction,
-                                                                   [in_temps_min[heat_in_idx]],
-                                                                   [in_temps_max[heat_in_idx]],
-                                                                   [in_uacs[heat_in_idx]],
-                                                                   out_temps_min,
-                                                                   out_temps_max,
-                                                                   out_uacs)
-
-            append!(layers_heat_in, layers_heat_in_temp)
-            append!(layers_heat_in_temperature, layers_heat_in_temperature_temp)
-            append!(layers_heat_in_uac, layers_heat_in_uac_temp)
-            # Is this correct? Using the highest energy as worst case should be good for now...
-            if heat_in_idx == 1
-                layers_el_in = layers_el_in_temp
-                layers_heat_out = layers_heat_out_temp
-                layers_heat_out_temperature = layers_heat_out_temperature_temp
-                layers_heat_out_uac = layers_heat_out_uac_temp
-            else
-                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
-                    layers_el_in = layers_el_in_temp
-                end
-                if _isless(_sum(layers_heat_out), _sum(layers_heat_out_temp))
-                    layers_heat_out = layers_heat_out_temp
-                    layers_heat_out_temperature = layers_heat_out_temperature_temp
-                    layers_heat_out_uac = layers_heat_out_uac_temp
-                end
-            end
-        end
-    elseif heat_out_has_inf_energy
-        for heat_out_idx in eachindex(potentials_energies_heat_out)
-            layers_el_in_temp,
-            layers_heat_in_temp,
-            layers_heat_in_temperature_temp,
-            layers_heat_in_uac_temp,
-            layers_heat_out_temp,
-            layers_heat_out_temperature_temp,
-            layers_heat_out_uac_temp = calculate_energies_heatpump(unit,
-                                                                   sim_params,
-                                                                   copy(potential_energy_el),
-                                                                   copy(potentials_energies_heat_in),
-                                                                   [Inf],
-                                                                   max_usage_fraction,
-                                                                   in_temps_min,
-                                                                   in_temps_max,
-                                                                   in_uacs,
-                                                                   [out_temps_min[heat_out_idx]],
-                                                                   [out_temps_max[heat_out_idx]],
-                                                                   [out_uacs[heat_out_idx]])
-
-            append!(layers_heat_out, layers_heat_out_temp)
-            append!(layers_heat_out_temperature, layers_heat_out_temperature_temp)
-            append!(layers_heat_out_uac, layers_heat_out_uac_temp)
-            # Is this correct? Using the highest energy as worst case should be good for now...
-            if heat_out_idx == 1
-                layers_el_in = layers_el_in_temp
-                layers_heat_in = layers_heat_in_temp
-                layers_heat_in_temperature = layers_heat_in_temperature_temp
-                layers_heat_in_uac = layers_heat_in_uac_temp
-            else
-                if _isless(_sum(layers_el_in), _sum(layers_el_in_temp))
-                    layers_el_in = layers_el_in_temp
-                end
-                if _isless(_sum(layers_heat_in), _sum(layers_heat_in_temp))
-                    layers_heat_in = layers_heat_in_temp
-                    layers_heat_in_temperature = layers_heat_in_temperature_temp
-                    layers_heat_in_uac = layers_heat_in_uac_temp
-                end
-            end
-        end
-    else # fully known energies and temperatures in inputs and outputs
-        layers_el_in,
-        layers_heat_in,
-        layers_heat_in_temperature,
-        layers_heat_in_uac,
-        layers_heat_out,
-        layers_heat_out_temperature,
-        layers_heat_out_uac = calculate_energies_heatpump(unit,
-                                                          sim_params,
-                                                          potential_energy_el,
-                                                          potentials_energies_heat_in,
-                                                          potentials_energies_heat_out,
-                                                          max_usage_fraction,
-                                                          in_temps_min,
-                                                          in_temps_max,
-                                                          in_uacs,
-                                                          out_temps_min,
-                                                          out_temps_max,
-                                                          out_uacs)
+        return false, energies
     end
 
-    # if all chosen heat layers combined are not enough to meet minimum power fraction,
-    # the heat pump doesn't run at all
-    usage_fraction = (sum(layers_heat_out; init=0.0)) / sim_params["watt_to_wh"](unit.power_th)
-    if usage_fraction < unit.min_power_fraction
-        return false, (nothing, nothing, nothing)
+    if energies.heat_in_has_inf_energy
+        for heat_in_idx in eachindex(energies.potentials_energies_heat_in)
+            energies = reset_available!(energies; as_inf=1, idx=heat_in_idx)
+            energies = calculate_energies_heatpump(unit, sim_params, energies)
+            energies = add_heat_in_temp_to_slices(energies)
+            energies = copy_heat_out_temp_to_slices(energies)
+        end
+    elseif energies.heat_out_has_inf_energy
+        for heat_out_idx in eachindex(energies.potentials_energies_heat_out)
+            energies = reset_available!(energies; as_inf=2, idx=heat_out_idx)
+            energies = calculate_energies_heatpump(unit, sim_params, energies)
+            energies = add_heat_out_temp_to_slices(energies)
+            energies = copy_heat_in_temp_to_slices(energies)
+        end
+    else
+        energies = reset_available!(energies)
+        energies = calculate_energies_heatpump(unit, sim_params, energies, unit.optimise_slice_dispatch)
+        energies = copy_temp_to_slices!(energies)
     end
 
-    return true,
-           (layers_el_in,                  # 1
-            layers_heat_in,                # 2 
-            layers_heat_in_temperature,    # 3
-            layers_heat_in_uac,            # 4
-            layers_heat_out,               # 5
-            layers_heat_out_temperature,   # 6
-            layers_heat_out_uac,           # 7
-            heat_in_has_inf_energy,        # 8
-            heat_out_has_inf_energy)       # 9
+    # calculate average cop before losses
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
+    if el_in > sim_params["epsilon"]
+        unit.cop = heat_out / el_in
+    end
+
+    # now set losses of the heat pump and add the losses to the actually consumed
+    # power / heat for the slices
+    unit.losses_power = -1.0 * el_in
+    unit.losses_heat = -1.0 * heat_in
+    energies.slices_el_in ./= unit.power_losses_factor
+    energies.slices_heat_in ./= unit.heat_losses_factor
+
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
+
+    unit.losses_power += el_in
+    unit.losses_heat += heat_in
+    unit.losses = unit.losses_power + unit.losses_heat
+
+    # calculate effective cop after losses
+    if el_in > sim_params["epsilon"]
+        unit.effective_cop = heat_out / el_in
+    end
+
+    return true, energies
 end
 
 function potential(unit::HeatPump, sim_params::Dict{String,Any})
@@ -563,19 +1118,19 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit,
-                          energies[1],
-                          energies[2],
-                          energies[5],
-                          energies[4],
-                          energies[7],
-                          energies[8],
-                          energies[9])
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          energies.slices_heat_out,
+                          energies.slices_heat_in_uac,
+                          energies.slices_heat_out_uac,
+                          energies.heat_in_has_inf_energy,
+                          energies.heat_out_has_inf_energy)
         set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         lowest(energies[3]),
+                         lowest(energies.slices_heat_in_temperature),
                          nothing)
         set_temperature!(unit.output_interfaces[unit.m_heat_out],
                          nothing,
-                         highest(energies[6]))
+                         highest(energies.slices_heat_out_temperature))
     end
 end
 
@@ -587,44 +1142,43 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    el_in = sum(energies[1]; init=0.0)
-    heat_out = sum(energies[5]; init=0.0)
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_out = sum(energies.slices_heat_out; init=0.0)
 
     if heat_out < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
-    # calculate average cop of current time step
-    if el_in > sim_params["epsilon"]
-        unit.cop = heat_out / el_in
-    end
-    unit.mix_temp_input = _weighted_mean(energies[3], energies[2])
-    unit.mix_temp_output = _weighted_mean(energies[6], energies[5])
+    unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
+    unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
 
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
-    sub!(unit.input_interfaces[unit.m_heat_in], energies[2], lowest(energies[3]), energies[4])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[5], highest(energies[6]), energies[7])
+    sub!(unit.input_interfaces[unit.m_heat_in],
+         energies.slices_heat_in,
+         lowest(energies.slices_heat_in_temperature),
+         energies.slices_heat_in_uac)
+    add!(unit.output_interfaces[unit.m_heat_out],
+         energies.slices_heat_out,
+         highest(energies.slices_heat_out_temperature),
+         energies.slices_heat_out_uac)
 end
 
-# has its own reset function as here more parameters are present that need to be reset in every timestep
+# has its own reset function as here more parameters are present that need to be reset in
+# every timestep
 function reset(unit::HeatPump)
-    for inface in values(unit.input_interfaces)
-        if inface !== nothing
-            reset!(inface)
-        end
-    end
-    for outface in values(unit.output_interfaces)
-        if outface !== nothing
-            reset!(outface)
-        end
-    end
+    invoke(reset, Tuple{Component}, unit)
 
     # reset other parameter
-    unit.losses = 0.0
     unit.cop = 0.0
+    unit.effective_cop = 0.0
     unit.mix_temp_input = 0.0
     unit.mix_temp_output = 0.0
+    unit.losses_heat = 0.0
+    unit.losses_power = 0.0
+    unit.avg_plr = 0.0
+    unit.time_active = 0.0
+    unit.time_active_min = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
@@ -632,9 +1186,15 @@ function output_values(unit::HeatPump)::Vector{String}
             string(unit.m_heat_in) * " IN",
             string(unit.m_heat_out) * " OUT",
             "COP",
-            "Losses",
+            "Effective_COP",
+            "Avg_PLR",
+            "Time_active",
+            "Time_active_min",
             "MixingTemperature_Input",
-            "MixingTemperature_Output"]
+            "MixingTemperature_Output",
+            "Losses_power",
+            "Losses_heat",
+            "Losses"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -644,12 +1204,24 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "COP"
         return unit.cop
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "Effective_COP"
+        return unit.effective_cop
+    elseif key.value_key == "Avg_PLR"
+        return unit.avg_plr
+    elseif key.value_key == "Time_active"
+        return unit.time_active
+    elseif key.value_key == "Time_active_min"
+        return unit.time_active_min
     elseif key.value_key == "MixingTemperature_Input"
         return unit.mix_temp_input
     elseif key.value_key == "MixingTemperature_Output"
         return unit.mix_temp_output
+    elseif key.value_key == "Losses_power"
+        return unit.losses_power
+    elseif key.value_key == "Losses_heat"
+        return unit.losses_heat
+    elseif key.value_key == "Losses"
+        return unit.losses
     end
     throw(KeyError(key.value_key))
 end

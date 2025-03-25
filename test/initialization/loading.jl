@@ -29,7 +29,9 @@ function test_load_from_dict()
                                       "storage_uac" => "TST_BT_01",
                                   )],
             "power_th" => 20000,
-            "constant_cop" => 3.0,
+            "cop_function" => "const:3.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
         "TST_BT_01" => Dict{String,Any}(
             "type" => "BufferTank",
@@ -52,7 +54,7 @@ function test_load_from_dict()
     @test length(keys(components)) == 5
     @test typeof(components["TST_BT_01"]) == Resie.EnergySystems.BufferTank
     @test components["TST_BT_01"].sys_function == Resie.EnergySystems.sf_storage
-    @test components["TST_HP_01"].power_th == 20000
+    @test components["TST_HP_01"].design_power_th == 20000
 end
 
 @testset "load_from_dict" begin
@@ -92,7 +94,9 @@ function test_load_custom_medium_categories()
             "m_heat_in" => "m_h_w_55c",
             "m_heat_out" => "m_h_w_85c",
             "power_th" => 12000,
-            "constant_cop" => 3.0,
+            "cop_function" => "const:3.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
         "TST_GRO_01" => Dict{String,Any}(
             "type" => "GridConnection",

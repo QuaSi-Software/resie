@@ -1,5 +1,7 @@
 module Resie
 
+using Printf
+using Dates: now, seconds
 using UUIDs
 
 """
@@ -93,6 +95,9 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
         "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
+        "step_info_interval" => default(project_config["io_settings"],
+                                        "step_info_interval",
+                                        Integer(floor(nr_of_steps / 20))),
     )
 
     # add helper functions to convert power to work and vice-versa. this uses the time step
@@ -215,6 +220,8 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     # export order of operation and other additional info like optional plots
     dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
+    @info "-- Start step loop"
+    start = now()
     for steps in 1:sim_params["number_of_time_steps"]
         # perform the simulation
         perform_steps(components, step_order, sim_params)
@@ -251,7 +258,20 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
         sim_params["time"] += Int(sim_params["time_step_seconds"])
         sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
                                                             Second(sim_params["time_step_seconds"]))
+
+        # progress report
+        if sim_params["step_info_interval"] > 0 && steps % sim_params["step_info_interval"] == 0
+            eta = ((sim_params["number_of_time_steps"] - steps)
+                   *
+                   seconds(now() - start)
+                   /
+                   sim_params["step_info_interval"])
+            @info "Progress: $(steps)/$(sim_params["number_of_time_steps"]) in" *
+                  " $(seconds(now() - start)) s. ETA: $(@sprintf("%.4f", eta)) s"
+            start = now()
+        end
     end
+    @info "-- Finished step loop"
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
@@ -261,7 +281,10 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                                   weather_data_keys,
                                   project_config,
                                   sim_params)
-        @info "Line plot created and saved to .output/output_plot.html"
+        filepath = default(project_config["io_settings"],
+                           "output_plot_file",
+                           "./output/output_plot.html")
+        @info "Line plot created and saved to $(filepath)"
     end
 
     # create Sankey diagram
@@ -272,7 +295,10 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
                       medium_of_interfaces,
                       nr_of_interfaces,
                       project_config["io_settings"])
-        @info "Sankey created and saved to .output/output_sankey.html"
+        filepath = default(project_config["io_settings"],
+                           "output_plot_file",
+                           "./output/output_plot.html")
+        @info "Sankey created and saved to $(filepath)"
     end
 
     if do_write_CSV
@@ -295,8 +321,15 @@ Load a project from the given file and run the simulation with it.
 
 # Arguments
 - `filepath::String`: Filepath to the project config file.
+# Returns
+- `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
 function load_and_run(filepath::String)
+    start = now()
+    @info "---- Simulation setup ----"
+    @info "-- Starting simulation at $(start)"
+    @info "-- Now reading project config"
+
     project_config = nothing
 
     try
@@ -304,21 +337,27 @@ function load_and_run(filepath::String)
     catch exc
         if isa(exc, MethodError)
             @error "Could not parse project config file at $(filepath)"
-            return
+            return false
         end
     end
 
     if project_config === nothing
         @error "Could not find or parse project config file at $(filepath)"
-        return
+        return false
     end
 
+    @info "-- Now preparing inputs"
     sim_params, components, step_order = prepare_inputs(project_config)
     run_ID = uuid1()
     sim_params["run_ID"] = run_ID
     current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+    @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
+    start = now()
+    @info "---- Simulation loop ----"
     run_simulation_loop(project_config, sim_params, components, step_order)
+    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
+    return true
 end
 
 end # module

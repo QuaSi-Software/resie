@@ -56,10 +56,192 @@ function test_efficiency_parsing()
     @test efficiency(0.5) ≈ 0.9
     @test efficiency(0.8) ≈ 0.96
     @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("offset_lin:0.25")
+    @test efficiency(0.0) ≈ 0.75
+    @test efficiency(0.5) ≈ 0.875
+    @test efficiency(1.0) ≈ 1.0
+
+    efficiency = EnergySystems.parse_efficiency_function("logarithmic:1.25,0.95")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.8620689655172411
+    @test efficiency(0.5) ≈ 1.1904761904761905
+    @test efficiency(0.75) ≈ 1.2295081967213115
+    @test efficiency(0.9) ≈ 1.2430939226519337
+    @test efficiency(1.0) ≈ 1.25
+
+    efficiency = EnergySystems.parse_efficiency_function("inv_poly:0.5,-0.2,0.815,0.01")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.05) ≈ 0.9937888198757764
+    @test efficiency(0.1) ≈ 1.111111111111111
+    @test efficiency(0.2) ≈ 1.183431952662722
+    @test efficiency(0.3) ≈ 1.2
+    @test efficiency(0.4) ≈ 1.1904761904761905
+    @test efficiency(0.5) ≈ 1.1627906976744187
+    @test efficiency(0.75) ≈ 1.0421189752496745
+    @test efficiency(1.0) ≈ 0.8888888888888888
+
+    efficiency = EnergySystems.parse_efficiency_function("exp:1.25,-1.25,-5.7")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.5430932016255786
+    @test efficiency(0.25) ≈ 0.9493644209895724
+    @test efficiency(0.5) ≈ 1.177694598906452
+    @test efficiency(0.75) ≈ 1.2326099391013279
+    @test efficiency(1.0) ≈ 1.2458175431781608
+
+    efficiency = EnergySystems.parse_efficiency_function("unified_plf:0.4,1.2,0.5,1.0")
+    @test efficiency(0.0) ≈ 0.0
+    @test efficiency(0.1) ≈ 0.3818181818181817
+    @test efficiency(0.2) ≈ 0.7
+    @test efficiency(0.3) ≈ 0.9692307692307692
+    @test efficiency(0.4) ≈ 1.2
+    @test efficiency(0.5) ≈ 1.1666666666666667
+    @test efficiency(0.6) ≈ 1.1333333333333333
+    @test efficiency(0.7) ≈ 1.1
+    @test efficiency(0.8) ≈ 1.0666666666666667
+    @test efficiency(0.9) ≈ 1.0333333333333332
+    @test efficiency(1.0) ≈ 1.0
 end
 
 @testset "test_efficiency_parsing" begin
     test_efficiency_parsing()
+end
+
+function test_cop_parsing()
+    const_val, cop_func = EnergySystems.parse_cop_function("const:0.314")
+    @test const_val == 0.314
+    @test cop_func(30.0, 50.0) ≈ 0.314
+    @test cop_func(10.0, 70.0) ≈ 0.314
+
+    const_val, cop_func = EnergySystems.parse_cop_function("carnot:0.4")
+    @test const_val === nothing
+    @test cop_func(30.0, 50.0) ≈ 6.463
+    @test cop_func(10.0, 70.0) ≈ 2.2876666666666
+
+    field_def = "field:" *
+                " 0, 0,10,20,30;" *
+                " 0,30,20,10, 5;" *
+                "10,30,30,20,10;" *
+                "20,30,30,30,20"
+    const_val, cop_func = EnergySystems.parse_cop_function(field_def)
+    @test const_val === nothing
+    @test cop_func(5.0, 5.0) ≈ 30.0
+    @test cop_func(10.0, 5.0) ≈ 30.0
+    @test cop_func(5.0, 10.0) ≈ 25.0
+    @test cop_func(12.5, 26.9) ≈ 15.6
+
+    error_occured = false
+    try
+        cop_func(9.0, 31.0) # ≈ 5.0
+    catch BoundsError
+        error_occured = true
+    end
+    @test error_occured
+
+    field_def = "field:" *
+                " 0, 0,10,20,30;" *
+                " 0,30,20,10, 5;" *
+                "10,30,30,25,10;" *
+                "20,30,30,30,20"
+    const_val, cop_func = EnergySystems.parse_cop_function(field_def)
+    @test const_val === nothing
+    @test cop_func(12.5, 26.9) ≈ 17.15
+
+    func_def = "poly-2:1.52e+1,1.44e-1,-6.45e-1,1.07e-3,-1.51e-3,1.19e-2,-8.20e-5," *
+               "2.13e-5,-6.04e-7,-7.60e-5"
+    const_val, cop_func = EnergySystems.parse_cop_function(func_def)
+    plf_func = EnergySystems.parse_efficiency_function("poly:1.0,0.0")
+    @test const_val === nothing
+    @test cop_func(20, 60) * plf_func(1.0) ≈ 4.231712
+    @test cop_func(10, 50) * plf_func(0.5) ≈ 2.0007
+end
+
+@testset "test_cop_parsing" begin
+    test_cop_parsing()
+end
+
+function test_2dim_parsing()
+    func_def = "poly-2:1.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0"
+    func_2dim = EnergySystems.parse_2dim_function(func_def)
+    @test func_2dim(12.0, 99.9) ≈ 7.0
+    func_def = "poly-2:1.0,0.0,0.5,0.0,0.0,0.0,0.0,0.0,0.0,0.0"
+    func_2dim = EnergySystems.parse_2dim_function(func_def)
+    @test func_2dim(99.0, 16.0) ≈ 9.0
+    func_def = "poly-2:2.0,0.5,0.5,0.0,0.1,0.0,0.0,0.0,0.0,0.0"
+    func_2dim = EnergySystems.parse_2dim_function(func_def)
+    @test func_2dim(10.0, 30.0) ≈ 52.0
+    func_def = "poly-2:1.0,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1"
+    func_2dim = EnergySystems.parse_2dim_function(func_def)
+    @test func_2dim(2.0, 3.0) ≈ 1.0 + 0.2 + 0.3 + 0.4 + 0.9 + 0.6 + 0.8 + 1.2 + 1.8 + 2.7
+end
+
+@testset "test_2dim_parsing" begin
+    test_2dim_parsing()
+end
+
+function test_bilinear_interpolate()
+    #   x    1   2   3
+    #  y   -----------
+    #    1 | 0       1
+    #    2 |     v
+    #    3 | 1       3
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 2, 3, 0, 1, 1, 3)
+    @test v ≈ 1.5
+
+    #   x    1   2   3
+    #  y   -----------
+    #    1 | 0   v   1
+    #    2 |
+    #    3 | 1       3
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 1, 3, 0, 1, 1, 3)
+    @test v ≈ 0.5
+
+    #   x    1   2   3
+    #  y   -----------
+    #    1 | 0       3
+    #    2 |         v
+    #    3 | 1       3
+    v = EnergySystems.bilinear_interpolate(1, 3, 3, 1, 2, 3, 0, 3, 1, 3)
+    @test v ≈ 3.0
+
+    #   x    1   2   3
+    #  y   -----------
+    #    1 | 3       1
+    #    2 |         
+    #    3 | 1       2
+    #
+    # five positions, four along each line of the box and one in the middle
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 1, 3, 3, 1, 1, 2)
+    @test v ≈ 2.0
+    v = EnergySystems.bilinear_interpolate(1, 3, 3, 1, 2, 3, 3, 1, 1, 2)
+    @test v ≈ 1.5
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 3, 3, 3, 1, 1, 2)
+    @test v ≈ 1.5
+    v = EnergySystems.bilinear_interpolate(1, 1, 3, 1, 2, 3, 3, 1, 1, 2)
+    @test v ≈ 2.0
+    # the crease is along the axis from (1,1) to (3,3), thus the value between (1,3) and
+    # (3,1) is not linear and can have a different value than expected from a linear inter-
+    # polation between the values 1 and 1
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 2, 3, 3, 1, 1, 2)
+    @test v ≈ 2.5
+
+    # concave crease from (1,1) to (3,3)
+    #
+    #   x    1   2   3
+    #  y   -----------
+    #    1 | 1       3
+    #    2 |     v   v
+    #    3 | 2   v   1
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 3, 3, 1, 3, 2, 1)
+    @test v ≈ 1.5
+    v = EnergySystems.bilinear_interpolate(1, 2, 3, 1, 2, 3, 1, 3, 2, 1)
+    @test v ≈ 1.0
+    v = EnergySystems.bilinear_interpolate(1, 3, 3, 1, 2, 3, 1, 3, 2, 1)
+    @test v ≈ 2.0
+end
+
+@testset "test_bilinear_interpolate" begin
+    test_bilinear_interpolate()
 end
 
 function test_inverse_efficiency()
