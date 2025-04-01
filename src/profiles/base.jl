@@ -575,11 +575,19 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
         has_corrected = false
         zoned_time = 0
 
+        counter = 1
         for ts in timestamp
             # Convert the timestamp to ZonedDateTime and back to DateTime to eliminate any DST effects.
             # This results in local standard time.
             try
-                zoned_time = ZonedDateTime(ts, tz)
+                possible = TimeZones.interpret(ts, tz, TimeZones.Local)
+                if length(possible) == 1
+                    zoned_time = ZonedDateTime(ts, tz)
+                    counter = 1  # reset counter
+                else
+                    zoned_time = ZonedDateTime(ts, tz, counter)
+                    counter += 1 # add one to switch to the second occuurence of the duplicate hour
+                end
                 push!(corrected_timestamps, sub_ignoring_leap_days(DateTime(zoned_time), zoned_time.zone.offset.dst))
             catch e
                 @error "In the profile at $file_path, the datestamp $ts is probably invalid for the specified time " *
