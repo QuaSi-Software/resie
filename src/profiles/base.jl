@@ -546,9 +546,32 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
                    "It has to be an IANA (also known as TZ or TZDB) time zone identifier."
             throw(InputError)
         end
+        if tz isa FixedTimeZone
+            @error "The time zone $(tz) of the profile at $(file_path) is a FixedTimeZone. " *
+                   "This is not supported! Please use a VariableTimeZone given as IANA (also known as TZ or TZDB) time " *
+                   "zone identifier, or remove the time_zone parameter if you use local standard time. If you want to " *
+                   "shift the whole time series, use the parameter time_shift_seconds."
+            throw(InputError)
+        end
+
+        # check if the current time zone includes any DST within the simulation time
+        fist_time_step = nothing
+        try
+            fist_time_step = ZonedDateTime(timestamp[1], tz)
+        catch e
+            @error "In the profile at $file_path, the first datestamp $tz is probably invalid for the specified time " *
+                   "zone $time_zone. The following error occured: $e"
+            throw(InputError)
+        end
+        has_dst = false
+        next_transition = next_transition_instant(fist_time_step)
+        if next_transition !== nothing && DateTime(next_transition) > timestamp[1] &&
+           DateTime(next_transition) < timestamp[end]
+            has_dst = true
+        end
 
         timestamp_max_year = year(timestamp[end])
-        if year(tz.transitions[end].utc_datetime) < timestamp_max_year
+        if !(tz isa FixedTimeZone) && has_dst && year(tz.transitions[end].utc_datetime) < timestamp_max_year
             try
                 TimeZones.TZData.compile(; max_year=Int(timestamp_max_year))
             catch e
@@ -575,11 +598,22 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
         has_corrected = false
         zoned_time = 0
 
+        double_timesteps = []
         for ts in timestamp
-            # Convert the timestamp to ZonedDateTime and back to DateTime to eliminate any DST effects.
-            # This results in local standard time.
             try
-                zoned_time = ZonedDateTime(ts, tz)
+                # Convert the timestamp to ZonedDateTime and back to DateTime to eliminate any DST effects.
+                # This results in local standard time.
+                possible = TimeZones.interpret(ts, tz, TimeZones.Local)
+                if length(possible) == 1
+                    zoned_time = ZonedDateTime(ts, tz)
+                else
+                    if ts in double_timesteps
+                        zoned_time = ZonedDateTime(ts, tz, 2)
+                    else
+                        zoned_time = ZonedDateTime(ts, tz, 1)
+                    end
+                    push!(double_timesteps, ts)  # add ts to double_timesteps to track it
+                end
                 push!(corrected_timestamps, sub_ignoring_leap_days(DateTime(zoned_time), zoned_time.zone.offset.dst))
             catch e
                 @error "In the profile at $file_path, the datestamp $ts is probably invalid for the specified time " *
