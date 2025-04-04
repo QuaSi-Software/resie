@@ -25,6 +25,7 @@ export check_balances, Component, each, Grouping, link_output_with, perform_step
        highest, default, plot_optional_figures_begin, plot_optional_figures_end
 
 using ..Profiles
+using UUIDs
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -159,10 +160,11 @@ Then, has_calculated_all_maxima is set to true.
 mutable struct MaxEnergy
     max_energy::Vector{Floathing}
     has_calculated_all_maxima::Bool
+    recalculate_max_energy::Bool
     purpose_uac::Vector{Stringing}
 end
 
-MaxEnergy() = MaxEnergy([nothing], false, [])
+MaxEnergy() = MaxEnergy([nothing], false, false, [])
 
 """
 Copy function for custom type MaxEnergy
@@ -170,6 +172,7 @@ Copy function for custom type MaxEnergy
 function Base.copy(original::MaxEnergy)
     return MaxEnergy(copy(original.max_energy),
                      copy(original.has_calculated_all_maxima),
+                     copy(original.recalculate_max_energy),
                      copy(original.purpose_uac))
 end
 
@@ -464,7 +467,7 @@ function set_temperature!(interface::SystemInterface,
 end
 
 """
-    set_max_energy!(interface, value, purpose_uac, has_calculated_all_maxima)
+    set_max_energy!(interface, value, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
 
 Set the maximum energy in the `interface` to the given `value` representing the maximum 
 energy that the calling component can deliver.
@@ -491,32 +494,42 @@ considering that the single values can not be summed up but they all have to be 
 decreased if one of them is reduced. An analogy would be to divide the current time step 
 into smaller time steps, in each of which a different component is supplied or drawn with
 a subset of the maximum possible energy of the current time step.
+
+The flag `recalculate_max_energy` can be used recalculate the max_energy of a component
+each time the bus distributes energy to or from this component. This can be useful if the 
+leftover max_energy depends on the already taken energy, e.g. for the STES loading, where the
+determination of the leftover free space can not be calculated easily after a given energy at given
+temperature has alread been loaded into the storage. To use this funcionality, the component
+need to have a function recalculate_max_energy() implemented that is called in reduce_max_energy!().
 """
 function set_max_energy!(interface::SystemInterface,
                          value::Union{Floathing,Vector{<:Floathing}},
-                         purpose_uac::Union{Stringing,Vector{Stringing}}=nothing,
-                         has_calculated_all_maxima::Bool=false)
+                         purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing,
+                         has_calculated_all_maxima::Bool=false,
+                         recalculate_max_energy::Bool=false)
     if interface.source.sys_function == sf_bus
-        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
+        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
         set_max_energy!(interface.source,
                         interface.target,
                         false,
                         value,
                         purpose_uac,
-                        has_calculated_all_maxima)
+                        has_calculated_all_maxima,
+                        recalculate_max_energy)
     elseif interface.target.sys_function == sf_bus
-        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
+        set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
         set_max_energy!(interface.target,
                         interface.source,
                         true,
                         value,
                         purpose_uac,
-                        has_calculated_all_maxima)
+                        has_calculated_all_maxima,
+                        recalculate_max_energy)
     else
         # 1-to-1 interface between two components 
         # --> check if value is smaller than current max_energy
         if is_max_energy_nothing(interface.max_energy) || _isless(_sum(value), get_max_energy(interface.max_energy))
-            set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima)
+            set_max_energy!(interface.max_energy, value, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
         end
     end
 end
@@ -545,7 +558,7 @@ function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::String
 end
 
 """
-    reduce_max_energy!(max_energy, amount, uac_to_reduce)
+    reduce_max_energy!(max_energy, amount, temperature, uac_of_caller, uac_of_owner, run_id)
 
 This function decreases the maximum energy values stored in `max_energy` by the given `amount`.
 If `uac_to_reduce` is specified and found in `max_energy.purpose_uac`, only the corresponding
@@ -553,17 +566,32 @@ max_energy value will be reduced.
 f the maximum possible energy for all max_energy have been calculated (`has_calculated_all_maxima` 
 is true), the other max_energy values will be reduced proportionally by a linear percentage. 
 If `uac_to_reduce` could not be found, an error arises.
+If `recalculate_max_energy` is set in the max_energy, a special function will be called located 
+in the owner component to calculate the leftover max_energy after the amount are applied.
 
-If no `uac_to_reduce` is specified of if `max_energy.purpose_uac` is empty, the amount 
+If no `uac_to_reduce` is specified or if `max_energy.purpose_uac` is empty, the amount 
 decreases the entries in max_energy.max_energy, starting with the first one, until the amount 
 is fully distributed.
 """
 function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                             amount::Union{Float64,Vector{Float64}},
-                            uac_to_reduce::Union{Stringing,Vector{Stringing}}=nothing)
-    for amount_idx in eachindex(amount)
-        current_amount = length(amount) == 1 ? amount : amount[amount_idx]
-        if uac_to_reduce === nothing || is_purpose_uac_nothing(max_energy)
+                            temperature::Union{Temperature,Vector{Temperature}},
+                            uac_of_caller::String,
+                            uac_of_owner::String,
+                            run_id::UUID)
+    if max_energy.recalculate_max_energy
+        # can handle vectors of temperatures and amounts
+        run = get_run(run_id)
+        max_energy = recalculate_max_energy(run.components[uac_of_owner],
+                                            amount,
+                                            temperature,
+                                            max_energy,
+                                            run.parameters)
+    else
+        # here, only the most recent entry in amount is used, as all the distributed energy 
+        # from before is not relevant
+        current_amount = isa(amount, AbstractVector) ? amount[end] : amount
+        if is_purpose_uac_nothing(max_energy)
             for i in eachindex(max_energy.max_energy)
                 to_reduce = min(current_amount, max_energy.max_energy[i])
                 max_energy.max_energy[i] -= to_reduce
@@ -573,8 +601,7 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                 end
             end
         else
-            currrent_uac_to_reduce = isa(uac_to_reduce, AbstractVector) ? uac_to_reduce[amount_idx] : uac_to_reduce
-            idx = findfirst(==(currrent_uac_to_reduce), max_energy.purpose_uac)
+            idx = findfirst(==(uac_of_caller), max_energy.purpose_uac)
             if idx !== nothing
                 if max_energy.has_calculated_all_maxima
                     max_energy.max_energy .*= 1 - (current_amount / max_energy.max_energy[idx])
@@ -595,7 +622,7 @@ This function increases the maximum energy values stored in `max_energy` by the 
 If `uac_to_increase` is specified and found in `max_energy.purpose_uac`, the corresponding
 max_energy value will be increased. 
 If `uac_to_increase` could not be found, a new value in max_energy is added.
-If no `uac_to_increase` is given of if `max_energy.purpose_uac` is empty, the given amount is added
+If no `uac_to_increase` is given or if `max_energy.purpose_uac` is empty, the given amount is added
 to the first max_energy.max_energy as in this case, only one value should be present (e.g 1-to-1 
 connection or components that don't care).
 """
@@ -607,14 +634,14 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
         currrent_uac_to_increase = isa(uac_to_increase, AbstractVector) ? uac_to_increase[amount_idx] : uac_to_increase
         if uac_to_increase === nothing || is_purpose_uac_nothing(max_energy)
             if is_max_energy_nothing(max_energy) || length(max_energy.max_energy) == 0
-                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false)
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, false)
             else
                 max_energy.max_energy[1] += current_amount
             end
         else
             idx = findfirst(==(currrent_uac_to_increase), max_energy.purpose_uac)
             if idx === nothing
-                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, true)
+                set_max_energy!(max_energy, current_amount, currrent_uac_to_increase, false, false, true)
             else
                 max_energy.max_energy[idx] += current_amount
             end
@@ -636,7 +663,7 @@ function max_energy_sum(max_energy::EnergySystems.MaxEnergy)
 end
 
 """
-    set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima)
+    set_max_energy!(max_energy,  values, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
 
 Fills a MaxEnergy struct with given values.
 If the given values are scalars, they are converted into vectors.
@@ -644,8 +671,9 @@ If `values` is empty, a zero is added to ensure accessibility.
 """
 function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
                          values::Union{Floathing,Vector{<:Floathing}},
-                         purpose_uac::Union{Stringing,Vector{Stringing}},
+                         purpose_uac::Union{Stringing,Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool,
+                         recalculate_max_energy::Bool,
                          append::Bool=false)
     if !isa(values, AbstractVector)
         values = [values]
@@ -667,10 +695,12 @@ function set_max_energy!(max_energy::EnergySystems.MaxEnergy,
         append!(max_energy.max_energy, values)
         append!(max_energy.purpose_uac, purpose_uac)
         max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+        max_energy.recalculate_max_energy = recalculate_max_energy
     else
         max_energy.max_energy = values
         max_energy.purpose_uac = purpose_uac
         max_energy.has_calculated_all_maxima = has_calculated_all_maxima
+        max_energy.recalculate_max_energy = recalculate_max_energy
     end
 end
 

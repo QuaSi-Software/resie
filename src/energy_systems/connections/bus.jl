@@ -1,3 +1,6 @@
+using ..Resie: get_run
+using UUIDs
+
 """
 Utility struct to contain the connections, input/output priorities and other related data
 for bus components.
@@ -155,6 +158,8 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table::Array{Union{Nothing,Float64},2}
     proxy::Union{Nothing,Bus}
 
+    run_id::UUID
+
     epsilon::Float64
 end
 
@@ -187,6 +192,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
                nothing,                                      # proxy
+               uuid1(),                                      # holds the current run ID later
                sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
 end
 
@@ -206,6 +212,7 @@ Contstructor for a Bus that creates a mostly empty bus with the minimal paramete
 """
 function Bus(uac::String,
              medium::Symbol,
+             run_id::UUID,
              epsilon::Float64)
     return Bus(uac,
                Controller(nothing),
@@ -219,6 +226,7 @@ function Bus(uac::String,
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table
                nothing,                                      # proxy
+               run_id,                                       # run ID
                epsilon)
 end
 
@@ -240,6 +248,8 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
                                                                      do_storage_transfer=outface.do_storage_transfer)
         p += 1
     end
+
+    unit.run_id = sim_params["run_ID"]
 end
 
 function reset(unit::Bus)
@@ -264,6 +274,8 @@ end
 
 """
     balance_nr(unit, caller)
+
+TODO: This function is never called?!
 
 Variant of [`balance`](@ref) that includes other connected bus components and their energy
 balance, but does so in a non-recursive manner such that any bus in the chain of connected
@@ -370,7 +382,7 @@ function energy_flow_is_denied(unit::Bus, input_row::BTInputRow, output_row::BTO
 end
 
 """
-    set_max_energy!(bus, component, is_input, value, purpose_uac, has_calculated_all_maxima)
+    set_max_energy!(bus, component, is_input, value, purpose_uac, has_calculated_all_maxima, recalculate_max_energy)
 
 Communicates the max_energy of an input/output on a bus.
 
@@ -388,19 +400,22 @@ function set_max_energy!(unit::Bus,
                          is_input::Bool,
                          value::Union{Floathing,Vector{<:Floathing}},
                          purpose_uac::Union{Stringing,Vector{<:Stringing}},
-                         has_calculated_all_maxima::Bool)
+                         has_calculated_all_maxima::Bool,
+                         recalculate_max_energy::Bool)
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
         set_max_energy!(bus.balance_table_inputs[comp.uac].energy_potential,
                         _abs(value),
                         purpose_uac,
-                        has_calculated_all_maxima)
+                        has_calculated_all_maxima,
+                        recalculate_max_energy)
     else
         set_max_energy!(bus.balance_table_outputs[comp.uac].energy_potential,
                         _abs(value),
                         purpose_uac,
-                        has_calculated_all_maxima)
+                        has_calculated_all_maxima,
+                        recalculate_max_energy)
     end
 
     if unit.proxy !== nothing
@@ -410,7 +425,8 @@ function set_max_energy!(unit::Bus,
         set_max_energy!(proxy_interface.max_energy,
                         value,
                         purpose_uac,
-                        has_calculated_all_maxima)
+                        has_calculated_all_maxima,
+                        recalculate_max_energy)
     end
 end
 
@@ -751,20 +767,51 @@ function inner_distribute!(unit::Bus)
 
             energy_flow = min(target_energy, available_energy)
             unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
-            unit.balance_table[input_row.priority, output_row.priority * 2] = max_min
+            unit.balance_table[input_row.priority, output_row.priority * 2] = min_max  # TODO What should be written here?!
+
+            # exctract the alread distributed energy from balance table
+            already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
+                                                                             1:2:(output_row.priority * 2 - 1)])
+            already_distributed_input_temperatures = unit.balance_table[input_row.priority,
+                                                                        2:2:(output_row.priority * 2)]
+
+            already_distributed_output_energies = Float64.(unit.balance_table[1:(input_row.priority),
+                                                                              output_row.priority * 2 - 1])
+            already_distributed_output_temperatures = unit.balance_table[1:(input_row.priority),
+                                                                         output_row.priority * 2]
 
             if energy_flow !== 0.0
                 if !is_max_energy_nothing(input_row.energy_potential_temp)
-                    reduce_max_energy!(input_row.energy_potential_temp, energy_flow, output_row.target.uac)
+                    reduce_max_energy!(input_row.energy_potential_temp,
+                                       already_distributed_input_energies,
+                                       already_distributed_input_temperatures,
+                                       output_row.target.uac,
+                                       input_row.source.uac,
+                                       unit.run_id)
                 end
                 if !is_max_energy_nothing(input_row.energy_pool_temp)
-                    reduce_max_energy!(input_row.energy_pool_temp, energy_flow, output_row.target.uac)
+                    reduce_max_energy!(input_row.energy_pool_temp,
+                                       already_distributed_input_energies,
+                                       already_distributed_input_temperatures,
+                                       output_row.target.uac,
+                                       input_row.source.uac,
+                                       unit.run_id)
                 end
                 if !is_max_energy_nothing(output_row.energy_potential_temp)
-                    reduce_max_energy!(output_row.energy_potential_temp, energy_flow, input_row.source.uac)
+                    reduce_max_energy!(output_row.energy_potential_temp,
+                                       already_distributed_output_energies,
+                                       already_distributed_output_temperatures,
+                                       input_row.source.uac,
+                                       output_row.target.uac,
+                                       unit.run_id)
                 end
                 if !is_max_energy_nothing(output_row.energy_pool_temp)
-                    reduce_max_energy!(output_row.energy_pool_temp, energy_flow, input_row.source.uac)
+                    reduce_max_energy!(output_row.energy_pool_temp,
+                                       already_distributed_output_energies,
+                                       already_distributed_output_temperatures,
+                                       input_row.source.uac,
+                                       output_row.target.uac,
+                                       unit.run_id)
                 end
             end
         end

@@ -140,8 +140,9 @@ Construct and prepare parameters, energy system components and the order of oper
 -`Grouping`: The constructed energy system components
 -`StepInstructions`: Order of operations
 """
-function prepare_inputs(project_config::Dict{AbstractString,Any})
+function prepare_inputs(project_config::Dict{AbstractString,Any}, run_ID::UUID)
     sim_params = get_simulation_params(project_config)
+    sim_params["run_ID"] = run_ID
 
     components = load_components(project_config["components"], sim_params)
 
@@ -347,9 +348,8 @@ function load_and_run(filepath::String)
     end
 
     @info "-- Now preparing inputs"
-    sim_params, components, step_order = prepare_inputs(project_config)
     run_ID = uuid1()
-    sim_params["run_ID"] = run_ID
+    sim_params, components, step_order = prepare_inputs(project_config, run_ID)
     current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
