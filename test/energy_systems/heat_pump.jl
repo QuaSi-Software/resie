@@ -664,8 +664,7 @@ function test_heat_pump_2S2D_losses()
     @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
     @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
     @test heat_pump.time_active ≈ 0.75
-    @test heat_pump.avg_plr ≈ 0.0 # no idea why the PLR calculation doesn't work here,
-    # but it's not really relevant for the test
+    @test heat_pump.avg_plr ≈ 1.0
 end
 
 @testset "heat_pump_2S2D_losses" begin
