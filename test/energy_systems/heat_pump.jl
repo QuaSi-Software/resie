@@ -458,6 +458,58 @@ end
     test_heat_pump_1S1D_losses()
 end
 
+function test_heat_pump_1S1D_constant_losses()
+    components_config = get_config_heat_pump_1S1D()
+    simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["cop_function"] = "const:2.0"
+    components_config["TST_HP_01"]["constant_loss_power"] = 20
+    delete!(components_config["TST_SRC_01"], "max_power_profile_file_path")
+    components_config["TST_SRC_01"]["constant_power"] = 400
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    heat_pump.power_losses_factor = 0.97
+    heat_pump.heat_losses_factor = 0.95
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    # first timestep, demand is well below max power of source
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+
+    @test el_in ≈ 56.25 / 0.97 + 5
+    @test heat_in ≈ 56.25 / 0.95
+    @test heat_out ≈ 112.5
+    @test heat_pump.cop ≈ 2.0
+    @test heat_pump.effective_cop ≈ 112.5 / (56.25 / 0.97 + 5)
+    @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 56.25
+    @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 56.25
+    @test heat_pump.losses ≈ (1.0 / 0.97 - 1.0) * 56.25 + (1.0 / 0.95 - 1.0) * 56.25 + 5
+end
+
+@testset "test_heat_pump_1S1D_constant_losses" begin
+    test_heat_pump_1S1D_constant_losses()
+end
+
 function get_config_heat_pump_2S2D()
     return Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
