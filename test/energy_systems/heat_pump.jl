@@ -273,8 +273,8 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
         extended = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
                 "type" => "GridConnection",
-                "medium" => "m_h_w_lt1",
-                "output_refs" => ["TST_HP_01"],
+                "medium" => "m_h_w_ht1",
+                "output_refs" => [],
                 "is_source" => false,
             ),
             "TST_SRC_01" => Dict{String,Any}(
@@ -326,8 +326,48 @@ function test_heat_pump_1S1D_infinite_input()
     @test cop ≈ 4.442
 end
 
-@testset "test_heat_pump_1S1D_infinite_output" begin
+@testset "test_heat_pump_1S1D_infinite_input" begin
     test_heat_pump_1S1D_infinite_input()
+end
+
+function test_heat_pump_1S1D_infinite_output()
+    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    cop = heat_out / el_in
+    @test el_in ≈ 562.8095452498875
+    @test heat_in ≈ 1968.5952273750563
+    @test heat_out ≈ 2500.0
+    @test cop ≈ 4.442
+end
+
+@testset "test_heat_pump_1S1D_infinite_output" begin
+    test_heat_pump_1S1D_infinite_output()
 end
 
 function test_heat_pump_1S1D_losses()
@@ -416,46 +456,6 @@ end
 
 @testset "test_heat_pump_1S1D_losses" begin
     test_heat_pump_1S1D_losses()
-end
-
-function test_heat_pump_1S1D_infinite_output()
-    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
-    simulation_parameters = get_default_sim_params()
-
-    components = Resie.load_components(components_config, simulation_parameters)
-    setup_mock_run!(components, simulation_parameters)
-
-    heat_pump = components["TST_HP_01"]
-    source = components["TST_SRC_01"]
-    demand = components["TST_DEM_01"]
-    grid = components["TST_GRI_01"]
-
-    for unit in values(components)
-        EnergySystems.reset(unit)
-    end
-
-    EnergySystems.control(demand, components, simulation_parameters)
-    EnergySystems.control(source, components, simulation_parameters)
-    EnergySystems.control(heat_pump, components, simulation_parameters)
-    EnergySystems.control(grid, components, simulation_parameters)
-
-    EnergySystems.process(demand, simulation_parameters)
-    EnergySystems.process(heat_pump, simulation_parameters)
-    EnergySystems.process(source, simulation_parameters)
-    EnergySystems.process(grid, simulation_parameters)
-
-    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
-    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
-    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    cop = heat_out / el_in
-    @test el_in ≈ 581.0575246949
-    @test heat_in ≈ 2000
-    @test heat_out ≈ 2581.0575246949
-    @test cop ≈ 4.442
-end
-
-@testset "test_heat_pump_1S1D_infinite_input" begin
-    test_heat_pump_1S1D_infinite_input()
 end
 
 function get_config_heat_pump_2S2D()
