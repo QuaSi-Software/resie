@@ -406,7 +406,12 @@ function control(unit::SeasonalThermalStorage,
     unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
 
     unit.current_max_output_temperature = highest(unit.temperature_segments)
-    unit.current_min_input_temperature = unit.temperature_segments[2]
+    if unit.temperature_segments[1] == unit.temperature_segments[2]
+        # add 1K in the first time step if there is equal temperature distribution to avoid Inf mass flow
+        unit.current_min_input_temperature = unit.temperature_segments[1] + 1.0
+    else
+        unit.current_min_input_temperature = unit.temperature_segments[2]
+    end
 
     set_temperature!(unit.output_interfaces[unit.m_heat_out],
                      nothing,
@@ -498,10 +503,15 @@ given current_temperature_distribution
 """
 function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
                                                   current_temperature_distribution::Vector{Temperature})
-    return sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
-                                      actual_input_temp, unit.cp_medium)
-               for (layer, volume) in enumerate(unit.volume_segments)
-               if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
+    # reduce maximal energy if the input temperature is near the temperature of the lower layer to avoid
+    # numerical problems and pulsing during loading. Otherwise, it can happen that the STES is not taking
+    # the energy that it is supposed to take, or a unresonable high temporal resolution has to be used to
+    # calculate the new temperature distribution within the STES.
+    red_factor = 0.75 + clamp(actual_input_temp - current_temperature_distribution[1], 0.0, 5.0) * 0.25 / 5.0
+    return red_factor * sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
+                                                   actual_input_temp, unit.cp_medium)
+                            for (layer, volume) in enumerate(unit.volume_segments)
+                                if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
 end
 
 """
@@ -630,8 +640,14 @@ function update_STES(unit::SeasonalThermalStorage,
     mass_in_sum = sum(mass_in; init=0.0)
     mass_of_smallest_segment = minimum(unit.volume_segments) * unit.rho_medium
     factor = 5
-    if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && mass_out_sum > 0.0 && mass_in_sum > 0.0
+    if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && (mass_out_sum > 0.0 || mass_in_sum > 0.0)
         number_of_internal_timesteps = ceil(max(mass_out_sum, mass_in_sum) / (mass_of_smallest_segment / factor))
+        if number_of_internal_timesteps > 10000
+            number_of_internal_timesteps = 10000
+            @warn "In STES $(unit.uac), a very high internal time step has been determined. " *
+                  "Is was limited to 10 000.  This may lead to inaccurate results and increase " *
+                  "the losses in the current time step $(sim_params["time"])."
+        end
         dt = dt / number_of_internal_timesteps
     end
 
@@ -698,7 +714,6 @@ function update_STES(unit::SeasonalThermalStorage,
         load_new = (weighted_mean(t_new, unit.volume_segments, sim_params) - unit.low_temperature) /
                    (unit.high_temperature - unit.low_temperature) * unit.capacity
         losses = unit.load + sum(energy_input) - energy_output - load_new # + sum(Q_in_out)  # losses are positive here
-
         return losses, unit.load, load_new, t_new
     end
 end
