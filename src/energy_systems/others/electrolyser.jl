@@ -168,13 +168,9 @@ function control(unit::Electrolyser,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    set_temperature!(unit.output_interfaces[unit.m_heat_ht_out],
-                     nothing,
-                     unit.output_temperature_ht)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], nothing, nothing, unit.output_temperature_ht)
     if unit.heat_lt_is_usable
-        set_temperature!(unit.output_interfaces[unit.m_heat_lt_out],
-                         nothing,
-                         unit.output_temperature_lt)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], nothing, nothing, unit.output_temperature_lt)
     end
 end
 
@@ -185,9 +181,9 @@ function set_max_energies!(unit::Electrolyser,
                            h2_out::Float64,
                            o2_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out, nothing, unit.output_temperature_ht) # TODO: actual temp from balance?
     if unit.heat_lt_is_usable
-        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt) # TODO: actual temp from balance?
     end
     set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
     set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
@@ -316,7 +312,7 @@ end
 function potential(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5])
@@ -343,9 +339,9 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     unit.losses = unit.losses_heat + unit.losses_hydrogen
 
     sub!(unit.input_interfaces[unit.m_el_in], energies[1])
-    add!(unit.output_interfaces[unit.m_heat_ht_out], energies[2])
+    add!(unit.output_interfaces[unit.m_heat_ht_out], energies[2], unit.output_temperature_ht)
     if unit.heat_lt_is_usable
-        add!(unit.output_interfaces[unit.m_heat_lt_out], energies[3])
+        add!(unit.output_interfaces[unit.m_heat_lt_out], energies[3], unit.output_temperature_lt)
     end
     add!(unit.output_interfaces[unit.m_h2_out], energies[4])
     add!(unit.output_interfaces[unit.m_o2_out], energies[5])

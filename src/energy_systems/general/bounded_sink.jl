@@ -73,16 +73,13 @@ function control(unit::BoundedSink,
     else
         unit.max_energy = 0.0
     end
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_temperature!(unit.input_interfaces[unit.medium],
-                     unit.temperature,
-                     nothing)
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy, unit.temperature, nothing)
 end
 
 function process(unit::BoundedSink, sim_params::Dict{String,Any})

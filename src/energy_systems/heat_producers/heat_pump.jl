@@ -352,14 +352,16 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
     if unit.output_temperature !== nothing
-        set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                         unit.output_temperature,
-                         unit.output_temperature)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out],
+                        nothing,
+                        unit.output_temperature,
+                        unit.output_temperature)
     end
     if unit.input_temperature !== nothing
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         unit.input_temperature,
-                         unit.input_temperature)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in],
+                        nothing,
+                        unit.input_temperature,
+                        unit.input_temperature)
     end
 end
 
@@ -367,15 +369,17 @@ function set_max_energies!(unit::HeatPump,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
+                           slices_heat_in_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+                           slices_heat_out_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, purpose_uac_heat_in,
-                    has_calculated_all_maxima_heat_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, purpose_uac_heat_out,
-                    has_calculated_all_maxima_heat_out)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, slices_heat_in_temperature, nothing,
+                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
+                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
 end
 
 """
@@ -1114,23 +1118,19 @@ end
 function potential(unit::HeatPump, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit,
                           energies.slices_el_in,
                           energies.slices_heat_in,
                           energies.slices_heat_out,
+                          energies.slices_heat_in_temperature,
+                          energies.slices_heat_out_temperature,
                           energies.slices_heat_in_uac,
                           energies.slices_heat_out_uac,
                           energies.heat_in_has_inf_energy,
                           energies.heat_out_has_inf_energy)
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         lowest(energies.slices_heat_in_temperature),
-                         nothing)
-        set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                         nothing,
-                         highest(energies.slices_heat_out_temperature))
     end
 end
 
@@ -1156,11 +1156,11 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     sub!(unit.input_interfaces[unit.m_el_in], el_in)
     sub!(unit.input_interfaces[unit.m_heat_in],
          energies.slices_heat_in,
-         lowest(energies.slices_heat_in_temperature),
+         energies.slices_heat_in_temperature,
          energies.slices_heat_in_uac)
     add!(unit.output_interfaces[unit.m_heat_out],
          energies.slices_heat_out,
-         highest(energies.slices_heat_out_temperature),
+         energies.slices_heat_out_temperature,
          energies.slices_heat_out_uac)
 end
 

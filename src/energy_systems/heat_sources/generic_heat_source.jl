@@ -99,7 +99,6 @@ function control(unit::GenericHeatSource,
     else
         unit.max_energy = 0.0
     end
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
     if unit.constant_temperature !== nothing
         unit.temperature_src_in = unit.constant_temperature
@@ -121,10 +120,7 @@ function control(unit::GenericHeatSource,
     else
         unit.temperature_snk_out = unit.temperature_src_in
     end
-
-    set_temperature!(unit.output_interfaces[unit.medium],
-                     nothing,
-                     unit.temperature_snk_out)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy, nothing, unit.temperature_snk_out)
 end
 
 function process(unit::GenericHeatSource, sim_params::Dict{String,Any})

@@ -674,9 +674,6 @@ function control(unit::GeothermalProbes,
 
     # get output temperature for energy output and set temperature and max_energy to output interface
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     highest(unit.min_probe_temperature_unloading, unit.current_output_temperature))
 
     # get requested temperature of the probe output, if they are written and present, to set the desired output 
     # temperature. If the output interface does not provide a temperature, the highest requested temperature of the last
@@ -727,20 +724,20 @@ function control(unit::GeothermalProbes,
     unit.current_max_output_energy = -max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
     unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
 
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+                    highest(unit.min_probe_temperature_unloading, unit.current_output_temperature))
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread / 2 # of geothermal probe field 
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         unit.current_input_temperature,
-                         nothing)
+
         if unit.max_probe_temperature_loading !== nothing &&
            unit.current_input_temperature > unit.max_probe_temperature_loading
-            set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+            set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0, unit.current_input_temperature, nothing)
             unit.current_max_input_energy = 0.0
         else
-            set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy)
+            set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.max_input_energy,
+                            unit.current_input_temperature, nothing)
             unit.current_max_input_energy = unit.max_input_energy
         end
     end
@@ -1019,13 +1016,8 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing
-            &&
-            exchange.temperature_min > unit.current_input_temperature
-            ||
-            exchange.temperature_max !== nothing
-            &&
-            exchange.temperature_max < unit.current_input_temperature)
+        if exchange.temperature_max !== nothing &&
+           exchange.temperature_max < unit.current_input_temperature
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue
@@ -1057,8 +1049,8 @@ function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{
                  energy_potential=balance_written ? 0.0 :
                                   (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
                  purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
+                 temperature_min=highest(interface.max_energy.temperature_min),
+                 temperature_max=lowest(interface.max_energy.temperature_max),
                  pressure=nothing,
                  voltage=nothing)]
 end

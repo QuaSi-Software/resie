@@ -78,15 +78,9 @@ function control(unit::GridConnection,
     end
 
     if unit.sys_function === sf_bounded_source
-        set_max_energy!(unit.output_interfaces[unit.medium], Inf)
-        set_temperature!(unit.output_interfaces[unit.medium],
-                         nothing,
-                         unit.temperature)
+        set_max_energy!(unit.output_interfaces[unit.medium], Inf, nothing, unit.temperature)
     else
-        set_max_energy!(unit.input_interfaces[unit.medium], Inf)
-        set_temperature!(unit.input_interfaces[unit.medium],
-                         unit.temperature,
-                         nothing)
+        set_max_energy!(unit.input_interfaces[unit.medium], Inf, unit.temperature, nothing)
     end
 end
 

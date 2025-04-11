@@ -413,35 +413,34 @@ function control(unit::SeasonalThermalStorage,
         unit.current_min_input_temperature = unit.temperature_segments[2]
     end
 
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     unit.current_max_output_temperature)
-    set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                     unit.current_min_input_temperature,
-                     nothing)
-
     # calculate maximum energies for input
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
-    unit.temperatures_charging = highest.([exchange.temperature_max for exchange in exchanges],
-                                          [exchange.temperature_min for exchange in exchanges])
-    unit.temperatures_charging = [temp === nothing ? unit.high_temperature : temp
-                                  for temp in unit.temperatures_charging]
-    source_uac = [exchange.purpose_uac for exchange in exchanges]
-    energy_supply = [exchange.balance + exchange.energy_potential for exchange in exchanges]
+    temperatures_charging = highest.([exchange.temperature_max for exchange in exchanges],
+                                     [exchange.temperature_min for exchange in exchanges])
+    temperatures_charging = [temp === nothing ? unit.high_temperature : temp
+                             for temp in temperatures_charging]
 
-    max_input_energy = zeros(length(unit.temperatures_charging))
-    for (input_idx, temperature) in enumerate(unit.temperatures_charging)
+    # filter out the elements where the temperature is below the current_min_input_temperature
+    mask = temperatures_charging .>= unit.current_min_input_temperature
+    temperatures_charging = temperatures_charging[mask]
+    source_uac = [exchange.purpose_uac for exchange in exchanges][mask]
+    energy_supply = [exchange.balance + exchange.energy_potential for exchange in exchanges][mask]
+
+    max_input_energy = zeros(length(temperatures_charging))
+    for (input_idx, temperature) in enumerate(temperatures_charging)
         max_input_energy[input_idx] = min(calcuate_max_input_energy_by_temperature(unit,
                                                                                    temperature,
                                                                                    unit.temperature_segments),
                                           min(unit.max_input_energy, energy_supply[input_idx]))
     end
-    set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy, source_uac, false, true)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy, temperatures_charging,
+                    temperatures_charging, source_uac, false, true)
 
     # calculate maximum energies for output
     unit.current_max_output_energy = max(min(unit.load, unit.max_output_energy), 0.0)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+                    unit.current_max_output_temperature)
 
     if unit.ambient_temperature_profile !== nothing
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
@@ -454,7 +453,7 @@ function control(unit::SeasonalThermalStorage,
 end
 
 # This function will only be called from a Bus, never in a 1-to-1 connection to another component.
-# energ_input and temperauture_input are all inputs that have alread been put into the STES.
+# energy_input and temperatures_input are all inputs that have alread been put into the STES.
 function recalculate_max_energy(unit::SeasonalThermalStorage,
                                 energy_input::Union{Float64,Vector{Float64}},
                                 temperatures_input::Union{Temperature,Vector{Temperature}},
@@ -473,8 +472,8 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
                                                  temporary_calculation=true)
 
     # calculate new max_energy for the input energy for all elements in max_energy
-    # and limit it by the the alread filled energ and the charging rate limit
-    for (input_idx, temperature) in enumerate(unit.temperatures_charging)
+    # and limit it by the the alread filled energy and the charging rate limit
+    for (input_idx, temperature) in enumerate(max_energy.temperature_max) # TODO is this correct? 
         max_energy.max_energy[input_idx] = min(calcuate_max_input_energy_by_temperature(unit,
                                                                                         temperature,
                                                                                         temperature_segments_temporary),
@@ -881,24 +880,6 @@ function calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_o
     return mass_out_temp, mass_out_vec
 end
 
-# TODO: Remove as not needed?!
-# function balance_on(interface::SystemInterface,
-#                     unit::SeasonalThermalStorage)::Vector{EnergyExchange}
-#     caller_is_input = unit.uac == interface.target.uac
-#     balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-#     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-#     return [EnEx(;
-#                  balance=interface.balance,
-#                  energy_potential=balance_written ? 0.0 :
-#                                   (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
-#                  purpose_uac=purpose_uac,
-#                  temperature_min=interface.temperature_min,
-#                  temperature_max=interface.temperature_max,
-#                  pressure=nothing,
-#                  voltage=nothing)]
-# end
-
 function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.m_heat_out]
     exchanges = balance_on(outface, outface.target)
@@ -917,9 +898,8 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing
-            &&
-            exchange.temperature_min > unit.current_max_output_temperature)
+        if exchange.temperature_min !== nothing &&
+           exchange.temperature_min > unit.current_max_output_temperature
             # we can only supply energy at a temperature at or below the STES's current
             # max output temperature
             continue

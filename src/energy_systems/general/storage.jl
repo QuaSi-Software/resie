@@ -63,8 +63,8 @@ function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExc
                  balance=interface.balance,
                  energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
                  purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
+                 temperature_min=highest(interface.max_energy.temperature_min),
+                 temperature_max=lowest(interface.max_energy.temperature_max),
                  pressure=nothing,
                  voltage=nothing)]
 end

@@ -187,15 +187,10 @@ function control(unit::BufferTank,
 
     unit.current_max_output_temperature = temperature_at_load(unit)
 
-    set_temperature!(unit.output_interfaces[unit.medium],
-                     nothing,
-                     unit.current_max_output_temperature)
-    set_temperature!(unit.input_interfaces[unit.medium],
-                     unit.high_temperature,
-                     unit.high_temperature)
-
-    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy))
-    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy))
+    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy),
+                    unit.high_temperature, unit.high_temperature)
+    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy), nothing,
+                    unit.current_max_output_temperature)
 
     if unit.ambient_temperature_profile !== nothing && unit.consider_losses
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
@@ -294,8 +289,8 @@ function balance_on(interface::SystemInterface,
                  energy_potential=balance_written ? 0.0 :
                                   (caller_is_input ? -(unit.capacity - current_load) : current_load),
                  purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
+                 temperature_min=highest(interface.max_energy.temperature_min),
+                 temperature_max=lowest(interface.max_energy.temperature_max),
                  pressure=nothing,
                  voltage=nothing)]
 end
@@ -360,11 +355,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing &&
-            exchange.temperature_min > unit.high_temperature
-            ||
-            exchange.temperature_max !== nothing &&
-            exchange.temperature_max < unit.high_temperature)
+        if exchange.temperature_max !== nothing &&
+           exchange.temperature_max < unit.high_temperature
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue

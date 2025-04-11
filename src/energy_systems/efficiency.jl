@@ -648,28 +648,29 @@ Checks the available energy on the input heat interface.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
 function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
-    if !unit.controller.parameters["consider_m_heat_in"]
-        return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                [unit.input_interfaces[unit.m_heat_in].source.uac])
-    end
-
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
-        # end of condition
+        # direct connection to transformer that has not had its potential
         return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_min[1]],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_max[1]],
                 [unit.input_interfaces[unit.m_heat_in].source.uac])
     else
         exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
                                unit.input_interfaces[unit.m_heat_in].source)
-        return ([e.balance + e.energy_potential for e in exchanges],
-                temp_min_all(exchanges),
-                temp_max_all(exchanges),
-                [e.purpose_uac for e in exchanges])
+
+        if unit.controller.parameters["consider_m_heat_in"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat input, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end
 
@@ -902,27 +903,27 @@ Checks the available energy on the output heat interface.
 - `Vector{Stringing}`: The UACs of the targets on the interface.
 """
 function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
-    if !unit.controller.parameters["consider_m_heat_out"]
-        return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                [unit.output_interfaces[unit.m_heat_out].target.uac])
-    end
-
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
-        # end of condition
+        # direct connection to transformer that has not had its potential
         return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_max[1]],
                 [unit.output_interfaces[unit.m_heat_out].target.uac])
     else
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
-        return ([e.balance + e.energy_potential for e in exchanges],
-                temp_min_all(exchanges),
-                temp_max_all(exchanges),
-                [e.purpose_uac for e in exchanges])
+        if unit.controller.parameters["consider_m_heat_out"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat output, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end

@@ -571,9 +571,6 @@ function control(unit::GeothermalHeatCollector,
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     unit.current_output_temperature)
 
     # limit max_energy if current_output_temperature undercuts fluid_min_output_temperature
     if unit.fluid_min_output_temperature === nothing
@@ -582,15 +579,13 @@ function control(unit::GeothermalHeatCollector,
         unit.current_max_output_energy = unit.current_output_temperature <= unit.fluid_min_output_temperature ?
                                          0.0 : unit.max_output_energy
     end
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+                    unit.current_output_temperature)
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread / 2
         unit.current_input_temperature = lowest(unit.fluid_max_input_temperature, unit.current_input_temperature)
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         unit.current_input_temperature,
-                         nothing)
 
         # limit max_energy if current_input_temperature exceeds fluid_max_input_temperature
         if unit.fluid_max_input_temperature === nothing
@@ -599,7 +594,8 @@ function control(unit::GeothermalHeatCollector,
             unit.current_max_input_energy = unit.current_input_temperature >= unit.fluid_max_input_temperature ?
                                             0.0 : unit.max_input_energy
         end
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy,
+                        unit.current_input_temperature, nothing)
     end
 end
 
@@ -1095,11 +1091,8 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing &&
-            exchange.temperature_min > unit.current_input_temperature
-            ||
-            exchange.temperature_max !== nothing &&
-            exchange.temperature_max < unit.current_input_temperature)
+        if exchange.temperature_max !== nothing &&
+           exchange.temperature_max < unit.current_input_temperature
             # we can only take energy if it's at a higher/equal temperature than the
             # collector's current input temperature
             continue
@@ -1128,8 +1121,8 @@ function balance_on(interface::SystemInterface, unit::GeothermalHeatCollector)::
                  energy_potential=balance_written ? 0.0 :
                                   (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
                  purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
+                 temperature_min=highest(interface.max_energy.temperature_min),
+                 temperature_max=lowest(interface.max_energy.temperature_max),
                  pressure=nothing,
                  voltage=nothing)]
 end

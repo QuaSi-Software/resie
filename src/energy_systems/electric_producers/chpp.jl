@@ -100,15 +100,13 @@ function control(unit::CHPP,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     unit.output_temperature)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], nothing, nothing, unit.output_temperature)
 end
 
 function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature) # TODO: actual temp from balance?
 end
 
 function calculate_energies(unit::CHPP, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
@@ -124,7 +122,7 @@ end
 function potential(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit, energies[1], energies[2], energies[3])
@@ -134,14 +132,15 @@ end
 function process(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
+        unit.losses = 0.0
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
     add!(unit.output_interfaces[unit.m_el_out], energies[2])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[3], unit.output_temperature)
 
     unit.losses = energies[1] - energies[2] - energies[3]
 end
