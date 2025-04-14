@@ -326,10 +326,10 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
         if unit.load > used_heat
             unit.load -= used_heat
-            add!(outface, used_heat, tank_temp)
+            add!(outface, used_heat, nothing, tank_temp)
             energy_demanded += used_heat
         else
-            add!(outface, unit.load, tank_temp)
+            add!(outface, unit.load, nothing, tank_temp)
             energy_demanded += unit.load
             unit.load = 0.0
         end
@@ -367,11 +367,11 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 
         if diff > used_heat
             unit.load += used_heat
-            sub!(inface, used_heat, unit.high_temperature)
+            sub!(inface, used_heat, unit.high_temperature, nothing)
             energy_available -= used_heat
         else
             unit.load = unit.capacity
-            sub!(inface, diff, unit.high_temperature)
+            sub!(inface, diff, unit.high_temperature, nothing)
             energy_available -= diff
         end
     end

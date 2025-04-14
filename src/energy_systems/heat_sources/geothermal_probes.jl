@@ -689,8 +689,9 @@ function control(unit::GeothermalProbes,
                                              unit.min_probe_temperature_unloading)
     end
     if desired_output_temperature !== nothing
-        # limit to minimum output temperature
-        desired_output_temperature = highest(desired_output_temperature, unit.min_probe_temperature_unloading)
+        # limit to minimum output temperature and to current_output_temperature as upper bound
+        desired_output_temperature = lowest(highest(desired_output_temperature, unit.min_probe_temperature_unloading),
+                                            unit.current_output_temperature)
         # add small number to avoid problems with rough tolerances of find_zero()    
         desired_output_temperature += 0.001
     end
@@ -981,9 +982,9 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
         if energy_available > used_heat
             energy_available -= used_heat
-            add!(outface, used_heat, unit.current_output_temperature)
+            add!(outface, used_heat, nothing, unit.current_output_temperature)
         else
-            add!(outface, energy_available, unit.current_output_temperature)
+            add!(outface, energy_available, nothing, unit.current_output_temperature)
             energy_available = 0.0
         end
     end
@@ -1025,9 +1026,9 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
         if energy_demand > exchange_energy_available
             energy_demand -= exchange_energy_available
-            sub!(inface, exchange_energy_available, unit.current_input_temperature)
+            sub!(inface, exchange_energy_available, unit.current_input_temperature, nothing)
         else
-            sub!(inface, energy_demand, unit.current_input_temperature)
+            sub!(inface, energy_demand, unit.current_input_temperature, nothing)
             energy_demand = 0.0
         end
     end

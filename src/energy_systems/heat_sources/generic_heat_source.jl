@@ -146,7 +146,7 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
     end
 
     if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), unit.temperature_snk_out)
+        add!(outface, min(abs(energy_demand), unit.max_energy), nothing, unit.temperature_snk_out)
     end
 end
 

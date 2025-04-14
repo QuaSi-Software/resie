@@ -1157,9 +1157,11 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     sub!(unit.input_interfaces[unit.m_heat_in],
          energies.slices_heat_in,
          energies.slices_heat_in_temperature,
+         [nothing for _ in energies.slices_heat_in_temperature],
          energies.slices_heat_in_uac)
     add!(unit.output_interfaces[unit.m_heat_out],
          energies.slices_heat_out,
+         [nothing for _ in energies.slices_heat_out_temperature],
          energies.slices_heat_out_temperature,
          energies.slices_heat_out_uac)
 end

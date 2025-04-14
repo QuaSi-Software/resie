@@ -1050,9 +1050,9 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
         if energy_available > used_heat
             energy_available -= used_heat
-            add!(outface, used_heat, unit.current_output_temperature)
+            add!(outface, used_heat, nothing, unit.current_output_temperature)
         else
-            add!(outface, energy_available, unit.current_output_temperature)
+            add!(outface, energy_available, nothing, unit.current_output_temperature)
             energy_available = 0.0
         end
     end
@@ -1100,9 +1100,9 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
         if energy_demand > exchange_energy_available
             energy_demand -= exchange_energy_available
-            sub!(inface, exchange_energy_available, unit.current_input_temperature)
+            sub!(inface, exchange_energy_available, unit.current_input_temperature, nothing)
         else
-            sub!(inface, energy_demand, unit.current_input_temperature)
+            sub!(inface, energy_demand, unit.current_input_temperature, nothing)
             energy_demand = 0.0
         end
     end

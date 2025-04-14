@@ -384,7 +384,7 @@ function check_epsilon(value::Float64, sim_params::Dict{String,Any})
 end
 
 """
-    add!(interface, change, temperature)
+    add!(interface, change, temperature_min, temperature_max, purpose_uac)
 
 Add the given amount of energy (in Wh) to the balance of the interface.
 
@@ -392,36 +392,39 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function add!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
-              temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+              temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
+              temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
               purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
-    temperature = convert_to_vector(temperature, Vector{Temperature})
+    temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
+    temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
 
     interface.balance += sum(change)
     interface.sum_abs_change += sum(abs.(change))
 
     # check 1-to-1 connections where only one max_energy is written
-    if temperature[1] !== nothing && length(interface.max_energy.temperature_min) == 1
-        if interface.max_energy.temperature_min[1] !== nothing &&
-           temperature[1] < interface.max_energy.temperature_min[1]
-            @warn ("Given temperature $(temperature[1]) on interface $(interface.source.uac) " *
-                   "-> $(interface.target.uac) lower than minimum $(interface.max_energy.temperature_min[1])")
-        elseif interface.max_energy.temperature_max[1] !== nothing &&
-               temperature[1] > interface.max_energy.temperature_max[1]
-            @warn ("Given temperature $(temperature[1]) on interface $(interface.source.uac) " *
-                   "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
-        end
+    if temperature_min[1] !== nothing && length(interface.max_energy.temperature_min) == 1 &&
+       interface.max_energy.temperature_min[1] !== nothing &&
+       temperature_min[1] < interface.max_energy.temperature_min[1]
+        @warn ("Given temperature $(temperature_min[1]) on interface $(interface.source.uac) " *
+               "-> $(interface.target.uac) lower than minimum $(interface.max_energy.temperature_min[1])")
+    end
+    if temperature_max[1] !== nothing && length(interface.max_energy.temperature_max) == 1 &&
+       interface.max_energy.temperature_max[1] !== nothing &&
+       temperature_max[1] > interface.max_energy.temperature_max[1]
+        @warn ("Given temperature $(temperature_max[1]) on interface $(interface.source.uac) " *
+               "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
     end
 
     if interface.source.sys_function == sf_bus
-        add_balance!(interface.source, interface.target, false, change, temperature, purpose_uac)
+        add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature, purpose_uac)
+        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
     end
 end
 
 """
-    sub!(interface, change, temperature, purpose_uac)
+    sub!(interface, change, temperature_min, temperature_max), purpose_uac)
 
 Subtract the given amount of energy (in Wh) from the balance of the interface.
 
@@ -429,31 +432,34 @@ If the source or target of the interface is a bus, communicates the change to th
 """
 function sub!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
-              temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+              temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
+              temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
               purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
-    temperature = convert_to_vector(temperature, Vector{Temperature})
+    temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
+    temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
 
     interface.balance -= sum(change)
     interface.sum_abs_change += sum(abs.(change))
 
     # check 1-to-1 connections where only one max_energy is written
-    if temperature[1] !== nothing && length(interface.max_energy.temperature_min) == 1
-        if interface.max_energy.temperature_min[1] !== nothing &&
-           temperature[1] < interface.max_energy.temperature_min[1]
-            @warn ("Given temperature $(temperature[1]) on interface $(interface.source.uac) " *
-                   "-> $(interface.target.uac) lower than minimum $(interface.max_energy.temperature_min[1])")
-        elseif interface.max_energy.temperature_max[1] !== nothing &&
-               temperature[1] > interface.max_energy.temperature_max[1]
-            @warn ("Given temperature $(temperature[1]) on interface $(interface.source.uac) " *
-                   "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
-        end
+    if temperature_min[1] !== nothing && length(interface.max_energy.temperature_min) == 1 &&
+       interface.max_energy.temperature_min[1] !== nothing &&
+       temperature_min[1] < interface.max_energy.temperature_min[1]
+        @warn ("Given temperature $(temperature_min[1]) on interface $(interface.source.uac) " *
+               "-> $(interface.target.uac) lower than minimum $(interface.max_energy.temperature_min[1])")
+    end
+    if temperature_max[1] !== nothing && length(interface.max_energy.temperature_max) == 1 &&
+       interface.max_energy.temperature_max[1] !== nothing &&
+       temperature_max[1] > interface.max_energy.temperature_max[1]
+        @warn ("Given temperature $(temperature_max[1]) on interface $(interface.source.uac) " *
+               "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
     end
 
     if interface.source.sys_function == sf_bus
-        sub_balance!(interface.source, interface.target, false, change, temperature, purpose_uac)
+        sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature, purpose_uac)
+        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
     end
 end
 
@@ -736,52 +742,55 @@ connection or components that don't care).
 """
 function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                               energy::Union{Floathing,Vector{<:Floathing}},
-                              temperature::Union{Temperature,Vector{<:Temperature}},
+                              temperature_min::Union{Temperature,Vector{<:Temperature}},
+                              temperature_max::Union{Temperature,Vector{<:Temperature}},
                               uac_to_increase::Union{Stringing,Vector{<:Stringing}}=nothing)
     energy = convert_to_vector(energy, Vector{Floathing})
     uac_to_increase = convert_to_vector(uac_to_increase, Vector{Stringing})
-    temperature = convert_to_vector(temperature, Vector{Temperature})
+    temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
+    temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
+
     # TODO simplify
     for (energy_idx, current_energy) in enumerate(energy)
         if uac_to_increase[energy_idx] === nothing || is_purpose_uac_nothing(max_energy)
             if is_max_energy_nothing(max_energy) # no purpose_uac given and max_energy is empty
-                set_max_energy!(max_energy, current_energy, temperature[energy_idx], temperature[energy_idx],
+                set_max_energy!(max_energy, current_energy, temperature_min[energy_idx], temperature_max[energy_idx],
                                 uac_to_increase[energy_idx], false, false)
             else # no purpose_uac but max_energy already holds one value 
-                # (if there would be more than one entry in max_energy, a purpose_uac would be given!) # TODO really?
-                if temperature[energy_idx] !== nothing &&
-                   (max_energy.temperature_min[1] !== nothing &&
-                    temperature[energy_idx] < max_energy.temperature_min[1] ||
-                    max_energy.temperature_max[1] !== nothing &&
-                    temperature[energy_idx] > max_energy.temperature_max[1])
+                # (if there would be more than one entry in max_energy, a purpose_uac would be given!)
+                if temperature_min[energy_idx] !== nothing && max_energy.temperature_min[1] !== nothing &&
+                   temperature_min[energy_idx] !== max_energy.temperature_min[1] ||
+                   temperature_max[energy_idx] !== nothing && max_energy.temperature_max[1] !== nothing &&
+                   temperature_max[energy_idx] !== max_energy.temperature_max[1]
                     # ...but temperatures missmatch, so a new entry will be created
-                    set_max_energy!(max_energy, current_energy, temperature[energy_idx], temperature[energy_idx],
+                    set_max_energy!(max_energy, current_energy, temperature_min[energy_idx],
+                                    temperature_max[energy_idx],
                                     uac_to_increase[energy_idx], false, false, true)
 
                 else
                     max_energy.max_energy[1] += current_energy
-                    max_energy.temperature_min[1] = temperature[energy_idx]
-                    max_energy.temperature_max[1] = temperature[energy_idx]
+                    max_energy.temperature_min[1] = temperature_min[energy_idx]
+                    max_energy.temperature_max[1] = temperature_max[energy_idx]
                 end
             end
         else
             purpose_idx = findfirst(==(uac_to_increase[energy_idx]), max_energy.purpose_uac)
             if purpose_idx === nothing # no purpose_uac written yet --> append
-                set_max_energy!(max_energy, current_energy, temperature[energy_idx], temperature[energy_idx],
+                set_max_energy!(max_energy, current_energy, temperature_min[energy_idx], temperature_max[energy_idx],
                                 uac_to_increase[energy_idx], false, false, true)
             else # an existing entry with the same purpose_uac is found # TODO is this correct now? iterate over purpose index?!
-                if temperature[energy_idx] !== nothing &&
-                   (max_energy.temperature_min[purpose_idx] !== nothing &&
-                    temperature[energy_idx] < max_energy.temperature_min[purpose_idx] ||
-                    max_energy.temperature_max[purpose_idx] !== nothing &&
-                    temperature[energy_idx] > max_energy.temperature_max[purpose_idx])
+                if temperature_min[energy_idx] !== nothing && max_energy.temperature_min[purpose_idx] !== nothing &&
+                   temperature_min[energy_idx] !== max_energy.temperature_min[purpose_idx] ||
+                   temperature_max[energy_idx] !== nothing && max_energy.temperature_max[purpose_idx] !== nothing &&
+                   temperature_max[energy_idx] !== max_energy.temperature_max[purpose_idx]
                     # ...but temperatures missmatch, so a new entry will be created
-                    set_max_energy!(max_energy, current_energy, temperature[energy_idx], temperature[energy_idx],
+                    set_max_energy!(max_energy, current_energy, temperature_min[energy_idx],
+                                    temperature_max[energy_idx],
                                     uac_to_increase[energy_idx], false, false, true)
                 else # ... temperatures match, so the existing entry will be updated
                     max_energy.max_energy[purpose_idx] += current_energy
-                    max_energy.temperature_min[purpose_idx] = temperature[energy_idx]
-                    max_energy.temperature_max[purpose_idx] = temperature[energy_idx]
+                    max_energy.temperature_min[purpose_idx] = temperature_min[energy_idx]
+                    max_energy.temperature_max[purpose_idx] = temperature_max[energy_idx]
                 end
             end
         end

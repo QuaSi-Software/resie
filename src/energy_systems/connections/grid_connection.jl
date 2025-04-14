@@ -110,7 +110,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
         end
         if energy_demand < 0.0
             unit.output_sum += energy_demand
-            add!(outface, abs(energy_demand), temp_out)
+            add!(outface, abs(energy_demand), nothing, temp_out)
         end
     else
         inface = unit.input_interfaces[unit.medium]
@@ -136,7 +136,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
 
         if energy_supply > 0.0
             unit.input_sum += energy_supply
-            sub!(inface, abs(energy_supply), unit.temperature)
+            sub!(inface, abs(energy_supply), unit.temperature, nothing)
         end
     end
 end

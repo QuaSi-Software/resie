@@ -94,7 +94,7 @@ Set maximum energies that can be taken in and put out by the unit
 """
 function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature) # TODO: actual temp from balance?
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
 end
 
 function calculate_energies(unit::FuelBoiler,
@@ -128,7 +128,7 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     end
 
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[2], unit.output_temperature)
+    add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
     unit.losses = energies[1] - energies[2]
 end

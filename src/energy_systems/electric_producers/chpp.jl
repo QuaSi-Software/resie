@@ -106,7 +106,7 @@ end
 function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature) # TODO: actual temp from balance?
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
 end
 
 function calculate_energies(unit::CHPP, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
@@ -140,7 +140,7 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
 
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
     add!(unit.output_interfaces[unit.m_el_out], energies[2])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[3], unit.output_temperature)
+    add!(unit.output_interfaces[unit.m_heat_out], energies[3], nothing, unit.output_temperature)
 
     unit.losses = energies[1] - energies[2] - energies[3]
 end

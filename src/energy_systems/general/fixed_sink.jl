@@ -87,7 +87,7 @@ end
 
 function process(unit::FixedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    sub!(inface, unit.demand, unit.temperature)
+    sub!(inface, unit.demand, unit.temperature, nothing)
 end
 
 function output_values(unit::FixedSink)::Vector{String}

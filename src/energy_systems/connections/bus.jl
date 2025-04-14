@@ -450,19 +450,22 @@ function add_balance!(unit::Bus,
                       comp::Component,
                       is_input::Bool,
                       energy::Union{Floathing,Vector{<:Floathing}},
-                      temperature::Union{Temperature,Vector{<:Temperature}},
+                      temperature_min::Union{Temperature,Vector{<:Temperature}},
+                      temperature_max::Union{Temperature,Vector{<:Temperature}},
                       purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
                              energy,
-                             temperature,
+                             temperature_min,
+                             temperature_max,
                              purpose_uac)
         bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              energy,
-                             temperature,
+                             temperature_min,
+                             temperature_max,
                              purpose_uac)
         bus.balance_table_outputs[comp.uac].energy_potential = MaxEnergy()
     end
@@ -488,19 +491,22 @@ function sub_balance!(unit::Bus,
                       comp::Component,
                       is_input::Bool,
                       energy::Union{Floathing,Vector{<:Floathing}},
-                      temperature::Union{Temperature,Vector{<:Temperature}},
+                      temperature_min::Union{Temperature,Vector{<:Temperature}},
+                      temperature_max::Union{Temperature,Vector{<:Temperature}},
                       purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
         increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
                              abs.(energy),
-                             temperature,
+                             temperature_min,
+                             temperature_max,
                              purpose_uac)
         bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              abs.(energy),
-                             temperature,
+                             temperature_min,
+                             temperature_max,
                              purpose_uac)
         bus.balance_table_outputs[comp.uac].energy_potential = MaxEnergy()
     end

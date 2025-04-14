@@ -88,7 +88,7 @@ end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    add!(outface, unit.supply, unit.temperature)
+    add!(outface, unit.supply, nothing, unit.temperature)
 end
 
 function output_values(unit::FixedSupply)::Vector{String}

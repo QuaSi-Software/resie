@@ -909,10 +909,10 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
         if energy_available > used_heat
             energy_available -= used_heat
-            add!(outface, used_heat, unit.current_max_output_temperature)
+            add!(outface, used_heat, nothing, unit.current_max_output_temperature)
             unit.current_energy_output += used_heat
         else
-            add!(outface, energy_available, unit.current_max_output_temperature)
+            add!(outface, energy_available, nothing, unit.current_max_output_temperature)
             unit.current_energy_output += energy_available
             energy_available = 0.0
         end
@@ -956,7 +956,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         current_exchange_temperature = highest(exchange.temperature_max, unit.current_min_input_temperature)
 
         # all energies in the exchange can be used as it was already made sure than they do not exeed the STES limit
-        sub!(inface, exchange_energy_available, current_exchange_temperature)
+        sub!(inface, exchange_energy_available, current_exchange_temperature, nothing)
         push!(unit.current_energy_input, exchange_energy_available)
         push!(unit.current_temperature_input, current_exchange_temperature)
     end

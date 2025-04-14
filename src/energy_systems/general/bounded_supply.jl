@@ -108,7 +108,7 @@ function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     end
 
     if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), temp_out)
+        add!(outface, min(abs(energy_demand), unit.max_energy), nothing, temp_out)
     end
 end
 

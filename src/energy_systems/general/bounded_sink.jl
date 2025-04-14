@@ -105,7 +105,7 @@ function process(unit::BoundedSink, sim_params::Dict{String,Any})
     end
 
     if energy_supply > 0.0
-        sub!(inface, min(energy_supply, unit.max_energy), unit.temperature)
+        sub!(inface, min(energy_supply, unit.max_energy), unit.temperature, nothing)
     end
 end
 
