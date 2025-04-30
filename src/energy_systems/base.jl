@@ -399,8 +399,8 @@ function add!(interface::SystemInterface,
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
 
-    interface.balance += sum(change)
-    interface.sum_abs_change += sum(abs.(change))
+    interface.balance += sum(change; init=0.0)
+    interface.sum_abs_change += sum(abs.(change); init=0.0)
 
     # check 1-to-1 connections where only one max_energy is written
     if temperature_min[1] !== nothing && length(interface.max_energy.temperature_min) == 1 &&
@@ -746,7 +746,11 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                               temperature_max::Union{Temperature,Vector{<:Temperature}},
                               uac_to_increase::Union{Stringing,Vector{<:Stringing}}=nothing)
     energy = convert_to_vector(energy, Vector{Floathing})
-    uac_to_increase = convert_to_vector(uac_to_increase, Vector{Stringing})
+    if uac_to_increase === nothing
+        uac_to_increase = Vector{Stringing}([nothing for _ in energy])
+    else
+        uac_to_increase = convert_to_vector(uac_to_increase, Vector{Stringing})
+    end
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
 
@@ -1193,7 +1197,7 @@ function check_temperatures_sink(exchanges::Vector{EnergyExchange}, input_temper
             end
         end
     end
-    return energy_demand, temperature_min, temperature_max
+    return energy_supply, temperature_min, temperature_max
 end
 
 """
