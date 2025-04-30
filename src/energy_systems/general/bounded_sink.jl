@@ -86,26 +86,18 @@ function process(unit::BoundedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
     exchanges = balance_on(inface, inface.source)
 
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single input which can happen for direct 1-to-1 connections or if the bus has
-    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
-        energy_supply = balance(exchanges) + energy_potential(exchanges)
-    else
-        e = first(exchanges)
-        if (unit.temperature === nothing ||
-            (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-            (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
-            # end of condition
-            energy_supply = e.balance + e.energy_potential
-        else
-            energy_supply = 0.0
-        end
+    # if we get the exchanges from a bus, the temperature check has already been performed
+    if inface.source.sys_function == EnergySystems.sf_bus
+        energy_supply = [e.balance + e.energy_potential for e in exchanges]
+        temperature_min = [e.temperature_min for e in exchanges]
+        temperature_max = [e.temperature_max for e in exchanges]
+    else # check temperature
+        energy_supply,
+        temperature_min,
+        temperature_max = check_temperatures_sink(exchanges, unit.temperature, unit.max_energy)
     end
-
-    if energy_supply > 0.0
-        sub!(inface, min(energy_supply, unit.max_energy), unit.temperature, nothing)
+    if sum(energy_supply; init=0.0) > 0.0
+        sub!(inface, energy_supply, temperature_min, temperature_max)
     end
 end
 

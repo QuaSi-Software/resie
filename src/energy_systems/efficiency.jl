@@ -793,9 +793,8 @@ interfaces in the corresponding components. For example a CHPP would call check_
 which uses check_heat_out_impl internally.
 
 This also checks the temperatures of the exchanges that are returned from a balance_on call,
-which can be more than one exchange in the case of a bus, and checks if the output
-temperature of the component falls into the minimum and maximum temperature range of the
-exchange, if any is given at all.
+which can be more than one exchange, and checks if the output temperature of the component
+falls into the minimum and maximum temperature range of the exchange, if any is given at all.
 
 # Arguments
 - `unit::Union{CHPP,Electrolyser,FuelBoiler}`: The component
@@ -824,24 +823,12 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
     exchanges = balance_on(unit.output_interfaces[medium],
                            unit.output_interfaces[medium].target)
 
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single input which can happen for direct 1-to-1 connections or if the bus has
-    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
+    # if we get the exchanges from a bus, the temperature check has already been performed
+    if unit.output_interfaces[medium].target.sys_function == sf_bus
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-    else
-        e = first(exchanges)
-        if (output_temperature === nothing
-            ||
-            (e.temperature_min === nothing || e.temperature_min <= output_temperature)
-            &&
-            (e.temperature_max === nothing || e.temperature_max >= output_temperature))
-            # end of condition
-            potential_energy_heat_out = e.balance + e.energy_potential
-        else
-            potential_energy_heat_out = 0.0
-        end
+    else # check temperature for 1-to-1 connections and sum up energy
+        potential_energy_heat_out, _, _ = check_temperatures_source(exchanges, output_temperature, Inf)
+        potential_energy_heat_out = sum(potential_energy_heat_out; init=0.0)
     end
 
     if potential_energy_heat_out >= -sim_params["epsilon"]

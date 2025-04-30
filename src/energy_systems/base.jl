@@ -1122,6 +1122,81 @@ function temp_min_all_non_empty(entries::Vector{EnergyExchange})::Vector{Tempera
 end
 
 """
+    check_temperatures_source(exchanges, output_temperature, max_energy) 
+    
+Checks the compatibility of temperature ranges for a given set of energy exchanges and 
+calculates the energy demand (as vector) and associated temperature ranges for a source.
+
+# Arguments
+- `exchanges::Vector{EnergyExchange}`: A vector of `EnergyExchange` objects
+- `output_temperature::Temperature`: The desired output temperature
+- `max_energy::Float64`: The maximum allowable energy demand
+
+# Returns
+- `energy_demand::Vector{Float64}`: A vector of energy demands that satisfy the temperature constraints.
+- `temperature_min::Vector{Temperature}`: A vector of minimum temperatures corresponding to the energy demands.
+- `temperature_max::Vector{Temperature}`: A vector of maximum temperatures corresponding to the energy demands.
+
+"""
+function check_temperatures_source(exchanges::Vector{EnergyExchange}, output_temperature::Temperature,
+                                   max_energy::Float64)
+    energy_demand = Float64[]
+    temperature_min = Temperature[]
+    temperature_max = Temperature[]
+    for e in exchanges
+        if (output_temperature === nothing ||
+            (e.temperature_min === nothing || e.temperature_min <= output_temperature) &&
+            (e.temperature_max === nothing || e.temperature_max >= output_temperature))
+            # end of condition
+            energy_demand_sum = sum(energy_demand; init=0.0)
+            if energy_demand_sum < max_energy
+                push!(energy_demand, min(e.balance + e.energy_potential, max_energy - energy_demand_sum))
+                push!(temperature_min, nothing)
+                push!(temperature_max, output_temperature)
+            end
+        end
+    end
+    return energy_demand, temperature_min, temperature_max
+end
+
+"""
+    check_temperatures_sink(exchanges, input_temperature, max_energy) 
+    
+Checks the compatibility of temperature ranges for a given set of energy exchanges and 
+calculates the energy demand (as vector) and associated temperature ranges for a sink.
+
+# Arguments
+- `exchanges::Vector{EnergyExchange}`: A vector of `EnergyExchange` objects
+- `input_temperature::Temperature`: The desired input temperature
+- `max_energy::Float64`: The maximum allowable energy demand
+
+# Returns
+- `energy_demand::Vector{Float64}`: A vector of energy demands that satisfy the temperature constraints.
+- `temperature_min::Vector{Temperature}`: A vector of minimum temperatures corresponding to the energy demands.
+- `temperature_max::Vector{Temperature}`: A vector of maximum temperatures corresponding to the energy demands.
+
+"""
+function check_temperatures_sink(exchanges::Vector{EnergyExchange}, input_temperature::Temperature, max_energy::Float64)
+    energy_supply = Float64[]
+    temperature_min = Temperature[]
+    temperature_max = Temperature[]
+    for e in exchanges
+        if (input_temperature === nothing ||
+            (e.temperature_min === nothing || e.temperature_min <= input_temperature) &&
+            (e.temperature_max === nothing || e.temperature_max >= input_temperature))
+            # end of condition
+            energy_supply_sum = sum(energy_supply; init=0.0)
+            if energy_supply_sum < max_energy
+                push!(energy_supply, min(e.balance + e.energy_potential, max_energy - energy_supply_sum))
+                push!(temperature_min, e.temperature_min)
+                push!(temperature_max, e.temperature_max)
+            end
+        end
+    end
+    return energy_demand, temperature_min, temperature_max
+end
+
+"""
     balance_on(interface, unit)
 
 Return the balance of a unit in respect to the given interface.
