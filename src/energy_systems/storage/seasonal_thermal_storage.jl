@@ -474,7 +474,7 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
 
     # calculate new max_energy for the input energy for all elements in max_energy
     # and limit it by the the alread filled energy and the charging rate limit
-    for (input_idx, temperature) in enumerate(max_energy.temperature_max) # TODO is this correct? 
+    for (input_idx, temperature) in enumerate(highest.(max_energy.temperature_max, max_energy.temperature_min))
         max_energy.max_energy[input_idx] = min(calcuate_max_input_energy_by_temperature(unit,
                                                                                         temperature,
                                                                                         temperature_segments_temporary),
