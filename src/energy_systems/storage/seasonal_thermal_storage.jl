@@ -410,6 +410,7 @@ function control(unit::SeasonalThermalStorage,
         # add 1K in the first time step if there is equal temperature distribution to avoid Inf mass flow
         unit.current_min_input_temperature = unit.temperature_segments[1] + 1.0
     else
+        # limit the input temperature to the temperature of the second layer from below
         unit.current_min_input_temperature = unit.temperature_segments[2]
     end
 
@@ -506,7 +507,7 @@ function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, 
     # numerical problems and pulsing during loading. Otherwise, it can happen that the STES is not taking
     # the energy that it is supposed to take, or a unresonable high temporal resolution has to be used to
     # calculate the new temperature distribution within the STES.
-    red_factor = 0.75 + clamp(actual_input_temp - current_temperature_distribution[1], 0.0, 5.0) * 0.25 / 5.0
+    red_factor = 0.0 + clamp(actual_input_temp - current_temperature_distribution[2], 0.0, 5.0) * 1.0 / 5.0
     return red_factor * sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
                                                    actual_input_temp, unit.cp_medium)
                             for (layer, volume) in enumerate(unit.volume_segments)
@@ -909,10 +910,10 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
         if energy_available > used_heat
             energy_available -= used_heat
-            add!(outface, used_heat, nothing, unit.current_max_output_temperature)
+            add!(outface, used_heat, nothing, unit.current_max_output_temperature, exchange.purpose_uac)
             unit.current_energy_output += used_heat
         else
-            add!(outface, energy_available, nothing, unit.current_max_output_temperature)
+            add!(outface, energy_available, nothing, unit.current_max_output_temperature, exchange.purpose_uac)
             unit.current_energy_output += energy_available
             energy_available = 0.0
         end
@@ -956,7 +957,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         current_exchange_temperature = highest(exchange.temperature_max, unit.current_min_input_temperature)
 
         # all energies in the exchange can be used as it was already made sure than they do not exeed the STES limit
-        sub!(inface, exchange_energy_available, current_exchange_temperature, nothing)
+        sub!(inface, exchange_energy_available, current_exchange_temperature, nothing, exchange.purpose_uac)
         push!(unit.current_energy_input, exchange_energy_available)
         push!(unit.current_temperature_input, current_exchange_temperature)
     end
