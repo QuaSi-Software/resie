@@ -780,7 +780,10 @@ function inner_distribute!(unit::Bus)
 
             energy_flow = min(target_energy, available_energy)
             unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
-            unit.balance_table[input_row.priority, output_row.priority * 2] = temperature_highest_min  # TODO What should be written here?!
+            # if both min and max temperature are given and differing (is currently never happening), 
+            # the lowest temperature is set:
+            unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
+                                                                                     temperature_lowest_max)
 
             # exctract the alread distributed energy from balance table
             already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
