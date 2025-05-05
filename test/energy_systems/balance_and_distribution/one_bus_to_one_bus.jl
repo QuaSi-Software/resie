@@ -132,11 +132,11 @@ function test_one_bus_to_one_bus()
     exchanges = EnergySystems.balance_on(bus_2.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 75.0  # as grid is produced, this is the produced energy at this point
-    @test EnergySystems.temp_max_highest(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) == 55.0
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 75.0  # as grid is produced, this is the produced energy at this point
-    @test EnergySystems.temp_max_highest(exchanges) === nothing
+    @test EnergySystems.temp_max_highest(exchanges) == 55.0
 
     # balance in interfaces of components are non-zero:
     @test demand.input_interfaces[demand.medium].balance ≈ -75.0

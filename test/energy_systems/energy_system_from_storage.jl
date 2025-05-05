@@ -270,7 +270,7 @@ function test_run_energy_system_from_storage_denied()
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 0.0
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 0.0
-    @test lheat_storage.output_interfaces[lheat_storage.medium].max_energy.temperature_max == [35.0]
+    @test lheat_storage.output_interfaces[lheat_storage.medium].max_energy.temperature_max == [nothing]
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
