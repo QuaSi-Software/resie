@@ -25,6 +25,7 @@ mutable struct SeasonalThermalStorage <: Component
     volume::Float64
     hr_ratio::Float64
     sidewall_angle::Float64
+    shape::String
     rho_medium::Float64
     cp_medium::Float64
     diffussion_coefficient::Float64
@@ -109,6 +110,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "volume", nothing),             # volume of the STES [m^3]
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
                    default(config, "sidewall_angle", 0.0),         # angle of the sidewall of the STES with respect to the horizont [°]
+                   default(config, "shape", "cuboid"),             # can be "round" for cylinder/truncated cone or "cuboid" for tank or truncated quadratic pyramid (pit)
                    default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
                    default(config, "cp_medium", 4.18),             # specific thermal capacity of medium [kJ/kgK]
                    default(config, "diffussion_coefficient", 0.143 * 10^-6), # diffussion coefficient of the medium [m^2/s]
@@ -187,7 +189,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                            unit.volume,
                                            unit.sidewall_angle,
                                            unit.hr_ratio,
-                                           unit.number_of_layer_total)
+                                           unit.number_of_layer_total,
+                                           unit.shape)
 
     # calculate the mass of the medium in each layer
     unit.layer_masses = unit.rho_medium .* unit.volume_segments
@@ -263,7 +266,9 @@ end
 """
     calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
 
-Calculate the geometry of a seasonal thermal energy storage (STES) system, either as a cylinder or a truncated cone.
+Calculate the geometry of a seasonal thermal energy storage (STES) system, either as a 
+- cylinder or a truncated cone (shape == round) 
+- tank with quadratic base or a truncated quadratic pyramid (pit) (shape == cuboid)
 
 # Arguments
 - `uac::String`: Unique identifier for the STES
@@ -272,6 +277,8 @@ Calculate the geometry of a seasonal thermal energy storage (STES) system, eithe
                     If `alpha` is 90, the storage is a cylinder.
 - `hr::Float64`: Height-to-radius ratio
 - `n_segments::Int64`: Number of segments to divide the storage into for calculation
+- `shape::String`: Shape of the STES, can be "round" for cylinder/truncated cone or "cuboid" for tank or 
+                   truncated quadratic pyramid (pit)
 
 # Returns
 - `a_lid::Float64`: Surface area of the top lid [m^2]
@@ -283,11 +290,15 @@ Calculate the geometry of a seasonal thermal energy storage (STES) system, eithe
 - `radius_large::Float64`: Radius of the larger base (for truncated cone) [m]
 
 """
-function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64)
+function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Float64, n_segments::Int64, shape::String)
     a_barrel = zeros(n_segments)
     v_section = zeros(n_segments)
 
-    if alpha == 90  # cylinder
+    # helper functions
+    deg2rad(deg) = deg * (π / 180)
+    rad2deg(rad) = rad * (180 / π)
+
+    if alpha == 90 && shape == "round"  # cylinder
         # calculate radius and height of cylinder
         radius = cbrt(volume / (pi * hr))
         height = hr * radius
@@ -301,11 +312,21 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         a_bottom = a_lid
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius, radius
-    else  # truncated cone
-        # helper functions
-        deg2rad(deg) = deg * (π / 180)
-        rad2deg(rad) = rad * (180 / π)
+    elseif alpha == 90 && shape == "cuboid"  # cuboid with square cross-section 
+        # calculate radius and height of cuboid
+        side_length = cbrt(2 * volume / hr)
+        height = hr * (side_length / 2)
 
+        # calculate surfaces and volumes of the sections
+        a_lid = side_length^2
+        for n in 1:n_segments
+            a_barrel[n] = 4 * side_length * height / n_segments
+            v_section[n] = side_length^2 * height / n_segments
+        end
+        a_bottom = a_lid
+
+        return a_lid, a_barrel, a_bottom, v_section, height, side_length / 2, side_length / 2
+    elseif shape == "round"   # truncated cone
         alpha_rad = deg2rad(alpha)
         alpha_tan = tan(alpha_rad)
 
@@ -317,7 +338,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
             alpha_max = 180 - alpha_min
             hr_max = 2 * alpha_tan
 
-            @error "For the STES $(uac), reduce the h/r ratio for the truncated cone or increase the slope angle.  " *
+            @error "For the STES $(uac), reduce the h/r ratio for the truncated cone or increase the slope angle. " *
                    "For a given h/r ratio of $(hr), the slope angle must be greater than $(round(alpha_min; digits=2))° and " *
                    "less than $(round(alpha_max; digits=2))°. For a given slope angle of $(alpha)°, the h/r ratio must be " *
                    "less than $(round(hr_max; digits=2))."
@@ -338,6 +359,57 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         end
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius_small, radius_large
+    elseif shape == "cuboid"   # truncated quadratic pyramid (pit)
+        alpha_rad = deg2rad(alpha)
+        alpha_tan = tan(alpha_rad)
+
+        # check if input parameters are creating a valid truncated quadratic pyramid
+        hr_max = 2 * alpha_tan
+        if hr > hr_max
+            alpha_min_deg = rad2deg(atan(hr / 2))
+            alpha_max_deg = 180 - alpha_min_deg
+
+            @error "For the STES $(uac), reduce the h/r ratio for the truncated quadratic pyramit or increase the slope angle. " *
+                   "For a given h/r ratio of $(hr), the slope angle must be greater than $(round(alpha_min_deg; digits=2))° and " *
+                   "smaller than $(round(alpha_max_deg; digits=2))°. " *
+                   "For a given slope angle of $(alpha)°, the h/r ratio must be less than $(round(hr_max; digits=2))."
+            throw(InputError())
+        end
+
+        # top side has bigger cross section than bottom side to form a pit: \_/
+        # hr = h/r_mean  ⇒  λ = t/b, Volume = (hr·b³/12)·(1+λ)(1+λ+λ^2)
+        lam = (2 * alpha_tan - hr) / (2 * alpha_tan + hr)
+        top_side = (12 * volume / (hr * (1 + lam) * (1 + lam + lam^2)))^(1 / 3)
+        base_side = lam * top_side
+        height = hr * (base_side + top_side) / 4
+
+        # areas
+        a_bottom = base_side^2
+        a_top = top_side^2
+
+        # segments
+        dh = height / n_segments
+        a_lat = zeros(Float64, n_segments)
+        v_section = zeros(Float64, n_segments)
+
+        for i in 1:n_segments
+            z_bot = dh * (i - 1)
+            z_top = dh * i
+
+            # lineare Interpolation of edge length
+            a_bot = base_side + (top_side - base_side) * (z_bot / height)
+            a_up = base_side + (top_side - base_side) * (z_top / height)
+            # volume of segments
+            v_section[i] = (dh / 3) * (a_bot^2 + a_bot * a_up + a_up^2)
+
+            # Segment-laterale area
+            l_seg = sqrt(((a_bot - a_up) / 2)^2 + dh^2)
+            a_lat[i] = 2 * (a_bot + a_up) * l_seg
+        end
+        return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
+    else
+        @error "Invalid shape type of seasonal thermal storage $(unit.uac). Shape has to be 'round' or 'cuboid'!"
+        throw(InputError)
     end
 end
 
@@ -349,7 +421,7 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
     Plots.plot!([-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
     Plots.plot!([unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
     Plots.plot!([-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    Plots.plot!(; title="Cross section of the STES $(unit.uac)",
+    Plots.plot!(; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
                 xlabel="x-coordinate [m]",
                 ylabel="height [m]",
                 legend=false,
