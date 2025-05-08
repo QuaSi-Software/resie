@@ -180,6 +180,7 @@ mutable struct HPEnergies
     slices_heat_out_temperature::Vector{Temperature}
     slices_heat_out_uac::Vector{Stringing}
     slices_times::Vector{Floathing}
+    optimal_plrs::Vector{Floathing}
 
     function HPEnergies()
         return new(0.0,
@@ -215,6 +216,7 @@ mutable struct HPEnergies
                    Vector{Floathing}(),
                    Vector{Temperature}(),
                    Vector{Stringing}(),
+                   Vector{Floathing}(),
                    Vector{Floathing}())
     end
 end
@@ -828,25 +830,7 @@ function calculate_energies_heatpump(unit::HeatPump,
                                f_abstol=0.001))
     optimal_plrs = minimizer(results)
     energies = calculate_slices(unit, sim_params, energies, optimal_plrs, fixed_heat_in, fixed_heat_out)
-
-    # calculate average PLR, from active slices, and weighted by heat produced
-    weights = 0
-    for (_, (plr_idx, slice_idx)) in pairs(energies.double_to_single_idx)
-        if slice_idx == -1
-            continue
-        end
-        weight = energies.slices_temp_heat_out[slice_idx]
-        unit.avg_plr += optimal_plrs[plr_idx] * weight
-        weights += weight
-    end
-    if weights > 0
-        unit.avg_plr /= weights
-    else
-        unit.avg_plr = 0.0
-    end
-
-    # calculate active time as fraction of the simulation time step
-    unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
+    energies.optimal_plrs = optimal_plrs
 
     return energies
 end
@@ -1056,6 +1040,25 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     end
     unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
     unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
+
+    # calculate average PLR, from active slices, and weighted by heat produced
+    weights = 0
+    for (_, (plr_idx, slice_idx)) in pairs(energies.double_to_single_idx)
+        if slice_idx == -1
+            continue
+        end
+        weight = energies.slices_heat_out[slice_idx]
+        unit.avg_plr += energies.optimal_plrs[plr_idx] * weight
+        weights += weight
+    end
+    if weights > 0
+        unit.avg_plr /= weights
+    else
+        unit.avg_plr = 0.0
+    end
+
+    # calculate active time as fraction of the simulation time step
+    unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
 end
 
 # has its own reset function as here more parameters are present that need to be reset in
