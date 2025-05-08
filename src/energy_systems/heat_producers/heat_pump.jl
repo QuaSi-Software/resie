@@ -199,7 +199,7 @@ mutable struct HPEnergies
                    Vector{Stringing}(),
                    false,
                    false,
-                   Dict{Integer,Tuple{Integer,Integer}}(),
+                   Dict{Tuple{Integer,Integer},Tuple{Integer,Integer}}(),
                    Vector{Floathing}(),
                    Vector{Floathing}(),
                    Vector{Temperature}(),
@@ -827,7 +827,7 @@ function calculate_energies_heatpump(unit::HeatPump,
                                x_abstol=0.01,
                                f_abstol=0.001))
     optimal_plrs = minimizer(results)
-    energies = calculate_slices(unit, sim_params, energies, optimal_plrs)
+    energies = calculate_slices(unit, sim_params, energies, optimal_plrs, fixed_heat_in, fixed_heat_out)
 
     # calculate average PLR, from active slices, and weighted by heat produced
     weights = 0
