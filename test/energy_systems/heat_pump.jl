@@ -360,9 +360,14 @@ function test_heat_pump_1S1D_infinite_output()
     heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     cop = heat_out / el_in
-    @test el_in ≈ 562.8095452498875
-    @test heat_in ≈ 1968.5952273750563
-    @test heat_out ≈ 2500.0
+    # the calculation of the heat pump includes a fudge factor that slightly
+    # overestimates the heat output
+    fudge = 1.001
+    @test el_in ≈ 563.3723547951373
+    # the input is a fixed source and the heat pump slightly undersized, so there is heat
+    # input left over that we have to consider
+    @test heat_in ≈ (2000 + 1939.1276452048621) * 0.5
+    @test heat_out ≈ 2500.0 * fudge
     @test cop ≈ 4.442
 end
 
@@ -715,8 +720,8 @@ function test_heat_pump_2S2D_losses()
     @test heat_pump.effective_cop ≈ 3.714126760978019
     @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
     @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
-    @test heat_pump.time_active ≈ 0.75
-    @test heat_pump.avg_plr ≈ 1.0
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.75
 end
 
 @testset "heat_pump_2S2D_losses" begin
@@ -1012,9 +1017,9 @@ function test_heat_pump_2S2D_optimising_slices()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 < 1403.5371253472942 - eps
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 > 1596.4628746527055 + eps
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 3000.0
-    # fully optimal would be 1.0 for time_active and 0.4 for plr
-    @test heat_pump.time_active ≈ 0.9222481721394582
-    @test heat_pump.avg_plr ≈ 0.4653057040302939
+    # the optimiser has 1.0 for time_active and a value close to 0.4 for plr as optimum
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.4285714285714286
 end
 
 @testset "heat_pump_2S2D_optimising_slices" begin
