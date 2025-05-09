@@ -584,8 +584,12 @@ function set_max_energy!(interface::SystemInterface,
                         push!(uac, purpose_uac[new_idx])
                     end
                     if current_energy !== nothing
-                        current_max_energies[old_idx] -= current_energy
-                        new_max_energy -= current_energy
+                        if current_max_energies[old_idx] !== nothing
+                            current_max_energies[old_idx] -= current_energy
+                        end
+                        if new_max_energy !== nothing
+                            new_max_energy -= current_energy
+                        end
                     end
                 end
             end
