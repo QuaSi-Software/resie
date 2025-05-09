@@ -354,14 +354,14 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
     if unit.output_temperature !== nothing
         set_max_energy!(unit.output_interfaces[unit.m_heat_out],
                         nothing,
-                        unit.output_temperature,
+                        nothing,
                         unit.output_temperature)
     end
     if unit.input_temperature !== nothing
         set_max_energy!(unit.input_interfaces[unit.m_heat_in],
                         nothing,
                         unit.input_temperature,
-                        unit.input_temperature)
+                        nothing)
     end
 end
 

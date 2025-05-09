@@ -553,12 +553,44 @@ function set_max_energy!(interface::SystemInterface,
                         has_calculated_all_maxima,
                         recalculate_max_energy)
     else
-        # 1-to-1 interface between two components. Only one max_energy and temperature can be given. --> Wrong! TODO
-        # use intersecting temperature set and smallest energy
-        temp_min = highest(highest(interface.max_energy.temperature_min), temperature_min[1])
-        temp_max = lowest(lowest(interface.max_energy.temperature_max), temperature_max[1])
-        max_energy = is_max_energy_nothing(interface.max_energy) ? nothing : get_max_energy(interface.max_energy)
-        energy_new = _isless2(_sum(energy), max_energy) ? _sum(energy) : max_energy
+        # 1-to-1 interface between two components.
+        # Assuming that temperatures always match: This is valid as currently only heat pumps
+        # write multiple layers in a 1-to-1 Interface. If two heat pumps are connected to each
+        # other, only the output might have different temperatures, but they will match the 
+        # existing temperatures as the heat pump checks the temperatures.
+        if is_max_energy_nothing(interface.max_energy)
+            # no max_energy is set yet, so set the new one
+            energy_new = energy
+            temp_min = temperature_min
+            temp_max = temperature_max
+            uac = purpose_uac
+        else
+            # limit max_energy to existing max_energy and get temperatures
+            energy_new = Vector{Floathing}()
+            temp_min = Vector{Temperature}()
+            temp_max = Vector{Temperature}()
+            uac = Vector{Stringing}()
+            current_max_energies = copy(interface.max_energy.max_energy)
+
+            for (new_idx, new_max_energy) in enumerate(energy)
+                for (old_idx, old_max_energy) in enumerate(current_max_energies)
+                    current_energy = lowest(new_max_energy, old_max_energy)
+                    push!(energy_new, current_energy)
+                    push!(temp_min, highest(temperature_min[new_idx], interface.max_energy.temperature_min[old_idx]))
+                    push!(temp_max, lowest(temperature_max[new_idx], interface.max_energy.temperature_max[old_idx]))
+                    if purpose_uac === nothing
+                        push!(uac, nothing)
+                    else
+                        push!(uac, purpose_uac[new_idx])
+                    end
+                    if current_energy !== nothing
+                        current_max_energies[old_idx] -= current_energy
+                        new_max_energy -= current_energy
+                    end
+                end
+            end
+        end
+
         set_max_energy!(interface.max_energy, energy_new, temp_min, temp_max, purpose_uac,
                         has_calculated_all_maxima, recalculate_max_energy)
     end
@@ -677,7 +709,7 @@ end
 This function decreases the maximum energy values stored in `max_energy` by the given `amount`.
 If `uac_to_reduce` is specified and found in `max_energy.purpose_uac`, only the corresponding
 max_energy value will be reduced. 
-f the maximum possible energy for all max_energy have been calculated (`has_calculated_all_maxima` 
+If the maximum possible energy for all max_energy have been calculated (`has_calculated_all_maxima` 
 is true), the other max_energy values will be reduced proportionally by a linear percentage. 
 If `uac_to_reduce` could not be found, an error arises.
 If `recalculate_max_energy` is set in the max_energy, a special function will be called located 
@@ -714,7 +746,7 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                     break
                 end
             end
-        else# TODO is this correct here? Should temperatures be checked?
+        else # a purpose uac is given and temperature is checked by the calling bus
             idx = findfirst(==(uac_of_caller), max_energy.purpose_uac)
             if idx !== nothing
                 if max_energy.has_calculated_all_maxima
@@ -754,7 +786,6 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
 
-    # TODO simplify
     for (energy_idx, current_energy) in enumerate(energy)
         if uac_to_increase[energy_idx] === nothing || is_purpose_uac_nothing(max_energy)
             if is_max_energy_nothing(max_energy) # no purpose_uac given and max_energy is empty
@@ -766,7 +797,7 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                    temperature_min[energy_idx] !== max_energy.temperature_min[1] ||
                    temperature_max[energy_idx] !== nothing && max_energy.temperature_max[1] !== nothing &&
                    temperature_max[energy_idx] !== max_energy.temperature_max[1]
-                    # ...but temperatures missmatch, so a new entry will be created
+                    # ...but temperatures missmatch, so a new entry will be created --> append
                     set_max_energy!(max_energy, current_energy, temperature_min[energy_idx],
                                     temperature_max[energy_idx],
                                     uac_to_increase[energy_idx], false, false, true)
@@ -778,23 +809,33 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                 end
             end
         else
-            purpose_idx = findfirst(==(uac_to_increase[energy_idx]), max_energy.purpose_uac)
-            if purpose_idx === nothing # no purpose_uac written yet --> append
+            purpose_indexes = findall(==(uac_to_increase[energy_idx]), max_energy.purpose_uac)
+            if purpose_indexes == [] # no purpose_uac written yet --> append
                 set_max_energy!(max_energy, current_energy, temperature_min[energy_idx], temperature_max[energy_idx],
                                 uac_to_increase[energy_idx], false, false, true)
-            else # an existing entry with the same purpose_uac is found # TODO is this correct now? iterate over purpose index?!
-                if temperature_min[energy_idx] !== nothing && max_energy.temperature_min[purpose_idx] !== nothing &&
-                   temperature_min[energy_idx] !== max_energy.temperature_min[purpose_idx] ||
-                   temperature_max[energy_idx] !== nothing && max_energy.temperature_max[purpose_idx] !== nothing &&
-                   temperature_max[energy_idx] !== max_energy.temperature_max[purpose_idx]
-                    # ...but temperatures missmatch, so a new entry will be created
+            else # one or more existing entries with the same purpose_uac are found --> check for the same temperatures
+                index_found = false
+                for purpose_idx in purpose_indexes
+                    if ((temperature_min[energy_idx] === nothing ||
+                         max_energy.temperature_min[purpose_idx] === nothing ||
+                         temperature_min[energy_idx] == max_energy.temperature_min[purpose_idx])
+                        &&
+                        (temperature_max[energy_idx] === nothing ||
+                         max_energy.temperature_max[purpose_idx] === nothing ||
+                         temperature_max[energy_idx] == max_energy.temperature_max[purpose_idx]))
+                        # temperatures match or are not from interest, so the existing entry will be updated
+                        max_energy.max_energy[purpose_idx] += current_energy
+                        max_energy.temperature_min[purpose_idx] = temperature_min[energy_idx]
+                        max_energy.temperature_max[purpose_idx] = temperature_max[energy_idx]
+                        index_found = true
+                        break
+                    end
+                end
+                if !index_found
+                    # no matching temperatures were found, so a new entry will be created
                     set_max_energy!(max_energy, current_energy, temperature_min[energy_idx],
                                     temperature_max[energy_idx],
                                     uac_to_increase[energy_idx], false, false, true)
-                else # ... temperatures match, so the existing entry will be updated
-                    max_energy.max_energy[purpose_idx] += current_energy
-                    max_energy.temperature_min[purpose_idx] = temperature_min[energy_idx]
-                    max_energy.temperature_max[purpose_idx] = temperature_max[energy_idx]
                 end
             end
         end
