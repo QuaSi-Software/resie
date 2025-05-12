@@ -910,7 +910,7 @@ function test_heat_pump_2S2D_min_power()
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
 
-    # first time step: slices can be "slowed down" enough to compensate for high power
+    # first time step: min power is below the operation point
 
     for unit in values(components)
         EnergySystems.reset(unit)
@@ -929,13 +929,13 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
-    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    @test produced_heat ≈ 3000.0
-    @test produced_heat / energy_full_power > 0.35
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test heat_out ≈ 3000.0
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.42857142857143
 
-    # second time step: min power of each slice is so high that they can't be "slowed down"
-    # enough to compensate
+    # second time step: min power is above the operation point, causing slices to run with
+    # higher power, less time and more PLR
     heat_pump.min_power_function = (x, y) -> 0.8
 
     for unit in values(components)
@@ -955,10 +955,10 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
-    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    @test produced_heat ≈ 0.0
-    @test produced_heat / energy_full_power ≈ 0.0
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test heat_out ≈ 3000.0
+    @test heat_pump.time_active ≈ 0.5357142857142857
+    @test heat_pump.avg_plr ≈ 0.8
 end
 
 @testset "heat_pump_2S2D_min_power" begin
