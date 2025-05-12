@@ -188,7 +188,7 @@ function control(unit::BufferTank,
     unit.current_max_output_temperature = temperature_at_load(unit)
 
     set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy),
-                    unit.high_temperature, unit.high_temperature)
+                    unit.high_temperature, nothing)
     set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy), nothing,
                     unit.current_max_output_temperature)
 
