@@ -180,7 +180,7 @@ mutable struct HPEnergies
     slices_heat_out_temperature::Vector{Temperature}
     slices_heat_out_uac::Vector{Stringing}
     slices_times::Vector{Floathing}
-    optimal_plrs::Vector{Floathing}
+    used_plrs::Vector{Floathing}
 
     function HPEnergies()
         return new(0.0,
@@ -234,6 +234,7 @@ function reset_temp_slices!(energies::HPEnergies)::HPEnergies
     energies.slices_temp_heat_out_uac = Vector{Stringing}()
     energies.slices_temp_times = Vector{Floathing}()
     energies.double_to_single_idx = Dict{Tuple{Integer,Integer},Integer}()
+    energies.used_plrs = Vector{Floathing}()
     return energies
 end
 
@@ -675,6 +676,9 @@ function calculate_slices(unit::HeatPump,
         end
     end
 
+    # init used PLRs as zero so unused slices don't contribute to the average
+    energies.used_plrs = fill(0.0, length(plrs))
+
     slice_idx::Int = 1
     src_idx::Int = 1
     snk_idx::Int = 1
@@ -720,19 +724,21 @@ function calculate_slices(unit::HeatPump,
         # 3. the maximum usage fraction (as fraction of the nominal power)
         # 4. the PLR of the slice
         # 5. how much time is left in the time step
+        plr_idx = energies.double_to_single_idx[(src_idx, snk_idx)][1]
         min_power_frac = max(0.0, min(1.0, unit.min_power_function(src_temperature, snk_temperature)))
         min_power = unit.design_power_th * min_power_frac
         max_power_frac = max(0.0, min(1.0, unit.max_power_function(src_temperature, snk_temperature)))
         max_power = unit.design_power_th * max_power_frac * energies.max_usage_fraction
-        used_power = max(min_power, max_power)
+        plr_power = max_power * plrs[plr_idx]
+        used_power = max(min_power, plr_power)
+        energies.used_plrs[plr_idx] = used_power / max_power
 
         # the fudge factor causes us to slightly overestimate the maximum heat out energy
         # assuming the remaining time is used up. this helps with the solver meeting demands
         # exactly and the resulting "error" is much smaller than the typical overall
         # inaccuracies of the calculation
-        plr_idx = energies.double_to_single_idx[(src_idx, snk_idx)][1]
         available_heat_out = min(energies.available_heat_out[snk_idx],
-                                 FUDGE_FACTOR * available_time * used_power * plrs[plr_idx] / 3600)
+                                 FUDGE_FACTOR * available_time * used_power / 3600)
 
         used_heat_in,
         used_el_in,
@@ -747,7 +753,7 @@ function calculate_slices(unit::HeatPump,
                                        plrs[plr_idx])
 
         # finally all checks done, we add the slice and update remaining energies
-        used_time = used_heat_out * 3600 / (used_power * plrs[plr_idx])
+        used_time = used_heat_out * 3600 / used_power
         add_temp_slice!(energies, used_el_in, used_heat_in, used_heat_out,
                         src_temperature, snk_temperature,
                         energies.in_uacs[src_idx],
@@ -830,7 +836,6 @@ function calculate_energies_heatpump(unit::HeatPump,
                                f_abstol=0.001))
     optimal_plrs = minimizer(results)
     energies = calculate_slices(unit, sim_params, energies, optimal_plrs, fixed_heat_in, fixed_heat_out)
-    energies.optimal_plrs = optimal_plrs
 
     return energies
 end
@@ -1048,7 +1053,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
             continue
         end
         weight = energies.slices_heat_out[slice_idx]
-        unit.avg_plr += energies.optimal_plrs[plr_idx] * weight
+        unit.avg_plr += energies.used_plrs[plr_idx] * weight
         weights += weight
     end
     if weights > 0
