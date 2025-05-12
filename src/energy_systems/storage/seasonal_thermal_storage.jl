@@ -467,6 +467,8 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
 
     fig_name = "temperature_distribution_STES_$(unit.uac).html"
     PlotlyJS.savefig(p, output_path * "/" * fig_name)
+
+    return true
 end
 
 function control(unit::SeasonalThermalStorage,
@@ -499,6 +501,11 @@ function control(unit::SeasonalThermalStorage,
     temperatures_charging = temperatures_charging[mask]
     source_uac = [exchange.purpose_uac for exchange in exchanges][mask]
     energy_supply = [exchange.balance + exchange.energy_potential for exchange in exchanges][mask]
+
+    # check for directly connected transformers in input interface and set its max energy to Inf
+    if inface.source.sys_function == sf_transformer && length(energy_supply) == 1
+        energy_supply[1] = Inf
+    end
 
     max_input_energy = zeros(length(temperatures_charging))
     for (input_idx, temperature) in enumerate(temperatures_charging)

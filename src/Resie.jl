@@ -308,9 +308,15 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     # plot additional figures potentially available from components after simulation
     if default(project_config["io_settings"], "auxiliary_plots", false)
+        component_list = []
         output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
         for component in components
-            plot_optional_figures_end(component[2], sim_params, output_path)
+            if plot_optional_figures_end(component[2], sim_params, output_path)
+                push!(component_list, component[2].uac)
+            end
+        end
+        if length(component_list) > 0
+            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: $(join(component_list, ", "))"
         end
     end
 end
