@@ -709,35 +709,22 @@ function control(unit::GeothermalProbes,
     # calculate the temperature that is still acceptable if the output temperature is mixed over the whole time step
     # to achieve the desired output temperature.
     if desired_output_temperature < unit.current_output_temperature
-        lower_temperature = desired_output_temperature - (unit.current_output_temperature - desired_output_temperature)
-        # if highest(lower_temperature, unit.min_probe_temperature_unloading) == unit.min_probe_temperature_unloading
-        #     desired_output_temperature = (unit.current_output_temperature + unit.min_probe_temperature_unloading) / 2
-        #     lower_temperature = unit.min_probe_temperature_unloading
-        # end
+        minimum_output_temperature = desired_output_temperature -
+                                     (unit.current_output_temperature - desired_output_temperature)
     else
-        lower_temperature = desired_output_temperature
+        minimum_output_temperature = desired_output_temperature
     end
 
-    local max_energy_in_out_per_probe_meter
-    if current_min_output_temperature < lower_temperature
-        try
-            max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_output_energy(energy_in_out_per_probe_meter,
-                                                                                                                   unit,
-                                                                                                                   lower_temperature,
-                                                                                                                   sim_params["wh_to_watts"])),
-                                                          -unit.max_output_energy /
-                                                          (unit.probe_depth * unit.number_of_probes),
-                                                          Order0();
-                                                          atol=0.001)
-        catch # handles non-converging results of find_zero()
-            max_energy_in_out_per_probe_meter = -unit.max_output_energy / (unit.probe_depth * unit.number_of_probes)
-        end
+    if current_min_output_temperature < minimum_output_temperature
+        minimum_output_temperature::Union{Temperature,Float64} = current_min_output_temperature
+        unit.current_max_output_energy = calculate_output_energy_from_output_temperature(unit,
+                                                                                         minimum_output_temperature,
+                                                                                         sim_params)
     else
         max_energy_in_out_per_probe_meter = -unit.max_output_energy / (unit.probe_depth * unit.number_of_probes)
+        unit.current_max_output_energy = -max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
+        unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
     end
-
-    unit.current_max_output_energy = -max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
-    unit.current_max_output_energy = min(max(0, unit.current_max_output_energy), unit.max_output_energy)
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
                     desired_output_temperature)
@@ -781,7 +768,7 @@ Returns:
 """
 function find_max_output_energy(energy_in_out_per_probe_meter::Float64,
                                 unit::GeothermalProbes,
-                                desired_output_temperature::Float64,
+                                desired_output_temperature::Temperature,
                                 wh2w::Function)
     # set energy_in_out_per_probe_meter to given energy_in_out_per_probe_meter to as vehicle 
     # to deliver the information to calculate_new_fluid_temperature(unit)
@@ -793,6 +780,46 @@ function find_max_output_energy(energy_in_out_per_probe_meter::Float64,
     unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0
 
     return new_fluid_temperature + unit.unloading_temperature_spread / 2 - desired_output_temperature
+end
+
+"""
+    calculate_output_energy_from_output_temperature(unit::GeothermalProbes,
+                                                    minimum_output_temperature::Temperature, 
+                                                    sim_params::Dict{String,Any})
+
+Calculates the maximum energy that can be taken out of the probe field while not exceeding the given minimum_output_temperature.
+If no converging result can be found, the maximum energy is set to the maximum energy of the probe field.
+The maximum energy is limited to the user-input of the max_energy.
+
+Inputs:
+    `unit::GeothermalProbes`: the unit struct of the geothermal probe with all its parameters
+    `minimum_output_temperature::Temperature`: the desired minimum output temperature of the fluid temperature
+    `sim_params::Dict{String,Any}`: simulation parameters
+Returns:
+    `current_max_output_energy::Float64`: the maximum energy that can be taken out of the probe field while not exceeding the 
+                                          given minimum_output_temperature.
+
+"""
+function calculate_output_energy_from_output_temperature(unit::GeothermalProbes,
+                                                         minimum_output_temperature::Temperature,
+                                                         sim_params::Dict{String,Any})
+    local max_energy_in_out_per_probe_meter
+    try
+        max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_output_energy(energy_in_out_per_probe_meter,
+                                                                                                               unit,
+                                                                                                               minimum_output_temperature,
+                                                                                                               sim_params["wh_to_watts"])),
+                                                      -unit.max_output_energy /
+                                                      (unit.probe_depth * unit.number_of_probes),
+                                                      Order0();
+                                                      atol=0.001)
+    catch # handles non-converging results of find_zero()
+        max_energy_in_out_per_probe_meter = -unit.max_output_energy / (unit.probe_depth * unit.number_of_probes)
+    end
+    current_max_output_energy = -max_energy_in_out_per_probe_meter * (unit.probe_depth * unit.number_of_probes)
+    current_max_output_energy = min(max(0, current_max_output_energy), unit.max_output_energy)
+
+    return current_max_output_energy
 end
 
 """
