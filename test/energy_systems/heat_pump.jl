@@ -653,6 +653,7 @@ end
 function test_heat_pump_2S2D_losses()
     components_config = get_config_heat_pump_2S2D()
     simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["model_type"] = "on-off"
     components_config["TST_HP_01"]["power_losses_factor"] = 0.97
     components_config["TST_HP_01"]["heat_losses_factor"] = 0.95
     components_config["TST_HP_01"]["power_th"] = 16000
@@ -892,6 +893,7 @@ end
 function test_heat_pump_2S2D_min_power()
     components_config = get_config_heat_pump_2S2D()
 
+    components_config["TST_HP_01"]["model_type"] = "on-off"
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.35"
@@ -968,6 +970,7 @@ end
 function test_heat_pump_2S2D_optimising_slices()
     components_config = get_config_heat_pump_2S2D()
 
+    components_config["TST_HP_01"]["model_type"] = "inverter"
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
@@ -1029,6 +1032,7 @@ end
 function test_heat_pump_2S2D_auto_calculate_optimal_plr()
     components_config = get_config_heat_pump_2S2D()
 
+    components_config["TST_HP_01"]["model_type"] = "inverter"
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.2"

@@ -29,6 +29,8 @@ mutable struct HeatPump <: Component
     m_heat_out::Symbol
     m_heat_in::Symbol
 
+    model_type::String
+
     design_power_th::Float64
     max_power_function::Function
     min_power_function::Function
@@ -39,11 +41,17 @@ mutable struct HeatPump <: Component
 
     consider_icing::Bool
     icing_coefficients::Vector{Float64}
-    optimise_slice_dispatch::Bool
-    nr_optimisation_passes::UInt
-    optimal_plr::Float64
     output_temperature::Temperature
     input_temperature::Temperature
+
+    nr_optimisation_passes::UInt
+    optimal_plr::Float64
+    eval_factor_heat::Float64
+    eval_factor_time::Float64
+    eval_factor_elec::Float64
+    fudge_factor::Float64
+    x_abstol::Float64
+    f_abstol::Float64
 
     power_losses_factor::Float64
     heat_losses_factor::Float64
@@ -81,24 +89,30 @@ mutable struct HeatPump <: Component
         coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
         icing_coefficients = parse.(Float64, split(coeff_def, ","))
 
-        optimise_slice_dispatch = default(config, "optimise_slice_dispatch", false)
+        model_type = lowercase(default(config, "model_type", "simplified"))
+        if !(model_type in ("simplified", "on-off", "inverter"))
+            @error "Unknown model type $(model_type) given for heat pump $(uac)."
+        end
+
         optimal_plr = default(config, "optimal_plr", nothing)
-        if optimise_slice_dispatch && optimal_plr === nothing
+        if model_type == "inverter" && optimal_plr === nothing
             results = optimize(x -> -plf_function(x), # minus because we actually want
                                0.0,                   # the maximum of the function
                                1.0)
             optimal_plr = first(minimizer(results))
-        elseif !optimise_slice_dispatch
+        elseif optimal_plr === nothing
             optimal_plr = 1.0
         end
-        if optimise_slice_dispatch && 1.0 - optimal_plr < sim_params["epsilon"]
-            @warn "Heat pump $(uac) is configured to optimise slice dispatch but has an " *
-                  "optimal PLR of 1.0. Consider toggling optimisation off as it has no effect."
+
+        if model_type == "inverter" && (1.0 - optimal_plr < sim_params["epsilon"])
+            @warn "Heat pump $(uac) is configured to optimise slice dispatch for inverter " *
+                  "driven operation, but has an optimal PLR of 1.0. Consider using model " *
+                  "type simplified instead as optimisation has no effect."
         end
-        if optimise_slice_dispatch && constant_cop !== nothing
-            @error "Heat pump $(uac) is configured to optimise slice dispatch but has " *
-                   "a constant COP. Toggle optimisation off as the algorithm is unstable " *
-                   "in this case."
+        if model_type == "inverter" && constant_cop !== nothing
+            @error "Heat pump $(uac) is configured to optimise slice dispatch for inverter " *
+                   "driven operation, but has a constant COP. Toggle optimisation off as " *
+                   "the algorithm is unstable in this case."
         end
 
         return new(uac,
@@ -110,6 +124,7 @@ mutable struct HeatPump <: Component
                    m_el_in,
                    m_heat_out,
                    m_heat_in,
+                   model_type,
                    config["power_th"],
                    max_power_function,
                    min_power_function,
@@ -119,11 +134,16 @@ mutable struct HeatPump <: Component
                    default(config, "bypass_cop", 15.0),
                    default(config, "consider_icing", false),
                    icing_coefficients,
-                   optimise_slice_dispatch,
-                   UInt(default(config, "nr_optimisation_passes", 10)),
-                   optimal_plr,
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
+                   UInt(default(config, "nr_optimisation_passes", 20)),
+                   optimal_plr,
+                   default(config, "eval_factor_heat", 5.0),
+                   default(config, "eval_factor_time", 1.0),
+                   default(config, "eval_factor_elec", 1.0),
+                   default(config, "fudge_factor", 1.001),
+                   default(config, "x_abstol", 0.01),
+                   default(config, "f_abstol", 0.001),
                    default(config, "power_losses_factor", 0.97),
                    default(config, "heat_losses_factor", 0.95),
                    sim_params["watt_to_wh"](default(config, "constant_loss_power", 0.0)),
@@ -684,7 +704,6 @@ function calculate_slices(unit::HeatPump,
     snk_idx::Int = 1
     available_time = sim_params["time_step_seconds"]
     EPS = sim_params["epsilon"]
-    FUDGE_FACTOR = 1.001 # @TODO: make customizable
 
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
         # we can skip calculation if there is no energy left to be distributed. this can
@@ -738,7 +757,7 @@ function calculate_slices(unit::HeatPump,
         # exactly and the resulting "error" is much smaller than the typical overall
         # inaccuracies of the calculation
         available_heat_out = min(energies.available_heat_out[snk_idx],
-                                 FUDGE_FACTOR * available_time * used_power / 3600)
+                                 unit.fudge_factor * available_time * used_power / 3600)
 
         used_heat_in,
         used_el_in,
@@ -812,6 +831,17 @@ function calculate_energies_heatpump(unit::HeatPump,
                                      energies::HPEnergies;
                                      fixed_heat_in::Union{Nothing,Integer}=nothing,
                                      fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
+    # no optimisation for simplified heat pump, as the slicing algorithm will result in a
+    # solution independent of chosen PLRs assuming sufficient time is available to meet
+    # demands, hence the PLRs are set to 1.0
+    if unit.model_type == "simplified"
+        default_plrs = fill(1.0,
+                            length(energies.potentials_heat_in) *
+                            length(energies.potentials_heat_out))
+        energies = calculate_slices(unit, sim_params, energies, default_plrs, fixed_heat_in, fixed_heat_out)
+        return energies
+    end
+
     # estimate initial PLRs by demand sum over nominal power
     heat_out_sum = sum(energies.potentials_heat_out; init=0.0)
     plr = heat_out_sum / sim_params["watt_to_wh"](unit.design_power_th)
@@ -826,14 +856,15 @@ function calculate_energies_heatpump(unit::HeatPump,
                       length(energies.potentials_heat_in) *
                       length(energies.potentials_heat_out))
 
-    # run optimisation to find PLRs that meet demands and use up the available time
+    # run optimisation to find PLRs that meet demands and are optimal by criteria depending
+    # on the model type (see function evaluate)
     results = optimize(plrs -> evaluate(calculate_slices(unit,
                                                          sim_params, energies, plrs,
-                                                         fixed_heat_in, fixed_heat_out), plrs, sim_params),
+                                                         fixed_heat_in, fixed_heat_out), unit, plrs, sim_params),
                        lower_plrs, upper_plrs, initial_plrs, NelderMead(),
-                       Options(; iterations=20,
-                               x_abstol=0.01,
-                               f_abstol=0.001))
+                       Options(; iterations=Int64(unit.nr_optimisation_passes),
+                               x_abstol=unit.x_abstol,
+                               f_abstol=unit.f_abstol))
     optimal_plrs = minimizer(results)
     energies = calculate_slices(unit, sim_params, energies, optimal_plrs, fixed_heat_in, fixed_heat_out)
 
