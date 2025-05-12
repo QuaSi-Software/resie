@@ -536,7 +536,7 @@ function filter_by_transformer(energies::HPEnergies,
     return filtered
 end
 
-function evaluate(energies::HPEnergies, plrs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
+function evaluate(energies::HPEnergies, unit::HeatPump, plrs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
     # barrier term if implausible PLRs are given
     for plr in plrs
         if plr > 1.0 || plr < 0.0
@@ -544,18 +544,27 @@ function evaluate(energies::HPEnergies, plrs::Vector{Float64}, sim_params::Dict{
         end
     end
 
-    # @TODO make this configurable
-    EVAL_HEAT_FACTOR = 5.0
-    EVAL_TIME_FACTOR = 1.0
-
-    # weighted heat_out and time terms
-    heat_out_sum = sum(energies.slices_heat_out; init=0.0)
+    # heat_out term with a (usually) higher weight factor so meeting demands exactly is
+    # preferred by the optimisation
+    heat_out_sum = sum(energies.slices_temp_heat_out; init=0.0)
     demand_sum = sum(energies.potentials_heat_out; init=0.0)
     heat_part = abs(demand_sum - heat_out_sum) / demand_sum
-    time_sum = sum(energies.slices_times; init=0.0)
-    time_part = (sim_params["time_step_seconds"] - time_sum) / sim_params["time_step_seconds"]
 
-    val = EVAL_HEAT_FACTOR * heat_part + EVAL_TIME_FACTOR * time_part
+    if unit.model_type == "on-off"
+        # for on-off heat pumps we "optimise" the time to use up the whole timestep. this is not
+        # actually better in terms of efficiency, but since the PLF function is supposed to
+        # capture the effects of cycling, we want to use as much time as available
+        time_sum = sum(energies.slices_temp_times; init=0.0)
+        time_part = (sim_params["time_step_seconds"] - time_sum) / sim_params["time_step_seconds"]
+        val = unit.eval_factor_heat * heat_part + unit.eval_factor_time * time_part
+    else
+        # for inverter-driven heat pumps we perform actualy optimisation by adjusting PLRs
+        # to optimise for lowest electricity use while maintaining meeting demands
+        elec_sum = sum(energies.slices_temp_el_in; init=0.0)
+        elec_part = elec_sum / heat_out_sum
+        val = unit.eval_factor_heat * heat_part + unit.eval_factor_elec * elec_part
+    end
+
     return val
 end
 
