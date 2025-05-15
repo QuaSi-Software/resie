@@ -45,7 +45,6 @@ mutable struct HeatPump <: Component
     input_temperature::Temperature
 
     nr_optimisation_passes::UInt
-    optimal_plr::Float64
     eval_factor_heat::Float64
     eval_factor_time::Float64
     eval_factor_elec::Float64
@@ -94,21 +93,6 @@ mutable struct HeatPump <: Component
             @error "Unknown model type $(model_type) given for heat pump $(uac)."
         end
 
-        optimal_plr = default(config, "optimal_plr", nothing)
-        if model_type == "inverter" && optimal_plr === nothing
-            results = optimize(x -> -plf_function(x), # minus because we actually want
-                               0.0,                   # the maximum of the function
-                               1.0)
-            optimal_plr = first(minimizer(results))
-        elseif optimal_plr === nothing
-            optimal_plr = 1.0
-        end
-
-        if model_type == "inverter" && (1.0 - optimal_plr < sim_params["epsilon"])
-            @warn "Heat pump $(uac) is configured to optimise slice dispatch for inverter " *
-                  "driven operation, but has an optimal PLR of 1.0. Consider using model " *
-                  "type simplified instead as optimisation has no effect."
-        end
         if model_type == "inverter" && constant_cop !== nothing
             @error "Heat pump $(uac) is configured to optimise slice dispatch for inverter " *
                    "driven operation, but has a constant COP. Toggle optimisation off as " *
@@ -137,7 +121,6 @@ mutable struct HeatPump <: Component
                    default(config, "output_temperature", nothing),
                    default(config, "input_temperature", nothing),
                    UInt(default(config, "nr_optimisation_passes", 20)),
-                   optimal_plr,
                    default(config, "eval_factor_heat", 5.0),
                    default(config, "eval_factor_time", 1.0),
                    default(config, "eval_factor_elec", 1.0),
