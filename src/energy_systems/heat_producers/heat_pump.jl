@@ -10,12 +10,12 @@ some of which involve the temperatures at which the heat input is provided and h
 is requested. While this is similar to the calculation of efficiencies in other transformers
 such as a CHPP, the implementation does not numerically inverse the given input functions
 and determine energies from those. Instead the efficiencies are calculated "forward", which
-has problems in reaching the equilibrium point if kappa_opt != 1.0. This might be improved
-in the future, but was deemed to difficult to implement at time of writing.
+incurs the problem of having to determine kappa (the PLR). This might be improved in the
+future for heat pumps serving exactly one demand using exactly one source.
 
-The heat pump can also be configured to skip most complicated calculations and use a
-constant or Carnot-based COP and no PLRDE, etc. This too can be improved for heat pumps with
-exactly one input and exactly one output, since the slicing algorithm is not required then.
+The heat pump can also be configured to use on of three models: Inverter-driven, on-off and
+simplified heat pumps. The first two require an optimisation algorithm to determine the
+operation point, while the simplified skips this process and always uses kappa = 1.0.
 """
 mutable struct HeatPump <: Component
     uac::String
@@ -241,19 +241,9 @@ function reset_temp_slices!(energies::HPEnergies)::HPEnergies
     return energies
 end
 
-function add_slice!(energies::HPEnergies, el_in::Floathing, heat_in::Floathing, heat_out::Floathing,
-                    heat_in_temp::Temperature, heat_out_temp::Temperature, heat_in_uac::Stringing,
-                    heat_out_uac::Stringing, time::Floathing)
-    push!(energies.slices_el_in, el_in)
-    push!(energies.slices_heat_in, heat_in)
-    push!(energies.slices_heat_in_temperature, heat_in_temp)
-    push!(energies.slices_heat_in_uac, heat_in_uac)
-    push!(energies.slices_heat_out, heat_out)
-    push!(energies.slices_heat_out_temperature, heat_out_temp)
-    push!(energies.slices_heat_out_uac, heat_out_uac)
-    push!(energies.slices_times, time)
-end
-
+"""
+Add a temporary slice to the given energies container.
+"""
 function add_temp_slice!(energies::HPEnergies, el_in::Floathing, heat_in::Floathing, heat_out::Floathing,
                          heat_in_temp::Temperature, heat_out_temp::Temperature, heat_in_uac::Stringing,
                          heat_out_uac::Stringing, time::Floathing)
@@ -269,15 +259,16 @@ end
 
 """
 Resets the available energies of an energies container based on the potentials.
-If an specific input or output layer index is given, that layer will be set as infinite and
+
+If a specific input or output layer index is given, that layer will be set as infinite and
 the calculation will be done with only that layer on the input or output side.
 
 # Arguments
 - `energies::HPEnergies`: The energies container
-- `as_inf::Integer`: If 1, sets the given input layer as infinite. If 2, the outputs.
-    Defaults to 0, which does nothing.
-- `idx::Integer`: The index of the layer to set as infinte. Defaults to 0, which does
-    nothing.
+- `fixed_heat_in::Union{Nothing,Integer}`: If a layer index is given, sets that input layer
+    to infinite and selects it exclusively for sources.
+- `fixed_heat_out::Union{Nothing,Integer}`: If a layer index is given, sets that output
+    layer to infinite and selects it exclusively for sinks.
 # Returns
 - `HPEnergies`: The energies container
 """
@@ -367,6 +358,11 @@ function copy_heat_out_temp_to_slices(energies::HPEnergies)::HPEnergies
     return energies
 end
 
+"""
+Copies the temporary slices of the given energy container to the actual slices.
+
+This overwrites any existing actual slices.
+"""
 function copy_temp_to_slices!(energies::HPEnergies)::HPEnergies
     energies.slices_el_in = copy(energies.slices_temp_el_in)
     energies.slices_heat_in = copy(energies.slices_temp_heat_in)
@@ -519,6 +515,23 @@ function filter_by_transformer(energies::HPEnergies,
     return filtered
 end
 
+"""
+Evaluates the results of the slicing algorithm during the optimisation of PLRs.
+
+This serves as the objective function to be minimised and includes the following factors:
+* Barrier term to exclude implausible PLRs
+* Meeting demands exactly (higher and lower sums are evaluated less favourably)
+* For inverter heat pumps: Minismising electricity input
+* For on-off heat pumps: Using up the entire time step
+
+# Arguments
+- `energies::HPEnergies`: The energies container
+- `unit::HeatPump`: The heat pump
+- `plrs::Vector{Float64}`: The chosen PLRs
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Float64`: The evaluation of the results. A lower number is better.
+"""
 function evaluate(energies::HPEnergies, unit::HeatPump, plrs::Vector{Float64}, sim_params::Dict{String,Any})::Float64
     # barrier term if implausible PLRs are given
     for plr in plrs
@@ -637,26 +650,24 @@ function handle_slice(unit::HeatPump,
 end
 
 """
-Performs the slicing algorithm given a set list of PLRs for each possible slice (each
-combination input and output layer). If the PLR for a slice is nothing, sets it to 1.0 and
-calculates the slice based on that.
+Performs the slicing algorithm given a set list of PLRs for each possible slice.
+    
+A slice is a unique combination of input and output layer.
 
-Note the difference in indexing between the PLRs, where all possible slices are listed via
-their input layer and output layer indices, and the return values, where the selected slices
-are listed linearly and doesn't necessarily list all slices.
+Note the difference in indexing between the PLRs, which are listed in a particular order for
+all possible slices, and the return values, where only selected slices are listed. For this
+reason the energies container has a field `double_to_single_idx`, which saves the mapping
+between these indices.
 
 # Arguments
 - `unit::HeatPump`: The heat pump.
 - `sim_params::Dict{String,Any}`: Simulation parameters.
 - `energies::HPEnergies`: The energies container.
-- `plrs::Array{<:Floathing,2}`: The PLRs for each slice (may be nothing). Will be modified.
+- `plrs::Array{Float64}`: The PLR for each slice.
+- `fixed_heat_in`: If given, this input layer is fixed (see reset_available!())
+- `fixed_heat_out`:  If given, this output layer is fixed (see reset_available!())
 # Returns
 - `HPEnergies`: The energies container.
-- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
-    minimal power for that slice.
-- `Vector{Float64}`: The time each selected slice takes up assuming the heat pump runs with
-    the selected PLR for that slice.
-- `Vector{Float64}`: The PLRs for each slice.
 """
 function calculate_slices(unit::HeatPump,
                           sim_params::Dict{String,Any},
@@ -665,7 +676,8 @@ function calculate_slices(unit::HeatPump,
                           fixed_heat_in::Union{Nothing,Integer}=nothing,
                           fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
     # reset at the beginning, because the optimisation algorithm will call this function
-    # multiple times with different plrs
+    # multiple times with different plrs (and also at least once in both the potential and
+    # process step)
     energies = reset_available!(energies; fixed_heat_in, fixed_heat_out)
     energies = reset_temp_slices!(energies)
 
@@ -682,7 +694,8 @@ function calculate_slices(unit::HeatPump,
                 return energies
             end
 
-            # the slice index is set later, here's just a dummy value
+            # the first index is the index in the PLR list
+            # the slice index (second) is set later, here's just a dummy value
             energies.double_to_single_idx[(src_idx, snk_idx)] = (idx, -1)
             idx += 1
         end
@@ -697,6 +710,7 @@ function calculate_slices(unit::HeatPump,
     available_time = sim_params["time_step_seconds"]
     EPS = sim_params["epsilon"]
 
+    # keep running until we ran out of either sources or sinks to check
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
         # we can skip calculation if there is no energy left to be distributed. this can
         # happen for example during potential calculations when another transformer has
@@ -709,7 +723,8 @@ function calculate_slices(unit::HeatPump,
         end
 
         # check and determine input temperature of layer, also skip if it's not in the list
-        # of indices to be used (this is used by the mechanism for transformer chains)
+        # of indices to be used (this is used by the mechanism for transformer chains and
+        # is controlled by arguments fixed_heat_in and fixed_heat_out)
         skip_slice, src_temperature = get_layer_temperature(unit, src_idx,
                                                             energies.in_temps_min,
                                                             energies.in_temps_max;
@@ -802,27 +817,30 @@ function calculate_slices(unit::HeatPump,
 end
 
 """
-The inner part of the calculate_energies function.
+Finds the best slicing for the given potentials and demands.
 
-The steps are:
-1. Initialises the PLRs for all possible slices as nothing (they will be set as 1.0 upon
-    selection)
-2. Performs the slicing algorithm with the assumption of full power
-3. Checks if minimum power restrictions were observed.
-4. Optionally performs optimisation of the PLRs
+Depending on the model type this requires an optimisation process that finds the best PLRs
+for each possible slice. In this case the function `evaluate` determines the optimum that is
+found. The optimisation can be configured and technically is not guarranteed to find the
+global optimum, however the default parameters should lead to decent results.
+
+For the model type `simplified` the optimisation is not required and this function simply
+runs the slicing algorithm once assuming PLRs of 1.0 for all slices.
 
 # Arguments
 - `unit::HeatPump`: The heat pump.
 - `sim_params::Dict{String,Any}`: Simulation parameters.
 - `energies::HPEnergies`: The energies container.
+- `fixed_heat_in`: If given, this input layer is fixed (see reset_available!())
+- `fixed_heat_out`:  If given, this output layer is fixed (see reset_available!())
 # Returns
 - `HPEnergies`: The energies container.
 """
-function calculate_energies_heatpump(unit::HeatPump,
-                                     sim_params::Dict{String,Any},
-                                     energies::HPEnergies;
-                                     fixed_heat_in::Union{Nothing,Integer}=nothing,
-                                     fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
+function find_best_slicing(unit::HeatPump,
+                           sim_params::Dict{String,Any},
+                           energies::HPEnergies;
+                           fixed_heat_in::Union{Nothing,Integer}=nothing,
+                           fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
     # no optimisation for simplified heat pump, as the slicing algorithm will result in a
     # solution independent of chosen PLRs assuming sufficient time is available to meet
     # demands, hence the PLRs are set to 1.0
@@ -866,15 +884,16 @@ end
 """
 Calculates the energies the heat pump can process in the timestep.
 
-This is split in an inner function (see calculate_energies_heatpump) and this outer
-function, because the calculation happens differently depending on whether there are other
-transformers in the input exchanges, outputs, both or neither.
+This is split in an inner function (see find_best_slicing) and this outer function, because
+the calculation happens differently depending on whether there are other transformers in the
+input exchanges, outputs, both or neither. Also the calculation of losses requires another
+layer around the function for calculating the slices.
 
 # Arguments
 - `unit::HeatPump`: The heat pump.
 - `sim_params::Dict{String,Any}`: Simulation parameters.
 # Returns
-- `HPEnergies`: The energies container.
+- `HPEnergies`: The energies container containing the results of the calculations.
 """
 function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
     energies = HPEnergies()
@@ -953,18 +972,18 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
         if energies.heat_in_has_inf_energy
             for heat_in_idx in eachindex(energies.potentials_heat_in)
-                energies = calculate_energies_heatpump(unit, sim_params, energies; fixed_heat_in=heat_in_idx)
+                energies = find_best_slicing(unit, sim_params, energies; fixed_heat_in=heat_in_idx)
                 energies = add_heat_in_temp_to_slices(energies)
                 energies = copy_heat_out_temp_to_slices(energies)
             end
         elseif energies.heat_out_has_inf_energy
             for heat_out_idx in eachindex(energies.potentials_heat_out)
-                energies = calculate_energies_heatpump(unit, sim_params, energies; fixed_heat_out=heat_out_idx)
+                energies = find_best_slicing(unit, sim_params, energies; fixed_heat_out=heat_out_idx)
                 energies = add_heat_out_temp_to_slices(energies)
                 energies = copy_heat_in_temp_to_slices(energies)
             end
         else
-            energies = calculate_energies_heatpump(unit, sim_params, energies)
+            energies = find_best_slicing(unit, sim_params, energies)
             energies = copy_temp_to_slices!(energies)
         end
     end
@@ -1036,8 +1055,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     # electricity input is (almost) never zero, so we need to set it to the constant loss
     if heat_out < sim_params["epsilon"]
         set_max_energies!(unit, el_in, 0.0, 0.0)
-        # it is guarranteed that we have an electricity slice, however the input and output heat
-        # should only be set if there are slices
+        # it is guarranteed that we have an electricity slice, however the input and output
+        # heat should only be set if there are slices
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
         return
     end
