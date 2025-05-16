@@ -37,3 +37,25 @@ profiles/validation/RSTV/WMZ_power_kW.prf
 profiles/validation/RSTV/WMZ_temperature_in.prf
 profiles/validation/RSTV/WMZ_temperature_out.prf
 src/energy_systems/heat_sources/solarthermal_collector_validation.jl
+profiles/validation/RSTV/DWD_solar_zenith.prf
+profiles/validation/RSTV/DWD Wetter.csv
+profiles/validation/demand_huge_st_validation.prf
+profiles/validation/RSTV/ProWetter Strahlung.csv
+profiles/validation/RSTV/ProWetter_dif_hor_irr_calc.prf
+profiles/validation/RSTV/ProWetter_glob_hor_irr.prf
+profiles/validation/Dannenmannstr/240503_Dannenmann_validation_data.csv
+profiles/validation/Dannenmannstr/absorber_energy_Wh.prf
+profiles/validation/Dannenmannstr/absorber_flow_rate_m3_h.prf
+profiles/validation/Dannenmannstr/absorber_power_kW.prf
+profiles/validation/Dannenmannstr/absorber_temperature_haus13.prf
+profiles/validation/Dannenmannstr/absorber_temperature_haus15.prf
+profiles/validation/Dannenmannstr/absorber_temperature_in.prf
+profiles/validation/Dannenmannstr/absorber_temperature_out.prf
+profiles/validation/Dannenmannstr/ambient_temperature_haus13.prf
+profiles/validation/Dannenmannstr/ambient_temperature_haus15.prf
+profiles/validation/Dannenmannstr/ambient_temperature.prf
+profiles/validation/Dannenmannstr/WMZ_temperature_in.prf
+profiles/validation/Dannenmannstr/WMZ_temperature_out.prf
+profiles/validation/RSTV/240503_RSTV_validation_data.csv
+profiles/validation/RSTV/DWD_beam_irr.prf
+profiles/validation/RSTV/ProWetter_beam_hor_irr.prf

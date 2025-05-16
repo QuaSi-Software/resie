@@ -25,6 +25,7 @@ export check_balances, Component, each, Grouping, link_output_with, perform_step
        highest, default, plot_optional_figures_begin, plot_optional_figures_end
 
 using ..Profiles
+using Dates
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
@@ -240,12 +241,6 @@ Base.@kwdef mutable struct SystemInterface
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
 end
-
-"""
-Custom error handler for exception "InputError".
-Call with throw(InputError)
-"""
-struct InputError <: Exception end
 
 """
     set_storage_transfer!(interface, value)
@@ -1238,8 +1233,8 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 #TODO only for validation
-# include("heat_sources/solarthermal_collector.jl")
-include("heat_sources/solarthermal_collector_validation.jl")
+include("heat_sources/solarthermal_collector.jl")
+# include("heat_sources/solarthermal_collector_validation.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into seperate files for less clutter
@@ -1492,9 +1487,19 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
 
     # 1. If a constant value is specified
     if haskey(config, constant_key) && config[constant_key] isa Number
-        val = config[constant_key]
+        val = Float64(config[constant_key])
+        timestamps = remove_leap_days(collect(range(sim_params["start_date"]; stop=sim_params["end_date"], 
+                                                    step=Second(sim_params["time_step_seconds"]))))
+        const_profile = Profile(constant_key,
+                                sim_params;
+                                given_profile_values=fill(val, sim_params["number_of_time_steps"]),
+                                given_timestamps=timestamps,
+                                given_time_step=Second(sim_params["time_step_seconds"]),
+                                given_data_type="intensive",
+                                shift=Second(0),
+                                interpolation_type="stepwise")
         @info "For '$uac', the '$param_symbol' is set to the constant value of $val."
-        return val, nothing
+        return val, const_profile
     end
 
     # 2. If a `.prf` file path is specified

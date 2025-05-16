@@ -16,8 +16,8 @@ mutable struct WeatherData
     """Wind speed, in m/s."""
     wind_speed::Profile
 
-    """Direct horizontal irradiation, in Wh/m^2."""
-    dirHorIrr::Profile
+    """Beam horizontal irradiation, in Wh/m^2."""
+    beamHorIrr::Profile
 
     """Diffuse horizontal irradiation, in Wh/m^2."""
     difHorIrr::Profile
@@ -165,9 +165,9 @@ mutable struct WeatherData
             # convert solar radiation data to profile. In DWD-dat, solar radiation is given as 
             # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00. 
             # Therefore the data is the mean of the hour ahead of the current time step.
-            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
+            beamHorIrr = Profile(weather_file_path * ":BeamHorizontalIrradiation",
                                 sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
+                                given_profile_values=repeat(Float64.(weatherdata_dict["beamHorIrr"]), nr_of_years),
                                 given_timestamps=timestamps,
                                 given_time_step=time_step,
                                 given_data_type="extensive",
@@ -183,7 +183,7 @@ mutable struct WeatherData
                                 shift=Second(0),
                                 interpolation_type=weather_interpolation_type_solar,
                                 sunrise_sunset=[sunrise, sunset])
-            globHorIrr = deepcopy(dirHorIrr)
+            globHorIrr = deepcopy(beamHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
         elseif endswith(lowercase(weather_file_path), ".epw")
@@ -284,7 +284,7 @@ mutable struct WeatherData
                                 shift=Second(0),
                                 interpolation_type=weather_interpolation_type_solar,
                                 sunrise_sunset=[sunrise, sunset])
-            dirHorIrr = Profile(weather_file_path * ":DirHorizontalIrradiation",
+            beamHorIrr = Profile(weather_file_path * ":BeamHorizontalIrradiation",
                                 sim_params;
                                 given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
                                                             nr_of_years),
@@ -294,13 +294,13 @@ mutable struct WeatherData
                                 shift=Second(0),
                                 interpolation_type=weather_interpolation_type_solar,
                                 sunrise_sunset=[sunrise, sunset])
-            globHorIrr = deepcopy(dirHorIrr)
-            globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
+            globHorIrr = deepcopy(beamHorIrr)
+            globHorIrr.data = Dict(key => beamHorIrr.data[key] + difHorIrr.data[key] for key in keys(beamHorIrr.data))
         end
 
         return new(temp_ambient_air,
                    wind_speed,
-                   dirHorIrr,
+                   beamHorIrr,
                    difHorIrr,
                    globHorIrr,
                    longWaveIrr, 
@@ -397,7 +397,7 @@ function read_dat_file(weather_file_path::String)
     # Define column names of weatherdata_dict
     colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air",
                 "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover",
-                "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr",
+                "precipitable_water", "relative_humidity", "beamHorIrr", "difHorIrr",
                 "longWaveIrr", "terrestric_heat_irr", "quality"]
 
     weatherdata_dict = Dict{String,Vector{Any}}()

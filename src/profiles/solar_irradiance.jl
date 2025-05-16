@@ -2,7 +2,6 @@ module SolarIrradiance
 
 using Dates
 using Roots
-using Resie.Profiles
 
 export sun_position, irr_in_plane, get_sunrise_sunset
 
@@ -95,7 +94,7 @@ function alg5(t2060::Number, tt::Number, longitude::Number)
 end
 
 function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number, 
-    global_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
+    beam_solar_hor_irradiance::Number, diffuse_solar_hor_irradiance::Number, dni=nothing, 
     pressure::Number=1.0, temperature::Number=20.0, ground_reflectance::Number=0.2, 
     zenith_threshold_for_zero_dni::Number=89.5)
     """
@@ -103,8 +102,14 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     All angles are in degrees and irradiances in W/m²
     """
     # get sunrise and senset to adjust time_step length from sunrise to end of time_step and start of time_step to sunset
-    sr = Profiles.value_at_time(sim_params["weather_data"].sunrise, sim_params)
-    ss = Profiles.value_at_time(sim_params["weather_data"].sunset, sim_params)
+    if "weather_data" in keys(sim_params)
+        sr = sim_params["weather_data"].sunrise.data[sim_params["current_date"]]
+        ss = sim_params["weather_data"].sunset.data[sim_params["current_date"]]
+    else
+        sr, ss = get_sunrise_sunset(sim_params["current_date"], sim_params["latitude"], 
+                                    sim_params["longitude"], sim_params["timezone"], 
+                                    pressure, temperature)
+    end 
     sr = convert_decimal_time_to_datetime(sim_params["current_date"], sr)
     ss = convert_decimal_time_to_datetime(sim_params["current_date"], ss)
     dt_start = sim_params["current_date"]
@@ -133,14 +138,13 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     aoi_l = abs(tilt_angle - atand(tand(solar_zenith) * cosd(azimuth_angle - solar_azimuth)))
     aoi_l_iso = atand(sind(aoi) * cosd(azimuth_angle - solar_azimuth) / cosd(aoi))
 
-    # calculate direct normal irradiance from global horrizontal irradiance (GHI) and 
-    # diffuse horrizontal irradiance (DHI)
+    # calculate direct normal irradiance from beam horrizontal irradiance
     if isnothing(dni)
         if solar_zenith >= zenith_threshold_for_zero_dni
             direct_normal_irradiance = 0
         else
             direct_normal_irradiance = max(
-                (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / cosd(solar_zenith), 0
+                (beam_solar_hor_irradiance) / cosd(solar_zenith), 0
                 )
         end
     else
@@ -155,7 +159,7 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     # Solar Energy, Jg. 23, Nr. 4, S. 301–307, 1979. doi: 10.1016/0038-092X(79)90123-3. 
     ext_terr_normal_irr = extraterrestrial_normal_irradiance(dayofyear(sim_params["current_date"]))
     ext_terr_irr = ext_terr_normal_irr * cosd(solar_zenith) 
-    anisotropy_index = (global_solar_hor_irradiance - diffuse_solar_hor_irradiance) / ext_terr_irr
+    anisotropy_index = beam_solar_hor_irradiance / ext_terr_irr
 
     diffuse_sky_irradiance_in_plane = diffuse_solar_hor_irradiance * (
                                         (1 - anisotropy_index) * (1 + cosd(tilt_angle)) / 2 + 
@@ -163,7 +167,7 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
                                         )
 
     # calculate the diffuse irradiance on the collector plane from the ground
-    diffuse_ground_irradiance_in_plane = ground_reflectance * global_solar_hor_irradiance * (1 - cosd(tilt_angle)) / 2 
+    diffuse_ground_irradiance_in_plane = ground_reflectance * (beam_solar_hor_irradiance + diffuse_solar_hor_irradiance) * (1 - cosd(tilt_angle)) / 2 
 
     diffuse_solar_irradiance_in_plane = diffuse_sky_irradiance_in_plane + diffuse_ground_irradiance_in_plane
 

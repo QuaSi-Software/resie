@@ -1,6 +1,7 @@
 module Profiles
 using Interpolations
 using Dates, TimeZones
+using Resie.SolarIrradiance
 
 export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
@@ -68,8 +69,9 @@ mutable struct Profile
                      interpolation_type::String="stepwise",           # optional: interpolation type. Can be one of: "stepwise",
                                                                       # "linear_classic", "linear_time_preserving", "linear_solar_radiation"
                      sunrise_sunset::Vector{Profile}=Vector{Profile}() # optional: sunrise and sunset times for solar radiation interpolation
-                     )           
-        if given_profile_values == []  # read data from file_path
+                     )     
+
+          if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
 
@@ -134,8 +136,7 @@ mutable struct Profile
                 if file_handle !== nothing
                     close(file_handle)
                 end
-            end
-
+            end 
             profile_timestamps_date = Vector{DateTime}(undef, length(profile_values))
             # convert profile_timestamps to DateTime
             if time_definition == "startdate_timestepsize"
@@ -171,6 +172,7 @@ mutable struct Profile
                            "profile header!"
                     throw(InputError)
                 else
+                    
                     # calculate time step from startdate and continuos timestamp
                     start_date = parse_datestamp(profile_start_date,
                                                  convert_String_to_DateFormat(profile_start_date_format, file_path),
@@ -255,9 +257,25 @@ mutable struct Profile
         if shift > Second(0)
             profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
+
+            # add multiple entries to beginning of profile if they are missing. copy first or last value.
+            while profile_timestamps_date[1] > sim_params["start_date"]
+                profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
+                                        profile_timestamps_date)
+                profile_values = vcat(profile_values[1], profile_values)
+            end
+            @info "The profile at $(file_path) has been extended by $shift at the begin by doubling the first value."
         elseif shift < Second(0)
             profile_timestamps_date = sub_ignoring_leap_days.(profile_timestamps_date, -shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
+
+            # add multiple entries to end of profile if they are missing. copy first or last value.
+            while profile_timestamps_date[end] < sim_params["end_date"]
+                profile_timestamps_date = vcat(profile_timestamps_date,
+                                            profile_timestamps_date[end] + Second(profile_time_step))
+                profile_values = vcat(profile_values, profile_values[end])
+            end
+            @info "The profile at $(file_path) has been extended by one timestep at the end by doubling the last value."
         end
 
         if interpolation_type == "linear_time_preserving" && profile_time_step > sim_params["time_step_seconds"]
@@ -267,18 +285,19 @@ mutable struct Profile
         end
 
         # add first or last entry if only one time step is missing. copy first or last value.
+        temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
         if profile_timestamps_date[1] > sim_params["start_date"] &&
            profile_timestamps_date[1] - Second(profile_time_step) <= sim_params["start_date"]
-            profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
-                                           profile_timestamps_date)
-            profile_values = vcat(profile_values[1], profile_values)
+            while profile_timestamps_date[1] > sim_params["start_date"]
+                profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
+                                            profile_timestamps_date)
+                profile_values = vcat(profile_values[1], profile_values)
+            end
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the first value."
         end
-        temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
-        time_diff_timesteps = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
-        if profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps &&
+        if profile_timestamps_date[end] < sim_params["end_date"] &&
            profile_timestamps_date[end] + temp_diff >= sim_params["end_date"]
-            while profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps
+            while profile_timestamps_date[end] < sim_params["end_date"]
                 profile_timestamps_date = vcat(profile_timestamps_date,
                                                profile_timestamps_date[end] + Second(profile_time_step))
                 profile_values = vcat(profile_values, profile_values[end])
@@ -765,6 +784,40 @@ function convert_profile(values::Vector{Float64},
                 @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
                        "aligned to the simulation start time to use the linear_solar_radiation method for interpolation!"
                 throw(InputError)
+            end
+            if length(sunrise_sunset) == 0
+                sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
+                ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
+                calculated_sr_dates = Date[]
+                for (idx, timestamp) in enumerate(timestamps)
+                    if Date(timestamp) in calculated_sr_dates
+                        sr_arr[idx] = sr_arr[idx-1]
+                        ss_arr[idx] = ss_arr[idx-1]
+                    else
+                        push!(calculated_sr_dates, Date(timestamp))
+                        sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
+                                                    sim_params["latitude"],
+                                                    sim_params["longitude"],
+                                                    sim_params["timezone"])
+                    end
+                end
+                sunrise = Profile("sunrise_times",
+                                  sim_params;
+                                  given_profile_values=sr_arr,
+                                  given_timestamps=timestamps,
+                                  given_time_step=Second(new_time_step),
+                                  given_data_type="intensive",
+                                  shift=Second(0),
+                                  interpolation_type="stepwise")
+                sunset = Profile("sunset_times",
+                                 sim_params;
+                                 given_profile_values=ss_arr,
+                                 given_timestamps=timestamps,
+                                 given_time_step=Second(new_time_step),
+                                 given_data_type="intensive",
+                                 shift=Second(0),
+                                 interpolation_type="stepwise") 
+                sunrise_sunset = [sunrise, sunset]
             end
 
             values, timestamps = segment_profile(timestamps[1],

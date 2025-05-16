@@ -38,6 +38,12 @@ function get_run(id::UUID)::SimulationRun
     return current_runs[id]
 end
 
+"""
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -45,10 +51,10 @@ end
 # this is done so the latter files can access the symbols of the submodules the same as
 # if the code was inside this file.
 
-include("profiles/base.jl")
-using .Profiles
 include("profiles/solar_irradiance.jl")
 using .SolarIrradiance
+include("profiles/base.jl")
+using .Profiles
 include("profiles/weatherdata.jl")
 using .Weatherdata
 
@@ -198,7 +204,12 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        try
+            reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        catch
+            csv_output_file_path = replace(csv_output_file_path, ".csv" => "_1.csv")
+            reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        end
     end
 
     # check if sankey should be plotted
