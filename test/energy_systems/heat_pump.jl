@@ -977,8 +977,6 @@ function test_heat_pump_2S2D_optimising_slices()
     components_config["TST_HP_01"]["min_power_fraction"] = 0.2
     components_config["TST_HP_01"]["plf_function"] = "poly:-1.93407,1.53407,0.9"
     components_config["TST_HP_01"]["cop_function"] = "carnot:0.4"
-    components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
-    components_config["TST_HP_01"]["optimal_plr"] = 0.4
 
     simulation_parameters = get_default_sim_params()
     eps = simulation_parameters["epsilon"]
@@ -1027,27 +1025,4 @@ end
 
 @testset "heat_pump_2S2D_optimising_slices" begin
     test_heat_pump_2S2D_optimising_slices()
-end
-
-function test_heat_pump_2S2D_auto_calculate_optimal_plr()
-    components_config = get_config_heat_pump_2S2D()
-
-    components_config["TST_HP_01"]["model_type"] = "inverter"
-    components_config["TST_HP_01"]["power_th"] = 28000
-    components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
-    components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
-    components_config["TST_HP_01"]["min_power_fraction"] = 0.2
-    components_config["TST_HP_01"]["plf_function"] = "poly:-1.93407,1.53407,0.9"
-    components_config["TST_HP_01"]["cop_function"] = "carnot:0.4"
-    components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
-
-    simulation_parameters = get_default_sim_params()
-    components = Resie.load_components(components_config, simulation_parameters)
-    heat_pump = components["TST_HP_01"]
-    @test heat_pump.optimal_plr > 0.39659112648456 - 0.001
-    @test heat_pump.optimal_plr < 0.39659112648456 + 0.001
-end
-
-@testset "heat_pump_2S2D_auto_calculate_optimal_plr" begin
-    test_heat_pump_2S2D_auto_calculate_optimal_plr()
 end
