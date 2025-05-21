@@ -175,6 +175,9 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     mean_temperature = unit.initial_load * (unit.high_temperature - unit.low_temperature) + unit.low_temperature
     unit.temperature_segments = [mean_temperature for _ in 1:(unit.number_of_layer_total)]
 
+    # set initial temperature bounds
+    set_temperature_limits!(unit, sim_params)
+
     # calculate thermal transmission coefficients # TODO other transmission below ground
     thermal_transmission_barrels = [unit.thermal_transmission_barrel for _ in 1:(unit.number_of_layer_total)]
 
@@ -487,15 +490,6 @@ function control(unit::SeasonalThermalStorage,
     # write old temperature field for output
     unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
 
-    unit.current_max_output_temperature = highest(unit.temperature_segments)
-    if unit.temperature_segments[1] == unit.temperature_segments[2]
-        # add 1K in the first time step if there is equal temperature distribution to avoid Inf mass flow
-        unit.current_min_input_temperature = unit.temperature_segments[1] + 1.0
-    else
-        # limit the input temperature to the temperature of the second layer from below
-        unit.current_min_input_temperature = unit.temperature_segments[2]
-    end
-
     # calculate maximum energies for input
     inface = unit.input_interfaces[unit.m_heat_in]
     exchanges = balance_on(inface, inface.source)
@@ -543,6 +537,31 @@ function control(unit::SeasonalThermalStorage,
     unit.effective_ambient_temperature = vcat(fill(unit.ambient_temperature, unit.number_of_layer_above_ground),
                                               fill(unit.ground_temperature,
                                                    unit.number_of_layer_total - unit.number_of_layer_above_ground))
+end
+
+# This funtcion sets the current_min_input_temperature and current_max_output_temperature 
+function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    unit.current_max_output_temperature = unit.temperature_segments[end]
+    if unit.temperature_segments[1] == unit.temperature_segments[2] && sim_params["time"] == 0
+        # add 1K in the first time step if there is equal temperature distribution to avoid Inf mass flow
+        unit.current_min_input_temperature = unit.temperature_segments[1] + 1.0
+    else
+        # limit the input temperature to the temperature of the second layer from below
+        if unit.temperature_segments[1] == lowest(unit.temperature_segments)
+            unit.current_min_input_temperature = unit.temperature_segments[2]
+        else
+            # If there is a inverse temperature distrubution within the storage, search for the first layer
+            # where the temperature is higher than the temperature of the bottom layer and use this temperature.
+            # If the lowest layer is the hottest one, set the current_min_input_temperature to the temperature
+            # of the first layer + 1K
+            idx = findfirst(x -> x > unit.temperature_segments[1], unit.temperature_segments)
+            if isnothing(idx)
+                unit.current_min_input_temperature = unit.temperature_segments[1] + 1.0
+            else
+                unit.current_min_input_temperature = unit.temperature_segments[idx]
+            end
+        end
+    end
 end
 
 # This function will only be called from a Bus, never in a 1-to-1 connection to another component.
@@ -606,7 +625,7 @@ function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, 
                                 if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
 end
 
-"""
+""" 
     convert_kJ_in_Wh(energy::Float64)
 
 takes energy in [kJ] and convert it to [Wh]
@@ -1030,6 +1049,8 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                                 unit.current_energy_output,
                                                 unit.current_temperature_output,
                                                 sim_params)
+        # set new temperatures limits for the next time step
+        set_temperature_limits!(unit, sim_params)
         return
     end
 
@@ -1064,6 +1085,8 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                             unit.current_energy_output,
                                             unit.current_temperature_output,
                                             sim_params)
+    # set new temperatures limits for the next time step
+    set_temperature_limits!(unit, sim_params)
 end
 
 function reset(unit::SeasonalThermalStorage)
