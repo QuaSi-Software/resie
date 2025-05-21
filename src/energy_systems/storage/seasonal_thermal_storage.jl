@@ -460,9 +460,17 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
                                  name=plot_label)
         push!(traces, trace)
     end
+
+    leap_days_str = string.([Date(year, 2, 29)
+                             for year in
+                                 Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                             if isleapyear(year)])
+
     layout = PlotlyJS.Layout(; title_text="Temperature distribution over time in STES $(unit.uac)",
                              xaxis_title_text="Date",
-                             yaxis_title_text="Temperature [°C]")
+                             yaxis_title_text="Temperature [°C]",
+                             xaxis=PlotlyJS.attr(; type="date",
+                                                 rangebreaks=[Dict("values" => leap_days_str)]))
     p = PlotlyJS.plot(traces, layout)
 
     fig_name = "temperature_distribution_STES_$(unit.uac).html"
