@@ -522,6 +522,11 @@ function control(unit::SeasonalThermalStorage,
                                                                                    unit.temperature_segments),
                                           min(unit.max_input_energy, energy_supply[input_idx]))
     end
+    if isempty(temperatures_charging)
+        max_input_energy = [0.0]
+        temperatures_charging = [nothing]
+        source_uac = [nothing]
+    end
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], max_input_energy, temperatures_charging,
                     temperatures_charging, source_uac, false, true)
 
