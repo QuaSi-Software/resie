@@ -625,6 +625,25 @@ function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, 
                                 if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
 end
 
+"""
+    calculate_input_energy_from_input_temperature(energy::Float64)
+
+Wrapper function to calculate the maximum input energy for a given input temperature for the STES.
+
+Inputs:
+- `unit::SeasonalThermalStorage`: The seasonal thermal storage unit for which the calculation is performed.
+- `actual_input_temp::Temperature`: The temperature of the input energy being added to the storage.
+
+Returns:
+- `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
+
+"""
+function calculate_input_energy_from_input_temperature(unit::SeasonalThermalStorage,
+                                                       actual_input_temp::Temperature,
+                                                       sim_params::Dict{String,Any})
+    return calcuate_max_input_energy_by_temperature(unit, actual_input_temp, unit.temperature_segments)
+end
+
 """ 
     convert_kJ_in_Wh(energy::Float64)
 
