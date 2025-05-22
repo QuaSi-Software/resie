@@ -77,22 +77,6 @@ function control(unit::Battery,
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge)
 end
 
-function balance_on(interface::SystemInterface,
-                    unit::Battery)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(;
-                 balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.max_charge) : unit.max_discharge),
-                 purpose_uac=purpose_uac,
-                 temperature_min=highest(interface.max_energy.temperature_min),
-                 temperature_max=lowest(interface.max_energy.temperature_max),
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_discharge < sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)

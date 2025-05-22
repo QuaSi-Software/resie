@@ -271,30 +271,6 @@ function calculate_losses!(unit::BufferTank, sim_params)
     unit.load = unit.load - unit.losses
 end
 
-function balance_on(interface::SystemInterface,
-                    unit::BufferTank)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    # The losses should be applied to the load at the beginning of the next timestep, but they
-    # might already be included in the load here. To avoid other components calling the balance_on() 
-    # in between, what then would include the current losses that are intended to be applied 
-    # in the next timestep, the losses must be added here again.
-    # In the first time step and ahead of their calculation, losses are zero.
-    current_load = unit.load + unit.losses
-
-    return [EnEx(;
-                 balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 :
-                                  (caller_is_input ? -(unit.capacity - current_load) : current_load),
-                 purpose_uac=purpose_uac,
-                 temperature_min=highest(interface.max_energy.temperature_min),
-                 temperature_max=lowest(interface.max_energy.temperature_max),
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function process(unit::BufferTank, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)

@@ -1269,16 +1269,31 @@ called in 1-to-1 connections. Here, the components take care of matching tempera
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
     balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    input_sign = unit.uac == interface.target.uac ? -1 : +1
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
-    return [EnEx(; balance=interface.balance,
-                 energy_potential=(balance_written ? 0.0 : input_sign * get_max_energy(interface.max_energy)),
-                 purpose_uac=purpose_uac,
-                 temperature_min=highest(interface.max_energy.temperature_min),
-                 temperature_max=lowest(interface.max_energy.temperature_max),
-                 pressure=nothing,
-                 voltage=nothing)]
+    if balance_written
+        return [EnEx(; balance=interface.balance,
+                     energy_potential=0.0,
+                     purpose_uac=purpose_uac,
+                     temperature_min=highest(interface.max_energy.temperature_min),
+                     temperature_max=lowest(interface.max_energy.temperature_max),
+                     pressure=nothing,
+                     voltage=nothing)]
+    else
+        exchanges = Vector{EnergyExchange}()
+        input_sign = unit.uac == interface.target.uac ? -1 : +1
+        for (idx, max_energy) in enumerate(interface.max_energy.max_energy)
+            push!(exchanges,
+                  EnEx(; balance=interface.balance,
+                       energy_potential=max_energy === nothing ? nothing : input_sign * max_energy,
+                       purpose_uac=purpose_uac,
+                       temperature_min=interface.max_energy.temperature_min[idx],
+                       temperature_max=interface.max_energy.temperature_max[idx],
+                       pressure=nothing,
+                       voltage=nothing))
+        end
+        return exchanges
+    end
 end
 
 """

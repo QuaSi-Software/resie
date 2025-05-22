@@ -1082,21 +1082,6 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
 end
 
-function balance_on(interface::SystemInterface, unit::GeothermalProbes)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(; balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 :
-                                  (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
-                 purpose_uac=purpose_uac,
-                 temperature_min=highest(interface.max_energy.temperature_min),
-                 temperature_max=lowest(interface.max_energy.temperature_max),
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function output_values(unit::GeothermalProbes)::Vector{String}
     output_vals = []
     if unit.regeneration
