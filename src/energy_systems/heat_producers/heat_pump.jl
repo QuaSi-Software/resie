@@ -754,10 +754,9 @@ function calculate_slices(unit::HeatPump,
         min_power_frac = max(0.0, min(1.0, unit.min_power_function(src_temperature, snk_temperature)))
         min_power = unit.design_power_th * min_power_frac
         max_power_frac = max(0.0, min(1.0, unit.max_power_function(src_temperature, snk_temperature)))
-        max_power = unit.design_power_th * max_power_frac * energies.max_usage_fraction
-        plr_power = max_power * plrs[plr_idx]
+        max_power = unit.design_power_th * max_power_frac
+        plr_power = min(max_power * plrs[plr_idx], max_power * energies.max_usage_fraction)
         used_power = max(min_power, plr_power)
-        energies.used_plrs[plr_idx] = used_power / max_power
 
         # the fudge factor causes us to slightly overestimate the maximum heat out energy
         # assuming the remaining time is used up. this helps with the solver meeting demands
@@ -778,8 +777,10 @@ function calculate_slices(unit::HeatPump,
                                        snk_temperature,
                                        plrs[plr_idx])
 
-        # finally all checks done, we add the slice and update remaining energies
         used_time = used_heat_out * 3600 / used_power
+        energies.used_plrs[plr_idx] = used_heat_out / sim_params["watt_to_wh"](max_power)
+
+        # finally all checks done, we add the slice and update remaining energies
         add_temp_slice!(energies, used_el_in, used_heat_in, used_heat_out,
                         src_temperature, snk_temperature,
                         energies.in_uacs[src_idx],
@@ -988,6 +989,16 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         end
     end
 
+    # calculate average PLR, from active slices. because they already have been weighted
+    # by max power for each slice, we can simply add them up here
+    unit.avg_plr = 0.0
+    for (_, (plr_idx, slice_idx)) in pairs(energies.double_to_single_idx)
+        if slice_idx == -1
+            continue
+        end
+        unit.avg_plr += energies.used_plrs[plr_idx]
+    end
+
     # calculate COP before losses
     el_in = sum(energies.slices_el_in; init=0.0)
     heat_in = sum(energies.slices_heat_in; init=0.0)
@@ -1087,22 +1098,6 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     end
     unit.mix_temp_input = _weighted_mean(energies.slices_heat_in_temperature, energies.slices_heat_in)
     unit.mix_temp_output = _weighted_mean(energies.slices_heat_out_temperature, energies.slices_heat_out)
-
-    # calculate average PLR, from active slices, and weighted by heat produced
-    weights = 0
-    for (_, (plr_idx, slice_idx)) in pairs(energies.double_to_single_idx)
-        if slice_idx == -1
-            continue
-        end
-        weight = energies.slices_heat_out[slice_idx]
-        unit.avg_plr += energies.used_plrs[plr_idx] * weight
-        weights += weight
-    end
-    if weights > 0
-        unit.avg_plr /= weights
-    else
-        unit.avg_plr = 0.0
-    end
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]

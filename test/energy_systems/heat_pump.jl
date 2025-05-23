@@ -937,7 +937,8 @@ function test_heat_pump_2S2D_min_power()
     @test heat_pump.avg_plr ≈ 0.42857142857143
 
     # second time step: min power is above the operation point, causing slices to run with
-    # higher power, less time and more PLR
+    # higher power and thus less time. the PLR is unaffected as it is calculated from
+    # actually produced and maximum energies, which haven't changed.
     heat_pump.min_power_function = (x, y) -> 0.8
 
     for unit in values(components)
@@ -960,7 +961,7 @@ function test_heat_pump_2S2D_min_power()
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     @test heat_out ≈ 3000.0
     @test heat_pump.time_active ≈ 0.5357142857142857
-    @test heat_pump.avg_plr ≈ 0.8
+    @test heat_pump.avg_plr ≈ 0.42857142857143
 end
 
 @testset "heat_pump_2S2D_min_power" begin
