@@ -6,8 +6,8 @@ using Resie.Profiles
 
 include("../test_util.jl")
 
-function test_multiple_transformer_with_limitations()
-    components_config = Dict{String,Any}(
+function get_energy_system_ely_and_hp()
+    return Dict{String,Any}(
         "TST_DEM_heat_01" => Dict{String,Any}(
             "type" => "Demand",
             "medium" => "m_h_w_ht1",
@@ -64,13 +64,18 @@ function test_multiple_transformer_with_limitations()
             "type" => "HeatPump",
             "output_refs" => ["TST_DEM_heat_01"],
             "power_th" => 2240,
+            "model_type" => "simplified",
             "cop_function" => "const:3.5",
             "min_power_function" => "const:0.0",
+            "min_usage_fraction" => 0.3,
             "power_losses_factor" => 1.0,
             "heat_losses_factor" => 1.0,
         ),
     )
+end
 
+function test_multiple_transformer_with_limitations()
+    components_config = get_energy_system_ely_and_hp()
     simulation_parameters = get_default_sim_params()
     components = Resie.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
@@ -240,4 +245,127 @@ end
 
 @testset "multiple_transformer_with_limitations" begin
     test_multiple_transformer_with_limitations()
+end
+
+function test_heat_pump_min_use_fraction_limited_by_ely()
+    components_config = get_energy_system_ely_and_hp()
+    simulation_parameters = get_default_sim_params()
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    electrolyser = components["TST_ELY_01"]
+    grid_el1 = components["TST_GRI_el_01"]
+    grid_el2 = components["TST_GRI_el_02"]
+    demand_h2 = components["TST_DEM_H2_01"]
+    demand_heat = components["TST_DEM_heat_01"]
+    grid_o2 = components["TST_GRI_O2_01"]
+
+    # first time step, heat pump is at 100 % load
+    demand_h2.constant_demand = 2400
+    demand_heat.constant_demand = 2240
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand_heat, components, simulation_parameters)
+    EnergySystems.control(demand_h2, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(electrolyser, components, simulation_parameters)
+    EnergySystems.control(grid_el1, components, simulation_parameters)
+    EnergySystems.control(grid_el2, components, simulation_parameters)
+    EnergySystems.control(grid_o2, components, simulation_parameters)
+
+    # calculated OoO says ELY has potential first, then the heat pump would have its potential
+    # step, but as it is processed right after the step is skipped
+    EnergySystems.process(demand_h2, simulation_parameters)
+    EnergySystems.process(demand_heat, simulation_parameters)
+    EnergySystems.potential(electrolyser, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(electrolyser, simulation_parameters)
+    EnergySystems.process(grid_el1, simulation_parameters)
+    EnergySystems.process(grid_el2, simulation_parameters)
+    EnergySystems.process(grid_o2, simulation_parameters)
+
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].balance ≈ 0.0
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].sum_abs_change * 0.5 ≈ 2400 * 0.25
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 ≈ 1600 * 0.25
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 ≈ 640 * 0.25
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0.0
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 2240 * 0.25
+
+    # second step, heat pump is limited at 50% from heat demand, electrolyser carries that
+    # limitation to H2 demand
+    demand_h2.constant_demand = 2400
+    demand_heat.constant_demand = 1120
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand_heat, components, simulation_parameters)
+    EnergySystems.control(demand_h2, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(electrolyser, components, simulation_parameters)
+    EnergySystems.control(grid_el1, components, simulation_parameters)
+    EnergySystems.control(grid_el2, components, simulation_parameters)
+    EnergySystems.control(grid_o2, components, simulation_parameters)
+
+    EnergySystems.process(demand_h2, simulation_parameters)
+    EnergySystems.process(demand_heat, simulation_parameters)
+    EnergySystems.potential(electrolyser, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(electrolyser, simulation_parameters)
+    EnergySystems.process(grid_el1, simulation_parameters)
+    EnergySystems.process(grid_el2, simulation_parameters)
+    EnergySystems.process(grid_o2, simulation_parameters)
+
+    # because H2 is a fixed demand, some demand is left over as only half is covered
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].balance ≈ -1200.0 * 0.25
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].sum_abs_change * 0.5 ≈ 2400 * 0.25 * 0.75
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 ≈ 800 * 0.25
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 ≈ 320 * 0.25
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0.0
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 1120 * 0.25
+
+    # third step, heat pump is limited at 25% from heat demand, but has 30% minimum load,
+    # thus shuts down and electrolyser also can't operate
+    demand_h2.constant_demand = 2400
+    demand_heat.constant_demand = 560
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand_heat, components, simulation_parameters)
+    EnergySystems.control(demand_h2, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(electrolyser, components, simulation_parameters)
+    EnergySystems.control(grid_el1, components, simulation_parameters)
+    EnergySystems.control(grid_el2, components, simulation_parameters)
+    EnergySystems.control(grid_o2, components, simulation_parameters)
+
+    EnergySystems.process(demand_h2, simulation_parameters)
+    EnergySystems.process(demand_heat, simulation_parameters)
+    EnergySystems.potential(electrolyser, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(electrolyser, simulation_parameters)
+    EnergySystems.process(grid_el1, simulation_parameters)
+    EnergySystems.process(grid_el2, simulation_parameters)
+    EnergySystems.process(grid_o2, simulation_parameters)
+
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].balance ≈ -2400.0 * 0.25
+    @test electrolyser.output_interfaces[electrolyser.m_h2_out].sum_abs_change * 0.5 ≈ 2400 * 0.25 * 0.5
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ 0.0
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 ≈ 0.0
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -560.0 * 0.25
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 560 * 0.25 * 0.5
+end
+
+@testset "heat_pump_min_use_fraction_limited_by_ely" begin
+    test_heat_pump_min_use_fraction_limited_by_ely()
 end

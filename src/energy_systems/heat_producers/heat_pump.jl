@@ -38,6 +38,7 @@ mutable struct HeatPump <: Component
     constant_cop::Floathing
     dynamic_cop::Function
     bypass_cop::Float64
+    min_usage_fraction::Float64
 
     consider_icing::Bool
     icing_coefficients::Vector{Float64}
@@ -116,6 +117,7 @@ mutable struct HeatPump <: Component
                    constant_cop,
                    cop_function,
                    default(config, "bypass_cop", 15.0),
+                   default(config, "min_usage_fraction", 0.0),
                    default(config, "consider_icing", false),
                    icing_coefficients,
                    default(config, "output_temperature", nothing),
@@ -997,6 +999,14 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
             continue
         end
         unit.avg_plr += energies.used_plrs[plr_idx]
+    end
+
+    # if minimum usage fraction was not reached, we discard all slices
+    if unit.avg_plr < unit.min_usage_fraction
+        energies.slices_el_in = Vector{Floathing}()
+        energies.slices_heat_in = Vector{Floathing}()
+        energies.slices_heat_out = Vector{Floathing}()
+        energies.slices_times = Vector{Floathing}()
     end
 
     # calculate COP before losses
