@@ -1027,3 +1027,66 @@ end
 @testset "heat_pump_2S2D_optimising_slices" begin
     test_heat_pump_2S2D_optimising_slices()
 end
+
+function test_heat_pump_2S2D_on_off_optimisation_is_constant()
+    components_config = get_config_heat_pump_2S2D()
+
+    components_config["TST_HP_01"]["model_type"] = "on-off"
+    components_config["TST_HP_01"]["power_th"] = 10000
+    # we give the optimisation enough iterations to converge
+    components_config["TST_HP_01"]["nr_optimisation_passes"] = 100
+    # both sources can cover more than either demand, but not both
+    components_config["TST_DEM_01"]["constant_demand"] = 4000
+    components_config["TST_DEM_02"]["constant_demand"] = 4000
+    components_config["TST_SRC_01"]["constant_power"] = 4000
+    components_config["TST_SRC_02"]["constant_power"] = 4000
+
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    all_values_as_expected = true
+    for _ in range(1, 10)
+        for unit in values(components)
+            EnergySystems.reset(unit)
+        end
+        for unit in values(components)
+            EnergySystems.control(unit, components, simulation_parameters)
+        end
+
+        EnergySystems.process(demand_1, simulation_parameters)
+        EnergySystems.process(demand_2, simulation_parameters)
+        EnergySystems.process(heat_pump, simulation_parameters)
+        EnergySystems.process(source_1, simulation_parameters)
+        EnergySystems.process(source_2, simulation_parameters)
+        EnergySystems.process(grid, simulation_parameters)
+
+        EnergySystems.distribute!(bus_1)
+        EnergySystems.distribute!(bus_2)
+
+        all_values_as_expected = all_values_as_expected &&
+                                 heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 2000.0
+        all_values_as_expected = all_values_as_expected && heat_pump.time_active ≈ 1.0003909380947407 # fudge factor
+        all_values_as_expected = all_values_as_expected && heat_pump.avg_plr ≈ 0.8
+        all_values_as_expected = all_values_as_expected &&
+                                 source_1.output_interfaces[source_1.medium].sum_abs_change * 0.5 ≈ 1000.0
+        all_values_as_expected = all_values_as_expected &&
+                                 source_2.output_interfaces[source_2.medium].sum_abs_change * 0.5 ≈ 585.9995757533969
+    end
+
+    @test all_values_as_expected
+end
+
+@testset "heat_pump_2S2D_on_off_optimisation_is_constant" begin
+    test_heat_pump_2S2D_on_off_optimisation_is_constant()
+end
