@@ -176,10 +176,13 @@ function initialise!(unit::SolarthermalCollectorVal, sim_params::Dict{String,Any
     unit.K_b_itp = init_K_b(unit.K_b_array)
 
     # for validation
-    # unit.flow_rate_profile = Profile("./profiles/validation/TRNSYS_flow_rate_l_h.prf", sim_params)
-    unit.flow_rate_profile = Profile("./profiles/validation/Dannenmannstr/absorber_flow_rate_m3_h.prf", sim_params)
-    # unit.input_temp_profile = Profile("./profiles/validation/TRNSYS_temperature_in.prf", sim_params)
-    unit.input_temp_profile = Profile("./profiles/validation/Dannenmannstr/WMZ_temperature_in.prf", sim_params)
+    unit.flow_rate_profile = Profile("./profiles/validation/TRNSYS_flow_rate_l_h.prf", sim_params)
+    # unit.flow_rate_profile = Profile("./profiles/validation/Dannenmannstr/absorber_flow_rate_m3_h.prf", sim_params)
+    unit.input_temp_profile = Profile("./profiles/validation/TRNSYS_temperature_in.prf", sim_params)
+    # unit.input_temp_profile = Profile("./profiles/validation/Dannenmannstr/WMZ_temperature_in.prf", sim_params)
+    unit.beam_irr_profile = Profile("./profiles/validation/TRNSYS_beam_irr.prf", sim_params)
+    unit.diff_irr_profile = Profile("./profiles/validation/TRNSYS_diff_irr.prf", sim_params)
+    unit.dni_profile = Profile("./profiles/validation/TRNSYS_dni.prf", sim_params)
 
 end
 
@@ -227,6 +230,17 @@ function control(unit::SolarthermalCollectorVal,
                  diffuse_solar_hor_irradiance, nothing, 1.0, mean_ambient_temperature, 
                  unit.ground_reflectance
                  )
+
+    # for validation
+    unit.beam_solar_irradiance_in_plane = sim_params["wh_to_watts"](Profiles.value_at_time(
+        unit.diffuse_solar_hor_irradiance_profile, sim_params
+        ))
+    unit.diffuse_solar_irradiance_in_plane = sim_params["wh_to_watts"](Profiles.value_at_time(
+        unit.diffuse_solar_hor_irradiance_profile, sim_params
+        ))
+    unit.direct_normal_irradiance = sim_params["wh_to_watts"](Profiles.value_at_time(
+        unit.diffuse_solar_hor_irradiance_profile, sim_params
+        ))
     
     unit.zenith_angle = solar_zenith
     unit.angle_of_incidence = angle_of_incidence
