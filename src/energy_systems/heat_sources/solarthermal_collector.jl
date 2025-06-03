@@ -268,8 +268,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     unit.output_temperature = _weighted_mean(collect(values(sort(unit.output_temperatures))), collect(values(sort(unit.runtimes))))
     unit.average_temperature = _weighted_mean(collect(values(sort(unit.average_temperatures))), collect(values(sort(unit.runtimes))))
     unit.last_average_temperature = unit.average_temperature
-
-    ifelse(isnothing(unit.output_temperature), 0, unit.output_temperature)
+    
     if unit.output_temperature == unit.average_temperature
         unit.spec_flow_rate_actual = 0
     else 
@@ -279,19 +278,15 @@ end
 
 function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     
-    exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
-
-    left_energy_factor = 1.0
-
-    if sum([abs(e.balance + e.energy_potential) for e in exchanges]) == 0
-        left_energy_factor = 0
-    end
-
     available_energies = Dict{String, Floathing}()
     calculated_values = Dict()
     average_temperatures = Dict{String, Temperature}()
     output_temperatures = Dict{String, Temperature}()
     runtimes = Dict{String, Floathing}()
+    left_energy_factor = 1.0
+    component_idx = 1
+
+    exchanges = balance_on(unit.output_interfaces[unit.medium], unit.output_interfaces[unit.medium].target)
 
     uacs = [e.purpose_uac for e in exchanges]
     target_temperatures = temp_min_all(exchanges)
@@ -302,12 +297,16 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
         potential_energies = [abs(e.balance + e.energy_potential) for e in exchanges]
     end
 
-    component_idx = 1
    
     while component_idx <= length(exchanges) && left_energy_factor > 0
         
         # calculate specific thermal power depending on control mode; reuse already caluclated values if possible
-        if target_temperatures[component_idx] in keys(calculated_values)
+        if potential_energies[component_idx] == 0
+            p_spec_th = nothing
+            t_avg = nothing
+            t_target = nothing
+        
+        elseif target_temperatures[component_idx] in keys(calculated_values)
             p_spec_th, t_avg, t_target = calculated_values[target_temperatures[component_idx]]
 
         elseif unit.delta_T !== nothing && unit.spec_flow_rate === nothing
@@ -381,7 +380,7 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
         average_temperatures[unit.uac] = average_temperature
         output_temperatures[unit.uac] = average_temperature
         runtimes[unit.uac] = 1
-    else # TODO anpassen damit kein nothing entsteht 
+    else
         calc_max = false
         average_temperatures[unit.uac] = nothing
         output_temperatures[unit.uac] = nothing
