@@ -130,7 +130,7 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
     add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
-    unit.losses = energies[1] - energies[2]
+    unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}

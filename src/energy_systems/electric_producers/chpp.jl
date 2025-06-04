@@ -142,7 +142,7 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_el_out], energies[2])
     add!(unit.output_interfaces[unit.m_heat_out], energies[3], nothing, unit.output_temperature)
 
-    unit.losses = energies[1] - energies[2] - energies[3]
+    unit.losses = check_epsilon(energies[1] - energies[2] - energies[3], sim_params)
 end
 
 function output_values(unit::CHPP)::Vector{String}
