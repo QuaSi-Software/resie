@@ -556,6 +556,16 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         output_all_value_sum[interface] = sum(output_all_values[:, interface])
     end
 
+    # convert Losses into Gains if they are negative
+    for idx in 1:nr_of_interfaces
+        if medium_of_interfaces[idx] == "Losses" && output_all_value_sum[idx] < 0.0
+            medium_of_interfaces[idx] = "Gains"
+            output_all_value_sum[idx] = -output_all_value_sum[idx]
+            output_all_targetnames[idx] = output_all_sourcenames[idx]
+            output_all_sourcenames[idx] = "Gains"
+        end
+    end
+
     # remove data that should not be plotted in Sankey
     interface_new = 1
     for _ in 1:nr_of_interfaces
@@ -581,8 +591,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     end
     interface_new -= 1
 
-    # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
-    output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
+    # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
+    output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
 
     # prepare data for sankey diagram and create sankey
     # set label of blocks
