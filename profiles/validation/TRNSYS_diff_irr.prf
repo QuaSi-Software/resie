@@ -1,4 +1,4 @@
-﻿# data_type:                 extensive
+# data_type:                 extensive
 # time_definition:           startdate_timestamp
 # profile_start_date:        01.01.2015 00:00
 # profile_start_date_format: dd.mm.yyyy HH:MM
@@ -35039,7 +35039,7 @@
 31529700;0
 31530600;0
 31531500;0
-31532400;#WERT!
-31533300;#WERT!
-31534200;#WERT!
-31535100;#WERT!
+31532400;0.0
+31533300;0.0
+31534200;0.0
+31535100;0.0

@@ -275,7 +275,7 @@ mutable struct Profile
                                             profile_timestamps_date[end] + Second(profile_time_step))
                 profile_values = vcat(profile_values, profile_values[end])
             end
-            @info "The profile at $(file_path) has been extended by one timestep at the end by doubling the last value."
+            @info "The profile at $(file_path) has been extended by $shift at the end by doubling the last value."
         end
 
         if interpolation_type == "linear_time_preserving" && profile_time_step > sim_params["time_step_seconds"]
@@ -731,6 +731,10 @@ function convert_profile(values::Vector{Float64},
     time_is_aligned = sim_params["start_date"] in timestamps
 
     if original_time_step == new_time_step && time_is_aligned   # do nothing
+        # cut values and timestamps to simulation time
+        mask = (timestamps .>= sim_params["start_date"]) .&& (timestamps .<= sim_params["end_date"])
+        values = values[mask]
+        timestamps = timestamps[mask]
         return values, timestamps
 
     elseif original_time_step == new_time_step                  # time shift only
@@ -780,12 +784,14 @@ function convert_profile(values::Vector{Float64},
                        "1 hour (3600 seconds) to use the linear_solar_radiation method for interpolation!"
                 throw(InputError)
             end
+
             if !time_is_aligned
                 @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
                        "aligned to the simulation start time to use the linear_solar_radiation method for interpolation!"
                 throw(InputError)
             end
-            if length(sunrise_sunset) == 0
+
+            if length(sunrise_sunset) == 0 
                 sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
                 ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
                 calculated_sr_dates = Date[]
@@ -826,6 +832,11 @@ function convert_profile(values::Vector{Float64},
                                                  new_time_step,
                                                  sim_params,
                                                  sunrise_sunset=sunrise_sunset)
+        
+            # cut values and timestamps to simulation time
+            mask = (timestamps .>= sim_params["start_date"]) .&& (timestamps .<= sim_params["end_date"])
+            values = values[mask]
+            timestamps = timestamps[mask]
 
         elseif interpolation_type == "linear_classic"
             values, timestamps = profile_linear_interpolation(values,
@@ -1169,8 +1180,15 @@ function segment_profile(begin_dt::DateTime,
         interval_end = (i == n_hours) ? fractional_hour(end_dt) : end_of_hour
 
         # Get sunrise and sunset for current_date.
-        sunrise = sunrise_sunset[1].data[current_hour_dt]
-        sunset = sunrise_sunset[2].data[current_hour_dt]
+        if in(current_hour_dt, sunrise_sunset[1].data.keys)
+            sunrise = sunrise_sunset[1].data[current_hour_dt]
+            sunset = sunrise_sunset[2].data[current_hour_dt]
+        else
+            sunrise, sunset = get_sunrise_sunset(current_hour_dt,
+                                                sim_params["latitude"],
+                                                sim_params["longitude"],
+                                                sim_params["timezone"])
+        end
 
         # Retrieve current and next hourly integrated irradiation.
         hn = hourly_H[i]

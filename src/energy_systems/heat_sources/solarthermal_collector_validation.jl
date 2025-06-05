@@ -55,7 +55,7 @@ mutable struct SolarthermalCollectorVal <: Component
     delta_T::Union{Float32,Nothing}
     spec_flow_rate::Union{Float64,Nothing}
     delta_T_min::Union{Float32,Nothing}
-    spec_flow_rate_min::Union{Float32,Nothing}
+    spec_flow_rate_min::Union{Float64,Nothing}
 
     spec_thermal_power::Float64
     max_energy::Union{Float64,Nothing}
@@ -63,6 +63,7 @@ mutable struct SolarthermalCollectorVal <: Component
     output_temperature::Temperature
     average_temperature::Temperature
     last_average_temperature::Temperature
+    spec_flow_rate_actual::Union{Float64,Nothing}
 
     available_energies::Dict{String, Floathing}
     average_temperatures::Dict{String, Temperature}
@@ -77,6 +78,10 @@ mutable struct SolarthermalCollectorVal <: Component
     input_temp::Float32
     zenith_angle::Float32
     angle_of_incidence::Float32
+    beam_irr_profile::Union{Profile,Nothing}
+    diff_irr_profile::Union{Profile,Nothing}
+    dni_profile::Union{Profile,Nothing}
+    spec_flow_rate_profile_value::Float64
 
     function SolarthermalCollectorVal(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         _, ambient_temperature_profile = get_parameter_profile_from_config(config, sim_params, :temperature, "temperature_profile_file_path", "temperature_from_global_file", "constant_temperature", uac, required=true)
@@ -141,6 +146,7 @@ mutable struct SolarthermalCollectorVal <: Component
             0.0, # output temperature in current time step, calculated in control()
             0.0, # average temperature in current time step, calculated in control()
             0.0, # average temperature from last time step, calculated in control()
+            0.0, # actual flow rate resulting from simulation and used energy
 
             Dict{String, Float64}(), # list of available_energies in for each component connected to the collector
             Dict{String, Temperature}(), # list of average_temperatures in for each component connected to the collector
@@ -154,6 +160,10 @@ mutable struct SolarthermalCollectorVal <: Component
             nothing,
             -1.5,
             0.0,
+            0.0,
+            nothing,
+            nothing,
+            nothing,
             0.0
             )
     end
@@ -180,8 +190,8 @@ function initialise!(unit::SolarthermalCollectorVal, sim_params::Dict{String,Any
     # unit.flow_rate_profile = Profile("./profiles/validation/Dannenmannstr/absorber_flow_rate_m3_h.prf", sim_params)
     unit.input_temp_profile = Profile("./profiles/validation/TRNSYS_temperature_in.prf", sim_params)
     # unit.input_temp_profile = Profile("./profiles/validation/Dannenmannstr/WMZ_temperature_in.prf", sim_params)
-    unit.beam_irr_profile = Profile("./profiles/validation/TRNSYS_beam_irr.prf", sim_params)
-    unit.diff_irr_profile = Profile("./profiles/validation/TRNSYS_diff_irr.prf", sim_params)
+    unit.beam_irr_profile = Profile("./profiles/validation/TRNSYS_beam_irr.prf", sim_params, shift=Dates.Second(3600))
+    unit.diff_irr_profile = Profile("./profiles/validation/TRNSYS_diff_irr.prf", sim_params, shift=Dates.Second(3600))
     unit.dni_profile = Profile("./profiles/validation/TRNSYS_dni.prf", sim_params)
 
 end
@@ -192,9 +202,9 @@ function control(unit::SolarthermalCollectorVal,
     update(unit.controller)
 
     # for validation
-    # unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 
-    #                       3600 / 1000 / unit.collector_gross_area
-    unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
+    unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 
+                          3600 / 1000 / unit.collector_gross_area
+    # unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
     # unit.spec_flow_rate = ifelse(unit.spec_flow_rate < 2.78e-5 * 0.8, 2.78e-5, unit.spec_flow_rate)
     runtime_percent = 1
     # runtime_percent = (Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
@@ -232,16 +242,11 @@ function control(unit::SolarthermalCollectorVal,
                  )
 
     # for validation
-    unit.beam_solar_irradiance_in_plane = sim_params["wh_to_watts"](Profiles.value_at_time(
-        unit.diffuse_solar_hor_irradiance_profile, sim_params
-        ))
-    unit.diffuse_solar_irradiance_in_plane = sim_params["wh_to_watts"](Profiles.value_at_time(
-        unit.diffuse_solar_hor_irradiance_profile, sim_params
-        ))
-    unit.direct_normal_irradiance = sim_params["wh_to_watts"](Profiles.value_at_time(
-        unit.diffuse_solar_hor_irradiance_profile, sim_params
-        ))
-    
+    unit.beam_solar_irradiance_in_plane = (Profiles.value_at_time(unit.beam_irr_profile, sim_params))
+    unit.diffuse_solar_irradiance_in_plane = (Profiles.value_at_time(unit.diff_irr_profile, sim_params))
+    unit.direct_normal_irradiance = (Profiles.value_at_time(unit.dni_profile, sim_params))
+    unit.spec_flow_rate_profile_value = unit.spec_flow_rate
+
     unit.zenith_angle = solar_zenith
     unit.angle_of_incidence = angle_of_incidence
     
@@ -315,9 +320,9 @@ function process(unit::SolarthermalCollectorVal, sim_params::Dict{String,Any})
     unit.last_average_temperature = unit.average_temperature
 
     if unit.output_temperature == unit.average_temperature
-        unit.spec_flow_rate = 0
+        unit.spec_flow_rate_actual = 0
     else 
-        unit.spec_flow_rate = (unit.used_energy * 3600.0 / sim_params["time_step_seconds"]) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
+        unit.spec_flow_rate_actual = (unit.used_energy * 3600.0 / sim_params["time_step_seconds"]) / unit.collector_gross_area / ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap) 
     end
 end
 
@@ -785,6 +790,7 @@ function output_values(unit::SolarthermalCollectorVal)::Vector{String}
             "diffuse_solar_irradiance_in_plane",
             "delta_T",
             "spec_flow_rate",
+            "spec_flwo_rate_profile",
             "zenith_angle",
             "angle_of_incidence"
             ]
@@ -812,7 +818,9 @@ function output_value(unit::SolarthermalCollectorVal, key::OutputKey)::Float64
     elseif key.value_key == "delta_T"
         return (unit.output_temperature - unit.average_temperature) * 2
     elseif key.value_key == "spec_flow_rate"
-        return unit.spec_flow_rate
+        return unit.spec_flow_rate_actual
+    elseif key.value_key == "spec_flow_rate_profile"
+        return unit.spec_flow_rate_profile_value
     elseif key.value_key == "zenith_angle"
         return unit.zenith_angle
     elseif key.value_key == "angle_of_incidence"
