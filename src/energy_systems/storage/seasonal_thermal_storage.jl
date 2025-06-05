@@ -417,7 +417,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
 end
 
 function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::String, output_formats::Vector{String},
-                                     sim_params::Dict{String,Any})
+                                     sim_params::Dict{String,Any})::Bool
     # Plot geometry of STES
     plt = Plots.plot()
     Plots.plot!([-unit.radius_large, unit.radius_large], [unit.height, unit.height]; color=:blue, lw=6, label="")  # Top
@@ -445,7 +445,8 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
     return true
 end
 
-function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any}, output_path::String)
+function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any},
+                                   output_path::String)::Bool
     # Plot temperature distribution over time    
     x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
@@ -570,7 +571,7 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
                                 energy_input::Union{Float64,Vector{Float64}},
                                 temperatures_input::Union{Temperature,Vector{Temperature}},
                                 max_energy::EnergySystems.MaxEnergy,
-                                sim_params::Dict{String,Any})
+                                sim_params::Dict{String,Any})::EnergySystems.MaxEnergy
     energy_input = isa(energy_input, AbstractVector) ? energy_input : [energy_input]
     temperatures_input = isa(temperatures_input, AbstractVector) ? temperatures_input : [temperatures_input]
 
@@ -597,6 +598,26 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
 end
 
 """
+    get_input_temperature_bounds(unit::SeasonalThermalStorage)
+
+Function used by the control module negotiate_temperature to get the current minimum 
+and maximum temperatures for charging.
+
+# Arguments
+- `unit::SeasonalThermalStorage`: The seasonal thermal storage unit for which the calculation is performed.
+
+# Returns
+- `input_min_temperature::Temperature`: The current minimal temperature that can be taken in the input
+- `input_max_temperature::Temperature`: The current maximum temperature that can be taken in the input
+
+"""
+function get_input_temperature_bounds(unit::SeasonalThermalStorage)::Tuple{Temperature,Temperature}
+    input_min_temperature = unit.current_min_input_temperature
+    input_max_temperature = unit.high_temperature
+    return input_min_temperature, input_max_temperature
+end
+
+"""
     calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
                                             current_temperature_distribution::Vector{Temperature}) -> Float64
 
@@ -613,7 +634,7 @@ given current_temperature_distribution
 - `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
 """
 function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
-                                                  current_temperature_distribution::Vector{Temperature})
+                                                  current_temperature_distribution::Vector{Temperature})::Float64
     # reduce maximal energy if the input temperature is near the temperature of the lower layer to avoid
     # numerical problems and pulsing during loading. Otherwise, it can happen that the STES is not taking
     # the energy that it is supposed to take, or a unresonable high temporal resolution has to be used to
@@ -640,7 +661,7 @@ Returns:
 """
 function calculate_input_energy_from_input_temperature(unit::SeasonalThermalStorage,
                                                        actual_input_temp::Temperature,
-                                                       sim_params::Dict{String,Any})
+                                                       sim_params::Dict{String,Any})::Float64
     return calcuate_max_input_energy_by_temperature(unit, actual_input_temp, unit.temperature_segments)
 end
 
@@ -649,7 +670,7 @@ end
 
 takes energy in [kJ] and convert it to [Wh]
 """
-function convert_kJ_in_Wh(energy::Float64)
+function convert_kJ_in_Wh(energy::Float64)::Float64
     return energy / 3.6
 end
 
@@ -665,7 +686,7 @@ end
 - `cp::Float64`: sppecific heat capacity [kJ/KgK]
 
 """
-function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)
+function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
     if energy == 0.0
         return 0.0
     else
@@ -685,7 +706,7 @@ end
 - `cp::Float64`: sppecific heat capacity [kJ/KgK]
 
 """
-function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)
+function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
     return mass * convert_kJ_in_Wh(cp) * (temp_high - temp_low)
 end
 
@@ -696,7 +717,7 @@ end
                 energy_output::Float64,
                 temperature_output::Temperature,
                 sim_params::Dict{String,Any};
-                temporary_calculation::Bool=false) -> Tuple{Float64, Float64, Float64, Vector{Float64}}
+                temporary_calculation::Bool=false)
 
 This function updates the temperature segments of the STES unit by calculating the new temperatures 
 for each layer based on thermal diffusion, losses, thermal input/output, and mass input/output
@@ -869,7 +890,8 @@ lowest layer that is below the temperature of the input (e.g. lance)
 - `mass_in_vec::Vector{Float64}`: Vector of mass flow into each layer.
 """
 function calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-                                            mass_in::Vector{Float64}, lower_node::Int, sim_params::Dict{String,Any})
+                                            mass_in::Vector{Float64}, lower_node::Int,
+                                            sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
     number_of_inputs = length(unit.current_energy_input)
     mass_in_temp = zeros(unit.number_of_layer_total)
     mass_in_vec = zeros(unit.number_of_layer_total)
@@ -959,7 +981,8 @@ It handles cases where the mass flow into a layer is greater than the volume of 
 """
 function calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
                                                mass_out::Float64, return_temperature_input::Temperature,
-                                               lower_node::Int, sim_params::Dict{String,Any})
+                                               lower_node::Int,
+                                               sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
     upper_node_discharging = unit.number_of_layer_total - unit.output_layer_from_top + 1
     mass_out_temp = zeros(unit.number_of_layer_total)
     mass_in_layer = [mass_out]

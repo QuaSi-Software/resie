@@ -8,7 +8,6 @@ using Interpolations
 using Plots: plot, scatter, savefig
 using Plots: Plots
 using Roots
-using Optim
 
 mutable struct GeothermalProbes <: Component
     uac::String
@@ -76,6 +75,8 @@ mutable struct GeothermalProbes <: Component
 
     borehole_diameter::Float64
     shank_spacing::Float64
+
+    limit_max_output_energy_to_avoid_pulsing::Bool
 
     fluid_reynolds_number::Float64
 
@@ -174,6 +175,9 @@ mutable struct GeothermalProbes <: Component
                    default(config, "borehole_diameter", 0.15),              # borehole diameter in m.
                    default(config, "shank_spacing", 0.1),                   # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. required for calculation of thermal borehole resistance.
                    #
+                   default(config, "limit_max_output_energy_to_avoid_pulsing", false),  # limit_max_output_energy_to_avoid_pulsing. If a control module is given, this parameter will be overwritten by the control module!
+                   # If set to false, the temperature acts as a stupid turn-on-temperature, representing an on-off fluid pump
+                   # If set to true, the maximum energy is calculated to provide the current temperature also in the next timestep to prevent pulsing, representing a variable speed pump
                    0.0,                                                     # Reynoldsnumber. To be calculated in function later.
                    nothing)                                                 # probe_coordinates to save them for plotting
     end
@@ -673,10 +677,6 @@ end
     check_temperature_and_get_max_energy(unit::GeothermalProbes,
                                          sim_params::Dict{String,Any},
                                          temperature_output::Temperature,
-                                         source_min_unloading_temperature::Temperature,
-                                         source_current_upper_temp_limit::Temperature,
-                                         output_temp_after_max_energy::Temperature,
-                                         source_max_energy::Float64,
                                          limit_max_output_energy_to_avoid_pulsing::Bool)
 
 Checks if a requested output temperature is within the allowed operational range for the geothermal probe.
@@ -690,10 +690,6 @@ time step is limited to avoid pulsing (limit_max_output_energy_to_avoid_pulsing=
 - `unit::GeothermalProbes`: The geothermal probe unit for which the calculation is performed.
 - `sim_params::Dict{String,Any}`: Simulation parameters.
 - `temperature_output::Temperature`: The requested output temperature of the geothermal probe.
-- `source_min_unloading_temperature::Temperature`: A user defined minimum temperature at which unloading has to stop.
-- `source_current_upper_temp_limit::Temperature`: The current upper temperature limit for the source.
-- `output_temp_after_max_energy::Temperature`: The expected output temperature after extracting the maximum allowed energy.
-- `source_max_energy::Float64`: The maximum energy that can be extracted from the source.
 - `limit_max_output_energy_to_avoid_pulsing::Bool`: Indicates if the max energy should be limited to avoid pulsing.
 
 # Returns
@@ -704,26 +700,38 @@ Returns a tuple containing:
 function check_temperature_and_get_max_energy(unit::GeothermalProbes,
                                               sim_params::Dict{String,Any},
                                               temperature_output::Temperature,
-                                              source_min_unloading_temperature::Temperature,
-                                              source_current_upper_temp_limit::Temperature,
-                                              output_temp_after_max_energy::Temperature,
-                                              source_max_energy::Float64,
-                                              limit_max_output_energy_to_avoid_pulsing::Bool)
+                                              limit_max_output_energy_to_avoid_pulsing::Bool)::Tuple{Temperature,
+                                                                                                     Float64}
+    # calculate the minimal temperature in the probe field that could occur in the current time step.
+    # as this is quite heavy in computational needs, it will only be called if required
+    function calculate_output_temp_after_max_energy(unit::GeothermalProbes, sim_params::Dict{String,Any})
+        unit.energy_in_out_per_probe_meter[unit.time_index] = -unit.max_output_energy /
+                                                              (unit.probe_depth * unit.number_of_probes)
+        output_temp_after_max_energy = calculate_new_fluid_temperature(unit, sim_params["wh_to_watts"])
+        unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0
+        return output_temp_after_max_energy
+    end
+
+    # get min and max output temperature of geothermal probe
+    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(unit)
+
     # check temperatures and get the max_energy
     if temperature_output === nothing
         # no temperature information is given, set temperature so that the maximum energy can be used
-        return (source_current_upper_temp_limit + output_temp_after_max_energy) / 2, source_max_energy
-    elseif source_min_unloading_temperature !== nothing && temperature_output < source_min_unloading_temperature ||
-           temperature_output > source_current_upper_temp_limit
+        return (source_max_out_temperature + calculate_output_temp_after_max_energy(unit, sim_params)) / 2,
+               unit.max_output_energy
+    elseif source_min_out_temperature !== nothing && temperature_output < source_min_out_temperature ||
+           temperature_output > source_max_out_temperature
         # the requested temperature is higher than the current output temperature or
         # the user-defined minimum temperature is not reached
         return nothing, 0.0
-    elseif temperature_output < (source_current_upper_temp_limit + output_temp_after_max_energy) / 2 ||
-           !limit_max_output_energy_to_avoid_pulsing
-        # the requested temperature is lower than the temperature that would be reached with maximum energy draw,
+    elseif !limit_max_output_energy_to_avoid_pulsing ||
+           temperature_output <
+           (source_max_out_temperature + calculate_output_temp_after_max_energy(unit, sim_params)) / 2
+        # the temperature acts as a stupid turn-on temperature, the temperature in the next timestep does not matter.
+        # OR the requested temperature is lower than the temperature that would be reached with maximum energy draw,
         # so the maximum energy can be used
-        # OR the temperature acts as a stupid turn-on temperature, the temperature in the next timestep does not matter.
-        return temperature_output, source_max_energy
+        return temperature_output, unit.max_output_energy
     else
         # Here, limit_max_output_energy_to_avoid_pulsing is always true, and the requested temperature is higher than the
         # mean temperature that would be reached with maximum energy draw, so the maximum energy is calculated, that can 
@@ -731,111 +739,9 @@ function check_temperature_and_get_max_energy(unit::GeothermalProbes,
         # --> this works for probe, but probably not for solarthermal!
 
         # calculate the maximum energy that can be delivered while not changing the output temperature for the next time step
-        max_energy = calculate_output_energy_from_output_temperature(unit, source_current_upper_temp_limit, sim_params)
+        max_energy = calculate_output_energy_from_output_temperature(unit, source_max_out_temperature, sim_params)
 
         return temperature_output, max_energy
-    end
-end
-
-"""
-    determine_temperature_and_energy(components::Grouping,
-                                     unit::GeothermalProbes,
-                                     target_uac::String,
-                                     sim_params::Dict{String,Any},
-                                     output_temp_after_max_energy::Temperature,
-                                     source_min_unloading_temperature::Temperature,
-                                     source_current_upper_temp_limit::Temperature,
-                                     source_max_energy::Float64,
-                                     limit_max_output_energy_to_avoid_pulsing::Bool)
-
-Depending on the control module, this function determines the temperauture and the maximum energy that can be extracted
-from the geothermal probe field. Several options are available:
-- Optimisation: Here, the temperature is optimized (within a given bound) to get the maximum possible energy between 
-                the geothermal probe and a target component.
-- Constant temperature: The desired output temperature is set to a constant value by the input parameter.
-- Dynamic temperature: The desired output temperature is set to a dynamic value, e.g. the temperature of a given layer
-                       in a connected STES.
-- Mean temperature: The desired output temperature is set to the mean value of the upper and lower temperature bound,
-                    calculated from the source and the target component. This is computationally much cheaper than 
-                    optimization but can lead to quite good results.
-
-# Arguments
-- `components::Grouping`: All components of the energy system.
-- `unit::GeothermalProbes`: The geothermal probe unit for which the calculation is performed.
-- `target_uac::String`: The target unit uac.
-- `sim_params::Dict{String,Any}`: Simulation parameters.
-- `output_temp_after_max_energy::Temperature`: The output temperature that would be reached after extracting the maximum energy.
-- `source_min_unloading_temperature::Temperature`: A user defined minimum temperature at which unloading has to stop.
-- `source_current_upper_temp_limit::Temperature`: The current upper temperature limit for the source.
-- `source_max_energy::Float64`: The maximum energy that can be extracted from the source.
-- `limit_max_output_energy_to_avoid_pulsing::Bool`: Indicates if the max energy should be limited to avoid pulsing.
-# Returns
-- The resulting maximum possible energy and the corresponding temperature.
-"""
-function determine_temperature_and_energy(components::Grouping,
-                                          unit::GeothermalProbes,
-                                          target_uac::String,
-                                          sim_params::Dict{String,Any},
-                                          output_temp_after_max_energy::Temperature,
-                                          source_min_unloading_temperature::Temperature,
-                                          source_current_upper_temp_limit::Temperature,
-                                          source_max_energy::Float64,
-                                          limit_max_output_energy_to_avoid_pulsing::Bool)
-    # would be the same as from exchange, but control might not performed yet
-    target_min_temperature = components[target_uac].current_min_input_temperature  # TODO: use generalized function or variable name!
-    target_max_temperature = components[target_uac].high_temperature  # TODO: use generalized function or variable name!
-
-    # get temperature bounds for connection from unit to target
-    lower_temperature_bound = highest(source_min_unloading_temperature, target_min_temperature)
-    upper_temperature_bound = lowest(source_current_upper_temp_limit, target_max_temperature)
-
-    if upper_temperature_bound < lower_temperature_bound # both should be a number here
-        # temperatures do not match, no energy can be delivered
-        return nothing, 0.0
-    end
-
-    # move to control module TODO move to input
-    temperature_mode = "mean"  # "STES_layer", "constant_temperature", "optimize_for_max_energy", "mean", "upper", "lower"
-    # For temperature_mode = "STES_layer", the uac of the STES and the layer should be given. Note: Layer numbering starts at the bottom!
-    dynamic_reference = ("TST_STES_TH_01", 3)     # UAC of the STES and layer that should be used: Note: In case of an inverse
-    # temperature gradient, energy may can not be delivered to the STES!         
-
-    if temperature_mode == "optimize_for_max_energy"
-        return find_best_temperature_and_get_energy(calculate_output_energy_from_output_temperature,
-                                                    calculate_input_energy_from_input_temperature,
-                                                    lower_temperature_bound,
-                                                    upper_temperature_bound,
-                                                    components[unit.uac],
-                                                    components[target_uac],
-                                                    sim_params)
-    else
-        # call the control module to calculate the temperature
-        if temperature_mode == "constant_temperature"
-            temperature_output = 15  # user input
-        elseif temperature_mode == "STES_layer"
-            temperature_output = components[dynamic_reference[1]].temperature_segments[dynamic_reference[2]]
-        elseif temperature_mode == "mean"
-            temperature_output = (lower_temperature_bound + upper_temperature_bound) / 2
-        elseif temperature_mode == "upper"
-            temperature_output = upper_temperature_bound
-        elseif temperature_mode == "lower"
-            temperature_output = lower_temperature_bound
-        else
-            @error "The temperature mode \"$(temperature_mode)\" in the control module of unit $(unit.uac) is not supported. " *
-                   "Please use one of the following: " *
-                   "\"optimize_for_max_energy\", \"STES_layer\", \"constant_temperature\", \"upper\", \"mean\" or \"lower\"."
-            throw(InputError)
-        end
-
-        # check if the temperature is within the bounds and calculate the corresponding energy
-        return check_temperature_and_get_max_energy(unit,
-                                                    sim_params,
-                                                    temperature_output,
-                                                    source_min_unloading_temperature,
-                                                    source_current_upper_temp_limit,
-                                                    output_temp_after_max_energy,
-                                                    source_max_energy,
-                                                    limit_max_output_energy_to_avoid_pulsing)
     end
 end
 
@@ -850,23 +756,8 @@ function control(unit::GeothermalProbes,
     # get output temperature for energy output and set temperature and max_energy to output interface
     unit.current_max_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
 
-    # calculate the minimal temperature in the probe field that could occur in the current time step.
-    unit.energy_in_out_per_probe_meter[unit.time_index] = -unit.max_output_energy /
-                                                          (unit.probe_depth * unit.number_of_probes)
-    output_temp_after_max_energy = calculate_new_fluid_temperature(unit, sim_params["wh_to_watts"])
-    unit.energy_in_out_per_probe_meter[unit.time_index] = 0.0
-
     # calculate maximum energy in dependence of the output temperature(s)
     exchange = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
-
-    function controlmodule_exists(controller, target_uac)
-        return false # TODO move to input
-    end
-    # decide if the temperature acts as a stupid turn-on-temperature (limit_max_output_energy_to_avoid_pulsing=false, 
-    # representing kind of an on-off fluid pump) or if the maximum energy should be calculated to prevent pulsing,
-    # (limit_max_output_energy_to_avoid_pulsing=true, representing a variable speed pump)
-    # This parameter may should be in the control module, but it is required even if no control module is needed
-    limit_max_output_energy_to_avoid_pulsing = true # TODO move to input
 
     max_energy_out = Float64[]
     temp_out = Temperature[]
@@ -875,28 +766,19 @@ function control(unit::GeothermalProbes,
         target_uac = exchange.purpose_uac
         # no check for possibly written max energy --> is done by set_max_energy!() for 1-to-1 connections and for a 
         # connection to a bus, the interface is only used by the current component
-        if controlmodule_exists(unit.controller, target_uac)
-            temperature, max_energy = determine_temperature_and_energy(components,
-                                                                       unit,
-                                                                       target_uac,
-                                                                       sim_params,
-                                                                       output_temp_after_max_energy,
-                                                                       unit.min_probe_temperature_unloading,
-                                                                       unit.current_max_output_temperature,
-                                                                       unit.max_output_energy,
-                                                                       limit_max_output_energy_to_avoid_pulsing)
-        else
-            # no control module is used
+        success, temperature, max_energy = determine_temperature_and_energy(unit.controller,
+                                                                            components,
+                                                                            unit.uac,
+                                                                            target_uac,
+                                                                            sim_params)
+        if !success
+            # no control module is provided between source and tartet
             # set temperature to exchange.temperature_min --> can also be nothing, but in case it is given we will use it
             # if no control module is used
             temperature, max_energy = check_temperature_and_get_max_energy(unit,
                                                                            sim_params,
                                                                            exchange.temperature_min,
-                                                                           unit.min_probe_temperature_unloading,
-                                                                           unit.current_max_output_temperature,
-                                                                           output_temp_after_max_energy,
-                                                                           unit.max_output_energy,
-                                                                           limit_max_output_energy_to_avoid_pulsing)
+                                                                           unit.limit_max_output_energy_to_avoid_pulsing)
         end
 
         push!(max_energy_out, max_energy)
@@ -934,39 +816,21 @@ function control(unit::GeothermalProbes,
     end
 end
 
-function find_best_temperature_and_get_energy(func_output, func_input, temp_min, temp_max, unit_output, unit_input,
-                                              sim_params)
-    function f_min(temperature, unit_output, unit_input, sim_params)
-        temp::Temperature = temperature
-        return_1 = func_output(unit_output, temp, sim_params)
-        return_2 = func_input(unit_input, temp, sim_params)
-        return min(return_1, return_2)
-    end
+"""
+    get_output_temperature_bounds(unit::GeothermalProbes)::Tuple{Temperature, Temperature}
 
-    # Find indices where energy is significantly non-zero to get proper bounds
-    step_size = 2
-    n_steps = max(6, Int(ceil((temp_max - temp_min) / step_size)))
-    temps = range(temp_min, temp_max; length=n_steps)
-    energies = [f_min(T, unit_output, unit_input, sim_params) for T in temps]
-    active_indices = findall(energy -> energy > sim_params["epsilon"], energies)
+Returns a tuple containing the current minimum and maximum output temperatures for the given `GeothermalProbes` unit.
 
-    if isempty(active_indices)
-        return nothing, 0.0
-    else
-        temp_min_current = max(temps[first(active_indices)] - step_size, temp_min)
-        temp_max_current = min(temps[last(active_indices)] + step_size, temp_max)
+# Arguments
+- `unit::GeothermalProbes`: The geothermal probes unit for which to retrieve the temperature bounds.
 
-        result = optimize(temperature -> -f_min(temperature, unit_output, unit_input, sim_params),
-                          temp_min_current,
-                          temp_max_current,
-                          Brent();
-                          rel_tol=1e-5,   # Looser relative tolerance: 1e-3
-                          abs_tol=0.001,  # Looser absolute tolerance: 0.1
-                          show_trace=false)
-        temperature_opt = Optim.minimizer(result)
-        max_energy = f_min(temperature_opt, unit_output, unit_input, sim_params)
-        return temperature_opt, max_energy
-    end
+# Returns
+- `Tuple{Temperature, Temperature}`: A tuple where the first element is the minimum probe temperature during unloading, 
+                                     and the second element is the current maximum output temperature.
+"""
+function get_output_temperature_bounds(unit::GeothermalProbes)::Tuple{Temperature,Temperature}
+    # current minimum output temperature and current maximum output temperature
+    return unit.min_probe_temperature_unloading, unit.current_max_output_temperature
 end
 
 """
@@ -993,7 +857,7 @@ Returns:
 function find_max_output_energy(energy_in_out_per_probe_meter::Float64,
                                 unit::GeothermalProbes,
                                 desired_output_temperature::Temperature,
-                                wh2w::Function)
+                                wh2w::Function)::Temperature
     # set energy_in_out_per_probe_meter to given energy_in_out_per_probe_meter to as vehicle 
     # to deliver the information to calculate_new_fluid_temperature(unit)
     unit.energy_in_out_per_probe_meter[unit.time_index] = energy_in_out_per_probe_meter
@@ -1026,7 +890,7 @@ Returns:
 """
 function calculate_output_energy_from_output_temperature(unit::GeothermalProbes,
                                                          minimum_output_temperature::Temperature,
-                                                         sim_params::Dict{String,Any})
+                                                         sim_params::Dict{String,Any})::Float64
     local max_energy_in_out_per_probe_meter
     try
         max_energy_in_out_per_probe_meter = find_zero((energy_in_out_per_probe_meter -> find_max_output_energy(energy_in_out_per_probe_meter,
@@ -1067,7 +931,7 @@ Returns:
     fluid_temperature::Float64:     the new average temperature of the fluid in the geothermal probe after an energy in- or output 
                                     stored in unit.energy_in_out_per_probe_meter
 """
-function calculate_new_fluid_temperature(unit::GeothermalProbes, wh2w::Function)
+function calculate_new_fluid_temperature(unit::GeothermalProbes, wh2w::Function)::Float64
     if unit.model_type == "detailed"
         # R_B with Hellström (thermal borehole resistance)
         # calculate convective heat transfer coefficient alpha in pipe
@@ -1129,7 +993,7 @@ Returns:
     alpha::Float64:                 convective heat transfer coefficient in pipe in current time step
     fluid_reynolds_number::Float64  the current Reynolds number of the fluid in the pipe
 """
-function calculate_alpha_pipe(unit::GeothermalProbes, wh2w::Function)
+function calculate_alpha_pipe(unit::GeothermalProbes, wh2w::Function)::Tuple{Float64,Float64}
     # calculate mass flow in pipe
     power_in_out_per_pipe = wh2w(abs(unit.energy_in_out_per_probe_meter[unit.time_index])) * unit.probe_depth /
                             unit.probe_type  # W/pipe
@@ -1180,7 +1044,7 @@ Args:
 Returns:
     Nusselt_laminar::Float64:           Nusselt number in current pipe for given Reynolds number and pipe dimensions
 """
-function calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Float64)
+function calculate_Nu_laminar(unit::GeothermalProbes, fluid_reynolds_number::Float64)::Float64
     k_a = 1.1 - 1 / (3.4 + 0.0667 * unit.fluid_prandtl_number)
     k_n = 0.35 + 1 / (7.825 + 2.6 * sqrt(unit.fluid_prandtl_number))
 
@@ -1205,7 +1069,7 @@ Args:
 Returns:
     Nusselt_turbulent::Float64:         Nusselt number in current pipe for given Reynolds number and pipe dimensions
 """
-function calculate_Nu_turbulent(unit::GeothermalProbes, fluid_reynolds_number::Float64)
+function calculate_Nu_turbulent(unit::GeothermalProbes, fluid_reynolds_number::Float64)::Float64
     zeta = (1.8 * log(fluid_reynolds_number) - 1.5)^-2
     Nu_turbulent = (zeta / 8 * fluid_reynolds_number * unit.fluid_prandtl_number) /
                    (1 + 12.7 * sqrt(zeta / 8) * (unit.fluid_prandtl_number^(2 / 3) - 1))
