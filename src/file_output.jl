@@ -138,10 +138,10 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
         end
 
         # add losses
-        if hasfield(typeof(each_component[2]), Symbol("losses"))
+        if "LossesGains" in output_values(each_component[2])
             push!(output_sourcenames_sankey, each_component[2].uac)
-            push!(output_targetnames_sankey, "Losses")
-            push!(medium_of_interfaces, "Losses")
+            push!(output_targetnames_sankey, "LossesGains")
+            push!(medium_of_interfaces, "LossesGains")
             nr_of_interfaces += 1
         end
     end
@@ -190,8 +190,11 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
         end
 
         # add losses
-        if hasfield(typeof(each_component[2]), Symbol("losses"))
-            energies[n] = each_component[2].losses
+        if "LossesGains" in output_values(each_component[2])
+            energies[n] = output_value(each_component[2],
+                                       EnergySystems.OutputKey(; unit=each_component[2],
+                                                               medium=nothing,
+                                                               value_key="LossesGains"))
             n += 1
         end
     end
@@ -558,11 +561,16 @@ function create_sankey(output_all_sourcenames::Vector{Any},
 
     # convert Losses into Gains if they are negative
     for idx in 1:nr_of_interfaces
-        if medium_of_interfaces[idx] == "Losses" && output_all_value_sum[idx] < 0.0
-            medium_of_interfaces[idx] = "Gains"
-            output_all_value_sum[idx] = -output_all_value_sum[idx]
-            output_all_targetnames[idx] = output_all_sourcenames[idx]
-            output_all_sourcenames[idx] = "Gains"
+        if medium_of_interfaces[idx] == "LossesGains"
+            if output_all_value_sum[idx] < 0.0  # Losses
+                medium_of_interfaces[idx] = "Losses"
+                output_all_value_sum[idx] = -output_all_value_sum[idx]
+                output_all_targetnames[idx] = "Losses"
+            else # Gains
+                medium_of_interfaces[idx] = "Gains"
+                output_all_targetnames[idx] = output_all_sourcenames[idx]
+                output_all_sourcenames[idx] = "Gains"
+            end
         end
     end
 

@@ -1125,7 +1125,7 @@ function output_values(unit::SeasonalThermalStorage)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses",
+            "LossesGains",
             "CurrentMaxOutTemp"]
 end
 
@@ -1140,8 +1140,8 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
     end

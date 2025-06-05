@@ -136,7 +136,7 @@ function output_values(unit::Battery)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
@@ -150,8 +150,8 @@ function output_value(unit::Battery, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

@@ -1196,7 +1196,7 @@ function output_values(unit::HeatPump)::Vector{String}
             "MixingTemperature_Output",
             "Losses_power",
             "Losses_heat",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -1219,11 +1219,11 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
     elseif key.value_key == "MixingTemperature_Output"
         return unit.mix_temp_output
     elseif key.value_key == "Losses_power"
-        return unit.losses_power
+        return -unit.losses_power
     elseif key.value_key == "Losses_heat"
-        return unit.losses_heat
-    elseif key.value_key == "Losses"
-        return unit.losses
+        return -unit.losses_heat
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

@@ -371,7 +371,7 @@ function output_values(unit::Electrolyser)::Vector{String}
                 string(unit.m_h2_out) * " OUT",
                 string(unit.m_o2_out) * " OUT",
                 string(unit.m_heat_ht_out) * " OUT",
-                "Losses",
+                "LossesGains",
                 "Losses_heat",
                 "Losses_hydrogen"]
 
@@ -389,11 +389,11 @@ function output_value(unit::Electrolyser, key::OutputKey)::Float64
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Losses_heat"
-        return unit.losses_heat
+        return -unit.losses_heat
     elseif key.value_key == "Losses_hydrogen"
-        return unit.losses_hydrogen
-    elseif key.value_key == "Losses"
-        return unit.losses
+        return -unit.losses_hydrogen
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

@@ -136,7 +136,7 @@ end
 function output_values(unit::FuelBoiler)::Vector{String}
     return [string(unit.m_fuel_in) * " IN",
             string(unit.m_heat_out) * " OUT",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::FuelBoiler, key::OutputKey)::Float64
@@ -144,8 +144,8 @@ function output_value(unit::FuelBoiler, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

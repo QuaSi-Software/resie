@@ -1320,9 +1320,9 @@ function output_value(unit::GeothermalProbes, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "new_fluid_temperature"
         return unit.fluid_temperature
-    elseif key.value_key == "current_max_output_temperature" # TODO change in docu
+    elseif key.value_key == "current_max_output_temperature"
         return unit.current_max_output_temperature
-    elseif key.value_key == "current_min_input_temperature" # TODO change in docu
+    elseif key.value_key == "current_min_input_temperature"
         return unit.current_min_input_temperature
     elseif key.value_key == "fluid_reynolds_number"
         return unit.fluid_reynolds_number
