@@ -138,14 +138,15 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     aoi_l = abs(tilt_angle - atand(tand(solar_zenith) * cosd(azimuth_angle - solar_azimuth)))
     aoi_l_iso = atand(sind(aoi) * cosd(azimuth_angle - solar_azimuth) / cosd(aoi))
 
+    ext_terr_normal_irr = extraterrestrial_normal_irradiance(dayofyear(sim_params["current_date"]))
+
     # calculate direct normal irradiance from beam horrizontal irradiance
     if isnothing(dni)
         if solar_zenith >= zenith_threshold_for_zero_dni
             direct_normal_irradiance = 0
         else
-            direct_normal_irradiance = max(
-                (beam_solar_hor_irradiance) / cosd(solar_zenith), 0
-                )
+            direct_normal_irradiance = max((beam_solar_hor_irradiance) / cosd(solar_zenith), 0)
+            direct_normal_irradiance = min(direct_normal_irradiance, ext_terr_normal_irr)
         end
     else
         direct_normal_irradiance = dni
@@ -157,17 +158,17 @@ function irr_in_plane(sim_params, tilt_angle::Number, azimuth_angle::Number,
     # calculate the diffuse irradiance on the collector plane from the sky with the Hay model see:
     # J. E. Hay, Calculation of monthly mean solar radiation for horizontal and inclined surfaces, 
     # Solar Energy, Jg. 23, Nr. 4, S. 301–307, 1979. doi: 10.1016/0038-092X(79)90123-3. 
-    ext_terr_normal_irr = extraterrestrial_normal_irradiance(dayofyear(sim_params["current_date"]))
-    ext_terr_irr = ext_terr_normal_irr * cosd(solar_zenith) 
-    anisotropy_index = beam_solar_hor_irradiance / ext_terr_irr
+    anisotropy_index = direct_normal_irradiance / ext_terr_normal_irr
 
-    diffuse_sky_irradiance_in_plane = diffuse_solar_hor_irradiance * (
+    diffuse_sky_irradiance_in_plane = max(0, diffuse_solar_hor_irradiance * (
                                         (1 - anisotropy_index) * (1 + cosd(tilt_angle)) / 2 + 
                                         anisotropy_index * cosd(aoi)/sind(solar_zenith)
-                                        )
+                                        ))
 
     # calculate the diffuse irradiance on the collector plane from the ground
-    diffuse_ground_irradiance_in_plane = ground_reflectance * (beam_solar_hor_irradiance + diffuse_solar_hor_irradiance) * (1 - cosd(tilt_angle)) / 2 
+    diffuse_ground_irradiance_in_plane = ground_reflectance * 
+                                         (beam_solar_hor_irradiance + diffuse_solar_hor_irradiance) * 
+                                         (1 - cosd(tilt_angle)) / 2 
 
     diffuse_solar_irradiance_in_plane = diffuse_sky_irradiance_in_plane + diffuse_ground_irradiance_in_plane
 
@@ -183,12 +184,13 @@ function extraterrestrial_normal_irradiance(day_of_year::Int)
     """
     day_angle = 2*pi*(day_of_year-1) / 365
     solar_constant = 1361 # new solar constant since 2015
-    etrn = solar_constant * 1.000110 + 0.034221 * cos(day_angle) + 0.001280 * sin(day_angle) + 
-           0.000719 * cos(2*day_angle) + 0.000077 * sin(2*day_angle) 
+    etrn = solar_constant * (1.000110 + 0.034221 * cos(day_angle) + 0.001280 * sin(day_angle) + 
+           0.000719 * cos(2*day_angle) + 0.000077 * sin(2*day_angle)) 
     return etrn
 end
 
-function get_sunrise_sunset(dt::DateTime, latitude::Number, longitude::Number, time_zone::Number, pressure::Number=1.0, temperature::Number=10.9)
+function get_sunrise_sunset(dt::DateTime, latitude::Number, longitude::Number, 
+                            time_zone::Number, pressure::Number=1.0, temperature::Number=10.9)
     """
     get_sunset_sunrise computes sunrise and sunset (in fractional hours) for a given Date and location.
     """
