@@ -521,13 +521,13 @@ function set_max_energy!(interface::SystemInterface,
     energy = convert_to_vector(energy, Vector{Floathing})
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
-    if length(temperature_min) !== length(temperature_max)
-        if temperature_min == Vector{Temperature}([nothing])
-            temperature_min = Vector{Temperature}([nothing for _ in temperature_max])
-        elseif temperature_max == Vector{Temperature}([nothing])
-            temperature_max = Vector{Temperature}([nothing for _ in temperature_min])
-        end
+    if length(energy) !== length(temperature_min)
+        temperature_min = Vector{Temperature}([nothing for _ in energy])
     end
+    if length(energy) !== length(temperature_max)
+        temperature_max = Vector{Temperature}([nothing for _ in energy])
+    end
+
     if interface.source.sys_function == sf_bus
         set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
                         has_calculated_all_maxima, recalculate_max_energy)

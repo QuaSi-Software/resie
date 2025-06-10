@@ -5,7 +5,7 @@ This control module is located always at the source component.
 
 Currently implemented for
     Sources: GeothermalProbes
-    Tartes: SeasonalThermalStorage
+    Targets: SeasonalThermalStorage
 
 Source components need to have the following functions:
     - get_output_temperature_bounds()
