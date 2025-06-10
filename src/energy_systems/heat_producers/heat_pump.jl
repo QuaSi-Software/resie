@@ -666,6 +666,7 @@ between these indices.
 - `sim_params::Dict{String,Any}`: Simulation parameters.
 - `energies::HPEnergies`: The energies container.
 - `plrs::Array{Float64}`: The PLR for each slice.
+- `is_final::Bool`: If this is the final calculation of the optimisation process
 - `fixed_heat_in`: If given, this input layer is fixed (see reset_available!())
 - `fixed_heat_out`:  If given, this output layer is fixed (see reset_available!())
 # Returns
@@ -675,6 +676,7 @@ function calculate_slices(unit::HeatPump,
                           sim_params::Dict{String,Any},
                           energies::HPEnergies,
                           plrs::Vector{Float64},
+                          is_final::Bool,
                           fixed_heat_in::Union{Nothing,Integer}=nothing,
                           fixed_heat_out::Union{Nothing,Integer}=nothing)::HPEnergies
     # reset at the beginning, because the optimisation algorithm will call this function
@@ -763,9 +765,10 @@ function calculate_slices(unit::HeatPump,
         # the fudge factor causes us to slightly overestimate the maximum heat out energy
         # assuming the remaining time is used up. this helps with the solver meeting demands
         # exactly and the resulting "error" is much smaller than the typical overall
-        # inaccuracies of the calculation
+        # inaccuracies of the calculation. however we only do this in the final calculation
         available_heat_out = min(energies.available_heat_out[snk_idx],
-                                 unit.fudge_factor * available_time * used_power / 3600)
+                                 (is_final ? unit.fudge_factor : 1.0)
+                                 * available_time * used_power / 3600)
 
         used_heat_in,
         used_el_in,
@@ -851,7 +854,9 @@ function find_best_slicing(unit::HeatPump,
         default_plrs = fill(1.0,
                             length(energies.potentials_heat_in) *
                             length(energies.potentials_heat_out))
-        energies = calculate_slices(unit, sim_params, energies, default_plrs, fixed_heat_in, fixed_heat_out)
+        # technically this is the only and final calculation, but the fudge factor is only
+        # relevant for optimisation, which is why we disable it here
+        energies = calculate_slices(unit, sim_params, energies, default_plrs, false, fixed_heat_in, fixed_heat_out)
         return energies
     end
 
@@ -872,14 +877,14 @@ function find_best_slicing(unit::HeatPump,
     # run optimisation to find PLRs that meet demands and are optimal by criteria depending
     # on the model type (see function evaluate)
     results = optimize(plrs -> evaluate(calculate_slices(unit,
-                                                         sim_params, energies, plrs,
+                                                         sim_params, energies, plrs, false,
                                                          fixed_heat_in, fixed_heat_out), unit, plrs, sim_params),
                        lower_plrs, upper_plrs, initial_plrs, NelderMead(),
                        Options(; iterations=Int64(unit.nr_optimisation_passes),
                                x_abstol=unit.x_abstol,
                                f_abstol=unit.f_abstol))
     optimal_plrs = minimizer(results)
-    energies = calculate_slices(unit, sim_params, energies, optimal_plrs, fixed_heat_in, fixed_heat_out)
+    energies = calculate_slices(unit, sim_params, energies, optimal_plrs, true, fixed_heat_in, fixed_heat_out)
 
     return energies
 end

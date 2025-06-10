@@ -361,13 +361,13 @@ function test_heat_pump_1S1D_infinite_output()
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
     cop = heat_out / el_in
     # the calculation of the heat pump includes a fudge factor that slightly
-    # overestimates the heat output
-    fudge = 1.001
-    @test el_in ≈ 563.3723547951373
+    # overestimates the heat output, however it shouldn't affect operation when the power or
+    # heat output is the limiting factor
+    @test el_in ≈ 562.8095452498875
     # the input is a fixed source and the heat pump slightly undersized, so there is heat
     # input left over that we have to consider
-    @test heat_in ≈ (2000 + 1939.1276452048621) * 0.5
-    @test heat_out ≈ 2500.0 * fudge
+    @test heat_in ≈ 1968.5952273750563
+    @test heat_out ≈ 2500.0
     @test cop ≈ 4.442
 end
 
@@ -1076,7 +1076,7 @@ function test_heat_pump_2S2D_on_off_optimisation_is_constant()
 
         all_values_as_expected = all_values_as_expected &&
                                  heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 2000.0
-        all_values_as_expected = all_values_as_expected && heat_pump.time_active ≈ 1.0003909380947407 # fudge factor
+        all_values_as_expected = all_values_as_expected && heat_pump.time_active ≈ 1.0
         all_values_as_expected = all_values_as_expected && heat_pump.avg_plr ≈ 0.8
         all_values_as_expected = all_values_as_expected &&
                                  source_1.output_interfaces[source_1.medium].sum_abs_change * 0.5 ≈ 1000.0
