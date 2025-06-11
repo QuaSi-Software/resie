@@ -118,7 +118,7 @@ from a given source. Several options are available:
 function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
                                           components::Grouping,
                                           source_uac::String,
-                                          target_uac::String,
+                                          target_uac::Stringing,
                                           sim_params::Dict{String,Any})::Tuple{Temperature,Float64}
     # get temperature bounds from source and target
     # would be the same as from exchange, but control might not performed yet

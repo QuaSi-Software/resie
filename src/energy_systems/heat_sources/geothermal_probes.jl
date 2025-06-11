@@ -757,12 +757,12 @@ function control(unit::GeothermalProbes,
     unit.current_max_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
 
     # calculate maximum energy in dependence of the output temperature(s)
-    exchange = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
+    exchanges = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
 
     max_energy_out = Float64[]
     temp_out = Temperature[]
-    uac_out = String[]
-    for exchange in exchange
+    uac_out = Stringing[]
+    for exchange in exchanges
         target_uac = exchange.purpose_uac
         # no check for possibly written max energy --> is done by set_max_energy!() for 1-to-1 connections and for a 
         # connection to a bus, the interface is only used by the current component

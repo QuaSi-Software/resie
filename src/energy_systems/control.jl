@@ -416,7 +416,7 @@ to target. No aggregation with other control modules.
 function determine_temperature_and_energy(controller::Controller,
                                           components::Grouping,
                                           source_uac::String,
-                                          target_uac::String,
+                                          target_uac::Stringing,
                                           sim_params::Dict{String,Any})::Tuple{Bool,Temperature,Float64}
     for mod in controller.modules
         if !has_method_for(mod, cmf_negotiate_temperature)
@@ -426,17 +426,13 @@ function determine_temperature_and_energy(controller::Controller,
             continue
         end
 
-        results = determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
-                                                   components::Grouping,
-                                                   source_uac::String,
-                                                   target_uac::String,
-                                                   sim_params::Dict{String,Any})
+        results = determine_temperature_and_energy(mod, components, source_uac, target_uac, sim_params)
         return true, results[1], results[2]
     end
 
     if sim_params["time"] == 0
         if components[source_uac] isa TemperatureNegotiateSource &&
-           components[target_uac] isa TemperatureNegotiateTarget
+           target_uac !== nothing && components[target_uac] isa TemperatureNegotiateTarget
             @warn "From $(source_uac) to $(target_uac), no control module is activated. This can lead to unexpected " *
                   "results. Add a `negotiate_temperature` control module at $(source_uac)!"
         end
