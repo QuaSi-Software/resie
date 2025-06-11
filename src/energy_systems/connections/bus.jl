@@ -678,7 +678,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 energy_pot = Inf
                 temperature_min = get_min_temperature(input_row.energy_potential, input_row.energy_pool,
                                                       output_row.target.uac)
-                temperature_max = get_min_temperature(input_row.energy_pool, input_row.energy_potential,
+                temperature_max = get_max_temperature(input_row.energy_pool, input_row.energy_potential,
                                                       output_row.target.uac)
             else
                 if is_max_energy_nothing(interface.max_energy) # no max energy is written --> get infos from input_row
