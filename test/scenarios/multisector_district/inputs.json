@@ -380,6 +380,7 @@
             "m_heat_out": "m_h_w_ht1",
             "power_th": 550000,
             "cop_function": "const:3.0",
+            "min_usage_fraction": 0.2,
             "power_losses_factor": 1.0,
             "heat_losses_factor": 1.0
         },

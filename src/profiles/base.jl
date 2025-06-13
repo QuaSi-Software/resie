@@ -81,10 +81,12 @@ mutable struct Profile
             time_shift_seconds = nothing
 
             file_handle = nothing
+            current_line = nothing
 
             try
                 file_handle = open(abspath(file_path), "r")
                 for (line_idx, line) in enumerate(readlines(file_handle))
+                    current_line = line_idx
                     line = strip(line)
 
                     if isempty(line) || length(line) < 1 # handle empty lines
@@ -125,7 +127,7 @@ mutable struct Profile
                     end
                 end
             catch e
-                @error "While reading the data from the profile at $(file_path) the following error occured: $e\n" *
+                @error "While reading the data from the profile at $(file_path) in line $(current_line) the following error occured: $e\n" *
                        "Check if the file exists at the specified path!"
                 throw(InputError)
             finally

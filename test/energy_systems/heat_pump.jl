@@ -273,8 +273,8 @@ function get_config_heat_pump_1S1D_infinities(; inf_as_source::Bool=true)
         extended = Dict{String,Any}(
             "TST_DEM_01" => Dict{String,Any}(
                 "type" => "GridConnection",
-                "medium" => "m_h_w_lt1",
-                "output_refs" => ["TST_HP_01"],
+                "medium" => "m_h_w_ht1",
+                "output_refs" => [],
                 "is_source" => false,
             ),
             "TST_SRC_01" => Dict{String,Any}(
@@ -326,8 +326,53 @@ function test_heat_pump_1S1D_infinite_input()
     @test cop ≈ 4.442
 end
 
-@testset "test_heat_pump_1S1D_infinite_output" begin
+@testset "test_heat_pump_1S1D_infinite_input" begin
     test_heat_pump_1S1D_infinite_input()
+end
+
+function test_heat_pump_1S1D_infinite_output()
+    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
+    simulation_parameters = get_default_sim_params()
+
+    components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
+    heat_pump = components["TST_HP_01"]
+    source = components["TST_SRC_01"]
+    demand = components["TST_DEM_01"]
+    grid = components["TST_GRI_01"]
+
+    for unit in values(components)
+        EnergySystems.reset(unit)
+    end
+
+    EnergySystems.control(demand, components, simulation_parameters)
+    EnergySystems.control(source, components, simulation_parameters)
+    EnergySystems.control(heat_pump, components, simulation_parameters)
+    EnergySystems.control(grid, components, simulation_parameters)
+
+    EnergySystems.process(source, simulation_parameters)
+    EnergySystems.process(heat_pump, simulation_parameters)
+    EnergySystems.process(demand, simulation_parameters)
+    EnergySystems.process(grid, simulation_parameters)
+
+    el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
+    heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    cop = heat_out / el_in
+    # the calculation of the heat pump includes a fudge factor that slightly
+    # overestimates the heat output, however it shouldn't affect operation when the power or
+    # heat output is the limiting factor
+    @test el_in ≈ 562.8095452498875
+    # the input is a fixed source and the heat pump slightly undersized, so there is heat
+    # input left over that we have to consider
+    @test heat_in ≈ 1968.5952273750563
+    @test heat_out ≈ 2500.0
+    @test cop ≈ 4.442
+end
+
+@testset "test_heat_pump_1S1D_infinite_output" begin
+    test_heat_pump_1S1D_infinite_output()
 end
 
 function test_heat_pump_1S1D_losses()
@@ -418,9 +463,13 @@ end
     test_heat_pump_1S1D_losses()
 end
 
-function test_heat_pump_1S1D_infinite_output()
-    components_config = get_config_heat_pump_1S1D_infinities(; inf_as_source=false)
+function test_heat_pump_1S1D_constant_losses()
+    components_config = get_config_heat_pump_1S1D()
     simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["cop_function"] = "const:2.0"
+    components_config["TST_HP_01"]["constant_loss_power"] = 20
+    delete!(components_config["TST_SRC_01"], "max_power_profile_file_path")
+    components_config["TST_SRC_01"]["constant_power"] = 400
 
     components = Resie.load_components(components_config, simulation_parameters)
     setup_mock_run!(components, simulation_parameters)
@@ -430,10 +479,14 @@ function test_heat_pump_1S1D_infinite_output()
     demand = components["TST_DEM_01"]
     grid = components["TST_GRI_01"]
 
+    heat_pump.power_losses_factor = 0.97
+    heat_pump.heat_losses_factor = 0.95
+
     for unit in values(components)
         EnergySystems.reset(unit)
     end
 
+    # first timestep, demand is well below max power of source
     EnergySystems.control(demand, components, simulation_parameters)
     EnergySystems.control(source, components, simulation_parameters)
     EnergySystems.control(heat_pump, components, simulation_parameters)
@@ -447,15 +500,19 @@ function test_heat_pump_1S1D_infinite_output()
     el_in = heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5
     heat_in = heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5
     heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    cop = heat_out / el_in
-    @test el_in ≈ 581.0575246949
-    @test heat_in ≈ 2000
-    @test heat_out ≈ 2581.0575246949
-    @test cop ≈ 4.442
+
+    @test el_in ≈ 56.25 / 0.97 + 5
+    @test heat_in ≈ 56.25 / 0.95
+    @test heat_out ≈ 112.5
+    @test heat_pump.cop ≈ 2.0
+    @test heat_pump.effective_cop ≈ 112.5 / (56.25 / 0.97 + 5)
+    @test heat_pump.losses_heat ≈ (1.0 / 0.95 - 1.0) * 56.25
+    @test heat_pump.losses_power ≈ (1.0 / 0.97 - 1.0) * 56.25
+    @test heat_pump.losses ≈ (1.0 / 0.97 - 1.0) * 56.25 + (1.0 / 0.95 - 1.0) * 56.25 + 5
 end
 
-@testset "test_heat_pump_1S1D_infinite_input" begin
-    test_heat_pump_1S1D_infinite_input()
+@testset "test_heat_pump_1S1D_constant_losses" begin
+    test_heat_pump_1S1D_constant_losses()
 end
 
 function get_config_heat_pump_2S2D()
@@ -596,6 +653,7 @@ end
 function test_heat_pump_2S2D_losses()
     components_config = get_config_heat_pump_2S2D()
     simulation_parameters = get_default_sim_params()
+    components_config["TST_HP_01"]["model_type"] = "on-off"
     components_config["TST_HP_01"]["power_losses_factor"] = 0.97
     components_config["TST_HP_01"]["heat_losses_factor"] = 0.95
     components_config["TST_HP_01"]["power_th"] = 16000
@@ -663,9 +721,8 @@ function test_heat_pump_2S2D_losses()
     @test heat_pump.effective_cop ≈ 3.714126760978019
     @test heat_pump.losses_heat > 2333.163086075765 - 2225.82807180554
     @test heat_pump.losses_power < 807.7268744618796 - 774.1719281944598
-    @test heat_pump.time_active ≈ 0.75
-    @test heat_pump.avg_plr ≈ 0.0 # no idea why the PLR calculation doesn't work here,
-    # but it's not really relevant for the test
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.75
 end
 
 @testset "heat_pump_2S2D_losses" begin
@@ -836,6 +893,7 @@ end
 function test_heat_pump_2S2D_min_power()
     components_config = get_config_heat_pump_2S2D()
 
+    components_config["TST_HP_01"]["model_type"] = "on-off"
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.35"
@@ -854,7 +912,7 @@ function test_heat_pump_2S2D_min_power()
     bus_1 = components["TST_BUS_01"]
     bus_2 = components["TST_BUS_02"]
 
-    # first time step: slices can be "slowed down" enough to compensate for high power
+    # first time step: min power is below the operation point
 
     for unit in values(components)
         EnergySystems.reset(unit)
@@ -873,13 +931,14 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
-    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    @test produced_heat ≈ 3000.0
-    @test produced_heat / energy_full_power > 0.35
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test heat_out ≈ 3000.0
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.42857142857143
 
-    # second time step: min power of each slice is so high that they can't be "slowed down"
-    # enough to compensate
+    # second time step: min power is above the operation point, causing slices to run with
+    # higher power and thus less time. the PLR is unaffected as it is calculated from
+    # actually produced and maximum energies, which haven't changed.
     heat_pump.min_power_function = (x, y) -> 0.8
 
     for unit in values(components)
@@ -899,10 +958,10 @@ function test_heat_pump_2S2D_min_power()
     EnergySystems.distribute!(bus_1)
     EnergySystems.distribute!(bus_2)
 
-    energy_full_power = simulation_parameters["watt_to_wh"](heat_pump.design_power_th)
-    produced_heat = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
-    @test produced_heat ≈ 0.0
-    @test produced_heat / energy_full_power ≈ 0.0
+    heat_out = heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5
+    @test heat_out ≈ 3000.0
+    @test heat_pump.time_active ≈ 0.5357142857142857
+    @test heat_pump.avg_plr ≈ 0.42857142857143
 end
 
 @testset "heat_pump_2S2D_min_power" begin
@@ -912,14 +971,13 @@ end
 function test_heat_pump_2S2D_optimising_slices()
     components_config = get_config_heat_pump_2S2D()
 
+    components_config["TST_HP_01"]["model_type"] = "inverter"
     components_config["TST_HP_01"]["power_th"] = 28000
     components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
     components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
     components_config["TST_HP_01"]["min_power_fraction"] = 0.2
     components_config["TST_HP_01"]["plf_function"] = "poly:-1.93407,1.53407,0.9"
     components_config["TST_HP_01"]["cop_function"] = "carnot:0.4"
-    components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
-    components_config["TST_HP_01"]["optimal_plr"] = 0.4
 
     simulation_parameters = get_default_sim_params()
     eps = simulation_parameters["epsilon"]
@@ -961,33 +1019,74 @@ function test_heat_pump_2S2D_optimising_slices()
     @test heat_pump.input_interfaces[heat_pump.m_el_in].sum_abs_change * 0.5 < 1403.5371253472942 - eps
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].sum_abs_change * 0.5 > 1596.4628746527055 + eps
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 3000.0
-    # fully optimal would be 1.0 for time_active and 0.4 for plr
-    @test heat_pump.time_active ≈ 0.9222481721394582
-    @test heat_pump.avg_plr ≈ 0.4653057040302939
+    # the optimiser has 1.0 for time_active and a value close to 0.4 for plr as optimum
+    @test heat_pump.time_active ≈ 1.0
+    @test heat_pump.avg_plr ≈ 0.4285714285714286
 end
 
 @testset "heat_pump_2S2D_optimising_slices" begin
     test_heat_pump_2S2D_optimising_slices()
 end
 
-function test_heat_pump_2S2D_auto_calculate_optimal_plr()
+function test_heat_pump_2S2D_on_off_optimisation_is_constant()
     components_config = get_config_heat_pump_2S2D()
 
-    components_config["TST_HP_01"]["power_th"] = 28000
-    components_config["TST_HP_01"]["max_power_function"] = "const:1.0"
-    components_config["TST_HP_01"]["min_power_function"] = "const:0.2"
-    components_config["TST_HP_01"]["min_power_fraction"] = 0.2
-    components_config["TST_HP_01"]["plf_function"] = "poly:-1.93407,1.53407,0.9"
-    components_config["TST_HP_01"]["cop_function"] = "carnot:0.4"
-    components_config["TST_HP_01"]["optimise_slice_dispatch"] = true
+    components_config["TST_HP_01"]["model_type"] = "on-off"
+    components_config["TST_HP_01"]["power_th"] = 10000
+    # we give the optimisation enough iterations to converge
+    components_config["TST_HP_01"]["nr_optimisation_passes"] = 100
+    # both sources can cover more than either demand, but not both
+    components_config["TST_DEM_01"]["constant_demand"] = 4000
+    components_config["TST_DEM_02"]["constant_demand"] = 4000
+    components_config["TST_SRC_01"]["constant_power"] = 4000
+    components_config["TST_SRC_02"]["constant_power"] = 4000
 
     simulation_parameters = get_default_sim_params()
+
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
-    @test heat_pump.optimal_plr > 0.39659112648456 - 0.001
-    @test heat_pump.optimal_plr < 0.39659112648456 + 0.001
+    source_1 = components["TST_SRC_01"]
+    source_2 = components["TST_SRC_02"]
+    demand_1 = components["TST_DEM_01"]
+    demand_2 = components["TST_DEM_02"]
+    grid = components["TST_GRI_01"]
+    bus_1 = components["TST_BUS_01"]
+    bus_2 = components["TST_BUS_02"]
+
+    all_values_as_expected = true
+    for _ in range(1, 10)
+        for unit in values(components)
+            EnergySystems.reset(unit)
+        end
+        for unit in values(components)
+            EnergySystems.control(unit, components, simulation_parameters)
+        end
+
+        EnergySystems.process(demand_1, simulation_parameters)
+        EnergySystems.process(demand_2, simulation_parameters)
+        EnergySystems.process(heat_pump, simulation_parameters)
+        EnergySystems.process(source_1, simulation_parameters)
+        EnergySystems.process(source_2, simulation_parameters)
+        EnergySystems.process(grid, simulation_parameters)
+
+        EnergySystems.distribute!(bus_1)
+        EnergySystems.distribute!(bus_2)
+
+        all_values_as_expected = all_values_as_expected &&
+                                 heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change * 0.5 ≈ 2000.0
+        all_values_as_expected = all_values_as_expected && heat_pump.time_active ≈ 1.0
+        all_values_as_expected = all_values_as_expected && heat_pump.avg_plr ≈ 0.8
+        all_values_as_expected = all_values_as_expected &&
+                                 source_1.output_interfaces[source_1.medium].sum_abs_change * 0.5 ≈ 1000.0
+        all_values_as_expected = all_values_as_expected &&
+                                 source_2.output_interfaces[source_2.medium].sum_abs_change * 0.5 ≈ 585.9995757533969
+    end
+
+    @test all_values_as_expected
 end
 
-@testset "heat_pump_2S2D_auto_calculate_optimal_plr" begin
-    test_heat_pump_2S2D_auto_calculate_optimal_plr()
+@testset "heat_pump_2S2D_on_off_optimisation_is_constant" begin
+    test_heat_pump_2S2D_on_off_optimisation_is_constant()
 end
