@@ -92,12 +92,22 @@ mutable struct HeatPump <: Component
         model_type = lowercase(default(config, "model_type", "simplified"))
         if !(model_type in ("simplified", "on-off", "inverter"))
             @error "Unknown model type $(model_type) given for heat pump $(uac)."
+            throw(InputError)
         end
 
-        if model_type == "inverter" && constant_cop !== nothing
-            @error "Heat pump $(uac) is configured to optimise slice dispatch for inverter " *
-                   "driven operation, but has a constant COP. Toggle optimisation off as " *
-                   "the algorithm is unstable in this case."
+        if model_type in ("inverter", "on-off") && constant_cop !== nothing
+            @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
+                   "or on-off operation, but has a constant COP. Toggle optimisation off " *
+                   "by switching to simplified model type as the algorithm is unstable " *
+                   "this case."
+            throw(InputError)
+        end
+
+        if model_type == "simplified" && !occursin("const", default(config, "plf_function", "const:1.0"))
+            @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
+                   "function. The simplified model cannot handle this correctly. Please " *
+                   "use a different model type or switch to a constant PLF function."
+            throw(InputError)
         end
 
         return new(uac,
