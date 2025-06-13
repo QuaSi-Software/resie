@@ -1086,28 +1086,22 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     el_in = sum(energies.slices_el_in; init=0.0)
     heat_out = sum(energies.slices_heat_out; init=0.0)
 
-    # we set the max energies to zero now, as they will be overwritten with actual values
-    # if and only if the heat pump is actually running. however due to constant losses the
-    # it is guarranteed that we have an electricity slice
     if heat_out < sim_params["epsilon"]
+        # due to constant losses we are guarranteed to have an electricity slice, though
+        # it might be zero. we also need to set the max_energy values to zero for the
+        # heat input and output, as the sub! and add! methods do that when called
         set_max_energies!(unit, el_in, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
-
-        if length(energies.slices_heat_in) > 0
-            sub!(unit.input_interfaces[unit.m_heat_in],
-                 energies.slices_heat_in,
-                 lowest(energies.slices_heat_in_temperature),
-                 energies.slices_heat_in_uac)
-        end
-
-        if length(energies.slices_heat_out) > 0
-            add!(unit.output_interfaces[unit.m_heat_out],
-                 energies.slices_heat_out,
-                 highest(energies.slices_heat_out_temperature),
-                 energies.slices_heat_out_uac)
-        end
+        sub!(unit.input_interfaces[unit.m_heat_in],
+             energies.slices_heat_in,
+             lowest(energies.slices_heat_in_temperature),
+             energies.slices_heat_in_uac)
+        add!(unit.output_interfaces[unit.m_heat_out],
+             energies.slices_heat_out,
+             highest(energies.slices_heat_out_temperature),
+             energies.slices_heat_out_uac)
     end
 
     # calculate losses, effective COP and mixing temperatures with the final values of
