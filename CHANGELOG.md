@@ -4,6 +4,18 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.11.2
+* Improve error output for reading in profiles from files by including the line where the error occured
+* Adjust ReSiE CLI to handle Ctrl+c more gracefully
+* Add tests for control module profile_limited, which previously had none
+* Updates to heat pump:
+  * Introduce parameter model_type with three options:
+    * simplified: A model that assumes a constant part load factor (PLF) function, meaning that efficiency does not depend on the part load ratio (PLR)
+    * inverter: This replaces the previous optimisation model, which tries to adjust the PLRs for each slice such that less electricity is consumed (as inverter-driven heat pumps are more efficient with a PLR less than 1.0)
+    * on-off: This now also makes use of optimisation to adjust the PLRs of each slice, however in this case to "fill out" the timestep completely, such that the active time becomes 1.0. This is intended as the PLF function of on-off heat pumps are supposed to capture cycling losses when the heat pump repeatedly turns on and off to meet a demand less than its full power.
+  * Add option to model a constant electricity loss even when the heat pump is not running
+  * Add minimum usage fraction (not to be confused with minimum power) as parameter, causing the heat pump to not run when the calculated usage is below this threshold
+
 ### Version 0.11.1
 * Fix profiles (type "datestamp") to correctly handle data with and without DST
 
