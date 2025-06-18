@@ -59,3 +59,11 @@ profiles/validation/Dannenmannstr/WMZ_temperature_out.prf
 profiles/validation/RSTV/240503_RSTV_validation_data.csv
 profiles/validation/RSTV/DWD_beam_irr.prf
 profiles/validation/RSTV/ProWetter_beam_hor_irr.prf
+profiles/validation/Dannenmannstr/absorber_flow_rate_l_h.prf
+profiles/validation/Dannenmannstr/absorber_delta_T_haus13.prf
+profiles/weather/Messwerte_Tuebingen_2021.epw
+profiles/validation/Dannenmannstr/absorber_flow_rate_calc_l_h.prf
+profiles/weather/Messwerte_Stuttgart_2021.epw
+profiles/validation/RSTV/WMZ_flow_rate_l_h.prf
+profiles/validation/RSTV/calc_temperature_in_haus4a.prf
+profiles/validation/RSTV/calc_flow_rate_l_h.prf

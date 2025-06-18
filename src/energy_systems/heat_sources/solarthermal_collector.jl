@@ -126,10 +126,10 @@ mutable struct SolarthermalCollector <: Component
             0.0, # long_wave_irradiance from profile
             0.0, # direct_normal_irradiance calculated from sun position
             
-            default(config, "delta_T", nothing), # delta_T between input and output temperature
-            default(config, "spec_flow_rate", nothing), # nominal specific volume flow of the thermal collector
-            default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy; used together with spec_flow_rate
-            default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy; used together with delta_T
+            default(config, "delta_T", nothing), # delta_T between input and output temperature in K
+            default(config, "spec_flow_rate", nothing), # nominal specific volume flow of the thermal collector in m³/(m²*s)
+            default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
+            default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
 
             0.0, # specific thermal power of the solarthermal collector
             0.0, # maximum available energy

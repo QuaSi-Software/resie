@@ -135,10 +135,10 @@ mutable struct SolarthermalCollectorVal <: Component
             0.0, # long_wave_irradiance from profile
             0.0, # direct_normal_irradiance calculated from sun position
             
-            default(config, "delta_T", nothing), # delta_T between input and output temperature
-            default(config, "spec_flow_rate", nothing), # nominal specific volume flow of the thermal collector
-            default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy; used together with spec_flow_rate
-            default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy; used together with delta_T
+            default(config, "delta_T", nothing), # delta_T between input and output temperature in K
+            default(config, "spec_flow_rate", nothing), # nominal specific volume flow of the thermal collector in m³/(m²*s)
+            default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
+            default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
 
             0.0, # specific thermal power of the solarthermal collector
             0.0, # maximum available energy
@@ -186,13 +186,17 @@ function initialise!(unit::SolarthermalCollectorVal, sim_params::Dict{String,Any
     unit.K_b_itp = init_K_b(unit.K_b_array)
 
     # for validation
-    unit.flow_rate_profile = Profile("./profiles/validation/TRNSYS_flow_rate_l_h.prf", sim_params)
-    # unit.flow_rate_profile = Profile("./profiles/validation/Dannenmannstr/absorber_flow_rate_m3_h.prf", sim_params)
-    unit.input_temp_profile = Profile("./profiles/validation/TRNSYS_temperature_in.prf", sim_params)
-    # unit.input_temp_profile = Profile("./profiles/validation/Dannenmannstr/WMZ_temperature_in.prf", sim_params)
-    unit.beam_irr_profile = Profile("./profiles/validation/TRNSYS_beam_irr.prf", sim_params, shift=Dates.Second(3600))
-    unit.diff_irr_profile = Profile("./profiles/validation/TRNSYS_diff_irr.prf", sim_params, shift=Dates.Second(3600))
-    unit.dni_profile = Profile("./profiles/validation/TRNSYS_dni.prf", sim_params)
+    # unit.flow_rate_profile = Profile("./profiles/validation/TRNSYS_flow_rate_l_h.prf", sim_params)
+    # unit.flow_rate_profile = Profile("./profiles/validation/Dannenmannstr/absorber_flow_rate_calc_l_h.prf", sim_params)
+    # unit.flow_rate_profile = Profile("./profiles/validation/RSTV/WMZ_flow_rate_l_h.prf", sim_params)
+    unit.flow_rate_profile = Profile("./profiles/validation/RSTV/calc_flow_rate_l_h.prf", sim_params)
+    # unit.input_temp_profile = Profile("./profiles/validation/TRNSYS_temperature_in.prf", sim_params)
+    # unit.input_temp_profile = Profile("./profiles/validation/Dannenmannstr/absorber_temperature_in.prf", sim_params)
+    unit.input_temp_profile = Profile("./profiles/validation/RSTV/all_temperature_in.prf", sim_params)
+    # unit.input_temp_profile = Profile("./profiles/validation/RSTV/calc_temperature_in_haus4a.prf", sim_params)
+    # unit.beam_irr_profile = Profile("./profiles/validation/TRNSYS_beam_irr.prf", sim_params, shift=Dates.Second(3600))
+    # unit.diff_irr_profile = Profile("./profiles/validation/TRNSYS_diff_irr.prf", sim_params, shift=Dates.Second(3600))
+    # unit.dni_profile = Profile("./profiles/validation/TRNSYS_dni.prf", sim_params)
 
 end
 
@@ -204,7 +208,6 @@ function control(unit::SolarthermalCollectorVal,
     # for validation
     unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 
                           3600 / 1000 / unit.collector_gross_area
-    # unit.spec_flow_rate = Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
     # unit.spec_flow_rate = ifelse(unit.spec_flow_rate < 2.78e-5 * 0.8, 2.78e-5, unit.spec_flow_rate)
     runtime_percent = 1
     # runtime_percent = (Profiles.value_at_time(unit.flow_rate_profile, sim_params) / 3600 / unit.collector_gross_area
@@ -226,8 +229,10 @@ function control(unit::SolarthermalCollectorVal,
         )
     mean_ambient_temperature = _mean(collect(values(unit.ambient_temperature_profile.data)))
 
+    # unit.reduced_wind_speed = max(
+    #     Profiles.value_at_time(unit.wind_speed_profile, sim_params) * unit.wind_speed_reduction - 3, 0)
     unit.reduced_wind_speed = max(
-        Profiles.value_at_time(unit.wind_speed_profile, sim_params) * unit.wind_speed_reduction - 3, 0)
+        Profiles.value_at_time(unit.wind_speed_profile, sim_params) * unit.wind_speed_reduction, 0)
 
     unit.long_wave_irradiance = sim_params["wh_to_watts"](Profiles.value_at_time(
         unit.long_wave_irradiance_profile, sim_params
@@ -242,9 +247,9 @@ function control(unit::SolarthermalCollectorVal,
                  )
 
     # for validation
-    unit.beam_solar_irradiance_in_plane = (Profiles.value_at_time(unit.beam_irr_profile, sim_params))
-    unit.diffuse_solar_irradiance_in_plane = (Profiles.value_at_time(unit.diff_irr_profile, sim_params))
-    unit.direct_normal_irradiance = (Profiles.value_at_time(unit.dni_profile, sim_params))
+    # unit.beam_solar_irradiance_in_plane = (Profiles.value_at_time(unit.beam_irr_profile, sim_params))
+    # unit.diffuse_solar_irradiance_in_plane = (Profiles.value_at_time(unit.diff_irr_profile, sim_params))
+    # unit.direct_normal_irradiance = (Profiles.value_at_time(unit.dni_profile, sim_params))
     unit.spec_flow_rate_profile_value = unit.spec_flow_rate
 
     unit.zenith_angle = solar_zenith
@@ -738,12 +743,14 @@ Function for calculating the thermal power output of a solarthermal collector.
 Can be used to solve after t_avg and find average_temperature for specific used energy
 """
 function spec_thermal_power_func_input_temp_old(t_avg, t_input, t_avg_last, spec_flow_rate, unit, time_step)   
-    eta_0_hem = 0.162
-    b_params = [10.04, 0.81, 0.152]
+    # eta_0_hem = 0.162
+    # b_params = [10.04, 0.81, 0.152]
+    eta_0_hem = 0.702
+    b_params = [32.64, 3.59, 0.066]
     
     f = 
-    eta_0_hem * (1-b_params[3]) * ((unit.beam_solar_irradiance_in_plane + unit.diffuse_solar_irradiance_in_plane) + 0.85 * (unit.long_wave_irradiance - 5.670374419e-8 * (unit.ambient_temperature + 273.15)^4)) -
-    (b_params[1] + b_params[2] * unit.reduced_wind_speed) * (t_avg - unit.ambient_temperature) -
+    eta_0_hem * (1-b_params[3] * (unit.reduced_wind_speed)) * ((unit.beam_solar_irradiance_in_plane + unit.diffuse_solar_irradiance_in_plane) + 0.85 * (unit.long_wave_irradiance - 5.670374419e-8 * (unit.ambient_temperature + 273.15)^4)) -
+    (b_params[1] + b_params[2] * (unit.reduced_wind_speed)) * (t_avg - unit.ambient_temperature) -
     spec_flow_rate * (t_avg - t_input) * 2 * unit.vol_heat_cap
 end
 
@@ -790,7 +797,7 @@ function output_values(unit::SolarthermalCollectorVal)::Vector{String}
             "diffuse_solar_irradiance_in_plane",
             "delta_T",
             "spec_flow_rate",
-            "spec_flwo_rate_profile",
+            "spec_flow_rate_profile",
             "zenith_angle",
             "angle_of_incidence"
             ]
