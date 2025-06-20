@@ -187,15 +187,10 @@ function control(unit::BufferTank,
 
     unit.current_max_output_temperature = temperature_at_load(unit)
 
-    set_temperature!(unit.output_interfaces[unit.medium],
-                     nothing,
-                     unit.current_max_output_temperature)
-    set_temperature!(unit.input_interfaces[unit.medium],
-                     unit.high_temperature,
-                     unit.high_temperature)
-
-    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy))
-    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy))
+    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy),
+                    unit.high_temperature, nothing)
+    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy), nothing,
+                    unit.current_max_output_temperature)
 
     if unit.ambient_temperature_profile !== nothing && unit.consider_losses
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
@@ -276,30 +271,6 @@ function calculate_losses!(unit::BufferTank, sim_params)
     unit.load = unit.load - unit.losses
 end
 
-function balance_on(interface::SystemInterface,
-                    unit::BufferTank)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    # The losses should be applied to the load at the beginning of the next timestep, but they
-    # might already be included in the load here. To avoid other components calling the balance_on() 
-    # in between, what then would include the current losses that are intended to be applied 
-    # in the next timestep, the losses must be added here again.
-    # In the first time step and ahead of their calculation, losses are zero.
-    current_load = unit.load + unit.losses
-
-    return [EnEx(;
-                 balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 :
-                                  (caller_is_input ? -(unit.capacity - current_load) : current_load),
-                 purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function process(unit::BufferTank, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
@@ -331,10 +302,10 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
         if unit.load > used_heat
             unit.load -= used_heat
-            add!(outface, used_heat, tank_temp)
+            add!(outface, used_heat, nothing, tank_temp)
             energy_demanded += used_heat
         else
-            add!(outface, unit.load, tank_temp)
+            add!(outface, unit.load, nothing, tank_temp)
             energy_demanded += unit.load
             unit.load = 0.0
         end
@@ -360,11 +331,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing &&
-            exchange.temperature_min > unit.high_temperature
-            ||
-            exchange.temperature_max !== nothing &&
-            exchange.temperature_max < unit.high_temperature)
+        if exchange.temperature_max !== nothing &&
+           exchange.temperature_max < unit.high_temperature
             # we can only take in energy if it's at a higher/equal temperature than the
             # tank's upper limit for temperatures
             continue
@@ -375,11 +343,11 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 
         if diff > used_heat
             unit.load += used_heat
-            sub!(inface, used_heat, unit.high_temperature)
+            sub!(inface, used_heat, unit.high_temperature, nothing)
             energy_available -= used_heat
         else
             unit.load = unit.capacity
-            sub!(inface, diff, unit.high_temperature)
+            sub!(inface, diff, unit.high_temperature, nothing)
             energy_available -= diff
         end
     end
@@ -393,7 +361,7 @@ function output_values(unit::BufferTank)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses",
+            "LossesGains",
             "CurrentMaxOutTemp"]
 end
 
@@ -408,8 +376,8 @@ function output_value(unit::BufferTank, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
     end

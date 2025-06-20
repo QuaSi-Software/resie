@@ -48,14 +48,18 @@ function test_run_energy_system_from_storage()
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
-            "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0,
+            "cop_function" => "const:3.0",
+            "min_power_function" => "const:0.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]
@@ -79,7 +83,7 @@ function test_run_energy_system_from_storage()
 
     EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
-    @test hheat_demand.input_interfaces[hheat_demand.medium].temperature_min === 45.0
+    @test hheat_demand.input_interfaces[hheat_demand.medium].max_energy.temperature_min == [45.0]
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
@@ -91,12 +95,12 @@ function test_run_energy_system_from_storage()
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ 0
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 1600
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min ≈ 45.0
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max === nothing
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_min == [45.0]
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_max == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -800 / 3
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy.temperature_min == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -800 * 2 / 3
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy.temperature_min == [nothing]
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -104,12 +108,12 @@ function test_run_energy_system_from_storage()
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 800 * 2 / 3
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 800 * 2 / 3
-    @test lheat_storage.output_interfaces[lheat_storage.medium].temperature_max ≈ 35.0
+    @test lheat_storage.output_interfaces[lheat_storage.medium].max_energy.temperature_max == [35.0]
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2 * 800 / 3
-    @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
+    @test power_grid.output_interfaces[power_grid.medium].max_energy.temperature_max == [nothing]
 
     # second step: storage is nearly empty, operation of heatpump is limited
 
@@ -130,7 +134,7 @@ function test_run_energy_system_from_storage()
 
     EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
-    @test hheat_demand.input_interfaces[hheat_demand.medium].temperature_min ≈ 45.0
+    @test hheat_demand.input_interfaces[hheat_demand.medium].max_energy.temperature_min == [45.0]
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
@@ -142,12 +146,12 @@ function test_run_energy_system_from_storage()
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800 + 100 * 3 / 2
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800 + 100 * 3 / 2
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min ≈ 45.0
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max === nothing
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_min == [45.0]
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_max == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ -(100 * 3 / 2) / 3
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy.temperature_min == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ -100
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy.temperature_min == [nothing]
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -155,12 +159,12 @@ function test_run_energy_system_from_storage()
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 100
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 100
-    @test lheat_storage.output_interfaces[lheat_storage.medium].temperature_max === 35.0
+    @test lheat_storage.output_interfaces[lheat_storage.medium].max_energy.temperature_max == [35.0]
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 2 * (100 * 3 / 2) / 3
-    @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
+    @test power_grid.output_interfaces[power_grid.medium].max_energy.temperature_max == [nothing]
 end
 
 function test_run_energy_system_from_storage_denied()
@@ -205,14 +209,18 @@ function test_run_energy_system_from_storage_denied()
             ),
             "m_el_in" => "m_e_ac_230v",
             "power_th" => 12000,
-            "constant_cop" => 3.0,
-            "min_power_fraction" => 0.0,
+            "cop_function" => "const:3.0",
+            "min_power_function" => "const:0.0",
+            "power_losses_factor" => 1.0,
+            "heat_losses_factor" => 1.0,
         ),
     )
 
     simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
+    setup_mock_run!(components, simulation_parameters)
+
     heat_pump = components["TST_HP_01"]
     hheat_demand = components["TST_DEM_01"]
     power_grid = components["TST_GRI_01"]
@@ -237,7 +245,7 @@ function test_run_energy_system_from_storage_denied()
 
     EnergySystems.process(hheat_demand, simulation_parameters)
     @test hheat_demand.input_interfaces[hheat_demand.medium].balance ≈ -800
-    @test hheat_demand.input_interfaces[hheat_demand.medium].temperature_min === 45.0
+    @test hheat_demand.input_interfaces[hheat_demand.medium].max_energy.temperature_min == [45.0]
 
     # demand not processed yet --> balance is zero, but energy_potential not
     # input interfaces
@@ -249,12 +257,12 @@ function test_run_energy_system_from_storage_denied()
     EnergySystems.process(heat_pump, simulation_parameters)
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].balance ≈ -800
     @test heat_pump.output_interfaces[heat_pump.m_heat_out].sum_abs_change ≈ 800
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_min ≈ 45.0
-    @test heat_pump.output_interfaces[heat_pump.m_heat_out].temperature_max === nothing
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_min == [45.0]
+    @test heat_pump.output_interfaces[heat_pump.m_heat_out].max_energy.temperature_max == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_el_in].balance ≈ 0.0
-    @test heat_pump.input_interfaces[heat_pump.m_el_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_el_in].max_energy.temperature_min == [nothing]
     @test heat_pump.input_interfaces[heat_pump.m_heat_in].balance ≈ 0.0
-    @test heat_pump.input_interfaces[heat_pump.m_heat_in].temperature_min === nothing
+    @test heat_pump.input_interfaces[heat_pump.m_heat_in].max_energy.temperature_min == [nothing]
 
     EnergySystems.process(lheat_bus, simulation_parameters)
     EnergySystems.process(lheat_storage, simulation_parameters)
@@ -262,12 +270,12 @@ function test_run_energy_system_from_storage_denied()
 
     @test lheat_storage.output_interfaces[lheat_storage.medium].balance ≈ 0.0
     @test lheat_storage.output_interfaces[lheat_storage.medium].sum_abs_change ≈ 0.0
-    @test lheat_storage.output_interfaces[lheat_storage.medium].temperature_max === 35.0
+    @test lheat_storage.output_interfaces[lheat_storage.medium].max_energy.temperature_max == [nothing]
 
     EnergySystems.process(power_grid, simulation_parameters)
     @test power_grid.output_interfaces[power_grid.medium].balance ≈ 0
     @test power_grid.output_interfaces[power_grid.medium].sum_abs_change ≈ 0.0
-    @test power_grid.output_interfaces[power_grid.medium].temperature_max === nothing
+    @test power_grid.output_interfaces[power_grid.medium].max_energy.temperature_max == [nothing]
 end
 
 @testset "run_energy_system_from_storage" begin

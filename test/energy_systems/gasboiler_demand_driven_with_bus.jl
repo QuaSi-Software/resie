@@ -58,7 +58,7 @@ function test_gasboiler_demand_driven_with_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 12000
     demand.constant_temperature = 85
@@ -81,7 +81,7 @@ function test_gasboiler_demand_driven_with_bus()
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min ≈ 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
@@ -112,7 +112,7 @@ function test_gasboiler_demand_driven_with_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 15000
     demand.constant_temperature = 85
@@ -135,7 +135,7 @@ function test_gasboiler_demand_driven_with_bus()
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min ≈ 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
@@ -166,7 +166,7 @@ function test_gasboiler_demand_driven_with_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 10000
     demand.constant_temperature = 85
@@ -188,7 +188,7 @@ function test_gasboiler_demand_driven_with_bus()
     @test EnergySystems.energy_potential(exchanges) ≈ Inf
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min ≈ 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential shows the possible energy to deliver, balance is zero
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[bus.medium], bus)
@@ -255,7 +255,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 12000
     demand.constant_temperature = 85
@@ -277,7 +277,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -12000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min == 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
@@ -308,7 +308,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 15000
     demand.constant_temperature = 85
@@ -330,7 +330,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -15000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min == 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)
@@ -361,7 +361,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.control(demand, components, simulation_parameters)
     @test demand.demand == EnergySystems.get_max_energy(demand.input_interfaces[demand.medium].max_energy)
-    @test demand.temperature == demand.input_interfaces[demand.medium].temperature_min
+    @test demand.temperature == demand.input_interfaces[demand.medium].max_energy.temperature_min[1]
     EnergySystems.reset(demand)
     demand.constant_demand = 10000
     demand.constant_temperature = 85
@@ -383,7 +383,7 @@ function test_gasboiler_demand_driven_without_bus()
 
     EnergySystems.process(demand, simulation_parameters)
     @test demand.input_interfaces[demand.medium].balance ≈ -10000 / 4
-    @test demand.input_interfaces[demand.medium].temperature_min == 85
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [85.0]
 
     # demand was processed --> energy_potential should be zero, but not the balance
     exchanges = EnergySystems.balance_on(gasboiler.output_interfaces[gasboiler.m_heat_out], gasboiler)

@@ -4,28 +4,142 @@ include("resie_logger.jl")
 using .Resie_Logger
 
 """
-    main()
+    parse_arguments(input)
 
-Entry point of the CLI.
+Parses a string into a vector of strings.
 
-# Command line arguments
-## Positional arguments
+The input string is split by spaces, but strings enclosed in double quotes are treated as a
+single argument. For example, the string `run "some file"` is parsed as
+`["run", "some file"]`. Note that the double quotes are removed from the resulting strings.
+
+# Args
+- `input::String`: The string to parse.
+# Returns
+- `Vector{String}`: The parsed arguments.
+"""
+function parse_arguments(input::String)::Vector{String}
+    arguments = []
+    for match in eachmatch(r"\"[^\"]*\"|[^\s]+", input)
+        push!(arguments, string(strip(match.match, '"')))
+    end
+    return arguments
+end
+
+"""
+Main loop for the CLI. This function will run the CLI until the user exits.
+
+If there are additional arguments passed to the script, they will be used as the first
+command to run with the arguments following that as arguments to the command. If no
+additional arguments are passed, the user will be prompted to enter a command.
+"""
+function run_cli_loop()
+    is_first = true
+    while true
+        parts = []
+        if is_first
+            is_first = false
+            if length(ARGS) > 0
+                parts = ARGS
+            end
+        end
+
+        if length(parts) == 0
+            println("Enter command or 'exit' to quit or 'help' for more info:")
+            input = string(strip(readline()))
+            parts = parse_arguments(input)
+            if length(parts) == 0
+                continue
+            end
+        end
+
+        command_input = lowercase(parts[1])
+        deleteat!(parts, 1)
+
+        if command_input == "exit"
+            break
+        end
+
+        if command_input == "help"
+            println("Commands:")
+            println("  - 'exit': Exit the CLI.")
+            println("  - 'help': Display this help message.")
+            println("  - 'run': Run the simulation with arguments:")
+            println("    - <file_path>: Project config file")
+            println("    - --exit-after-run: (Optional) Exit the CLI after running the simulation")
+            println("")
+            continue
+        end
+
+        if command_input == "run"
+            success = false
+            exit_after_run = false
+
+            try
+                success, exit_after_run = run(map(string, parts))
+            catch
+                println("An error occurred while running the simulation:")
+                for (exception, backtrace) in current_exceptions()
+                    showerror(stdout, exception, backtrace)
+                    println(stdout)
+                end
+            end
+
+            if !success
+                println("Simulation was not successful. Check logs for details.")
+            end
+            println("")
+
+            if exit_after_run
+                break
+            end
+            continue
+        end
+
+        println("Invalid command. Type 'help' for more info.")
+        println("")
+    end
+end
+
+"""
+    run(arguments)
+
+Runs the simulation with the given arguments.
+
+The function has a single argument, which is an array of CLI-like arguments. The positional
+arguments are as follows:
 - `String`: Filepath to the project config file (see documentation on file format). Can be
 a path relative to the CWD of the caller.
+
+Keyword arguments:
+- `--exit-after-run`: If this argument is present, the CLI will exit after running the
+simulation.
+
+# Args
+- `arguments::Array{String}`: Array of CLI-like arguments. See above for details.
+# Returns
+- `Bool`: `true` if the simulation was successful, `false` otherwise.
+- `Bool`: `true` if the CLI should be quit after running the simulation, `false` otherwise.
 """
-function main()
-    if length(ARGS) < 1
+function run(arguments::Array{String})::Tuple{Bool,Bool}
+    exit_after_run = false
+    for (idx, arg) in enumerate(arguments)
+        if lowercase(arg) == "--exit-after-run"
+            exit_after_run = true
+            deleteat!(arguments, idx)
+        end
+    end
+
+    if length(arguments) < 1
         @error "No project config file argument given."
-        return
+        return false, exit_after_run
     end
 
-    input_filepath = ARGS[1]
+    input_filepath = string(arguments[1])
     if input_filepath === nothing || strip(input_filepath) == ""
-        @error "Could not find or access project config file at $input_filepath"
-        return
+        @error "Given project config file argument is empty."
+        return false, exit_after_run
     end
 
-    # set up logging
     log_to_console = true
     log_to_file = true
     general_logfile_path = "output/logfile_general.log"
@@ -38,12 +152,10 @@ function main()
                                                                        min_log_level,
                                                                        input_filepath)
 
-    # run the simulation
-    Resie.load_and_run(input_filepath)
+    success = Resie.load_and_run(input_filepath)
 
-    # close logging
     Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
-    return
+    return success, exit_after_run
 end
 
-main()
+run_cli_loop()

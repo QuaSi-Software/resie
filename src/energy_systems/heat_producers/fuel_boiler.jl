@@ -34,9 +34,7 @@ mutable struct FuelBoiler <: Component
     energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
-    min_run_time::UInt
     output_temperature::Temperature
-
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -70,7 +68,6 @@ mutable struct FuelBoiler <: Component
                    interface_list,
                    Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
                    1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
-                   default(config, "min_run_time", 0),
                    default(config, "output_temperature", nothing),
                    0.0)  # losses
     end
@@ -89,9 +86,7 @@ function control(unit::FuelBoiler,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     unit.output_temperature)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], nothing, nothing, unit.output_temperature)
 end
 
 """
@@ -99,7 +94,7 @@ Set maximum energies that can be taken in and put out by the unit
 """
 function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
 end
 
 function calculate_energies(unit::FuelBoiler,
@@ -116,7 +111,7 @@ end
 function potential(unit::FuelBoiler, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0)
     else
         set_max_energies!(unit, energies[1], energies[2])
@@ -126,21 +121,22 @@ end
 function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
+        unit.losses = 0.0
         set_max_energies!(unit, 0.0, 0.0)
         return
     end
 
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[2])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
-    unit.losses = energies[1] - energies[2]
+    unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}
     return [string(unit.m_fuel_in) * " IN",
             string(unit.m_heat_out) * " OUT",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::FuelBoiler, key::OutputKey)::Float64
@@ -148,8 +144,8 @@ function output_value(unit::FuelBoiler, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

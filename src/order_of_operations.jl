@@ -91,6 +91,11 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     simulation_order = remove_double_transformer_process_steps(simulation_order, components)
     # TODO: detect and remove unnecessary potentials in future versions?
 
+    # Change order or control steps to make sure that:
+    #   - geothermal probe and solar thermal collector comes at last
+    #   - seasonal thermal storage comes even later
+    reorder_control_steps(simulation_order, components)
+
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
     # message if this leads to missalignement with the output order.
@@ -2357,6 +2362,51 @@ function has_grid_output(bus, input_interface_uac)
         end
     end
     return false
+end
+
+"""
+    reorder_control_steps(simulation_order, components)
+
+Change order or control steps to make sure that:
+ - geothermal probe and solar thermal comes at last
+ - seasonal thermal storage comes even later
+
+The component types that should be moved to the end can be specified within the function.
+
+# Arguments
+- `simulation_order`: A global parameter holding the simulation order
+- `components`: The mapping of component functions
+
+"""
+function reorder_control_steps(simulation_order, components)
+    # Define component types whose control is to be moved to the end: the last one has the highest priority
+    type_to_move_to_end = [EnergySystems.GeothermalProbes,
+                           # EnergySystems.SolarthermalCollector,  # TODO: activate when SolarthermalCollector is included
+                           EnergySystems.SeasonalThermalStorage]
+
+    for component_type_to_move in type_to_move_to_end
+        for (_, step_to_move) in simulation_order
+            if step_to_move[2] == EnergySystems.s_control && isa(components[step_to_move[1]], component_type_to_move)
+                # determine current last control step
+                last_control_rank = simulation_order[1][1]
+                last_control_idx = 0
+                for (idx, (rank, current_last_step)) in enumerate(simulation_order)
+                    if current_last_step[2] == EnergySystems.s_control
+                        if rank < last_control_rank
+                            last_control_rank = rank
+                            last_control_idx = idx
+                        end
+                    end
+                end
+
+                # move the current component of type component_type_to_move to the end of 
+                # all control steps
+                place_one_lower!(simulation_order,
+                                 (simulation_order[last_control_idx][2][1], EnergySystems.s_control),
+                                 (step_to_move[1], EnergySystems.s_control))
+            end
+        end
+    end
 end
 
 """

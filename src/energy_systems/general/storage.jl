@@ -54,21 +54,6 @@ function control(unit::Storage,
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
 end
 
-function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(;
-                 balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
-                 purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
@@ -117,7 +102,7 @@ function output_values(unit::Storage)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::Storage, key::OutputKey)::Float64
@@ -131,8 +116,8 @@ function output_value(unit::Storage, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

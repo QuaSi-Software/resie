@@ -4,6 +4,30 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.11.1
+* Fix profiles (type "datestamp") to correctly handle data with and without DST
+
+### Version 0.11.0
+* Restructure the CLI and how simulations are performed with it.
+  * Instead of a single call to the CLI script, that runs the simulation and then returns to the shell, it now puts the user into an interactive CLI that keeps prompting for commands until exited. This has the advantage that performing multiple runs without changing the code results in a significant performance boost for runs after the first one, as the code does not have be compiled again and is reused.
+  * The interactive part can be circumvented by adding the command and associated arguments to the call starting the CLI. An optional argument `--exit-after-run` will exit the CLI after the simulation is done.
+  * **Note:** **This is a breaking change**, as the previous command to run a simulation, e.g. `julia --project=. src/resie-cli.jl examples/simple_heat_pump.json`, no longer works. With the new CLI a single simulation run with no interactive part now looks like this: `julia --project=. src/resie-cli.jl run --exit-after-run examples/simple_heat_pump.json`. Please update any scripts or automated processes to reflect these changes.
+* Add additional output of simulation progress/status
+* Minor fixes:
+  * Remove spurious warning during precompilation due to overly general import
+  * Fix hardcoded path of output files in info log message
+
+### Version 0.10.7
+* Update HeatPump to implement the detailed model as described in the documentation. This includes:
+  * Calculation of the COP as a customisable function of the source and sink temperatures
+  * Customisable temperature-dependent minimum/maximum power functions
+  * Part load ratio (PLR) dependent efficiency as customisable function modifying the COP depending on the PLR
+  * Optimisation of the PLR if the heat pump is not working under full load. This is a useful feature for inverter heat pumps, that typically work most efficiently at a PLR of less than 100%. **Note:** this optimisation could be improved and does not always calculate the true optimum. There also known problems where activating this feature will lead to energy balances not quite working out. Hopefully this will be fixed in future updates.
+  * Handling multiple combinations of input and output (so-called "slices") in each timestep. For example a heat pump can supply both room heating and domestic hot water (DHW) demands at the same time, calculating each with a different COP and power
+  * Losses of power and heat input that are not included in the heat output as these represent true losses to the environment, as compared to losses of efficiency, which are included in the COP function.
+  * More output channels to make it easier to understand how the heat pump works
+* New control module "temperature_sorting", which enables sorting the inputs or outputs of a heat pump by temperature. This can be used to override a static order, derived from priorities on a bus, with an order that chooses the highest or lowest temperature first.
+
 ### Version 0.10.6
 * add the possibility to output the weather data from EPW and dat-files to the lineplot and CSV output
 * add two more interpolation methods for segmentation of data: "stepwise", "linear_classic", "linear_time_preserving", "linear_solar_radiation"

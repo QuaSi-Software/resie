@@ -79,35 +79,41 @@ function test_many_to_one()
     exchanges = EnergySystems.balance_on(bus.output_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
     @test EnergySystems.energy_potential(exchanges) ≈ 500.0 # already inner_distributed and fitting the demand
-    @test EnergySystems.temp_min_highest(exchanges) === nothing
-    @test EnergySystems.temp_max_highest(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) == 54.0
+    @test EnergySystems.temp_min_all(exchanges) == [54.0]
+    @test EnergySystems.temp_max_highest(exchanges) == 54.0
+    @test EnergySystems.temp_max_all(exchanges) == [54.0]
 
     EnergySystems.process(demand_1, simulation_parameters)
 
     @test demand_1.input_interfaces[demand_1.medium].balance == -500.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature_min == 54.0
+    @test demand_1.input_interfaces[demand_1.medium].max_energy.temperature_min == [54.0]
 
     exchanges = EnergySystems.balance_on(bus.output_interfaces[2], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
     @test EnergySystems.energy_potential(exchanges) ≈ 500.0
-    @test EnergySystems.temp_min_highest(exchanges) === nothing
-    @test EnergySystems.temp_max_highest(exchanges) === 55.0
+    @test EnergySystems.temp_min_highest(exchanges) == 53.0
+    @test EnergySystems.temp_min_all(exchanges) == [53.0]
+    @test EnergySystems.temp_max_highest(exchanges) == 53.0
+    @test EnergySystems.temp_max_all(exchanges) == [53.0]
 
     EnergySystems.process(demand_2, simulation_parameters)
 
     @test demand_2.input_interfaces[demand_2.medium].balance == -500.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature_min == 53.0
+    @test demand_2.input_interfaces[demand_2.medium].max_energy.temperature_min == [53.0]
 
     exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) ≈ 0.0            # is always zero in exchange of bus
     @test EnergySystems.energy_potential(exchanges) ≈ -1000.0
     @test EnergySystems.temp_min_highest(exchanges) === 54.0
+    @test EnergySystems.temp_max_all(exchanges) == [54.0, 53.0]
+    @test EnergySystems.temp_min_all(exchanges) == [54.0, 53.0]
 
     EnergySystems.process(bus, simulation_parameters)
     EnergySystems.process(source, simulation_parameters)
 
     @test source.output_interfaces[source.medium].balance == 1000.0
-    @test source.output_interfaces[source.medium].temperature_max == 55.0
+    @test source.output_interfaces[source.medium].max_energy.temperature_max == [55.0]
 
     blnc = EnergySystems.balance(bus)
     @test blnc == 0.0
@@ -115,13 +121,13 @@ function test_many_to_one()
     EnergySystems.distribute!(bus)
 
     @test demand_1.input_interfaces[demand_1.medium].balance == 0.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature_min === 54.0
+    @test demand_1.input_interfaces[demand_1.medium].max_energy.temperature_min == [54.0]
 
     @test demand_2.input_interfaces[demand_2.medium].balance == 0.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature_min === 53.0
+    @test demand_2.input_interfaces[demand_2.medium].max_energy.temperature_min == [53.0]
 
     @test source.output_interfaces[source.medium].balance == 0.0
-    @test source.output_interfaces[source.medium].temperature_max == 55.0
+    @test source.output_interfaces[source.medium].max_energy.temperature_max == [55.0]
 end
 
 @testset "many_to_one" begin

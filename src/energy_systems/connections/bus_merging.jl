@@ -218,7 +218,7 @@ function find_parents_of_sinks(nodes::Dict{String,BusNode})::Vector{Tuple{Intege
 end
 
 function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
-    bus = Bus(node.uac, template.medium, template.epsilon)
+    bus = Bus(node.uac, template.medium, template.run_id, template.epsilon)
 
     # create inputs
     for (idx, input) in pairs(node.inputs)

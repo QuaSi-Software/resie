@@ -77,22 +77,18 @@ function control(unit::FixedSupply,
     else
         unit.supply = 0.0
     end
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.supply)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-
-    set_temperature!(unit.output_interfaces[unit.medium],
-                     nothing,
-                     unit.temperature)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.supply, nothing, unit.temperature)
 end
 
 function process(unit::FixedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
-    add!(outface, unit.supply, unit.temperature)
+    add!(outface, unit.supply, nothing, unit.temperature)
 end
 
 function output_values(unit::FixedSupply)::Vector{String}
