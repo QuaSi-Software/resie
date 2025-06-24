@@ -1,3 +1,9 @@
+using Test
+using Resie
+using Resie.EnergySystems
+
+include("../test_util.jl")
+
 function setup_control_tests()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
@@ -52,6 +58,7 @@ end
 
 function test_move_state_storage_driven_hp()
     components, simulation_params = setup_control_tests()
+    setup_mock_run!(components, simulation_params)
     buffer_tank = components["TST_BT_01"]
     heat_pump = components["TST_HP_01"]
 
