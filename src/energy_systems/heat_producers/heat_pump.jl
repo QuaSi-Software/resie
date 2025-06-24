@@ -613,12 +613,10 @@ function handle_slice(unit::HeatPump,
                       out_temp::Temperature,
                       plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
-    do_bypass = false
     if unit.constant_cop !== nothing
         cop = unit.constant_cop * unit.plf_function(plr)
     elseif in_temp >= out_temp
         cop = unit.bypass_cop
-        do_bypass = true
     else
         cop = unit.dynamic_cop(in_temp, out_temp)
         if cop === nothing
@@ -662,7 +660,7 @@ function handle_slice(unit::HeatPump,
             used_el_in,
             used_heat_out,
             in_temp,
-            do_bypass ? in_temp : out_temp)
+            out_temp)
 end
 
 """
