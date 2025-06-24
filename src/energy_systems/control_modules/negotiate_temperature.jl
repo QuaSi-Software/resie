@@ -35,6 +35,8 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
             "temperature_mode" => "mean",
             "limit_max_output_energy_to_avoid_pulsing" => true,
             "constant_output_temperature" => nothing,
+            "optim_temperature_rel_tol" => 1e-5,   # Looser relative tolerance: 1e-3
+            "optim_temperature_abs_tol" => 0.001,  # Looser absolute tolerance: 0.1
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -135,7 +137,8 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     end
 
     if mod.parameters["temperature_mode"] == "optimize_for_max_energy"
-        return find_best_temperature_and_get_energy(calculate_output_energy_from_output_temperature,
+        return find_best_temperature_and_get_energy(mod,
+                                                    calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,
                                                     lower_temperature_bound,
                                                     upper_temperature_bound,
@@ -164,7 +167,8 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     end
 end
 
-function find_best_temperature_and_get_energy(func_output::Function,
+function find_best_temperature_and_get_energy(mod::CM_Negotiate_Temperature,
+                                              func_output::Function,
                                               func_input::Function,
                                               temp_min::Temperature,
                                               temp_max::Temperature,
@@ -195,8 +199,8 @@ function find_best_temperature_and_get_energy(func_output::Function,
                           temp_min_current,
                           temp_max_current,
                           Brent();
-                          rel_tol=1e-5,   # Looser relative tolerance: 1e-3
-                          abs_tol=0.001,  # Looser absolute tolerance: 0.1
+                          rel_tol=mod.parameters["optim_temperature_rel_tol"],
+                          abs_tol=mod.parameters["optim_temperature_abs_tol"],
                           show_trace=false)
         temperature_opt = Optim.minimizer(result)
         max_energy = f_min(temperature_opt, unit_output, unit_input, sim_params)
