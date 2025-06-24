@@ -732,6 +732,12 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
     if max_energy.recalculate_max_energy
         # can handle vectors of temperatures and amounts
         run = get_run(run_id)
+
+        # filter out all entries with amount == 0.0 as here the temperature can be nothing
+        mask = amount .!== 0.0
+        amount = amount[mask]
+        temperature = temperature[mask]
+
         max_energy = recalculate_max_energy(run.components[uac_of_owner],
                                             amount,
                                             temperature,
