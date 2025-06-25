@@ -14,7 +14,7 @@ using Test
     include("energy_systems/heat_pump.jl")
     include("energy_systems/energy_system_from_storage.jl")
     include("energy_systems/storage_loading_switch.jl")
-    include("energy_systems/multiple_transformer_limited.jl")
+    include("energy_systems/multiple_transformers.jl")
     include("energy_systems/gasboiler_demand_driven_with_bus.jl")
     include("energy_systems/plr_dependent_efficiency.jl")
 end

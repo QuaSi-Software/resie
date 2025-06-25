@@ -418,13 +418,12 @@ end
 
 function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::String, output_formats::Vector{String},
                                      sim_params::Dict{String,Any})::Bool
-    # Plot geometry of STES
-    plt = Plots.plot()
-    Plots.plot!([-unit.radius_large, unit.radius_large], [unit.height, unit.height]; color=:blue, lw=6, label="")  # Top
-    Plots.plot!([-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
-    Plots.plot!([unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    Plots.plot!([-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    Plots.plot!(; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
+    # Plot geometry of STES: 2D Cross Section 
+    p = Plots.plot([-unit.radius_large, unit.radius_large], [unit.height, unit.height]; color=:blue, lw=6, label="")  # Top
+    Plots.plot!(p, [-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
+    Plots.plot!(p, [unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
+    Plots.plot!(p, [-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
+    Plots.plot!(p, ; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
                 xlabel="x-coordinate [m]",
                 ylabel="height [m]",
                 legend=false,
@@ -439,8 +438,136 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
                 margin=15Plots.mm)
     fig_name = "STES_cross_section_$(unit.uac)"
     for output_format in output_formats
-        Plots.savefig(output_path * "/" * fig_name * "." * output_format)
+        Plots.savefig(p, output_path * "/" * fig_name * "." * output_format)
     end
+
+    # Plot geometry of STES: 3D
+    Plots.plotlyjs()
+    if unit.shape == "cuboid"
+        # — Cuboid setup — 
+        r1 = unit.radius_small    # 1/2 of the bottom side length
+        r2 = unit.radius_large    # 1/2 of the top side length
+        H = unit.height           # height
+        nh = 40     # vertical resolution
+        ns = 30     # side‐to‐side resolution
+
+        # interpolation of half‐width at each z
+        half_width(z) = r1 + (r2 - r1) * (z / H)
+
+        # Bottom face (square at z=0)
+        Xb = [-r1 -r1;
+              r1 r1]
+        Yb = [-r1 r1;
+              -r1 r1]
+        Zb = zeros(2, 2)
+        p = Plots.surface(Xb, Yb, Zb; color=:blue, alpha=0.65, legend=false)
+
+        h_vec = range(0, H; length=nh)          # z levels
+        s = range(-1, 1; length=ns)             # normalized side parameter
+
+        # Four trapezoidal side faces
+        for (sign, axis) in ((+1, :y), (-1, :y), (+1, :x), (-1, :x))
+            # Build Z and S meshes
+            Z = repeat(h_vec', ns, 1)
+            S = repeat(s, 1, nh)
+            # half‐width at each z‐row
+            W = half_width.(Z)
+            # parametric face
+            if axis == :y
+                X_face = S .* W
+                Y_face = sign .* W
+            else  # axis == :x
+                X_face = sign .* W
+                Y_face = S .* W
+            end
+            Plots.surface!(p, X_face, Y_face, Z; color=:blue, alpha=0.5, legend=false)
+        end
+
+        # add black contour lines
+        edges = [
+                 # bottom square
+                 ([-r1, r1, r1, -r1, -r1],
+                  [-r1, -r1, r1, r1, -r1],
+                  zeros(5)),
+                 # top square
+                 ([-r2, r2, r2, -r2, -r2],
+                  [-r2, -r2, r2, r2, -r2],
+                  fill(H, 5)),
+                 # four corners
+                 ([-r1, -r2], [-r1, -r2], [0, H]), # back‐left
+                 ([r1, r2], [-r1, -r2], [0, H]),   # back‐right
+                 ([r1, r2], [r1, r2], [0, H]),     # front‐right
+                 ([-r1, -r2], [r1, r2], [0, H])]   # front‐left
+
+        for (xs, ys, zs) in edges
+            Plots.plot3d!(p, xs, ys, zs; color=:black, lw=2)
+        end
+
+    elseif unit.shape == "round"
+        # — Truncated cone (frustum) setup —
+        r1 = unit.radius_small    # bottom radius
+        r2 = unit.radius_large    # top radius
+        h = unit.height           # height
+        nθ, nz = 60, 30           # mesh resolution
+
+        θ = range(0, 2π; length=nθ)
+        z = range(0, h; length=nz)
+
+        # Make 2D grids for Θ and Z:
+        Θ = repeat(θ', nz, 1)
+        Z = repeat(z, 1, nθ)
+
+        # Radius varies linearly with z:
+        R = r1 .+ (r2 - r1) / h .* Z
+
+        # Parametric coords for the lateral surface:
+        Xc = R .* cos.(Θ)
+        Yc = R .* sin.(Θ)
+        Zc = Z
+
+        # Start with the side‐surface
+        p = Plots.surface(Xc, Yc, Zc; alpha=0.5, color=:blue, legend=false)
+
+        # Add bottom cap
+        # Parameterize a filled disc at z = 0
+        pr = range(0, r1; length=25)        # radial coordinate
+        Θb = repeat(θ, 1, length(pr))       #  nθ × nρ
+        Rb = repeat(pr', nθ, 1)             #  nθ × nρ
+
+        Xb = Rb .* cos.(Θb)
+        Yb = Rb .* sin.(Θb)
+        Zb = zeros(size(Xb))                # all at z = 0
+
+        Plots.surface!(p, Xb, Yb, Zb; color=:blue, alpha=0.65, legend=false)
+
+        # add black contour lines
+        Plots.plot3d!(p,
+                      r1 .* cos.(θ),
+                      r1 .* sin.(θ),
+                      zeros(length(θ));
+                      color=:black, lw=1)
+        # top rim
+        Plots.plot3d!(p,
+                      r2 .* cos.(θ),
+                      r2 .* sin.(θ),
+                      fill(h, length(θ));
+                      color=:black, lw=1)
+    end
+
+    fig_size = 1.2 * max(unit.radius_large, unit.height)
+    Plots.plot!(p;
+                xlabel="x-coordinate [m]", ylabel="y-coordinate [m]", zlabel="height [m]",
+                legend=false,
+                # proj_type=:ortho, # is not working...
+                aspect_ratio=:equal,
+                xlims=(-fig_size, fig_size),
+                ylims=(-fig_size, fig_size),
+                zlims=(-fig_size, fig_size),
+                size=(1000, 1000),
+                camera=(45, 20),
+                title="3D shape of the STES $(unit.uac) (cross-section: $(unit.shape))")
+    fig_name = "STES_3D_shape_$(unit.uac)"
+    Plots.savefig(p, output_path * "/" * fig_name * ".html")
 
     return true
 end

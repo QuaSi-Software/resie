@@ -33,6 +33,10 @@ command to run with the arguments following that as arguments to the command. If
 additional arguments are passed, the user will be prompted to enter a command.
 """
 function run_cli_loop()
+    # setting this to false causes Ctrl+c to throw InterruptException instead of quitting
+    # Julia entirely
+    Base.exit_on_sigint(false)
+
     is_first = true
     while true
         parts = []
@@ -76,11 +80,16 @@ function run_cli_loop()
 
             try
                 success, exit_after_run = run(map(string, parts))
-            catch
-                println("An error occurred while running the simulation:")
-                for (exception, backtrace) in current_exceptions()
-                    showerror(stdout, exception, backtrace)
-                    println(stdout)
+            catch exc
+                if exc isa InterruptException
+                    println("Simulation was interrupted.")
+                    success = true # not quite correct, but suppresses the next message
+                else
+                    println("An error occurred while running the simulation:")
+                    for (exception, backtrace) in current_exceptions()
+                        showerror(stdout, exception, backtrace)
+                        println(stdout)
+                    end
                 end
             end
 
@@ -158,4 +167,13 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
     return success, exit_after_run
 end
 
-run_cli_loop()
+try
+    run_cli_loop()
+catch exc
+    if exc isa InterruptException
+        # nothing to do, just exit
+    else
+        # exceptions not caught inside the loop should be carried to the shell
+        rethrow(exc)
+    end
+end
