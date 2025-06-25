@@ -1555,8 +1555,8 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 #TODO only for validation
-include("heat_sources/solarthermal_collector.jl")
-# include("heat_sources/solarthermal_collector_validation.jl")
+# include("heat_sources/solarthermal_collector.jl")
+include("heat_sources/solarthermal_collector_validation.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the
 # base module and has been moved into seperate files for less clutter
@@ -1565,7 +1565,7 @@ include("efficiency.jl")
 # now that the components are defined we can load the control modules, which depend on their
 # definitions
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
-const TemperatureNegotiateSource = Union{GeothermalProbes, SolarthermalCollector}
+const TemperatureNegotiateSource = Union{GeothermalProbes, SolarthermalCollectorVal}
 const TemperatureNegotiateTarget = Union{SeasonalThermalStorage}
 
 include("control_modules/economical_discharge.jl")

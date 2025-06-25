@@ -1,4 +1,4 @@
-using Interpolations
+import Interpolations as ip
 using Roots
 using Resie.SolarIrradiance
 
@@ -223,7 +223,7 @@ function control(unit::SolarthermalCollector,
     unit.temperature_energy_pairs[current_max_temperature] = (0, current_max_temperature, current_max_temperature)
  
     unit.available_energies, has_calculated_all_maxima, unit.average_temperatures, 
-    unit.output_temperatures, unit.runtimes = calculate_energies(unit, sim_params)
+    unit.output_temperatures, unit.runtimes = calculate_energies(unit, components, sim_params)
 
     unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0, 
                              _sum(collect(values(unit.available_energies))))
@@ -231,8 +231,11 @@ function control(unit::SolarthermalCollector,
     
     set_max_energy!(unit.output_interfaces[unit.medium], 
                     collect(values(sort(unit.available_energies))), 
-                    collect(keys(sort(unit.available_energies))), has_calculated_all_maxima)
-    set_temperature!(unit.output_interfaces[unit.medium], nothing, unit.output_temperature)
+                    [nothing for _ in 1:length(unit.available_energies)],
+                    collect(values(sort(unit.output_temperatures))), 
+                    collect(keys(sort(unit.available_energies))), 
+                    has_calculated_all_maxima, 
+                    false)
 end
 
 function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
@@ -290,7 +293,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     end
 end
 
-function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String,Any})
+function calculate_energies(unit::SolarthermalCollector, components, sim_params::Dict{String,Any})
     
     available_energies = Dict{String, Floathing}()
     average_temperatures = Dict{String, Temperature}()
@@ -337,6 +340,7 @@ function calculate_energies(unit::SolarthermalCollector, sim_params::Dict{String
         else
             produced_energy = left_energy_factor * calculate_output_energy_from_output_temperature(
                 unit, target_temperatures[component_idx], sim_params)
+            _, t_avg, t_target = unit.temperature_energy_pairs[target_temperatures[component_idx]]
 
         end
 
@@ -416,7 +420,7 @@ and maximum temperatures that can be supplied.
 """
 function get_output_temperature_bounds(unit::SolarthermalCollector)::Tuple{Temperature,Temperature}
     temps = collect(keys(unit.temperature_energy_pairs))
-    zero_energy_mask = [v[1] == 0 for v in values(d)]
+    zero_energy_mask = [v[1] == 0 for v in values(unit.temperature_energy_pairs)]
     return nothing, lowest(temps[zero_energy_mask])
 end
 
@@ -527,16 +531,16 @@ function init_K_b(K_b_array)
         end
         K_b_filtered = reshape(K_b_filtered, (3, :))
 
-        itp_t = interpolate((K_b_filtered[1, :],), K_b_filtered[2, :], Gridded(Linear()))
-        itp_l = interpolate((K_b_filtered[1, :],), K_b_filtered[3, :], Gridded(Linear()))
+        itp_t = ip.interpolate((K_b_filtered[1, :],), K_b_filtered[2, :], ip.Gridded(ip.Linear()))
+        itp_l = ip.interpolate((K_b_filtered[1, :],), K_b_filtered[3, :], ip.Gridded(ip.Linear()))
 
         for idx in missing_idx
             K_b_array[2, idx] = itp_t(angle_range[idx])
             K_b_array[3, idx] = itp_l(angle_range[idx])
         end
     end
-    interp_transversal = scale(interpolate(K_b_array[2, :], BSpline(Cubic(Flat(OnGrid())))), angle_range)
-    interp_longitudinal = scale(interpolate(K_b_array[2, :], BSpline(Cubic(Flat(OnGrid())))), angle_range)
+    interp_transversal = ip.scale(ip.interpolate(K_b_array[2, :], ip.BSpline(ip.Cubic(ip.Flat(ip.OnGrid())))), angle_range)
+    interp_longitudinal = ip.scale(ip.interpolate(K_b_array[3, :], ip.BSpline(ip.Cubic(ip.Flat(ip.OnGrid())))), angle_range)
 
     return (interp_transversal, interp_longitudinal)
 end

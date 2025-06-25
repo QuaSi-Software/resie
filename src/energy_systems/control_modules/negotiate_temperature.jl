@@ -18,7 +18,7 @@ Target components need to have the following functions:
 
 """
 
-using Optim
+import Optim
 
 mutable struct CM_Negotiate_Temperature <: ControlModule
     name::String
@@ -191,10 +191,10 @@ function find_best_temperature_and_get_energy(func_output::Function,
         temp_min_current = max(temps[first(active_indices)] - step_size, temp_min)
         temp_max_current = min(temps[last(active_indices)] + step_size, temp_max)
 
-        result = optimize(temperature -> -f_min(temperature, unit_output, unit_input, sim_params),
+        result = Optim.optimize(temperature -> -f_min(temperature, unit_output, unit_input, sim_params),
                           temp_min_current,
                           temp_max_current,
-                          Brent();
+                          Optim.Brent();
                           rel_tol=1e-5,   # Looser relative tolerance: 1e-3
                           abs_tol=0.001,  # Looser absolute tolerance: 0.1
                           show_trace=false)

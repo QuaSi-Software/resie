@@ -144,7 +144,7 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
     log_to_file = true
     general_logfile_path = "output/logfile_general.log"
     balanceWarn_logfile_path = "output/logfile_balanceWarn.log"
-    min_log_level = Resie_Logger.Logging.Info
+    min_log_level = Resie_Logger.Logging.Error
     log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
                                                                        log_to_file,
                                                                        general_logfile_path,
