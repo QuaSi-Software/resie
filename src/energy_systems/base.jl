@@ -1575,12 +1575,14 @@ include("efficiency.jl")
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
 const TemperatureNegotiateSource = Union{GeothermalProbes} # TODO: add SolarthermalCollector
 const TemperatureNegotiateTarget = Union{SeasonalThermalStorage}
-
+const LimitCoolingInputTemperatureSource = Union{Electrolyser}
+const LimitCoolingInputTemperatureTarget = Union{SeasonalThermalStorage}
 include("control_modules/economical_discharge.jl")
 include("control_modules/profile_limited.jl")
 include("control_modules/storage_driven.jl")
 include("control_modules/temperature_sorting.jl")
 include("control_modules/negotiate_temperature.jl")
+include("control_modules/limit_cooling_input_temperature.jl")
 
 """
     link_output_with(unit, components)

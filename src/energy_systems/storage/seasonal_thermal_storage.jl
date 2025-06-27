@@ -78,6 +78,7 @@ mutable struct SeasonalThermalStorage <: Component
     current_temperature_output::Temperature
     current_max_output_energy::Float64
     temperatures_charging::Vector{Temperature}
+    current_energy_input_return_temperature::Float64
 
     # additional output
     temp_distribution_output::Array{Float64}
@@ -160,6 +161,7 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # current_temperature_output, temperature of the output in current time step [°C]
                    0.0,                                            # current_max_output_energy, maximum output energy in current time step [Wh]
                    [],                                             # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
+                   0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
                    # additional output
                    Array{Float64}(undef, 0, 0))                    # temp_distribution_output [°C], holds temperature field of layers for output plot
     end
@@ -177,6 +179,9 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # set initial temperature bounds
     set_temperature_limits!(unit, sim_params)
+
+    # set initial current_energy_input_return_temperature, always use bottom layer to use the whole storage
+    unit.current_energy_input_return_temperature = unit.temperature_segments[1]
 
     # calculate thermal transmission coefficients # TODO other transmission below ground
     thermal_transmission_barrels = [unit.thermal_transmission_barrel for _ in 1:(unit.number_of_layer_total)]
@@ -617,6 +622,10 @@ function control(unit::SeasonalThermalStorage,
 
     # write old temperature field for output
     unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
+
+    # set current_energy_input_return_temperature, simplified constant in the current time step
+    # always use bottom layer to use the whole storage
+    unit.current_energy_input_return_temperature = unit.temperature_segments[1]
 
     # calculate maximum energies for input
     inface = unit.input_interfaces[unit.m_heat_in]
