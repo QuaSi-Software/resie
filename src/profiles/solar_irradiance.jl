@@ -11,10 +11,10 @@ export sun_position, irr_in_plane, get_sunrise_sunset
                  temperature::Number=10.9)
 
 Calculate solar position in degrees.
-Time is shifted by a half time_step forward, because it all profiles in Resie are given as 
+Time is shifted by a half time_step forward, because all profiles in Resie are given as 
 sum or mean over the next full time_step.
 Based on Roberto Grena (2012), Five new algorithms for the computation of sun position
-from 2010 to 2110, Solar Energy, 86(5):1323–1337, doi:10.1016/j.solener.2012.01.024.
+from 2010 to 2110, Solar Energy, 86(5):1323-1337, doi:10.1016/j.solener.2012.01.024.
 dt must be provided in UTC, if no time_zone is provided.
 time_zone is the time difference to UTC as INT in hours.
 longitude and latitude should be provided in WGS84.
