@@ -138,6 +138,7 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_reorder_inputs
     cmf_reorder_outputs
     cmf_negotiate_temperature
+    cfm_limit_cooling_input_temperature
 end
 
 """
@@ -439,4 +440,35 @@ function determine_temperature_and_energy(controller::Controller,
     end
 
     return false, nothing, 0.0
+end
+
+"""
+Callback for cooling_input_temperature_exeeded
+
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `components::Grouping`: All components of the energy system.
+- `target_uac::String`: The target unit uac.
+
+# Returns
+- `Bool`: A bool indicating if the input temperature is exeeded (true, meaning no energy flow is allowed) 
+          or not (false, energy flow is allowed)
+
+"""
+function cooling_input_temperature_exeeded(controller::Controller,
+                                           target_uac::Stringing,
+                                           sim_params::Dict{String,Any})::Bool
+    for mod in controller.modules
+        if !has_method_for(mod, cfm_limit_cooling_input_temperature)
+            continue
+        end
+        if mod.parameters["target_uac"] !== target_uac
+            continue
+        end
+        components = Dict{String,Component}(get_run(sim_params["run_ID"]).components)
+        return cooling_input_temperature_exeeded(mod, components, target_uac)
+    end
+
+    return false
 end

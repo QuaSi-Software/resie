@@ -823,6 +823,34 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
     exchanges = balance_on(unit.output_interfaces[medium],
                            unit.output_interfaces[medium].target)
 
+    # If the source is an Electrolyser, call the ControlModule limit_cooling_input_temperature
+    # for every target to check if the energy transfer is allowed or not. 
+    # If the temperaure input limit is exeeded (control module returns true), remove the entry from exchanges.
+    if isa(unit, Electrolyser)
+        idx_to_remove = Int[]
+        for (idx, exchange) in enumerate(exchanges)
+            if cooling_input_temperature_exeeded(unit.controller, exchange.purpose_uac, sim_params)
+                push!(idx_to_remove, idx)
+            end
+        end
+        if !isempty(idx_to_remove)
+            for idx in reverse(idx_to_remove)
+                popat!(exchanges, idx)
+            end
+
+            if isempty(exchanges)
+                push!(exchanges,
+                      EnEx(; balance=0.0,
+                           energy_potential=0.0,
+                           purpose_uac=nothing,
+                           temperature_min=nothing,
+                           temperature_max=nothing,
+                           pressure=nothing,
+                           voltage=nothing))
+            end
+        end
+    end
+
     # if we get the exchanges from a bus, the temperature check has already been performed
     if unit.output_interfaces[medium].target.sys_function == sf_bus
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
