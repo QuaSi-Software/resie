@@ -11,10 +11,13 @@ test/scenarios/*
 
 # input files (force-add new examples)
 examples/*.json
+
+#profiles
+profiles/*
 profiles/examples/district/230413_profiles_management.xlsx
 src/energy_systems/heat_sources/solarthermal_test.jl
-profiles/create_prf_from_csv.jl
 profiles/convert_polysun_logging.jl
+profiles/create_prf_from_csv.jl
 src/energy_systems/heat_sources/solarthermal_collector_validation_old.jl
 profiles/validation/RSTV/absorber_temperature_out_ba2.prf
 profiles/validation/RSTV/absorber_temperature_out_haus4a_shift.prf
