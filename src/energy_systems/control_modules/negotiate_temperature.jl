@@ -125,7 +125,7 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     # get temperature bounds from source and target
     # would be the same as from exchange, but control might not performed yet
     target_min_in_temperature, target_max_in_temperature = get_input_temperature_bounds(components[target_uac])
-    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac])
+    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac], sim_params)
 
     # get temperature bounds for connection from source_uac to target
     lower_temperature_bound = highest(source_min_out_temperature, target_min_in_temperature)

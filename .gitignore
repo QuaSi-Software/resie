@@ -15,3 +15,4 @@ examples/*.json
 #profiles
 profiles/*
 src/energy_systems/heat_sources/solarthermal_collector_validation.jl
+src/run_REPL.jl

@@ -584,7 +584,7 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
             fist_time_step = ZonedDateTime(timestamp[1], tz)
         catch e
             @error "In the profile at $file_path, the first datestamp $tz is probably invalid for the specified time " *
-                   "zone $time_zone. The following error occured: $e"
+                   "zone $time_zone. The following error occurred: $e"
             throw(InputError)
         end
         has_dst = false

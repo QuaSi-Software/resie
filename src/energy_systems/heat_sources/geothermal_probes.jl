@@ -713,7 +713,7 @@ function check_temperature_and_get_max_energy(unit::GeothermalProbes,
     end
 
     # get min and max output temperature of geothermal probe
-    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(unit)
+    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(unit, sim_params)
 
     # check temperatures and get the max_energy
     if temperature_output === nothing
@@ -817,18 +817,19 @@ function control(unit::GeothermalProbes,
 end
 
 """
-    get_output_temperature_bounds(unit::GeothermalProbes)::Tuple{Temperature, Temperature}
+    get_output_temperature_bounds(unit::GeothermalProbes, sim_params::Dict{String,Any})::Tuple{Temperature,Temperature}
 
 Returns a tuple containing the current minimum and maximum output temperatures for the given `GeothermalProbes` unit.
 
 # Arguments
 - `unit::GeothermalProbes`: The geothermal probes unit for which to retrieve the temperature bounds.
+- `sim_params::Dict{String,Any}`: simulation parameters
 
 # Returns
 - `Tuple{Temperature, Temperature}`: A tuple where the first element is the minimum probe temperature during unloading, 
                                      and the second element is the current maximum output temperature.
 """
-function get_output_temperature_bounds(unit::GeothermalProbes)::Tuple{Temperature,Temperature}
+function get_output_temperature_bounds(unit::GeothermalProbes, sim_params::Dict{String,Any})::Tuple{Temperature,Temperature}
     # current minimum output temperature and current maximum output temperature
     return unit.min_probe_temperature_unloading, unit.current_max_output_temperature
 end

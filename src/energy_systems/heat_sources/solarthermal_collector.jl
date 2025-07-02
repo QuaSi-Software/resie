@@ -8,7 +8,7 @@ Works for flat plate collectors, vacuum tube collectors and PVT modules.
 The calculation is based on EN ISO 9806:2017 for quasi-dynamic models.
 
 Stagnation is ignored under the assumption that the system has either measures to prevent 
-stagnation harming the collectors or the designed size is small enough in comparision to 
+stagnation harming the collectors or the designed size is small enough in comparison to 
 the global system for stagnation not to become a problem.
 
 ## ATTENTION: solarthermal heat collector is currently work in progress and not completed!!
@@ -59,7 +59,6 @@ mutable struct SolarthermalCollector <: Component
     delta_T_min::Union{Float32,Nothing}
     spec_flow_rate_min::Union{Float64,Nothing}
     # results
-    spec_thermal_power::Float64
     max_energy::Union{Float64,Nothing}
     used_energy::Float64
     output_temperature::Temperature
@@ -67,11 +66,13 @@ mutable struct SolarthermalCollector <: Component
     last_average_temperature::Temperature
     spec_flow_rate_actual::Union{Float64,Nothing}
     # internal parameters for temperature layers
-    available_energies::Dict{String,Floathing}
-    average_temperatures::Dict{String,Temperature}
-    output_temperatures::Dict{String,Temperature}
-    runtimes::Dict{String,Floathing}
+    available_energies::Array{Floathing}
+    average_temperatures::Array{Floathing}
+    output_temperatures::Array{Floathing}
+    runtimes::Array{Floathing}
     temperature_energy_pairs::Dict{Temperature,Tuple}
+    calc_uacs::Array{Stringing}
+    mean_ambient_temperature::Float32
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         const_ambient_temperature, 
@@ -105,6 +106,11 @@ mutable struct SolarthermalCollector <: Component
         wind_speed_profile = get_parameter_profile_from_config(config, sim_params, "wind_speed",
                                                                "wind_speed_profile_file_path", "wind_speed_from_global_file",
                                                                "constant_wind_speed", uac; required=true) # m/s
+        if const_wind_speed === nothing
+            const_wind_speed = 0
+        else
+            const_wind_speed = max(const_wind_speed * default(config, "wind_speed_reduction", 0.5) - 3, 0)
+        end
 
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         register_media([m_heat_out])
@@ -130,8 +136,8 @@ mutable struct SolarthermalCollector <: Component
                    1, # Calculate K_b from K_b_array in control()
                    config["K_d"], # collector parameter for diffuse irradiance 
                    config["a_params"], # collector sim_params a1 to a8 corresponding to EN ISO 9806:2017
-                   5.670374419 * 10^-8, # Stefan Bolzmann Constant
-                   default(config, "vol_heat_capacity", 4.2e6), # volumnetric heat capacity of the fluid in the collector in [J/(m³*K)]
+                   5.670374419 * 10^-8, # Stefan Boltzmann Constant
+                   default(config, "vol_heat_capacity", 4.2e6), # volumetric heat capacity of the fluid in the collector in [J/(m³*K)]
                    # weather profiles
                    ambient_temperature_profile,
                    beam_solar_hor_irradiance_profile,
@@ -143,7 +149,7 @@ mutable struct SolarthermalCollector <: Component
                    const_ambient_temperature, # ambient temperature [°C]
                    0.0, # beam_solar_irradiance in collector plane [W/m²]
                    0.0, # diffuse_solar_irradiance_in_plane [W/m²]
-                   max(const_wind_speed * default(config, "wind_speed_reduction", 0.5) - 3, 0), # wind_speed multiplied with wind speed reduction [m/s]
+                   const_wind_speed, # wind_speed multiplied with wind speed reduction [m/s]
                    const_beam_solar_hor_irradiance, # beam horizontal irradiance [W/m²]
                    const_diffuse_hor_irradiance, # diffuse horizontal irradiance [W/m²]
                    const_long_wave_irradiance, # long wave irradiance [W/m²]
@@ -154,7 +160,6 @@ mutable struct SolarthermalCollector <: Component
                    default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
                    default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
                    # results
-                   0.0, # specific thermal power of the solarthermal collector
                    0.0, # maximum available energy
                    0.0, # energy that was removed from the system in current time step
                    0.0, # output temperature in current time step, calculated in control()
@@ -162,11 +167,13 @@ mutable struct SolarthermalCollector <: Component
                    0.0, # average temperature from last time step, calculated in control()
                    0.0, # actual flow rate resulting from simulation and used energy
                    # internal parameters for temperature layers
-                   Dict{String,Float64}(), # list of available_energies in for each component connected to the collector
-                   Dict{String,Temperature}(), # list of average_temperatures in for each component connected to the collector
-                   Dict{String,Temperature}(), # list of output_temperatures in for each component connected to the collector
-                   Dict{String,Float64}(), # list of runtimes at different temperature levels for each component connected to the collector
-                   Dict{Temperature,Tuple}()) # list of all calculated output temperature and output energy pairs
+                   [], # list of available_energies in for each component connected to the collector
+                   [], # list of average_temperatures in for each component connected to the collector
+                   [], # list of output_temperatures in for each component connected to the collector
+                   [], # list of runtimes at different temperature levels for each component connected to the collector
+                   Dict{Temperature,Tuple}(), # list of all calculated output temperature and output energy pairs
+                   [], # uacs for which energy was calculated
+                   10.0)
     end
 end
 
@@ -183,6 +190,11 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     unit.output_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
     unit.average_temperature = unit.output_temperature
     unit.last_average_temperature = unit.output_temperature
+    if unit.ambient_temperature_profile !== nothing
+        unit.mean_ambient_temperature = _mean(collect(values(unit.ambient_temperature_profile.data)))
+    else
+        unit.mean_ambient_temperature = unit.ambient_temperature
+    end
 
     unit.K_b_itp = init_K_b(unit.K_b_array)
 end
@@ -205,9 +217,6 @@ function control(unit::SolarthermalCollector,
 
     if unit.ambient_temperature_profile !== nothing
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-        mean_ambient_temperature = _mean(collect(values(unit.ambient_temperature_profile.data)))
-    else
-        mean_ambient_temperature = unit.ambient_temperature
     end
 
     if unit.wind_speed_profile !== nothing
@@ -223,7 +232,7 @@ function control(unit::SolarthermalCollector,
     unit.direct_normal_irradiance, angle_of_incidence, longitudinal_angle, transversal_angle,
     solar_zenith, solar_azimuth = irr_in_plane(sim_params, unit.tilt_angle, unit.azimuth_angle,
                                                unit.beam_solar_hor_irradiance, unit.diffuse_solar_hor_irradiance, 
-                                               nothing, 1.0, mean_ambient_temperature, unit.ground_reflectance)
+                                               nothing, 1.0, unit.mean_ambient_temperature, unit.ground_reflectance)
 
     # Calculate K_b based on a table with provided values for longitudinal and transversal angles.
     # Table with provided values is mirrored for negative angles.
@@ -233,29 +242,22 @@ function control(unit::SolarthermalCollector,
         unit.K_b = 0
     end
 
-    # reset list of all calculated output temperature and output energy pairs; used as lookup table to speed up calculation
-    # calculation temperature when no energy is taken from collector
+    # reset list of all calculated output temperature and output energy pairs; 
+    # used as lookup table to speed up calculation
     unit.temperature_energy_pairs = Dict{Temperature,Tuple}()
-    current_max_temperature = find_zero((t_avg -> spec_thermal_power_func(t_avg, t_avg, unit.last_average_temperature,
-                                                                          0, unit, sim_params["time_step_seconds"]),
-                                         t_avg -> derivate_spec_thermal_power_func(t_avg, 0, unit,
-                                                                                   sim_params["time_step_seconds"])),
-                                        unit.last_average_temperature,
-                                        Roots.Newton())
-    unit.temperature_energy_pairs[current_max_temperature] = (0, current_max_temperature, current_max_temperature)
 
     unit.available_energies, has_calculated_all_maxima, unit.average_temperatures,
     unit.output_temperatures, unit.runtimes = calculate_energies(unit, components, sim_params)
 
-    unit.max_energy = ifelse(all(isnothing.(values(unit.available_energies))), 0,
-                             _sum(collect(values(unit.available_energies))))
-    unit.output_temperature = highest(collect(values(unit.output_temperatures)))
+    unit.max_energy = ifelse(all(isnothing.(unit.available_energies)), 0,
+                             _sum(unit.available_energies))
+    unit.output_temperature = highest(unit.output_temperatures)
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out],
-                    collect(values(sort(unit.available_energies))),
+                    unit.available_energies,
                     [nothing for _ in 1:length(unit.available_energies)],
-                    collect(values(sort(unit.output_temperatures))),
-                    collect(keys(sort(unit.available_energies))),
+                    unit.output_temperatures,
+                    unit.calc_uacs,
                     has_calculated_all_maxima,
                     false)
 end
@@ -267,28 +269,28 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     output_temperature_interface = lowest(unit.output_temperature, temp_min_highest(exchanges))
     unit.used_energy = 0.0
 
-    if sum(energy_demands) > 0 && _sum(collect(values(unit.available_energies))) > 0
-        for e in exchanges
-            comp_uac = e.purpose_uac
+    if sum(energy_demands) > 0 && _sum(unit.available_energies) > 0
+        uac_idx = 0
+        for (uac_idx, e) in enumerate(exchanges)
             comp_energy_demand = abs(e.balance + e.energy_potential)
-            used_energy_comp = min(comp_energy_demand, unit.available_energies[comp_uac])
+            used_energy_comp = min(comp_energy_demand, unit.available_energies[uac_idx])
 
             # recalculate the average_temperature if not all energy is used to keep a constant 
             # flow rate
             if unit.delta_T === nothing && unit.spec_flow_rate !== nothing &&
-               used_energy_comp < unit.available_energies[comp_uac]
+               used_energy_comp < unit.available_energies[uac_idx]
                # end of condition
-                unit.average_temperatures[comp_uac] = e.temperature_min -
-                                                      sim_params["wh_to_watts"](used_energy_comp) /
-                                                      unit.collector_gross_area /
-                                                      (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
+               unit.average_temperatures[uac_idx] = e.temperature_min -
+                                                    sim_params["wh_to_watts"](used_energy_comp) /
+                                                    unit.collector_gross_area /
+                                                    (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
             end
 
             unit.used_energy += used_energy_comp
-            unit.runtimes[comp_uac] = comp_energy_demand / unit.available_energies[comp_uac] * unit.runtimes[comp_uac]
+            unit.runtimes[uac_idx] = comp_energy_demand / unit.available_energies[uac_idx] * unit.runtimes[uac_idx]
         end
 
-        unit.runtimes[unit.uac] = 0
+        unit.runtimes[end] = 0
         add!(unit.output_interfaces[unit.m_heat_out],
              unit.used_energy,
              output_temperature_interface)
@@ -298,18 +300,23 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
     end
 
-    for uac in keys(unit.runtimes)
-        if !(uac in [e.purpose_uac for e in exchanges] || uac == unit.uac) && !isnothing(unit.average_temperatures[uac])
-            unit.runtimes[uac] = 0
-        elseif isnothing(unit.average_temperatures[uac])
-            unit.runtimes[uac] = nothing
+    for (uac_idx, uac) in enumerate(unit.calc_uacs)
+        if !(uac in [e.purpose_uac for e in exchanges] || uac == unit.uac) && !isnothing(unit.average_temperatures[uac_idx])
+            unit.runtimes[uac_idx] = 0
+        elseif isnothing(unit.average_temperatures[uac_idx])
+            unit.runtimes[uac_idx] = nothing
         end
     end
 
-    unit.output_temperature = _weighted_mean(collect(values(sort(unit.output_temperatures))),
-                                             collect(values(sort(unit.runtimes))))
-    unit.average_temperature = _weighted_mean(collect(values(sort(unit.average_temperatures))),
-                                              collect(values(sort(unit.runtimes))))
+    if _sum(unit.runtimes) == 0
+        stagnation_temp = get_stagnation_temperature(unit, sim_params)
+        unit.output_temperature = stagnation_temp
+        unit.average_temperature = stagnation_temp
+    else
+        unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
+        unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
+    end
+
     unit.last_average_temperature = unit.average_temperature
 
     if unit.output_temperature == unit.average_temperature
@@ -325,8 +332,8 @@ end
     calculate_energies(unit::SolarthermalCollector, components, sim_params::Dict{String,Any})
 
 Function used in the control() function of the solarthermal collector to calculate the 
-available energeries, average temperatures, output temperatures and partial runtime for each 
-connected component. Results are written as dictionares with the uac of the component as key.
+available energies, average temperatures, output temperatures and partial runtime for each 
+connected component. Results are written as dictionaries with the uac of the component as key.
 
 # Arguments
 - `unit::SolarthermalCollector`: The solarthermal collector for which the calculation is 
@@ -346,17 +353,18 @@ connected component. Results are written as dictionares with the uac of the comp
                                       gets delivered energy with uac as keys.
 """
 function calculate_energies(unit::SolarthermalCollector, components, sim_params::Dict{String,Any})
-    available_energies = Dict{String,Floathing}()
-    average_temperatures = Dict{String,Temperature}()
-    output_temperatures = Dict{String,Temperature}()
-    runtimes = Dict{String,Floathing}()
     left_energy_factor = 1.0
     component_idx = 1
 
     exchanges = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
 
+    available_energies = Array{Floathing}(nothing, length(exchanges) + 1)
+    average_temperatures = Array{Floathing}(nothing, length(exchanges) + 1)
+    output_temperatures = Array{Floathing}(nothing, length(exchanges) + 1)
+    runtimes = Array{Floathing}(nothing, length(exchanges) + 1)
+
     potential_energies = Float64[]
-    uacs = Stringing[]
+    unit.calc_uacs = Stringing[]
     target_temperatures = Temperature[]
     for exchange in exchanges
         # no check for possibly written max energy --> is done by set_max_energy!() for 
@@ -377,7 +385,7 @@ function calculate_energies(unit::SolarthermalCollector, components, sim_params:
                                                                                   false)
         end
 
-        push!(uacs, exchange.purpose_uac)
+        push!(unit.calc_uacs, exchange.purpose_uac)
         push!(target_temperatures, target_temperature)
         push!(potential_energies, max_energy)
     end
@@ -395,53 +403,51 @@ function calculate_energies(unit::SolarthermalCollector, components, sim_params:
 
         # check if more energy can be produced for a certain component than is demanded
         if any(isinf, potential_energies)
-            available_energies[uacs[component_idx]] = produced_energy
-            runtimes[uacs[component_idx]] = 1
+            available_energies[component_idx] = produced_energy
+            runtimes[component_idx] = 1
 
         elseif produced_energy == 0
-            available_energies[uacs[component_idx]] = produced_energy
-            runtimes[uacs[component_idx]] = nothing
+            available_energies[component_idx] = produced_energy
+            runtimes[component_idx] = nothing
 
         elseif produced_energy > potential_energies[component_idx]
-            available_energies[uacs[component_idx]] = potential_energies[component_idx]
+            available_energies[component_idx] = potential_energies[component_idx]
             left_energy_factor *= (produced_energy - potential_energies[component_idx]) / produced_energy
-            runtimes[uacs[component_idx]] = (produced_energy - potential_energies[component_idx]) / produced_energy
+            runtimes[component_idx] = (produced_energy - potential_energies[component_idx]) / produced_energy
 
         else
-            available_energies[uacs[component_idx]] = produced_energy
-            runtimes[uacs[component_idx]] = left_energy_factor
+            available_energies[component_idx] = produced_energy
+            runtimes[component_idx] = left_energy_factor
             left_energy_factor = 0
         end
 
-        average_temperatures[uacs[component_idx]] = t_avg
-        output_temperatures[uacs[component_idx]] = t_target
+        average_temperatures[component_idx] = t_avg
+        output_temperatures[component_idx] = t_target
         component_idx += 1
     end
 
+    push!(unit.calc_uacs, unit.uac)
+
     # if no energy at expected temperature levels is available then use max_output_temperature 
     # which equals average temperature with a used energy of 0
-    if _sum(collect(values(available_energies))) == 0
-        _, average_temperature = get_output_temperature_bounds(unit)
-
+    if _sum(available_energies) == 0
+        stagnation_temp = get_stagnation_temperature(unit, sim_params)
         calc_max = false
-        average_temperatures[unit.uac] = average_temperature
-        map!(v -> nothing, values(output_temperatures))
-        output_temperatures[unit.uac] = average_temperature
-        map!(v -> nothing, values(runtimes))
-        runtimes[unit.uac] = 1
+        average_temperatures[end] = stagnation_temp
+        output_temperatures[end] = stagnation_temp
+        runtimes[end] = 1
 
     elseif any(isinf, potential_energies)
-        _, average_temperature = get_output_temperature_bounds(unit)
-
+        stagnation_temp = get_stagnation_temperature(unit, sim_params)
         calc_max = true
-        average_temperatures[unit.uac] = average_temperature
-        output_temperatures[unit.uac] = average_temperature
-        runtimes[unit.uac] = 1
+        average_temperatures[end] = stagnation_temp
+        output_temperatures[end] = stagnation_temp
+        runtimes[end] = 1
     else
         calc_max = false
-        average_temperatures[unit.uac] = nothing
-        output_temperatures[unit.uac] = nothing
-        runtimes[unit.uac] = nothing
+        average_temperatures[end] = nothing
+        output_temperatures[end] = nothing
+        runtimes[end] = nothing
     end
 
     return (available_energies,
@@ -452,7 +458,8 @@ function calculate_energies(unit::SolarthermalCollector, components, sim_params:
 end
 
 """
-    get_input_temperature_bounds(unit::SolarthermalCollector)
+    get_input_temperature_bounds(unit::SolarthermalCollector, 
+                                 sim_params::Dict{String,Any})
 
 Function used by the control module negotiate_temperature to get the current minimum 
 and maximum temperatures that can be supplied.
@@ -460,6 +467,7 @@ and maximum temperatures that can be supplied.
 # Arguments
 - `unit::SolarthermalCollector`: The solarthermal collector for which the calculation is 
                                  performed.
+- `sim_params::Dict{String,Any}`: simulation parameters
 
 # Returns
 - `output_min_temperature::Temperature`: The current minimal temperature that can be given 
@@ -468,10 +476,71 @@ and maximum temperatures that can be supplied.
                                          in the output
 
 """
-function get_output_temperature_bounds(unit::SolarthermalCollector)::Tuple{Temperature,Temperature}
-    temps = collect(keys(unit.temperature_energy_pairs))
-    zero_energy_mask = [v[1] == 0 for v in values(unit.temperature_energy_pairs)]
-    return nothing, lowest(temps[zero_energy_mask])
+function get_output_temperature_bounds(unit::SolarthermalCollector, 
+                                       sim_params::Dict{String,Any})::Tuple{Temperature,Temperature}
+    if unit.delta_T_min == 0.0 || unit.spec_flow_rate_min == 0
+        current_max_temperature = get_stagnation_temperature(unit, sim_params)
+        energy_at_max_temp = 0
+
+    elseif unit.delta_T !== nothing && unit.spec_flow_rate === nothing
+        avg_temp = find_zero((t_avg -> spec_thermal_power_func(t_avg, t_avg + unit.delta_T / 2, 
+                                                               unit.last_average_temperature,
+                                                               unit.spec_flow_rate_min, unit, 
+                                                               sim_params["time_step_seconds"]),
+                              t_avg -> derivate_spec_thermal_power_func(t_avg, unit.spec_flow_rate_min, unit,
+                                                                        sim_params["time_step_seconds"])),
+                             unit.last_average_temperature,
+                             Roots.Newton())
+        current_max_temperature = avg_temp + unit.delta_T / 2
+        energy_at_max_temp = unit.spec_flow_rate_min * unit.delta_T * unit.vol_heat_cap
+
+    elseif unit.delta_T === nothing && unit.spec_flow_rate !== nothing
+        avg_temp = find_zero((t_avg -> spec_thermal_power_func(t_avg, t_avg + unit.delta_T_min / 2, 
+                                                               unit.last_average_temperature,
+                                                               unit.spec_flow_rate, unit, 
+                                                               sim_params["time_step_seconds"]),
+                              t_avg -> derivate_spec_thermal_power_func(t_avg, unit.spec_flow_rate, unit,
+                                                                        sim_params["time_step_seconds"])),
+                             unit.last_average_temperature,
+                             Roots.Newton())
+        current_max_temperature = avg_temp + unit.delta_T_min / 2
+        energy_at_max_temp = unit.spec_flow_rate * unit.delta_T_min * unit.vol_heat_cap
+
+    else
+        @error "Error in config file: Exclusively delta_T OR spec_flow_rate must have a value"
+        throw(InputError)
+    end
+    
+    unit.temperature_energy_pairs[current_max_temperature] = (energy_at_max_temp, 
+                                                              current_max_temperature, 
+                                                              current_max_temperature)
+
+    return nothing, current_max_temperature
+end
+
+"""
+    function get_stagnation_temperature(unit::SolarthermalCollector, sim_params::Dict{String,Any})
+
+Convenience function to calculation stagnation temperature of the solarthermal collector. 
+This is the temperature when no energy is taken from the collector by setting the flow rate 
+to 0.
+
+# Arguments
+- `unit::SolarthermalCollector`: The solarthermal collector for which the calculation is 
+                                 performed.
+- `sim_params::Dict{String,Any}`: simulation parameters
+
+# Returns
+- `stagnation_temp::Temperature`: Stagnation temperature with no energy taken from the collector
+"""
+function get_stagnation_temperature(unit::SolarthermalCollector, sim_params::Dict{String,Any})::Temperature
+    stagnation_temp = find_zero((t_avg -> spec_thermal_power_func(t_avg, t_avg, unit.last_average_temperature,
+                                                                        0, unit, sim_params["time_step_seconds"]),
+                                        t_avg -> derivate_spec_thermal_power_func(t_avg, 0, unit,
+                                                                                sim_params["time_step_seconds"])),
+                                    unit.last_average_temperature,
+                                    Roots.Newton())
+    return stagnation_temp
 end
 
 """
@@ -499,7 +568,7 @@ function calculate_output_energy_from_output_temperature(unit::SolarthermalColle
                                                          minimum_output_temperature::Temperature,
                                                          sim_params::Dict{String,Any})::Float64
 
-    # calculate specific thermal power depending on control mode; reuse already caluclated values if possible
+    # calculate specific thermal power depending on control mode; reuse already calculated values if possible
     if minimum_output_temperature in keys(unit.temperature_energy_pairs)
         p_spec_th, t_avg, t_target = unit.temperature_energy_pairs[minimum_output_temperature]
 
@@ -526,7 +595,7 @@ end
                                          temperature_output::Temperature)
 
 Checks if a requested output temperature is within the allowed operational range for the 
-solarthermal collector. If no temperautre is given, the function sets the temperature to the 
+solarthermal collector. If no temperature is given, the function sets the temperature to the 
 mean temperature that will be reached with maximum energy draw during the whole time step.
 The function also determines the maximum extractable energy for the given temperature.
 
@@ -549,7 +618,7 @@ function check_temperature_and_get_max_energy(unit::SolarthermalCollector,
                                               limit_max_output_energy_to_avoid_pulsing::Bool)::Tuple{Temperature,
                                                                                                      Float64}
     # get max output temperature of solarthermal collector
-    _, source_max_out_temperature = get_output_temperature_bounds(unit)
+    _, source_max_out_temperature = get_output_temperature_bounds(unit, sim_params)
 
     if temperature_output > source_max_out_temperature || temperature_output === nothing
         # the requested temperature is higher than the current output temperature or
@@ -750,7 +819,7 @@ end
     spec_thermal_power_func(t_avg::Temperature, spec_flow_rate::Float64, 
                             unit::SolarthermalCollector, time_step:Number)
 
-Derivative of the thermal power output fuction to speed up solve function for 
+Derivative of the thermal power output function to speed up solve function for 
 spec_thermal_power_func
 
 # Arguments
@@ -787,7 +856,7 @@ end
 
 function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
     if key.value_key == "OUT"
-        return calculate_energy_flow(unit.output_interfaces[key.m_heat_out])
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Temperature"
         return unit.output_temperature
     elseif key.value_key == "Max_Energy"
