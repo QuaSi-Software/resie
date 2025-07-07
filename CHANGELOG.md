@@ -6,6 +6,7 @@ As per the definition of semantic versioning and the reality of early developmen
 
 ### Version 0.11.3
 * Add solar thermal collector model
+* Add complex version seasonal thermal storage model (STES)
 * Add solar radiation model for sun position and beam and diffuse irradiances in a plane
 * Add new control module negotiate_temperature which defines temperature between two components with flexible temperatures. It has four options for temperature_mode:
   * optimize: Run a optimization algorithm to find the temperature with the maximal available energy. Can significantly increase calculation time.
@@ -61,7 +62,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * correct input variable naming for ambient temperature in buffer tank and geothermal collector
 
 ### Version 0.10.4
-* Update of buffer tank / STTES model. Now three different models are available, each with and without losses:
+* Update of buffer tank / STES model. Now three different models are available, each with and without losses:
   * ideally stratified: Supplies energy consistently at "high_temperature". Losses reduce energy but do not affect temperature.
   * ideally mixed: Fully mixed model, with temperature output depending on the current load. Losses decrease both energy and temperature.
   * balanced: Combines both models. A full tank behaves as ideally stratified, transitioning to ideally mixed as the tank empties.
