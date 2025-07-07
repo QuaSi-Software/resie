@@ -136,7 +136,7 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
         return nothing, 0.0
     end
 
-    if mod.parameters["temperature_mode"] == "optimize_for_max_energy"
+    if mod.parameters["temperature_mode"] == "optimize"
         return find_best_temperature_and_get_energy(mod,
                                                     calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,

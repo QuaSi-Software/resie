@@ -55,16 +55,15 @@ mutable struct SolarthermalCollector <: Component
     direct_normal_irradiance::Float32
     # operation parameters
     delta_T::Union{Float32,Nothing}
-    spec_flow_rate::Union{Float64,Nothing}
+    spec_flow_rate::Floathing
     delta_T_min::Union{Float32,Nothing}
-    spec_flow_rate_min::Union{Float64,Nothing}
+    spec_flow_rate_min::Floathing
     # results
-    max_energy::Union{Float64,Nothing}
     used_energy::Float64
     output_temperature::Temperature
     average_temperature::Temperature
     last_average_temperature::Temperature
-    spec_flow_rate_actual::Union{Float64,Nothing}
+    spec_flow_rate_actual::Floathing
     # internal parameters for temperature layers
     available_energies::Array{Floathing}
     average_temperatures::Array{Floathing}
@@ -160,7 +159,6 @@ mutable struct SolarthermalCollector <: Component
                    default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
                    default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
                    # results
-                   0.0, # maximum available energy
                    0.0, # energy that was removed from the system in current time step
                    0.0, # output temperature in current time step, calculated in control()
                    0.0, # average temperature in current time step, calculated in control()
@@ -249,15 +247,13 @@ function control(unit::SolarthermalCollector,
     unit.available_energies, has_calculated_all_maxima, unit.average_temperatures,
     unit.output_temperatures, unit.runtimes = calculate_energies(unit, components, sim_params)
 
-    unit.max_energy = ifelse(all(isnothing.(unit.available_energies)), 0,
-                             _sum(unit.available_energies))
     unit.output_temperature = highest(unit.output_temperatures)
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out],
-                    unit.available_energies,
-                    [nothing for _ in 1:length(unit.available_energies)],
-                    unit.output_temperatures,
-                    unit.calc_uacs,
+                    unit.available_energies[1:end-1],
+                    [nothing for _ in 1:length(unit.available_energies)-1],
+                    unit.output_temperatures[1:end-1],
+                    unit.calc_uacs[1:end-1],
                     has_calculated_all_maxima,
                     false)
 end
@@ -458,7 +454,7 @@ function calculate_energies(unit::SolarthermalCollector, components, sim_params:
 end
 
 """
-    get_input_temperature_bounds(unit::SolarthermalCollector, 
+    get_output_temperature_bounds(unit::SolarthermalCollector, 
                                  sim_params::Dict{String,Any})
 
 Function used by the control module negotiate_temperature to get the current minimum 
@@ -859,8 +855,6 @@ function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Temperature"
         return unit.output_temperature
-    elseif key.value_key == "Max_Energy"
-        return unit.max_energy
     elseif key.value_key == "Average_Temperature"
         return unit.average_temperature
     elseif key.value_key == "Used_Energy"

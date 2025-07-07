@@ -1285,7 +1285,7 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         for (idx, max_energy) in enumerate(interface.max_energy.max_energy)
             push!(exchanges,
                   EnEx(; balance=interface.balance,
-                       energy_potential=max_energy === nothing ? nothing : input_sign * max_energy,
+                       energy_potential=input_sign * max_energy,
                        purpose_uac=purpose_uac,
                        temperature_min=interface.max_energy.temperature_min[idx],
                        temperature_max=interface.max_energy.temperature_max[idx],
