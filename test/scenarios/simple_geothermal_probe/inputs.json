@@ -1,0 +1,176 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/simple_geothermal_probe/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/simple_geothermal_probe/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/simple_geothermal_probe/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": {
+            "TST_STH_01": ["m_h_w_ht1 OUT"],
+            "TST_DEM_01": ["m_h_w_ht1 IN"],
+            "TST_GTP_01": ["new_fluid_temperature","fluid_reynolds_number"]
+        },
+        "output_plot_file": "./test/scenarios/simple_geothermal_probe/output_plot.html",
+        "output_plot": {
+            
+            "1": {
+                "key": {"TST_DEM_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_GTP_01": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_STH_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_GTP_01": ["new_fluid_temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "6": {
+                "key": {"TST_GTP_01": ["current_max_output_temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "8": {
+                "key": {"TST_GTP_01": ["fluid_reynolds_number"]},
+                "axis": "left",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "9": {
+                "key": {"TST_GTP_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh", 
+                "scale_factor": 0.001       
+            },
+            "10": {
+                "key": {"TST_STH_01": ["m_h_w_ht1 Supply"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "11": {
+                "key": {"TST_DEM_01": ["m_h_w_ht1 Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "12": {
+                "key": {"TST_HP_01": ["COP"]},
+                "axis": "left",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "13": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "14": {
+                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes"
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "constant_temperature": 55,
+            "scale": 1500
+        },
+        "TST_STH_01": {
+            "type": "FixedSupply",
+            "medium": "m_h_w_ht1",
+            "output_refs": [
+                "TST_GTP_01"
+            ],
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "constant_temperature": 28,
+            "scale": 250
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_DEM_01"
+            ],
+            "power_th": 225000,
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "is_source": true
+        },
+
+        "TST_GTP_01": {
+            "type": "GeothermalProbes",
+            "m_heat_out": "m_h_w_lt1",
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "model_type": "detailed",
+            "___GENERAL PARAMETER___": "",
+            "max_output_power": 150,
+            "max_input_power": 150,
+            "regeneration": true,
+            "soil_undisturbed_ground_temperature": 13,
+            "soil_heat_conductivity": 1.6 ,
+            "soil_density": 1800,
+            "soil_specific_heat_capacity": 2400,
+            "probe_field_geometry": "rectangle",
+            "number_of_probes_x": 3, 
+            "number_of_probes_y": 12,
+            "probe_field_key_2": "",
+            "borehole_spacing": 8,
+            "probe_depth": 150,
+            "borehole_diameter": 0.16,
+            "boreholewall_start_temperature": 13,
+            "unloading_temperature_spread": 1.5,
+            "loading_temperature_spread": 4,
+            "___SIMPLIFIED MODEL___": "",
+            "borehole_thermal_resistance": 0.1,
+            "___DETAILED MODEL___": "",
+            "probe_type": 2,
+            "pipe_diameter_outer": 0.032,
+            "pipe_diameter_inner": 0.0262,
+            "pipe_heat_conductivity": 0.42,
+            "shank_spacing": 0.1,
+            "fluid_specific_heat_capacity": 3795,
+            "fluid_density": 1052,
+            "fluid_kinematic_viscosity": 3.9e-6,
+            "fluid_heat_conductivity": 0.48,
+            "fluid_prandtl_number": 31.3,
+            "grout_heat_conductivity": 2
+        }
+    }
+}

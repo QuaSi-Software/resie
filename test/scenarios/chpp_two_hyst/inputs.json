@@ -1,0 +1,137 @@
+{
+    "io_settings": {
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/chpp_two_hyst//auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/chpp_two_hyst/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_file": "./test/scenarios/chpp_two_hyst/out.csv",
+        "csv_output_keys": "nothing",
+        "output_plot_file": "./test/scenarios/chpp_two_hyst/output_plot.html",
+        "output_plot": "all"
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:30",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
+    },
+    "components": {
+        "TST_DEM_01" : {
+            "type" : "Demand",
+            "medium" : "m_h_w_ht1",
+            "output_refs" : [],
+            "energy_profile_file_path" : "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "scale" : 1000.0,
+            "constant_temperature": 60.0
+        },
+        "TST_DEM_02" : {
+            "type" : "Demand",
+            "medium" : "m_e_ac_230v",
+            "output_refs" : [],
+            "energy_profile_file_path" : "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "scale" : 200.0
+        },
+        "TST_GRI_01" : {
+            "type" : "GridConnection",
+            "medium" : "m_c_g_natgas",
+            "output_refs" : ["TST_CHP_01"],
+            "is_source" : true
+        },
+        "TST_GRO_01" : {
+            "type" : "GridConnection",
+            "medium" : "m_h_w_ht1",
+            "output_refs" : [],
+            "is_source" : false
+        },
+        "TST_BT_01": {
+            "type": "BufferTank",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "___GENERAL PARAMETER___": "",
+            "model_type": "balanced",
+            "capacity": 7000,
+            "initial_load": 0.5,
+            "high_temperature": 60.0,
+            "max_load_rate": 1.0,
+            "max_unload_rate": 1.0,
+            "___BALANCED MODEL___": "",
+            "switch_point": 0.20,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 0.9,
+            "thermal_transmission_barrel": 1.2,
+            "thermal_transmission_bottom": 1.5
+        },
+        "TST_BAT_01": {
+            "type": "Battery",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "capacity": 8000,
+            "load": 4000
+        },
+        "TST_BUS_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "TST_CHP_01",
+                    "TST_BT_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_BT_01",
+                    "TST_GRO_01"
+                ],
+                "energy_flow": [
+                    [1,1,1],
+                    [1,0,0]
+                ]
+            }
+        },
+        "TST_BUS_02": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "TST_CHP_01",
+                    "TST_BAT_01"
+                ],
+                "output_order": [
+                    "TST_DEM_02",
+                    "TST_BAT_01"
+                ]
+            }
+        },
+        "TST_CHP_01" : {
+            "type" : "CHPP",
+            "m_fuel_in" : "m_c_g_natgas",
+            "output_refs" : [
+                "TST_BUS_01",
+                "TST_BUS_02"
+            ],
+            "control_modules": [
+                {
+                    "name": "storage_driven",
+                    "low_threshold": 0.2,
+                    "high_threshold": 0.8,
+                    "storage_uac": "TST_BAT_01"
+                },
+                {
+                    "name": "storage_driven",
+                    "low_threshold": 0.3,
+                    "high_threshold": 0.9,
+                    "storage_uac": "TST_BT_01"
+                }
+            ],
+            "power_el" : 1500,
+            "min_power_fraction" : 0.4
+        }
+    }
+}

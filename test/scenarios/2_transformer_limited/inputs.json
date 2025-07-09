@@ -1,0 +1,135 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/2_transformer_limited/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/2_transformer_limited/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/2_transformer_limited/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": {
+            "TST_DEM_ht_01": ["m_h_w_ht1 Demand", "m_h_w_ht1 IN"],
+            "TST_DEM_H2_01": ["m_c_g_h2 Demand", "m_c_g_h2 IN"],
+            "TST_HP_01": ["m_h_w_ht1 OUT"],
+            "TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT", "m_c_g_h2 OUT"]
+        },
+        "output_plot_file": "./test/scenarios/2_transformer_limited/output_plot.html",
+        "output_plot": { 
+            "1": {
+                "key": {"TST_DEM_ht_01": ["m_h_w_ht1 Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_DEM_H2_01": ["m_c_g_h2 Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_DEM_ht_01": ["m_h_w_ht1 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_DEM_H2_01": ["m_c_g_h2 IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_01_ELT_01_ELY": ["m_h_w_lt1 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"TST_01_ELT_01_ELY": ["m_c_g_h2 OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            }
+          }    
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "01.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
+    },
+    "components": {
+        "TST_DEM_ht_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
+            "scale": 1500
+        },
+        "TST_DEM_H2_01": {
+            "type": "Demand",
+            "medium": "m_c_g_h2",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_h2.prf",
+            "scale": 3000
+        },
+        "TST_01_ELT_01_GRO": {
+            "type": "GridConnection",
+            "medium": "m_c_g_o2",
+            "output_refs": [],
+            "is_source": false
+        },
+        "TST_GRI_EL_01": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": ["TST_HP_01"],
+            "is_source": true
+        },
+        "TST_GRI_EL_02": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": ["TST_01_ELT_01_ELY"],
+            "is_source": true
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "output_refs": ["TST_DEM_ht_01" ],
+            "power_th": 5000,
+            "cop_function": "const:3.0",
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
+        },
+        "TST_01_ELT_01_ELY": {
+            "type": "Electrolyser",
+            "output_refs": [
+                "TST_HP_01",
+                "TST_DEM_H2_01",
+                "TST_01_ELT_01_GRO"
+            ],
+            "power_el": 4000,
+            "output_temperature_ht": 55.0,
+            "m_heat_ht_out": "m_h_w_lt1",
+            "m_heat_lt_out": "m_h_w_lt2",
+            "nr_switchable_units": 1,
+            "dispatch_strategy": "all_equal",
+            "heat_lt_is_usable": false,
+            "min_power_fraction": 0.0,
+            "min_power_fraction_total": 0.0,
+            "linear_interface": "el_in",
+            "efficiency_el_in": "const:1.0",
+            "efficiency_h2_out": "const:0.6",
+            "efficiency_h2_out_lossless": "const:0.6",
+            "efficiency_o2_out": "const:0.6",
+            "efficiency_heat_ht_out": "const:0.4"
+        }
+        
+    }
+}
