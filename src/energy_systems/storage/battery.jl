@@ -125,7 +125,7 @@ end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_charge < sim_params["epsilon"]
-        set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+        set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
     end
 
