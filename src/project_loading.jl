@@ -1,7 +1,7 @@
 # this file contains functionality pertaining to loading a project's metadata and the
 # energy system components from the project config file, as well as constructing certain
 # helpful information data structures from the inputs in the config
-import JSON
+using JSON: JSON
 
 """
     read_JSON(filepath)
@@ -54,23 +54,19 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
 
     # link inputs/outputs
     for (unit_key, entry) in pairs(config)
-        if (
-            String(entry["type"]) != "Bus"
+        if (String(entry["type"]) != "Bus"
             && haskey(entry, "output_refs")
-            && length(entry["output_refs"]) > 0
-        )
+            && length(entry["output_refs"]) > 0)
+            # end of condition
             others = Grouping(key => components[key] for key in entry["output_refs"])
             link_output_with(components[unit_key], others)
 
-        elseif (
-            String(entry["type"]) == "Bus"
-            && haskey(entry, "connections")
-            && length(entry["connections"]) > 0
-        )
-            others = Grouping(
-                key => components[key]
-                for key in entry["connections"]["output_order"]
-            )
+        elseif (String(entry["type"]) == "Bus"
+                && haskey(entry, "connections")
+                && length(entry["connections"]) > 0)
+            # end of condition
+            others = Grouping(key => components[key]
+                              for key in entry["connections"]["output_order"])
             link_output_with(components[unit_key], others)
         end
     end
@@ -83,22 +79,23 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         # registered here, compare automatic selection of component class
         for module_config in default(entry, "control_modules", [])
             if lowercase(module_config["name"]) === "economical_discharge"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_EconomicalDischarge(
-                        module_config, components, sim_params
-                    )
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params))
             elseif lowercase(module_config["name"]) === "profile_limited"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_ProfileLimited(module_config, components, sim_params)
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params))
             elseif lowercase(module_config["name"]) === "storage_driven"
-                push!(
-                    unit.controller.modules,
-                    EnergySystems.CM_StorageDriven(module_config, components, sim_params)
-                )
+                push!(unit.controller.modules,
+                      EnergySystems.CM_StorageDriven(module_config, components, sim_params))
+            elseif lowercase(module_config["name"]) === "temperature_sorting"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
+            elseif lowercase(module_config["name"]) === "negotiate_temperature"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_Negotiate_Temperature(module_config, components, sim_params, unit.uac))
+            elseif lowercase(module_config["name"]) === "limit_cooling_input_temperature"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_LimitCoolingInputTemperature(module_config, components, sim_params, unit.uac))
             end
         end
     end
@@ -143,14 +140,10 @@ function reorder_interfaces_of_busses(components::Grouping)::Grouping
 
             # Get the permutation indices that would sort the 'source'/'target' field by
             # 'uac' order
-            output_perm_indices = sortperm([
-                output_order_dict[unit.output_interfaces[i].target.uac]
-                for i in 1:length(unit.output_interfaces)
-            ])
-            input_perm_indices = sortperm([
-                input_order_dict[unit.input_interfaces[i].source.uac]
-                for i in 1:length(unit.input_interfaces)
-            ])
+            output_perm_indices = sortperm([output_order_dict[unit.output_interfaces[i].target.uac]
+                                            for i in 1:length(unit.output_interfaces)])
+            input_perm_indices = sortperm([input_order_dict[unit.input_interfaces[i].source.uac]
+                                           for i in 1:length(unit.input_interfaces)])
 
             # Reorder the input and output interfaces using the permutation indices
             unit.output_interfaces = unit.output_interfaces[output_perm_indices]
@@ -167,26 +160,44 @@ Function to read in the time step information from the input file.
 If no information is given in the input file, the following defaults 
 will be set:
 time_step = 900 s
-start_timestamp = 0 s
-end_timestamp = 900 s
 """
-function get_timesteps(simulation_parameters::Dict{String, Any})
-    time_step = 900
-    if "time_step_seconds" in keys(simulation_parameters)
-        time_step = UInt(simulation_parameters["time_step_seconds"])
+function get_timesteps(simulation_parameters::Dict{String,Any})
+    start_date = DateTime(0)
+    end_date = DateTime(0)
+    try
+        start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
+        end_date = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
+    catch e
+        @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
+               "'start_end_unit' has to be a daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
+               "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start" *
+               "and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
+               "The following error occured: $e")
+        throw(InputError)
     end
 
-    start_timestamp = 0
-    if "start" in keys(simulation_parameters)
-        start_timestamp = Integer(simulation_parameters["start"])
+    if simulation_parameters["time_step_unit"] == "seconds"
+        time_step = simulation_parameters["time_step"]
+    elseif simulation_parameters["time_step_unit"] == "minutes"
+        time_step = simulation_parameters["time_step"] * 60
+    elseif simulation_parameters["time_step_unit"] == "hours"
+        time_step = simulation_parameters["time_step"] * 60 * 60
+    else
+        time_step = 900
+        @info("The simulation time step is set to 900 s as default, as it could not be found in the input file" *
+              "(`time_step` and `time_step_unit` have to be given!).")
     end
 
-    end_timestamp = 900
-    if "end" in keys(simulation_parameters)
-        end_timestamp = Integer(simulation_parameters["end"])
-    end
+    nr_of_steps = UInt(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
 
-    return time_step, start_timestamp, end_timestamp
+    # set end_date to be integer dividable by the timestep
+    end_date = add_ignoring_leap_days(start_date, (nr_of_steps - 1) * Second(time_step))
+
+    if (month(start_date) == 2 && day(start_date) == 29) || (month(end_date) == 2 && day(end_date) == 29)
+        @error "The simulation start and end date can not be at a leap day!"
+        throw(InputError)
+    end
+    return UInt(time_step), start_date, end_date, nr_of_steps
 end
 
 # calculation of the order of operations has its own include files due to its complexity

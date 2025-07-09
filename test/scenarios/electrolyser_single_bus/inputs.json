@@ -68,9 +68,12 @@
         }
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 604800,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes",
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
     },
     "components": {
         "TST_01_HZG_01_DEM": {
@@ -211,7 +214,9 @@
                 "TST_01_HZG_00_BUS"
             ],
             "power_th": 20000,
-            "constant_cop": 3.0
+            "cop_function": "const:3.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -219,15 +224,18 @@
                 "TST_01_HZG_00_BUS"
             ],
             "power_th": 20000,
-            "constant_cop": 3.0
+            "cop_function": "const:3.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_01_HZG_00_BFT": {
             "type": "BufferTank",
             "output_refs": [
                 "TST_01_HZG_00_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 40000,
-            "load": 20000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_BFT": {
@@ -235,8 +243,9 @@
             "output_refs": [
                 "TST_01_HZG_01_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 20000,
-            "load": 10000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_02_BFT": {
@@ -244,8 +253,9 @@
             "output_refs": [
                 "TST_01_HZG_02_BUS"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 20000,
-            "load": 10000,
+            "initial_load": 0.5,
             "high_temperature": 90.0
         },
         "TST_01_HZG_01_GBO": {
@@ -290,11 +300,30 @@
         },
         "TST_01_HZG_01_STS": {
             "type": "SeasonalThermalStorage",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_lt1",
             "output_refs": [
                 "TST_01_HZG_02_HTP"
             ],
-            "capacity": 4000000,
-            "load": 400000
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "volume": 45.9,
+            "hr_ratio": 2,
+            "sidewall_angle": 90,
+            "rho_medium": 1000,
+            "cp_medium": 4.18,
+            "diffussion_coefficient": 0.000000143,
+            "number_of_layer_total": 25,
+            "number_of_layer_above_ground": 1,
+            "output_layer_from_top": 1,
+            "high_temperature": 90,
+            "low_temperature": 15,
+            "max_load_rate": 1,
+            "max_unload_rate": 1,
+            "thermal_transmission_lid": 0.25,
+            "thermal_transmission_barrel": 0.375,
+            "thermal_transmission_bottom": 0.375,
+            "ground_temperature": 9.0,
+            "initial_load": 0.1
         },
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",

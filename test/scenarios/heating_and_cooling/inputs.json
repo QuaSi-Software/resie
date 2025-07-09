@@ -10,9 +10,11 @@
         "output_plot": "all"
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 604800,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_TH_DEM_01": {
@@ -80,8 +82,9 @@
             "output_refs": [
                 "TST_TH_BUS_01"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 80000,
-            "load": 40000,
+            "initial_load": 0.5,
             "high_temperature": 70.0
         },
         "TST_TH_HP_01": {
@@ -99,7 +102,9 @@
                 }
             ],
             "power_th": 4500,
-            "min_power_fraction": 0.3
+            "min_power_function": "const:0.3",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_TH_HP_02": {
             "type": "HeatPump",
@@ -108,8 +113,9 @@
             ],
             "m_heat_out": "m_h_w_lt2",
             "power_th": 3500,
-            "min_power_fraction": 0.2,
-            "output_temperature": 40.0
+            "output_temperature": 40.0,
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_EL_GRI_01": {
             "type": "GridConnection",

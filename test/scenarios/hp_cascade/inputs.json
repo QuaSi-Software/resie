@@ -20,9 +20,11 @@
         }
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 604800,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_01_HZG_01_DEM": {
@@ -98,7 +100,9 @@
             "power_th": 10000,
             "output_temperature": 35,
             "m_heat_out": "m_h_w_ht2",
-            "min_power_fraction" : 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_01_HZG_02_HTP": {
             "type": "HeatPump",
@@ -107,7 +111,9 @@
             ],
             "power_th": 10000,
             "m_heat_in": "m_h_w_ht2",
-            "min_power_fraction" : 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_01_HZG_01_GBO": {
             "type": "FuelBoiler",

@@ -4,6 +4,7 @@
         "auxiliary_info": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
+        "csv_time_unit": "date",
         "csv_output_keys": {
 			"TST_HP_01": [
                 "m_h_w_lt1 IN",
@@ -60,9 +61,11 @@
         }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 603900,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds"
     },
     "components": {
         "TST_DEM_01": {
@@ -97,8 +100,10 @@
                 "TST_DEM_01"
             ],
             "power_th": 9000,
-            "constant_cop": 3.0,
-            "min_power_fraction": 0.0
+            "cop_function": "const:3.0",
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         }
     }
 }

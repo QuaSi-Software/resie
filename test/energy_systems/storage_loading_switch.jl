@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../test_util.jl")
 
 function test_primary_producer_can_load_storage()
     components_config = Dict{String,Any}(
@@ -23,56 +23,43 @@ function test_primary_producer_can_load_storage()
         "TST_GBO_01" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "output_refs" => [
-                "TST_BUS_01"
-            ],
-            "control_modules" => [
-                Dict{String,Any}(
-                    "name" => "storage_driven",
-                    "high_threshold" => 0.5,
-                    "low_threshold" => 0.1,
-                    "storage_uac" => "TST_BFT_01"
-                )
-            ],
+            "output_refs" => ["TST_BUS_01"],
+            "control_modules" => [Dict{String,Any}(
+                                      "name" => "storage_driven",
+                                      "high_threshold" => 0.5,
+                                      "low_threshold" => 0.1,
+                                      "storage_uac" => "TST_BFT_01",
+                                  )],
             "power_th" => 10000,
             "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_GBO_02" => Dict{String,Any}(
             "type" => "FuelBoiler",
             "m_fuel_in" => "m_c_g_natgas",
-            "output_refs" => [
-                "TST_BUS_01"
-            ],
+            "output_refs" => ["TST_BUS_01"],
             "power_th" => 40000,
             "efficiency_fuel_in" => "const:1.0",
         ),
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_GBO_01",
-                    "TST_BFT_01",
-                    "TST_GBO_02"
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                    "TST_BFT_01"
-                ],
-                "energy_flow" => [
-                    [1, 1],
-                    [1, 0],
-                    [1, 0]
-                ]
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_GBO_01",
+                                  "TST_BFT_01",
+                                  "TST_GBO_02"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_BFT_01"],
+                "energy_flow" => [[1, 1],
+                                  [1, 0],
+                                  [1, 0]],
+            ),
         ),
         "TST_BFT_01" => Dict{String,Any}(
             "type" => "BufferTank",
-            "output_refs" => [
-                "TST_BUS_01"
-            ],
+            "output_refs" => ["TST_BUS_01"],
+            "model_type" => "ideally_stratified",
             "capacity" => 40000,
-            "load" => 0
+            "initial_load" => 0,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",
@@ -81,16 +68,11 @@ function test_primary_producer_can_load_storage()
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
             "temperature_profile_file_path" => "./profiles/tests/demand_heating_temperature.prf",
             "scale" => 1,
-            "constant_demand" => 20000
+            "constant_demand" => 20000,
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9,
-        "is_first_timestep" => true
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     demand = components["TST_DEM_01"]
@@ -126,14 +108,10 @@ function test_primary_producer_can_load_storage()
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[1], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[3], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[3], bus)
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
 
     EnergySystems.process(boiler_1, simulation_parameters)
@@ -152,14 +130,10 @@ function test_primary_producer_can_load_storage()
     EnergySystems.process(grid_1, simulation_parameters)
     EnergySystems.distribute!(bus)
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[1], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) == 0.0
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[3], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[3], bus)
     @test EnergySystems.balance(exchanges) == 0.0
 
     # in the second timestep, demand is lower than primary producer can provide, so the
@@ -189,9 +163,7 @@ function test_primary_producer_can_load_storage()
     EnergySystems.process(demand, simulation_parameters)
     EnergySystems.process(bus, simulation_parameters)
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[1], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) == 0.0  # balance of busses are always zero
 
     EnergySystems.process(boiler_1, simulation_parameters)
@@ -213,14 +185,10 @@ function test_primary_producer_can_load_storage()
     @test tank.input_interfaces[tank.medium].sum_abs_change == 2000.0
     @test boiler_1.output_interfaces[boiler_2.m_heat_out].sum_abs_change == 5000.0
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[1], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[1], bus)
     @test EnergySystems.balance(exchanges) == 0.0
 
-    exchanges = EnergySystems.balance_on(
-        bus.input_interfaces[3], bus
-    )
+    exchanges = EnergySystems.balance_on(bus.input_interfaces[3], bus)
     @test EnergySystems.balance(exchanges) == 0.0
 end
 

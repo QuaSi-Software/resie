@@ -36,9 +36,7 @@ mutable struct CHPP <: Component
     energy_to_plr::Dict{Symbol,Vector{Tuple{Float64,Float64}}}
     discretization_step::Float64
 
-    min_run_time::UInt
     output_temperature::Temperature
-
     losses::Float64
 
     function CHPP(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
@@ -48,117 +46,83 @@ mutable struct CHPP <: Component
         register_media([m_fuel_in, m_heat_out, m_el_out])
         interface_list = (Symbol("fuel_in"), Symbol("el_out"), Symbol("heat_out"))
 
-        linear_interface = Symbol(
-            replace(
-                default(config, "linear_interface", "fuel_in"),
-                "m_" => ""
-            )
-        )
+        linear_interface = Symbol(replace(default(config, "linear_interface", "fuel_in"), "m_" => ""))
         if !(linear_interface in interface_list)
             @error "Given unknown interface name $linear_interface designated as linear " *
-                "for component $uac"
+                   "for component $uac"
         end
 
         efficiencies = Dict{Symbol,Function}(
             Symbol("fuel_in") => parse_efficiency_function(default(config,
-                "efficiency_fuel_in", "const:1.0"
-            )),
+                                                                   "efficiency_fuel_in",
+                                                                   "const:1.0")),
             Symbol("el_out") => parse_efficiency_function(default(config,
-                "efficiency_el_out",
-                "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38"
-            )),
+                                                                  "efficiency_el_out",
+                                                                  "pwlin:0.01,0.17,0.25,0.31,0.35,0.37,0.38,0.38,0.38")),
             Symbol("heat_out") => parse_efficiency_function(default(config,
-                "efficiency_heat_out",
-                "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49"
-            )),
+                                                                    "efficiency_heat_out",
+                                                                    "pwlin:0.8,0.69,0.63,0.58,0.55,0.52,0.5,0.49,0.49")),
         )
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            sf_transformer, # sys_function
-            InterfaceMap( # input_interfaces
-                m_fuel_in => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                m_heat_out => nothing,
-                m_el_out => nothing
-            ),
-            m_fuel_in,
-            m_heat_out,
-            m_el_out,
-            config["power_el"] / efficiencies[Symbol("el_out")](1.0),
-            linear_interface,
-            default(config, "min_power_fraction", 0.2),
-            efficiencies,
-            interface_list,
-            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
-            1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
-            default(config, "min_run_time", 1800),
-            default(config, "output_temperature", nothing),
-            0.0, # losses
-        )
+        return new(uac, # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   sf_transformer,                      # sys_function
+                   InterfaceMap(m_fuel_in => nothing),  # input_interfaces
+                   InterfaceMap(m_heat_out => nothing,  # output_interfaces
+                                m_el_out => nothing),
+                   m_fuel_in,
+                   m_heat_out,
+                   m_el_out,
+                   config["power_el"] / efficiencies[Symbol("el_out")](1.0),
+                   linear_interface,
+                   default(config, "min_power_fraction", 0.2),
+                   efficiencies,
+                   interface_list,
+                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),       # energy_to_plr
+                   1.0 / default(config, "nr_discretization_steps", 8), # discretization_step
+                   default(config, "output_temperature", nothing),
+                   0.0) # losses
     end
 end
 
 function initialise!(unit::CHPP, sim_params::Dict{String,Any})
-    set_storage_transfer!(
-        unit.input_interfaces[unit.m_fuel_in],
-        unload_storages(unit.controller, unit.m_fuel_in)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_heat_out],
-        load_storages(unit.controller, unit.m_heat_out)
-    )
-    set_storage_transfer!(
-        unit.output_interfaces[unit.m_el_out],
-        load_storages(unit.controller, unit.m_el_out)
-    )
+    set_storage_transfer!(unit.input_interfaces[unit.m_fuel_in],
+                          unload_storages(unit.controller, unit.m_fuel_in))
+    set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
+                          load_storages(unit.controller, unit.m_heat_out))
+    set_storage_transfer!(unit.output_interfaces[unit.m_el_out],
+                          load_storages(unit.controller, unit.m_el_out))
 
     unit.energy_to_plr = create_plr_lookup_tables(unit, sim_params)
 end
 
-function control(
-    unit::CHPP,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::CHPP,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
-    set_temperature!(
-        unit.output_interfaces[unit.m_heat_out],
-        nothing,
-        unit.output_temperature,
-    )
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], nothing, nothing, unit.output_temperature)
 end
 
 function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
     set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
     set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
 end
 
-function calculate_energies(
-    unit::CHPP,
-    sim_params::Dict{String,Any},
-)::Tuple{Bool, Vector{Floathing}}
+function calculate_energies(unit::CHPP, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
         return (false, [])
     end
 
-    return calculate_energies_for_plrde(
-        unit, sim_params, unit.min_power_fraction, max_plr
-    )
+    return calculate_energies_for_plrde(unit, sim_params, unit.min_power_fraction, max_plr)
 end
 
-function potential(
-    unit::CHPP,
-    sim_params::Dict{String,Any}
-)
+function potential(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0)
     else
         set_max_energies!(unit, energies[1], energies[2], energies[3])
@@ -168,23 +132,24 @@ end
 function process(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
+        unit.losses = 0.0
         set_max_energies!(unit, 0.0, 0.0, 0.0)
         return
     end
 
     sub!(unit.input_interfaces[unit.m_fuel_in], energies[1])
     add!(unit.output_interfaces[unit.m_el_out], energies[2])
-    add!(unit.output_interfaces[unit.m_heat_out], energies[3])
+    add!(unit.output_interfaces[unit.m_heat_out], energies[3], nothing, unit.output_temperature)
 
-    unit.losses = energies[1] - energies[2] - energies[3]
+    unit.losses = check_epsilon(energies[1] - energies[2] - energies[3], sim_params)
 end
 
 function output_values(unit::CHPP)::Vector{String}
-    return [string(unit.m_fuel_in)*" IN",
-            string(unit.m_el_out)*" OUT",
-            string(unit.m_heat_out)*" OUT",
-            "Losses"]
+    return [string(unit.m_fuel_in) * " IN",
+            string(unit.m_el_out) * " OUT",
+            string(unit.m_heat_out) * " OUT",
+            "LossesGains"]
 end
 
 function output_value(unit::CHPP, key::OutputKey)::Float64
@@ -192,8 +157,8 @@ function output_value(unit::CHPP, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

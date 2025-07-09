@@ -10,9 +10,11 @@
         "output_plot": "all"
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 604800,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_TH_DEM_01": {
@@ -92,7 +94,7 @@
             "number_of_probes_x": 1, 
             "number_of_probes_y": 1,
             "probe_field_key_2": "",
-            "borehole_spacing": 8,
+            "borehole_spacing": 5,
             "probe_depth": 150,
             "borehole_diameter": 0.16,
             "boreholewall_start_temperature": 13,
@@ -120,7 +122,9 @@
             ],
             "m_heat_out": "m_h_w_ht1",
             "power_th": 4500,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_EL_GRI_01": {
             "type": "GridConnection",

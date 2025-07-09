@@ -29,73 +29,58 @@ mutable struct GridConnection <: Component
         medium = Symbol(config["medium"])
         register_media([medium])
 
-        temperature_profile = get_temperature_profile_from_config(config, sim_params, uac)
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "temperature",
+                                                                "temperature_profile_file_path",
+                                                                "temperature_from_global_file",
+                                                                "constant_temperature",
+                                                                uac)
 
-        return new(
-            uac, # uac
-            Controller(default(config, "control_parameters", nothing)),
-            if Bool(config["is_source"])
-                sf_bounded_source
-            else
-                sf_bounded_sink
-            end, # sys_function
-            medium, # medium
-            InterfaceMap( # input_interfaces
-                medium => nothing
-            ),
-            InterfaceMap( # output_interfaces
-                medium => nothing
-            ),
-            temperature_profile, #temperature_profile
-            default(config, "constant_temperature", nothing), # constant_temperature
-            nothing, # temperature
-            0.0, # output_sum,
-            0.0, # input_sum
-        )
+        return new(uac,         # uac
+                   Controller(default(config, "control_parameters", nothing)),
+                   if Bool(config["is_source"])
+                       sf_bounded_source
+                   else
+                       sf_bounded_sink
+                   end,         # sys_function
+                   medium,      # medium
+                   InterfaceMap(medium => nothing), # input_interfaces
+                   InterfaceMap(medium => nothing), # output_interfaces
+                   temperature_profile,    # temperature_profile
+                   constant_temperature,   # constant_temperature
+                   nothing,     # temperature
+                   0.0,         # output_sum,
+                   0.0)         # input_sum
     end
 end
 
 function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
     if unit.sys_function === sf_bounded_source
-        set_storage_transfer!(
-            unit.output_interfaces[unit.medium],
-            load_storages(unit.controller, unit.medium)
-        )
+        set_storage_transfer!(unit.output_interfaces[unit.medium],
+                              load_storages(unit.controller, unit.medium))
     else
-        set_storage_transfer!(
-            unit.input_interfaces[unit.medium],
-            unload_storages(unit.controller, unit.medium)
-        )
+        set_storage_transfer!(unit.input_interfaces[unit.medium],
+                              unload_storages(unit.controller, unit.medium))
     end
 end
 
-function control(
-    unit::GridConnection,
-    components::Grouping,
-    sim_params::Dict{String,Any}
-)
+function control(unit::GridConnection,
+                 components::Grouping,
+                 sim_params::Dict{String,Any})
     update(unit.controller)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
-        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params["time"])
+        unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
     if unit.sys_function === sf_bounded_source
-        set_max_energy!(unit.output_interfaces[unit.medium], Inf)
-        set_temperature!(
-            unit.output_interfaces[unit.medium],
-            nothing,
-            unit.temperature
-        )
+        set_max_energy!(unit.output_interfaces[unit.medium], Inf, nothing, unit.temperature)
     else
-        set_max_energy!(unit.input_interfaces[unit.medium], Inf) 
-        set_temperature!(
-            unit.input_interfaces[unit.medium],
-            nothing,
-            unit.temperature
-        )
+        set_max_energy!(unit.input_interfaces[unit.medium], Inf, unit.temperature, nothing)
     end
 end
 
@@ -113,11 +98,10 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
             temp_out = temp_min_highest(exchanges)
         else
             e = first(exchanges)
-            if (
-                unit.temperature === nothing ||
+            if (unit.temperature === nothing ||
                 (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-                (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
-            )
+                (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
+                # end of condition
                 energy_demand = e.balance + e.energy_potential
                 temp_out = lowest(e.temperature_min, unit.temperature)
             else
@@ -126,7 +110,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
         end
         if energy_demand < 0.0
             unit.output_sum += energy_demand
-            add!(outface, abs(energy_demand), temp_out)
+            add!(outface, abs(energy_demand), nothing, temp_out)
         end
     else
         inface = unit.input_interfaces[unit.medium]
@@ -140,11 +124,10 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
             energy_supply = balance(exchanges) + energy_potential(exchanges)
         else
             e = first(exchanges)
-            if (
-                unit.temperature === nothing ||
+            if (unit.temperature === nothing ||
                 (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-                (e.temperature_max === nothing || e.temperature_max >= unit.temperature)
-            )
+                (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
+                # end of condition
                 energy_supply = e.balance + e.energy_potential
             else
                 energy_supply = 0.0
@@ -153,7 +136,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
 
         if energy_supply > 0.0
             unit.input_sum += energy_supply
-            sub!(inface, abs(energy_supply), unit.temperature)
+            sub!(inface, abs(energy_supply), unit.temperature, nothing)
         end
     end
 end
@@ -161,9 +144,9 @@ end
 function output_values(unit::GridConnection)::Vector{String}
     output_vals = []
     if unit.sys_function == sf_bounded_source
-        append!(output_vals, [string(unit.medium)*" OUT", "Output_sum"])
+        append!(output_vals, [string(unit.medium) * " OUT", "Output_sum"])
     elseif unit.sys_function == sf_bounded_sink
-        append!(output_vals, [string(unit.medium)*" IN", "Input_sum"])
+        append!(output_vals, [string(unit.medium) * " IN", "Input_sum"])
     end
     if unit.temperature !== nothing
         push!(output_vals, "Temperature")

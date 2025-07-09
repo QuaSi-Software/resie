@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../../test_util.jl")
 
 function test_one_to_one_via_bus()
     components_config = Dict{String,Any}(
@@ -25,24 +25,14 @@ function test_one_to_one_via_bus()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_GRI_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
-                "energy_flow" => [
-                    [1],
-                ],
+                "input_order" => ["TST_GRI_01"],
+                "output_order" => ["TST_DEM_01"],
+                "energy_flow" => [[1]],
             ),
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     grid = components["TST_GRI_01"]
@@ -66,13 +56,13 @@ function test_one_to_one_via_bus()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
     EnergySystems.process(grid, simulation_parameters)
 
     @test grid.output_interfaces[grid.medium].balance == 1000.0
-    @test grid.output_interfaces[grid.medium].temperature_max === nothing
+    @test grid.output_interfaces[grid.medium].max_energy.temperature_max == [nothing]
 
     blnc = EnergySystems.balance(bus)
     @test blnc == 0.0
@@ -80,10 +70,10 @@ function test_one_to_one_via_bus()
     EnergySystems.distribute!(bus)
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
-    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     @test grid.output_interfaces[grid.medium].balance == 0.0
-    @test grid.output_interfaces[grid.medium].temperature_max === nothing
+    @test grid.output_interfaces[grid.medium].max_energy.temperature_max == [nothing]
 end
 
 @testset "one_to_one_via_bus" begin

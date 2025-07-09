@@ -62,9 +62,11 @@
         }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 86400,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "01.01.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_01": {
@@ -99,8 +101,10 @@
                 "TST_DEM_01"
             ],
             "power_th": 9000,
-            "constant_cop": 3.0,
-            "min_power_fraction": 0.0
+            "cop_function": "const:3.0",
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         }
     }
 }

@@ -1,0 +1,18 @@
+# time_definition:           startdate_timestamp
+# profile_start_date:        01.01.2024 00:00:00
+# profile_start_date_format: dd.mm.yyyy HH:MM:SS
+# timestamp_format:          seconds 
+# data_type:                 extensive
+# interpolation_type:        linear_classic
+0;10.0
+900;12.0
+1800;60.0
+2700;0.0
+3600;2.5
+4500;23.0
+5400;5.0
+6300;11.0
+7200;1.0
+8100;42.0
+
+

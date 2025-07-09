@@ -108,9 +108,12 @@
         }    
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 31535100,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes",
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
     },
     "components": {
         "TST_DEM_TH_01": {
@@ -343,8 +346,9 @@
             "output_refs": [
                 "TST_BUS_TH_01"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 500000,
-            "load": 0,
+            "initial_load": 0,
             "high_temperature": 60.0
         },
         "TST_BFT_TH_02": {
@@ -352,18 +356,37 @@
             "output_refs": [
                 "TST_BUS_TH_02"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 500000,
-            "load": 150000,
+            "initial_load": 0.3,
             "high_temperature": 60.0
         },
         "TST_STES_TH_01": {
             "type": "SeasonalThermalStorage",
+            "m_heat_in": "m_h_w_ht1",
+            "m_heat_out": "m_h_w_lt1",
             "output_refs": [
                 "TST_HTP_01"
             ],
-            "capacity": 400000000,
-            "load": 190000000,
-            "high_temperature": 60.0
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "volume": 7655.5,
+            "hr_ratio": 2,
+            "sidewall_angle": 90,
+            "rho_medium": 1000,
+            "cp_medium": 4.18,
+            "diffussion_coefficient": 0.000000143,
+            "number_of_layer_total": 25,
+            "number_of_layer_above_ground": 1,
+            "output_layer_from_top": 1,
+            "high_temperature": 60,
+            "low_temperature": 15,
+            "max_load_rate": 1,
+            "max_unload_rate": 1,
+            "thermal_transmission_lid": 0.25,
+            "thermal_transmission_barrel": 0.375,
+            "thermal_transmission_bottom": 0.375,
+            "ground_temperature": 9.0,
+            "initial_load": 0.475
         },
         "TST_HTP_01": {
             "type": "HeatPump",
@@ -373,10 +396,13 @@
             "control_parameters": {
                 "load_storages m_h_w_ht1": false
             },
+            "m_heat_in": "m_h_w_lt1",
             "m_heat_out": "m_h_w_ht1",
             "power_th": 550000,
-            "constant_cop": 3.0,
-            "min_power_fraction": 0.2
+            "cop_function": "const:3.0",
+            "min_usage_fraction": 0.2,
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_HTP_02": {
             "type": "HeatPump",
@@ -384,7 +410,9 @@
                 "TST_BUS_TH_00"
             ],
             "power_th": 300000,
-            "constant_cop": 3.5
+            "cop_function": "const:3.5",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         }
     }
 }

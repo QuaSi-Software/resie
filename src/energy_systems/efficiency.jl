@@ -12,14 +12,14 @@ Parse the given definition of an efficiency function and return it as a callable
 The function should return an efficiency factor e (on [0,1]) given an input of the part load
 ratio (PLR) value (on [0,1]).
 
-The definition looks like this: `<function_model>:<list_of_numbers>` with `function_model`
-being a string (see below) and `list_of_numbers` being a comma-seperated list of numbers
-with a period as decimal seperator and no thousands-seperator. The meaning of the numbers
-depends on the function model.
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
 
-Three different function models are implemented:
+Three different function prototypes are implemented:
     * const: Takes one number and uses it as a constant efficiency factor.
-    * poly: Takes a list of numbers as uses them as the coefficients of a polynomial with
+    * poly: Takes a list of numbers and uses them as the coefficients of a polynomial with
         order n-1 where n is the length of coefficients. The list starts with coefficients
         of the highest order. E.g. `poly:0.5,2.0,0.1` means e(x)=0.5x²+2x+0.1
     * pwlin: A piece-wise linear interpolation. Takes a list of numbers and uses them as
@@ -29,6 +29,24 @@ Three different function models are implemented:
         the values for a PLR of 0.0 and 1.0 respectively. E.g. `pwlin:0.6,0.8,0.9` means
         two sections of step size 0.5 with a value of e(0.0)==0.6, e(0.5)==0.8, e(1.0)=0.9
         and linear interpolation inbetween.
+    * offset_lin: Takes one number and uses as the slope of a linear function with an offset
+        of its complement (in regards to 1.0). E.g. `offset_lin:0.5` means
+        e(x)=1.0-0.5*(1.0-x)
+    * logarithmic: Takes two numbers and uses them as the coefficients of a
+        quasi-logarithmic function. E.g. `logarithmic:0.5,0.3` means
+        e(x)=0.5x/(0.3x+(1-0.3))
+    * inv_poly: Takes a list of numbers and uses them as the coefficients of a polynomial
+        with order n-1 where n is the length of coefficients. The list starts with
+        coefficients of the highest order. The inverse of the polynomial multiplied with the
+        PLR is used as the efficiency function. E.g. `inv_poly:0.5,2.0,0.1`
+        means e(x)=x/(0.5x²+2x+0.1)
+    * exp: Takes three numbers and uses them as the coefficients of an exponential function.
+        E.g. `exp:0.1,0.2,0.3` means e(x)=0.1+0.2*exp(0.3x)
+    * unified_plf: Takes four numbers and uses them as the coefficients of a composite
+        function of a logarithmic and linear function as described in the documentation on
+        the unified formulation for PLR-dependent efficiencies of heat pumps. The first two
+        numbers are the optimal PLR and the PLF at that PLR. The third number is a scaling
+        factor for the logarithmic part and the fourth number is the PLF at PLR=1.0.
 
 # Arguments
 - `eff_def::String`: The efficiency definition as described above
@@ -62,11 +80,247 @@ function parse_efficiency_function(eff_def::String)::Function
                 upper_bound = params[min(bracket_nr + 1, length(params))]
                 return lower_bound + (upper_bound - lower_bound) * (plr % step) / step
             end
+
+        elseif method == "offset_lin"
+            c = parse(Float64, data)
+            return plr -> 1.0 - c * (1.0 - plr)
+
+        elseif method == "logarithmic"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> params[1] * plr / (params[2] * plr + (1 - params[2]))
+
+        elseif method == "inv_poly"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> plr / sum(p * plr^(length(params) - i) for (i, p) in enumerate(params))
+
+        elseif method == "exp"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return plr -> params[1] + params[2] * exp(params[3] * plr)
+
+        elseif method == "unified_plf"
+            params = map(x -> parse(Float64, x), split(data, ","))
+            return function (plr)
+                if plr < params[1]
+                    a = params[2] * (params[3] * (params[1] - 1) + 1) / params[1]
+                    return a * plr / (params[3] * plr + 1 - params[3])
+                else
+                    return (params[4] - params[2]) * (plr - params[1]) / (1 - params[1]) + params[2]
+                end
+            end
         end
     end
 
-    @warn "Cannot parse efficiency function from: $eff_def"
+    @error "Cannot parse efficiency function from: $eff_def"
     return plr -> plr
+end
+
+"""
+    parse_2dim_function(eff_def)
+
+Parse the given definition of an general 2D function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator. The
+meaning of the numbers depends on the function prototype.
+
+Two different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant value.
+    * poly-2: Takes a list of numbers and uses them as the coefficients of a 2D polynomial
+        with order three. The coefficients are the numbered constants in the following
+        formula: f(x,y) = c_1 + c_2*x + c_3*y + c_4*x² + c_5*x*y + c_6*y²
+            + c_7*x³ + c_8*x²*y + c_9*x*y² + c_10*y³
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Function`: A callable function which returns a scalar value given values (usually
+    temperatures) as input.
+"""
+function parse_2dim_function(eff_def::String)::Function
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        if method == "const"
+            c = parse(Float64, data)
+            return (x, y) -> c
+
+        elseif method == "poly-2"
+            params = parse.(Float64, split(data, ","))
+            return function (x, y)
+                return params[1] +
+                       params[2] * x +
+                       params[3] * y +
+                       params[4] * x * x +
+                       params[5] * x * y +
+                       params[6] * y * y +
+                       params[7] * x * x * x +
+                       params[8] * x * x * y +
+                       params[9] * x * y * y +
+                       params[10] * y * y * y
+            end
+        end
+    end
+
+    @error "Cannot parse 2-dimensional function from: $eff_def"
+    return (x, y) -> 0.0
+end
+
+"""
+Performs bilinear interpolation between four support values.
+
+The interpolation is on the surface of two triangles with a common diagonal between the two
+points (x1,y1) and (x3,y3). The four values are, in order, on the points (x1,y1), (x3,y1),
+(x1,y3) and (x3,y3). The point (x2,y2) is the point at which interpolation happens.
+
+# Arguments
+- `x1::Float64`: x-coordinate of points of v1 and v3
+- `x2::Float64`: x-coordinate to interpolate
+- `x3::Float64`: x-coordinate of points of v2 and v4
+- `y1::Float64`: y-coordinate of points of v1 and v2
+- `y2::Float64`: y-coordinate to interpolate
+- `y3::Float64`: y-coordinate of points of v3 and v4
+- `v1::Float64`: value at (x1,y1)
+- `v2::Float64`: value at (x3,y1)
+- `v3::Float64`: value at (x1,y3)
+- `v4::Float64`: value at (x3,y3)
+# Returns
+- `Float64`: Interpolated value at (x2,y2)
+"""
+function bilinear_interpolate(x1, x2, x3, y1, y2, y3, v1, v2, v3, v4)
+    lin_x = (x2 - x1) / (x3 - x1)
+    lin_y = (y2 - y1) / (y3 - y1)
+    # value in plane spanned by v1, v3 and v4
+    u = v1 + lin_x * (v4 - v3)
+    v = v3 + lin_x * (v4 - v3)
+    val_134 = u + lin_y * (v - u)
+    # value in plane spanned by v1, v2 and v4
+    u = v1 + lin_x * (v2 - v1)
+    v = v4 - (1.0 - lin_x) * (v2 - v1)
+    val_124 = u + lin_y * (v - u)
+    # if the crease is convex, we take the min, otherwise the max
+    if v2 < v1 + (v4 - v3)
+        return min(val_134, val_124)
+    else
+        return max(val_134, val_124)
+    end
+end
+
+"""
+    parse_cop_function(eff_def)
+
+Parse the given definition of a COP function and return it as a callable function.
+
+The definition looks like this: `function_prototype:list_of_numbers` with
+`function_prototype` being a string (see below) and `list_of_numbers` being a comma-
+seperated list of numbers with a period as decimal seperator and no thousands-seperator and
+semicolon as row seperator. The meaning of the numbers depends on the function prototype.
+
+Four different function prototypes are implemented:
+    * const: Takes one number and uses it as a constant COP.
+    * carnot: Takes one number as uses it as the scaling factor for the Carnot-COP.
+    * poly-2: Uses the same functionality for 2D polynomials of order 3 as described in
+        function `parse_2dim_function`.
+    * field: Takes a 2D array of values and performs bilinear interpolation between the
+        surrounding four support values. An example with additional line breaks and spaces
+        added for clarity:
+        "field:
+         0, 0,10,20,30;
+         0,15, 9, 6, 4;
+        10,15,15,10, 7;
+        20,15,15,15,11"
+        The first row are the grid points along the T_sink_out dimension, with the first
+        value being ignored. The points cover a range from 0 °C to 30 °C with a spacing of
+        10 K. The first column are the grid points along the T_source_in dimension, with the
+        first value being ignored. The points cover a range from 0 °C to 20 °C with a
+        spacing of 10 K. The support values are the COP (at PLR=1), for example a value of
+        10 for T_source_in=10 and T_sink_out=20.
+
+# Arguments
+- `eff_def::String`: The function definition as described above
+# Returns
+- `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
+- `Function`: A callable function which, when called with the input and output temperatures
+    as arguments, returns the COP value at a PLR of 1.0.
+"""
+function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method_cop = lowercase(splitted[1])
+        data_cop = splitted[2]
+
+        if method_cop == "const"
+            c = parse(Float64, data_cop)
+            return c, function (src, snk)
+                       return c
+                   end
+
+        elseif method_cop == "carnot"
+            c = parse(Float64, data_cop)
+            return nothing, function (src, snk)
+                       if src === nothing || snk === nothing
+                           return nothing
+                       end
+                       return c * (273.15 + snk) / (snk - src)
+                   end
+
+        elseif method_cop == "poly-2"
+            poly = parse_2dim_function(method_cop * ":" * data_cop)
+            return nothing, poly
+
+        elseif method_cop == "field"
+            rows = split(data_cop, ';')
+            cells = [parse.(Float64, split(row, ",")) for row in rows]
+            dim_src = length(cells)
+            dim_snk = length(cells[1])
+            values = Array{Float64,2}(undef, dim_src, dim_snk)
+            for (idx_src, row) in pairs(cells)
+                for (idx_snk, val) in pairs(row)
+                    values[idx_src, idx_snk] = val
+                end
+            end
+
+            # first dim of values is source, second is sink. source is vertical (one row is
+            # at the same source temp), sink is horizontal (one column is at the same sink
+            # temp). first row is sink temperatures, first column is source temperatures
+            return nothing,
+                   function (src, snk)
+                       src_idx = nothing
+                       for idx in 2:(dim_src - 1)
+                           if src >= values[idx, 1] && src < values[idx + 1, 1]
+                               src_idx = idx
+                           end
+                       end
+                       snk_idx = nothing
+                       for idx in 2:(dim_snk - 1)
+                           if snk >= values[1, idx] && snk < values[1, idx + 1]
+                               snk_idx = idx
+                           end
+                       end
+                       if snk_idx === nothing || src_idx === nothing
+                           @error "Given temperatures $src and $snk outside of COP field."
+                           throw(BoundsError(values, (src_idx, snk_idx)))
+                       end
+                       return bilinear_interpolate(values[1, snk_idx],
+                                                   snk,
+                                                   values[1, snk_idx + 1],
+                                                   values[src_idx, 1],
+                                                   src,
+                                                   values[src_idx + 1, 1],
+                                                   values[src_idx, snk_idx],
+                                                   values[src_idx, snk_idx + 1],
+                                                   values[src_idx + 1, snk_idx],
+                                                   values[src_idx + 1, snk_idx + 1])
+                   end
+        end
+    end
+
+    @error "Cannot parse COP function from: $eff_def"
+    return nothing, ((x, y) -> 0.0)
 end
 
 """
@@ -98,7 +352,8 @@ function create_plr_lookup_tables(unit::PLRDEComponent, sim_params::Dict{String,
     for name in unit.interface_list
         lookup_table = []
         for plr in collect(0.0:(unit.discretization_step):1.0)
-            push!(lookup_table, (watt_to_wh(unit.power) * plr * unit.efficiencies[name](plr),
+            push!(lookup_table, (sim_params["watt_to_wh"](unit.power) * plr *
+                                 unit.efficiencies[name](plr),
                                  plr))
         end
         tables[name] = lookup_table
@@ -138,15 +393,17 @@ is performed to calculate the corresponding PLR.
 - `interface::Symbol`: The interface to which the energy value corresponds. This should be
     one of the names defined in field `interface_list` of the component.
 - `energy_value::Float64`: The energy value
+- `w2wh::Function`: Function to convert power to work
 # Returns
 - `Float64`: The part load ratio (from 0.0 to 1.0) as inverse from the energy value
 """
 function plr_from_energy(unit::PLRDEComponent,
                          interface::Symbol,
-                         energy_value::Float64)::Float64
+                         energy_value::Float64,
+                         w2wh::Function)::Float64
     # shortcut if the given interface is designated as linear in respect to PLR
     if interface === unit.linear_interface
-        return energy_value / watt_to_wh(unit.power)
+        return energy_value / w2wh(unit.power)
     end
 
     lookup_table = unit.energy_to_plr[interface]
@@ -193,22 +450,24 @@ Calculates the energy value for the given interface from the given PLR.
 - `interface::Symbol`: The interface to which the energy value corresponds. This should be
     one of the names defined in field `interface_list` of the component.
 - `plr::Float64`: The part load ratio, should be between 0.0 and 1.0
+- `w2wh::Function`: Function to convert power to work
 # Returns
 - `Float64`: The energy value
 """
 function energy_from_plr(unit::PLRDEComponent,
                          interface::Symbol,
-                         plr::Float64)::Float64
+                         plr::Float64,
+                         w2wh::Function)::Float64
     # the intuitive solution would be to multiply the power with the part load ratio and the
     # the efficiency at that PLR, but for unknown reasons this introduces an error in the
     # linear interpolation that appears to be quadratic in the distance to the support
     # values
     # @TODO: Investigate this further for improved performance
-    # return plr * watt_to_wh(unit.power) * unit.efficiencies[interface](plr)
+    # return plr * w2wh(unit.power) * unit.efficiencies[interface](plr)
 
     # shortcut if the given interface is designated as linear in respect to PLR
     if interface === unit.linear_interface
-        return plr * watt_to_wh(unit.power)
+        return plr * w2wh(unit.power)
     end
 
     lookup_table = unit.energy_to_plr[interface]
@@ -281,11 +540,11 @@ function calculate_energies_for_plrde(unit::PLRDEComponent,
         energy = abs(energy)
 
         # limit to design power
-        energy = min(watt_to_wh(unit.power) * unit.efficiencies[name](1.0),
+        energy = min(sim_params["watt_to_wh"](unit.power) * unit.efficiencies[name](1.0),
                      energy)
 
         push!(available_energy, energy)
-        push!(plr_from_nrg, plr_from_energy(unit, name, energy))
+        push!(plr_from_nrg, plr_from_energy(unit, name, energy, sim_params["watt_to_wh"]))
     end
 
     # the operation point of the component is the minimum of the PLR from all inputs/outputs
@@ -298,7 +557,7 @@ function calculate_energies_for_plrde(unit::PLRDEComponent,
 
     energies = []
     for name in unit.interface_list
-        push!(energies, energy_from_plr(unit, name, used_plr))
+        push!(energies, energy_from_plr(unit, name, used_plr, sim_params["watt_to_wh"]))
     end
     return (true, energies)
 end
@@ -370,6 +629,48 @@ function check_el_in(unit::Union{Electrolyser,HeatPump},
             return nothing
         end
         return potential_energy_el
+    end
+end
+
+"""
+    check_heat_in_layered(unit, sim_params)
+
+Checks the available energy on the input heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The available energy on the interface as one layer per source. The
+    value can be `Inf`, which is a special floating point value signifying an infinite value
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per source.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
+- `Vector{Stringing}`: The UACs of the sources on the interface.
+"""
+function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
+        # direct connection to transformer that has not had its potential
+        return ([Inf],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_min[1]],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_max[1]],
+                [unit.input_interfaces[unit.m_heat_in].source.uac])
+    else
+        exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
+                               unit.input_interfaces[unit.m_heat_in].source)
+
+        if unit.controller.parameters["consider_m_heat_in"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat input, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end
 
@@ -492,9 +793,8 @@ interfaces in the corresponding components. For example a CHPP would call check_
 which uses check_heat_out_impl internally.
 
 This also checks the temperatures of the exchanges that are returned from a balance_on call,
-which can be more than one exchange in the case of a bus, and checks if the output
-temperature of the component falls into the minimum and maximum temperature range of the
-exchange, if any is given at all.
+which can be more than one exchange, and checks if the output temperature of the component
+falls into the minimum and maximum temperature range of the exchange, if any is given at all.
 
 # Arguments
 - `unit::Union{CHPP,Electrolyser,FuelBoiler}`: The component
@@ -523,24 +823,40 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
     exchanges = balance_on(unit.output_interfaces[medium],
                            unit.output_interfaces[medium].target)
 
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single input which can happen for direct 1-to-1 connections or if the bus has
-    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
-        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-    else
-        e = first(exchanges)
-        if (output_temperature === nothing
-            ||
-            (e.temperature_min === nothing || e.temperature_min <= output_temperature)
-            &&
-            (e.temperature_max === nothing || e.temperature_max >= output_temperature))
-            # end of condition
-            potential_energy_heat_out = e.balance + e.energy_potential
-        else
-            potential_energy_heat_out = 0.0
+    # If the source is an Electrolyser, call the ControlModule limit_cooling_input_temperature
+    # for every target to check if the energy transfer is allowed or not. 
+    # If the temperaure input limit is exeeded (control module returns true), remove the entry from exchanges.
+    if isa(unit, Electrolyser)
+        idx_to_remove = Int[]
+        for (idx, exchange) in enumerate(exchanges)
+            if cooling_input_temperature_exeeded(unit.controller, exchange.purpose_uac, sim_params)
+                push!(idx_to_remove, idx)
+            end
         end
+        if !isempty(idx_to_remove)
+            for idx in reverse(idx_to_remove)
+                popat!(exchanges, idx)
+            end
+
+            if isempty(exchanges)
+                push!(exchanges,
+                      EnEx(; balance=0.0,
+                           energy_potential=0.0,
+                           purpose_uac=nothing,
+                           temperature_min=nothing,
+                           temperature_max=nothing,
+                           pressure=nothing,
+                           voltage=nothing))
+            end
+        end
+    end
+
+    # if we get the exchanges from a bus, the temperature check has already been performed
+    if unit.output_interfaces[medium].target.sys_function == sf_bus
+        potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
+    else # check temperature for 1-to-1 connections and sum up energy
+        potential_energy_heat_out, _, _ = check_temperatures_source(exchanges, output_temperature, Inf)
+        potential_energy_heat_out = sum(potential_energy_heat_out; init=0.0)
     end
 
     if potential_energy_heat_out >= -sim_params["epsilon"]
@@ -583,4 +899,46 @@ function check_heat_lt_out(unit::Electrolyser,
                                unit.m_heat_lt_out,
                                unit.output_temperature_lt,
                                sim_params)
+end
+
+"""
+    check_heat_out_layered(unit, sim_params)
+
+Checks the available energy on the output heat interface.
+
+# Arguments
+- `unit::HeatPump`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The requested energy on the interface as one layer per target. The
+    value can be `-Inf`, which is a special floating point value signifying a negative
+    infinite value.
+- `Vector{Temperature}`: The minimum temperatures on the interface as one layer per target.
+- `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
+- `Vector{Stringing}`: The UACs of the targets on the interface.
+"""
+function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
+    if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        # direct connection to transformer that has not had its potential
+        return ([-Inf],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_max[1]],
+                [unit.output_interfaces[unit.m_heat_out].target.uac])
+    else
+        exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
+                               unit.output_interfaces[unit.m_heat_out].target)
+        if unit.controller.parameters["consider_m_heat_out"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat output, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
+    end
 end

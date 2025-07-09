@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../../test_util.jl")
 
 function test_many_to_one()
     components_config = Dict{String,Any}(
@@ -33,26 +33,16 @@ function test_many_to_one()
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
             "connections" => Dict{String,Any}(
-                "input_order" => [
-                    "TST_SRC_01",
-                    "TST_SRC_02",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                ],
-                "energy_flow" => [
-                    [1],
-                    [1]
-                ],
+                "input_order" => ["TST_SRC_01",
+                                  "TST_SRC_02"],
+                "output_order" => ["TST_DEM_01"],
+                "energy_flow" => [[1],
+                                  [1]],
             ),
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     source_1 = components["TST_SRC_01"]
@@ -80,18 +70,18 @@ function test_many_to_one()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
     EnergySystems.process(source_1, simulation_parameters)
 
     @test source_1.output_interfaces[source_1.medium].balance == 800.0
-    @test source_1.output_interfaces[source_1.medium].temperature_max == 55.0
+    @test source_1.output_interfaces[source_1.medium].max_energy.temperature_max == [55.0]
 
     EnergySystems.process(source_2, simulation_parameters)
 
     @test source_2.output_interfaces[source_2.medium].balance == 200.0
-    @test source_2.output_interfaces[source_2.medium].temperature_max == 55.0
+    @test source_2.output_interfaces[source_2.medium].max_energy.temperature_max == [55.0]
 
     blnc = EnergySystems.balance(bus)
     @test blnc == 0.0
@@ -99,13 +89,13 @@ function test_many_to_one()
     EnergySystems.distribute!(bus)
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
-    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     @test source_1.output_interfaces[source_1.medium].balance == 0.0
-    @test source_1.output_interfaces[source_1.medium].temperature_max == 55.0
+    @test source_1.output_interfaces[source_1.medium].max_energy.temperature_max == [55.0]
 
     @test source_2.output_interfaces[source_2.medium].balance == 0.0
-    @test source_2.output_interfaces[source_2.medium].temperature_max == 55.0
+    @test source_2.output_interfaces[source_2.medium].max_energy.temperature_max == [55.0]
 
     # second timestep, source 1 is too cold to supply demand, source 2 can't fully
     # supply demand
@@ -127,12 +117,12 @@ function test_many_to_one()
     EnergySystems.process(source_1, simulation_parameters)
 
     @test source_1.output_interfaces[source_1.medium].balance == 0.0
-    @test source_1.output_interfaces[source_1.medium].temperature_max == 50.0
+    @test source_1.output_interfaces[source_1.medium].max_energy.temperature_max == [50.0]
 
     EnergySystems.process(source_2, simulation_parameters)
 
     @test source_2.output_interfaces[source_2.medium].balance == 500.0
-    @test source_2.output_interfaces[source_2.medium].temperature_max == 55.0
+    @test source_2.output_interfaces[source_2.medium].max_energy.temperature_max == [55.0]
 
     blnc = EnergySystems.balance(bus)
     @test blnc == -500.0

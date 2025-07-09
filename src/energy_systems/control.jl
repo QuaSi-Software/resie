@@ -73,29 +73,21 @@ end
 """
 Constructor of StateMachine for non-default fields.
 """
-StateMachine(
-    state::UInt,
-    state_names::Dict{UInt,String},
-    transitions::Dict{UInt,TruthTable}
-) = StateMachine(
-    state,
-    state_names,
-    transitions,
-    UInt(0)
-)
+StateMachine(state::UInt,
+state_names::Dict{UInt,String},
+transitions::Dict{UInt,TruthTable}) = StateMachine(state,
+                                                   state_names,
+                                                   transitions,
+                                                   UInt(0))
 
 """
 Default constructor of StateMachine that creates a state machine with only one state called
 "Default" and no transitions (as there no other states).
 """
-StateMachine() = StateMachine(
-    UInt(1),
-    Dict(UInt(1) => "Default"),
-    Dict(UInt(1) => TruthTable(
-        conditions=Vector(),
-        table_data=Dict()
-    ))
-)
+StateMachine() = StateMachine(UInt(1),
+                              Dict(UInt(1) => "Default"),
+                              Dict(UInt(1) => TruthTable(; conditions=Vector(),
+                                                         table_data=Dict())))
 
 """
 Advances the given state machine by checking the conditions in its current state.
@@ -143,6 +135,10 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_upper_plr_limit
     cmf_charge_is_allowed
     cmf_discharge_is_allowed
+    cmf_reorder_inputs
+    cmf_reorder_outputs
+    cmf_negotiate_temperature
+    cfm_limit_cooling_input_temperature
 end
 
 """
@@ -155,27 +151,23 @@ mutable struct Controller
     modules::Vector{ControlModule}
 
     function Controller(config::Union{Nothing,Dict{String,Any}})::Controller
-        return new(
-            Base.merge( # parameters
-                Dict{String,Any}(
-                    "aggregation_plr_limit" => "max",
-                    "aggregation_charge" => "all",
-                    "aggregation_discharge" => "all",
-                    "consider_m_el_in" => true,
-                    "consider_m_el_out" => true,
-                    "consider_m_gas_in" => true,
-                    "consider_m_fuel_in" => true,
-                    "consider_m_h2_out" => true,
-                    "consider_m_o2_out" => true,
-                    "consider_m_heat_out" => true,
-                    "consider_m_heat_ht_out" => true,
-                    "consider_m_heat_lt_out" => true,
-                    "consider_m_heat_in" => true
-                ),
-                config === nothing ? Dict{String,Any}() : config
-            ),
-            [] # modules
-        )
+        return new(Base.merge(Dict{String,Any}(
+                                  "aggregation_plr_limit" => "max",
+                                  "aggregation_charge" => "all",
+                                  "aggregation_discharge" => "all",
+                                  "consider_m_el_in" => true,
+                                  "consider_m_el_out" => true,
+                                  "consider_m_gas_in" => true,
+                                  "consider_m_fuel_in" => true,
+                                  "consider_m_h2_out" => true,
+                                  "consider_m_o2_out" => true,
+                                  "consider_m_heat_out" => true,
+                                  "consider_m_heat_ht_out" => true,
+                                  "consider_m_heat_lt_out" => true,
+                                  "consider_m_heat_in" => true,
+                              ),
+                              config === nothing ? Dict{String,Any}() : config),
+                   [])
     end
 end
 
@@ -197,9 +189,7 @@ is to allow storage loading.
 - `Bool`: True if the parameter is set and is false, true otherwise
 """
 function load_storages(controller::Controller, medium::Symbol)::Bool
-    return default(
-        controller.parameters, "load_storages " * String(medium), true
-    )
+    return default(controller.parameters, "load_storages " * String(medium), true)
 end
 
 """
@@ -215,9 +205,7 @@ is to allow storage unloading.
 - `Bool`: True if the parameter is set and is false, true otherwise
 """
 function unload_storages(controller::Controller, medium::Symbol)::Bool
-    return default(
-        controller.parameters, "unload_storages " * String(medium), true
-    )
+    return default(controller.parameters, "unload_storages " * String(medium), true)
 end
 
 """
@@ -264,11 +252,9 @@ have a value larger zero for the component to run.
 - `Float64`: The aggregated upper PLR limit
 """
 function upper_plr_limit(controller::Controller, sim_params::Dict{String,Any})::Float64
-    limits = collect(
-        upper_plr_limit(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_upper_plr_limit)
-    )
+    limits = collect(upper_plr_limit(mod, sim_params)
+                     for mod in controller.modules
+                     if has_method_for(mod, cmf_upper_plr_limit))
     if length(limits) == 0
         return 1.0
     end
@@ -297,11 +283,9 @@ method "any" it is sufficient if any one module returns true.
 - `Bool`: The aggregated charging flag with true meaning charging is allowed
 """
 function charge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    flags = collect(
-        charge_is_allowed(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_charge_is_allowed)
-    )
+    flags = collect(charge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_charge_is_allowed))
     if length(flags) == 0
         return true
     end
@@ -330,11 +314,9 @@ aggregation method "any" it is sufficient if any one module returns true.
 - `Bool`: The aggregated charging flag with true meaning discharging is allowed
 """
 function discharge_is_allowed(controller::Controller, sim_params::Dict{String,Any})::Bool
-    flags = collect(
-        discharge_is_allowed(mod, sim_params)
-        for mod in controller.modules
-        if has_method_for(mod, cmf_discharge_is_allowed)
-    )
+    flags = collect(discharge_is_allowed(mod, sim_params)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_discharge_is_allowed))
     if length(flags) == 0
         return true
     end
@@ -346,4 +328,147 @@ function discharge_is_allowed(controller::Controller, sim_params::Dict{String,An
     end
 
     return true
+end
+
+"""
+Callback for reordering inputs of a component according to the temperatures of the inputs.
+
+As there is no clear way to aggregate multiple reorderings the last module to apply a
+reordering "wins" and its index permutation is returned. If no module performs any
+reordering the indices of the `temps_max` argument is returned, resulting in no changes.
+
+It is assumed, but not checked, that all vectors, to which the permutation is applied, have
+the same length.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `temps_min::Vector{<:Temperature}`: The minimum temperature vector
+- `temps_max::Vector{<:Temperature}`: The maximum temperature vector
+# Returns
+- `Vector{Integer}`: The index permutation
+"""
+function reorder_inputs(controller::Controller,
+                        temps_min::Vector{<:Temperature},
+                        temps_max::Vector{<:Temperature})::Vector{Integer}
+    reordering = [i for i in 1:length(temps_max)]
+
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_reorder_inputs)
+            continue
+        end
+
+        reordering = reorder_inputs(mod, temps_min, temps_max)
+    end
+
+    return reordering
+end
+
+"""
+Callback for reordering outputs of a component according to the temperatures of the outputs.
+
+As there is no clear way to aggregate multiple reorderings the last module to apply a
+reordering "wins" and its index permutation is returned. If no module performs any
+reordering the indices of the `temps_max` argument is returned, resulting in no changes.
+
+It is assumed, but not checked, that all vectors, to which the permutation is applied, have
+the same length.
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `temps_min::Vector{<:Temperature}`: The minimum temperature vector
+- `temps_max::Vector{<:Temperature}`: The maximum temperature vector
+# Returns
+- `Vector{Integer}`: The index permutation
+"""
+function reorder_outputs(controller::Controller,
+                         temps_min::Vector{<:Temperature},
+                         temps_max::Vector{<:Temperature})::Vector{Integer}
+    reordering = [i for i in 1:length(temps_min)]
+
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_reorder_outputs)
+            continue
+        end
+
+        reordering = reorder_outputs(mod, temps_min, temps_max)
+    end
+
+    return reordering
+end
+
+"""
+Callback for determine_temperature_and_energy of a component according to the temperatures of the outputs.
+
+This function only checks if a control module exists for the chosen interconnection from source
+to target. No aggregation with other control modules. 
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `components::Grouping`: All components of the energy system.
+- `source_uac::String`: The source unit uac.
+- `target_uac::String`: The target unit uac.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+
+# Returns
+- `success::Bool`: A bool indicating if a control module exists between source and target (true) or not (false).
+- `temperature::Temperature`: The negotiated temperature.
+- `max_energy::Float64`: The energy corresponding to the negotiated temperature.
+"""
+function determine_temperature_and_energy(controller::Controller,
+                                          components::Grouping,
+                                          source_uac::String,
+                                          target_uac::Stringing,
+                                          sim_params::Dict{String,Any})::Tuple{Bool,Temperature,Float64}
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_negotiate_temperature)
+            continue
+        end
+        if mod.parameters["target_uac"] !== target_uac
+            continue
+        end
+
+        results = determine_temperature_and_energy(mod, components, source_uac, target_uac, sim_params)
+        return true, results[1], results[2]
+    end
+
+    if sim_params["time"] == 0
+        if components[source_uac] isa TemperatureNegotiateSource &&
+           target_uac !== nothing && components[target_uac] isa TemperatureNegotiateTarget
+            @warn "From $(source_uac) to $(target_uac), no control module is activated. This can lead to unexpected " *
+                  "results. Add a `negotiate_temperature` control module at $(source_uac)!"
+        end
+    end
+
+    return false, nothing, 0.0
+end
+
+"""
+Callback for cooling_input_temperature_exeeded
+
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `components::Grouping`: All components of the energy system.
+- `target_uac::String`: The target unit uac.
+
+# Returns
+- `Bool`: A bool indicating if the input temperature is exeeded (true, meaning no energy flow is allowed) 
+          or not (false, energy flow is allowed)
+
+"""
+function cooling_input_temperature_exeeded(controller::Controller,
+                                           target_uac::Stringing,
+                                           sim_params::Dict{String,Any})::Bool
+    for mod in controller.modules
+        if !has_method_for(mod, cfm_limit_cooling_input_temperature)
+            continue
+        end
+        if mod.parameters["target_uac"] !== target_uac
+            continue
+        end
+        components = Dict{String,Component}(get_run(sim_params["run_ID"]).components)
+        return cooling_input_temperature_exeeded(mod, components, target_uac)
+    end
+
+    return false
 end

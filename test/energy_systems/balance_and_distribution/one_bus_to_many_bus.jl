@@ -4,7 +4,7 @@ using Resie
 using Resie.EnergySystems
 using Resie.Profiles
 
-EnergySystems.set_timestep(900)
+include("../../test_util.jl")
 
 function test_one_bus_to_many_bus()
     components_config = Dict{String,Any}(
@@ -18,43 +18,31 @@ function test_one_bus_to_many_bus()
         "TST_BUS_01" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_SRC_01",
-                ],
-                "output_order" => [
-                    "TST_BUS_02",
-                    "TST_BUS_03",
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_SRC_01"],
+                "output_order" => ["TST_BUS_02",
+                                   "TST_BUS_03"],
+            ),
         ),
         "TST_BUS_02" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_BUS_01",
-                    "TST_TES_01",
-                ],
-                "output_order" => [
-                    "TST_DEM_01",
-                    "TST_TES_01",
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01",
+                                  "TST_TES_01"],
+                "output_order" => ["TST_DEM_01",
+                                   "TST_TES_01"],
+            ),
         ),
         "TST_BUS_03" => Dict{String,Any}(
             "type" => "Bus",
             "medium" => "m_h_w_ht1",
-            "connections" => Dict{String, Any}(
-                "input_order" => [
-                    "TST_BUS_01",
-                    "TST_TES_02",
-                ],
-                "output_order" => [
-                    "TST_DEM_02",
-                    "TST_TES_02",
-                ],
-            )
+            "connections" => Dict{String,Any}(
+                "input_order" => ["TST_BUS_01",
+                                  "TST_TES_02"],
+                "output_order" => ["TST_DEM_02",
+                                   "TST_TES_02"],
+            ),
         ),
         "TST_TES_01" => Dict{String,Any}(
             "type" => "Storage",
@@ -86,11 +74,7 @@ function test_one_bus_to_many_bus()
         ),
     )
 
-    simulation_parameters = Dict{String,Any}(
-        "time_step_seconds" => 900,
-        "time" => 0,
-        "epsilon" => 1e-9
-    )
+    simulation_parameters = get_default_sim_params()
 
     components = Resie.load_components(components_config, simulation_parameters)
     demand_1 = components["TST_DEM_01"]
@@ -136,12 +120,11 @@ function test_one_bus_to_many_bus()
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[3], bus_3)  # DEM_02
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 100.0  # limited by the actual demand
-    @test EnergySystems.temp_min_highest(exchanges) === nothing
-
+    @test EnergySystems.temp_min_highest(exchanges) == 55.0
     exchanges = EnergySystems.balance_on(bus_proxy.output_interfaces[1], bus_2)  # DEM_01
     @test EnergySystems.balance(exchanges) ≈ 0.0
     @test EnergySystems.energy_potential(exchanges) ≈ 100.0  # limited by the actual demand
-    @test EnergySystems.temp_min_highest(exchanges) === nothing
+    @test EnergySystems.temp_min_highest(exchanges) == 55.0
 
     EnergySystems.process(demand_2, simulation_parameters)
     EnergySystems.process(demand_1, simulation_parameters)
@@ -216,7 +199,6 @@ function test_one_bus_to_many_bus()
     @test bus_1.output_interfaces[1].sum_abs_change ≈ 2 * 100.0  # to bus_1
     @test bus_1.output_interfaces[2].sum_abs_change ≈ 0.0        # to bus_2
     @test bus_1.input_interfaces[1].sum_abs_change ≈ 2 * 100.0   # from src_1
-
 end
 
 @testset "one_bus_to_many_bus" begin

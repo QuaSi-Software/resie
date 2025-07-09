@@ -10,9 +10,11 @@
         "output_plot": "all"
     },
     "simulation_parameters": {
-        "start": 0,
-        "end": 603900,
-        "time_step_seconds": 900
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:30",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes"
     },
     "components": {
         "TST_DEM_01": {
@@ -70,7 +72,9 @@
                 "TST_BUS_TH"
             ],
             "power_th": 1200,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_HP_02": {
             "type": "HeatPump",
@@ -81,7 +85,9 @@
             ],
             "power_th": 9000,
             "input_temperature": 30,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_HP_03": {
             "type": "HeatPump",
@@ -92,7 +98,9 @@
             ],
             "power_th": 9000,
             "input_temperature": 50,
-            "min_power_fraction": 0.0
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
         },
         "TST_CHP_01": {
             "type": "CHPP",
@@ -152,11 +160,11 @@
             "output_refs": [
                 "TST_BUS_TH"
             ],
+            "model_type": "ideally_stratified",
             "capacity": 150000,
-            "load": 70000,
+            "initial_load": 0.46666666666666666666666666666667,
             "high_temperature": 50.0,
-            "low_temperature": 20.0,
-            "use_adaptive_temperature": false
+            "low_temperature": 20.0
         }
     }
 }
