@@ -12,5 +12,4 @@ test/scenarios/*
 # input files (force-add new examples)
 examples/*.json
 profiles/examples/district/230413_profiles_management.xlsx
-Project.toml
 src/run_REPL.jl

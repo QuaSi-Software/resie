@@ -14,13 +14,16 @@ Base.@kwdef mutable struct Battery <: Component
 
     medium::Symbol
 
+    model_type::String
+
     capacity::Float64
     load::Float64
-    load_end_of_last_timestep::Float64
+    
     charge_efficiency::Float64
     discharge_efficiency::Float64
     self_discharge_rate::Float64
 
+    load_end_of_last_timestep::Float64
     losses::Float64
     max_charge::Float64
     max_discharge::Float64
@@ -37,10 +40,10 @@ Base.@kwdef mutable struct Battery <: Component
                    medium,
                    config["capacity"], # capacity
                    config["load"], # load
-                   0.0, # load_end_of_last_timestep
                    config["charge_efficiency"],
                    config["discharge_efficiency"],
                    config["self_discharge_rate"],
+                   0.0, # load_end_of_last_timestep
                    0.0, # losses
                    0.0, # max_charge
                    0.0) # max_discharge
@@ -68,9 +71,8 @@ function control(unit::Battery,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    old_load = unit.load
-    unit.load *= unit.self_discharge_rate
-    unit.losses += old_load - unit.load
+    unit.losses = unit.load * unit.self_discharge_rate
+    unit.load -= unit.losses
 
     if discharge_is_allowed(unit.controller, sim_params)
         unit.max_discharge = unit.load * unit.discharge_efficiency
@@ -85,20 +87,6 @@ function control(unit::Battery,
         unit.max_charge = 0.0
     end
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge)
-end
-
-function balance_on(interface::SystemInterface,
-                    unit::Battery)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(; balance=interface.balance,
-                 energy_potential=caller_is_input ? -(unit.max_charge) : unit.max_discharge,
-                 purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
-                 pressure=nothing,
-                 voltage=nothing)]
 end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
@@ -116,9 +104,9 @@ function process(unit::Battery, sim_params::Dict{String,Any})
         return # process is only concerned with moving energy to the target
     end
 
-    if unit.load > abs(energy_demand) * unit.discharge_efficiency
-        unit.losses += abs(energy_demand) * (1.0 - unit.discharge_efficiency)
-        unit.load += energy_demand * unit.discharge_efficiency
+    if unit.load > abs(energy_demand) / unit.discharge_efficiency
+        unit.losses += abs(energy_demand) * (1.0 / unit.discharge_efficiency - 1)
+        unit.load += energy_demand / unit.discharge_efficiency
         add!(outface, abs(energy_demand))
     else
         unit.losses += unit.load * (1.0 - unit.discharge_efficiency)
