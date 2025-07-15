@@ -119,7 +119,7 @@ mutable struct GeothermalProbes <: Component
                    model_type,     # model type. currently "simplified" with constant thermal borehole resistance and 
                    #                 "detailed" with calculated thermal borehole resistance in every time step are available.
 
-                   default(config, "max_probe_temperature_loading", nothing),     # upper temperauture limit in the probe for loading
+                   default(config, "max_probe_temperature_loading", nothing),     # upper temperature limit in the probe for loading
                    default(config, "min_probe_temperature_unloading", nothing),   # lower temperature limit in the probe for unloading
                    default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
                    default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
@@ -148,11 +148,11 @@ mutable struct GeothermalProbes <: Component
                    #
                    default(config, "g_function_file_path", nothing),     # path to a file with a custom g-function
                    probe_field_geometry,                                 # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
-                   default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
-                   default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-fuction library. Note that number_of_probes_x <= number_of_probes_y!
-                   default(config, "probe_field_key_2", ""),             # key2 of g-fuction library. Can also be "" if non is needed. The value depends on the chosen library type.
+                   default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-function library. Note that number_of_probes_x <= number_of_probes_y!
+                   default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-function library. Note that number_of_probes_x <= number_of_probes_y!
+                   default(config, "probe_field_key_2", ""),             # key2 of g-function library. Can also be "" if non is needed. The value depends on the chosen library type.
                    default(config, "probe_depth", 150.0),                # depth (or length) of a single geothermal probe. Has to be between 24 m and 384 m.
-                   0,                                                    # number of geothermal probes in the borefield, determined in inizialize from borehole configuration
+                   0,                                                    # number of geothermal probes in the borefield, determined in initialize from borehole configuration
                    default(config, "borehole_spacing", 5),               # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
                    default(config, "probe_type", 2),                     # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
                    #
@@ -235,7 +235,7 @@ Returns:
                          
 """
 function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
-    # set Parameters (user input): Set key_1 and key_2 for library geometrie properties.
+    # set Parameters (user input): Set key_1 and key_2 for library geometry properties.
     key1 = "$(unit.number_of_probes_x)_$(unit.number_of_probes_y)"      # Note that  x <= y!
     key2 = unit.probe_field_key_2
     probe_field_configurations = Dict("rectangle" => "rectangle_5m_v1.0.json",
@@ -259,7 +259,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     steady_state_time = unit.probe_depth^2 / (9 * soil_diffusivity)  # [s]
 
     if unit.g_function_file_path === nothing
-        # Get pre-caluclated g-function values out of g-function library json file
+        # Get pre-calculated g-function values out of g-function library json file
         g_values_long_term,
         log_time_stamp,
         number_of_probes,
@@ -271,16 +271,16 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                                                       key2,
                                                       libfile_path)
     else
-        # Get pre-caluclated g-function values from custom input file
+        # Get pre-calculated g-function values from custom input file
         g_values_long_term, log_time_stamp, number_of_probes, probe_coordinates = get_g_values_from_file(unit)
     end
 
-    # Change normalized time values to absolut time and round to fit into simulation step width.
+    # Change normalized time values to absolute time and round to fit into simulation step width.
     library_time_grid_absolute = round_to_simulation_step_width(ln_to_normal(log_time_stamp,
                                                                              steady_state_time),
                                                                 sim_params["time_step_seconds"])
 
-    # Interpolation between grid points of library, to get g-function values for eacht time-step.
+    # Interpolation between grid points of library, to get g-function values for each time-step.
     simulation_end_timestamp = Int(sim_params["number_of_time_steps"] * sim_params["time_step_seconds"])
     if library_time_grid_absolute[end] < simulation_end_timestamp
         @error "The duration of the time horizon given for the g_function of \"$(unit.uac)\" does not cover " *
@@ -300,8 +300,8 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     g_function = itp.(simulation_time_grid_precalculated)
 
     # change first time period of g-function to fitted f(x)=a*log(b*x) function to better represent short term effects.
-    # This follows the method of an infitine line source that is widely used to calculate the short term g-functions
-    # of a single probe. As for short time periods, the interferrence between the probes in the field is assumed to be
+    # This follows the method of an infinite line source that is widely used to calculate the short term g-functions
+    # of a single probe. As for short time periods, the interference between the probes in the field is assumed to be
     # very small, therefore this approach is commonly assumed to be valid.
     # f(x) is fitted in a way that the function goes through the first and second node of the existing non-interpolated g-function.
     # therefore: a = y1/log(x1*exp(log(x1^y2/x2^y1)/(y1 - y2))) and b = exp(log(x1^y2/x2^y1)/(y1 - y2))
@@ -386,7 +386,7 @@ Inputs:
                                                  given as ln(absolute_time/steady_state_time) 
     steady_state_time::Float64                 - steady state time = unit.probe_depth^2/(9* soil_diffusivity) in [s]
 Returns:
-    time::Array{Float64}                       - array of absolute time calculated from the normlized time as
+    time::Array{Float64}                       - array of absolute time calculated from the normalized time as
                                                  exp(time_step_ln_normalized)*steady_state_time
 """
 function ln_to_normal(time_step_ln_normalized::Array{Float64}, steady_state_time::Float64)
@@ -444,9 +444,9 @@ The file needs to have the following structure (without the notes!):
         ...
 
 The first column has to hold the normalized logarithmic time as ln(real time / characteristic time)
-with the characteristic time = borewhole_depth^2 / (9 * ground thermal diffusivity [m^2/s]).
-
-The second column, separatey by a semicolon, holds the g-function values.
+with the characteristic time = borehole_depth^2 / (9 * ground thermal diffusivity [m^2/s]).
+ 
+The second column, separately by a semicolon, holds the g-function values.
 Note that the number of probes has to be given as well in the header.
 
 """
@@ -485,7 +485,7 @@ function get_g_values_from_file(unit::GeothermalProbes)
                             push!(g_func_vals, parse(Float64, strip(values[2])))
                         catch e
                             @error "Invalid data line \"$line\" in the file with given g-function values for the " *
-                                   "\"$(unit.uac)\" at $(unit.g_function_file_path). The follwoing error occured: $e. " *
+                                   "\"$(unit.uac)\" at $(unit.g_function_file_path). The following error occurred: $e. " *
                                    "Please check the data given in the file."
                             throw(InputError)
                         end
@@ -509,11 +509,11 @@ function get_g_values_from_file(unit::GeothermalProbes)
     catch e
         if isa(e, SystemError)
             @error "Could not open the file with given g-function values for the \"$(unit.uac)\" at " *
-                   "$(unit.g_function_file_path). The following error occured: $e"
+                   "$(unit.g_function_file_path). The following error occurred: $e"
             throw(InputError)
         else
-            @error "An error occured reading the file with given g-function values for the \"$(unit.uac)\" at " *
-                   "$(unit.g_function_file_path). The following error occured: $e"
+            @error "An error occurred reading the file with given g-function values for the \"$(unit.uac)\" at " *
+                   "$(unit.g_function_file_path). The following error occurred: $e"
             throw(InputError)
         end
     end
@@ -526,12 +526,12 @@ Read long term g-function from the precalculated library provided by:
 G-Function Library V1.0 by T. West, J. Cook and D. Spitler, 2021, Oklahoma State University
 See: https://doi.org/10.15121/1811518
 
-There are various sets of grid points refering to different borehole depths and borehole cofigurations.
+There are various sets of grid points referring to different borehole depths and borehole configurations.
 Two sets of grid points have to be read out of one .json library-file to do interpolation, 
-as they are refered to specific borehole depth.
-This function checks, which two sets of grid points (refered to borehole depth borehole_depth_library_lower 
+as they are referred to specific borehole depth.
+This function checks, which two sets of grid points (referred to borehole depth borehole_depth_library_lower 
 and borehole depth borehole_depth_library_upper) are read out of json file.
-First, each set of grid points is refered to a default borehole radius 
+First, each set of grid points is referred to a default borehole radius 
 (borehole_radius_library_lower, borehole_radius_library_upper). Later, the grid points are
 corrected to the real borehole radius.
 
@@ -540,10 +540,10 @@ Inputs:
     borehole_depth::Float64      - borehole depth in [m]
     borehole_radius::Float64     - borehole radius in [m]
     borehole_spacing::Float64    - borehole spacing in [m], assumed to be equal for all boreholes in both directions
-    key1::String                 - parameter of West/Cook/Spitler library, normaly the number of probes in each 
-                                   direction: "m_n" while n >= m! See dokumentation of library for details.
+    key1::String                 - parameter of West/Cook/Spitler library, normally the number of probes in each 
+                                   direction: "m_n" while n >= m! See documentation of library for details.
     key2::String                 - parameter of West/Cook/Spitler library, meaning depends of type of probefield
-                                   geometry, can also be "" if none is needed. See dokumentation of library for details.
+                                   geometry, can also be "" if none is needed. See documentation of library for details.
     libfile_path::String         - file path to the library. Note that different probefield geometries are stored in different files.
 Returns:
     g_values_library_corrected::Array{Float64} - interpolated and corrected g-values read out of library for given key1 and key2
@@ -559,7 +559,7 @@ function get_g_values_from_library(unit::Component,
                                    key2::String,
                                    libfile_path::String)
 
-    # normalized characteristic logaritmic time stamps used in the library.
+    # normalized characteristic logarithmic time stamps used in the library.
     # They are the same for each set of grid points, as follows:
     #! format: off
     library_time_grid_normalized = Float64[-8.5,   -7.8,   -7.2,   -6.5,   -5.9,   -5.2,   -4.5,
@@ -600,7 +600,7 @@ function get_g_values_from_library(unit::Component,
         library = JSON.parsefile(libfile_path)
     catch e
         @error "The library with precalculated g-values for the geothermal probe \"$(unit.uac)\" could not be read in. " *
-               "The following error occured: $e\n Check the file located at $libfile_path."
+               "The following error occurred: $e\n Check the file located at $libfile_path."
         throw(InputError)
     end
 
@@ -616,7 +616,7 @@ function get_g_values_from_library(unit::Component,
         end
     catch e
         @error "The probe field configuration for the geothermal probe  \"$(unit.uac)\" could not be detected from the " *
-               "given library. The following error occured: $e\n" *
+               "given library. The following error occurred: $e\n" *
                "Check the probe field configuration given as key1 = $key1 and key2 = $key2."
         throw(InputError)
     end
@@ -625,7 +625,7 @@ function get_g_values_from_library(unit::Component,
     number_of_probes = length(probe_coordinates)
 
     if number_of_probes == 1 && borehole_spacing != 5.0
-        @error "You are requesting a single probe for the probe field \"$(unit.uac)\". Due to the underlaying library, " *
+        @error "You are requesting a single probe for the probe field \"$(unit.uac)\". Due to the underlying library, " *
                "the borehole_spacing has to be set to 5 m in this case! Otherwise, a wrong g-function will be calculated."
         throw(InputError)
     end
@@ -634,7 +634,7 @@ function get_g_values_from_library(unit::Component,
     g_values_library_lower = gVals["$lib_default_spacing._$borehole_depth_library_lower._$borehole_radius_library_lower"]
     g_values_library_upper = gVals["$lib_default_spacing._$borehole_depth_library_upper._$borehole_radius_library_upper"]
 
-    # Linear intepolation between upper and lower default g_values on B/H-ratio. B: Borehole spacing. H: Borehole depth.
+    # Linear interpolation between upper and lower default g_values on B/H-ratio. B: Borehole spacing. H: Borehole depth.
     spacing_to_depth_ratio_library_lower = lib_default_spacing / borehole_depth_library_lower
     spacing_to_depth_ratio_library_upper = lib_default_spacing / borehole_depth_library_upper
 
@@ -645,8 +645,8 @@ function get_g_values_from_library(unit::Component,
               "($borehole_depth m) is not covered in the library! The g-values will be extrapolated " *
               "from the nearest ratios which are $(round(spacing_to_depth_ratio_library_lower; digits=2)) and " *
               "$(round(spacing_to_depth_ratio_library_upper; digits=2)) to the requested ratio of " *
-              "$(round(spacing_to_depth; digits=2)). Note that this can leed to unexpected g-function shapes! " *
-              "Check the shape of the g-fuction by activating auxiliary_plots."
+              "$(round(spacing_to_depth; digits=2)). Note that this can lead to unexpected g-function shapes! " *
+              "Check the shape of the g-function by activating auxiliary_plots."
     end
 
     # Substitution "interpolation_factor". 
@@ -657,7 +657,7 @@ function get_g_values_from_library(unit::Component,
     g_values_library_interpolated = g_values_library_upper -
                                     (1 - interpolation_factor) * (g_values_library_upper - g_values_library_lower)
 
-    # g_values_library_interpolated are refered to a not existing boreholeradius (borehole_radius_interpolated), because 
+    # g_values_library_interpolated are referred to a not existing boreholeradius (borehole_radius_interpolated), because 
     # Interpolation is based on B/H. Within the interpolation based on B/H, the ratio r_b/H is interpolated, too. 
     # That's why a correction is needed to refer to the real borehole radius (which is set by user or default).
     r_b_H_ratio_library_default_lower = borehole_radius_library_lower / borehole_depth_library_lower
@@ -680,7 +680,7 @@ end
                                          limit_max_output_energy_to_avoid_pulsing::Bool)
 
 Checks if a requested output temperature is within the allowed operational range for the geothermal probe.
-I no temperautre is given, the function sets the temperature to the mean temperature that will be reached with maximum 
+I no temperature is given, the function sets the temperature to the mean temperature that will be reached with maximum 
 energy draw during the whole time step.
 The function also determines the maximum extractable energy for the given temperature. Here, the temperature is
 handled either as turn-on temperature (limit_max_output_energy_to_avoid_pulsing=false) or the max energy in the current
@@ -736,7 +736,6 @@ function check_temperature_and_get_max_energy(unit::GeothermalProbes,
         # Here, limit_max_output_energy_to_avoid_pulsing is always true, and the requested temperature is higher than the
         # mean temperature that would be reached with maximum energy draw, so the maximum energy is calculated, that can 
         # be drawn from the source without changing the output temperature for the next time step.
-        # --> this works for probe, but probably not for solarthermal!
 
         # calculate the maximum energy that can be delivered while not changing the output temperature for the next time step
         max_energy = calculate_output_energy_from_output_temperature(unit, source_max_out_temperature, sim_params)
@@ -772,7 +771,7 @@ function control(unit::GeothermalProbes,
                                                                             target_uac,
                                                                             sim_params)
         if !success
-            # no control module is provided between source and tartet
+            # no control module is provided between source and target
             # set temperature to exchange.temperature_min --> can also be nothing, but in case it is given we will use it
             # if no control module is used
             temperature, max_energy = check_temperature_and_get_max_energy(unit,
@@ -845,7 +844,7 @@ the given desired_output_temperature using a find_zero() algorithm.
 Note that this function resets the unit.energy_in_out_per_probe_meter[unit.time_index] to zero.
 
 Args:
-    energy_in_out_per_probe_meter::Float64:   the energy input (positve) or output (negative) of the probe field (per probe meter!)        
+    energy_in_out_per_probe_meter::Float64:   the energy input (positive) or output (negative) of the probe field (per probe meter!)        
     unit::GeothermalProbes :                  the unit struct of the geothermal probe with all its parameters
     desired_output_temperature::Float64       the desired temperature of the fluid temperature at the probe field output
     wh2w::Function:                           function to convert work to power
@@ -920,7 +919,7 @@ Uses parameters stored in unit::GeothermalProbes, specifically the energy_in_out
 a global variable within the geothermal probe and that is set in load() as positive value and in process() as negative value.
 Note that this function has to be called at least once in every time step to retrieve the current fluid temperature.
 
-To calculate the fluid tempeature from the borehole wall temperature, an approach by Hellström 1991 is used to
+To calculate the fluid temperature from the borehole wall temperature, an approach by Hellström 1991 is used to
 determine the effective thermal borehole resistance using the convective heat transfer coefficient within the pipe.:
 Hellström, G. Ground Heat Storage [online]. Thermal Analyses of Duct Storage Systems. Theorie, 1991.
 
@@ -1005,9 +1004,9 @@ function calculate_alpha_pipe(unit::GeothermalProbes, wh2w::Function)::Tuple{Flo
     fluid_reynolds_number = (4 * mass_flow_per_pipe) /
                             (unit.fluid_density * unit.fluid_kinematic_viscosity * unit.pipe_diameter_inner * pi)
 
-    # # In case that someone wants to implement temperature-dependend fluid properties in a later version, this already
+    # # In case that someone wants to implement temperature-dependent fluid properties in a later version, this already
     # # existing code can be used to start with. The equations are not checked and it is not known for which fluid the 
-    # # parameters are valid. The reynolds-number is calculated based on dynamic viscosity using dynamic temperature-dependend 
+    # # parameters are valid. The reynolds-number is calculated based on dynamic viscosity using dynamic temperature-dependent 
     # # fluid properties. The method is adapted from TRNSYS Type 710:
     # fluid_dynamic_viscosity = 0.0000017158* unit.fluid_temperature^2 - 0.0001579079*unit.fluid_temperature+0.0048830621
     # unit.fluid_heat_conductivity = 0.0010214286 * unit.fluid_temperature + 0.447

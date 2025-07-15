@@ -443,7 +443,7 @@ function determine_temperature_and_energy(controller::Controller,
 end
 
 """
-Callback for cooling_input_temperature_exeeded
+Callback for cooling_input_temperature_exceeded
 
 
 # Arguments
@@ -452,13 +452,13 @@ Callback for cooling_input_temperature_exeeded
 - `target_uac::String`: The target unit uac.
 
 # Returns
-- `Bool`: A bool indicating if the input temperature is exeeded (true, meaning no energy flow is allowed) 
+- `Bool`: A bool indicating if the input temperature is exceeded (true, meaning no energy flow is allowed) 
           or not (false, energy flow is allowed)
 
 """
-function cooling_input_temperature_exeeded(controller::Controller,
-                                           target_uac::Stringing,
-                                           sim_params::Dict{String,Any})::Bool
+function cooling_input_temperature_exceeded(controller::Controller,
+                                            target_uac::Stringing,
+                                            sim_params::Dict{String,Any})::Bool
     for mod in controller.modules
         if !has_method_for(mod, cfm_limit_cooling_input_temperature)
             continue
@@ -467,7 +467,7 @@ function cooling_input_temperature_exeeded(controller::Controller,
             continue
         end
         components = Dict{String,Component}(get_run(sim_params["run_ID"]).components)
-        return cooling_input_temperature_exeeded(mod, components, target_uac)
+        return cooling_input_temperature_exceeded(mod, components, target_uac)
     end
 
     return false
