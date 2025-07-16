@@ -823,39 +823,11 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
     exchanges = balance_on(unit.output_interfaces[medium],
                            unit.output_interfaces[medium].target)
 
-    # If the source is an Electrolyser, call the ControlModule limit_cooling_input_temperature
-    # for every target to check if the energy transfer is allowed or not. 
-    # If the temperaure input limit is exeeded (control module returns true), remove the entry from exchanges.
-    if isa(unit, Electrolyser)
-        idx_to_remove = Int[]
-        for (idx, exchange) in enumerate(exchanges)
-            if cooling_input_temperature_exeeded(unit.controller, exchange.purpose_uac, sim_params)
-                push!(idx_to_remove, idx)
-            end
-        end
-        if !isempty(idx_to_remove)
-            for idx in reverse(idx_to_remove)
-                popat!(exchanges, idx)
-            end
-
-            if isempty(exchanges)
-                push!(exchanges,
-                      EnEx(; balance=0.0,
-                           energy_potential=0.0,
-                           purpose_uac=nothing,
-                           temperature_min=nothing,
-                           temperature_max=nothing,
-                           pressure=nothing,
-                           voltage=nothing))
-            end
-        end
-    end
-
     # if we get the exchanges from a bus, the temperature check has already been performed
     if unit.output_interfaces[medium].target.sys_function == sf_bus
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
     else # check temperature for 1-to-1 connections and sum up energy
-        potential_energy_heat_out, _, _ = check_temperatures_source(exchanges, output_temperature, Inf)
+        potential_energy_heat_out, _, _, _ = check_temperatures_source(exchanges, output_temperature, Inf)
         potential_energy_heat_out = sum(potential_energy_heat_out; init=0.0)
     end
 
@@ -863,6 +835,75 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
         return nothing
     end
     return potential_energy_heat_out
+end
+
+"""
+    check_heat_out_layered(unit, interface, medium, output_temperature, sim_params)
+
+Checks the available energy on the output high temperature heat interface of the electrolyser.
+Includes the required check for return temperatures for the control module "limit_cooling_input_temperature".
+Therefore, it returns not only the energies but also the corresponding target_uac.
+
+# Arguments
+- `unit::Electrolyser`: The component
+- `interface_name::String`: The name of the interface, e.g. "heat_ht_out"
+- `medium::Symbol`: The medium of the interface, e.g. `:m_heat_ht_out`
+- `output_temperature::Floathing`: The output temperature of the electrolyser for 1-to-1 temperature checks
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The requested energy on the interface as one layer per target. The
+    value can be `-Inf`, which is a special floating point value signifying a negative
+    infinite value.
+- `Vector{Stringing}`: The UACs of the targets on the interface corresponding to the energies.
+"""
+function check_heat_out_layered(unit::Electrolyser,
+                                interface_name::String,
+                                medium::Symbol,
+                                output_temperature::Floathing,
+                                sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_" * interface_name]
+        # ignore the energy of the heat output, but target_uac is still required
+        return ([-Inf for _ in exchanges],
+                [e.purpose_uac for e in exchanges])
+    end
+
+    if (unit.output_interfaces[medium].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[medium].max_energy))
+        # direct connection to transformer that has not had its potential
+        # no temperature check required
+        energy = [-Inf]
+        purpose_uac = [unit.output_interfaces[medium].target.uac]
+    else
+        exchanges = balance_on(unit.output_interfaces[medium],
+                               unit.output_interfaces[medium].target)
+
+        if unit.output_interfaces[medium].target.sys_function == sf_bus
+            # if we get the exchanges from a bus, the temperature check has already been performed
+            energy = [e.balance + e.energy_potential for e in exchanges]
+            purpose_uac = [e.purpose_uac for e in exchanges]
+        else
+            # check temperature for 1-to-1 connections
+            energy, _, _, purpose_uac = check_temperatures_source(exchanges, output_temperature, Inf)
+        end
+    end
+
+    # If the source is an Electrolyser, call the ControlModule limit_cooling_input_temperature
+    # for every target to check if the energy transfer is allowed or not. 
+    # If the temperature input limit is exceeded (control module returns true), remove the entry from returns.
+    idx_to_remove = Int[]
+    for idx in eachindex(purpose_uac)
+        if cooling_input_temperature_exceeded(unit.controller, purpose_uac[idx], sim_params)
+            push!(idx_to_remove, idx)
+        end
+    end
+
+    if !isempty(idx_to_remove)
+        deleteat!(energy, idx_to_remove)
+        deleteat!(purpose_uac, idx_to_remove)
+    end
+
+    return (energy, purpose_uac)
 end
 
 """
@@ -882,11 +923,11 @@ Alias to check_heat_out_impl for a heat output interface called heat_ht_out.
 """
 function check_heat_ht_out(unit::Electrolyser,
                            sim_params::Dict{String,Any})
-    return check_heat_out_impl(unit,
-                               "heat_ht_out",
-                               unit.m_heat_ht_out,
-                               unit.output_temperature_ht,
-                               sim_params)
+    return check_heat_out_layered(unit,
+                                  "heat_ht_out",
+                                  unit.m_heat_ht_out,
+                                  unit.output_temperature_ht,
+                                  sim_params)
 end
 
 """

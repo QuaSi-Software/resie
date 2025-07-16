@@ -496,8 +496,8 @@ to be necessarily unique.
 The flag `has_calculated_all_maxima` can be set to true if the calling component has not known
 the combination of temperature and energy of a source or a sink during its pre-calculation. 
 Then, the calling component can calculate the maximum energy that could potentially be taken 
-or delivered for each source or for each sink seperately, ignoring all other inputs or outputs. 
-Setting the flag, the max_energy is then later handeled accordingly by reduce_max_energy!(),
+or delivered for each source or for each sink separately, ignoring all other inputs or outputs. 
+Setting the flag, the max_energy is then later handled accordingly by reduce_max_energy!(),
 considering that the single values can not be summed up but they all have to be linearly
 decreased if one of them is reduced. An analogy would be to divide the current time step 
 into smaller time steps, in each of which a different component is supplied or drawn with
@@ -507,7 +507,7 @@ The flag `recalculate_max_energy` can be used recalculate the max_energy of a co
 each time the bus distributes energy to or from this component. This can be useful if the 
 leftover max_energy depends on the already taken energy, e.g. for the STES loading, where the
 determination of the leftover free space can not be calculated easily after a given energy at given
-temperature has alread been loaded into the storage. To use this funcionality, the component
+temperature has already been loaded into the storage. To use this functionality, the component
 need to have a function recalculate_max_energy() implemented that is called in reduce_max_energy!().
 """
 function set_max_energy!(interface::SystemInterface,
@@ -605,7 +605,11 @@ function convert_to_vector(temp, ::Type{T}) where {T<:AbstractVector}
         return T([nothing])
     elseif isa(temp, AbstractVector)
         if isempty(temp)
-            return T([nothing])
+            if isa(T, Vector{Temperature})
+                return T([nothing])
+            elseif isa(T, Vector{Floathing})
+                return T([0.0])
+            end
         else
             return T(temp)
         end
@@ -641,7 +645,7 @@ end
     get_min_temperature(max_energy, max_energy, purpose_uac)
 
 A wrapper for get_min_temperature(max_energy, purpose_uac) that takes two MaxEnergy values 
-with one of them beeing emtpy. The temperature is extraced from the non-empty MaxEnergy.
+with one of them being empty. The temperature is extracted from the non-empty MaxEnergy.
 """
 function get_min_temperature(max_energy_1::EnergySystems.MaxEnergy, max_energy_2::EnergySystems.MaxEnergy,
                              purpose_uac::Stringing=nothing)
@@ -676,7 +680,7 @@ end
     get_max_temperature(max_energy, max_energy, purpose_uac)
 
 A wrapper for get_max_temperature(max_energy, purpose_uac) that takes two MaxEnergy values 
-with one of them beeing emtpy. The temperature is extraced from the non-empty MaxEnergy.
+with one of them being empty. The temperature is extracted from the non-empty MaxEnergy.
 """
 function get_max_temperature(max_energy_1::EnergySystems.MaxEnergy, max_energy_2::EnergySystems.MaxEnergy,
                              purpose_uac::Stringing=nothing)
@@ -795,6 +799,14 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
     end
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
+    energy_length = length(energy)
+    if energy_length !== length(temperature_min) ||
+       energy_length !== length(temperature_max) ||
+       energy_length !== length(uac_to_increase)
+        # should actually not happen if everything is implemented correctly
+        @error "Internal error: Check if energies, temperatures and uac have the same length when calling add, sub or set!"
+        throw(CalculationError)
+    end
 
     for (energy_idx, current_energy) in enumerate(energy)
         if uac_to_increase[energy_idx] === nothing || is_purpose_uac_nothing(max_energy)
@@ -807,7 +819,7 @@ function increase_max_energy!(max_energy::EnergySystems.MaxEnergy,
                    temperature_min[energy_idx] !== max_energy.temperature_min[1] ||
                    temperature_max[energy_idx] !== nothing && max_energy.temperature_max[1] !== nothing &&
                    temperature_max[energy_idx] !== max_energy.temperature_max[1]
-                    # ...but temperatures missmatch, so a new entry will be created --> append
+                    # ...but temperatures mismatch, so a new entry will be created --> append
                     set_max_energy!(max_energy, current_energy, temperature_min[energy_idx],
                                     temperature_max[energy_idx],
                                     uac_to_increase[energy_idx], false, false, true)
@@ -915,7 +927,7 @@ end
     is_max_energy_nothing(max_energy)
 
 Checks a MaxEnergy struct if the `max_energy` is nothing (true), meaning that no potential has
-beed performed (yet).
+been performed (yet).
 """
 function is_max_energy_nothing(max_energy::EnergySystems.MaxEnergy)
     return max_energy.max_energy[1] === nothing && length(max_energy.max_energy) == 1
@@ -1041,7 +1053,7 @@ components are linked) or a SystemInterface instance.
 const InterfaceMap = Dict{Symbol,Union{Nothing,SystemInterface}}
 
 """
-Contains the data on the energy exchance (and related information) on an interface.
+Contains the data on the energy exchange (and related information) on an interface.
 """
 Base.@kwdef mutable struct EnergyExchange
     balance::Float64
@@ -1191,13 +1203,14 @@ calculates the energy demand (as vector) and associated temperature ranges for a
 - `energy_demand::Vector{Float64}`: A vector of energy demands that satisfy the temperature constraints.
 - `temperature_min::Vector{Temperature}`: A vector of minimum temperatures corresponding to the energy demands.
 - `temperature_max::Vector{Temperature}`: A vector of maximum temperatures corresponding to the energy demands.
-
+- `purpose_uac::Vector{Stringing}`: A vector of purpose UACs corresponding to the energy demands.
 """
 function check_temperatures_source(exchanges::Vector{EnergyExchange}, output_temperature::Temperature,
                                    max_energy::Float64)
     energy_demand = Float64[]
     temperature_min = Temperature[]
     temperature_max = Temperature[]
+    purpose_uac = Stringing[]
     for e in exchanges
         if (output_temperature === nothing ||
             (e.temperature_min === nothing || e.temperature_min <= output_temperature) &&
@@ -1208,10 +1221,11 @@ function check_temperatures_source(exchanges::Vector{EnergyExchange}, output_tem
                 push!(energy_demand, min(e.balance + e.energy_potential, max_energy - energy_demand_sum))
                 push!(temperature_min, nothing)
                 push!(temperature_max, output_temperature)
+                push!(purpose_uac, e.purpose_uac)
             end
         end
     end
-    return energy_demand, temperature_min, temperature_max
+    return energy_demand, temperature_min, temperature_max, purpose_uac
 end
 
 """
@@ -1567,7 +1581,7 @@ include("heat_producers/heat_pump.jl")
 include("electric_producers/pv_plant.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the
-# base module and has been moved into seperate files for less clutter
+# base module and has been moved into separate files for less clutter
 include("efficiency.jl")
 
 # now that the components are defined we can load the control modules, which depend on their

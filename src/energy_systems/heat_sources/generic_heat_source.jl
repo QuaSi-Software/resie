@@ -135,7 +135,7 @@ function process(unit::GenericHeatSource, sim_params::Dict{String,Any})
     else # check temperatures
         energy_demand,
         temperature_min,
-        temperature_max = check_temperatures_source(exchanges, unit.temperature_snk_out, unit.max_energy)
+        temperature_max, _ = check_temperatures_source(exchanges, unit.temperature_snk_out, unit.max_energy)
     end
 
     if sum(energy_demand; init=0.0) < 0.0

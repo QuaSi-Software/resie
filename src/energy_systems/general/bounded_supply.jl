@@ -95,7 +95,7 @@ function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     else # check temperature
         energy_demand,
         temperature_min,
-        temperature_max = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
+        temperature_max, _ = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
     end
 
     if sum(energy_demand; init=0.0) < 0.0

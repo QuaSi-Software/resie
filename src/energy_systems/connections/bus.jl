@@ -602,7 +602,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
 
     # sanity check, as this situation should not happen
     if (caller_is_input && caller_is_output) || (!caller_is_input && !caller_is_output)
-        throw(ArgumentError("Error in connnection of components on bus \"$(unit.uac)\". " *
+        throw(ArgumentError("Error in connection of components on bus \"$(unit.uac)\". " *
                             "Caller must be input XOR output."))
     end
 
@@ -785,7 +785,7 @@ function inner_distribute!(unit::Bus)
             unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
                                                                                      temperature_lowest_max)
 
-            # exctract the alread distributed energy from balance table
+            # extract the already distributed energy from balance table
             already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
                                                                              1:2:(output_row.priority * 2 - 1)])
             already_distributed_input_temperatures = unit.balance_table[input_row.priority,
