@@ -296,7 +296,7 @@ mutable struct Profile
         elseif length(profile_timestamps_date) > 1 &&
                length(unique(diff_ignore_leap_days(profile_timestamps_date))) !== 1
             @error "The timestamp of the profile at $(file_path) has an inconsistent time step width! " *
-                   "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'!" *
+                   "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'! " *
                    "If the profile has no daylight savings, a 'time_zone' must not be given!"
             throw(InputError)
         end
@@ -505,8 +505,8 @@ function diff_ignore_leap_days(timestamps::Vector{DateTime})
 
         # Check if the range includes a leap day and adjust the difference
         if isleapyear(timestamps[i]) &&
-           month(timestamps[i - 1]) <= 2 && day(timestamps[i - 1]) <= 28 &&
-           month(timestamps[i]) >= 3 && day(timestamps[i]) >= 1
+           timestamps[i - 1] <= DateTime(year(timestamps[i - 1]), 02, 28, 23, 59, 59, 999) &&
+           timestamps[i] >= DateTime(year(timestamps[i]), 03, 01, 00, 00, 00, 000)
             diff = diff - Millisecond(86400000)  # equals 1 day
         end
         diffs[i - 1] = diff
