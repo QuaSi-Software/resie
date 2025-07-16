@@ -322,7 +322,7 @@
             "thermal_transmission_lid": 0.25,
             "thermal_transmission_barrel": 0.375,
             "thermal_transmission_bottom": 0.375,
-            "ground_temperature": 9.0,
+            "constant_ground_temperature": 9.0,
             "initial_load": 0.1
         },
         "TST_01_HZG_01_GRI": {

@@ -61,6 +61,7 @@ mutable struct SeasonalThermalStorage <: Component
     thermal_transmission_bottom::Float64
     ambient_temperature_profile::Union{Profile,Nothing}
     ambient_temperature::Temperature
+    ground_temperature_profile::Union{Profile,Nothing}
     ground_temperature::Temperature
     effective_ambient_temperature::Vector{Temperature}
 
@@ -97,6 +98,16 @@ mutable struct SeasonalThermalStorage <: Component
                                                                         "constant_ambient_temperature",
                                                                         uac;
                                                                         required=true)
+
+        constant_ground_temperature,
+        ground_temperature_profile = get_parameter_profile_from_config(config,
+                                                                       sim_params,
+                                                                       "ground_temperature",
+                                                                       "ground_temperature_profile_file_path",
+                                                                       "",
+                                                                       "constant_ground_temperature",
+                                                                       uac;
+                                                                       required=true)
 
         # Note: layer numbering starts at the bottom with index 1 and ends at the top with index number_of_layer_total
         return new(uac,                                            # uac
@@ -145,7 +156,8 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "thermal_transmission_bottom", 0.375), # [W/(m^2K)]
                    ambient_temperature_profile,                           # [°C]
                    constant_ambient_temperature,                          # ambient_temperature [°C]
-                   default(config, "ground_temperature", 12),             # [°C]
+                   ground_temperature_profile,                            # [°C]
+                   constant_ground_temperature,                           # ground_temperature [°C]
                    [],                                                    # effective_ambient_temperature corresponding to each layer [°C]          
                    # other
                    0.0,                                            # current_max_output_temperature
@@ -668,6 +680,10 @@ function control(unit::SeasonalThermalStorage,
 
     if unit.ambient_temperature_profile !== nothing
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    end
+
+    if unit.ground_temperature_profile !== nothing
+        unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
     end
 
     # effective ambient temperature for each layer of the STES
@@ -1285,7 +1301,8 @@ function output_values(unit::SeasonalThermalStorage)::Vector{String}
             "Load%",
             "Capacity",
             "LossesGains",
-            "CurrentMaxOutTemp"]
+            "CurrentMaxOutTemp",
+            "GroundTemperature"]
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
@@ -1303,6 +1320,8 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return -unit.losses
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
+    elseif key.value_key == "GroundTemperature"
+        return unit.ground_temperature
     end
     throw(KeyError(key.value_key))
 end
