@@ -216,6 +216,21 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
         unit.max_input_energy = sim_params["watt_to_wh"](unit.max_input_power * unit.probe_depth *
                                                          unit.number_of_probes)
     end
+
+    # check temperatures if limit_max_output_energy_to_avoid_pulsing is set to true in controller or unit:
+    # If the undisturbed ground temperature and the boreholewall temperature are initially too close to each 
+    # other, the energy draw will not start using limit_max_output_energy_to_avoid_pulsing.
+    controller_idx = findfirst(x -> x isa EnergySystems.CM_Negotiate_Temperature, unit.controller.modules)
+    if ((controller_idx !== nothing &&
+         unit.controller.modules[controller_idx].parameters["limit_max_output_energy_to_avoid_pulsing"] == true) ||
+        unit.limit_max_output_energy_to_avoid_pulsing == true) &&
+       abs(unit.borehole_current_wall_temperature - unit.soil_undisturbed_ground_temperature) <=
+       unit.unloading_temperature_spread / 2
+        @warn "In the geothermal probe field \"$(unit.uac)\", the \"boreholewall_start_temperature\" and the " *
+              "\"soil_undisturbed_ground_temperature\" are quite close to each other. This can cause problems at the " *
+              "beginning of the simulation if \"limit_max_output_energy_to_avoid_pulsing\" is set to true and the " *
+              "max_output_power is high. Consider a temperature difference of at least half the unloading temperature spread."
+    end
 end
 
 """
