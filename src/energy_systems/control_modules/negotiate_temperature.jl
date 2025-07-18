@@ -10,11 +10,11 @@ Currently implemented for
 Source components need to have the following functions:
     - get_output_temperature_bounds()
     - check_temperature_and_get_max_energy()
-    - calculate_output_energy_from_output_temperature() (for optimize_for_max_energy only)
+    - calculate_output_energy_from_output_temperature() (for "optimize" only)
 
 Target components need to have the following functions:
     - get_input_temperature_bounds()
-    - calculate_input_energy_from_input_temperature() (for optimize_for_max_energy only)
+    - calculate_input_energy_from_input_temperature() (for "optimize" only)
 
 """
 
@@ -33,7 +33,7 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
             "source_uac" => source_uac,
             "target_uac" => nothing,
             "temperature_mode" => "mean",
-            "limit_max_output_energy_to_avoid_pulsing" => true,
+            "limit_max_output_energy_to_avoid_pulsing" => false,
             "constant_output_temperature" => nothing,
             "optim_temperature_rel_tol" => 1e-5,   # Looser relative tolerance: 1e-3
             "optim_temperature_abs_tol" => 0.001,  # Looser absolute tolerance: 0.1
@@ -42,7 +42,7 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
 
         # check if the temperature mode is allowed
         allowed_parameter_temperature_mode = ["constant_temperature",
-                                              "optimize_for_max_energy",
+                                              "optimize",
                                               "mean",
                                               "upper",
                                               "lower"]
@@ -96,7 +96,7 @@ end
                                      target_uac::String,
                                      sim_params::Dict{String,Any})
 
-Depending on the control module, this function determines the temperauture and the maximum energy that can be extracted
+Depending on the control module, this function determines the temperature and the maximum energy that can be extracted
 from a given source. Several options are available:
 - Optimisation: Here, the temperature is optimized (within a given bound) to get the maximum possible energy between 
                 the source and the target component.
@@ -136,7 +136,7 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
         return nothing, 0.0
     end
 
-    if mod.parameters["temperature_mode"] == "optimize_for_max_energy"
+    if mod.parameters["temperature_mode"] == "optimize"
         return find_best_temperature_and_get_energy(mod,
                                                     calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,
