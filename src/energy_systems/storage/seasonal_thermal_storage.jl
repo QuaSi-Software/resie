@@ -122,7 +122,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "volume", nothing),             # volume of the STES [m^3]
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
                    default(config, "sidewall_angle", 0.0),         # angle of the sidewall of the STES with respect to the horizon [°]
-                   default(config, "shape", "cuboid"),             # can be "round" for cylinder/truncated cone or "cuboid" for tank or truncated quadratic pyramid (pit)
+                   default(config, "shape", "quadratic"),             # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
                    default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
                    default(config, "cp_medium", 4.18),             # specific thermal capacity of medium [kJ/kgK]
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
@@ -288,7 +288,7 @@ end
 
 Calculate the geometry of a seasonal thermal energy storage (STES) system, either as a 
 - cylinder or a truncated cone (shape == round) 
-- tank with quadratic base or a truncated quadratic pyramid (pit) (shape == cuboid)
+- tank with quadratic base or a truncated quadratic pyramid (pit) (shape == quadratic)
 
 # Arguments
 - `uac::String`: Unique identifier for the STES
@@ -297,7 +297,7 @@ Calculate the geometry of a seasonal thermal energy storage (STES) system, eithe
                     If `alpha` is 90, the storage is a cylinder.
 - `hr::Float64`: Height-to-radius ratio
 - `n_segments::Int64`: Number of segments to divide the storage into for calculation
-- `shape::String`: Shape of the STES, can be "round" for cylinder/truncated cone or "cuboid" for tank or 
+- `shape::String`: Shape of the STES, can be "round" for cylinder/truncated cone or "quadratic" for tank or 
                    truncated quadratic pyramid (pit)
 
 # Returns
@@ -332,7 +332,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         a_bottom = a_lid
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius, radius
-    elseif alpha == 90 && shape == "cuboid"  # cuboid with square cross-section 
+    elseif alpha == 90 && shape == "quadratic"  # cuboid with square cross-section 
         # calculate radius and height of cuboid
         side_length = cbrt(2 * volume / hr)
         height = hr * (side_length / 2)
@@ -379,7 +379,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         end
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius_small, radius_large
-    elseif shape == "cuboid"   # truncated quadratic pyramid (pit)
+    elseif shape == "quadratic"   # truncated quadratic pyramid (pit)
         alpha_rad = deg2rad(alpha)
         alpha_tan = tan(alpha_rad)
 
@@ -423,12 +423,13 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
             v_section[i] = (dh / 3) * (a_bot^2 + a_bot * a_up + a_up^2)
 
             # Segment-lateral area
-            l_seg = sqrt(((a_bot - a_up) / 2)^2 + dh^2)
-            a_lat[i] = 2 * (a_bot + a_up) * l_seg
+            l_side_segment = sqrt(dh^2 + (a_up - a_bot)^2 / 2)
+            h_trapeze = sqrt(l_side_segment^2 - ((a_up - a_bot) / 2)^2)
+            a_lat[i] = 2 * (a_bot + a_up) * h_trapeze
         end
         return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
     else
-        @error "Invalid shape type of seasonal thermal storage $(unit.uac). Shape has to be 'round' or 'cuboid'!"
+        @error "Invalid shape type of seasonal thermal storage $(unit.uac). Shape has to be 'round' or 'quadratic'!"
         throw(InputError)
     end
 end
@@ -460,7 +461,7 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
 
     # Plot geometry of STES: 3D
     Plots.plotlyjs()
-    if unit.shape == "cuboid"
+    if unit.shape == "quadratic"
         # — Cuboid setup — 
         r1 = unit.radius_small    # 1/2 of the bottom side length
         r2 = unit.radius_large    # 1/2 of the top side length
