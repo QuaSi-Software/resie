@@ -107,7 +107,7 @@ end
 
 Checks if the given input/output row is "empty".
 
-Empty in this regard means if an energy potential or pool (utilised energy) has been
+Empty in this regard means if an energy potential or pool (utilized energy) has been
 written.
 
 # Arguments
@@ -123,7 +123,7 @@ function is_empty(row::Union{BTInputRow,BTOutputRow})::Bool
 end
 
 """
-Imnplementation of a bus component for balancing multiple inputs and outputs.
+Implementation of a bus component for balancing multiple inputs and outputs.
 
 This component is both a possible real energy system component (mostly for electricity) as
 well as a necessary abstraction of the model. The basic idea is that one or more components
@@ -191,7 +191,7 @@ end
 """
     Bus(uac, medium, epsilon)
 
-Contstructor for a Bus that creates a mostly empty bus with the minimal parameters.
+Constructor for a Bus that creates a mostly empty bus with the minimal parameters.
 
 # Arguments
 `uac::String`: The UAC of the new bus
@@ -265,55 +265,6 @@ function reset(unit::Bus)
 end
 
 """
-    balance_nr(unit, caller)
-
-TODO: This function is never called?!
-
-Variant of [`balance`](@ref) that includes other connected bus components and their energy
-balance, but does so in a non-recursive manner such that any bus in the chain of connected
-bus components is only considered once.
-"""
-function balance_nr(unit::Bus, caller::Bus)::Float64
-    blnc = 0.0
-
-    for inface in unit.input_interfaces # supply
-        if inface.source == caller
-            continue
-        end
-
-        if isa(inface.source, Bus)
-            other_bus_balance = balance_nr(inface.source, unit)
-            balance_supply = max(other_bus_balance, inface.balance)
-            if balance_supply < 0.0
-                continue
-            end
-        else
-            balance_supply = balance(balance_on(inface, inface.source))
-        end
-        blnc += balance_supply
-    end
-
-    for outface in unit.output_interfaces # demand
-        if outface.target == caller
-            continue
-        end
-
-        if isa(outface.target, Bus)
-            other_bus_balance = balance_nr(outface.target, unit)
-            balance_demand = min(other_bus_balance, outface.balance)
-            if balance_demand > 0.0
-                continue
-            end
-        else
-            balance_demand = balance(balance_on(outface, outface.target))
-        end
-        blnc += balance_demand
-    end
-
-    return blnc + unit.remainder
-end
-
-"""
     balance_direct(unit)
 
 Energy balance on a bus component without considering any other connected bus components.
@@ -344,7 +295,7 @@ end
 
 function balance(unit::Bus)::Float64
     # if there is a proxy bus, the balance is only correct on its calculation, which happens
-    # seperately. if there is no proxy, there are also no bus components connected to the
+    # separately. if there is no proxy, there are also no bus components connected to the
     # given bus
     return balance_direct(unit)
 end
@@ -558,7 +509,7 @@ very important for the correct energy flow calculations.
 Because components, on a bus, communicate via balance_on with other components, the internal
 balance calculation in some sense replaces the individual calculations of each component.
 
-If a chain of busses has been set up with a proxy, the prinicipal busses relay the call to
+If a chain of busses has been set up with a proxy, the principal busses relay the call to
 balance_on to the proxy bus and return the results. From the perspective of the non-bus
 components this behaves the same, but allows for communication and energy flow across all
 busses of the chain.
@@ -569,7 +520,7 @@ busses of the chain.
 
 # Returns
 `Vector{EnergyExchange}`: A list of energy exchanges, each of which encode one potential
-    source or target for the component requesting a balance calcultion.
+    source or target for the component requesting a balance calculation.
 """
 function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchange}
     if unit.proxy !== nothing
@@ -950,7 +901,7 @@ List of all outputs to the given bus, including all outputs from outgoing busses
 recursively.
 
 The components are ordered according to the output priorities of each bus, where the list
-of any bus in inserted in place of the output priority of that bus in the preceeding bus.
+of any bus in inserted in place of the output priority of that bus in the preceding bus.
 
 # Arguments
 `unit::Bus`: The bus from which to start the recursive descent
@@ -973,7 +924,7 @@ end
 """
     bus_transfer_sum(proxy, left_bus, right_bus)
 
-Sum of energy that was transfered from the left bus to the right bus.
+Sum of energy that was transferred from the left bus to the right bus.
 
 # Arguments
 `proxy::Bus`: The proxy bus to both busses
@@ -981,7 +932,7 @@ Sum of energy that was transfered from the left bus to the right bus.
 `right::Bus`: The bus receiving energy
 
 # Returns
-`Float64`: The sum of energy transfered
+`Float64`: The sum of energy transferred
 """
 function bus_transfer_sum(proxy::Bus, left::Bus, right::Bus)::Float64
     transfer_sum = 0.0
@@ -1007,7 +958,7 @@ end
 
 Bus-specific implementation of distribute!.
 
-This balances the busses in the chain and sets the energy transfered between busses as the
+This balances the busses in the chain and sets the energy transferred between busses as the
 value on the connecting interfaces. The actual balancing is done in the balance table
 calculations of balance_on, so this serves as the last call to distribution functions at the
 end of a timestep. The function is designed to work both for single busses and busses in a
