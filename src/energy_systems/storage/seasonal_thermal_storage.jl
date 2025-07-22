@@ -121,10 +121,10 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # capacity of the STES [Wh]
                    default(config, "volume", nothing),             # volume of the STES [m^3]
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
-                   default(config, "sidewall_angle", 0.0),         # angle of the sidewall of the STES with respect to the horizon [°]
-                   default(config, "shape", "quadratic"),             # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
+                   default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
+                   default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
                    default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.18),             # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "cp_medium", 4.186),            # specific thermal capacity of medium [kJ/kgK]
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
                    0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
                    0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
@@ -144,8 +144,8 @@ mutable struct SeasonalThermalStorage <: Component
                    [],                                             # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
                    [],                                             # layer_masses, mass of the medium in each layer [kg]
                    # loading and unloading
-                   default(config, "high_temperature", 75.0),      # upper temperature of the STES [°C]
-                   default(config, "low_temperature", 20),         # lower temperature of the STES [°C]
+                   default(config, "high_temperature", 90.0),      # upper temperature of the STES [°C]
+                   default(config, "low_temperature", 15.0),       # lower temperature of the STES [°C]
                    default(config, "max_load_rate", nothing),      # maximum load rate given in 1/h
                    default(config, "max_unload_rate", nothing),    # maximum unload rate given in 1/h
                    nothing,                                        # max_input_energy, maximum input energy per time step [Wh]
