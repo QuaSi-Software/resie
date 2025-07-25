@@ -50,8 +50,10 @@ mutable struct SeasonalThermalStorage <: Component
     # loading and unloading
     high_temperature::Temperature
     low_temperature::Temperature
-    max_load_rate::Floathing
-    max_unload_rate::Floathing
+    max_load_rate_energy::Floathing
+    max_unload_rate_energy::Floathing
+    max_load_rate_mass::Floathing
+    max_unload_rate_mass::Floathing
     max_input_energy::Floathing
     max_output_energy::Floathing
 
@@ -83,6 +85,8 @@ mutable struct SeasonalThermalStorage <: Component
 
     # additional output
     temp_distribution_output::Array{Float64}
+    mass_in_sum::Float64
+    mass_out_sum::Float64
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -146,8 +150,10 @@ mutable struct SeasonalThermalStorage <: Component
                    # loading and unloading
                    default(config, "high_temperature", 90.0),      # upper temperature of the STES [°C]
                    default(config, "low_temperature", 15.0),       # lower temperature of the STES [°C]
-                   default(config, "max_load_rate", nothing),      # maximum load rate given in 1/h
-                   default(config, "max_unload_rate", nothing),    # maximum unload rate given in 1/h
+                   default(config, "max_load_rate_energy", nothing),   # maximum load rate given in 1/h, total energy input related to the total energy capacity of the STES
+                   default(config, "max_unload_rate_energy", nothing), # maximum unload rate given in 1/h, total energy input related to the total volume of the STES
+                   default(config, "max_load_rate_mass", nothing),     # maximum load rate given in 1/h, mass flow per Interface related to the total volume of the STES
+                   default(config, "max_unload_rate_mass", nothing),   # maximum unload rate given in 1/h, mass flow in total related to the total volume of the STES
                    nothing,                                        # max_input_energy, maximum input energy per time step [Wh]
                    nothing,                                        # max_output_energy, maximum output energy per time step [Wh]
                    # Losses
@@ -175,7 +181,9 @@ mutable struct SeasonalThermalStorage <: Component
                    [],                                             # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
                    0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
                    # additional output
-                   Array{Float64}(undef, 0, 0))                    # temp_distribution_output [°C], holds temperature field of layers for output plot
+                   Array{Float64}(undef, 0, 0),                    # temp_distribution_output [°C], holds temperature field of layers for output plot
+                   0.0,                                            # mass_in_sum [kg]
+                   0.0)                                            # mass_out_sum [kg]
     end
 end
 
@@ -248,15 +256,16 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.load_end_of_last_timestep = copy(unit.load)
 
     # calculate maximum input and output energy
-    if unit.max_load_rate === nothing
+    if unit.max_load_rate_energy === nothing
         unit.max_input_energy = Inf
     else
-        unit.max_input_energy = unit.max_load_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)     # [Wh per timestep]
+        unit.max_input_energy = unit.max_load_rate_energy * unit.capacity * (sim_params["time_step_seconds"] / 60 / 60)     # [Wh per timestep]
     end
-    if unit.max_unload_rate === nothing
+    if unit.max_unload_rate_energy === nothing
         unit.max_output_energy = Inf
     else
-        unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+        unit.max_output_energy = unit.max_unload_rate_energy * unit.capacity *
+                                 (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
     # vector to hold the results of the temperatures for each layer in each simulation time step
@@ -429,7 +438,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         end
         return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
     else
-        @error "Invalid shape type of seasonal thermal storage $(unit.uac). Shape has to be 'round' or 'quadratic'!"
+        @error "Invalid shape type of seasonal thermal storage $(uac). Shape has to be 'round' or 'quadratic'!"
         throw(InputError)
     end
 end
@@ -664,7 +673,9 @@ function control(unit::SeasonalThermalStorage,
         max_input_energy[input_idx] = min(calculate_max_input_energy_by_temperature(unit,
                                                                                     temperature,
                                                                                     unit.temperature_segments),
-                                          min(unit.max_input_energy, energy_supply[input_idx]))
+                                          min(min(current_max_input_energy_vol(unit, temperature, sim_params),
+                                                  unit.max_input_energy),
+                                              energy_supply[input_idx]))
     end
     if isempty(temperatures_charging)
         max_input_energy = [0.0]
@@ -675,7 +686,18 @@ function control(unit::SeasonalThermalStorage,
                     temperatures_charging, source_uac, false, true)
 
     # calculate maximum energies for output
-    unit.current_max_output_energy = max(min(unit.load, unit.max_output_energy), 0.0)
+    if unit.max_unload_rate_mass !== nothing
+        current_max_output_energy_from_mass = convert_mass_in_energy(unit.max_unload_rate_mass * unit.volume *
+                                                                     unit.rho_medium *
+                                                                     (sim_params["time_step_seconds"] / 60 / 60),
+                                                                     unit.low_temperature,
+                                                                     unit.current_max_output_temperature,
+                                                                     unit.cp_medium)
+        unit.current_max_output_energy = max(min(min(unit.load, unit.max_output_energy),
+                                                 current_max_output_energy_from_mass), 0.0)
+    else
+        unit.current_max_output_energy = max(min(unit.load, unit.max_output_energy), 0.0)
+    end
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
                     unit.current_max_output_temperature)
 
@@ -718,6 +740,20 @@ function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{
     end
 end
 
+function current_max_input_energy_vol(unit::SeasonalThermalStorage, temp_in::Temperature,
+                                      sim_params::Dict{String,Any})::Float64
+    if unit.max_load_rate_mass === nothing
+        return Inf
+    else
+        # calculate maximum energy from mass flow / volume limit for current temperature
+        return convert_mass_in_energy(unit.max_load_rate_mass * unit.volume * unit.rho_medium *
+                                      (sim_params["time_step_seconds"] / 60 / 60),
+                                      unit.temperature_segments[1],
+                                      temp_in,
+                                      unit.cp_medium)
+    end
+end
+
 # This function will only be called from a Bus, never in a 1-to-1 connection to another component.
 # energy_input and temperatures_input are all inputs that have already been put into the STES.
 function recalculate_max_energy(unit::SeasonalThermalStorage,
@@ -743,7 +779,8 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
         max_energy.max_energy[input_idx] = min(calculate_max_input_energy_by_temperature(unit,
                                                                                          temperature,
                                                                                          temperature_segments_temporary),
-                                               min(unit.max_input_energy - sum(energy_input; init=0.0),
+                                               min(min(unit.max_input_energy - sum(energy_input; init=0.0),
+                                                       current_max_input_energy_vol(unit, temperature, sim_params)),
                                                    max_energy.max_energy[input_idx]))
     end
 
@@ -940,12 +977,14 @@ function update_STES(unit::SeasonalThermalStorage,
 
     # Check if the mass flow is greater than the volume of the smallest segment. 
     # If yes, the internal time step is reduced to avoid numerical instabilities.
-    mass_out_sum = sum(mass_out; init=0.0)
-    mass_in_sum = sum(mass_in; init=0.0)
+    unit.mass_out_sum = sum(mass_out; init=0.0)
+    unit.mass_in_sum = sum(mass_in; init=0.0)
     mass_of_smallest_segment = minimum(unit.volume_segments) * unit.rho_medium
     factor = 5
-    if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && (mass_out_sum > 0.0 || mass_in_sum > 0.0)
-        number_of_internal_timesteps = ceil(max(mass_out_sum, mass_in_sum) / (mass_of_smallest_segment / factor))
+    if max(unit.mass_out_sum, unit.mass_in_sum) > (mass_of_smallest_segment / factor) &&
+       (unit.mass_out_sum > 0.0 || unit.mass_in_sum > 0.0)
+        number_of_internal_timesteps = ceil(max(unit.mass_out_sum, unit.mass_in_sum) /
+                                            (mass_of_smallest_segment / factor))
         if number_of_internal_timesteps > 10000
             number_of_internal_timesteps = 10000
             @warn "In STES $(unit.uac), a very high internal time step has been determined. " *
@@ -1303,7 +1342,14 @@ function output_values(unit::SeasonalThermalStorage)::Vector{String}
             "Capacity",
             "LossesGains",
             "CurrentMaxOutTemp",
-            "GroundTemperature"]
+            "GroundTemperature",
+            "MassInput",
+            "MassOutput",
+            "Temperature_upper",
+            "Temperature_three_quarter",
+            "Temperature_middle",
+            "Temperature_one_quarter",
+            "Temperature_lower"]
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
@@ -1323,6 +1369,20 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return unit.current_max_output_temperature
     elseif key.value_key == "GroundTemperature"
         return unit.ground_temperature
+    elseif key.value_key == "MassInput"
+        return unit.mass_in_sum
+    elseif key.value_key == "MassOutput"
+        return unit.mass_out_sum
+    elseif key.value_key == "Temperature_lower"
+        return unit.temperature_segments[1]
+    elseif key.value_key == "Temperature_one_quarter"
+        return unit.temperature_segments[Int(round(0.25 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_middle"
+        return unit.temperature_segments[Int(round(0.5 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_three_quarter"
+        return unit.temperature_segments[Int(round(0.75 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_upper"
+        return unit.temperature_segments[end]
     end
     throw(KeyError(key.value_key))
 end
