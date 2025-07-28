@@ -710,9 +710,9 @@ function control(unit::SeasonalThermalStorage,
     end
 
     # effective ambient temperature for each layer of the STES
-    unit.effective_ambient_temperature = vcat(fill(unit.ambient_temperature, unit.number_of_layer_above_ground),
-                                              fill(unit.ground_temperature,
-                                                   unit.number_of_layer_total - unit.number_of_layer_above_ground))
+    unit.effective_ambient_temperature = vcat(fill(unit.ground_temperature,
+                                                   unit.number_of_layer_total - unit.number_of_layer_above_ground),
+                                              fill(unit.ambient_temperature, unit.number_of_layer_above_ground))
 end
 
 # This function sets the current_min_input_temperature and current_max_output_temperature 
@@ -1018,16 +1018,16 @@ function update_STES(unit::SeasonalThermalStorage,
             if n == 1  # bottom layer, single-side
                 t_new[n] = t_old[n] +
                            consider_losses *
-                           (3600 * unit.diffusion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through bottom and side walls
+                           (3600 * unit.diffusion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through bottom and side walls
                            # unit.lambda[n] * (Q_in_out)[n] +                                                            # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
             elseif n == unit.number_of_layer_total  # top layer, single-side
                 t_new[n] = t_old[n] +
                            consider_losses *
-                           (3600 * unit.diffusion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through lid and side walls
+                           (3600 * unit.diffusion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through lid and side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1036,7 +1036,7 @@ function update_STES(unit::SeasonalThermalStorage,
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
                             unit.dz_normalized[n]^2 +                                                                    # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through side walls
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
