@@ -434,17 +434,16 @@ If a leap day is in between, it is not counted!
 """
 function add_ignoring_leap_days(timestamp::DateTime, diff::Period)
     new_time = timestamp + diff
-    nr_of_leap_days = 0
     for year in year(timestamp):year(new_time)
         if isleapyear(year)
             leap_day = Date(year, 2, 29)
             if leap_day >= Date(timestamp) && leap_day <= Date(new_time)
-                nr_of_leap_days += 1
+                new_time += Day(1)
             end
         end
     end
 
-    return new_time + nr_of_leap_days * Day(1)
+    return new_time
 end
 
 """
@@ -455,17 +454,16 @@ If a leap day is in between, it is not counted!
 """
 function sub_ignoring_leap_days(timestamp::DateTime, diff::Period)
     new_time = timestamp - diff
-    nr_of_leap_days = 0
     for year in year(new_time):year(timestamp)
         if isleapyear(year)
             leap_day = Date(year, 2, 29)
             if leap_day <= Date(timestamp) && leap_day >= Date(new_time)
-                nr_of_leap_days += 1
+                new_time -= Day(1)
             end
         end
     end
 
-    return new_time - nr_of_leap_days * Day(1)
+    return new_time
 end
 
 """
