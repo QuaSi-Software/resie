@@ -129,7 +129,7 @@ mutable struct WeatherData
                                        shift=Second(0),
                                        interpolation_type=weather_interpolation_type_general)
 
-            sunrise, sunset = calc_sunrise_sunset(timestamps, temp_ambient_air, sim_params)
+            sunrise, sunset = calc_sunrise_sunset(timestamps, time_step, temp_ambient_air, sim_params)
 
             # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
             #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
@@ -209,7 +209,7 @@ mutable struct WeatherData
                                  shift=Second(30 * 60),
                                  interpolation_type=weather_interpolation_type_general)
 
-            sunrise, sunset = calc_sunrise_sunset(timestamps, temp_ambient_air, sim_params)
+            sunrise, sunset = calc_sunrise_sunset(timestamps, time_step, temp_ambient_air, sim_params)
 
             # convert solar radiation data to profile
             # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
@@ -257,6 +257,7 @@ Function calculate sunrise and sunset time for given timestamps.
 # Arguments
     `timestamps::Vector{DateTime}`: Vector of timestamps for which the sunrise and sunset
                                     should be calculated.
+    `time_step`::Second`:           Time step width for profiles of sunrise and sunset.
     `temp_ambient_air::Profile`:    A profile with ambient air temperature at the location.
                                     Used to calculate the yearly average air temperature.
     `sim_params::Dict{String,Any}`: Simulation parameters.
@@ -266,7 +267,7 @@ Function calculate sunrise and sunset time for given timestamps.
     `sunset::Profile`:  Profile with times of sunset as fractional hour.
 """
 
-function calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile, 
+function calc_sunrise_sunset(timestamps::Vector{DateTime}, time_step::Second, temp_ambient_air::Profile, 
                              sim_params::Dict{String,Any})
     # calculate sunrise and sunset times for each timestamp
     sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
