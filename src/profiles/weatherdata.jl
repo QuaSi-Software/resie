@@ -123,41 +123,7 @@ mutable struct WeatherData
                                        shift=Second(0),
                                        interpolation_type=weather_interpolation_type_general)
 
-            # calculate sunrise and sunset times for each timestamp
-            sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
-            ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
-            calculated_sr_dates = Date[]
-            average_yearly_temperature = Base.sum((values(temp_ambient_air.data))) / length(temp_ambient_air.data)
-            for (idx, timestamp) in enumerate(timestamps)
-                if Date(timestamp) in calculated_sr_dates
-                    sr_arr[idx] = sr_arr[idx-1]
-                    ss_arr[idx] = ss_arr[idx-1]
-                else
-                    push!(calculated_sr_dates, Date(timestamp))
-                    sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
-                                                sim_params["latitude"],
-                                                sim_params["longitude"],
-                                                sim_params["timezone"],
-                                                1.0,
-                                                average_yearly_temperature)
-                end
-            end
-            sunrise = Profile("sunrise_times",
-                              sim_params;
-                              given_profile_values=sr_arr,
-                              given_timestamps=timestamps,
-                              given_time_step=time_step,
-                              given_data_type="intensive",
-                              shift=Second(0),
-                              interpolation_type="stepwise")
-            sunset = Profile("sunset_times",
-                             sim_params;
-                             given_profile_values=ss_arr,
-                             given_timestamps=timestamps,
-                             given_time_step=time_step,
-                             given_data_type="intensive",
-                             shift=Second(0),
-                             interpolation_type="stepwise") 
+            sunrise, sunset = calc_sunrise_sunset(timestamps, temp_ambient_air, sim_params)
 
             # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
             #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
@@ -237,41 +203,7 @@ mutable struct WeatherData
                                  shift=Second(30 * 60),
                                  interpolation_type=weather_interpolation_type_general)
 
-            # calculate sunrise and sunset times for each timestamp
-            sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
-            ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
-            calculated_sr_dates = Date[]
-            average_yearly_temperature = Base.sum((values(temp_ambient_air.data))) / length(temp_ambient_air.data)
-            for (idx, timestamp) in enumerate(timestamps)
-                if Date(timestamp) in calculated_sr_dates
-                    sr_arr[idx] = sr_arr[idx-1]
-                    ss_arr[idx] = ss_arr[idx-1]
-                else
-                    push!(calculated_sr_dates, Date(timestamp))
-                    sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
-                                                sim_params["latitude"],
-                                                sim_params["longitude"],
-                                                sim_params["timezone"],
-                                                1.0,
-                                                average_yearly_temperature)
-                end
-            end
-            sunrise = Profile("sunrise_times",
-                              sim_params;
-                              given_profile_values=sr_arr,
-                              given_timestamps=timestamps,
-                              given_time_step=time_step,
-                              given_data_type="intensive",
-                              shift=Second(0),
-                              interpolation_type="stepwise")
-            sunset = Profile("sunset_times",
-                             sim_params;
-                             given_profile_values=ss_arr,
-                             given_timestamps=timestamps,
-                             given_time_step=time_step,
-                             given_data_type="intensive",
-                             shift=Second(0),
-                             interpolation_type="stepwise")
+            sunrise, sunset = calc_sunrise_sunset(timestamps, temp_ambient_air, sim_params)
 
             # convert solar radiation data to profile
             # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
@@ -308,6 +240,65 @@ mutable struct WeatherData
                    sunset)
                    
     end
+end
+
+"""
+    calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile, 
+                        sim_params::Dict{String,Any})
+
+Function calculate sunrise and sunset time for given timestamps.
+
+# Arguments
+    `timestamps::Vector{DateTime}`: Vector of timestamps for which the sunrise and sunset
+                                    should be calculated.
+    `temp_ambient_air::Profile`:    A profile with ambient air temperature at the location.
+                                    Used to calculate the yearly average air temperature.
+    `sim_params::Dict{String,Any}`: Simulation parameters.
+
+# Returns
+    `sunrise::Profile`: Profile with times of sunrise as fractional hour.
+    `sunset::Profile`:  Profile with times of sunset as fractional hour.
+"""
+
+function calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile, 
+                             sim_params::Dict{String,Any})
+    # calculate sunrise and sunset times for each timestamp
+    sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
+    ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
+    calculated_sr_dates = Date[]
+    average_yearly_temperature = Base.sum((values(temp_ambient_air.data))) / 
+                                 length(temp_ambient_air.data)
+    for (idx, timestamp) in enumerate(timestamps)
+        if Date(timestamp) in calculated_sr_dates
+            sr_arr[idx] = sr_arr[idx-1]
+            ss_arr[idx] = ss_arr[idx-1]
+        else
+            push!(calculated_sr_dates, Date(timestamp))
+            sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
+                                        sim_params["latitude"],
+                                        sim_params["longitude"],
+                                        sim_params["timezone"],
+                                        1.0,
+                                        average_yearly_temperature)
+        end
+    end
+    sunrise = Profile("sunrise_times",
+                        sim_params;
+                        given_profile_values=sr_arr,
+                        given_timestamps=timestamps,
+                        given_time_step=time_step,
+                        given_data_type="intensive",
+                        shift=Second(0),
+                        interpolation_type="stepwise")
+    sunset = Profile("sunset_times",
+                        sim_params;
+                        given_profile_values=ss_arr,
+                        given_timestamps=timestamps,
+                        given_time_step=time_step,
+                        given_data_type="intensive",
+                        shift=Second(0),
+                        interpolation_type="stepwise")
+    return sunrise, sunset
 end
 
 """
