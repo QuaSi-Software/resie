@@ -6,12 +6,6 @@ using Resie.SolarIrradiance
 Implementation of a solarthermal collector.
 Works for flat plate collectors, vacuum tube collectors and PVT modules.
 The calculation is based on EN ISO 9806:2017 for quasi-dynamic models.
-
-Stagnation is ignored under the assumption that the system has either measures to prevent 
-stagnation harming the collectors or the designed size is small enough in comparison to 
-the global system for stagnation not to become a problem.
-
-## ATTENTION: solarthermal heat collector is currently work in progress and not completed!!
 """
 
 mutable struct SolarthermalCollector <: Component
@@ -25,16 +19,16 @@ mutable struct SolarthermalCollector <: Component
     m_heat_out::Symbol
     # collector installation
     collector_gross_area::Float64
-    tilt_angle::Float32
-    azimuth_angle::Float32
+    tilt_angle::Float64
+    azimuth_angle::Float64
     ground_reflectance::Float64
     # collector parameters
-    eta_0_b::Float32
-    K_b_array::Array{Union{Missing,Float32},2}
-    K_b_itp::Any
-    K_b::Float32
-    K_d::Float32
-    a_params::Array{Float32,1}
+    eta_0_b::Float64
+    K_b_array::Array{Union{Missing,Float64},2}
+    K_b_itp::Tuple{AbstractArray}
+    K_b::Float64
+    K_d::Float64
+    a_params::Array{Float64,1}
     sigma::Float64
     vol_heat_cap::Float64
     # weather profiles
@@ -44,19 +38,19 @@ mutable struct SolarthermalCollector <: Component
     long_wave_irradiance_profile::Union{Profile,Nothing}
     wind_speed_profile::Union{Profile,Nothing}
     # weather parameters
-    wind_speed_reduction::Float32 
+    wind_speed_reduction::Float64 
     ambient_temperature::Temperature
-    beam_solar_irradiance_in_plane::Float32
-    diffuse_solar_irradiance_in_plane::Float32
+    beam_solar_irradiance_in_plane::Float64
+    diffuse_solar_irradiance_in_plane::Float64
     reduced_wind_speed::Floathing
     beam_solar_hor_irradiance::Floathing
     diffuse_solar_hor_irradiance::Floathing
     long_wave_irradiance::Floathing
-    direct_normal_irradiance::Float32
+    direct_normal_irradiance::Float64
     # operation parameters
-    delta_T::Union{Float32,Nothing}
+    delta_T::Union{Float64,Nothing}
     spec_flow_rate::Floathing
-    delta_T_min::Union{Float32,Nothing}
+    delta_T_min::Union{Float64,Nothing}
     spec_flow_rate_min::Floathing
     # results
     used_energy::Float64
@@ -71,7 +65,7 @@ mutable struct SolarthermalCollector <: Component
     runtimes::Array{Floathing}
     temperature_energy_pairs::Dict{Temperature,Tuple}
     calc_uacs::Array{Stringing}
-    mean_ambient_temperature::Float32
+    mean_ambient_temperature::Float64
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         const_ambient_temperature, 
@@ -630,21 +624,21 @@ function check_temperature_and_get_max_energy(unit::SolarthermalCollector,
 end
 
 """
-    init_K_b(K_b_array::Array{Union{Missing,Float32},2})
+    init_K_b(K_b_array::Array{Union{Missing,Float64},2})
 
 Calculate K_b based on a table with provided values for longitudinal and transversal angles 
 and the angle of irradiance on the plane of the solarthermal collector.
 Table with provided values is mirrored for negative angles.
 
 # Arguments
-- `K_b_array::Array{Union{Missing,Float32},2}`: Simulation parameters.
+- `K_b_array::Array{Union{Missing,Float64},2}`: Simulation parameters.
 
 # Returns
 Returns a tuple containing two interpolation objects:
 - interpolation object for transversal K_b value.
 - interpolation object for longitudinal K_b value.
 """
-function init_K_b(K_b_array::Array{Union{Missing,Float32},2})
+function init_K_b(K_b_array::Array{Union{Missing,Float64},2})
     K_b_array = hcat([0, 1, 1], K_b_array)
     K_b_array[:, 10] = [90, 0, 0]
     angle_range = K_b_array[1, 1]:10:K_b_array[1, end]
@@ -839,10 +833,8 @@ end
 
 function output_values(unit::SolarthermalCollector)::Vector{String}
     return [string(unit.m_heat_out) * " OUT",
-            "Temperature",
-            "Max_Energy",
-            "Average_Temperature",
-            "Used_Energy",
+            "Temperature_Output",
+            "Temperature_Mean_Collector",
             "direct_normal_irradiance",
             "beam_solar_irradiance_in_plane",
             "diffuse_solar_irradiance_in_plane",
@@ -853,12 +845,10 @@ end
 function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
     if key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif key.value_key == "Temperature"
+    elseif key.value_key == "Temperature_Output"
         return unit.output_temperature
-    elseif key.value_key == "Average_Temperature"
+    elseif key.value_key == "Temperature_Mean_Collector"
         return unit.average_temperature
-    elseif key.value_key == "Used_Energy"
-        return unit.used_energy
     elseif key.value_key == "direct_normal_irradiance"
         return unit.direct_normal_irradiance
     elseif key.value_key == "beam_solar_irradiance_in_plane"

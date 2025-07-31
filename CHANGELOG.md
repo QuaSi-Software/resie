@@ -62,7 +62,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * correct input variable naming for ambient temperature in buffer tank and geothermal collector
 
 ### Version 0.10.4
-* Update of buffer tank / STES model. Now three different models are available, each with and without losses:
+* Update of buffer tank / STTES model. Now three different models are available, each with and without losses:
   * ideally stratified: Supplies energy consistently at "high_temperature". Losses reduce energy but do not affect temperature.
   * ideally mixed: Fully mixed model, with temperature output depending on the current load. Losses decrease both energy and temperature.
   * balanced: Combines both models. A full tank behaves as ideally stratified, transitioning to ideally mixed as the tank empties.

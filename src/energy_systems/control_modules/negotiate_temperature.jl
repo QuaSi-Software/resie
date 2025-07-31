@@ -136,7 +136,23 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
         return nothing, 0.0
     end
 
+    # check for activated hysteresis
+    if mod.parameters["use_hysteresis"]
+        if mod.parameters["running"] == false && mod.parameters["hysteresis_temp_on"] <= source_max_out_temperature
+            # run
+            mod.parameters["running"] = true
+        elseif mod.parameters["running"] == true &&
+               mod.parameters["hysteresis_temp_off"] > source_max_out_temperature
+            # do not run
+            mod.parameters["running"] = false
+        end
+        if mod.parameters["running"] == false
+            return nothing, 0.0
+        end
+    end
+
     if mod.parameters["temperature_mode"] == "optimize"
+        # use optimization to determine the temperature for the maximum energy delivery from source to target
         return find_best_temperature_and_get_energy(mod,
                                                     calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,

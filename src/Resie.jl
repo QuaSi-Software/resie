@@ -210,12 +210,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     # reset CSV file
     if do_write_CSV
-        try
-            reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
-        catch
-            csv_output_file_path = replace(csv_output_file_path, ".csv" => "_1.csv")
-            reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
-        end
+        reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
     end
 
     # check if sankey should be plotted

@@ -61,11 +61,6 @@ function sun_position(dt::DateTime, time_step_seconds::Number, longitude::Number
     azimuth = atan(sH, cH * sp - sd * cp / cd)
 
     epr = max((0.08422 * pressure) / ((273.0 + temperature) * tan(ep + 0.003138 / (ep + 0.08919))), 0)
-    # if epr > 0.0
-    #     zenith = pi/2 - ep - epr
-    # else
-    #     zenith = pi/2 - ep
-    # end
     zenith = pi/2 - ep - epr
     return rad2deg(zenith), rad2deg(azimuth)
 end
