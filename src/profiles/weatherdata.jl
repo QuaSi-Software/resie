@@ -8,6 +8,12 @@ using Resie.SolarIrradiance
 export WeatherData, gather_weather_data, get_weather_data_keys
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
 """
 mutable struct WeatherData
     """Ambient air temperature, in °C."""

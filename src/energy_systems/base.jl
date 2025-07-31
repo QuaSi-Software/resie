@@ -28,6 +28,12 @@ using ..Profiles
 using UUIDs
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
 Convenience function to get the value of a key from a config dict using a default value.
 """
 default(config::Dict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
@@ -1819,18 +1825,8 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
     # 1. If a constant value is specified
     if haskey(config, constant_key) && config[constant_key] isa Number
         val = Float64(config[constant_key])
-        timestamps = remove_leap_days(collect(range(sim_params["start_date"]; stop=sim_params["end_date"], 
-                                                    step=Second(sim_params["time_step_seconds"]))))
-        const_profile = Profile(constant_key,
-                                sim_params;
-                                given_profile_values=fill(val, sim_params["number_of_time_steps"]),
-                                given_timestamps=timestamps,
-                                given_time_step=Second(sim_params["time_step_seconds"]),
-                                given_data_type="intensive",
-                                shift=Second(0),
-                                interpolation_type="stepwise")
         @info "For '$uac', the '$param_symbol' is set to the constant value of $val."
-        return val, const_profile
+        return val, nothing
     end
 
     # 2. If a `.prf` file path is specified
