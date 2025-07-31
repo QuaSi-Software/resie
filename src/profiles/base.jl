@@ -280,16 +280,18 @@ mutable struct Profile
         temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
         if profile_timestamps_date[1] > sim_params["start_date"] &&
            profile_timestamps_date[1] - temp_diff <= sim_params["start_date"]
-            while profile_timestamps_date[1] > sim_params["start_date"]
+            while profile_timestamps_date[1] > sim_params["start_date"] 
                 profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
                                             profile_timestamps_date)
                 profile_values = vcat(profile_values[1], profile_values)
             end
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the first value."
         end
-        if profile_timestamps_date[end] < sim_params["end_date"] &&
+        
+        time_diff_timesteps = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
+        if profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps &&
            profile_timestamps_date[end] + temp_diff >= sim_params["end_date"]
-            while profile_timestamps_date[end] < sim_params["end_date"]
+            while profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps
                 profile_timestamps_date = vcat(profile_timestamps_date,
                                                profile_timestamps_date[end] + Second(profile_time_step))
                 profile_values = vcat(profile_values, profile_values[end])
