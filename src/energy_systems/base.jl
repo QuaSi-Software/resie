@@ -243,12 +243,6 @@ Base.@kwdef mutable struct SystemInterface
 end
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
-"""
-struct InputError <: Exception end
-
-"""
     set_storage_transfer!(interface, value)
 
 Sets the flag to decide over storage potential transfer to the given boolean value. Note
