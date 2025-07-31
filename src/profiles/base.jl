@@ -7,6 +7,12 @@ export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
 Holds values from a file so they can be retrieved later and indexed by time.
 
 Profiles are automatically aggregated or segmentated to fit the simulation time step.
@@ -259,25 +265,9 @@ mutable struct Profile
         if shift > Second(0)
             profile_timestamps_date = add_ignoring_leap_days.(profile_timestamps_date, shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
-
-            # add multiple entries to beginning of profile if they are missing. copy first or last value.
-            while profile_timestamps_date[1] > sim_params["start_date"]
-                profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
-                                        profile_timestamps_date)
-                profile_values = vcat(profile_values[1], profile_values)
-            end
-            @info "The profile at $(file_path) has been extended by $shift at the begin by doubling the first value."
         elseif shift < Second(0)
             profile_timestamps_date = sub_ignoring_leap_days.(profile_timestamps_date, -shift)
             @info "The timestamp of the profile at $(file_path) was shifted by $shift."
-
-            # add multiple entries to end of profile if they are missing. copy first or last value.
-            while profile_timestamps_date[end] < sim_params["end_date"]
-                profile_timestamps_date = vcat(profile_timestamps_date,
-                                            profile_timestamps_date[end] + Second(profile_time_step))
-                profile_values = vcat(profile_values, profile_values[end])
-            end
-            @info "The profile at $(file_path) has been extended by $shift at the end by doubling the last value."
         end
 
         if interpolation_type == "linear_time_preserving" && profile_time_step > sim_params["time_step_seconds"]
@@ -289,7 +279,7 @@ mutable struct Profile
         # add first or last entry if only one time step is missing. copy first or last value.
         temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
         if profile_timestamps_date[1] > sim_params["start_date"] &&
-           profile_timestamps_date[1] - Second(profile_time_step) <= sim_params["start_date"]
+           profile_timestamps_date[1] - temp_diff <= sim_params["start_date"]
             while profile_timestamps_date[1] > sim_params["start_date"]
                 profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
                                             profile_timestamps_date)
@@ -941,118 +931,6 @@ Returns (t_sub, irr_sub, G_end) where:
   • irr_sub is the average irradiance (W/m²) for each subinterval,
   • G_end is the endpoint to carry over.
 """
-function segment_interval_old(hn::Float64, hnp1::Float64,
-                          interval_start::Float64, interval_end::Float64,
-                          dt_h::Float64, g_start::Float64,
-                          sunrise::Float64, sunset::Float64)
-    # 1. Divide the full hourly interval into dt blocks (using ceil to ensure full coverage)
-    n_total = max(Int(ceil((interval_end - interval_start) / dt_h)), 1)
-    t_blocks = [interval_start + (j - 1) * dt_h for j in 1:n_total]
-
-    # 2. Define the effective daylight region.
-    eff_start = max(interval_start, sunrise)
-    eff_end = min(interval_end, sunset)
-    if eff_end <= eff_start || hn <= 0.0
-        # No daylight: all dt blocks get zero irradiance.
-        return t_blocks, zeros(Float64, n_total), 0.0
-    end
-    dt_eff = eff_end - eff_start
-    is_sunrise = eff_start == sunrise
-    is_sunset = eff_end == sunset
-
-    # 3. Subdivide the effective region into dt blocks (again using ceil)
-    n_eff = max(Int(ceil(dt_eff / dt_h)), 1)
-
-    # 4. Compute the effective endpoint.
-    # If the hour includes sunset, force the endpoint to zero.
-    if (sunset > interval_start && sunset < interval_end)
-        effective_G_end = 0.0
-    else
-        if hnp1 > hn && is_sunrise
-            effective_G_end = (2 * hn) / dt_eff
-        elseif hnp1 < hn && is_sunrise
-            effective_G_end = (0.25 * hn + 0.75 * hnp1) / dt_eff
-        else
-            effective_G_end = (0.5 * hn + 0.5 * hnp1) / dt_eff
-        end
-    end
-
-    # 5. Compute the midpoint value (g_mid) over the effective region.
-    g_mid_was_zero = false
-
-    if n_eff == 1
-        g_mid = hn / dt_h
-    else
-        n_mid = Int(floor(n_eff / 2))
-        g_mid = (2 * hn / (n_eff * dt_h)) - (n_mid * g_start) / n_eff - ((n_eff - n_mid) * effective_G_end) / n_eff
-        if g_mid < 0
-            g_mid = (2 * hn / dt_h - (g_start + effective_G_end)) / (2 * (n_eff - 1))
-            g_mid_was_zero = true
-        end
-    end
-
-    # 6. Build the piecewise–linear boundaries over the effective region.
-    if g_mid < 0  #g_mid still zero?
-        boundaries = vcat(g_start, zeros(n_eff))
-    elseif g_mid_was_zero
-        boundaries = vcat(vcat(g_start, fill(g_mid, n_eff - 1)), effective_G_end)
-    else
-        boundaries = zeros(Float64, n_eff + 1)
-        boundaries[1] = g_start
-        if n_eff > 1
-            n_mid = Int(floor(n_eff / 2))
-            # First part: interpolate from g_start to g_mid over n_mid subintervals.
-            for j in 1:n_mid
-                boundaries[j + 1] = g_start + (j / n_mid) * (g_mid - g_start)
-            end
-            # Second part: interpolate from g_mid to effective_G_end over the remaining subintervals.
-            #              effective_G_end is considered to be the first value of the next interval.
-            m = n_eff - n_mid
-            for k in 1:m
-                boundaries[n_mid + 1 + k] = g_mid + (k / m) * (effective_G_end - g_mid)
-            end
-        else
-            boundaries[2] = g_mid
-        end
-    end
-
-    # 7. Compute the effective irradiance values (midpoints) over the effective region.
-    effective_irr = [(boundaries[i] + boundaries[i + 1]) / 2 for i in 1:(length(boundaries) - 1)]
-
-    # 8. fill effective_irr with zeros at the beginning or end, depending if we are during 
-    #    sunset or sunrise
-    if n_eff < n_total
-        if is_sunrise
-            effective_irr = vcat(zeros(Float64, n_total - n_eff), effective_irr)
-        elseif is_sunset
-            effective_irr = vcat(effective_irr, zeros(Float64, n_total - n_eff))
-        end
-    end
-
-    return t_blocks, effective_irr, effective_G_end
-end
-
-"""
-    segment_interval() 
-segments one hourly interval given as fractional times (relative to midnight) using the 
-algorithm of TRNSYS 18, described in:
-    T. McDowell, S. Letellier-Duchesne, M. Kummert (2018):
-    "A New Method for Determining Sub-hourly Solar Radiation from Hourly Data" 
-
-Parameters:
-  • hn       : hourly integrated irradiation for the current hour [Wh/m²]
-  • hnp1     : hourly integrated irradiation for the next hour [Wh/m²]
-  • interval_start, interval_end : start and end of the current hourly interval
-      (in fractional hours, e.g., 7.24 or 8.0)
-  • dt_h     : required simulation timestep (in hours)
-  • g_start  : carry-over instantaneous radiation from the previous interval (W/m²)
-  • sunrise, sunset : daylight bounds (fractional hours)
-
-Returns (t_sub, irr_sub, G_end) where:
-  • t_sub is a vector of fractional hour values (currently computed as startpoints)
-  • irr_sub is the average irradiance (W/m²) for each subinterval,
-  • G_end is the endpoint to carry over.
-"""
 function segment_interval(hn::Float64, hnp1::Float64,
                           interval_start::Float64, interval_end::Float64,
                           dt_h::Float64, g_start::Float64,
@@ -1096,15 +974,6 @@ function segment_interval(hn::Float64, hnp1::Float64,
     if n_eff == 1
         g_mid = hn / dt_h
         boundaries[end] = g_mid
-    # elseif g_start == 0.0
-    #     g_mid = 2 * hn / (n_eff * dt_h) - ((n_eff - n_mid) * effective_G_end) / n_eff
-    #     if n_eff <= 3
-    #         boundaries[2] = g_mid
-    #     else
-    #         boundaries[2] = (g_start + g_mid) / 2
-    #         boundaries[end-1] = (g_mid + effective_G_end) / 2
-    #         boundaries[3:end-2] = fill(g_mid, n_eff - 3)
-    #     end
     
     else
         n_mid = Int(floor(n_eff / 2))
