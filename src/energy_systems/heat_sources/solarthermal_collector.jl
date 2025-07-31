@@ -25,7 +25,7 @@ mutable struct SolarthermalCollector <: Component
     # collector parameters
     eta_0_b::Float64
     K_b_array::Array{Union{Missing,Float64},2}
-    K_b_itp::Tuple{AbstractArray}
+    K_b_itp::Tuple{AbstractArray, AbstractArray}
     K_b::Float64
     K_d::Float64
     a_params::Array{Float64,1}
@@ -125,7 +125,7 @@ mutable struct SolarthermalCollector <: Component
                         # row1: angle 0° to 90°/vertical/west, 
                         # row2: transversal/tilt, 
                         # row3: longitudinal/azimuth/orientation
-                   (), # initialise Interpolation functions for K_b
+                   ([], []), # initialise Interpolation functions for K_b
                    1, # Calculate K_b from K_b_array in control()
                    config["K_d"], # collector parameter for diffuse irradiance 
                    config["a_params"], # collector sim_params a1 to a8 corresponding to EN ISO 9806:2017
