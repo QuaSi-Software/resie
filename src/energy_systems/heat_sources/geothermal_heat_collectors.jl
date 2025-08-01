@@ -880,6 +880,8 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Di
         time[] = v
     end
     wait(display(f))
+
+    return false
 end
 
 # function to handle freezing of the soil. Corrects the new temperature to include the enthalpy of fusion

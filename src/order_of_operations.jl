@@ -2505,13 +2505,12 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
 
         input_storages = [i.source for i in bus.input_interfaces
                           if i.source.sys_function == EnergySystems.sf_storage]
-        first_input_storage = length(input_storages) < 1 ? nothing : input_storages[1]
         last_input_storage = length(input_storages) < 1 ? nothing : input_storages[end]
 
         # for the storage with the highest output priority, place its load step after the
         # process step of the input storage with highest priority, so that the subsequent
         # insertions maintain the order of process steps first, then load steps
-        if first_input_storage !== nothing && first_output_storage !== nothing
+        if last_input_storage !== nothing && first_output_storage !== nothing
             place_one_lower!(simulation_order,
                              (last_input_storage.uac, EnergySystems.s_process),
                              (first_output_storage.uac, EnergySystems.s_load))
@@ -2526,7 +2525,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
                              for i in bus.input_interfaces
                              if i.source.sys_function == EnergySystems.sf_transformer]
         last_input_transformer = length(input_transformer) < 1 ? nothing : input_transformer[end]
-        if first_input_storage !== nothing && last_input_transformer !== nothing
+        if first_output_storage !== nothing && last_input_transformer !== nothing
             place_one_lower!(simulation_order,
                              (last_input_transformer.uac, EnergySystems.s_process),
                              (first_output_storage.uac, EnergySystems.s_load))

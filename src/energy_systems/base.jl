@@ -412,8 +412,13 @@ function add!(interface::SystemInterface,
     if temperature_max[1] !== nothing && length(interface.max_energy.temperature_max) == 1 &&
        interface.max_energy.temperature_max[1] !== nothing &&
        temperature_max[1] > interface.max_energy.temperature_max[1]
-        @warn ("Given temperature $(temperature_max[1]) on interface $(interface.source.uac) " *
-               "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
+        warn_message = "Given temperature $(temperature_max[1]) on interface $(interface.source.uac) " *
+                       "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])."
+        if interface.source.sys_function == sf_storage
+            warn_message *= " As the source is a storage, this is likely due to loading and unloading within the " *
+                            "same time step."
+        end
+        @warn warn_message
     end
 
     if interface.source.sys_function == sf_bus
@@ -636,7 +641,11 @@ function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::String
         if isempty(idx)
             return 0.0
         else
-            return sum(max_energy.max_energy[i] for i in idx)
+            if max_energy.has_calculated_all_maxima
+                return max_energy.max_energy[idx[1]]
+            else
+                return sum(max_energy.max_energy[i] for i in idx)
+            end
         end
     end
 end
@@ -761,12 +770,16 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                 end
             end
         else # a purpose uac is given and temperature is checked by the calling bus
-            idx = findfirst(==(uac_of_caller), max_energy.purpose_uac)
-            if idx !== nothing
-                if max_energy.has_calculated_all_maxima
-                    max_energy.max_energy .*= 1 - (current_amount / max_energy.max_energy[idx])
-                else
-                    max_energy.max_energy[idx] -= current_amount
+            idx_list = findall(uac_of_caller .== max_energy.purpose_uac)
+            if !isempty(idx_list)
+                for idx in idx_list
+                    current_amount_idx = min(current_amount, max_energy.max_energy[idx])
+                    if max_energy.has_calculated_all_maxima
+                        max_energy.max_energy .*= 1 - (current_amount_idx / max_energy.max_energy[idx])
+                    else
+                        max_energy.max_energy[idx] -= current_amount_idx
+                    end
+                    current_amount -= current_amount_idx
                 end
             else
                 @error "The uac could not be found in the max_energy."

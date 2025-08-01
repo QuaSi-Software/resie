@@ -775,7 +775,7 @@ function convert_profile(values::Vector{Float64},
                                                      new_time_step,
                                                      sim_params)
         info_message *= "was converted from the profile timestep $(Second(original_time_step)) to the simulation " *
-                        "timestep of $(new_time_step)."
+                        "timestep of $(Second(new_time_step))."
 
     elseif original_time_step > new_time_step              # segmentation
         if profile_type == :extensive

@@ -578,19 +578,27 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 || get_max_energy(output_row.energy_pool, input_row.source.uac) == Inf
                 || get_max_energy(output_row.energy_potential, input_row.source.uac) == Inf)
                 # end of condition
-                energy_pot = -Inf
                 temperature_min = get_min_temperature(output_row.energy_potential, output_row.energy_pool,
                                                       input_row.source.uac)
                 temperature_max = get_max_temperature(output_row.energy_potential, output_row.energy_pool,
                                                       input_row.source.uac)
+                if temperatures_match(temperature_min, temperature_max, input_row, output_row.target.uac)
+                    energy_pot = -Inf
+                else
+                    energy_pot = 0.0
+                end
             else
                 if is_max_energy_nothing(interface.max_energy)  # the caller has not performed a potential
-                    energy_pot = -_add(get_max_energy(output_row.energy_pool_temp, input_row.source.uac),
-                                       get_max_energy(output_row.energy_potential_temp, input_row.source.uac))
                     temperature_min = get_min_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
                                                           input_row.source.uac)
                     temperature_max = get_max_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
                                                           input_row.source.uac)
+                    if temperatures_match(temperature_min, temperature_max, input_row, output_row.target.uac)
+                        energy_pot = -_add(get_max_energy(output_row.energy_pool_temp, input_row.source.uac),
+                                           get_max_energy(output_row.energy_potential_temp, input_row.source.uac))
+                    else
+                        energy_pot = 0.0
+                    end
                 else  # the caller has performed a potential and has already written a max_energy itself
                     energy_pot = -(unit.balance_table[input_row.priority, output_row.priority * 2 - 1])
                     temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
@@ -626,19 +634,27 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 || get_max_energy(input_row.energy_pool, output_row.target.uac) == Inf
                 || get_max_energy(input_row.energy_potential, output_row.target.uac) == Inf)
                 # end of condition
-                energy_pot = Inf
                 temperature_min = get_min_temperature(input_row.energy_potential, input_row.energy_pool,
                                                       output_row.target.uac)
                 temperature_max = get_max_temperature(input_row.energy_pool, input_row.energy_potential,
                                                       output_row.target.uac)
+                if temperatures_match(temperature_min, temperature_max, output_row, input_row.source.uac)
+                    energy_pot = Inf
+                else
+                    energy_pot = 0.0
+                end
             else
-                if is_max_energy_nothing(interface.max_energy) # no max energy is written --> get infos from input_row
-                    energy_pot = _add(get_max_energy(input_row.energy_pool_temp, output_row.target.uac),
-                                      get_max_energy(input_row.energy_potential_temp, output_row.target.uac))
+                if is_max_energy_nothing(interface.max_energy) # no max energy is written, but maybe temperatures --> get infos from input_row
                     temperature_min = get_min_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
                                                           output_row.target.uac)
                     temperature_max = get_max_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
                                                           output_row.target.uac)
+                    if temperatures_match(temperature_min, temperature_max, output_row, input_row.source.uac)
+                        energy_pot = _add(get_max_energy(input_row.energy_pool_temp, output_row.target.uac),
+                                          get_max_energy(input_row.energy_potential_temp, output_row.target.uac))
+                    else
+                        energy_pot = 0.0
+                    end
                 else # max energy is written and was distributed by the bus --> get infos from balance_table
                     energy_pot = unit.balance_table[input_row.priority, output_row.priority * 2 - 1]
                     temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
@@ -671,6 +687,37 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     end
 
     return return_exchanges
+end
+
+"""
+    temperatures_match(other_temp_min::Temperature, other_temp_max::Temperature, own_row, target)
+
+This function checks if the temperatures match between input_row and output_row.
+
+# Arguments
+`other_temp_min::Temperature`: The minimum temperature of the other row
+`other_temp_max::Temperature`: The maximum temperature of the other row
+`own_row::Union{BTInputRow,BTOutputRow}`: The row that should be connected to the other row
+`target::String`: The uac of the other component
+# Returns
+`::Bool`: true: temperatures match; false: temperatures do not match
+"""
+function temperatures_match(other_temp_min::Temperature,
+                            other_temp_max::Temperature,
+                            own_row::Union{BTInputRow,BTOutputRow},
+                            target::String)
+    own_temp_min = get_min_temperature(own_row.energy_potential_temp, own_row.energy_pool_temp, target)
+    own_temp_max = get_max_temperature(own_row.energy_potential_temp, own_row.energy_pool_temp, target)
+
+    temperature_highest_min = highest(other_temp_min, own_temp_min)
+    temperature_lowest_max = lowest(own_temp_max, other_temp_max)
+
+    if temperature_highest_min !== nothing && temperature_lowest_max !== nothing &&
+       temperature_highest_min > temperature_lowest_max
+        return false
+    else
+        return true
+    end
 end
 
 """
