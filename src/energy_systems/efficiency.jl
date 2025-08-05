@@ -416,7 +416,8 @@ function plr_from_energy(unit::PLRDEComponent,
     end
 
     nr_iter = 0
-    candidate_idx = max(1, floor(Int64, length(lookup_table) * energy_value / energy_at_max))
+    candidate_idx = min(length(lookup_table) - 1,
+                        max(1, floor(Int64, length(lookup_table) * energy_value / energy_at_max)))
 
     while (nr_iter < length(lookup_table)
            && candidate_idx < length(lookup_table)
