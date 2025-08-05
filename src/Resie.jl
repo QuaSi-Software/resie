@@ -91,7 +91,7 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "number_of_time_steps" => nr_of_steps,
         "start_date" => start_date,
         "end_date" => end_date,
-        "epsilon" => 1e-9,
+        "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
         "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
