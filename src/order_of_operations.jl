@@ -10,7 +10,7 @@
 load_order_of_operations(order_of_operation_input, components)
 
 Reads in the order of operation given in the input file.
-The Vektor that is passed has to have one entry for each operation. All operations have to 
+The Vector that is passed has to have one entry for each operation. All operations have to 
 be in the following syntax:
 [
     "UAC_Key s_step",
@@ -19,11 +19,11 @@ be in the following syntax:
 "UAC_Key s_step" can be "TST_01_HZG_02_DEM s_reset" for example.
 
 # Args
-- `order_of_operation_input::Vector{String}`: A Vektor of strings containing the operations 
+- `order_of_operation_input::Vector{String}`: A Vector of strings containing the operations 
                                               given in the input file 
 - `components::Grouping`: All components of the input file
 # Returns
-- `step_instructions`: The order of opertaions given in the input file in the structure:
+- `step_instructions`: The order of operations given in the input file in the structure:
 ```
 [
     ["UAC Key", s_step],
@@ -98,7 +98,7 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
 
     # Note that the input order at a bus has a higher priority compared to the output order! 
     # If there are contradictions, the input order applies. Currently, there is no warning 
-    # message if this leads to missalignement with the output order.
+    # message if this leads to misalignment with the output order.
     # Reorderings for input and output priorities only applies for process and not for potential steps!
     reorder_transformer_for_output_priorities(simulation_order, components, components_by_function)
     reorder_for_input_priorities(simulation_order, components, components_by_function)
@@ -112,8 +112,8 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order; by=fn_first, rev=true)]
 
     # remove transformers potential step if process is directly consecutive to a potential step
-    while contains_double_potental_produce(step_order)
-        step_order = remove_double_potental_produce(step_order)
+    while contains_double_potential_produce(step_order)
+        step_order = remove_double_potential_produce(step_order)
     end
 
     return step_order
@@ -134,7 +134,7 @@ interconnected if they can be seen EITHER in the outputs or the inputs, but not 
 input/output paths! 
 
 Chains found with direct_connection_only=false are filtered to find unique chains. They are
-merged to represent the longest possible chain and to avoid doublings or multible subset of
+merged to represent the longest possible chain and to avoid doublings or multiple subset of
 a bigger chain. Completely independent chains are returned as array of chains.
 
 # Arguments
@@ -364,6 +364,12 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
     transformers = components_by_function[4]
     if length(transformers) > 1
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
+        for component in transformers_and_busses
+            if component.sys_function === EnergySystems.sf_bus && component.proxy !== nothing
+                component = component.proxy
+            end
+        end
+        transformers_and_busses = unique(transformers_and_busses)
         # detect parallel branches in the current energy system
         parallel_branches = find_parallels(transformers_and_busses)
 
@@ -407,7 +413,7 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
                 reverse = true
             elseif count == 20
                 @warn ("The order of operation is potentially wrong as the process-step of one or more transformers " *
-                       "are missig in the OoO. Check the input and the order in the aux_info file. May specify a custom OoO!")
+                       "are missing in the OoO. Check the input and the order in the aux_info file. May specify a custom OoO!")
                 break
             end
             count += 1
@@ -433,7 +439,7 @@ Checks if a process step for all transformers_and_busses is included in the simu
 # Returns
 -`complete::Bool`: False if there are process steps of transformers or busses are missing in the simulation_order, 
                    and true if they are all contained in the simulation_order.
--`not_included_components::Array{SystemComponets}`: List of all transformers and busses that are not part of the 
+-`not_included_components::Array{SystemComponents}`: List of all transformers and busses that are not part of the 
                                                     simulation_order
              
 """
@@ -478,7 +484,7 @@ The following logic is used:
 - Of the chosen MT, the longer branch is taken and the add_transformer_steps is called recursively with the 
   transformer of the current branch handed over as new current_components. If branches have interdependencies, the 
   order of the branches is adjusted accordingly to calculate the dependencies first. With the components of each branch, 
-  the function add_transformer_steps is called recursivly. The branches are starting to potential from "outside", 
+  the function add_transformer_steps is called recursively. The branches are starting to potential from "outside", 
   meaning each branch starts at the point that is away from the MT. Then the MT does its potential, after all branches
   have finished. During process, the MT does its process first, then the branches do their process starting from the
   "inside" with the components near the MT.
@@ -670,7 +676,7 @@ function add_transformer_steps(simulation_order,
             for (idx, middle_transformer_branch) in enumerate(middle_transformer_branches)
                 current_reverse = determine_reverse(reverse, is_connecting_branch, idx, step_category)
 
-                # add process of middle_transformer bevor the first branch makes its process
+                # add process of middle_transformer before the first branch makes its process
                 if idx == 1 && step_category == "process"
                     push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
                     initial_nr -= 1
@@ -935,9 +941,9 @@ end
     
 This function takes a vector of tuples with integers like [(first_int_1, second_int_1), (first_int_2, second_int_2)]. 
 The integers can be indexes for example. For each tuple, the first_int should come ahead of second_int in the resulting 
-list. This fuction determines the order in a way that all given constraints are met, if possible, using topological 
+list. This function determines the order in a way that all given constraints are met, if possible, using topological 
 sorting. If the sorting was not successful, like if there were loops or contradictions in the given constraints, the
-function tries to solve the conflicts by removing the reversed dublicates in constraints and by starting the topological 
+function tries to solve the conflicts by removing the reversed duplicates in constraints and by starting the topological 
 sorting with the filtered list again.
 
 # Arguments
@@ -993,10 +999,10 @@ function order_indexes(constraints)
     success, sorted_list = topological_sorting(constraints)
 
     if !success
-        @warn "The order operation may be wrong, logical loops have beed detected. " *
+        @warn "The order operation may be wrong, logical loops have been detected. " *
               "Trying to solve them by removing contradictions."
 
-        # If there are loops, remove the reversed dublicates
+        # If there are loops, remove the reversed duplicates
         standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
         seen = Set{Tuple{Int,Int}}()
         unique_tuples = []
@@ -1025,7 +1031,7 @@ end
 This function detects the order of the branches under consideration of interdependencies between the branches.
 If a component in one branch has a component of another branch in its inputs (while not considering the path through 
 the middle bus), the other branch has to be calculated first and vice versa. For busses, this applies only in the 
-potnetial step!
+potential step!
 As base order, the the input/output order of the bus is used as handed over to this function.
 
 # Arguments
@@ -1269,7 +1275,7 @@ This function merges branches that are part of a parallel branch together to one
 - `is_input::Array{Bool}`: An array with bools indicating if a branch in branches is an input branch
 - `is_connecting_branch::Array{Bool}`: An array with bools indicating if a branch in branches is a connecting branch
 - `parallel_branches::Array{Bool}`: An array holding the parallel branches
-- `reverse::Bool`: Specify if the current branches should be handeled in reverse or not
+- `reverse::Bool`: Specify if the current branches should be handled in reverse or not
 
 # Returns
 - `branches_new::Array{Array{Grouping}}`: An array containing branches with components with merged parallels
@@ -1442,7 +1448,9 @@ function detect_middle_bus(current_components, reverse, checked_components, step
         transformer_in_output_interface = Any[]
         transformer_in_input_interface = Any[]
         if component.sys_function === EnergySystems.sf_bus
-            component = component.proxy === nothing ? component : component.proxy
+            if component.proxy !== nothing
+                continue
+            end
             for inface in values(component.input_interfaces)
                 if has_grid_output(component, inface.source.uac)
                     continue # skip all interfaces with connection to a grid
@@ -1532,7 +1540,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
         end
         push!(has_middle_bus_in_interfaces, has_middle_bus_in_interfaces_temp)
 
-        # deleat middle_bus from transformer sets and convert Set to array
+        # delete middle_bus from transformer sets and convert Set to array
         temp = []
         for interface in transformers_in_infaces[idx]
             temp_transformers = []
@@ -1702,7 +1710,7 @@ function detect_first_middle_transformer(current_components, checked_components)
         end
         push!(has_middle_transformer_in_inputs, has_middle_transformer_in_inputs_temp)
 
-        # deleat middle_transformer from transformer sets and convert Set to array
+        # delete middle_transformer from transformer sets and convert Set to array
         temp = []
         for interface in transformers_in_infaces[idx]
             temp_transformers = []
@@ -1977,7 +1985,7 @@ end
     add_non_recursive_indirect_outputs!(node_set, unit, checked_interfaces, sys_function)
 
 Add connected units of the same system function to the node set in a non-recursive manner.
-Here, "connected" does not necessarily mean that the components have to be connected directy 
+Here, "connected" does not necessarily mean that the components have to be connected directly 
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the outputs of each component, starting with "unit".
 Note: Storages are defined to interrupt chains!
@@ -2047,7 +2055,7 @@ end
     add_non_recursive_indirect_inputs!(node_set, unit, checked_interfaces, sys_function)
 
 Add connected units of the same system function to the node set in a non-recursive manner.
-Here, "connected" does not necessarily mean that the components have to be connected directy 
+Here, "connected" does not necessarily mean that the components have to be connected directly 
 to each other, they can also be connected via busses or other components within the directed graph.
 This function only searches in the inputs of each component, starting with "unit".
 Note: Storages are defined to interrupt chains!
@@ -2121,7 +2129,7 @@ Calculate the distance of the given node to the sinks of the chain.
 
 A sink is defined as a node with no successors of the same system function. For the sinks
 this distance is 0. For all other nodes it is the maximum over the distances of its
-successors plus one. Only allowed connections are considered specified by the eneryg matrix 
+successors plus one. Only allowed connections are considered specified by the energy matrix 
 of busses.
 The parameter "checked_interfaces" is used to avoid loops when recursively calling the 
 function. When calling distance_to_sink() from outside, the parameter checked_interfaces 
@@ -2135,7 +2143,7 @@ should be set as empty array ([]).
 -`last_unit_uac::String`: string of the uac of the last unit. Should be "" when calling externally.                                               
 
 # Returns
-The maximum distance to the farest sink as Int.
+The maximum distance to the furthest sink as Int.
 """
 function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
     is_leaf = function (current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
@@ -2301,7 +2309,7 @@ end
 
 Reorder components connected to a bus so they match the input priority defined on that bus.
 This does not apply, if there is a grid output from the bus and the connection is allowed from 
-the inputs. This does not take into account any attributs like temperatures that deny the 
+the inputs. This does not take into account any attributes like temperatures that deny the 
 energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
 But, the energy flow matrix of the bus is taken into account.
 
@@ -2414,7 +2422,7 @@ end
 
 Reorder transformers connected to a bus so they match the output priority defined on that bus.
 This does not apply, if there is a grid input to the bus and the connection is allowed to 
-the output transformers. This does not take into account any attributs like temperatures that deny the 
+the output transformers. This does not take into account any attributes like temperatures that deny the 
 energy flow. Up to now, grids do not have any attributes, so that doesn't matter.
 But, the energy flow matrix of the bus is taken into account.
 
@@ -2552,12 +2560,12 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
 end
 
 """
-    contains_double_potental_produce(step_order)
+    contains_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step to later 
 remove the potential step. Also checks for identical consecutive steps.
 """
-function contains_double_potental_produce(step_order)
+function contains_double_potential_produce(step_order)
     last_unit = ""
     last_step = ""
     for entry in step_order
@@ -2579,7 +2587,7 @@ end
     remove_double_transformer_process_steps(simulation_order)
 
 Checks the simulation order for multiple process steps of one transformer.
-If there are multiple process steps for one tranformer, only the first one will be kept.
+If there are multiple process steps for one transformer, only the first one will be kept.
 """
 function remove_double_transformer_process_steps(simulation_order, components)
     detected_transformer_processes = []
@@ -2598,12 +2606,12 @@ function remove_double_transformer_process_steps(simulation_order, components)
 end
 
 """
-    remove_double_potental_produce(step_order)
+    remove_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
 removes the potential step. Also removes consecutive identical steps.
 """
-function remove_double_potental_produce(step_order)
+function remove_double_potential_produce(step_order)
     last_unit = ""
     last_step = ""
     to_remove = Int[]
@@ -2638,7 +2646,7 @@ The function search through the whole energy system.
 # Arguments
 -`interface::SystemInterface`: The interface that should be checked
 -`type::String`: Can be either "input" or "output". Defines if the "interface" should 
-                 be handeled as an input or an output interface.
+                 be handled as an input or an output interface.
 
 # Returns
 Returns either "true" if a transformer was found in the following or previous chain or 
@@ -2652,7 +2660,9 @@ function check_interface_for_transformer(interface, type)
             end
             for inface in values(current_node.input_interfaces)
                 if inface !== nothing
-                    if inface in checked_interfaces || inface.source == current_node
+                    if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
+                        continue
+                    elseif inface in checked_interfaces || inface.source == current_node
                         continue
                     elseif !connection_allowed(current_node, inface.source.uac, last_node_uac)
                         continue
@@ -2680,7 +2690,9 @@ function check_interface_for_transformer(interface, type)
             end
             for outface in values(current_node.output_interfaces)
                 if outface !== nothing
-                    if outface in checked_interfaces || outface.target == current_node
+                    if outface.target.sys_function === EnergySystems.sf_bus && startswith(outface.target.uac, "Proxy")
+                        continue
+                    elseif outface in checked_interfaces || outface.target == current_node
                         continue
                     elseif !connection_allowed(current_node, last_node_uac, outface.target.uac)
                         continue
@@ -2711,12 +2723,12 @@ end
     connection_allowed(component::Component, input_uac::String, output_uac::String)
 
 Checks a given connection defined by `input_uac` and `output_uac` is allowed. The `component`
-is the commponent between the two other components. If `component` is not a bus, this function
+is the component between the two other components. If `component` is not a bus, this function
 will return true. If component is a bus, then the connection matrix of the bus is checked 
 to determine if the connection from input_uac to output_uac is allowed. 
 
 # Arguments
--`component::Component`: A component beween input_uac and output_uac
+-`component::Component`: A component between input_uac and output_uac
 -`input_uac::String`: The uac of the input component
 -`output_uac::String`: The uac of the output component
 
