@@ -323,6 +323,21 @@ function base_order(components_by_function)
     # process bounded sources/sinks
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
+            if isa(unit, EnergySystems.GridConnection)
+                # skip grid connections here to place them after general bounded sources/sinks
+                continue
+            end
+            push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
+            initial_nr -= 1
+        end
+    end
+    # process grids
+    for sf_order in 6:7
+        for unit in values(components_by_function[sf_order])
+            if !isa(unit, EnergySystems.GridConnection)
+                # ignore general bounded sources/sinks here as they are already added
+                continue
+            end
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
             initial_nr -= 1
         end
