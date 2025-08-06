@@ -159,12 +159,12 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     if unit.max_load_rate === nothing
         unit.max_input_energy = Inf
     else
-        unit.max_input_energy = unit.max_load_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+        unit.max_input_energy = unit.max_load_rate * unit.capacity * (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
     if unit.max_unload_rate === nothing
         unit.max_output_energy = Inf
     else
-        unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+        unit.max_output_energy = unit.max_unload_rate * unit.capacity * (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
     # calculate surfaces of the buffer tank cylinder
