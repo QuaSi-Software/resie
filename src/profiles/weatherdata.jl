@@ -3,8 +3,15 @@ module Weatherdata
 using Resie.Profiles
 using Dates
 using Proj
+using Resie.SolarIrradiance
 
 export WeatherData, gather_weather_data, get_weather_data_keys
+
+"""
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
 
 """
 """
@@ -15,8 +22,8 @@ mutable struct WeatherData
     """Wind speed, in m/s."""
     wind_speed::Profile
 
-    """Direct horizontal irradiation, in Wh/m^2."""
-    dirHorIrr::Profile
+    """Beam horizontal irradiation, in Wh/m^2."""
+    beamHorIrr::Profile
 
     """Diffuse horizontal irradiation, in Wh/m^2."""
     difHorIrr::Profile
@@ -26,6 +33,12 @@ mutable struct WeatherData
 
     """Horizontal long wave (infrared) irradiation, in Wh/m^2."""
     longWaveIrr::Profile
+    
+    """sunrise, in decimal hours."""
+    sunrise::Profile
+
+    """sunset, in decimal hours."""
+    sunset::Profile
 
     """
     get_weather_data(weather_file_path, sim_params)
@@ -55,7 +68,7 @@ mutable struct WeatherData
         time_step = Second(3600)  # set fixed time step width for weather data
         start_year = Dates.value(Year(sim_params["start_date"]))
         end_year = Dates.value(Year(sim_params["end_date"]))
-        timestamp = remove_leap_days(collect(range(DateTime(start_year, 1, 1, 0, 0, 0);
+        timestamps = remove_leap_days(collect(range(DateTime(start_year, 1, 1, 0, 0, 0);
                                                    stop=DateTime(end_year, 12, 31, 23, 0, 0),
                                                    step=time_step)))
         nr_of_years = end_year - start_year + 1
@@ -86,36 +99,11 @@ mutable struct WeatherData
                       "one given in the input file: $(sim_params["timezone"])"
             end
 
-            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
-            #            consistent with the data from EWP, it is treated as energy in [Wh/m2] here!
-
-            # convert solar radiation data to profile. In DWD-dat, solar radiation is given as 
-            # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00. 
-            # Therefore the data is the mean of the hour ahead of the current time step.
-            dirHorIrr = Profile(weather_file_path * ":DirectHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["dirHorIrr"]), nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive",
-                                shift=Second(0),
-                                interpolation_type=weather_interpolation_type_solar)
-            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive",
-                                shift=Second(0),
-                                interpolation_type=weather_interpolation_type_solar)
-            globHorIrr = deepcopy(dirHorIrr)
-            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
-
             # Wind speed is measured as mean over the 10 Minutes ahead of the full hour 
             wind_speed = Profile(weather_file_path * ":WindSpeed",
                                  sim_params;
                                  given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
-                                 given_timestamps=timestamp,
+                                 given_timestamps=timestamps,
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(25 * 60),
@@ -125,7 +113,7 @@ mutable struct WeatherData
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
                                   sim_params;
                                   given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
-                                  given_timestamps=timestamp,
+                                  given_timestamps=timestamps,
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
@@ -135,11 +123,40 @@ mutable struct WeatherData
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
                                        sim_params;
                                        given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
-                                       given_timestamps=timestamp,
+                                       given_timestamps=timestamps,
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(0),
                                        interpolation_type=weather_interpolation_type_general)
+
+            sunrise, sunset = calc_sunrise_sunset(timestamps, time_step, temp_ambient_air, sim_params)
+
+            # Attention! The radiation data in the DWD-dat file is given as power in [W/m2]. To be 
+            #            consistent with the data from EPW, it is treated as energy in [Wh/m2] here!
+
+            # convert solar radiation data to profile. In DWD-dat, solar radiation is given as 
+            # the mean radiation intensity of the last hour. But, "hour 1" is mapped to 00:00. 
+            # Therefore the data is the mean of the hour ahead of the current time step.
+            beamHorIrr = Profile(weather_file_path * ":BeamHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["beamHorIrr"]), nr_of_years),
+                                given_timestamps=timestamps,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar,
+                                sunrise_sunset=[sunrise, sunset])
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["difHorIrr"]), nr_of_years),
+                                given_timestamps=timestamps,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar,
+                                sunrise_sunset=[sunrise, sunset])
+            globHorIrr = deepcopy(beamHorIrr)
+            globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
         elseif endswith(lowercase(weather_file_path), ".epw")
             weatherdata_dict, headerdata = read_epw_file(weather_file_path)
@@ -162,33 +179,11 @@ mutable struct WeatherData
                       "one given in the input file: $(sim_params["timezone"])"
             end
 
-            # convert solar radiation data to profile
-            # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
-            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive",
-                                shift=Second(0),
-                                interpolation_type=weather_interpolation_type_solar)
-            dirHorIrr = Profile(weather_file_path * ":DirHorizontalIrradiation",
-                                sim_params;
-                                given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
-                                                            nr_of_years),
-                                given_timestamps=timestamp,
-                                given_time_step=time_step,
-                                given_data_type="extensive",
-                                shift=Second(0),
-                                interpolation_type=weather_interpolation_type_solar)
-            globHorIrr = deepcopy(dirHorIrr)
-            globHorIrr.data = Dict(key => dirHorIrr.data[key] + difHorIrr.data[key] for key in keys(dirHorIrr.data))
-
             # Long wave irradiation is probably(?) given at full hours
             longWaveIrr = Profile(weather_file_path * ":LongWaveIrradiation",
                                   sim_params;
                                   given_profile_values=repeat(Float64.(weatherdata_dict["longWaveIrr"]), nr_of_years),
-                                  given_timestamps=timestamp,
+                                  given_timestamps=timestamps,
                                   given_time_step=time_step,
                                   given_data_type="extensive",
                                   shift=Second(30 * 60),
@@ -198,7 +193,7 @@ mutable struct WeatherData
             temp_ambient_air = Profile(weather_file_path * ":AmbientTemperature",
                                        sim_params;
                                        given_profile_values=repeat(Float64.(weatherdata_dict["temp_air"]), nr_of_years),
-                                       given_timestamps=timestamp,
+                                       given_timestamps=timestamps,
                                        given_time_step=time_step,
                                        given_data_type="intensive",
                                        shift=Second(30 * 60),
@@ -208,20 +203,109 @@ mutable struct WeatherData
             wind_speed = Profile(weather_file_path * ":WindSpeed",
                                  sim_params;
                                  given_profile_values=repeat(Float64.(weatherdata_dict["wind_speed"]), nr_of_years),
-                                 given_timestamps=timestamp,
+                                 given_timestamps=timestamps,
                                  given_time_step=time_step,
                                  given_data_type="intensive",
                                  shift=Second(30 * 60),
                                  interpolation_type=weather_interpolation_type_general)
+
+            sunrise, sunset = calc_sunrise_sunset(timestamps, time_step, temp_ambient_air, sim_params)
+
+            # convert solar radiation data to profile
+            # Radiation data in EPW is given as sum over the preceding time step. The first time step is mapped to 00:00.
+            difHorIrr = Profile(weather_file_path * ":DiffuseHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["dhi"]), nr_of_years),
+                                given_timestamps=timestamps,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar,
+                                sunrise_sunset=[sunrise, sunset])
+            beamHorIrr = Profile(weather_file_path * ":BeamHorizontalIrradiation",
+                                sim_params;
+                                given_profile_values=repeat(Float64.(weatherdata_dict["ghi"] .- weatherdata_dict["dhi"]),
+                                                            nr_of_years),
+                                given_timestamps=timestamps,
+                                given_time_step=time_step,
+                                given_data_type="extensive",
+                                shift=Second(0),
+                                interpolation_type=weather_interpolation_type_solar,
+                                sunrise_sunset=[sunrise, sunset])
+            globHorIrr = deepcopy(beamHorIrr)
+            globHorIrr.data = Dict(key => beamHorIrr.data[key] + difHorIrr.data[key] for key in keys(beamHorIrr.data))
         end
 
         return new(temp_ambient_air,
                    wind_speed,
-                   dirHorIrr,
+                   beamHorIrr,
                    difHorIrr,
                    globHorIrr,
-                   longWaveIrr)
+                   longWaveIrr, 
+                   sunrise,
+                   sunset)
+                   
     end
+end
+
+"""
+    calc_sunrise_sunset(timestamps::Vector{DateTime}, temp_ambient_air::Profile, 
+                        sim_params::Dict{String,Any})
+
+Function calculate sunrise and sunset time for given timestamps.
+
+# Arguments
+    `timestamps::Vector{DateTime}`: Vector of timestamps for which the sunrise and sunset
+                                    should be calculated.
+    `time_step`::Second`:           Time step width for profiles of sunrise and sunset.
+    `temp_ambient_air::Profile`:    A profile with ambient air temperature at the location.
+                                    Used to calculate the yearly average air temperature.
+    `sim_params::Dict{String,Any}`: Simulation parameters.
+
+# Returns
+    `sunrise::Profile`: Profile with times of sunrise as fractional hour.
+    `sunset::Profile`:  Profile with times of sunset as fractional hour.
+"""
+
+function calc_sunrise_sunset(timestamps::Vector{DateTime}, time_step::Second, temp_ambient_air::Profile, 
+                             sim_params::Dict{String,Any})
+    # calculate sunrise and sunset times for each timestamp
+    sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
+    ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
+    calculated_sr_dates = Date[]
+    average_yearly_temperature = Base.sum((values(temp_ambient_air.data))) / 
+                                 length(temp_ambient_air.data)
+    for (idx, timestamp) in enumerate(timestamps)
+        if Date(timestamp) in calculated_sr_dates
+            sr_arr[idx] = sr_arr[idx-1]
+            ss_arr[idx] = ss_arr[idx-1]
+        else
+            push!(calculated_sr_dates, Date(timestamp))
+            sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
+                                        sim_params["latitude"],
+                                        sim_params["longitude"],
+                                        sim_params["timezone"],
+                                        1.0,
+                                        average_yearly_temperature)
+        end
+    end
+    sunrise = Profile("sunrise_times",
+                        sim_params;
+                        given_profile_values=sr_arr,
+                        given_timestamps=timestamps,
+                        given_time_step=time_step,
+                        given_data_type="intensive",
+                        shift=Second(0),
+                        interpolation_type="stepwise")
+    sunset = Profile("sunset_times",
+                        sim_params;
+                        given_profile_values=ss_arr,
+                        given_timestamps=timestamps,
+                        given_time_step=time_step,
+                        given_data_type="intensive",
+                        shift=Second(0),
+                        interpolation_type="stepwise")
+    return sunrise, sunset
 end
 
 """
@@ -311,7 +395,7 @@ function read_dat_file(weather_file_path::String)
     # Define column names of weatherdata_dict
     colnames = ["Rechtswert", "Hochwert", "month", "day", "hour", "temp_air",
                 "atmospheric_pressure", "wind_direction", "wind_speed", "sky_cover",
-                "precipitable_water", "relative_humidity", "dirHorIrr", "difHorIrr",
+                "precipitable_water", "relative_humidity", "beamHorIrr", "difHorIrr",
                 "longWaveIrr", "terrestric_heat_irr", "quality"]
 
     weatherdata_dict = Dict{String,Vector{Any}}()

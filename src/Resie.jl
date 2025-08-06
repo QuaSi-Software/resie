@@ -40,6 +40,12 @@ function get_run(id::UUID)::SimulationRun
     return current_runs[id]
 end
 
+"""
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -47,6 +53,8 @@ end
 # this is done so the latter files can access the symbols of the submodules the same as
 # if the code was inside this file.
 
+include("profiles/solar_irradiance.jl")
+using .SolarIrradiance
 include("profiles/base.jl")
 using .Profiles
 include("profiles/weatherdata.jl")

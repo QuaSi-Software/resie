@@ -28,6 +28,12 @@ using ..Profiles
 using UUIDs
 
 """
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
+"""
 Convenience function to get the value of a key from a config dict using a default value.
 """
 default(config::Dict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
@@ -241,12 +247,6 @@ Base.@kwdef mutable struct SystemInterface
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
 end
-
-"""
-Custom error handler for exception "InputError".
-Call with throw(InputError)
-"""
-struct InputError <: Exception end
 
 """
     set_storage_transfer!(interface, value)
@@ -1318,7 +1318,7 @@ function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyE
         for (idx, max_energy) in enumerate(interface.max_energy.max_energy)
             push!(exchanges,
                   EnEx(; balance=interface.balance,
-                       energy_potential=max_energy === nothing ? nothing : input_sign * max_energy,
+                       energy_potential=input_sign * max_energy,
                        purpose_uac=purpose_uac,
                        temperature_min=interface.max_energy.temperature_min[idx],
                        temperature_max=interface.max_energy.temperature_max[idx],
@@ -1586,6 +1586,7 @@ include("storage/buffer_tank.jl")
 include("storage/seasonal_thermal_storage.jl")
 include("heat_sources/geothermal_probes.jl")
 include("heat_sources/geothermal_heat_collectors.jl")
+include("heat_sources/solarthermal_collector.jl")
 include("heat_sources/generic_heat_source.jl")
 include("electric_producers/chpp.jl")
 include("others/electrolyser.jl")
@@ -1600,7 +1601,7 @@ include("efficiency.jl")
 # now that the components are defined we can load the control modules, which depend on their
 # definitions
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
-const TemperatureNegotiateSource = Union{GeothermalProbes} # TODO: add SolarthermalCollector
+const TemperatureNegotiateSource = Union{GeothermalProbes, SolarthermalCollector}
 const TemperatureNegotiateTarget = Union{SeasonalThermalStorage}
 const LimitCoolingInputTemperatureSource = Union{Electrolyser}
 const LimitCoolingInputTemperatureTarget = Union{SeasonalThermalStorage}
@@ -1850,7 +1851,7 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
 
     # 1. If a constant value is specified
     if haskey(config, constant_key) && config[constant_key] isa Number
-        val = config[constant_key]
+        val = Float64(config[constant_key])
         @info "For '$uac', the '$param_symbol' is set to the constant value of $val."
         return val, nothing
     end
@@ -1885,6 +1886,100 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
     else
         @info "For '$uac', no '$param_symbol' is set."
         return nothing, nothing
+    end
+end
+
+"""
+get_diff_solar_radiation_profile_from_config(config, simulation_parameter, uac)
+
+Function to determine the source of the solar diffuse radiation profile.
+* If no information is given, nothing will be returned.
+* If a diffuse_solar_radiation_profile_file_path is given, the diffuse solar radiation will be
+  read from the user-defined profile.
+* If a constant_diffuse_solar_radiation is set, this will be used.
+* If diffuse_solar_radiation_from_global_file is set to a valid entry ("difHorIrr") of the
+  global weather file, this will be used.
+
+The function also checks whether more than one temperature source is specified and throws a
+warning if this is the case.
+"""
+function get_diff_solar_radiation_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any},
+                                                      uac::String)
+    # check input
+    if (haskey(config, "diffuse_solar_radiation_profile_file_path") +
+        haskey(config, "diffuse_solar_radiation_from_global_file") +
+        haskey(config, "constant_diffuse_solar_radiation")) > 1
+        # end of condition
+        @warn "Two or more diffuse radiation profile sources for $(uac) have been specified in the input file!"
+    end
+
+    # determine temperature
+    if haskey(config, "diffuse_solar_radiation_profile_file_path")
+        @info "For '$uac', the diffuse solar radiation profile is taken from the user-defined .prf file."
+        return Profile(config["diffuse_solar_radiation_profile_file_path"], sim_params)
+    elseif haskey(config, "constant_diffuse_solar_radiation") && config["constant_diffuse_solar_radiation"] isa Number
+        @info "For '$uac', a constant diffuse solar radiation of $(config["constant_diffuse_solar_radiation"]) Wh/m^2 is set."
+        return nothing
+    elseif haskey(config, "diffuse_solar_radiation_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["diffuse_solar_radiation_from_global_file"], string(field_name))
+               for field_name in fieldnames(typeof(sim_params["weather_data"])))
+            @info "For '$uac', the diffuse solar radiation profile is taken from the project-wide weather file: " *
+                  "$(config["diffuse_solar_radiation_from_global_file"])"
+            return getfield(sim_params["weather_data"], Symbol(config["diffuse_solar_radiation_from_global_file"]))
+        else
+            @error "For '$uac', the'diffuse_solar_radiation_from_global_file' has to be one of: " *
+                   "$(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
+            throw(InputError)
+        end
+    else
+        @info "For '$uac', no diffuse solar radiation is set."
+        return nothing
+    end
+end
+
+"""
+get_wind_speed_profile_from_config(config, simulation_parameter, uac)
+
+Function to determine the source of the wind speed profile for fixed and bounded sinks
+and sources.
+* If no information is given, nothing will be returned.
+* If a wind_speed_profile_file_path is given, the wind speed will be read from the
+  user-defined profile.
+* If a constant_wind_speed is set, this will be used.
+* If wind_speed_from_global_file is set to a valid entry ("wind_speed") of the global
+  weather file, this will be used.
+
+The function also checks whether more than one wind speed source is specified and throws a
+warning if this is the case.
+"""
+function get_wind_speed_profile_from_config(config::Dict{String,Any}, sim_params::Dict{String,Any}, uac::String)
+    # check input
+    if (haskey(config, "wind_speed_profile_file_path") +
+        haskey(config, "wind_speed_from_global_file") +
+        haskey(config, "constant_wind_speed")) > 1
+        # end of condition
+        @warn "Two or more wind speed profile sources for $(uac) have been specified in the input file!"
+    end
+
+    # determine wind_speed
+    if haskey(config, "wind_speed_profile_file_path")
+        @info "For '$uac', the wind speed profile is taken from the user-defined .prf file."
+        return Profile(config["wind_speed_profile_file_path"], sim_params)
+    elseif haskey(config, "constant_wind_speed") && config["constant_wind_speed"] isa Number
+        @info "For '$uac', a constant wind speed of $(config["constant_wind_speed"]) °C is set."
+        return nothing
+    elseif haskey(config, "wind_speed_from_global_file") && haskey(sim_params, "weather_data")
+        if any(occursin(config["wind_speed_from_global_file"], string(field_name))
+               for field_name in fieldnames(typeof(sim_params["weather_data"])))
+            @info "For '$uac', the wind speed profile is taken from the project-wide weather file: $(config["wind_speed_from_global_file"])"
+            return getfield(sim_params["weather_data"], Symbol(config["wind_speed_from_global_file"]))
+        else
+            @error "For '$uac', the'wind_speed_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))"
+            throw(InputError)
+        end
+    else
+        @info "For '$uac', no wind speed is set."
+        return nothing
     end
 end
 
