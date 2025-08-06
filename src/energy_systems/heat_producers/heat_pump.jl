@@ -736,6 +736,12 @@ function calculate_slices(unit::HeatPump,
             break
         end
 
+        # apply restrictions of control modules for a slice
+        if !check_src_to_snk(unit.controller, energies.in_uacs[src_idx], energies.out_uacs[snk_idx])
+            snk_idx += 1
+            continue
+        end
+
         # check and determine input temperature of layer, also skip if it's not in the list
         # of indices to be used (this is used by the mechanism for transformer chains and
         # is controlled by arguments fixed_heat_in and fixed_heat_out)
