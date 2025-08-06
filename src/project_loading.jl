@@ -90,6 +90,9 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
             elseif lowercase(module_config["name"]) === "temperature_sorting"
                 push!(unit.controller.modules,
                       EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
+            elseif lowercase(module_config["name"]) === "forbid_src_to_snk"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_Forbid_Src_To_Snk(module_config, components, sim_params))
             end
         end
     end

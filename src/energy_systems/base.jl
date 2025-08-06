@@ -1249,6 +1249,7 @@ include("control_modules/economical_discharge.jl")
 include("control_modules/profile_limited.jl")
 include("control_modules/storage_driven.jl")
 include("control_modules/temperature_sorting.jl")
+include("control_modules/forbid_src_to_snk.jl")
 
 """
     link_output_with(unit, components)
