@@ -1,4 +1,4 @@
-ReSiE balanceWarn log file of simulation started at: 2025-06-05 11:50:01
+ReSiE balanceWarn log file of simulation started at: 2025-08-07 09:34:02
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 281700: -22469.011706000078
@@ -44,7 +44,6 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 2888100: -10158.468771000014
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 2914200: -12943.867631999994
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 2915100: -2168.4269119999954
-[BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3740400: -9040.121086687694
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3741300: -14927.086880000003
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3742200: -12045.54280000001
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3743100: -8425.456048000007
@@ -68,7 +67,6 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3759300: -6343.063124999986
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3760200: -4743.9950240000035
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3761100: -1535.4578040000051
-[BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3826800: -778.3883839999908
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3827700: -5323.714800000002
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3828600: -2619.1272159999935
 [BalanceWarning] Balance for component Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 was not zero in timestep 3830400: -6506.055184000026
