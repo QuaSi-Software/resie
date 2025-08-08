@@ -569,9 +569,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
             end
 
             #   target is transformer that has not been calculated its potential or process...
-            if (output_row.target.sys_function === EnergySystems.sf_transformer
-                &&
-                is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_potential)
+            if output_row.target.sys_function === EnergySystems.sf_transformer &&
+               (is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_potential)
                 &&
                 is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_pool)
                 # ...or has Inf written in its interface
@@ -606,7 +605,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 end
             end
 
-            if energy_pot < 0.0
+            if energy_pot < 0.0 ||
+               (input_row.source isa TemperatureNegotiateSource && output_row.target isa TemperatureNegotiateTarget)
                 push!(return_exchanges,
                       EnEx(; balance=0.0,
                            energy_potential=energy_pot,
@@ -625,9 +625,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
             end
 
             #   source is transformer that has not been calculated its potential or process...
-            if (input_row.source.sys_function === EnergySystems.sf_transformer
-                &&
-                is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_potential)
+            if input_row.source.sys_function === EnergySystems.sf_transformer &&
+               (is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_potential)
                 &&
                 is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_pool)
                 # ...or has Inf written in its interface
@@ -662,7 +661,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 end
             end
 
-            if energy_pot > 0.0
+            if energy_pot > 0.0 ||
+               (input_row.source isa TemperatureNegotiateSource && output_row.target isa TemperatureNegotiateTarget)
                 push!(return_exchanges,
                       EnEx(; balance=0.0,
                            energy_potential=energy_pot,

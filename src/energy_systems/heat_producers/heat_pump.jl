@@ -631,9 +631,9 @@ function handle_slice(unit::HeatPump,
     end
 
     if cop < 1.0
+        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
+               "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
         cop = 1.0
-        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
-               "input for mistakes as this should not happen. COP was set to 1.0")
     end
 
     # calculate energies with the current cop
