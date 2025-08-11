@@ -1015,7 +1015,9 @@ function order_indexes(constraints)
 
     if !success
         @warn "The order operation may be wrong, logical loops have been detected. " *
-              "Trying to solve them by removing contradictions."
+              "The algorithm will try to solve them by removing contradictions... You can check the input/output " *
+              "orders on the busses for contradictions - may there are some causing problems during the determination " *
+              "of the order or operation."
 
         # If there are loops, remove the reversed duplicates
         standardize_tuple(t) = t[1] < t[2] ? t : (t[2], t[1])
@@ -1035,6 +1037,8 @@ function order_indexes(constraints)
 
     if !success
         @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
+    else
+        @warn "...solved! But better check the order of operation in the auxiliary infos and the simulation results!"
     end
 
     return sorted_list
@@ -1875,16 +1879,34 @@ function find_parallels(components)
         return all(v -> v[end - 1] == last_name, vectors)
     end
 
+    function check_paths(paths)
+        filter!(path -> length(path) > 1, paths)
+        if length(paths) <= 1
+            return []
+        else
+            return paths
+        end
+    end
+
     for (keys, paths) in parallel_paths
         while values_are_identical(paths, 1) && values_are_identical(paths, 2)
             for v in paths
                 popfirst!(v)
             end
+            paths = check_paths(paths)
+            if paths == []
+                break
+            end
         end
-
-        while last_are_identical(paths) && second_last_are_identical(paths)
-            for v in paths
-                pop!(v)
+        if paths != []
+            while last_are_identical(paths) && second_last_are_identical(paths)
+                for v in paths
+                    pop!(v)
+                end
+                paths = check_paths(paths)
+                if paths == []
+                    break
+                end
             end
         end
     end
@@ -2404,7 +2426,7 @@ The component types that should be moved to the end can be specified within the 
 function reorder_control_steps(simulation_order, components)
     # Define component types whose control is to be moved to the end: the last one has the highest priority
     type_to_move_to_end = [EnergySystems.GeothermalProbes,
-                           # EnergySystems.SolarthermalCollector,  # TODO: activate when SolarthermalCollector is included
+                           EnergySystems.SolarthermalCollector,
                            EnergySystems.SeasonalThermalStorage]
 
     for component_type_to_move in type_to_move_to_end
