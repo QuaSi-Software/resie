@@ -1033,12 +1033,14 @@ function order_indexes(constraints)
         end
 
         success, sorted_list = topological_sorting(unique_tuples)
+
+        if success
+            @warn "...solved! But better check the order of operation in the auxiliary infos and the simulation results!"
+        end
     end
 
     if !success
         @warn "The order operation may be wrong. Check the results and the aux_info, may add a custom order!"
-    else
-        @warn "...solved! But better check the order of operation in the auxiliary infos and the simulation results!"
     end
 
     return sorted_list

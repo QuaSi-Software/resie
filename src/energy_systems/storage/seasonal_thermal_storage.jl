@@ -670,12 +670,11 @@ function control(unit::SeasonalThermalStorage,
 
     max_input_energy = zeros(length(temperatures_charging))
     for (input_idx, temperature) in enumerate(temperatures_charging)
-        max_input_energy[input_idx] = min(calculate_max_input_energy_by_temperature(unit,
+        max_input_energy[input_idx] = min(energy_supply[input_idx],
+                                          calculate_max_input_energy_by_temperature(unit,
                                                                                     temperature,
-                                                                                    unit.temperature_segments),
-                                          min(min(current_max_input_energy_vol(unit, temperature, sim_params),
-                                                  unit.max_input_energy),
-                                              energy_supply[input_idx]))
+                                                                                    unit.temperature_segments,
+                                                                                    sim_params))
     end
     if isempty(temperatures_charging)
         max_input_energy = [0.0]
@@ -741,14 +740,14 @@ function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{
 end
 
 function current_max_input_energy_vol(unit::SeasonalThermalStorage, temp_in::Temperature,
-                                      sim_params::Dict{String,Any})::Float64
+                                      lower_temp::Temperature, sim_params::Dict{String,Any})::Float64
     if unit.max_load_rate_mass === nothing
         return Inf
     else
         # calculate maximum energy from mass flow / volume limit for current temperature
         return convert_mass_in_energy(unit.max_load_rate_mass * unit.volume * unit.rho_medium *
                                       (sim_params["time_step_seconds"] / 60 / 60),
-                                      unit.temperature_segments[1],
+                                      lower_temp,
                                       temp_in,
                                       unit.cp_medium)
     end
@@ -778,9 +777,9 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
     for (input_idx, temperature) in enumerate(highest.(max_energy.temperature_max, max_energy.temperature_min))
         max_energy.max_energy[input_idx] = min(calculate_max_input_energy_by_temperature(unit,
                                                                                          temperature,
-                                                                                         temperature_segments_temporary),
-                                               min(min(unit.max_input_energy - sum(energy_input; init=0.0),
-                                                       current_max_input_energy_vol(unit, temperature, sim_params)),
+                                                                                         temperature_segments_temporary,
+                                                                                         sim_params),
+                                               min(unit.max_input_energy - sum(energy_input; init=0.0),
                                                    max_energy.max_energy[input_idx]))
     end
 
@@ -809,7 +808,8 @@ end
 
 """
     calculate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
-                                            current_temperature_distribution::Vector{Temperature}) -> Float64
+                                              current_temperature_distribution::Vector{Temperature},
+                                              sim_params::Dict{String,Any}) -> Float64
 
 Calculates the maximum possible input energy at a given single actual_input_temp for the
 given current_temperature_distribution
@@ -823,27 +823,37 @@ given current_temperature_distribution
 # Returns
 - `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
 """
-function calculate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
-                                                   current_temperature_distribution::Vector{Temperature})::Float64
+function calculate_max_input_energy_by_temperature(unit::SeasonalThermalStorage,
+                                                   actual_input_temp::Temperature,
+                                                   current_temperature_distribution::Vector{Temperature},
+                                                   sim_params::Dict{String,Any})::Float64
     # reduce maximal energy if the input temperature is near the temperature of the lower layer to avoid
     # numerical problems and pulsing during loading. Otherwise, it can happen that the STES is not taking
     # the energy that it is supposed to take, or a unreasonable high temporal resolution has to be used to
     # calculate the new temperature distribution within the STES.
     red_factor = 0.0 + clamp(actual_input_temp - current_temperature_distribution[2], 0.0, 5.0) * 1.0 / 5.0
-    return red_factor * sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
-                                                   actual_input_temp, unit.cp_medium)
-                            for (layer, volume) in enumerate(unit.volume_segments)
-                                if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
+    input_energy_limit = min(unit.max_input_energy,
+                             current_max_input_energy_vol(unit,
+                                                          actual_input_temp,
+                                                          current_temperature_distribution[1],
+                                                          sim_params))
+    return min(input_energy_limit,
+               red_factor *
+               sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
+                                          actual_input_temp, unit.cp_medium)
+                   for (layer, volume) in enumerate(unit.volume_segments)
+                   if current_temperature_distribution[layer] < actual_input_temp; init=0.0))
 end
 
 """
-    calculate_input_energy_from_input_temperature(energy::Float64)
+    calculate_input_energy_from_input_temperature(unit, actual_input_temp, sim_params)
 
 Wrapper function to calculate the maximum input energy for a given input temperature for the STES.
 
 Inputs:
 - `unit::SeasonalThermalStorage`: The seasonal thermal storage unit for which the calculation is performed.
 - `actual_input_temp::Temperature`: The temperature of the input energy being added to the storage.
+- `sim_params::Dict{String,Any}`: A dictionary containing simulation parameters
 
 Returns:
 - `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
@@ -852,7 +862,10 @@ Returns:
 function calculate_input_energy_from_input_temperature(unit::SeasonalThermalStorage,
                                                        actual_input_temp::Temperature,
                                                        sim_params::Dict{String,Any})::Float64
-    return calculate_max_input_energy_by_temperature(unit, actual_input_temp, unit.temperature_segments)
+    return calculate_max_input_energy_by_temperature(unit,
+                                                     actual_input_temp,
+                                                     unit.temperature_segments,
+                                                     sim_params)
 end
 
 """ 

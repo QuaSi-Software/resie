@@ -18,7 +18,7 @@ Target components need to have the following functions:
 
 """
 
-import Optim
+using Optim: Optim
 
 mutable struct CM_Negotiate_Temperature <: ControlModule
     name::String
@@ -136,7 +136,8 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     # get temperature bounds from source and target
     # would be the same as from exchange, but control might not performed yet
     target_min_in_temperature, target_max_in_temperature = get_input_temperature_bounds(components[target_uac])
-    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac], sim_params)
+    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac],
+                                                                                           sim_params)
 
     # get temperature bounds for connection from source_uac to target
     lower_temperature_bound = highest(source_min_out_temperature, target_min_in_temperature)
@@ -221,12 +222,12 @@ function find_best_temperature_and_get_energy(mod::CM_Negotiate_Temperature,
         temp_max_current = min(temps[last(active_indices)] + step_size, temp_max)
 
         result = Optim.optimize(temperature -> -f_min(temperature, unit_output, unit_input, sim_params),
-                          temp_min_current,
-                          temp_max_current,
-                          Optim.Brent();
-                          rel_tol=mod.parameters["optim_temperature_rel_tol"],
-                          abs_tol=mod.parameters["optim_temperature_abs_tol"],
-                          show_trace=false)
+                                temp_min_current,
+                                temp_max_current,
+                                Optim.Brent();
+                                rel_tol=mod.parameters["optim_temperature_rel_tol"],
+                                abs_tol=mod.parameters["optim_temperature_abs_tol"],
+                                show_trace=false)
         temperature_opt = Optim.minimizer(result)
         max_energy = f_min(temperature_opt, unit_output, unit_input, sim_params)
         return temperature_opt, max_energy
