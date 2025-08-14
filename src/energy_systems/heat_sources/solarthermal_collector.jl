@@ -53,7 +53,7 @@ mutable struct SolarthermalCollector <: Component
     delta_T_min::Union{Float64,Nothing}
     spec_flow_rate_min::Floathing
     # results
-    used_energy::Float64
+    used_energy::Array{Float64}
     output_temperature::Temperature
     average_temperature::Temperature
     last_average_temperature::Temperature
@@ -154,7 +154,7 @@ mutable struct SolarthermalCollector <: Component
                    default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
                    default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
                    # results
-                   0.0, # energy that was removed from the system in current time step
+                   [], # energy that was removed from the system in current time step
                    0.0, # output temperature in current time step, calculated in control()
                    0.0, # average temperature in current time step, calculated in control()
                    0.0, # average temperature from last time step, calculated in control()
@@ -240,16 +240,19 @@ function control(unit::SolarthermalCollector,
     # used as lookup table to speed up calculation
     unit.temperature_energy_pairs = Dict{Temperature,Tuple}()
 
-    unit.available_energies, has_calculated_all_maxima, unit.average_temperatures,
-    unit.output_temperatures, unit.runtimes = calculate_energies(unit, components, sim_params)
+    unit.available_energies,
+    has_calculated_all_maxima,
+    unit.average_temperatures,
+    unit.output_temperatures,
+    unit.calc_uacs = calculate_energies(unit, components, sim_params)
 
     unit.output_temperature = highest(unit.output_temperatures)
 
     set_max_energy!(unit.output_interfaces[unit.m_heat_out],
-                    unit.available_energies[1:(end - 1)],
-                    [nothing for _ in 1:(length(unit.available_energies) - 1)],
-                    unit.output_temperatures[1:(end - 1)],
-                    unit.calc_uacs[1:(end - 1)],
+                    unit.available_energies,
+                    [nothing for _ in 1:(length(unit.available_energies))],
+                    unit.output_temperatures,
+                    unit.calc_uacs,
                     has_calculated_all_maxima,
                     false)
 end
@@ -258,12 +261,15 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     exchanges = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
     energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
 
-    output_temperature_interface = lowest(unit.output_temperature, temp_min_highest(exchanges))
-    unit.used_energy = 0.0
-
+    unit.used_energy = zeros(Float64, length(unit.calc_uacs))
+    unit.runtimes = Array{Floathing}(nothing, length(unit.calc_uacs))
+    
     if sum(energy_demands) > 0 && _sum(unit.available_energies) > 0
-        uac_idx = 0
-        for (uac_idx, e) in enumerate(exchanges)
+        temperature_min = Array{Temperature}(nothing, length(unit.calc_uacs))
+        temperature_max = Array{Temperature}(nothing, length(unit.calc_uacs))
+        purpose_uac = Array{Stringing}(nothing, length(unit.calc_uacs))
+        for e in exchanges
+            uac_idx = findfirst(==(e.purpose_uac), unit.calc_uacs)
             comp_energy_demand = abs(e.balance + e.energy_potential)
             used_energy_comp = min(comp_energy_demand, unit.available_energies[uac_idx])
 
@@ -278,17 +284,23 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
                                                      (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
             end
 
-            unit.used_energy += used_energy_comp
-            unit.runtimes[uac_idx] = comp_energy_demand / unit.available_energies[uac_idx] * unit.runtimes[uac_idx]
+            unit.used_energy[uac_idx] = used_energy_comp
+            temperature_min[uac_idx] = e.temperature_min
+            temperature_max[uac_idx] = e.temperature_max
+            purpose_uac[uac_idx] = e.purpose_uac
+            if unit.available_energies[uac_idx] > 0
+                unit.runtimes[uac_idx] = used_energy_comp / unit.available_energies[uac_idx]
+            end
         end
 
-        unit.runtimes[end] = 0
         add!(unit.output_interfaces[unit.m_heat_out],
              unit.used_energy,
-             output_temperature_interface)
-
+             temperature_min,
+             temperature_max,
+             purpose_uac)
     else
-        unit.used_energy = 0.0
+        unit.used_energy = [0.0]
+        # unit.runtimes = [nothing]
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
     end
 
@@ -301,7 +313,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         end
     end
 
-    if _sum(unit.runtimes) == 0
+    if isnothing(_sum(unit.runtimes)) || _sum(unit.runtimes) == 0
         stagnation_temp = get_stagnation_temperature(unit, sim_params)
         unit.output_temperature = stagnation_temp
         unit.average_temperature = stagnation_temp
@@ -309,16 +321,26 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
         unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
     end
-
-    unit.last_average_temperature = unit.average_temperature
+    
+    # if isnothing(_sum(unit.runtimes)) || _sum(unit.runtimes) == 0
+    #     stagnation_temp = get_stagnation_temperature(unit, sim_params)
+    #     push!(unit.output_temperatures, stagnation_temp)
+    #     push!(unit.average_temperatures, stagnation_temp)
+    #     push!(unit.runtimes, 1)
+    # end
+    
+    # unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
+    # unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
 
     if unit.output_temperature == unit.average_temperature
         unit.spec_flow_rate_actual = 0
     else
-        unit.spec_flow_rate_actual = (unit.used_energy * 3600.0 / sim_params["time_step_seconds"]) /
+        unit.spec_flow_rate_actual = (_sum(unit.used_energy) * 3600.0 / sim_params["time_step_seconds"]) /
                                      unit.collector_gross_area /
                                      ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap)
     end
+
+    unit.last_average_temperature = unit.average_temperature
 end
 
 """
@@ -342,112 +364,55 @@ connected component. Results are written as dictionaries with the uac of the com
 - `runtimes::Array{Floathing}`: The partial time as part of 1 each connected component gets delivered energy with uac as keys.
 """
 function calculate_energies(unit::SolarthermalCollector, components, sim_params::Dict{String,Any})
-    left_energy_factor = 1.0
-    component_idx = 1
-
     exchanges = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
 
-    available_energies = Array{Floathing}(nothing, length(exchanges) + 1)
-    average_temperatures = Array{Floathing}(nothing, length(exchanges) + 1)
-    output_temperatures = Array{Floathing}(nothing, length(exchanges) + 1)
-    runtimes = Array{Floathing}(nothing, length(exchanges) + 1)
-
-    potential_energies = Float64[]
-    unit.calc_uacs = Stringing[]
-    target_temperatures = Temperature[]
-    for exchange in exchanges
+    average_temperatures = Array{Floathing}(nothing, length(exchanges))
+    output_temperatures = Array{Floathing}(nothing, length(exchanges))
+    max_energies = zeros(Float64, length(exchanges))
+    target_uac = Array{Stringing}(nothing, length(exchanges))
+    for (ex_idx, exchange) in enumerate(exchanges)
         # no check for possibly written max energy --> is done by set_max_energy!() for 
         # 1-to-1 connections and for a connection to a bus, the interface is only used by 
         # the current component
-        success, target_temperature, max_energy = determine_temperature_and_energy(unit.controller,
-                                                                                   components,
-                                                                                   unit.uac,
-                                                                                   exchange.purpose_uac,
-                                                                                   sim_params)
+        success, exchange_temperature, max_energy = determine_temperature_and_energy(unit.controller,
+                                                                                     components,
+                                                                                     unit.uac,
+                                                                                     exchange.purpose_uac,
+                                                                                     sim_params)
         if !success
             # no control module is provided between source and target
             # set temperature to exchange.temperature_min --> can also be nothing, but in 
             # case it is given we will use it if no control module is used
-            target_temperature, max_energy = check_temperature_and_get_max_energy(unit,
-                                                                                  sim_params,
-                                                                                  exchange.temperature_min,
-                                                                                  false)
+            exchange_temperature, max_energy = check_temperature_and_get_max_energy(unit,
+                                                                                    sim_params,
+                                                                                    exchange.temperature_min,
+                                                                                    false)
         end
-
-        push!(unit.calc_uacs, exchange.purpose_uac)
-        push!(target_temperatures, target_temperature)
-        push!(potential_energies, max_energy)
-    end
-
-    for component_idx in 1:length(exchanges)
-        if left_energy_factor < 0
-            available_energies[component_idx] = 0
-            runtimes[component_idx] = 0
-            continue
-        end
-        if potential_energies[component_idx] == 0
+    
+        if max_energy == 0
             t_avg = nothing
-            t_target = nothing
-            produced_energy = 0.0
+            exchange_temperature = nothing
         else
-            produced_energy = calculate_output_energy_from_output_temperature(unit, target_temperatures[component_idx],
-                                                                              sim_params) * left_energy_factor
-            _, t_avg, t_target = unit.temperature_energy_pairs[target_temperatures[component_idx]]
+            _, t_avg, exchange_temperature = unit.temperature_energy_pairs[exchange_temperature]
         end
 
-        # check if more energy can be produced for a certain component than is demanded
-        if any(isinf, potential_energies)
-            available_energies[component_idx] = produced_energy
-            runtimes[component_idx] = 1
-
-        elseif produced_energy == 0
-            available_energies[component_idx] = produced_energy
-            runtimes[component_idx] = 0
-
-        elseif produced_energy > potential_energies[component_idx]
-            available_energies[component_idx] = potential_energies[component_idx]
-            left_energy_factor *= (produced_energy - potential_energies[component_idx]) / produced_energy
-            runtimes[component_idx] = (produced_energy - potential_energies[component_idx]) / produced_energy
-
-        else
-            available_energies[component_idx] = produced_energy
-            runtimes[component_idx] = left_energy_factor
-            left_energy_factor = 0
-        end
-
-        average_temperatures[component_idx] = t_avg
-        output_temperatures[component_idx] = t_target
+        target_uac[ex_idx] = exchange.purpose_uac
+        output_temperatures[ex_idx] = exchange_temperature
+        max_energies[ex_idx] = max_energy
+        average_temperatures[ex_idx] = t_avg
     end
 
-    push!(unit.calc_uacs, unit.uac)
-
-    # if no energy at expected temperature levels is available then use max_output_temperature 
-    # which equals average temperature with a used energy of 0
-    if _sum(available_energies) == 0
-        stagnation_temp = get_stagnation_temperature(unit, sim_params)
-        calc_max = false
-        average_temperatures[end] = stagnation_temp
-        output_temperatures[end] = stagnation_temp
-        runtimes[end] = 1
-
-    elseif any(isinf, potential_energies)
-        stagnation_temp = get_stagnation_temperature(unit, sim_params)
-        calc_max = true
-        average_temperatures[end] = stagnation_temp
-        output_temperatures[end] = stagnation_temp
-        runtimes[end] = 1
+    if length(exchanges) > 1
+        has_calculated_all_maxima = true
     else
-        calc_max = false
-        average_temperatures[end] = nothing
-        output_temperatures[end] = nothing
-        runtimes[end] = nothing
+        has_calculated_all_maxima = false
     end
 
-    return (available_energies,
-            calc_max,
+    return (max_energies,
+            has_calculated_all_maxima,
             average_temperatures,
             output_temperatures,
-            runtimes)
+            target_uac)
 end
 
 """
