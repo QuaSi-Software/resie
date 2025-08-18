@@ -642,7 +642,7 @@ function get_max_energy(max_energy::EnergySystems.MaxEnergy, purpose_uac::String
             return 0.0
         else
             if max_energy.has_calculated_all_maxima
-                return max_energy.max_energy[idx[1]]
+                return sum(max_energy.max_energy[idx])
             else
                 return sum(max_energy.max_energy[i] for i in idx)
             end
@@ -772,16 +772,23 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
         else # a purpose uac is given and temperature is checked by the calling bus
             idx_list = findall(uac_of_caller .== max_energy.purpose_uac)
             if !isempty(idx_list)
-                for idx in idx_list
-                    current_amount_idx = min(current_amount, max_energy.max_energy[idx])
-                    if max_energy.has_calculated_all_maxima
-                        max_energy.max_energy .*= 1 - (current_amount_idx / max_energy.max_energy[idx])
-                    else
-                        max_energy.max_energy[idx] -= current_amount_idx
+                if max_energy.has_calculated_all_maxima
+                    total_max_energy = sum(max_energy.max_energy[idx_list])
+                    if current_amount > total_max_energy
+                        @error "This should not happen."
                     end
-                    current_amount -= current_amount_idx
+                    if total_max_energy != 0.0
+                        max_energy.max_energy .*= 1 - (current_amount / total_max_energy)
+                    end
+                else
+                    for idx in idx_list
+                        current_amount_idx = min(current_amount, max_energy.max_energy[idx])
+                        max_energy.max_energy[idx] -= current_amount_idx
+                        current_amount -= current_amount_idx
+                    end
                 end
             else
+                test = 1
                 @error "The uac could not be found in the max_energy."
             end
         end
@@ -1601,7 +1608,7 @@ include("efficiency.jl")
 # now that the components are defined we can load the control modules, which depend on their
 # definitions
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
-const TemperatureNegotiateSource = Union{GeothermalProbes, SolarthermalCollector}
+const TemperatureNegotiateSource = Union{GeothermalProbes,SolarthermalCollector}
 const TemperatureNegotiateTarget = Union{SeasonalThermalStorage}
 const LimitCoolingInputTemperatureSource = Union{Electrolyser}
 const LimitCoolingInputTemperatureTarget = Union{SeasonalThermalStorage}
