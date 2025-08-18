@@ -133,6 +133,10 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
 end
 
+function component_has_minimum_part_load(unit::FuelBoiler)
+    return unit.min_power_fraction > 0.0
+end
+
 function output_values(unit::FuelBoiler)::Vector{String}
     return [string(unit.m_fuel_in) * " IN",
             string(unit.m_heat_out) * " OUT",

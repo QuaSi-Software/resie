@@ -377,14 +377,22 @@ transformer to the simulation_order without calling add_transformer_steps.
 """
 function wrapper_add_transformer_steps(components_by_function, simulation_order, initial_nr)
     transformers = components_by_function[4]
-    if length(transformers) > 1
+    if length(transformers) == 1
+        # check if this transformer is a circle_transformer, meaning it has input and output to the same bus
+        all_input_busses = [i.source.proxy === nothing ? i.source.uac : i.source.proxy.uac
+                            for i in values(transformers[1].input_interfaces)
+                            if i.source.sys_function === EnergySystems.sf_bus]
+        all_output_busses = [i.target.proxy === nothing ? i.target.uac : i.target.proxy.uac
+                             for i in values(transformers[1].output_interfaces)
+                             if i.target.sys_function === EnergySystems.sf_bus]
+        is_circle_transformer = !isempty(intersect(all_input_busses, all_output_busses))
+    else
+        is_circle_transformer = false
+    end
+
+    if length(transformers) > 1 || is_circle_transformer
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
-        for component in transformers_and_busses
-            if component.sys_function === EnergySystems.sf_bus && component.proxy !== nothing
-                component = component.proxy
-            end
-        end
-        transformers_and_busses = unique(transformers_and_busses)
+        filter!(c -> !(c.sys_function === EnergySystems.sf_bus && c.proxy !== nothing), transformers_and_busses)
         # detect parallel branches in the current energy system
         parallel_branches = find_parallels(transformers_and_busses)
 
@@ -564,8 +572,8 @@ function add_transformer_steps(simulation_order,
                                step_category;
                                reverse=nothing,
                                connecting_component=nothing,
-                               checked_components=[])
-
+                               checked_components=[],
+                               exit_on_next_iteration=false)
     # Here are some helper functions that are used by MBs and MTs
     function add_component_to_checked_components(checked_components, branches)
         if branches !== nothing
@@ -631,6 +639,20 @@ function add_transformer_steps(simulation_order,
             current_reverse = rev
         end
         return current_reverse
+    end
+
+    function contains_transformer_with_min_part_load(components)
+        transformer_only = [component
+                            for component in components if component.sys_function === EnergySystems.sf_transformer]
+        if length(transformer_only) <= 1
+            return false
+        end
+        for component in transformer_only
+            if EnergySystems.component_has_minimum_part_load(component)
+                return true
+            end
+        end
+        return false
     end
 
     # detect the first "middle transformers" that has either at more than one input interface 
@@ -844,6 +866,50 @@ function add_transformer_steps(simulation_order,
                                                           connecting_component=connecting_component,
                                                           checked_components=current_checked_components)
             end
+            if step_category == "potential" && !exit_on_next_iteration
+                # Check if the middle_bus has the same transformer both in the inputs and outputs.
+                # If yes, iterate over middle bus branches again with !reverse
+                all_input_transformer = [i.source.uac
+                                         for i in first_middle_bus.input_interfaces
+                                         if i.source.sys_function === EnergySystems.sf_transformer]
+                all_output_transformer = [i.target.uac
+                                          for i in first_middle_bus.output_interfaces
+                                          if i.target.sys_function === EnergySystems.sf_transformer]
+                if !isempty(intersect(all_input_transformer, all_output_transformer))
+                    for (idx, middle_bus_branch) in enumerate(Iterators.reverse(middle_bus_branches))
+                        idx = length(middle_bus_branches) - (idx - 1)
+                        middle_bus_branch_transformer = [x
+                                                         for x in middle_bus_branch
+                                                         if x.sys_function === EnergySystems.sf_transformer]
+                        if isempty(middle_bus_branch_transformer)
+                            continue
+                        end
+
+                        current_reverse = !determine_reverse(reverse, is_connecting_branch, idx, step_category)
+
+                        if is_input[idx]
+                            connecting_component = middle_bus_branch_transformer[end]
+                        else
+                            connecting_component = middle_bus_branch_transformer[1]
+                        end
+
+                        current_checked_components = setdiff(checked_components, middle_bus_branch)
+
+                        simulation_order,
+                        initial_nr,
+                        _,
+                        parallel_branches = add_transformer_steps(simulation_order,
+                                                                  initial_nr,
+                                                                  middle_bus_branch,
+                                                                  parallel_branches,
+                                                                  step_category;
+                                                                  reverse=current_reverse,
+                                                                  connecting_component=connecting_component,
+                                                                  checked_components=current_checked_components,
+                                                                  exit_on_next_iteration=true)
+                    end
+                end
+            end
         else
             # no middle busses found
             # write steps according default or predefined order if given
@@ -907,21 +973,26 @@ function add_transformer_steps(simulation_order,
                                     initial_nr -= 1
                                 end
                             end
-                            # if there is a transformer that is starting and/or endpoint of the parallel paths, then
+                            # If there is a transformer that is starting and/or endpoint of the parallel paths, then
                             # perform also on the last step a "reverse" of potential and afterwards potential the transformer
-                            if (length(current_middle_transformers) > 0
-                                && branch_idx == nr_parallel_branches
-                                && step_category == "potential")
-                                # end of condition
-                                for component_rev in Iterators.reverse(current_branch_transformers[1:(end - 1)])
-                                    push!(simulation_order,
-                                          [initial_nr, (component_rev.uac, EnergySystems.s_potential)])
-                                    initial_nr -= 1
+                            # If there is a transformer with minimum part load in the current branch that also contains at 
+                            # least two transformers, then also perform another potential with reverse order.
+                            if step_category == "potential"
+                                if (length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches) ||
+                                   contains_transformer_with_min_part_load(current_branch)
+                                    # end of condition
+                                    for component_rev in Iterators.reverse(current_branch_transformers[1:(end - 1)])
+                                        push!(simulation_order,
+                                              [initial_nr, (component_rev.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                 end
-                                for current_middle_transformer in current_middle_transformers
-                                    push!(simulation_order,
-                                          [initial_nr, (current_middle_transformer.uac, EnergySystems.s_potential)])
-                                    initial_nr -= 1
+                                if length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches
+                                    for current_middle_transformer in current_middle_transformers
+                                        push!(simulation_order,
+                                              [initial_nr, (current_middle_transformer.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                 end
                             elseif length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches &&
                                    step_category == "process"
@@ -944,6 +1015,26 @@ function add_transformer_steps(simulation_order,
                         initial_nr -= 1
                     end
                 end
+            end
+            if !branch_finished &&
+               step_category == "potential" &&
+               !exit_on_next_iteration &&
+               contains_transformer_with_min_part_load(current_components)
+                # if no parallel branch was detected and we are during the potential step, check if the current_components 
+                # contain a transformer with minimum part load and if the current_components contain more than one transformer.
+                # If yes, perform another potential with reverse order.
+                simulation_order,
+                initial_nr,
+                checked_components,
+                parallel_branches = add_transformer_steps(simulation_order,
+                                                          initial_nr,
+                                                          current_components,
+                                                          parallel_branches,
+                                                          step_category;
+                                                          reverse=!reverse,
+                                                          connecting_component=connecting_component,
+                                                          checked_components=checked_components,
+                                                          exit_on_next_iteration=true)
             end
         end
     end

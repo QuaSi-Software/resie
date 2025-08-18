@@ -1115,6 +1115,10 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
 end
 
+function component_has_minimum_part_load(unit::HeatPump)
+    return unit.min_usage_fraction > 0.0
+end
+
 # has its own reset function as here more parameters are present that need to be reset in
 # every timestep
 function reset(unit::HeatPump)

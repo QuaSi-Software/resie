@@ -409,6 +409,11 @@ function reset(unit::Electrolyser)
     unit.losses_heat = 0.0
 end
 
+function component_has_minimum_part_load(unit::Electrolyser)
+    return (unit.dispatch_strategy == "equal_with_mpf" && unit.min_power_fraction > 0.0) ||
+           unit.min_power_fraction_total > 0.0
+end
+
 function output_values(unit::Electrolyser)::Vector{String}
     channels = [string(unit.m_el_in) * " IN",
                 string(unit.m_h2_out) * " OUT",

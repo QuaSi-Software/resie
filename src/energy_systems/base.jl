@@ -1286,6 +1286,23 @@ function check_temperatures_sink(exchanges::Vector{EnergyExchange}, input_temper
 end
 
 """
+    component_has_minimum_part_load(component)
+
+Checks if a component has a minimum part-load ratio set by the user.
+This is a default implementation that is returns always false.
+
+# Arguments
+ `unit::Component`: The receiving component
+
+# Returns
+- `Bool`: A bool indicating if the component is part-load-dependent or not
+"""
+function component_has_minimum_part_load(component::Component)
+    # base implementation is always false
+    return false
+end
+
+"""
     balance_on(interface, unit)
 
 Return the balance of a unit in respect to the given interface.
