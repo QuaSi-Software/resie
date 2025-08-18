@@ -262,31 +262,21 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
 
     unit.used_energy = zeros(Float64, length(unit.calc_uacs))
-    unit.runtimes = Array{Floathing}(nothing, length(unit.calc_uacs))
-    
+    unit.runtimes = zeros(Float64, length(unit.calc_uacs))
+    purpose_uac = Array{Stringing}(nothing, length(unit.calc_uacs))
+
     if sum(energy_demands) > 0 && _sum(unit.available_energies) > 0
         temperature_min = Array{Temperature}(nothing, length(unit.calc_uacs))
         temperature_max = Array{Temperature}(nothing, length(unit.calc_uacs))
-        purpose_uac = Array{Stringing}(nothing, length(unit.calc_uacs))
+
         for e in exchanges
             uac_idx = findfirst(==(e.purpose_uac), unit.calc_uacs)
             comp_energy_demand = abs(e.balance + e.energy_potential)
             used_energy_comp = min(comp_energy_demand, unit.available_energies[uac_idx])
 
-            # recalculate the average_temperature if not all energy is used to keep a constant 
-            # flow rate
-            if unit.delta_T === nothing && unit.spec_flow_rate !== nothing &&
-               used_energy_comp < unit.available_energies[uac_idx]
-                # end of condition
-                unit.average_temperatures[uac_idx] = e.temperature_min -
-                                                     sim_params["wh_to_watts"](used_energy_comp) /
-                                                     unit.collector_gross_area /
-                                                     (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
-            end
-
-            unit.used_energy[uac_idx] = used_energy_comp
-            temperature_min[uac_idx] = e.temperature_min
-            temperature_max[uac_idx] = e.temperature_max
+            unit.used_energy[uac_idx] += used_energy_comp
+            temperature_min[uac_idx] = unit.output_temperatures[uac_idx]
+            temperature_max[uac_idx] = unit.output_temperatures[uac_idx]
             purpose_uac[uac_idx] = e.purpose_uac
             if unit.available_energies[uac_idx] > 0
                 unit.runtimes[uac_idx] = used_energy_comp / unit.available_energies[uac_idx]
@@ -300,16 +290,17 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
              purpose_uac)
     else
         unit.used_energy = [0.0]
-        # unit.runtimes = [nothing]
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
     end
 
-    for (uac_idx, uac) in enumerate(unit.calc_uacs)
-        if !(uac in [e.purpose_uac for e in exchanges] || uac == unit.uac) &&
-           !isnothing(unit.average_temperatures[uac_idx])
-            unit.runtimes[uac_idx] = 0
-        elseif isnothing(unit.average_temperatures[uac_idx])
-            unit.runtimes[uac_idx] = nothing
+    # correct runtimes to make sure the amount of non nothing runtimes is the same as non 
+    # nothing temperatures and the sum of runtimes is normalized to cover the whole time step
+    runtimes_sum = _sum(unit.runtimes)
+    for idx in eachindex(unit.runtimes)
+        if isnothing(unit.average_temperatures[idx])
+            unit.runtimes[idx] = nothing
+        else
+            unit.runtimes[idx] = unit.runtimes[idx] / runtimes_sum
         end
     end
 
@@ -318,24 +309,27 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         unit.output_temperature = stagnation_temp
         unit.average_temperature = stagnation_temp
     else
+        # recalculate the average_temperature to keep a constant flow rate if necessary
+        if unit.spec_flow_rate !== nothing
+            for uac_idx in eachindex(unit.runtimes)
+                if !isnothing(unit.runtimes[uac_idx]) && unit.runtimes[uac_idx] != 0
+                    unit.average_temperatures[uac_idx] = unit.output_temperatures[uac_idx] -
+                                                         (sim_params["wh_to_watts"](unit.used_energy[uac_idx]) /
+                                                          unit.runtimes[uac_idx]) /
+                                                         unit.collector_gross_area /
+                                                         (unit.spec_flow_rate * 2 * unit.vol_heat_cap)
+                end
+            end
+        end
+
         unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
         unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
     end
-    
-    # if isnothing(_sum(unit.runtimes)) || _sum(unit.runtimes) == 0
-    #     stagnation_temp = get_stagnation_temperature(unit, sim_params)
-    #     push!(unit.output_temperatures, stagnation_temp)
-    #     push!(unit.average_temperatures, stagnation_temp)
-    #     push!(unit.runtimes, 1)
-    # end
-    
-    # unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
-    # unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
 
     if unit.output_temperature == unit.average_temperature
         unit.spec_flow_rate_actual = 0
     else
-        unit.spec_flow_rate_actual = (_sum(unit.used_energy) * 3600.0 / sim_params["time_step_seconds"]) /
+        unit.spec_flow_rate_actual = sim_params["wh_to_watts"](_sum(unit.used_energy)) /
                                      unit.collector_gross_area /
                                      ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap)
     end
@@ -388,7 +382,7 @@ function calculate_energies(unit::SolarthermalCollector, components, sim_params:
                                                                                     exchange.temperature_min,
                                                                                     false)
         end
-    
+
         if max_energy == 0
             t_avg = nothing
             exchange_temperature = nothing
@@ -793,7 +787,7 @@ spec_thermal_power_func
 # Returns
 - 'Float64': Derivative of difference between generated energy, losses and power output
 """
-function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::SolarthermalCollector, 
+function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::SolarthermalCollector,
                                           time_step, independent_target_temp::Int64=1)
     unit.a_params[1] * (-1) -
     unit.a_params[2] * 2 * (t_avg - unit.ambient_temperature) -
