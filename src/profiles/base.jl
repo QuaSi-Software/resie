@@ -1085,7 +1085,7 @@ function segment_profile(begin_dt::DateTime,
         interval_end = (i == n_hours) ? fractional_hour(end_dt) : end_of_hour
 
         # Get sunrise and sunset for current_date.
-        if in(current_hour_dt, sunrise_sunset[1].data.keys)
+        if haskey(sunrise_sunset[1].data, current_hour_dt)
             sunrise = sunrise_sunset[1].data[current_hour_dt]
             sunset = sunrise_sunset[2].data[current_hour_dt]
         else
