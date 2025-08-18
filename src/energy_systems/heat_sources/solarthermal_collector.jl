@@ -53,11 +53,12 @@ mutable struct SolarthermalCollector <: Component
     delta_T_min::Union{Float64,Nothing}
     spec_flow_rate_min::Floathing
     # results
-    used_energy::Array{Float64}
+    used_energy::Array{Floathing}
     output_temperature::Temperature
     average_temperature::Temperature
     last_average_temperature::Temperature
     spec_flow_rate_actual::Floathing
+    delta_T_actual::Float64
     # internal parameters for temperature layers
     available_energies::Array{Floathing}
     average_temperatures::Array{Floathing}
@@ -159,6 +160,7 @@ mutable struct SolarthermalCollector <: Component
                    0.0, # average temperature in current time step, calculated in control()
                    0.0, # average temperature from last time step, calculated in control()
                    0.0, # actual flow rate resulting from simulation and used energy
+                   0.0, # actual delta_T resulting from simulation and written to output
                    # internal parameters for temperature layers
                    [], # list of available_energies in for each component connected to the collector
                    [], # list of average_temperatures in for each component connected to the collector
@@ -261,8 +263,8 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     exchanges = balance_on(unit.output_interfaces[unit.m_heat_out], unit.output_interfaces[unit.m_heat_out].target)
     energy_demands = [abs(e.balance + e.energy_potential) for e in exchanges]
 
-    unit.used_energy = zeros(Float64, length(unit.calc_uacs))
-    unit.runtimes = zeros(Float64, length(unit.calc_uacs))
+    unit.used_energy = zeros(length(unit.calc_uacs))
+    unit.runtimes = zeros(length(unit.calc_uacs))
     purpose_uac = Array{Stringing}(nothing, length(unit.calc_uacs))
 
     if sum(energy_demands) > 0 && _sum(unit.available_energies) > 0
@@ -289,7 +291,6 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
              temperature_max,
              purpose_uac)
     else
-        unit.used_energy = [0.0]
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
     end
 
@@ -299,6 +300,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     for idx in eachindex(unit.runtimes)
         if isnothing(unit.average_temperatures[idx])
             unit.runtimes[idx] = nothing
+            unit.used_energy[idx] = nothing
         else
             unit.runtimes[idx] = unit.runtimes[idx] / runtimes_sum
         end
@@ -308,6 +310,8 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         stagnation_temp = get_stagnation_temperature(unit, sim_params)
         unit.output_temperature = stagnation_temp
         unit.average_temperature = stagnation_temp
+        unit.spec_flow_rate_actual = 0
+        unit.delta_T_actual = 0
     else
         # recalculate the average_temperature to keep a constant flow rate if necessary
         if unit.spec_flow_rate !== nothing
@@ -324,14 +328,13 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
 
         unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.runtimes)
         unit.average_temperature = _weighted_mean(unit.average_temperatures, unit.runtimes)
-    end
 
-    if unit.output_temperature == unit.average_temperature
-        unit.spec_flow_rate_actual = 0
-    else
         unit.spec_flow_rate_actual = sim_params["wh_to_watts"](_sum(unit.used_energy)) /
                                      unit.collector_gross_area /
                                      ((unit.output_temperature - unit.average_temperature) * 2 * unit.vol_heat_cap)
+        unit.delta_T_actual = (unit.output_temperature - unit.average_temperature) * 2
+
+        unit.output_temperature = _weighted_mean(unit.output_temperatures, unit.used_energy)
     end
 
     unit.last_average_temperature = unit.average_temperature
@@ -822,7 +825,7 @@ function output_value(unit::SolarthermalCollector, key::OutputKey)::Float64
     elseif key.value_key == "diffuse_solar_irradiance_in_plane"
         return unit.diffuse_solar_irradiance_in_plane
     elseif key.value_key == "delta_T"
-        return (unit.output_temperature - unit.average_temperature) * 2
+        return unit.delta_T_actual
     elseif key.value_key == "spec_flow_rate"
         return unit.spec_flow_rate_actual
     end
