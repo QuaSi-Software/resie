@@ -373,16 +373,16 @@ function dump_auxiliary_outputs(project_config::Dict{AbstractString,Any},
 end
 
 """
-geather_output_data(output_keys, time)
+gather_output_data(output_keys, time)
 
-returns a vektor with the requested data in output_keys
+returns a vector with the requested data in output_keys
 """
-function geather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
-    return_values = Vector{Any}()
-    append!(return_values, time)
+function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
+    return_values = zeros(Union{Int,Float64}, length(output_keys) + 1)
+    return_values[1] = time
 
-    for outkey in output_keys
-        append!(return_values, output_value(outkey.unit, outkey))
+    for (idx, outkey) in enumerate(output_keys)
+        return_values[idx + 1] = output_value(outkey.unit, outkey)
     end
 
     return return_values

@@ -257,7 +257,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
         # gather output data of each component for line plot
         if do_create_plot_data
-            output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, sim_params["time"])
+            output_data_lineplot[steps, :] = gather_output_data(output_keys_lineplot, sim_params["time"])
         end
         if do_create_plot_weather
             output_weather_lineplot[steps, :] = gather_weather_data(weather_data_keys, sim_params)
