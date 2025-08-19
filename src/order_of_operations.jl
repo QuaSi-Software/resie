@@ -1163,6 +1163,9 @@ function detect_branch_order_of_middle_bus(middle_bus_branches, is_input, is_con
     # check for input interdependencies
     for (branch_idx, branch) in enumerate(middle_bus_branches)
         for (component_idx, component) in enumerate(branch)
+            if component.sys_function !== EnergySystems.sf_transformer
+                continue
+            end
             if is_input[branch_idx]
                 # check all input interface
                 exclude_input_interfaces = []
