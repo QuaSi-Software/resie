@@ -285,11 +285,16 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
             end
         end
 
-        add!(unit.output_interfaces[unit.m_heat_out],
-             unit.used_energy,
-             temperature_min,
-             temperature_max,
-             purpose_uac)
+        mask = abs.(unit.used_energy) .> sim_params["epsilon"]
+        if any(mask)
+            add!(unit.output_interfaces[unit.m_heat_out],
+                 unit.used_energy[mask],
+                 temperature_min[mask],
+                 temperature_max[mask],
+                 purpose_uac[mask])
+        else
+            set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
+        end
     else
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
     end
