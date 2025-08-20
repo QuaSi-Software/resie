@@ -40,6 +40,7 @@
 "Proxy-TST_BUS_01|TST_BUS_03 s_process",
 "TST_P2H_01 s_potential",
 "TST_HP_01 s_potential",
+"TST_P2H_01 s_potential",
 "TST_SRC_02 s_process",
 "TST_STC_01 s_process",
 "TST_SRC_03 s_process",

@@ -60,6 +60,7 @@
 "Proxy-TST_BUS_TH_00|TST_BUS_TH_01|TST_BUS_TH_02 s_process",
 "TST_ELY_01 s_potential",
 "TST_HTP_02 s_potential",
+"TST_ELY_01 s_potential",
 "TST_HTP_01 s_potential",
 "TST_CHP_01 s_potential",
 "TST_GBO_01 s_potential",
