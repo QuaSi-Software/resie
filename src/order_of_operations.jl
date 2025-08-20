@@ -379,13 +379,8 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
     transformers = components_by_function[4]
     if length(transformers) == 1
         # check if this transformer is a circle_transformer, meaning it has input and output to the same bus
-        all_input_busses = [i.source.proxy === nothing ? i.source.uac : i.source.proxy.uac
-                            for i in values(transformers[1].input_interfaces)
-                            if i.source.sys_function === EnergySystems.sf_bus]
-        all_output_busses = [i.target.proxy === nothing ? i.target.uac : i.target.proxy.uac
-                             for i in values(transformers[1].output_interfaces)
-                             if i.target.sys_function === EnergySystems.sf_bus]
-        is_circle_transformer = !isempty(intersect(all_input_busses, all_output_busses))
+        is_circle_transformer = transformer_has_circle(values(transformers[1].input_interfaces),
+                                                       values(transformers[1].output_interfaces))
     else
         is_circle_transformer = false
     end
@@ -1016,30 +1011,61 @@ function add_transformer_steps(simulation_order,
                     end
                 end
             end
-            if !branch_finished &&
-               step_category == "potential" &&
-               !exit_on_next_iteration &&
-               contains_transformer_with_min_part_load(current_components)
-                # if no parallel branch was detected and we are during the potential step, check if the current_components 
-                # contain a transformer with minimum part load and if the current_components contain more than one transformer.
-                # If yes, perform another potential with reverse order.
-                simulation_order,
-                initial_nr,
-                checked_components,
-                parallel_branches = add_transformer_steps(simulation_order,
-                                                          initial_nr,
-                                                          current_components,
-                                                          parallel_branches,
-                                                          step_category;
-                                                          reverse=!reverse,
-                                                          connecting_component=connecting_component,
-                                                          checked_components=checked_components,
-                                                          exit_on_next_iteration=true)
+            if !branch_finished && step_category == "potential" && !exit_on_next_iteration
+                # if no parallel branch was detected and we are during the potential step, check for circle_transformer 
+                # and transformer with minimum part load. If one of them is present, perform another potential in 
+                # reverse order.
+                contains_circle_transformer = any(t -> transformer_has_circle(values(t.input_interfaces),
+                                                                              values(t.output_interfaces)),
+                                                  (t
+                                                   for t in current_components
+                                                   if t.sys_function === EnergySystems.sf_transformer))
+
+                if contains_circle_transformer || contains_transformer_with_min_part_load(current_components)
+                    simulation_order,
+                    initial_nr,
+                    checked_components,
+                    parallel_branches = add_transformer_steps(simulation_order,
+                                                              initial_nr,
+                                                              current_components,
+                                                              parallel_branches,
+                                                              step_category;
+                                                              reverse=!reverse,
+                                                              connecting_component=connecting_component,
+                                                              checked_components=checked_components,
+                                                              exit_on_next_iteration=true)
+                end
             end
         end
     end
 
     return simulation_order, initial_nr, checked_components, parallel_branches
+end
+
+"""
+    transformer_has_circle(input_interfaces, output_interfaces)
+
+Checks if in given input and output interfaces the same bus occurs.
+
+# Arguments
+- `input_interfaces`: All input interfaces of the transformer to be checked
+- `output_interfaces`: All output interfaces of the transformer to be checked
+
+# Returns 
+- `is_circle_transformer::Bool`: A bool indicating if a bus occurs in both input and output interfaces
+
+"""
+function transformer_has_circle(input_interfaces, output_interfaces)
+    if isempty(input_interfaces) || isempty(output_interfaces)
+        return false
+    end
+    all_input_busses = [i.source.proxy === nothing ? i.source.uac : i.source.proxy.uac
+                        for i in input_interfaces
+                        if i.source.sys_function === EnergySystems.sf_bus]
+    all_output_busses = [i.target.proxy === nothing ? i.target.uac : i.target.proxy.uac
+                         for i in output_interfaces
+                         if i.target.sys_function === EnergySystems.sf_bus]
+    return !isempty(intersect(all_input_busses, all_output_busses))
 end
 
 """
