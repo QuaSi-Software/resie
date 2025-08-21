@@ -248,8 +248,6 @@ function control(unit::SolarthermalCollector,
     unit.output_temperatures,
     unit.calc_uacs = calculate_energies(unit, components, sim_params)
 
-    unit.output_temperature = highest(unit.output_temperatures)
-
     set_max_energy!(unit.output_interfaces[unit.m_heat_out],
                     unit.available_energies,
                     [nothing for _ in 1:(length(unit.available_energies))],
@@ -306,7 +304,7 @@ function process(unit::SolarthermalCollector, sim_params::Dict{String,Any})
         if isnothing(unit.average_temperatures[idx])
             unit.runtimes[idx] = nothing
             unit.used_energy[idx] = nothing
-        else
+        elseif runtimes_sum > 0
             unit.runtimes[idx] = unit.runtimes[idx] / runtimes_sum
         end
     end
