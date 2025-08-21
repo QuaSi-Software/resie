@@ -54,6 +54,7 @@
 "TST_01_HZG_02_BUS s_process",
 "TST_01_ELT_01_ELY s_potential",
 "TST_01_HZG_01_HTP s_potential",
+"TST_01_ELT_01_ELY s_potential",
 "TST_01_HZG_02_HTP s_potential",
 "TST_01_HZG_01_GBO s_potential",
 "TST_01_HZG_01_HTP s_process",

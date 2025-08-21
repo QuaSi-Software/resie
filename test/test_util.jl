@@ -113,10 +113,7 @@ code under test.
 - `components::Dict{String,<:Any}`: The components
 - `sim_params::Dict{String,Any}`: The simulation parameters
 - `ooo::Vector{Any}`: (Optional) The order of operations. Defaults to an empty vector.
-# Returns
-- `UUID`: The ID of the mock simulation run
 """
 function setup_mock_run!(components::Dict{String,<:Any}, sim_params::Dict{String,Any}; ooo::Vector{Any}=[])
     Resie.current_runs[sim_params["run_ID"]] = Resie.SimulationRun(sim_params, components, ooo)
-    return
 end

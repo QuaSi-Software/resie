@@ -131,7 +131,6 @@
             "vol_heat_capacity": 3921470,
             "wind_speed_reduction": 1,
             "spec_flow_rate": 4e-6,
-
             "ambient_temperature_from_global_file": "temp_ambient_air",
             "beam_solar_radiation_from_global_file": "beamHorIrr",
             "diffuse_solar_radiation_from_global_file": "difHorIrr",
