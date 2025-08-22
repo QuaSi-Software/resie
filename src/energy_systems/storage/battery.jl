@@ -22,6 +22,9 @@ Base.@kwdef mutable struct Battery <: Component
     max_charge::Float64
     max_discharge::Float64
 
+    process_done::Bool
+    load_done::Bool
+
     function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
         register_media([medium])
@@ -37,7 +40,9 @@ Base.@kwdef mutable struct Battery <: Component
                    0.0, # load_end_of_last_timestep
                    0.0, # losses
                    0.0, # max_charge
-                   0.0) # max_discharge
+                   0.0, # max_discharge
+                   false,  # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)  # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -79,6 +84,7 @@ end
 
 function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_discharge < sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return
     end
@@ -88,6 +94,7 @@ function process(unit::Battery, sim_params::Dict{String,Any})
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
     end
@@ -99,12 +106,29 @@ function process(unit::Battery, sim_params::Dict{String,Any})
         add!(outface, unit.load)
         unit.load = 0.0
     end
+
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::Battery, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update component
+        unit.load_end_of_last_timestep = copy(unit.load)
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_charge < sim_params["epsilon"]
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
-        unit.load_end_of_last_timestep = copy(unit.load)
         return
     end
 
@@ -113,8 +137,8 @@ function load(unit::Battery, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     if energy_available <= 0.0
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
-        unit.load_end_of_last_timestep = copy(unit.load)
         return # load is only concerned with receiving energy from the source
     end
 
@@ -127,7 +151,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
         sub!(inface, diff)
     end
 
-    unit.load_end_of_last_timestep = copy(unit.load)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::Battery)::Vector{String}

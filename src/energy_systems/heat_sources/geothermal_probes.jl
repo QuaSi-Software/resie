@@ -81,6 +81,8 @@ mutable struct GeothermalProbes <: Component
     fluid_reynolds_number::Float64
 
     probe_coordinates::Union{Nothing,Vector{Vector{Float64}}}
+    process_done::Bool
+    load_done::Bool
 
     function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -179,7 +181,9 @@ mutable struct GeothermalProbes <: Component
                    # If set to false, the temperature acts as a stupid turn-on-temperature, representing an on-off fluid pump
                    # If set to true, the maximum energy is calculated to provide the current temperature also in the next timestep to prevent pulsing, representing a variable speed pump
                    0.0,                                                     # Reynoldsnumber. To be calculated in function later.
-                   nothing)                                                 # probe_coordinates to save them for plotting
+                   nothing,                                                 # probe_coordinates to save them for plotting
+                   false,                                                   # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)                                                   # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -843,7 +847,8 @@ Returns a tuple containing the current minimum and maximum output temperatures f
 - `Tuple{Temperature, Temperature}`: A tuple where the first element is the minimum probe temperature during unloading, 
                                      and the second element is the current maximum output temperature.
 """
-function get_output_temperature_bounds(unit::GeothermalProbes, sim_params::Dict{String,Any})::Tuple{Temperature,Temperature}
+function get_output_temperature_bounds(unit::GeothermalProbes,
+                                       sim_params::Dict{String,Any})::Tuple{Temperature,Temperature}
     # current minimum output temperature and current maximum output temperature
     return unit.min_probe_temperature_unloading, unit.current_max_output_temperature
 end
@@ -1101,6 +1106,7 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
@@ -1128,11 +1134,28 @@ function process(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # write output heat flux into vector
     unit.energy_in_out_per_probe_meter[unit.time_index] = energy_delivered / (unit.probe_depth * unit.number_of_probes) # from total energy to specific power of one single probe.
+
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::GeothermalProbes, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update borehole temperature for next timestep
+        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     if !unit.regeneration
-        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
+        handle_component_update!(unit, "load", sim_params)
         return
     end
     inface = unit.input_interfaces[unit.m_heat_in]
@@ -1142,8 +1165,8 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
         return
     end
 
@@ -1173,8 +1196,8 @@ function load(unit::GeothermalProbes, sim_params::Dict{String,Any})
     energy_taken = unit.current_max_input_energy - energy_demand
     unit.energy_in_out_per_probe_meter[unit.time_index] += energy_taken / (unit.probe_depth * unit.number_of_probes)
 
-    # recalculate borehole temperature for next timestep
-    unit.fluid_temperature = calculate_new_fluid_temperature(unit::GeothermalProbes, sim_params["wh_to_watts"])
+    # update borehole temperature for next timestep
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::GeothermalProbes)::Vector{String}

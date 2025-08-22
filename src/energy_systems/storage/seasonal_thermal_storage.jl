@@ -82,6 +82,8 @@ mutable struct SeasonalThermalStorage <: Component
     current_max_output_energy::Float64
     temperatures_charging::Vector{Temperature}
     current_energy_input_return_temperature::Float64
+    process_done::Bool
+    load_done::Bool
 
     # additional output
     temp_distribution_output::Array{Float64}
@@ -180,6 +182,8 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # current_max_output_energy, maximum output energy in current time step [Wh]
                    [],                                             # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
                    0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
+                   false,                                          # process_done, bool indicating if the process step has already been performed in the current time step
+                   false,                                          # load_done, bool indicating if the load step has already been performed in the current time step
                    # additional output
                    Array{Float64}(undef, 0, 0),                    # temp_distribution_output [°C], holds temperature field of layers for output plot
                    0.0,                                            # mass_in_sum [kg]
@@ -1247,6 +1251,7 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
@@ -1277,16 +1282,18 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         end
         unit.current_temperature_output = unit.current_max_output_temperature
     end
+
+    handle_component_update!(unit, "process", sim_params)
 end
 
-function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    inface = unit.input_interfaces[unit.m_heat_in]
-    exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges)
-
-    # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+function handle_component_update!(unit::SeasonalThermalStorage, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update component
         unit.losses,
         unit.load_end_of_last_timestep,
         unit.load,
@@ -1298,6 +1305,21 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                                 sim_params)
         # set new temperatures limits for the next time step
         set_temperature_limits!(unit, sim_params)
+        # reset
+        unit.process_done = false
+        unit.load_done = false
+    end
+end
+
+function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    inface = unit.input_interfaces[unit.m_heat_in]
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
+
+    # shortcut if there is no energy to be used
+    if energy_available <= sim_params["epsilon"]
+        handle_component_update!(unit, "load", sim_params)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         return
     end
 
@@ -1322,18 +1344,7 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         push!(unit.current_temperature_input, current_exchange_temperature)
     end
 
-    # apply energy input and output and losses
-    unit.losses,
-    unit.load_end_of_last_timestep,
-    unit.load,
-    unit.temperature_segments = update_STES(unit,
-                                            unit.current_energy_input,
-                                            unit.current_temperature_input,
-                                            unit.current_energy_output,
-                                            unit.current_temperature_output,
-                                            sim_params)
-    # set new temperatures limits for the next time step
-    set_temperature_limits!(unit, sim_params)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function reset(unit::SeasonalThermalStorage)

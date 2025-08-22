@@ -61,6 +61,8 @@ mutable struct BufferTank <: Component
     load::Float64
     load_end_of_last_timestep::Float64
     losses::Float64
+    process_done::Bool
+    load_done::Bool
 
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_h_w_ht1"))
@@ -128,7 +130,9 @@ mutable struct BufferTank <: Component
                    default(config, "initial_load", 0.0),       # initial_load [%/100]
                    0.0,                                        # load, set to inital_load at the beginning [Wh]
                    0.0,                                        # load_end_of_last_timestep, stores the load of the previous time step without losses
-                   0.0)                                        # losses in current time step [Wh]
+                   0.0,                                        # losses in current time step [Wh]
+                   false,                                      # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)                                      # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -279,6 +283,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+        handle_component_update!(unit, "process", sim_params)
         return
     end
 
@@ -310,6 +315,23 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
             unit.load = 0.0
         end
     end
+
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::BufferTank, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update component
+        calculate_losses!(unit, sim_params)
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::BufferTank, sim_params::Dict{String,Any})
@@ -319,8 +341,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy to be used
     if energy_available <= sim_params["epsilon"]
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
-        calculate_losses!(unit, sim_params)
         return
     end
 
@@ -352,7 +374,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
         end
     end
 
-    calculate_losses!(unit, sim_params)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::BufferTank)::Vector{String}
