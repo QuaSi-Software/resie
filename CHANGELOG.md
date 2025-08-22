@@ -5,14 +5,28 @@ In general the development follows the [semantic versioning](https://semver.org/
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
 ### Version 0.11.3
-* Add solar thermal collector model
-* Add complex version seasonal thermal storage model (STES)
-* Add solar radiation model for sun position and beam and diffuse irradiances in a plane
-* Add new control module negotiate_temperature which defines temperature between two components with flexible temperatures. It has four options for temperature_mode:
-  * optimize: Run a optimization algorithm to find the temperature with the maximal available energy. Can significantly increase calculation time.
-  * mean: Take the mean between the lowest and highest possible temperature of both components.
-  * lower: Use the lowest possible temperature.
-  * upper: Use the highest possible temperature.
+* Add solar thermal collector model (STC)
+* Add detailed seasonal thermal storage model (STES)
+* Add solar radiation model for sun position and beam and diffuse irradiance in a plane. Also improves the interpolation method to better represent the needs of irradiation (energy conservation in every hour and consideration of sunset and sunrise)
+* Add new control module "negotiate_temperature" which defines temperature between two components with flexible temperatures. This also includes improvements in the control possibilities of the geothermal probe.
+* Add new control module "limit_cooling_input_temperature" for electrolysers with STES
+* Multiple bug fixes and improvements in the determination of the order of operation to cover more energy system configurations, especially circle-transformer (input and output to the same (Proxy)Bus) and busses with minimum part load ratio set; also differ between general bounded sources/sinks and grid input/output in the base order
+* Complete rework of temperature communication between components. This includes:
+  * Min and max temperatures are now part of the MaxEnergy struct (and no longer in the interfaces) and set during Control/Process and also using the add!() functions in Process. 
+  * Rework of the bus distribute and balance_on to better consider temperatures. Also update all functions dealing with MaxEnergy structs within the bus to consider these temperatures.
+  * Adaptation of the bypass of the heat pump which now limits the temperature during bypass to the actual demanded temperature
+  * Add another method to recalculate energies triggered by the bus ("recalculate_max_energy" in MaxEnergy) as second method in addition to "has_calculated_all_maxima"
+  * Adaptation of the order of Control-Steps in the OoO to allow STES and STC to gather information of temperatures during their control.
+  * Adjust Electrolyser to handle and communicate UACs of energies
+* Changed definition of Losses and Gains: Losses are now negative in output, Gains are positive in output. Note that in the components themselves Losses are still handled as positive and Gains as negative values!
+* Fix typos in multiple files
+* Adapted scenarios according to the changes made and added two new scenarios: "stc_2_demands" and "p2h_stes_stc"
+* Updated example multisector district to use new STES model
+* Add "epsilon" to input simulation parameter
+* Remove balance_on() functions of storages as they are now covered by the general implementation
+* Fix URL to Julia installation page
+*  Multiple bug fixes and improvements in Profiles and other parts of ReSiE
+*  Improve robustness of storages against the order of process and load steps
 
 ### Version 0.11.2
 * Improve error output for reading in profiles from files by including the line where the error occurred
