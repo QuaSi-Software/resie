@@ -73,7 +73,7 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
 end
 
 function has_method_for(mod::CM_LimitCoolingInputTemperature, func::ControlModuleFunction)::Bool
-    return func == cfm_limit_cooling_input_temperature
+    return func == cmf_limit_cooling_input_temperature
 end
 
 function update(mod::CM_LimitCoolingInputTemperature)

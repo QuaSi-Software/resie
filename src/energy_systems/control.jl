@@ -138,7 +138,7 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_reorder_inputs
     cmf_reorder_outputs
     cmf_negotiate_temperature
-    cfm_limit_cooling_input_temperature
+    cmf_limit_cooling_input_temperature
 end
 
 """
@@ -460,7 +460,7 @@ function cooling_input_temperature_exceeded(controller::Controller,
                                             target_uac::Stringing,
                                             sim_params::Dict{String,Any})::Bool
     for mod in controller.modules
-        if !has_method_for(mod, cfm_limit_cooling_input_temperature)
+        if !has_method_for(mod, cmf_limit_cooling_input_temperature)
             continue
         end
         if mod.parameters["target_uac"] !== target_uac
