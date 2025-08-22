@@ -354,20 +354,6 @@ function _isless(first::Float64, second::Float64)
     return first < second
 end
 
-# handles a number as smaller than nothing
-function _isless2(first::Nothing, second::Nothing)
-    return false
-end
-function _isless2(first::Float64, second::Nothing)
-    return true
-end
-function _isless2(first::Nothing, second::Float64)
-    return false
-end
-function _isless2(first::Float64, second::Float64)
-    return first < second
-end
-
 """
     check_epsilon(value, sim_params)
 
