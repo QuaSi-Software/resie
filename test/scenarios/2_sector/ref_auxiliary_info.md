@@ -38,9 +38,9 @@
 "TST_01_ELT_01_BAT s_process",
 "TST_01_HZG_01_BFT s_load",
 "TST_01_ELT_01_BAT s_load",
+"TST_01_HZG_02_SRC s_process",
 "TST_01_ELT_01_GRI s_process",
 "TST_01_HZG_01_GRI s_process",
-"TST_01_HZG_02_SRC s_process",
 "TST_01_ELT_01_GRO s_process",
 "TST_01_ELT_01_BUS s_distribute",
 "TST_01_HZG_01_BUS s_distribute"

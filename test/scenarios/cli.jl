@@ -134,9 +134,11 @@ function generate_output(name::String, subdir::String)
         print("|  X  ")
     end
 
+    run_ID = uuid1()
     components = nothing
     try
         if sim_params !== nothing && project_config !== nothing
+            sim_params["run_ID"] = run_ID
             components = Resie.load_components(project_config["components"], sim_params)
             print("|  ✓  ")
         else
@@ -173,8 +175,6 @@ function generate_output(name::String, subdir::String)
         && components !== nothing
         && step_order !== nothing)
         # end of condition
-        run_ID = uuid1()
-        sim_params["run_ID"] = run_ID
         Resie.current_runs[run_ID] = Resie.SimulationRun(sim_params, components, step_order)
         Resie.run_simulation_loop(project_config, sim_params, components, step_order)
         print("|  ✓  ")

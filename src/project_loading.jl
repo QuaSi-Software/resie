@@ -90,6 +90,12 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
             elseif lowercase(module_config["name"]) === "temperature_sorting"
                 push!(unit.controller.modules,
                       EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
+            elseif lowercase(module_config["name"]) === "negotiate_temperature"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_Negotiate_Temperature(module_config, components, sim_params, unit.uac))
+            elseif lowercase(module_config["name"]) === "limit_cooling_input_temperature"
+                push!(unit.controller.modules,
+                      EnergySystems.CM_LimitCoolingInputTemperature(module_config, components, sim_params, unit.uac))
             end
         end
     end

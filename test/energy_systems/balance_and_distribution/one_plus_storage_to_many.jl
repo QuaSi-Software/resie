@@ -78,17 +78,17 @@ function test_one_plus_storage_to_many()
 
     EnergySystems.process(demand_1, simulation_parameters)
     @test demand_1.input_interfaces[demand_1.medium].balance == -500.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature_min == 55.0
+    @test demand_1.input_interfaces[demand_1.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(demand_2, simulation_parameters)
     @test demand_2.input_interfaces[demand_2.medium].balance == -500.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature_min == 55.0
+    @test demand_2.input_interfaces[demand_2.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].balance == 750.0
-    @test source.output_interfaces[source.medium].temperature_max == 55.0
+    @test source.output_interfaces[source.medium].max_energy.temperature_max == [55.0]
 
     EnergySystems.process(storage, simulation_parameters)
     @test storage.output_interfaces[storage.medium].balance == 250.0
@@ -119,17 +119,17 @@ function test_one_plus_storage_to_many()
 
     EnergySystems.process(demand_1, simulation_parameters)
     @test demand_1.input_interfaces[demand_1.medium].balance == -500.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature_min == 55.0
+    @test demand_1.input_interfaces[demand_1.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(demand_2, simulation_parameters)
     @test demand_2.input_interfaces[demand_2.medium].balance == -500.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature_min == 55.0
+    @test demand_2.input_interfaces[demand_2.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].balance == 1000.0
-    @test source.output_interfaces[source.medium].temperature_max == 55.0
+    @test source.output_interfaces[source.medium].max_energy.temperature_max == [55.0]
 
     EnergySystems.process(storage, simulation_parameters)
     @test storage.output_interfaces[storage.medium].balance == 0.0
@@ -161,17 +161,17 @@ function test_one_plus_storage_to_many()
 
     EnergySystems.process(demand_1, simulation_parameters)
     @test demand_1.input_interfaces[demand_1.medium].balance == -500.0
-    @test demand_1.input_interfaces[demand_1.medium].temperature_min == 55.0
+    @test demand_1.input_interfaces[demand_1.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(demand_2, simulation_parameters)
     @test demand_2.input_interfaces[demand_2.medium].balance == -500.0
-    @test demand_2.input_interfaces[demand_2.medium].temperature_min == 55.0
+    @test demand_2.input_interfaces[demand_2.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
 
     EnergySystems.process(source, simulation_parameters)
     @test source.output_interfaces[source.medium].balance == 1250.0
-    @test source.output_interfaces[source.medium].temperature_max == 55.0
+    @test source.output_interfaces[source.medium].max_energy.temperature_max == [55.0]
 
     EnergySystems.process(storage, simulation_parameters)
     @test storage.output_interfaces[storage.medium].balance == 0.0

@@ -137,6 +137,8 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_discharge_is_allowed
     cmf_reorder_inputs
     cmf_reorder_outputs
+    cmf_negotiate_temperature
+    cmf_limit_cooling_input_temperature
 end
 
 """
@@ -392,4 +394,81 @@ function reorder_outputs(controller::Controller,
     end
 
     return reordering
+end
+
+"""
+Callback for determine_temperature_and_energy of a component according to the temperatures of the outputs.
+
+This function only checks if a control module exists for the chosen interconnection from source
+to target. No aggregation with other control modules. 
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `components::Grouping`: All components of the energy system.
+- `source_uac::String`: The source unit uac.
+- `target_uac::String`: The target unit uac.
+- `sim_params::Dict{String,Any}`: Simulation parameters.
+
+# Returns
+- `success::Bool`: A bool indicating if a control module exists between source and target (true) or not (false).
+- `temperature::Temperature`: The negotiated temperature.
+- `max_energy::Float64`: The energy corresponding to the negotiated temperature.
+"""
+function determine_temperature_and_energy(controller::Controller,
+                                          components::Grouping,
+                                          source_uac::String,
+                                          target_uac::Stringing,
+                                          sim_params::Dict{String,Any})::Tuple{Bool,Temperature,Float64}
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_negotiate_temperature)
+            continue
+        end
+        if mod.parameters["target_uac"] !== target_uac
+            continue
+        end
+
+        results = determine_temperature_and_energy(mod, components, source_uac, target_uac, sim_params)
+        return true, results[1], results[2]
+    end
+
+    if sim_params["time"] == 0
+        if components[source_uac] isa TemperatureNegotiateSource &&
+           target_uac !== nothing && components[target_uac] isa TemperatureNegotiateTarget
+            @warn "From $(source_uac) to $(target_uac), no control module is activated. This can lead to unexpected " *
+                  "results. Add a `negotiate_temperature` control module at $(source_uac)!"
+        end
+    end
+
+    return false, nothing, 0.0
+end
+
+"""
+Callback for cooling_input_temperature_exceeded
+
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `components::Grouping`: All components of the energy system.
+- `target_uac::String`: The target unit uac.
+
+# Returns
+- `Bool`: A bool indicating if the input temperature is exceeded (true, meaning no energy flow is allowed) 
+          or not (false, energy flow is allowed)
+
+"""
+function cooling_input_temperature_exceeded(controller::Controller,
+                                            target_uac::Stringing,
+                                            sim_params::Dict{String,Any})::Bool
+    for mod in controller.modules
+        if !has_method_for(mod, cmf_limit_cooling_input_temperature)
+            continue
+        end
+        if mod.parameters["target_uac"] !== target_uac
+            continue
+        end
+        components = Dict{String,Component}(get_run(sim_params["run_ID"]).components)
+        return cooling_input_temperature_exceeded(mod, components, target_uac)
+    end
+
+    return false
 end

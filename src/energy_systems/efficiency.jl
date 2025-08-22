@@ -416,7 +416,8 @@ function plr_from_energy(unit::PLRDEComponent,
     end
 
     nr_iter = 0
-    candidate_idx = max(1, floor(Int64, length(lookup_table) * energy_value / energy_at_max))
+    candidate_idx = min(length(lookup_table) - 1,
+                        max(1, floor(Int64, length(lookup_table) * energy_value / energy_at_max)))
 
     while (nr_iter < length(lookup_table)
            && candidate_idx < length(lookup_table)
@@ -648,28 +649,29 @@ Checks the available energy on the input heat interface.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
 function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
-    if !unit.controller.parameters["consider_m_heat_in"]
-        return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
-                [unit.input_interfaces[unit.m_heat_in].source.uac])
-    end
-
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
-        # end of condition
+        # direct connection to transformer that has not had its potential
         return ([Inf],
-                [unit.input_interfaces[unit.m_heat_in].temperature_min],
-                [unit.input_interfaces[unit.m_heat_in].temperature_max],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_min[1]],
+                [unit.input_interfaces[unit.m_heat_in].max_energy.temperature_max[1]],
                 [unit.input_interfaces[unit.m_heat_in].source.uac])
     else
         exchanges = balance_on(unit.input_interfaces[unit.m_heat_in],
                                unit.input_interfaces[unit.m_heat_in].source)
-        return ([e.balance + e.energy_potential for e in exchanges],
-                temp_min_all(exchanges),
-                temp_max_all(exchanges),
-                [e.purpose_uac for e in exchanges])
+
+        if unit.controller.parameters["consider_m_heat_in"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat input, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end
 
@@ -792,9 +794,8 @@ interfaces in the corresponding components. For example a CHPP would call check_
 which uses check_heat_out_impl internally.
 
 This also checks the temperatures of the exchanges that are returned from a balance_on call,
-which can be more than one exchange in the case of a bus, and checks if the output
-temperature of the component falls into the minimum and maximum temperature range of the
-exchange, if any is given at all.
+which can be more than one exchange, and checks if the output temperature of the component
+falls into the minimum and maximum temperature range of the exchange, if any is given at all.
 
 # Arguments
 - `unit::Union{CHPP,Electrolyser,FuelBoiler}`: The component
@@ -823,30 +824,87 @@ function check_heat_out_impl(unit::Union{CHPP,Electrolyser,FuelBoiler},
     exchanges = balance_on(unit.output_interfaces[medium],
                            unit.output_interfaces[medium].target)
 
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single input which can happen for direct 1-to-1 connections or if the bus has
-    # filtered inputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
+    # if we get the exchanges from a bus, the temperature check has already been performed
+    if unit.output_interfaces[medium].target.sys_function == sf_bus
         potential_energy_heat_out = balance(exchanges) + energy_potential(exchanges)
-    else
-        e = first(exchanges)
-        if (output_temperature === nothing
-            ||
-            (e.temperature_min === nothing || e.temperature_min <= output_temperature)
-            &&
-            (e.temperature_max === nothing || e.temperature_max >= output_temperature))
-            # end of condition
-            potential_energy_heat_out = e.balance + e.energy_potential
-        else
-            potential_energy_heat_out = 0.0
-        end
+    else # check temperature for 1-to-1 connections and sum up energy
+        potential_energy_heat_out, _, _, _ = check_temperatures_source(exchanges, output_temperature, Inf)
+        potential_energy_heat_out = sum(potential_energy_heat_out; init=0.0)
     end
 
     if potential_energy_heat_out >= -sim_params["epsilon"]
         return nothing
     end
     return potential_energy_heat_out
+end
+
+"""
+    check_heat_out_layered(unit, interface, medium, output_temperature, sim_params)
+
+Checks the available energy on the output high temperature heat interface of the electrolyser.
+Includes the required check for return temperatures for the control module "limit_cooling_input_temperature".
+Therefore, it returns not only the energies but also the corresponding target_uac.
+
+# Arguments
+- `unit::Electrolyser`: The component
+- `interface_name::String`: The name of the interface, e.g. "heat_ht_out"
+- `medium::Symbol`: The medium of the interface, e.g. `:m_heat_ht_out`
+- `output_temperature::Floathing`: The output temperature of the electrolyser for 1-to-1 temperature checks
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The requested energy on the interface as one layer per target. The
+    value can be `-Inf`, which is a special floating point value signifying a negative
+    infinite value.
+- `Vector{Stringing}`: The UACs of the targets on the interface corresponding to the energies.
+"""
+function check_heat_out_layered(unit::Electrolyser,
+                                interface_name::String,
+                                medium::Symbol,
+                                output_temperature::Floathing,
+                                sim_params::Dict{String,Any})
+    if !unit.controller.parameters["consider_m_" * interface_name]
+        # ignore the energy of the heat output, but target_uac is still required
+        return ([-Inf for _ in exchanges],
+                [e.purpose_uac for e in exchanges])
+    end
+
+    if (unit.output_interfaces[medium].target.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.output_interfaces[medium].max_energy))
+        # direct connection to transformer that has not had its potential
+        # no temperature check required
+        energy = [-Inf]
+        purpose_uac = [unit.output_interfaces[medium].target.uac]
+    else
+        exchanges = balance_on(unit.output_interfaces[medium],
+                               unit.output_interfaces[medium].target)
+
+        if unit.output_interfaces[medium].target.sys_function == sf_bus
+            # if we get the exchanges from a bus, the temperature check has already been performed
+            energy = [e.balance + e.energy_potential for e in exchanges]
+            purpose_uac = [e.purpose_uac for e in exchanges]
+        else
+            # check temperature for 1-to-1 connections
+            energy, _, _, purpose_uac = check_temperatures_source(exchanges, output_temperature, Inf)
+        end
+    end
+
+    # If the source is an Electrolyser, call the ControlModule limit_cooling_input_temperature
+    # for every target to check if the energy transfer is allowed or not. 
+    # If the temperature input limit is exceeded (control module returns true), remove the entry from returns.
+    idx_to_remove = Int[]
+    for idx in eachindex(purpose_uac)
+        if cooling_input_temperature_exceeded(unit.controller, purpose_uac[idx], sim_params)
+            push!(idx_to_remove, idx)
+        end
+    end
+
+    if !isempty(idx_to_remove)
+        deleteat!(energy, idx_to_remove)
+        deleteat!(purpose_uac, idx_to_remove)
+    end
+
+    return (energy, purpose_uac)
 end
 
 """
@@ -866,11 +924,11 @@ Alias to check_heat_out_impl for a heat output interface called heat_ht_out.
 """
 function check_heat_ht_out(unit::Electrolyser,
                            sim_params::Dict{String,Any})
-    return check_heat_out_impl(unit,
-                               "heat_ht_out",
-                               unit.m_heat_ht_out,
-                               unit.output_temperature_ht,
-                               sim_params)
+    return check_heat_out_layered(unit,
+                                  "heat_ht_out",
+                                  unit.m_heat_ht_out,
+                                  unit.output_temperature_ht,
+                                  sim_params)
 end
 
 """
@@ -902,27 +960,27 @@ Checks the available energy on the output heat interface.
 - `Vector{Stringing}`: The UACs of the targets on the interface.
 """
 function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
-    if !unit.controller.parameters["consider_m_heat_out"]
-        return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
-                [unit.output_interfaces[unit.m_heat_out].target.uac])
-    end
-
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
-        # end of condition
+        # direct connection to transformer that has not had its potential
         return ([-Inf],
-                [unit.output_interfaces[unit.m_heat_out].temperature_min],
-                [unit.output_interfaces[unit.m_heat_out].temperature_max],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
+                [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_max[1]],
                 [unit.output_interfaces[unit.m_heat_out].target.uac])
     else
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
-        return ([e.balance + e.energy_potential for e in exchanges],
-                temp_min_all(exchanges),
-                temp_max_all(exchanges),
-                [e.purpose_uac for e in exchanges])
+        if unit.controller.parameters["consider_m_heat_out"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat output, but temperature is still required
+            return ([Inf for _ in exchanges],
+                    temp_min_all(exchanges),
+                    temp_max_all(exchanges),
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end

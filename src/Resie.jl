@@ -40,6 +40,12 @@ function get_run(id::UUID)::SimulationRun
     return current_runs[id]
 end
 
+"""
+Custom error handler for exception "InputError".
+Call with throw(InputError)
+"""
+struct InputError <: Exception end
+
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
 # contain code that is intended to be used in-place of their include statement (as part
@@ -47,6 +53,8 @@ end
 # this is done so the latter files can access the symbols of the submodules the same as
 # if the code was inside this file.
 
+include("profiles/solar_irradiance.jl")
+using .SolarIrradiance
 include("profiles/base.jl")
 using .Profiles
 include("profiles/weatherdata.jl")
@@ -91,7 +99,7 @@ function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{S
         "number_of_time_steps" => nr_of_steps,
         "start_date" => start_date,
         "end_date" => end_date,
-        "epsilon" => 1e-9,
+        "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
         "longitude" => default(project_config["simulation_parameters"], "longitude", nothing),
         "timezone" => default(project_config["simulation_parameters"], "time_zone", nothing),
@@ -140,8 +148,9 @@ Construct and prepare parameters, energy system components and the order of oper
 -`Grouping`: The constructed energy system components
 -`StepInstructions`: Order of operations
 """
-function prepare_inputs(project_config::Dict{AbstractString,Any})
+function prepare_inputs(project_config::Dict{AbstractString,Any}, run_ID::UUID)
     sim_params = get_simulation_params(project_config)
+    sim_params["run_ID"] = run_ID
 
     components = load_components(project_config["components"], sim_params)
 
@@ -248,7 +257,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
         # gather output data of each component for line plot
         if do_create_plot_data
-            output_data_lineplot[steps, :] = geather_output_data(output_keys_lineplot, sim_params["time"])
+            output_data_lineplot[steps, :] = gather_output_data(output_keys_lineplot, sim_params["time"])
         end
         if do_create_plot_weather
             output_weather_lineplot[steps, :] = gather_weather_data(weather_data_keys, sim_params)
@@ -307,8 +316,15 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
 
     # plot additional figures potentially available from components after simulation
     if default(project_config["io_settings"], "auxiliary_plots", false)
+        component_list = []
+        output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
         for component in components
-            plot_optional_figures_end(component[2], sim_params)
+            if plot_optional_figures_end(component[2], sim_params, output_path)
+                push!(component_list, component[2].uac)
+            end
+        end
+        if length(component_list) > 0
+            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: $(join(component_list, ", "))"
         end
     end
 end
@@ -346,9 +362,8 @@ function load_and_run(filepath::String)
     end
 
     @info "-- Now preparing inputs"
-    sim_params, components, step_order = prepare_inputs(project_config)
     run_ID = uuid1()
-    sim_params["run_ID"] = run_ID
+    sim_params, components, step_order = prepare_inputs(project_config, run_ID)
     current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 

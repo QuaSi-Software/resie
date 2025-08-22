@@ -56,13 +56,13 @@ function test_one_to_one_via_bus()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(bus, simulation_parameters)
     EnergySystems.process(grid, simulation_parameters)
 
     @test grid.output_interfaces[grid.medium].balance == 1000.0
-    @test grid.output_interfaces[grid.medium].temperature_max === nothing
+    @test grid.output_interfaces[grid.medium].max_energy.temperature_max == [nothing]
 
     blnc = EnergySystems.balance(bus)
     @test blnc == 0.0
@@ -70,10 +70,10 @@ function test_one_to_one_via_bus()
     EnergySystems.distribute!(bus)
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
-    @test demand.input_interfaces[demand.medium].temperature_min === 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     @test grid.output_interfaces[grid.medium].balance == 0.0
-    @test grid.output_interfaces[grid.medium].temperature_max === nothing
+    @test grid.output_interfaces[grid.medium].max_energy.temperature_max == [nothing]
 end
 
 @testset "one_to_one_via_bus" begin

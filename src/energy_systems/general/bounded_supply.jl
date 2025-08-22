@@ -74,44 +74,32 @@ function control(unit::BoundedSupply,
     else
         unit.max_energy = 0.0
     end
-    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_temperature!(unit.output_interfaces[unit.medium],
-                     nothing,
-                     unit.temperature)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy, nothing, unit.temperature)
 end
 
 function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
 
-    # if we get multiple exchanges from balance_on, a bus is involved, which means the
-    # temperature check has already been performed. we only need to check the case for
-    # a single output which can happen for direct 1-to-1 connections or if the bus has
-    # filtered outputs down to a single entry, which works the same as the 1-to-1 case
-    if length(exchanges) > 1
-        energy_demand = balance(exchanges) + energy_potential(exchanges)
-        temp_out = temp_min_highest(exchanges)
-    else
-        e = first(exchanges)
-        if (unit.temperature === nothing ||
-            (e.temperature_min === nothing || e.temperature_min <= unit.temperature) &&
-            (e.temperature_max === nothing || e.temperature_max >= unit.temperature))
-            # end of condition
-            energy_demand = e.balance + e.energy_potential
-            temp_out = lowest(e.temperature_min, unit.temperature)
-        else
-            energy_demand = 0.0
-        end
+    # if we get the exchanges from a bus, the temperature check has already been performed
+    if outface.target.sys_function == EnergySystems.sf_bus
+        energy_demand = [e.balance + e.energy_potential for e in exchanges]
+        temperature_min = [nothing for _ in exchanges]
+        temperature_max = [unit.temperature for _ in exchanges]
+    else # check temperature
+        energy_demand,
+        temperature_min,
+        temperature_max, _ = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
     end
 
-    if energy_demand < 0.0
-        add!(outface, min(abs(energy_demand), unit.max_energy), temp_out)
+    if sum(energy_demand; init=0.0) < 0.0
+        add!(outface, abs.(energy_demand), temperature_min, temperature_max)
     end
 end
 

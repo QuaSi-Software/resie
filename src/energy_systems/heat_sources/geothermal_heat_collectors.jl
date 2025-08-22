@@ -116,6 +116,9 @@ mutable struct GeothermalHeatCollector <: Component
     delta_t_lat::Float64
     volume_adjacent_to_pipe::Float64
 
+    process_done::Bool
+    load_done::Bool
+
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -244,7 +247,9 @@ mutable struct GeothermalHeatCollector <: Component
                    0.0,                                                  # sigma_lat; precalculated parameter for freezing function
                    0.0,                                                  # t_lat; precalculated parameter for freezing function
                    0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
-                   0.0)                                                  # volume_adjacent_to_pipe; precalculated parameter
+                   0.0,                                                  # volume_adjacent_to_pipe; precalculated parameter
+                   false,                                                # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)                                                # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -571,9 +576,6 @@ function control(unit::GeothermalHeatCollector,
 
     unit.current_output_temperature = unit.fluid_temperature + unit.unloading_temperature_spread / 2
     unit.current_output_temperature = highest(unit.fluid_min_output_temperature, unit.current_output_temperature)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     unit.current_output_temperature)
 
     # limit max_energy if current_output_temperature undercuts fluid_min_output_temperature
     if unit.fluid_min_output_temperature === nothing
@@ -582,15 +584,13 @@ function control(unit::GeothermalHeatCollector,
         unit.current_max_output_energy = unit.current_output_temperature <= unit.fluid_min_output_temperature ?
                                          0.0 : unit.max_output_energy
     end
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
+                    unit.current_output_temperature)
 
     # get input temperature for energy input (regeneration) and set temperature and max_energy to input interface
     if unit.regeneration
         unit.current_input_temperature = unit.fluid_temperature - unit.loading_temperature_spread / 2
         unit.current_input_temperature = lowest(unit.fluid_max_input_temperature, unit.current_input_temperature)
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         unit.current_input_temperature,
-                         nothing)
 
         # limit max_energy if current_input_temperature exceeds fluid_max_input_temperature
         if unit.fluid_max_input_temperature === nothing
@@ -599,7 +599,8 @@ function control(unit::GeothermalHeatCollector,
             unit.current_max_input_energy = unit.current_input_temperature >= unit.fluid_max_input_temperature ?
                                             0.0 : unit.max_input_energy
         end
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], unit.current_max_input_energy,
+                        unit.current_input_temperature, nothing)
     end
 end
 
@@ -850,8 +851,7 @@ function plot_optional_figures_begin(unit::GeothermalHeatCollector,
     return true
 end
 
-function plot_optional_figures_end(unit::GeothermalHeatCollector,
-                                   sim_params::Dict{String,Any})
+function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}, output_path::String)
     # plot temperature field as 3D mesh with time-slider
     @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
           "Close figure to continue..."
@@ -885,6 +885,8 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector,
         time[] = v
     end
     wait(display(f))
+
+    return false
 end
 
 # function to handle freezing of the soil. Corrects the new temperature to include the enthalpy of fusion
@@ -1033,6 +1035,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
@@ -1055,9 +1058,9 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
         if energy_available > used_heat
             energy_available -= used_heat
-            add!(outface, used_heat, unit.current_output_temperature)
+            add!(outface, used_heat, nothing, unit.current_output_temperature)
         else
-            add!(outface, energy_available, unit.current_output_temperature)
+            add!(outface, energy_available, nothing, unit.current_output_temperature)
             energy_available = 0.0
         end
     end
@@ -1065,13 +1068,27 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # write output heat flux into vector
     energy_delivered = -(unit.current_max_output_energy - energy_available)
     unit.collector_total_heat_energy_in_out = energy_delivered
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::GeothermalHeatCollector, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # calculate new temperatures of field to account for possible ambient effects
+        calculate_new_temperature_field!(unit, unit.collector_total_heat_energy_in_out, sim_params)
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     if !unit.regeneration
-        # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
-                                         sim_params)
+        handle_component_update!(unit, "load", sim_params)
         return
     end
 
@@ -1082,10 +1099,8 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     if energy_available <= sim_params["epsilon"]
         # shortcut if there is no energy to be used
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
-                                         sim_params)
         return
     end
 
@@ -1096,11 +1111,8 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
             continue
         end
 
-        if (exchange.temperature_min !== nothing &&
-            exchange.temperature_min > unit.current_input_temperature
-            ||
-            exchange.temperature_max !== nothing &&
-            exchange.temperature_max < unit.current_input_temperature)
+        if exchange.temperature_max !== nothing &&
+           exchange.temperature_max < unit.current_input_temperature
             # we can only take energy if it's at a higher/equal temperature than the
             # collector's current input temperature
             continue
@@ -1108,31 +1120,16 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
         if energy_demand > exchange_energy_available
             energy_demand -= exchange_energy_available
-            sub!(inface, exchange_energy_available, unit.current_input_temperature)
+            sub!(inface, exchange_energy_available, unit.current_input_temperature, nothing)
         else
-            sub!(inface, energy_demand, unit.current_input_temperature)
+            sub!(inface, energy_demand, unit.current_input_temperature, nothing)
             energy_demand = 0.0
         end
     end
 
     energy_taken = unit.current_max_input_energy - energy_demand
     unit.collector_total_heat_energy_in_out += energy_taken
-    calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out, sim_params)
-end
-
-function balance_on(interface::SystemInterface, unit::GeothermalHeatCollector)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(; balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 :
-                                  (caller_is_input ? -unit.current_max_input_energy : unit.current_max_output_energy),
-                 purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
-                 pressure=nothing,
-                 voltage=nothing)]
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}

@@ -168,26 +168,24 @@ function control(unit::Electrolyser,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    set_temperature!(unit.output_interfaces[unit.m_heat_ht_out],
-                     nothing,
-                     unit.output_temperature_ht)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], nothing, nothing, unit.output_temperature_ht)
     if unit.heat_lt_is_usable
-        set_temperature!(unit.output_interfaces[unit.m_heat_lt_out],
-                         nothing,
-                         unit.output_temperature_lt)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], nothing, nothing, unit.output_temperature_lt)
     end
 end
 
 function set_max_energies!(unit::Electrolyser,
                            el_in::Float64,
-                           heat_ht_out::Float64,
+                           heat_ht_out::Union{Floathing,Vector{<:Floathing}},
                            heat_lt_out::Float64,
                            h2_out::Float64,
-                           o2_out::Float64)
+                           o2_out::Float64,
+                           purpose_uac_ht::Union{Stringing,Vector{<:Stringing}}=nothing)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out, nothing, unit.output_temperature_ht,
+                    purpose_uac_ht)
     if unit.heat_lt_is_usable
-        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt)
     end
     set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
     set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
@@ -204,7 +202,7 @@ Calculate the number of active units and the PLR for each in order to meet the g
 - `limit_name::Symbol`: The name of the interface that is limiting. Should be on of the
     values in the `interface_list` field.
 - `limit_value::Float64`: The limiting value to meet. Can be larger than the total power of
-    the electroylser, in which case all units are utilised to their full extent.
+    the electrolyser, in which case all units are utilized to their full extent.
 # Returns
 - `Integer`: Number of active units
 - `Float64`: PLR of each active unit
@@ -243,7 +241,11 @@ function dispatch_units(ely::Electrolyser,
     return nr_units, plr_per_unit
 end
 
-function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
+function calculate_energies(unit::Electrolyser,
+                            sim_params::Dict{String,Any})::Tuple{Bool,
+                                                                 Vector{Union{Floathing,
+                                                                              Vector{<:Floathing},
+                                                                              Vector{<:Stringing}}}}
     # get maximum PLR from control modules
     max_plr = upper_plr_limit(unit.controller, sim_params)
     if max_plr <= 0.0
@@ -256,9 +258,18 @@ function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::T
     limiting_interface = Symbol("h2_out")
     plr_from_nrg = []
 
+    # save the energies and purpose_uac for the heat ht output interfaces
+    energies_heat_ht_out = Float64[]
+    purpose_uac_ht_out = Stringing[]
+
     for name in unit.interface_list
         availability = getproperty(EnergySystems, Symbol("check_" * String(name)))
-        energy = availability(unit, sim_params)
+        if name == Symbol("heat_ht_out")
+            energies_heat_ht_out, purpose_uac_ht_out = availability(unit, sim_params)
+            energy = sum(energies_heat_ht_out; init=0.0)
+        else
+            energy = availability(unit, sim_params)
+        end
 
         # shortcut if we're limited by zero input/output
         if energy === nothing
@@ -305,21 +316,45 @@ function calculate_energies(unit::Electrolyser, sim_params::Dict{String,Any})::T
                                             limiting_energy,
                                             sim_params["watt_to_wh"])
 
-    # now the total energies can be calculated from the number and PLR of utilised units
-    energies = []
+    # now the total energies can be calculated from the number and PLR of utilized units
+    energies = Union{Floathing,Vector{Floathing},Vector{Stringing}}[]
+    purpose_uac = Stringing[]
     for name in unit.interface_list
-        push!(energies, nr_active * energy_from_plr(unit, name, plr_of_unit, sim_params["watt_to_wh"]))
+        if name == Symbol("heat_ht_out")
+            # split energy for the ht heat output interface into the different targets
+            used_energy = nr_active * energy_from_plr(unit, name, plr_of_unit, sim_params["watt_to_wh"])
+
+            energy_per_uac = Floathing[]
+            while used_energy > 0.0 && !isempty(energies_heat_ht_out)
+                current_energy = min(used_energy, abs(popfirst!(energies_heat_ht_out)))
+                push!(energy_per_uac, current_energy)
+                push!(purpose_uac, popfirst!(purpose_uac_ht_out))
+                used_energy -= current_energy
+            end
+            if isempty(energy_per_uac)
+                energy_per_uac = Floathing[0.0]
+            end
+            if isempty(purpose_uac)
+                purpose_uac = Stringing[nothing]
+            end
+            push!(energies, energy_per_uac)
+        else
+            push!(energies, nr_active * energy_from_plr(unit, name, plr_of_unit, sim_params["watt_to_wh"]))
+        end
     end
+    # add purpose_uac of ht heat output at the end
+    push!(energies, purpose_uac)
+
     return (true, energies)
 end
 
 function potential(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
-    if !success
+    if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5])
+        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5], energies[6])
     end
 end
 
@@ -334,7 +369,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     plr = energies[1] / sim_params["watt_to_wh"](unit.power_total * unit.efficiencies[Symbol("el_in")](1.0))
     h2_out_lossless = energies[1] * unit.efficiencies[Symbol("h2_out_lossless")](plr)
     unit.losses_hydrogen = h2_out_lossless - energies[4]
-    unit.losses_heat = energies[1] - energies[2] +
+    unit.losses_heat = energies[1] - sum(energies[2]; init=0.0) +
                        (unit.heat_lt_is_usable ? -1 : 0) * energies[3] -
                        h2_out_lossless
     unit.losses_hydrogen = check_epsilon(unit.losses_hydrogen, sim_params)
@@ -343,9 +378,13 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     unit.losses = unit.losses_heat + unit.losses_hydrogen
 
     sub!(unit.input_interfaces[unit.m_el_in], energies[1])
-    add!(unit.output_interfaces[unit.m_heat_ht_out], energies[2])
+    add!(unit.output_interfaces[unit.m_heat_ht_out],
+         energies[2],
+         fill(nothing, length(energies[2])),
+         fill(unit.output_temperature_ht, length(energies[2])),
+         energies[6])
     if unit.heat_lt_is_usable
-        add!(unit.output_interfaces[unit.m_heat_lt_out], energies[3])
+        add!(unit.output_interfaces[unit.m_heat_lt_out], energies[3], nothing, unit.output_temperature_lt)
     end
     add!(unit.output_interfaces[unit.m_h2_out], energies[4])
     add!(unit.output_interfaces[unit.m_o2_out], energies[5])
@@ -370,12 +409,17 @@ function reset(unit::Electrolyser)
     unit.losses_heat = 0.0
 end
 
+function component_has_minimum_part_load(unit::Electrolyser)
+    return (unit.dispatch_strategy == "equal_with_mpf" && unit.min_power_fraction > 0.0) ||
+           unit.min_power_fraction_total > 0.0
+end
+
 function output_values(unit::Electrolyser)::Vector{String}
     channels = [string(unit.m_el_in) * " IN",
                 string(unit.m_h2_out) * " OUT",
                 string(unit.m_o2_out) * " OUT",
                 string(unit.m_heat_ht_out) * " OUT",
-                "Losses",
+                "LossesGains",
                 "Losses_heat",
                 "Losses_hydrogen"]
 
@@ -393,11 +437,11 @@ function output_value(unit::Electrolyser, key::OutputKey)::Float64
     elseif key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Losses_heat"
-        return unit.losses_heat
+        return -unit.losses_heat
     elseif key.value_key == "Losses_hydrogen"
-        return unit.losses_hydrogen
-    elseif key.value_key == "Losses"
-        return unit.losses
+        return -unit.losses_hydrogen
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

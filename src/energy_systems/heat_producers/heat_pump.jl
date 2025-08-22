@@ -401,14 +401,16 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
     # for fixed input/output temperatures, overwrite the interface with those. otherwise
     # highest will choose the interface's temperature (including nothing)
     if unit.output_temperature !== nothing
-        set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                         unit.output_temperature,
-                         unit.output_temperature)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out],
+                        nothing,
+                        nothing,
+                        unit.output_temperature)
     end
     if unit.input_temperature !== nothing
-        set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                         unit.input_temperature,
-                         unit.input_temperature)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in],
+                        nothing,
+                        unit.input_temperature,
+                        nothing)
     end
 end
 
@@ -416,15 +418,17 @@ function set_max_energies!(unit::HeatPump,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
+                           slices_heat_in_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+                           slices_heat_out_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
-    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, purpose_uac_heat_in,
-                    has_calculated_all_maxima_heat_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, purpose_uac_heat_out,
-                    has_calculated_all_maxima_heat_out)
+    set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, slices_heat_in_temperature, nothing,
+                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
+                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
 end
 
 """
@@ -609,12 +613,10 @@ function handle_slice(unit::HeatPump,
                       out_temp::Temperature,
                       plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
-    do_bypass = false
     if unit.constant_cop !== nothing
         cop = unit.constant_cop * unit.plf_function(plr)
     elseif in_temp >= out_temp
         cop = unit.bypass_cop
-        do_bypass = true
     else
         cop = unit.dynamic_cop(in_temp, out_temp)
         if cop === nothing
@@ -629,9 +631,9 @@ function handle_slice(unit::HeatPump,
     end
 
     if cop < 1.0
+        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
+               "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
         cop = 1.0
-        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
-               "input for mistakes as this should not happen. COP was set to 1.0")
     end
 
     # calculate energies with the current cop
@@ -658,7 +660,7 @@ function handle_slice(unit::HeatPump,
             used_el_in,
             used_heat_out,
             in_temp,
-            do_bypass ? in_temp : out_temp)
+            out_temp)
 end
 
 """
@@ -1058,9 +1060,8 @@ end
 function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
-    heat_out = sum(energies.slices_heat_out; init=0.0)
-    if heat_out < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+    if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
+        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0)
         return
     end
 
@@ -1068,16 +1069,12 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                       energies.slices_el_in,
                       energies.slices_heat_in,
                       energies.slices_heat_out,
+                      energies.slices_heat_in_temperature,
+                      energies.slices_heat_out_temperature,
                       energies.slices_heat_in_uac,
                       energies.slices_heat_out_uac,
                       energies.heat_in_has_inf_energy,
                       energies.heat_out_has_inf_energy)
-    set_temperature!(unit.input_interfaces[unit.m_heat_in],
-                     lowest(energies.slices_heat_in_temperature),
-                     nothing)
-    set_temperature!(unit.output_interfaces[unit.m_heat_out],
-                     nothing,
-                     highest(energies.slices_heat_out_temperature))
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
@@ -1096,14 +1093,15 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
         sub!(unit.input_interfaces[unit.m_heat_in],
              energies.slices_heat_in,
-             lowest(energies.slices_heat_in_temperature),
+             energies.slices_heat_in_temperature,
+             [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
         add!(unit.output_interfaces[unit.m_heat_out],
              energies.slices_heat_out,
-             highest(energies.slices_heat_out_temperature),
+             [nothing for _ in energies.slices_heat_out_temperature],
+             energies.slices_heat_out_temperature,
              energies.slices_heat_out_uac)
     end
-
     # calculate losses, effective COP and mixing temperatures with the final values of
     # processed energies
     unit.losses = unit.losses_power + unit.losses_heat + unit.current_constant_loss
@@ -1115,6 +1113,10 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
+end
+
+function component_has_minimum_part_load(unit::HeatPump)
+    return unit.min_usage_fraction > 0.0
 end
 
 # has its own reset function as here more parameters are present that need to be reset in
@@ -1146,7 +1148,7 @@ function output_values(unit::HeatPump)::Vector{String}
             "MixingTemperature_Output",
             "Losses_power",
             "Losses_heat",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64
@@ -1167,11 +1169,11 @@ function output_value(unit::HeatPump, key::OutputKey)::Float64
     elseif key.value_key == "MixingTemperature_Output"
         return unit.mix_temp_output
     elseif key.value_key == "Losses_power"
-        return unit.losses_power
+        return -unit.losses_power
     elseif key.value_key == "Losses_heat"
-        return unit.losses_heat
-    elseif key.value_key == "Losses"
-        return unit.losses
+        return -unit.losses_heat
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end
