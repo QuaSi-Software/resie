@@ -138,10 +138,10 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
         end
 
         # add losses
-        if hasfield(typeof(each_component[2]), Symbol("losses"))
+        if "LossesGains" in output_values(each_component[2])
             push!(output_sourcenames_sankey, each_component[2].uac)
-            push!(output_targetnames_sankey, "Losses")
-            push!(medium_of_interfaces, "Losses")
+            push!(output_targetnames_sankey, "LossesGains")
+            push!(medium_of_interfaces, "LossesGains")
             nr_of_interfaces += 1
         end
     end
@@ -190,8 +190,11 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
         end
 
         # add losses
-        if hasfield(typeof(each_component[2]), Symbol("losses"))
-            energies[n] = each_component[2].losses
+        if "LossesGains" in output_values(each_component[2])
+            energies[n] = output_value(each_component[2],
+                                       EnergySystems.OutputKey(; unit=each_component[2],
+                                                               medium=nothing,
+                                                               value_key="LossesGains"))
             n += 1
         end
     end
@@ -370,16 +373,16 @@ function dump_auxiliary_outputs(project_config::Dict{AbstractString,Any},
 end
 
 """
-geather_output_data(output_keys, time)
+gather_output_data(output_keys, time)
 
-returns a vektor with the requested data in output_keys
+returns a vector with the requested data in output_keys
 """
-function geather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
-    return_values = Vector{Any}()
-    append!(return_values, time)
+function gather_output_data(output_keys::Vector{EnergySystems.OutputKey}, time::Int)
+    return_values = zeros(Union{Int,Float64}, length(output_keys) + 1)
+    return_values[1] = time
 
-    for outkey in output_keys
-        append!(return_values, output_value(outkey.unit, outkey))
+    for (idx, outkey) in enumerate(output_keys)
+        return_values[idx + 1] = output_value(outkey.unit, outkey)
     end
 
     return return_values
@@ -556,6 +559,21 @@ function create_sankey(output_all_sourcenames::Vector{Any},
         output_all_value_sum[interface] = sum(output_all_values[:, interface])
     end
 
+    # convert Losses into Gains if they are negative
+    for idx in 1:nr_of_interfaces
+        if medium_of_interfaces[idx] == "LossesGains"
+            if output_all_value_sum[idx] < 0.0  # Losses
+                medium_of_interfaces[idx] = "Losses"
+                output_all_value_sum[idx] = -output_all_value_sum[idx]
+                output_all_targetnames[idx] = "Losses"
+            else # Gains
+                medium_of_interfaces[idx] = "Gains"
+                output_all_targetnames[idx] = output_all_sourcenames[idx]
+                output_all_sourcenames[idx] = "Gains"
+            end
+        end
+    end
+
     # remove data that should not be plotted in Sankey
     interface_new = 1
     for _ in 1:nr_of_interfaces
@@ -581,8 +599,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     end
     interface_new -= 1
 
-    # add 0.000001 to all interfaces (except of losses) to display interfaces that are zero
-    output_all_value_sum += (medium_of_interfaces .!= "Losses") .* 0.000001
+    # add 0.000001 to all interfaces (except of losses and gains) to display interfaces that are zero
+    output_all_value_sum += .![medium in ["Losses", "Gains"] for medium in medium_of_interfaces] * 0.000001
 
     # prepare data for sankey diagram and create sankey
     # set label of blocks

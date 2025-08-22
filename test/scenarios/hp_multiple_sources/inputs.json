@@ -7,7 +7,8 @@
             "m_h_w_lt1": "red",
             "m_h_w_ht1": "darkred",
             "m_e_ac_230v": "darkgoldenrod1",
-            "Losses": "black"
+            "Losses": "black",
+            "Gains": "black"
         },
         "csv_output_file": "./test/scenarios/hp_multiple_sources/out.csv",
         "csv_output_keys": "all",

@@ -11,7 +11,7 @@ For information on how you can contribute please check the documentation.
 
 ### **Requirements**
 
-* Julia, minimum v1.8.5 and tested up to v1.11.3. You can find installation instructions [here](https://julialang.org/downloads/). Works best using Juliaup instead of precompiled binary files.
+* Julia, minimum v1.8.5 and tested up to v1.11.3. You can find installation instructions [here](https://julialang.org/install/). Works best using Juliaup instead of precompiled binary files.
 * (Optional) Python3, tested with v3.9.13. Only required for developing ReSiE.
 
 ### Instructions

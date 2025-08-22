@@ -1,11 +1,35 @@
 # Changes made, features added and bugs fixed
-In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatability then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independant of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
+In general the development follows the [semantic versioning](https://semver.org/) scheme. As the simulation is parameterized by the project file, the structure and meaning of this file represents the API of the simulation engine. Evaluating compatibility then follows required changes in the project file. This is complicated by the implementation of the individual energy system components, which happens within the framework but is also reasonably independent of the simulation model. A change in the implementation may have big effects on simulation results without requiring any change in the project file. It is up to the developers to find a workable middle ground.
 
 ## Pre-1.0-releases
-As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatability. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
+As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
+
+### Version 0.11.3
+* Add solar thermal collector model (STC)
+* Add detailed seasonal thermal storage model (STES)
+* Add solar radiation model for sun position and beam and diffuse irradiance in a plane. Also improves the interpolation method to better represent the needs of irradiation (energy conservation in every hour and consideration of sunset and sunrise)
+* Add new control module "negotiate_temperature" which defines temperature between two components with flexible temperatures. This also includes improvements in the control possibilities of the geothermal probe.
+* Add new control module "limit_cooling_input_temperature" for electrolysers with STES
+* Multiple bug fixes and improvements in the determination of the order of operation to cover more energy system configurations, especially circle-transformer (input and output to the same (Proxy)Bus) and busses with minimum part load ratio set; also differ between general bounded sources/sinks and grid input/output in the base order
+* Complete rework of temperature communication between components. This includes:
+  * Min and max temperatures are now part of the MaxEnergy struct (and no longer in the interfaces) and set during Control/Process and also using the add!() functions in Process. 
+  * Rework of the bus distribute and balance_on to better consider temperatures. Also update all functions dealing with MaxEnergy structs within the bus to consider these temperatures.
+  * Adaptation of the bypass of the heat pump which now limits the temperature during bypass to the actual demanded temperature
+  * Add another method to recalculate energies triggered by the bus ("recalculate_max_energy" in MaxEnergy) as second method in addition to "has_calculated_all_maxima"
+  * Adaptation of the order of Control-Steps in the OoO to allow STES and STC to gather information of temperatures during their control.
+  * Adjust Electrolyser to handle and communicate UACs of energies
+* Changed definition of Losses and Gains: Losses are now negative in output, Gains are positive in output. Note that in the components themselves Losses are still handled as positive and Gains as negative values!
+* Fix typos in multiple files
+* Adapted scenarios according to the changes made and added two new scenarios: "stc_2_demands" and "p2h_stes_stc"
+* Updated example multisector district to use new STES model
+* Add "epsilon" to input simulation parameter
+* Remove balance_on() functions of storages as they are now covered by the general implementation
+* Fix URL to Julia installation page
+*  Multiple bug fixes and improvements in Profiles and other parts of ReSiE
+*  Improve robustness of storages against the order of process and load steps
 
 ### Version 0.11.2
-* Improve error output for reading in profiles from files by including the line where the error occured
+* Improve error output for reading in profiles from files by including the line where the error occurred
 * Adjust ReSiE CLI to handle Ctrl+c more gracefully
 * Add tests for control module profile_limited, which previously had none
 * Updates to heat pump:
@@ -62,7 +86,7 @@ As per the definition of semantic versioning and the reality of early developmen
 ### Version 0.10.3
 * Add the possibility to create optional figures at the end of the simulation period
 * Fix balance_on() of storages for direct connections
-* Finalisation of the geothermal collector (successfully validated agains TRNSYS and DELPHIN):
+* Finalisation of the geothermal collector (successfully validated against TRNSYS and DELPHIN):
   * Revision of the entire model, including bug fixed and improvements
   * Add automatic generation of the numerical grid
   * Add time-shiftable plot of the temperature distribution (requires GLMakie package, activate with auxiliary_plots)
@@ -121,7 +145,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Add temperature layers in the input and output interfaces of components, if they need it. Currently only used by the heat pump, but solarthermal collector will follow.
 * Refactor heat pump to handle temperature layer in the input and output interfaces and add a bypass if the input temperature is higher than the output temperature.
 * Add method to deal with unknown energies at known temperatures for components during the potential step to avoid balance errors due to changed temperatures in process.
-* Add basic functionalites for component-controlled order on busses. The respective control_modules are not included yet.
+* Add basic functionalities for component-controlled order on busses. The respective control_modules are not included yet.
 * Add two new scenarios "transformer_chain" and "hp_temperature_layer". Set new scenario reference due to bypass and correct calculation of COP for multiple heat layers in the output of heat pumps.
 * Add output channels for temperatures for heat pump ("MixingTemperature_Input", "MixingTemperature_Output"), buffer tank ("CurrentMaxOutTemp") and geothermal probe ("current_input_temperature").
 
@@ -129,7 +153,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Implement functionality of control modules, that can be added to components and that control the operation of the components via defined callback functions. This replaces the previous implementation of "strategies", as this was too limiting. The currently implemented control module types are:
   * economical_discharge: Handles the discharging of a battery to only be allowed if sufficient charge is available and a linked PV plant has available power below a given threshold. Mostly used for examplatory purposes.
   * profile_limited: Sets the maximum PLR of a component to values from a profile. Used to set the operation of a component to a fixed schedule while allowing circumstances to override the schedule in favour of lower values (e.g. the produced energy could not be used up completely).
-  * storage_driven: Controls a component to only operate when the charge of a linked storage component falls below a certain threshold and keep operation until a certain higher threshold is reached. This is often used to avoid components switching on and off rapdily to keep a storage topped up, as realised systems often operate with this kind of hysteresis behaviour.
+  * storage_driven: Controls a component to only operate when the charge of a linked storage component falls below a certain threshold and keep operation until a certain higher threshold is reached. This is often used to avoid components switching on and off rapidly to keep a storage topped up, as realised systems often operate with this kind of hysteresis behaviour.
 * Restructure how the operational strategy is defined in the input file. In particular:
   * Remove entry "strategy"
   * Remove entry "control_refs"
@@ -138,7 +162,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Add scenario "chpp_two_hyst" to highlight the operation of a transformer with two storage_driven control modules
 
 ### Version 0.8.11
-* Add optional temperature to the input or ouput interface of the grid component (constant temperature, from profile or from weather file)
+* Add optional temperature to the input or output interface of the grid component (constant temperature, from profile or from weather file)
 
 ### Version 0.8.10
 * Major refactoring of the determination of the correct order of operation for transformer potential and process steps. Now, the order of operation for complex energy systems with branched transformer chains across busses can be determined automatically and these energy systems can be simulated. See the documentation for limitations and further details.
@@ -197,7 +221,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Rework internal energy distribution calculations on busses:
   * If two or more busses are connected in a chain (necessarily of the same medium), a so-called proxy bus is created, which handles the calculations for any energy transfer from components on any of the principal/original busses
   * Remove the distinction of maximum potential energy utilisation (`max_energy`) and storage un-/loading potential, as the calculation on a bus considers storages according to the energy flow matrix as well as storage loading flags and thus does not require a distinction anymore. Direct 1-to-1 connections do not require this either, hence the removal.
-  * Add automatically generated output channels for busses in a chain, where each bus tracks how much energy is transfered to other busses in the input->output direction
+  * Add automatically generated output channels for busses in a chain, where each bus tracks how much energy is transferred to other busses in the input->output direction
   * Some slight changes the generated order of operations, as this now makes use of the input and output order on proxy busses. This should not have an impact on results, but might change the order of operations compared to versions before v0.8.0.
 
 ### Version 0.7.1
@@ -246,7 +270,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Remove last potential() step of transformer chains as this is not needed
 * Add required Julia packages: Colors, Interpolations, Dates, Logging
 * Rename argument "parameters" for simulation parameters to "sim_params" and add them to all components and profiles
-* Rework communication of balances, energy/storage potentials and temperatures via busses. This is an extensive rework that touches almost all components and how the `process` and `potential` simulation steps work. Please note that the rework is not finished with v0.7.0 and will continue to support more energy systems and component configurations that might be of interest to users. However no compatability is knowingly broken with examples that worked in previous versions.
+* Rework communication of balances, energy/storage potentials and temperatures via busses. This is an extensive rework that touches almost all components and how the `process` and `potential` simulation steps work. Please note that the rework is not finished with v0.7.0 and will continue to support more energy systems and component configurations that might be of interest to users. However no compatibility is knowingly broken with examples that worked in previous versions.
 
 ### Version 0.6.5
 * "output_keys" and "output_plot" in the input file can now be "all", "nothing" or a list of entries for custom outputs of the CSV file and lineplot (backwards compatibility is given)
@@ -354,16 +378,16 @@ As per the definition of semantic versioning and the reality of early developmen
 
 ### Version 0.3.4
 * added feature to control transformers from user-given control profile with values within [0,1]. This adds to the already existing limitations in the control strategy of demand_driven, supply_driven and storage_driven strategy.
-* bugfix in index assignement of connectivity matrix to output_interfaces in balance_on() of bus
-* changed calculation of COP of heatpump: If fixed_cop is given in the input file, it will be used and not the temperature-dependend COP. Corrected tests to meet this definition.
+* bugfix in index assignment of connectivity matrix to output_interfaces in balance_on() of bus
+* changed calculation of COP of heatpump: If fixed_cop is given in the input file, it will be used and not the temperature-dependent COP. Corrected tests to meet this definition.
 
 ### Version 0.3.3
 * bugfix in calculation of IN and OUT energy in output_value() for chases with balance /= 0. 
 
 ### Version 0.3.2
-* adapted control strategies for all transformers: All in- and outputs need to be sattisfied by default
-* added optional user-defined input in control strategie of each transformer to ignore certain in- or outputs within control strategy
-* added optional user-defined input in control strategie of each transformer to allow or deny system-wide storage loading or unloading
+* adapted control strategies for all transformers: All in- and outputs need to be satisfied by default
+* added optional user-defined input in control strategy of each transformer to ignore certain in- or outputs within control strategy
+* added optional user-defined input in control strategy of each transformer to allow or deny system-wide storage loading or unloading
 * changed max_power to max_energy for all energy systems in outputs and unit structs
 * added max_energy to interfaces and control() of grids, sources and sinks in order to provide information on how many energy is available or can be taken, calculated in balance_on(), to meet new control strategies of transformers
 * adapted balance_on() to also return energy_potential (if sum_abs_change /= 0) that represents the potential maximum energy in- or output at unit (former potential is now named storage_potential, balance_on() returns now a named tuple instead of tuples)
@@ -411,15 +435,15 @@ As per the definition of semantic versioning and the reality of early developmen
 * Improve sankey output (hide null-flows and hide O2)
 * Refactor order of operations to include distribution between connected busses
 * Bugfix in distribution calculation of bus systems
-* Change examples to illstrutrate current problems
+* Change examples to illustrate current problems
 * Change how temperatures are read from profile files
 * Make feature of load-dependant temperatures of heat storages optional
 
 ### Version 0.2.5:
-* Refactor and fix how the storage loading potential and temperatures are transfered across busses, in partiular when multiple busses are connected in series
+* Refactor and fix how the storage loading potential and temperatures are transferred across busses, in particular when multiple busses are connected in series
 
 ### Version 0.2.4:
-* added example of system topology Esslingen in different variantes
+* added example of system topology Esslingen in different variants
 * added profiles for PV, heat demand
 * removed deprecated code in pv_plant.jl
 * bugfix in Resie.jl in collecting data of all interfaces (added div 2 for sum_abs_change and correct results for non-balanced interfaces)
@@ -429,7 +453,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * Fix distribution overwriting temperatures on system interfaces
 
 ### Version 0.2.2:
-* fixed bug with coloring of the medium in Sankey occuring in file_output.jl when only one medium is present in energy topology
+* fixed bug with coloring of the medium in Sankey occurring in file_output.jl when only one medium is present in energy topology
 * added example input file with one medium and two busses in paralell (currently not working!)
 
 ### Version 0.2.1:

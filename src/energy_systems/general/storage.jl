@@ -19,6 +19,9 @@ mutable struct Storage <: Component
     load_end_of_last_timestep::Float64
     losses::Float64
 
+    process_done::Bool
+    load_done::Bool
+
     function Storage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(config["medium"])
         register_media([medium])
@@ -32,7 +35,9 @@ mutable struct Storage <: Component
                    config["capacity"],  # capacity
                    config["load"],      # load
                    0.0,                 # load_end_of_last_timestep::Float64
-                   0.0)                 # losses
+                   0.0,                 # losses
+                   false,  # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)  # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -54,27 +59,13 @@ function control(unit::Storage,
     set_max_energy!(unit.output_interfaces[unit.medium], unit.load)
 end
 
-function balance_on(interface::SystemInterface, unit::Storage)::Vector{EnergyExchange}
-    caller_is_input = unit.uac == interface.target.uac
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
-    purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
-
-    return [EnEx(;
-                 balance=interface.balance,
-                 energy_potential=balance_written ? 0.0 : (caller_is_input ? -(unit.capacity - unit.load) : unit.load),
-                 purpose_uac=purpose_uac,
-                 temperature_min=interface.temperature_min,
-                 temperature_max=interface.temperature_max,
-                 pressure=nothing,
-                 voltage=nothing)]
-end
-
 function process(unit::Storage, sim_params::Dict{String,Any})
     outface = unit.output_interfaces[unit.medium]
     exchanges = balance_on(outface, outface.target)
     energy_demand = balance(exchanges) + energy_potential(exchanges)
 
     if energy_demand >= 0.0
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         return # process is only concerned with moving energy to the target
     end
@@ -86,6 +77,22 @@ function process(unit::Storage, sim_params::Dict{String,Any})
         add!(outface, unit.load)
         unit.load = 0.0
     end
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::Storage, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update component
+        unit.load_end_of_last_timestep = copy(unit.load)
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::Storage, sim_params::Dict{String,Any})
@@ -94,8 +101,8 @@ function load(unit::Storage, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     if energy_available <= 0.0
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
-        unit.load_end_of_last_timestep = copy(unit.load)
         return # load is only concerned with receiving energy from the source
     end
 
@@ -108,7 +115,7 @@ function load(unit::Storage, sim_params::Dict{String,Any})
         sub!(inface, diff)
     end
 
-    unit.load_end_of_last_timestep = copy(unit.load)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::Storage)::Vector{String}
@@ -117,7 +124,7 @@ function output_values(unit::Storage)::Vector{String}
             "Load",
             "Load%",
             "Capacity",
-            "Losses"]
+            "LossesGains"]
 end
 
 function output_value(unit::Storage, key::OutputKey)::Float64
@@ -131,8 +138,8 @@ function output_value(unit::Storage, key::OutputKey)::Float64
         return 100 * unit.load / unit.capacity
     elseif key.value_key == "Capacity"
         return unit.capacity
-    elseif key.value_key == "Losses"
-        return unit.losses
+    elseif key.value_key == "LossesGains"
+        return -unit.losses
     end
     throw(KeyError(key.value_key))
 end

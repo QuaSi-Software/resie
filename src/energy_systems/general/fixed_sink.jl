@@ -76,21 +76,18 @@ function control(unit::FixedSink,
     else
         unit.demand = 0.0
     end
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.demand)
 
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_temperature!(unit.input_interfaces[unit.medium],
-                     unit.temperature,
-                     nothing)
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.demand, unit.temperature, nothing)
 end
 
 function process(unit::FixedSink, sim_params::Dict{String,Any})
     inface = unit.input_interfaces[unit.medium]
-    sub!(inface, unit.demand, unit.temperature)
+    sub!(inface, unit.demand, unit.temperature, nothing)
 end
 
 function output_values(unit::FixedSink)::Vector{String}

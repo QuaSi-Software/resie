@@ -95,6 +95,7 @@ function get_default_sim_params()::Dict{String,Any}
         "wh_to_watts" => function (w)
             return w * 4.0
         end,
+        "run_ID" => uuid1(),
     )
 end
 
@@ -112,12 +113,7 @@ code under test.
 - `components::Dict{String,<:Any}`: The components
 - `sim_params::Dict{String,Any}`: The simulation parameters
 - `ooo::Vector{Any}`: (Optional) The order of operations. Defaults to an empty vector.
-# Returns
-- `UUID`: The ID of the mock simulation run
 """
-function setup_mock_run!(components::Dict{String,<:Any}, sim_params::Dict{String,Any}; ooo::Vector{Any}=[])::UUID
-    run_id = uuid1()
-    Resie.current_runs[run_id] = Resie.SimulationRun(sim_params, components, ooo)
-    sim_params["run_ID"] = run_id
-    return run_id
+function setup_mock_run!(components::Dict{String,<:Any}, sim_params::Dict{String,Any}; ooo::Vector{Any}=[])
+    Resie.current_runs[sim_params["run_ID"]] = Resie.SimulationRun(sim_params, components, ooo)
 end

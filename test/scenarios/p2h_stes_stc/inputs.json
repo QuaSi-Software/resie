@@ -1,0 +1,275 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/p2h_stes_stc/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/p2h_stes_stc/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/p2h_stes_stc/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_time_unit": "date",
+        "csv_output_keys": "all",
+        "output_plot_file": "./test/scenarios/p2h_stes_stc/output_plot.html",
+        "output_plot": "all"
+    },
+    "simulation_parameters": {
+        "start": "01.06.2024 00:00",
+        "end": "30.06.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes",
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw",
+        "epsilon": 1e-7
+    },
+    "components": {
+        "TST_STC_01": {
+            "type": "SolarthermalCollector",
+            "m_heat_out": "m_h_w_ht1",
+            "output_refs": ["TST_BUS_01"],
+            "control_modules": [{
+                "name": "negotiate_temperature",
+                "temperature_mode": "optimize",
+                "target_uac": "TST_STS_01",
+                "use_hysteresis": false,
+                "hysteresis_temp_on": 50,
+                "hysteresis_temp_off": 20
+            }],
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "beam_solar_radiation_from_global_file": "beamHorIrr",
+            "diffuse_solar_radiation_from_global_file": "difHorIrr",
+            "infrared_sky_radiation_from_global_file": "longWaveIrr",
+            "wind_speed_from_global_file": "wind_speed",
+            "collector_gross_area": 15000.0,
+            "tilt_angle": 30,
+            "azimuth_angle": 0,
+            "ground_reflectance":0.4,
+            "__RITTER_SOLAR_XL_19/49P__": "",
+            "eta_0_b": 0.576,
+            "K_b_t_array":[1.01, 1.01, 1.03, 1.04, 0.97, 1.06, 1.13, 0.57, 0.00],
+            "K_b_l_array":[1.00, 1.00, 0.99, 0.97, 0.91, 0.85, 0.70, 0.35, 0.00],
+            "K_d": 1.12,
+            "a_params": [0.47, 0.003, 0.0, 0.0, 13340.0, 0.0, 0.0, 0,0],
+            "vol_heat_capacity": 3921470,
+            "wind_speed_reduction": 1,
+            "delta_T_min": 2,
+            "spec_flow_rate": 1.0E-05
+        },
+        "TST_P2H_01": {
+            "type": "FuelBoiler",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "m_fuel_in": "m_e_ac_230v",
+            "m_heat_out": "m_h_w_ht1",
+            "power_th": 2000000,
+            "__OPTIONAL__": "",
+            "efficiency_fuel_in": "const:1.0",
+            "efficiency_heat_out": "const:0.97",
+            "linear_interface": "heat_out",
+            "min_power_fraction": 0.0,
+            "output_temperature": 95
+        },
+        "TST_BUS_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "TST_STC_01",
+                    "TST_SRC_03",
+                    "TST_P2H_01",
+                    "TST_STS_01",
+                    "TST_HP_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_BUS_03",
+                    "TST_HP_01",
+                    "TST_STS_01"
+                ],
+                "energy_flow": [
+                    [ 1, 0, 0, 1 ],
+                    [ 1, 1, 1, 1 ],
+                    [ 1, 1, 1, 1 ],
+                    [ 1, 1, 1, 1 ],
+                    [ 1, 1, 1, 0 ]
+                ]
+            }
+        },
+        "TST_BUS_02": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "TST_PV_01",
+                    "TST_SRC_02",
+                    "TST_GRI_01"
+                ],
+                "output_order": [
+                    "TST_P2H_01",
+                    "TST_HP_01",
+                    "TST_GRO_01"
+                ],
+                "energy_flow": [
+                    [ 1, 1, 1 ],
+                    [ 1, 1, 0 ],
+                    [ 0, 1, 0 ]
+                ]
+            }
+        },
+        "TST_PV_01": {
+            "type": "PVPlant",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "energy_profile_file_path": "profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 50000.0,
+            "m_el_out": "m_e_ac_230v"
+        },
+        "TST_SRC_02": {
+            "type": "BoundedSupply",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "medium": "m_e_ac_230v",
+            "max_power_profile_file_path": "./profiles/examples/district/4000hours_with_least_CO2_2022.prf",
+            "scale": 50000
+        },
+        "TST_SRC_03": {
+            "type": "BoundedSupply",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "medium": "m_h_w_ht1",
+            "max_power_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_west_Wh_per_square_meter.prf",
+            "constant_temperature": 60,
+            "scale": 200000.0
+        },
+        "TST_GRO_01": {
+            "type": "GridConnection",
+            "output_refs": [],
+            "medium": "m_e_ac_230v",
+            "is_source": false
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "power_th": 10000000,
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_h_w_ht1",
+            "m_el_in": "m_e_ac_230v",
+            "m_heat_out": "m_h_w_ht1",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "carnot:0.45",
+            "bypass_cop": 25.0,
+            "min_power_function": "const:0.0",
+            "max_power_function": "const:1.0",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 0.97,
+            "power_losses_factor": 0.97,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": false,
+            "icing_coefficients": "3,-0.42,15,2,30",
+            "__OPTIONAL_OPTIMISATION_FOR_INVERTER_HP__": "",
+            "optimise_slice_dispatch": true,
+            "optimal_plr": 0.5,
+            "nr_optimisation_passes": 10
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "medium": "m_e_ac_230v",
+            "is_source": true
+        },
+        "TST_DEM_02": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_h_w_ht1",
+            "constant_temperature": 85,
+            "energy_profile_file_path": "profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 500000.0
+        },
+        "TST_DEM_01": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_h_w_ht1",
+            "constant_temperature": 45,
+            "energy_profile_file_path": "profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 65000.0
+        },
+        "TST_BUS_03": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "TST_BUS_01",
+                    "TST_BFT_01"
+                ],
+                "output_order": [
+                    "TST_DEM_02",
+                    "TST_BFT_01"
+                ],
+                "energy_flow": [
+                    [ 1, 1 ],
+                    [ 1, 1 ]
+                ]
+            }
+        },
+        "TST_BFT_01": {
+            "type": "BufferTank",
+            "output_refs": [
+                "TST_BUS_03"
+            ],
+            "medium": "m_h_w_ht1",
+            "___GENERAL PARAMETER___": "",
+            "model_type": "ideally_stratified",
+            "volume": 5000,
+            "rho_medium": 1000,
+            "cp_medium": 4.18,
+            "high_temperature": 85.0,
+            "low_temperature": 10.0,
+            "initial_load": 0.5,
+            "max_load_rate": 1.0,
+            "max_unload_rate": 1.5,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 1.0,
+            "thermal_transmission_barrel": 1.0,
+            "thermal_transmission_bottom": 1.0
+        },
+        "TST_STS_01": {
+            "type": "SeasonalThermalStorage",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "volume": 150000,
+            "m_heat_out": "m_h_w_ht1",
+            "m_heat_in": "m_h_w_ht1",
+            "hr_ratio": 0.5,
+            "sidewall_angle": 40,
+            "shape": "quadratic",
+            "rho_medium": 1000,
+            "cp_medium": 4.18,
+            "diffusion_coefficient": 0.000000143,
+            "number_of_layer_total": 25,
+            "number_of_layer_above_ground": 1,
+            "output_layer_from_top": 1,
+            "high_temperature": 95,
+            "low_temperature": 10,
+            "max_load_rate_energy": 0.001,
+            "max_unload_rate_energy": 0.001,
+            "max_load_rate_mass": 0.0008,
+            "max_unload_rate_mass": 0.0008,
+            "thermal_transmission_lid": 0.25,
+            "thermal_transmission_barrel": 0.375,
+            "thermal_transmission_bottom": 0.375,
+            "constant_ground_temperature": 20.0,
+            "initial_load": 0.4
+        }
+    }
+}

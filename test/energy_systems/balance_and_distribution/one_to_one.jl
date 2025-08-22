@@ -44,12 +44,12 @@ function test_one_to_one_grid()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(grid, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == 0.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 end
 
 @testset "one_to_one_grid" begin
@@ -91,12 +91,12 @@ function test_one_to_one_bounded_source()
     EnergySystems.process(demand, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 
     EnergySystems.process(source, simulation_parameters)
 
     @test demand.input_interfaces[demand.medium].balance == -1000.0
-    @test demand.input_interfaces[demand.medium].temperature_min == 55.0
+    @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 end
 
 @testset "one_to_one_bounded_source" begin
