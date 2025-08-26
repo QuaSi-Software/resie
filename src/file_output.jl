@@ -41,9 +41,40 @@ function get_output_keys(io_settings::Dict{String,Any},
     if do_plot_all_outputs || do_write_all_CSV_outputs
         all_output_keys = Vector{EnergySystems.OutputKey}()
         for unit in components
-            temp_dict = Dict{String,Any}(unit[2].uac => output_values(unit[2]))
+            output_vals = output_values(unit[2])
+            temp_dict = Dict{String,Any}()
+            for output_val in output_vals
+                if startswith(output_val, "EnergyFlow")
+                    key = String(unit[2].medium)
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val[12:end])
+                    else
+                        temp_dict[key] = [output_val[12:end]]
+                    end
+                elseif startswith(output_val, "TemperatureFlow")
+                    # do nothing, temperature are added in output_keys()
+                    continue
+                else
+                    key = unit[2].uac
+                    if haskey(temp_dict, key)
+                        push!(temp_dict[key], output_val)
+                    else
+                        temp_dict[key] = [output_val]
+                    end
+                end
+            end
             append!(all_output_keys, output_keys(components, temp_dict))
         end
+
+        # sort keys
+        function sort_by(output_key)
+            any(startswith(output_key.value_key, p) for p in ("EnergyFlow", "TemperatureFlow")) ?
+            # special: primary = medium (always present), secondary = value_key
+            lowercase("zzzzzzzzzzzzz" * string(output_key.medium) * output_key.value_key) :
+            # default: primary = unit.uac, secondary = medium (if present), tertiary = value_key
+            lowercase(string(output_key.unit.uac) * string(something(output_key.medium, "")) * output_key.value_key)
+        end
+        sort!(all_output_keys; by=sort_by)
     end
 
     # collect output keys for lineplot and csv output
@@ -202,39 +233,82 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
 end
 
 """
-output_keys(from_config)
+output_keys(components, from_config, sort)
 
 Transform the output keys definition in the project config file into a list of OutputKey
 items. This is done to speed up selection of values for the output in each time step,
 as this transformation has to be done only once at the beginning.
 """
-function output_keys(components::Grouping, from_config::Dict{String,Any})::Vector{EnergySystems.OutputKey}
+function output_keys(components::Grouping, from_config::Dict{String,Any};
+                     sort::Bool=false)::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
-    for unit_key in keys(from_config)
-        unit = components[unit_key]
+    all_current_media = String.(unique([bus.medium
+                                        for bus in values(components) if bus.sys_function === EnergySystems.sf_bus]))
 
-        for entry in from_config[unit_key]
-            splitted = split(String(entry))
-            if length(splitted) > 1
-                medium_key = splitted[1]
-                medium = Symbol(String(medium_key))
-                if medium in EnergySystems.medium_categories
-                    value_key = splitted[2]
+    for key in keys(from_config)
+        if key in keys(components)
+            unit_key = key
+            unit = components[unit_key]
+
+            for entry in from_config[unit_key]
+                splitted = split(String(entry))
+                if length(splitted) > 1
+                    medium_key = splitted[1]
+                    medium = Symbol(String(medium_key))
+                    if medium in EnergySystems.medium_categories
+                        value_key = splitted[2]
+                    else
+                        @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
+                               "output key. Make sure that the medium \"$medium\" exists and that you have not used " *
+                               "spaces accidentally. Spaces are only allowed if you want to specify an output channel " *
+                               "of a specific medium!"
+                        throw(InputError)
+                    end
                 else
-                    @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an output key. 
-Make sure that the medium \"$medium\" exists and that you have not used spaces accidentally. 
-Spaces are only allowed if you want to specify an output channel of a specific medium!"
+                    medium = nothing
+                    value_key = splitted[1]
+                end
+
+                push!(outputs, EnergySystems.OutputKey(; unit=unit,
+                                                       medium=medium,
+                                                       value_key=value_key))
+            end
+        elseif key in all_current_media
+            media_key = key
+            medium = Symbol(String(media_key))
+            for value_key in from_config[media_key]
+                success = false
+                in_uac, out_uac = split(value_key, "->")
+                for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
+                    # consider only proxy busses or busses without proxies and busses with correct media
+                    if bus.proxy === nothing && bus.medium == medium
+                        # check if input and output exists
+                        if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
+                            output_key = "EnergyFlow " * value_key
+                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
+                                                                   medium=medium,
+                                                                   value_key=output_key))
+                            output_key = "TemperatureFlow " * value_key
+                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
+                                                                   medium=medium,
+                                                                   value_key=output_key))
+                            success = true
+                            break
+                        end
+                    end
+                end
+                if !success
+                    @error "The requested energy flow between components \"$(value_key)\" for medium \"$(media_key)\" could not " *
+                           "be found for the CSV output or the plot output. Note that only connections between " *
+                           "components with one or more busses but without any other component in between can be exported!"
                     throw(InputError)
                 end
-            else
-                medium = nothing
-                value_key = splitted[1]
             end
-
-            push!(outputs, EnergySystems.OutputKey(; unit=unit,
-                                                   medium=medium,
-                                                   value_key=value_key))
+        else
+            @error "The key \"$(key)\" in the provided output keys for CSV output or plot output could not be found. " *
+                   "It either has to be a medium or a component used in the current energy system."
+            throw(InputError)
         end
     end
 
@@ -268,7 +342,11 @@ function reset_file(filepath::String,
                 if outkey.medium === nothing
                     header = "$(outkey.unit.uac) $(outkey.value_key)"
                 else
-                    header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+                    if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                        header = "$(outkey.medium) $(outkey.value_key)"
+                    else
+                        header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+                    end
                 end
                 write(file_handle, ";$header")
             end
@@ -410,6 +488,8 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         for outkey in outputs_plot_keys
             if outkey.medium === nothing
                 push!(labels, string("$(outkey.unit.uac) $(outkey.value_key)"))
+            elseif startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                push!(labels, string("$(outkey.medium) $(outkey.value_key)"))
             else
                 push!(labels, string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"))
             end
@@ -426,9 +506,39 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         scale_fact = Float64[]
         if plot_data
             for plot in project_config["io_settings"]["output_plot"]
-                push!(axis, string(plot[2]["axis"]))
-                push!(unit, string(plot[2]["unit"]))
-                push!(scale_fact, plot[2]["scale_factor"])
+                if occursin("->", first(plot[2]["key"])[2][1])
+                    # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required!
+                    if !isa(plot[2]["axis"], AbstractVector) || length(plot[2]["axis"]) !== 2 ||
+                       !isa(plot[2]["unit"], AbstractVector) || length(plot[2]["unit"]) !== 2 ||
+                       !isa(plot[2]["scale_factor"], AbstractVector) || length(plot[2]["scale_factor"]) !== 2
+                        # only one set of meta information given. Use the given one both for energy and temperature flow
+                        push!(axis, isa(plot[2]["axis"], AbstractVector) ? plot[2]["axis"][1] : plot[2]["axis"])
+                        push!(unit, isa(plot[2]["unit"], AbstractVector) ? plot[2]["unit"][1] : plot[2]["unit"])
+                        push!(scale_fact,
+                              isa(plot[2]["scale_factor"], AbstractVector) ? plot[2]["scale_factor"][1] :
+                              plot[2]["scale_factor"])
+
+                        push!(axis, axis[end])
+                        push!(unit, unit[end])
+                        push!(scale_fact, scale_fact[end])
+                        @warn "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
+                              "do not contain two values. Please provide two sets, one for EnergyFlow and one " *
+                              "for TemperatureFlow using [EnergyFlow, TemperatureFlow] for axis, unit and scale_factor. " *
+                              "For now, the first entry is used for both EnergyFlow and TemperatureFlow."
+                    else
+                        push!(axis, string(plot[2]["axis"][1]))
+                        push!(unit, string(plot[2]["unit"][1]))
+                        push!(scale_fact, plot[2]["scale_factor"][1])
+
+                        push!(axis, string(plot[2]["axis"][2]))
+                        push!(unit, string(plot[2]["unit"][2]))
+                        push!(scale_fact, plot[2]["scale_factor"][2])
+                    end
+                else
+                    push!(axis, string(plot[2]["axis"]))
+                    push!(unit, string(plot[2]["unit"]))
+                    push!(scale_fact, plot[2]["scale_factor"])
+                end
             end
         end
         if plot_weather
@@ -445,6 +555,8 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             for outkey in outputs_plot_keys
                 if outkey.medium === nothing
                     push!(labels, string("$(outkey.unit.uac) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
+                elseif startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                    push!(labels, string("$(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
                 else
                     push!(labels,
                           string("$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key) [$(unit[n])] ($(axis[n]))"))
@@ -465,6 +577,25 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     else
         time_x = outputs_plot_weather[:, 1]
     end
+    # filter NaN values
+    if plot_data
+        idxs_to_remove = Int[]
+        for col in axes(outputs_plot_data, 2)
+            if col == 1 # never remove date
+                continue
+            elseif all(isnan, outputs_plot_data[:, col])
+                push!(idxs_to_remove, col)
+            end
+        end
+        if !isempty(idxs_to_remove)
+            outputs_plot_data = outputs_plot_data[:, setdiff(axes(outputs_plot_data, 2), idxs_to_remove)]
+            labels = labels[setdiff(1:length(labels), idxs_to_remove .- 1)]
+            if !plot_all
+                axis = axis[setdiff(1:length(axis), idxs_to_remove .- 1)]
+                scale_fact = scale_fact[setdiff(1:length(scale_fact), idxs_to_remove .- 1)]
+            end
+        end
+    end
     output_plot_time_unit = haskey(project_config["io_settings"], "output_plot_time_unit") ?
                             project_config["io_settings"]["output_plot_time_unit"] : "date"
     if !(output_plot_time_unit in ["seconds", "minutes", "hours", "date"])
@@ -481,7 +612,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     else
         if sim_params["start_date"] === nothing
             start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
-            @info ("Date of first data point in ouput line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
+            @info ("Date of first data point in output line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
         else
             start_date = sim_params["start_date"]
         end
