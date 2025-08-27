@@ -11,7 +11,7 @@ they should be created:
         - all possible keys (incl/excl flows) if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
-function get_output_keys(io_settings::Dict{String,Any},
+function get_output_keys(io_settings::AbstractDict{String,Any},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
     # determine if lineplot and csv should be created
@@ -164,7 +164,7 @@ Determines
 - the source component of each interface and [unit]
 - the target component of each interface [unit]
 
-The information is returned as single vectors with the indicees matching together.
+The information is returned as single vectors with the indices matching together.
 """
 function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any},Vector{Any},Vector{Any}}
     nr_of_interfaces = 0
@@ -174,7 +174,7 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
     for each_component in components
         for each_outputinterface in each_component[2].output_interfaces
             medium = nothing  # reset medium
-            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
+            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
                 medium = each_outputinterface[1] # then, the medium is stored separately
                 each_outputinterface = each_outputinterface[2]
             end
@@ -235,10 +235,10 @@ end
 """
 collect_interface_energies(components, nr_of_interfaces)
 
-Collects and returns the energy that was transportet through every interface.
+Collects and returns the energy that was transported through every interface.
 If the balance of an interface was not zero, the actual energy that was flowing
 is written to the outputs.
-Attention: This can lead to overfilling of demands which is currenlty not visible
+Attention: This can lead to overfilling of demands which is currently not visible
 in the sankey diagram!
 """
 function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
@@ -246,7 +246,7 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
     energies = zeros(Float64, nr_of_interfaces)
     for each_component in components
         for each_outputinterface in each_component[2].output_interfaces
-            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Touple
+            if isa(each_outputinterface, Pair) # some output_interfaces are wrapped in a Tuple
                 each_outputinterface = each_outputinterface[2]
             end
             if (isdefined(each_outputinterface, :target)
@@ -282,14 +282,13 @@ function collect_interface_energies(components::Grouping, nr_of_interfaces::Int)
 end
 
 """
-output_keys(components, from_config, sort)
+output_keys(components, from_config)
 
 Transform the output keys definition in the project config file into a list of OutputKey
 items. This is done to speed up selection of values for the output in each time step,
 as this transformation has to be done only once at the beginning.
 """
-function output_keys(components::Grouping, from_config::Dict{String,Any};
-                     sort::Bool=false)::Vector{EnergySystems.OutputKey}
+function output_keys(components::Grouping, from_config::AbstractDict{String,Any})::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
     all_current_media = String.(unique([bus.medium
@@ -460,7 +459,7 @@ Dump a bunch of information to file that might be useful to explain the result o
 This is mostly used for debugging and development purposes, but might prove useful in
 general to find out why the energy system behaves in the simulation as it does.
 """
-function dump_auxiliary_outputs(project_config::Dict{AbstractString,Any},
+function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
                                 components::Grouping,
                                 order_of_operations::StepInstructions,
                                 sim_params::Dict{String,Any})
@@ -524,7 +523,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
                                    outputs_plot_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                                    outputs_plot_weather::Union{Nothing,Matrix{Float64}},
                                    outputs_plot_weather_keys::Union{Nothing,Vector{String}},
-                                   project_config::Dict{AbstractString,Any},
+                                   project_config::AbstractDict{AbstractString,Any},
                                    sim_params::Dict{String,Any})
     plot_all = isa(project_config["io_settings"]["output_plot"], String) &&
                project_config["io_settings"]["output_plot"][1:3] == "all"
@@ -725,14 +724,14 @@ Inputs:
 output_all_sourcenames and *sinknames are vectors with names of the source and sink of each interface
 output_all_values are logs with data from each timestep in the shape [timestep,interface].
 medium_of_interface is a vector of the medium corresponding to each interface
-nr_of_interfaces is the total number of iterfaces in the current energy system
+nr_of_interfaces is the total number of interfaces in the current energy system
 """
 function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_targetnames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::Dict{String,Any})
+                       io_settings::AbstractDict{String,Any})
 
     # sum up data of each interface
     output_all_value_sum = zeros(Float64, nr_of_interfaces)
@@ -810,7 +809,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                 color_map[medium] = RGB(color_entry[1] / 255, color_entry[2] / 255, color_entry[3] / 255)
             catch e
                 @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
-                       "The following error occured: $e\n" *
+                       "The following error occurred: $e\n" *
                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
                 throw(InputError)
             end

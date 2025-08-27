@@ -36,9 +36,9 @@ struct InputError <: Exception end
 """
 Convenience function to get the value of a key from a config dict using a default value.
 """
-default(config::Dict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
-                                                                                config[name] :
-                                                                                default_val
+default(config::AbstractDict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
+                                                                                        config[name] :
+                                                                                        default_val
 
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
