@@ -37,13 +37,13 @@ required for the particular component. The `type` parameter must be present and 
 the symbol of the component class exactly. The structure is described in more detail in the
 accompanying documentation on the project file.
 """
-function load_components(config_ad::AbstractDict{String,Any}, sim_params::Dict{String,Any})::Grouping
+function load_components(config_ordered::AbstractDict{String,Any}, sim_params::Dict{String,Any})::Grouping
     # convert OrderedDict to normal Dict to have a normal dict in all components as they do not
     # require any sorting
     to_dict(x) = x
     to_dict(x::OrderedDict) = Dict{String,Any}(k => to_dict(v) for (k, v) in x)
     to_dict(x::AbstractVector) = map(to_dict, x)
-    config = to_dict(config_ad)
+    config = to_dict(config_ordered)
 
     components = Grouping()
 
@@ -62,20 +62,34 @@ function load_components(config_ad::AbstractDict{String,Any}, sim_params::Dict{S
 
     # link inputs/outputs
     for (unit_key, entry) in pairs(config)
-        if (String(entry["type"]) != "Bus"
-            && haskey(entry, "output_refs")
-            && length(entry["output_refs"]) > 0)
-            # end of condition
-            others = Grouping(key => components[key] for key in entry["output_refs"])
-            link_output_with(components[unit_key], others)
-
-        elseif (String(entry["type"]) == "Bus"
-                && haskey(entry, "connections")
-                && length(entry["connections"]) > 0)
-            # end of condition
-            others = Grouping(key => components[key]
-                              for key in entry["connections"]["output_order"])
-            link_output_with(components[unit_key], others)
+        if String(entry["type"]) != "Bus" && haskey(entry, "output_refs") && length(entry["output_refs"]) > 0
+            if isa(entry["output_refs"], AbstractDict)
+                # components with multiple outputs should enter the output_refs as Dict to achieve uniqueness 
+                media_keys = collect(keys(entry["output_refs"]))
+                target_components = [Grouping(uac => components[uac])
+                                     for uac in [entry["output_refs"][key] for key in media_keys]]
+                media_sym = Symbol[]
+                for medium in media_keys
+                    if hasproperty(components[unit_key], Symbol(medium))
+                        push!(media_sym, getproperty(components[unit_key], Symbol(medium)))
+                    else
+                        @error "For component $unit_key, the key `$medium` in the `output_refs` could not be found!"
+                        throw(InputError)
+                    end
+                end
+                link_output_with(components[unit_key], target_components; given_media=media_sym)
+            else
+                if length(entry["output_refs"]) > 1
+                    @warn "The component $unit_key has more than one output interface, but the `output_refs` are not " *
+                          "specified explicitly! This can work, but it can also cause wrong interconnection between " *
+                          "components! Consider using a mapping of the media to the target components "
+                end
+                target_components = Grouping(uac => components[uac] for uac in entry["output_refs"])
+                link_output_with(components[unit_key], target_components)
+            end
+        elseif String(entry["type"]) == "Bus" && haskey(entry, "connections") && length(entry["connections"]) > 0
+            target_components = Grouping(uac => components[uac] for uac in entry["connections"]["output_order"])
+            link_output_with(components[unit_key], target_components)
         end
     end
 

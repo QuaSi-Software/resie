@@ -1635,7 +1635,8 @@ determines which components provide energy to which other components.
 - `components::Grouping`: A set of components receiving energy. As components might have multiple
     outputs, this is used to set them all at once.
 """
-function link_output_with(unit::Component, components::Grouping)
+function link_output_with(unit::Component, components::Union{Grouping,Vector{Grouping}};
+                          given_media::Union{Nothing,Vector{Symbol}}=nothing)
     if isa(unit, Bus)
         for component in each(components)
             if isa(component, Bus)
@@ -1655,20 +1656,37 @@ function link_output_with(unit::Component, components::Grouping)
             end
         end
     else
-        for out_medium in keys(unit.output_interfaces)
-            for component in each(components)
-                if isa(component, Bus)
-                    if out_medium == component.medium
-                        connection = SystemInterface(; source=unit, target=component)
-                        push!(component.input_interfaces, connection)
-                        unit.output_interfaces[out_medium] = connection
-                    end
+        if given_media !== nothing
+            # media and target are specified in the input file. components is a Vector{Grouping} here with the
+            # same order than given_medium.
+            for (idx, given_medium) in enumerate(given_media)
+                current_component = only(values(components[idx]))
+                connection = SystemInterface(; source=unit, target=current_component)
+                unit.output_interfaces[given_medium] = connection
+                if isa(current_component, Bus)
+                    push!(current_component.input_interfaces, connection)
                 else
-                    for in_medium in keys(component.input_interfaces)
-                        if out_medium == in_medium
+                    current_component.input_interfaces[given_medium] = connection
+                end
+            end
+        else
+            for out_medium in keys(unit.output_interfaces)
+                for component in each(components)
+                    if isa(component, Bus)
+                        if out_medium == component.medium
                             connection = SystemInterface(; source=unit, target=component)
+                            push!(component.input_interfaces, connection)
                             unit.output_interfaces[out_medium] = connection
-                            component.input_interfaces[in_medium] = connection
+                            break
+                        end
+                    else
+                        for in_medium in keys(component.input_interfaces)
+                            if out_medium == in_medium
+                                connection = SystemInterface(; source=unit, target=component)
+                                unit.output_interfaces[out_medium] = connection
+                                component.input_interfaces[in_medium] = connection
+                                break
+                            end
                         end
                     end
                 end
