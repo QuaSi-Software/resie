@@ -4,6 +4,11 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.11.4
+* Add callback `check_src_to_snk` for controlling the flow of energy between a specific source and a specific sink on transformers that implement a layered approach to energy flow calculation, e.g. heat pumps
+* Add control module `forbid_src_to_snk` to implement this callback by forbidding the energy flow between a defined source and sink
+* Refactor control module loading such that it is no longer necessary to hardcode the files and classes, which eases development of new control modules
+
 ### Version 0.11.3
 * Add solar thermal collector model (STC)
 * Add detailed seasonal thermal storage model (STES)
