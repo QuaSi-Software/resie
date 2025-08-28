@@ -67,6 +67,10 @@ mutable struct CM_StorageDriven <: ControlModule
 
         return new("storage_driven", params, state_machine)
     end
+
+    function CM_StorageDriven()
+        return new("storage_driven", Dict{String,Any}(), StateMachine())
+    end
 end
 
 function has_method_for(mod::CM_StorageDriven, func::ControlModuleFunction)::Bool

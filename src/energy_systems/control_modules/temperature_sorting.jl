@@ -23,6 +23,10 @@ mutable struct CM_Temperature_Sorting <: ControlModule
 
         return new("temperature_sorting", params)
     end
+
+    function CM_Temperature_Sorting()
+        return new("temperature_sorting", Dict{String,Any}())
+    end
 end
 
 function has_method_for(mod::CM_Temperature_Sorting, func::ControlModuleFunction)::Bool

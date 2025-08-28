@@ -1,3 +1,5 @@
+using Dates
+
 """
 Control module for setting limits to the PLR of a component according to a profile.
 """
@@ -22,6 +24,24 @@ mutable struct CM_ProfileLimited <: ControlModule
         profile = Profile(params["profile_path"], sim_params)
 
         return new("profile_limited", params, profile)
+    end
+
+    function CM_ProfileLimited()
+        dummy_dates = DateTime[]
+        push!(dummy_dates, DateTime(2024, 1, 1, 0, 0, 0))
+        dummy_values = Float64[]
+        push!(dummy_values, 0.0)
+        dummy_profile = Profile("dummy",
+                                Dict{String,Any}(
+                                    "time_step_seconds" => 1,
+                                    "start_date" => DateTime(2024, 1, 1, 0, 0, 0),
+                                    "end_date" => DateTime(2024, 1, 1, 0, 0, 0),
+                                );
+                                given_profile_values=dummy_values,
+                                given_timestamps=dummy_dates,
+                                given_time_step=Second(1),
+                                given_data_type="intensive")
+        return new("profile_limited", Dict{String,Any}(), dummy_profile)
     end
 end
 
