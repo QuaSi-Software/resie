@@ -22,7 +22,10 @@ function test_sorting_inputs_correctly()
                                                               "input_order" => "desc",
                                                               "output_temps" => "min",
                                                               "output_order" => "none",
-                                                          ), EnergySystems.Grouping(), Dict{String,Any}())
+                                                          ),
+                                                          EnergySystems.Grouping(),
+                                                          Dict{String,Any}(),
+                                                          "Dummy")
     inputs_min = [nothing, nothing, nothing]
     inputs_max = [20.0, 10.0, 30.0]
     @test EnergySystems.reorder_inputs(control_module, inputs_min, inputs_max) == [3, 1, 2]
@@ -38,7 +41,10 @@ function test_sorting_outputs_correctly()
                                                               "input_order" => "none",
                                                               "output_temps" => "min",
                                                               "output_order" => "asc",
-                                                          ), EnergySystems.Grouping(), Dict{String,Any}())
+                                                          ),
+                                                          EnergySystems.Grouping(),
+                                                          Dict{String,Any}(),
+                                                          "Dummy")
     outputs_min = [30.0, 10.0, 20.0]
     outputs_max = [nothing, nothing, nothing]
     @test EnergySystems.reorder_outputs(control_module, outputs_min, outputs_max) == [2, 3, 1]
@@ -54,7 +60,10 @@ function test_sorting_both_correctly()
                                                               "input_order" => "asc",
                                                               "output_temps" => "max",
                                                               "output_order" => "desc",
-                                                          ), EnergySystems.Grouping(), Dict{String,Any}())
+                                                          ),
+                                                          EnergySystems.Grouping(),
+                                                          Dict{String,Any}(),
+                                                          "Dummy")
     inputs_min = [30.0, 20.0, 10.0]
     inputs_max = [nothing, nothing, nothing]
     outputs_min = [nothing, nothing, nothing]
@@ -70,7 +79,10 @@ function test_sorting_with_nothing_correctly()
                                                               "input_order" => "desc",
                                                               "output_temps" => "min",
                                                               "output_order" => "none",
-                                                          ), EnergySystems.Grouping(), Dict{String,Any}())
+                                                          ),
+                                                          EnergySystems.Grouping(),
+                                                          Dict{String,Any}(),
+                                                          "Dummy")
     inputs_min = [nothing, nothing, nothing]
     inputs_max = [nothing, 20.0, 10.0, nothing, 30.0, nothing]
     results = EnergySystems.reorder_inputs(control_module, inputs_min, inputs_max)
