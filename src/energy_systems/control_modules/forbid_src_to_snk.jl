@@ -1,8 +1,11 @@
 """
 Control module for disallowing a specific source to be used to supply a specific sink.
-This can be used, for example, to avoid a heat pump raising a heat storage component's
+
+This is specifically useful for components that have a layered approach for calculating
+energy flow. For example, to avoid a heat pump raising a heat storage component's
 temperature using electricity, while still allowing the heat pump to draw from the storage
-and putting excess heat into the storage, as long as there other sinks and sources involved.
+and putting excess heat into the storage, as long as there are other sinks and sources
+involved.
 """
 mutable struct CM_Forbid_Src_To_Snk <: ControlModule
     name::String
