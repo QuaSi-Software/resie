@@ -80,16 +80,16 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
         for module_config in default(entry, "control_modules", [])
             if lowercase(module_config["name"]) === "economical_discharge"
                 push!(unit.controller.modules,
-                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params))
+                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params, unit.uac))
             elseif lowercase(module_config["name"]) === "profile_limited"
                 push!(unit.controller.modules,
-                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params))
+                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params, unit.uac))
             elseif lowercase(module_config["name"]) === "storage_driven"
                 push!(unit.controller.modules,
-                      EnergySystems.CM_StorageDriven(module_config, components, sim_params))
+                      EnergySystems.CM_StorageDriven(module_config, components, sim_params, unit.uac))
             elseif lowercase(module_config["name"]) === "temperature_sorting"
                 push!(unit.controller.modules,
-                      EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
+                      EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params, unit.uac))
             elseif lowercase(module_config["name"]) === "negotiate_temperature"
                 push!(unit.controller.modules,
                       EnergySystems.CM_Negotiate_Temperature(module_config, components, sim_params, unit.uac))
@@ -98,7 +98,7 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
                       EnergySystems.CM_LimitCoolingInputTemperature(module_config, components, sim_params, unit.uac))
             elseif lowercase(module_config["name"]) === "forbid_src_to_snk"
                 push!(unit.controller.modules,
-                      EnergySystems.CM_Forbid_Src_To_Snk(module_config, components, sim_params))
+                      EnergySystems.CM_Forbid_Src_To_Snk(module_config, components, sim_params, unit.uac))
             end
         end
     end

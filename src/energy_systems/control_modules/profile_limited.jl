@@ -8,7 +8,8 @@ mutable struct CM_ProfileLimited <: ControlModule
 
     function CM_ProfileLimited(parameters::Dict{String,Any},
                                components::Grouping,
-                               sim_params::Dict{String,Any})
+                               sim_params::Dict{String,Any},
+                               unit_uac::String)
         default_parameters = Dict{String,Any}(
             "name" => "profile_limited",
             "profile_path" => nothing,

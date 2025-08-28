@@ -12,7 +12,8 @@ mutable struct CM_StorageDriven <: ControlModule
 
     function CM_StorageDriven(parameters::Dict{String,Any},
                               components::Grouping,
-                              sim_params::Dict{String,Any})
+                              sim_params::Dict{String,Any},
+                              unit_uac::String)
         default_parameters = Dict{String,Any}(
             "name" => "storage_driven",
             "low_threshold" => 0.2,

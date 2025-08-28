@@ -9,7 +9,8 @@ mutable struct CM_EconomicalDischarge <: ControlModule
 
     function CM_EconomicalDischarge(parameters::Dict{String,Any},
                                     components::Grouping,
-                                    sim_params::Dict{String,Any})
+                                    sim_params::Dict{String,Any},
+                                    unit_uac::String)
         default_parameters = Dict{String,Any}(
             "name" => "economical_discharge",
             "pv_threshold" => 1.0, # [Wh], a value of 1.0 essentially requires that the PV
