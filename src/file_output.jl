@@ -793,7 +793,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     medium_labels = [split(string(s), '.')[end] for s in medium_of_interfaces]
     unique_medium_labels = unique(medium_labels)
 
-    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], Dict{})
+    if io_settings["sankey_plot"] == "default" || !isa(io_settings["sankey_plot"], AbstractDict{})
         if length(unique_medium_labels) > 1
             colors = get(ColorSchemes.roma,
                          (0:(length(unique_medium_labels) - 1)) ./ (length(unique_medium_labels) - 1))
