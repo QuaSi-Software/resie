@@ -90,6 +90,10 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
 
         return new("negotiate_temperature", params)
     end
+
+    function CM_Negotiate_Temperature()
+        return new("negotiate_temperature", Dict{String,Any}())
+    end
 end
 
 function has_method_for(mod::CM_Negotiate_Temperature, func::ControlModuleFunction)::Bool

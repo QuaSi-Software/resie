@@ -17,6 +17,34 @@ function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
 end
 
 """
+    load_control_module_class_mapping()
+
+Loads the control modules' classes index by their name as used in the input file.
+
+Returns:
+-`Dict{String, Any}`: The mapping from name (String) to the module class, which is probably
+    of type `Symbol`, however `getproperty` does not specify the return type. In any case
+    the entry can be used for calling the constructor as if it was a function.
+"""
+function load_control_module_class_mapping()::Dict{String,Any}
+    mapping = Dict{String,Any}()
+
+    for name in names(EnergySystems; all=true)
+        if startswith(String(name), "CM_")
+            symbol = Symbol(String(name))
+            unit_class = getproperty(EnergySystems, symbol)
+
+            if unit_class <: EnergySystems.ControlModule
+                dummy = unit_class()
+                mapping[dummy.name] = unit_class
+            end
+        end
+    end
+
+    return mapping
+end
+
+"""
 load_components(config, sim_params)
 
 Construct instances of components from the given config.
@@ -94,31 +122,18 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
     end
 
     # add control modules to components
+    mapping = load_control_module_class_mapping()
     for (unit_key, entry) in pairs(config)
         unit = components[unit_key]
 
-        # TODO: rewrite this for automatic selection of modules so they don't need to be
-        # registered here, compare automatic selection of component class
         for module_config in default(entry, "control_modules", [])
-            if lowercase(module_config["name"]) === "economical_discharge"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "profile_limited"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "storage_driven"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_StorageDriven(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "temperature_sorting"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "negotiate_temperature"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_Negotiate_Temperature(module_config, components, sim_params, unit.uac))
-            elseif lowercase(module_config["name"]) === "limit_cooling_input_temperature"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_LimitCoolingInputTemperature(module_config, components, sim_params, unit.uac))
+            if !haskey(mapping, module_config["name"])
+                @warn("Unknown control module type $(module_config["name"]) while loading " *
+                      "unit $(unit.uac)")
+                continue
             end
+            module_class = mapping[module_config["name"]]
+            push!(unit.controller.modules, module_class(module_config, components, sim_params, unit.uac))
         end
     end
 

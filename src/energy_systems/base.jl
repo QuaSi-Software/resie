@@ -1608,19 +1608,20 @@ include("electric_producers/pv_plant.jl")
 # base module and has been moved into separate files for less clutter
 include("efficiency.jl")
 
-# now that the components are defined we can load the control modules, which depend on their
-# definitions
+# now that the components are defined we can define alias type unions, which the control
+# modules require in their constructors
 const StorageComponent = Union{Battery,BufferTank,SeasonalThermalStorage,Storage}
 const TemperatureNegotiateSource = Union{GeothermalProbes,SolarthermalCollector}
 const TemperatureNegotiateTarget = Union{SeasonalThermalStorage}
 const LimitCoolingInputTemperatureSource = Union{Electrolyser}
 const LimitCoolingInputTemperatureTarget = Union{SeasonalThermalStorage}
-include("control_modules/economical_discharge.jl")
-include("control_modules/profile_limited.jl")
-include("control_modules/storage_driven.jl")
-include("control_modules/temperature_sorting.jl")
-include("control_modules/negotiate_temperature.jl")
-include("control_modules/limit_cooling_input_temperature.jl")
+
+# dynamically include all control module files in the control_modules directory
+for file in readdir(joinpath(@__DIR__, "control_modules"))
+    if endswith(file, ".jl")
+        include(joinpath("control_modules", file))
+    end
+end
 
 """
     link_output_with(unit, components)

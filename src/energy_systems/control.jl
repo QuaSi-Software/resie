@@ -139,6 +139,7 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_reorder_outputs
     cmf_negotiate_temperature
     cmf_limit_cooling_input_temperature
+    cmf_check_src_to_snk
 end
 
 """
@@ -155,6 +156,7 @@ mutable struct Controller
                                   "aggregation_plr_limit" => "max",
                                   "aggregation_charge" => "all",
                                   "aggregation_discharge" => "all",
+                                  "aggregation_check_src_to_snk" => "all",
                                   "consider_m_el_in" => true,
                                   "consider_m_el_out" => true,
                                   "consider_m_gas_in" => true,
@@ -471,4 +473,38 @@ function cooling_input_temperature_exceeded(controller::Controller,
     end
 
     return false
+end
+
+"""
+Callback for checking if a specific source is allowed to be used to supply a specific sink.
+
+If multiple modules exist that implement this callback, the results of all modules are
+aggregated as defined by the control parameter `aggregation_check_src_to_snk` with possible
+options being `all` (all modules have to return true) or `any` (at least one module has to
+return true).
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `in_uac::Stringing`: The UAC of the source.
+- `out_uac::Stringing`: The UAC of the sink.
+# Returns
+- `Bool`: True, if the source is allowed to be used to supply the sink. False otherwise.
+"""
+function check_src_to_snk(controller::Controller,
+                          in_uac::Stringing,
+                          out_uac::Stringing)::Bool
+    flags = collect(check_src_to_snk(mod, in_uac, out_uac)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_check_src_to_snk))
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_check_src_to_snk"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_check_src_to_snk"] == "any"
+        return any(flags)
+    end
+
+    return true
 end

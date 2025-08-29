@@ -10,7 +10,8 @@ mutable struct CM_Temperature_Sorting <: ControlModule
 
     function CM_Temperature_Sorting(parameters::Dict{String,Any},
                                     components::Grouping,
-                                    sim_params::Dict{String,Any})
+                                    sim_params::Dict{String,Any},
+                                    unit_uac::String)
         default_parameters = Dict{String,Any}(
             "name" => "temperature_sorting",
             "input_temps" => "max",
@@ -21,6 +22,10 @@ mutable struct CM_Temperature_Sorting <: ControlModule
         params = Base.merge(default_parameters, parameters)
 
         return new("temperature_sorting", params)
+    end
+
+    function CM_Temperature_Sorting()
+        return new("temperature_sorting", Dict{String,Any}())
     end
 end
 

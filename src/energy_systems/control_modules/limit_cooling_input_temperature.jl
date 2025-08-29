@@ -70,6 +70,10 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
 
         return new("limit_cooling_input_temperature", params)
     end
+
+    function CM_LimitCoolingInputTemperature()
+        return new("limit_cooling_input_temperature", Dict{String,Any}())
+    end
 end
 
 function has_method_for(mod::CM_LimitCoolingInputTemperature, func::ControlModuleFunction)::Bool
