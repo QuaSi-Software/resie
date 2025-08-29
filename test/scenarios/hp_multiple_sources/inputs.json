@@ -11,7 +11,7 @@
             "Gains": "black"
         },
         "csv_output_file": "./test/scenarios/hp_multiple_sources/out.csv",
-        "csv_output_keys": "all",
+        "csv_output_keys": "all_excl_flows",
         "output_plot_file": "./test/scenarios/hp_multiple_sources/output_plot.html",
         "output_plot": {
             "1": {
@@ -103,6 +103,36 @@
                 "axis": "right",
                 "unit": "°C",
                 "scale_factor": 1.0
+            },
+            "16": {
+                "key": {"m_h_w_ht1": ["TST_HP_01->TST_DEM_02"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "17": {
+                "key": {"m_h_w_ht1": ["TST_HP_01->TST_BFT_TH_02"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "18": {
+                "key": {"m_h_w_lt1": ["TST_BFT_TH_01->TST_HP_01"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "19": {
+                "key": {"m_h_w_lt1": ["TST_SRC_01->TST_HP_01"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "20": {
+                "key": {"m_h_w_lt1": ["TST_SRC_02->TST_HP_01"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
             }
         }
     },
