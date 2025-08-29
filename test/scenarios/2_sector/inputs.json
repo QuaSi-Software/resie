@@ -160,10 +160,10 @@
         },
         "TST_01_HZG_01_CHP": {
             "type": "CHPP",
-            "output_refs": [
-                "TST_01_HZG_01_BUS",
-                "TST_01_ELT_01_BUS"
-            ],
+            "output_refs": {
+                "m_heat_out": "TST_01_HZG_01_BUS",
+                "m_el_out": "TST_01_ELT_01_BUS"
+            },
             "control_modules": [
                 {
                     "name": "storage_driven",

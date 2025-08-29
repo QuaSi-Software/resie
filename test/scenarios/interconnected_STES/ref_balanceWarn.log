@@ -1,4 +1,4 @@
-ReSiE balanceWarn log file of simulation started at: 2025-08-22 17:38:23
+ReSiE balanceWarn log file of simulation started at: 2025-08-29 13:57:45
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 194400: -341597.1753167808

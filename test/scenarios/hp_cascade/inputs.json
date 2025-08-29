@@ -35,7 +35,7 @@
             "temperature_profile_file_path": "./profiles/tests/demand_heating_temperature.prf",
             "scale": 2000.0
         },
-        "TST_01_HZG_02_DEM": {
+        "TST_01_H2_DEM": {
             "type": "Demand",
             "medium": "m_c_g_h2",
             "output_refs": [],
@@ -71,11 +71,11 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_HZG_02_DEM",
-                "TST_01_ELT_01_GRO"
-            ],
+            "output_refs": {
+              "m_heat_ht_out": "TST_01_HZG_01_HTP",
+              "m_h2_out": "TST_01_H2_DEM",
+              "m_o2_out": "TST_01_O2_DEM"
+            },
             "power_el": 20000,
             "output_temperature_ht": 25.0,
             "m_heat_ht_out": "m_h_w_lt1",
@@ -141,7 +141,7 @@
             ],
             "is_source": true
         },
-        "TST_01_ELT_01_GRO": {
+        "TST_01_O2_DEM": {
             "type": "GridConnection",
             "medium": "m_c_g_o2",
             "output_refs": [],

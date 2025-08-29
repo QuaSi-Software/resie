@@ -5,14 +5,14 @@
 "TST_01_ELT_01_ELY s_reset",
 "TST_GRI_EL_01 s_reset",
 "TST_GRI_EL_02 s_reset",
-"TST_01_ELT_01_GRO s_reset",
+"TST_DEM_O2_01 s_reset",
 "TST_DEM_ht_01 s_control",
 "TST_DEM_H2_01 s_control",
 "TST_HP_01 s_control",
 "TST_01_ELT_01_ELY s_control",
 "TST_GRI_EL_01 s_control",
 "TST_GRI_EL_02 s_control",
-"TST_01_ELT_01_GRO s_control",
+"TST_DEM_O2_01 s_control",
 "TST_DEM_ht_01 s_process",
 "TST_DEM_H2_01 s_process",
 "TST_HP_01 s_potential",
@@ -20,4 +20,4 @@
 "TST_HP_01 s_process",
 "TST_GRI_EL_01 s_process",
 "TST_GRI_EL_02 s_process",
-"TST_01_ELT_01_GRO s_process"
+"TST_DEM_O2_01 s_process"

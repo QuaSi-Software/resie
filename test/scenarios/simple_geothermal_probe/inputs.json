@@ -12,7 +12,6 @@
         },
         "output_plot_file": "./test/scenarios/simple_geothermal_probe/output_plot.html",
         "output_plot": {
-            
             "1": {
                 "key": {"TST_DEM_01": ["m_h_w_ht1 IN"]},
                 "axis": "left",

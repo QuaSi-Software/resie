@@ -2,13 +2,13 @@
     "io_settings": {
         "csv_output_file": "./test/scenarios/interconnected_STES/out.csv",
         "auxiliary_info": true,
-        "auxiliary_plots": true,
+        "auxiliary_plots": false,
         "auxiliary_info_file": "./test/scenarios/interconnected_STES/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/interconnected_STES/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "all",
-        "output_plot": "all",
+        "csv_output_keys": "nothing",
+        "output_plot": "all_incl_flows",
         "output_plot_file": "./test/scenarios/interconnected_STES/output_plot.html"
     },
     "simulation_parameters": {
@@ -23,11 +23,11 @@
     "components": {
         "TST_ELY_01": {
             "type": "Electrolyser",
-            "output_refs": [
-                "TST_BUS_01",
-                "TST_DEM_03",
-                "TST_GRO_01"
-            ],
+            "output_refs": {
+              "m_heat_ht_out": "TST_BUS_01",
+              "m_h2_out": "TST_DEM_03",
+              "m_o2_out": "TST_GRO_01"
+            },
             "control_modules": [
                 {
                 "name": "limit_cooling_input_temperature", 
@@ -64,10 +64,10 @@
         },
         "TST_CHPP_01": {
             "type": "CHPP",
-            "output_refs": [
-                "TST_BUS_01",
-                "TST_BUS_02"
-            ],
+            "output_refs" : {
+                "m_heat_out": "TST_BUS_01",
+                "m_el_out": "TST_BUS_02"
+            },
             "power_el": 200000,
             "__OPTIONAL_MEDIA__": "",
             "m_fuel_in": "m_c_g_natgas",
@@ -122,7 +122,9 @@
         "TST_STC_01": {
             "type": "SolarthermalCollector",
             "m_heat_out": "m_h_w_ht1",
-            "output_refs": ["TST_BUS_01"],
+            "output_refs": [
+                "TST_BUS_01"
+            ],
             "control_modules": [ 
                 { 
                 "name": "negotiate_temperature", 

@@ -7,7 +7,7 @@
         "sankey_plot": "default",
         "csv_output_keys": {},
         "output_plot_file": "./test/scenarios/transformer_chain/output_plot.html",
-        "output_plot": "all"
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -106,10 +106,10 @@
             "type": "CHPP",
             "m_fuel_in": "m_c_natgas",
             "m_heat_out": "m_h_w_ht1",
-            "output_refs": [
-                "TST_HP_02",
-                "TST_BUS_EL"
-            ],
+            "output_refs": {
+                "m_heat_out": "TST_HP_02",
+                "m_el_out": "TST_BUS_EL"    
+            },
             "power_el": 120000,
             "min_power_fraction": 0.0
         },

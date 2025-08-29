@@ -5,7 +5,7 @@
         "auxiliary_info_file": "./test/scenarios/stc_2_demands/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/stc_2_demands/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": "all",
+        "csv_output_keys": "all_excl_flows",
         "output_plot_file": "./test/scenarios/stc_2_demands/output_plot.html",
         "output_plot": {
             "1": {
@@ -21,37 +21,37 @@
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_SRC_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_STC_01": ["m_h_w_ht1 OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
-                "key": {"TST_SRC_01": ["Temperature_Mean_Collector"]},
+                "key": {"TST_STC_01": ["Temperature_Mean_Collector"]},
                 "axis": "right",
                 "unit": "°C",
                 "scale_factor": 1
             },
             "5": {
-                "key": {"TST_SRC_01": ["Temperature_Output"]},
+                "key": {"TST_STC_01": ["Temperature_Output"]},
                 "axis": "right",
                 "unit": "°C",
                 "scale_factor": 1
             },
             "10": {
-                "key": {"TST_SRC_01": ["delta_T"]},
+                "key": {"TST_STC_01": ["delta_T"]},
                 "axis": "right",
                 "unit": "K",
                 "scale_factor": 1
             },
             "11": {
-                "key": {"TST_SRC_01": ["spec_flow_rate"]},
+                "key": {"TST_STC_01": ["spec_flow_rate"]},
                 "axis": "right",
                 "unit": "l/(h*m²)",
                 "scale_factor": 3600000
             },
             "13": {
-                "key": {"TST_SRC_01": ["direct_normal_irradiance"]},
+                "key": {"TST_STC_01": ["direct_normal_irradiance"]},
                 "axis": "left",
                 "unit": "kW/m²",
                 "scale_factor": 0.001         
@@ -67,6 +67,18 @@
                 "axis": "left",
                 "unit": "°C",
                 "scale_factor": 1
+            },
+            "16": {
+                "key": {"m_h_w_ht1": ["TST_STC_01->TST_DEM_01"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "17": {
+                "key": {"m_h_w_ht1": ["TST_STC_01->TST_DEM_02"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
             }
         }    
     },
@@ -103,7 +115,7 @@
             "medium": "m_h_w_ht1",
             "connections": {
                 "input_order": [
-                    "TST_SRC_01"
+                    "TST_STC_01"
                 ],
                 "output_order": [
                     "TST_DEM_01",
@@ -115,7 +127,7 @@
             }
         },
 
-        "TST_SRC_01": {
+        "TST_STC_01": {
             "type": "SolarthermalCollector",
             "m_heat_out": "m_h_w_ht1",
             "output_refs": ["TST_BUS_01"],   

@@ -277,11 +277,11 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_H2_02_DEM",
-                "TST_01_ELT_01_GRO"
-            ],
+            "output_refs": {
+              "m_heat_ht_out": "TST_01_HZG_01_HTP",
+              "m_h2_out": "TST_01_H2_02_DEM",
+              "m_o2_out": "TST_01_ELT_01_GRO"
+            },
             "power_el": 40000,
             "output_temperature_ht": 55.0,
             "m_heat_ht_out": "m_h_w_lt1",

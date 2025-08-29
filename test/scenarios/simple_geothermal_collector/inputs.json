@@ -4,9 +4,9 @@
         "auxiliary_info_file": "./test/scenarios/simple_geothermal_collector/auxiliary_info.md",
         "sankey_plot": "default",
         "sankey_plot_file": "./test/scenarios/simple_geothermal_collector/sankey_plot.html",
-        "csv_output_keys": "all",
+        "csv_output_keys": "all_excl_flows",
         "csv_output_file": "./test/scenarios/simple_geothermal_collector/out.csv",
-        "output_plot": "all",
+        "output_plot": "all_excl_flows",
         "output_plot_file": "./test/scenarios/simple_geothermal_collector/output_plot.html",
         "auxiliary_plots": false
     },

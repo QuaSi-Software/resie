@@ -7,51 +7,7 @@
         "sankey_plot": "default",
         "csv_output_keys": "nothing",
         "output_plot_file": "./output/output_plot.html",
-        "output_plot": "all",
-        "_output_plot": {
-            "1": {
-                "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "2": {
-                "key": {"TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "3": {
-                "key": {"TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "4": {
-                "key": {"TST_01_HZG_00_BFT": ["Load"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "5": {
-                "key": {"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "6": {
-                "key": {"TST_01_HZG_01_STS": ["m_h_w_ht1 IN"]},
-                "axis": "left",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            },
-            "7": {
-                "key": {"TST_01_HZG_01_STS": ["Load"]},
-                "axis": "right",
-                "unit": "kWh",
-                "scale_factor": 0.001
-            }
-        }
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -60,42 +16,6 @@
         "time_step": 15,
         "time_step_unit": "minutes"
     },
-    "order_of_operation": [
-        "TST_TH_DEM_02 s_reset",
-        "TST_TH_DEM_01 s_reset",
-        "TST_TH_BUS_01 s_reset",
-        "TST_TH_BUS_02 s_reset",
-        "TST_EL_BUS_01 s_reset",
-        "TST_TH_HP_02 s_reset",
-        "TST_TH_HP_01 s_reset",
-        "TST_TH_BFT_01 s_reset",
-        "TST_EL_GRI_01 s_reset",
-        "TST_TH_GRO_01 s_reset",
-        "TST_TH_DEM_02 s_control",
-        "TST_TH_DEM_01 s_control",
-        "TST_TH_BUS_01 s_control",
-        "TST_TH_BUS_02 s_control",
-        "TST_EL_BUS_01 s_control",
-        "TST_TH_HP_01 s_control",
-        "TST_TH_HP_02 s_control",
-        "TST_TH_BFT_01 s_control",
-        "TST_EL_GRI_01 s_control",
-        "TST_TH_GRO_01 s_control",
-        "TST_TH_DEM_02 s_process",
-        "TST_TH_DEM_01 s_process",
-        "TST_TH_BUS_01 s_process",
-        "TST_TH_BUS_02 s_process",
-        "TST_EL_BUS_01 s_process",
-        "TST_TH_HP_01 s_process",
-        "TST_TH_HP_02 s_process",
-        "TST_TH_BFT_01 s_process",
-        "TST_TH_BFT_01 s_load",
-        "TST_EL_GRI_01 s_process",
-        "TST_TH_GRO_01 s_process",
-        "TST_TH_BUS_01 s_distribute",
-        "TST_TH_BUS_02 s_distribute",
-        "TST_EL_BUS_01 s_distribute"
-    ],
     "components": {
         "TST_TH_DEM_01": {
             "type": "Demand",

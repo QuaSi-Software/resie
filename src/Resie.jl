@@ -89,7 +89,7 @@ Constructs the dictionary of simulation parameters.
 # Returns
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
-function get_simulation_params(project_config::Dict{AbstractString,Any})::Dict{String,Any}
+function get_simulation_params(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
     time_step, start_date, end_date, nr_of_steps = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
@@ -148,7 +148,7 @@ Construct and prepare parameters, energy system components and the order of oper
 -`Grouping`: The constructed energy system components
 -`StepInstructions`: Order of operations
 """
-function prepare_inputs(project_config::Dict{AbstractString,Any}, run_ID::UUID)
+function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
     sim_params = get_simulation_params(project_config)
     sim_params["run_ID"] = run_ID
 
@@ -177,7 +177,7 @@ Performs the simulation as loop over time steps and records outputs.
 -`components::Grouping`: The energy system components
 -`step_order::StepInstructions`:: Order of operations
 """
-function run_simulation_loop(project_config::Dict{AbstractString,Any},
+function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              sim_params::Dict{String,Any},
                              components::Grouping,
                              step_order::StepInstructions)
@@ -217,7 +217,7 @@ function run_simulation_loop(project_config::Dict{AbstractString,Any},
     do_create_sankey = haskey(project_config["io_settings"], "sankey_plot") &&
                        project_config["io_settings"]["sankey_plot"] !== "nothing"
     if do_create_sankey
-        # get infomration about all interfaces for Sankey
+        # get information about all interfaces for Sankey
         nr_of_interfaces,
         medium_of_interfaces,
         output_sourcenames_sankey,

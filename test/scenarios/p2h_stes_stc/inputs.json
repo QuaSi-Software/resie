@@ -6,9 +6,9 @@
         "sankey_plot_file": "./test/scenarios/p2h_stes_stc/sankey_plot.html",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "all",
+        "csv_output_keys": "all_excl_flows",
         "output_plot_file": "./test/scenarios/p2h_stes_stc/output_plot.html",
-        "output_plot": "all"
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.06.2024 00:00",

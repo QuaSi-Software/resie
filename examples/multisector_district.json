@@ -287,11 +287,11 @@
         },
         "TST_ELY_01": {
             "type": "Electrolyser",
-            "output_refs": [
-                "TST_GRI_H2_01",
-                "TST_GRI_O2_01",
-                "TST_HTP_02"
-            ],
+            "output_refs": {
+              "m_heat_ht_out": "TST_HTP_02",
+              "m_h2_out": "TST_GRI_H2_01",
+              "m_o2_out": "TST_GRI_O2_01"
+            },
             "control_modules": [
                 {
                     "name": "profile_limited",
@@ -316,10 +316,10 @@
         },
         "TST_CHP_01": {
             "type": "CHPP",
-            "output_refs": [
-                "TST_BUS_TH_00",
-                "TST_BUS_EL_01"
-            ],
+            "output_refs": {
+                "m_heat_out": "TST_BUS_TH_00",
+                "m_el_out": "TST_BUS_EL_01"
+            },
             "control_parameters": {
                 "load_storages m_h_w_ht1": true,
                 "load_storages m_e_ac_230v": true
