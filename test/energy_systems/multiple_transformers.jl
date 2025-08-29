@@ -43,7 +43,10 @@ function get_energy_system_ely_and_hp()
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "output_refs" => ["TST_HP_01", "TST_DEM_H2_01", "TST_GRI_O2_01"],
+            "output_refs" => Dict{String,Any}(
+                "m_heat_ht_out" => "TST_HP_01",
+                "m_h2_out" => "TST_DEM_H2_01",
+                "m_o2_out" => "TST_GRI_O2_01"),
             "power_el" => 4000,
             "output_temperature_ht" => 55.0,
             "m_heat_ht_out" => "m_h_w_lt1",
