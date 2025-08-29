@@ -1099,7 +1099,9 @@ function output_value(unit::Bus, key::OutputKey)::Float64
         in_uac, out_uac = split(key.value_key[17:end], "->")
         temperature = unit.balance_table[unit.balance_table_inputs[in_uac].priority,
                                          (unit.balance_table_outputs[out_uac].priority * 2)]
-        if temperature === nothing
+        energy = unit.balance_table[unit.balance_table_inputs[in_uac].priority,
+                                    (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
+        if temperature === nothing || abs(energy) < unit.epsilon
             return NaN
         else
             return temperature
