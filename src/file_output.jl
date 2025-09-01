@@ -8,7 +8,7 @@ This function determines both for the lineplot and the csv output if
 they should be created:
     - if not, "nothing" will be returned as key list
     - if yes, the key lists of the outputs will be returned, either containing
-        - all possible keys (incl/excl flows) if this is requested in the input file or
+        - all possible keys (in-/excluding flows) if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},

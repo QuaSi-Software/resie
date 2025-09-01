@@ -1633,8 +1633,11 @@ determines which components provide energy to which other components.
 
 # Arguments
 - `unit::Component`: The unit providing energy
-- `components::Grouping`: A set of components receiving energy. As components might have multiple
-    outputs, this is used to set them all at once.
+- `components::Grouping`: A set of components receiving energy. As components might have
+    multiple outputs, this is used to set them all at once.
+- `given_media::Union{Nothing,Vector{Symbol}}`: (Optional) A list of media names from the
+    project config file for the outputs of the component. May be nothing if there is only
+    one output. Defaults to `nothing`.
 """
 function link_output_with(unit::Component, components::Union{Grouping,Vector{Grouping}};
                           given_media::Union{Nothing,Vector{Symbol}}=nothing)
