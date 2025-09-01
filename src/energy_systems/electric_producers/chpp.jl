@@ -150,9 +150,9 @@ function component_has_minimum_part_load(unit::CHPP)
 end
 
 function output_values(unit::CHPP)::Vector{String}
-    return [string(unit.m_fuel_in) * " IN",
-            string(unit.m_el_out) * " OUT",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_fuel_in) * ":IN",
+            string(unit.m_el_out) * ":OUT",
+            string(unit.m_heat_out) * ":OUT",
             "LossesGains"]
 end
 

@@ -6,27 +6,26 @@
         "sankey_plot_file": "./test/scenarios/simple_geothermal_probe/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_keys": {
-            "TST_STH_01": ["m_h_w_ht1 OUT"],
-            "TST_DEM_01": ["m_h_w_ht1 IN"],
+            "TST_STH_01": ["m_h_w_ht1:OUT"],
+            "TST_DEM_01": ["m_h_w_ht1:IN"],
             "TST_GTP_01": ["new_fluid_temperature","fluid_reynolds_number"]
         },
         "output_plot_file": "./test/scenarios/simple_geothermal_probe/output_plot.html",
         "output_plot": {
-            
             "1": {
-                "key": {"TST_DEM_01": ["m_h_w_ht1 IN"]},
+                "key": {"TST_DEM_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"TST_GTP_01": ["m_h_w_lt1 OUT"]},
+                "key": {"TST_GTP_01": ["m_h_w_lt1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_STH_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_STH_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -50,19 +49,19 @@
                 "scale_factor": 1
             },
             "9": {
-                "key": {"TST_GTP_01": ["m_h_w_ht1 IN"]},
+                "key": {"TST_GTP_01": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh", 
                 "scale_factor": 0.001       
             },
             "10": {
-                "key": {"TST_STH_01": ["m_h_w_ht1 Supply"]},
+                "key": {"TST_STH_01": ["Supply"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "11": {
-                "key": {"TST_DEM_01": ["m_h_w_ht1 Demand"]},
+                "key": {"TST_DEM_01": ["Demand"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -74,13 +73,13 @@
                 "scale_factor": 1
             },
             "13": {
-                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_HP_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "14": {
-                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "key": {"TST_HP_01": ["m_h_w_lt1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001

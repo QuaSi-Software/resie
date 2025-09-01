@@ -783,18 +783,18 @@ function inner_distribute!(unit::Bus)
             unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
                                                                                      temperature_lowest_max)
 
-            # extract the already distributed energy from balance table
-            already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
-                                                                             1:2:(output_row.priority * 2 - 1)])
-            already_distributed_input_temperatures = unit.balance_table[input_row.priority,
-                                                                        2:2:(output_row.priority * 2)]
-
-            already_distributed_output_energies = Float64.(unit.balance_table[1:(input_row.priority),
-                                                                              output_row.priority * 2 - 1])
-            already_distributed_output_temperatures = unit.balance_table[1:(input_row.priority),
-                                                                         output_row.priority * 2]
-
             if energy_flow !== 0.0
+                # extract the already distributed energy from balance table
+                already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
+                                                                                 1:2:(output_row.priority * 2 - 1)])
+                already_distributed_input_temperatures = unit.balance_table[input_row.priority,
+                                                                            2:2:(output_row.priority * 2)]
+
+                already_distributed_output_energies = Float64.(unit.balance_table[1:(input_row.priority),
+                                                                                  output_row.priority * 2 - 1])
+                already_distributed_output_temperatures = unit.balance_table[1:(input_row.priority),
+                                                                             output_row.priority * 2]
+
                 if !is_max_energy_nothing(input_row.energy_potential_temp)
                     reduce_max_energy!(input_row.energy_potential_temp,
                                        already_distributed_input_energies,
@@ -1054,12 +1054,27 @@ end
 
 function output_values(unit::Bus)::Vector{String}
     # dynamic output channels
-    outputs = ["Transfer->" * outface.target.uac
-               for outface in unit.output_interfaces
-               if outface.target.sys_function == sf_bus]
+    outputs_proxies = ["Transfer->" * outface.target.uac
+                       for outface in unit.output_interfaces
+                       if outface.target.sys_function == sf_bus]
 
-    # add to static output channels
-    return append!(["Balance"], outputs)
+    # energyFlow between inputs and outputs, only for proxy busses or busses without a proxy and for
+    # allowed connections
+    if unit.proxy === nothing
+        outputs_energy_flow = ["EnergyFlow $i->$o"
+                               for i in [inface.source.uac for inface in unit.input_interfaces]
+                               for o in [outface.target.uac for outface in unit.output_interfaces]
+                               if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                         unit.balance_table_outputs[o])]
+        outputs_temperature_flow = ["TemperatureFlow $i->$o"
+                                    for i in [inface.source.uac for inface in unit.input_interfaces]
+                                    for o in [outface.target.uac for outface in unit.output_interfaces]
+                                    if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                              unit.balance_table_outputs[o])]
+        return ["Balance"; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
+    else
+        return ["Balance"; outputs_proxies]
+    end
 end
 
 function output_value(unit::Bus, key::OutputKey)::Float64
@@ -1067,10 +1082,30 @@ function output_value(unit::Bus, key::OutputKey)::Float64
         return balance(unit)
 
     elseif startswith(key.value_key, "Transfer")
+        # Transfer between busses
         out_uac = last(split(key.value_key, "->"))
         outface = first([f for f in unit.output_interfaces
                          if f.target.uac == out_uac])
         return calculate_energy_flow(outface)
+
+    elseif startswith(key.value_key, "EnergyFlow")
+        # EnergyFlow between inputs and outputs
+        in_uac, out_uac = split(key.value_key[12:end], "->")
+        return unit.balance_table[unit.balance_table_inputs[in_uac].priority,
+                                  (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
+
+    elseif startswith(key.value_key, "TemperatureFlow")
+        # TemperatureFlow between inputs and outputs
+        in_uac, out_uac = split(key.value_key[17:end], "->")
+        temperature = unit.balance_table[unit.balance_table_inputs[in_uac].priority,
+                                         (unit.balance_table_outputs[out_uac].priority * 2)]
+        energy = unit.balance_table[unit.balance_table_inputs[in_uac].priority,
+                                    (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
+        if temperature === nothing || abs(energy) < unit.epsilon
+            return NaN
+        else
+            return temperature
+        end
     end
 
     throw(KeyError(key.value_key))

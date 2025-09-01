@@ -415,16 +415,16 @@ function component_has_minimum_part_load(unit::Electrolyser)
 end
 
 function output_values(unit::Electrolyser)::Vector{String}
-    channels = [string(unit.m_el_in) * " IN",
-                string(unit.m_h2_out) * " OUT",
-                string(unit.m_o2_out) * " OUT",
-                string(unit.m_heat_ht_out) * " OUT",
+    channels = [string(unit.m_el_in) * ":IN",
+                string(unit.m_h2_out) * ":OUT",
+                string(unit.m_o2_out) * ":OUT",
+                string(unit.m_heat_ht_out) * ":OUT",
                 "LossesGains",
                 "Losses_heat",
                 "Losses_hydrogen"]
 
     if unit.heat_lt_is_usable
-        append!(channels, [string(unit.m_heat_lt_out) * " OUT"])
+        append!(channels, [string(unit.m_heat_lt_out) * ":OUT"])
         return channels
     else
         return channels

@@ -138,8 +138,8 @@ function component_has_minimum_part_load(unit::FuelBoiler)
 end
 
 function output_values(unit::FuelBoiler)::Vector{String}
-    return [string(unit.m_fuel_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_fuel_in) * ":IN",
+            string(unit.m_heat_out) * ":OUT",
             "LossesGains"]
 end
 

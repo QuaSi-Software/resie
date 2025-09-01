@@ -5,9 +5,9 @@
         "auxiliary_info_file": "./test/scenarios/reversible_heat_pump/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/reversible_heat_pump/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": {},
+        "csv_output_keys": "nothing",
         "output_plot_file": "./test/scenarios/reversible_heat_pump/output_plot.html",
-        "output_plot": "all"
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",

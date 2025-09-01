@@ -36,9 +36,9 @@ struct InputError <: Exception end
 """
 Convenience function to get the value of a key from a config dict using a default value.
 """
-default(config::Dict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
-                                                                                config[name] :
-                                                                                default_val
+default(config::AbstractDict{String,Any}, name::String, default_val::Any)::Any = return name in keys(config) ?
+                                                                                        config[name] :
+                                                                                        default_val
 
 """
 Categories that each represent a physical medium in conjunction with additional attributes,
@@ -1633,19 +1633,26 @@ determines which components provide energy to which other components.
 
 # Arguments
 - `unit::Component`: The unit providing energy
-- `components::Grouping`: A set of components receiving energy. As components might have multiple
-    outputs, this is used to set them all at once.
+- `components::Grouping`: A set of components receiving energy. As components might have
+    multiple outputs, this is used to set them all at once.
+- `given_media::Union{Nothing,Vector{Symbol}}`: (Optional) A list of media names from the
+    project config file for the outputs of the component. May be nothing if there is only
+    one output. Defaults to `nothing`.
 """
-function link_output_with(unit::Component, components::Grouping)
+function link_output_with(unit::Component, components::Union{Grouping,Vector{Grouping}};
+                          given_media::Union{Nothing,Vector{Symbol}}=nothing)
+    # source is a bus, we have to look for the right medium when linking
     if isa(unit, Bus)
         for component in each(components)
             if isa(component, Bus)
+                # link bus to bus
                 if unit.medium == component.medium
                     connection = SystemInterface(; source=unit, target=component)
                     push!(component.input_interfaces, connection)
                     push!(unit.output_interfaces, connection)
                 end
             else
+                # link bus to component
                 for in_medium in keys(component.input_interfaces)
                     if in_medium == unit.medium
                         connection = SystemInterface(; source=unit, target=component)
@@ -1655,22 +1662,45 @@ function link_output_with(unit::Component, components::Grouping)
                 end
             end
         end
-    else
-        for out_medium in keys(unit.output_interfaces)
-            for component in each(components)
-                if isa(component, Bus)
-                    if out_medium == component.medium
+        return
+    end
+
+    # source is a component and media and target are specified in the input file. components
+    # is a Vector{Grouping} here with the same order than given_medium.
+    if given_media !== nothing
+        for (idx, given_medium) in enumerate(given_media)
+            current_component = only(values(components[idx]))
+            connection = SystemInterface(; source=unit, target=current_component)
+            unit.output_interfaces[given_medium] = connection
+            if isa(current_component, Bus)
+                push!(current_component.input_interfaces, connection)
+            else
+                current_component.input_interfaces[given_medium] = connection
+            end
+        end
+        return
+    end
+
+    # source is a component and no media given, we have to look for the right medium for
+    # a connection
+    for out_medium in keys(unit.output_interfaces)
+        for component in each(components)
+            if isa(component, Bus)
+                # link component to bus
+                if out_medium == component.medium
+                    connection = SystemInterface(; source=unit, target=component)
+                    push!(component.input_interfaces, connection)
+                    unit.output_interfaces[out_medium] = connection
+                    break
+                end
+            else
+                # link component to component
+                for in_medium in keys(component.input_interfaces)
+                    if out_medium == in_medium
                         connection = SystemInterface(; source=unit, target=component)
-                        push!(component.input_interfaces, connection)
                         unit.output_interfaces[out_medium] = connection
-                    end
-                else
-                    for in_medium in keys(component.input_interfaces)
-                        if out_medium == in_medium
-                            connection = SystemInterface(; source=unit, target=component)
-                            unit.output_interfaces[out_medium] = connection
-                            component.input_interfaces[in_medium] = connection
-                        end
+                        component.input_interfaces[in_medium] = connection
+                        break
                     end
                 end
             end

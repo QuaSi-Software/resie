@@ -4,6 +4,16 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.0
+* Add possibility to output energy and temperature flows between components that are connected via busses in plot and CSV output. Now the following inputs are available for `csv_output_keys` and `output_plot`
+  * `nothing`: no information will be plotted or written to CSV file
+  * `all_excl_flows`: outputs all available information without energy and temperature flows. Note that they are now sorted alphabetically!
+  *  `all_incl_flows`: outputs all available information including energy and temperature flows, as long as the connection via the energy matrix of the bus is allowed. Temperature is only output if energy is flowing. If no temperature is set for the flow, no output will be created. Note that the outputs are now sorted alphabetically, starting with the regular output followed by the flows.
+  *  custom output: see documentation for syntax. Note that now the order of the input represents the order of the output in plot and CSV.
+* Change the definition of `output_refs` for components with multiple outputs to achieve uniqueness in connections independent of the order of the input. Now, the `output_refs` can be defined as dict, the old method of input a list of targets is still valid, but a warn message is thrown for components with more than one output interface (currently CHPP, ELY). For components with only one output, the simple list is fully sufficient.
+* Change separator in input definition for specific IN or OUT output channels from " " to ":" to allow spaces in media names
+* All tests and scenarios were adjusted to be conform with this new syntax.
+
 ### Version 0.11.4
 * Add callback `check_src_to_snk` for controlling the flow of energy between a specific source and a specific sink on transformers that implement a layered approach to energy flow calculation, e.g. heat pumps
 * Add control module `forbid_src_to_snk` to implement this callback by forbidding the energy flow between a defined source and sink

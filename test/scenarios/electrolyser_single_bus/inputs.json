@@ -6,37 +6,37 @@
         "sankey_plot_file": "./test/scenarios/electrolyser_single_bus/sankey_plot.html",
         "sankey_plot": "default",
         "__heating_csv_output_keys": {
-            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
-            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1:OUT"],
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1:OUT"],
             "TST_01_HZG_00_BFT": ["Load"],
-            "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
+            "TST_01_HZG_01_GBO": ["m_h_w_ht1:OUT"],
+            "TST_01_HZG_01_STS": ["m_h_w_ht1:IN", "Load"]
         },
         "csv_output_keys": {
-            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"],
-            "TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"],
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"],
+            "TST_01_HZG_01_HTP": ["m_h_w_ht1:OUT"],
+            "TST_01_HZG_02_HTP": ["m_h_w_ht1:OUT"],
             "TST_01_HZG_00_BFT": ["Load"],
-            "TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"],
-            "TST_01_HZG_01_STS": ["m_h_w_ht1 IN", "Load"]
+            "TST_01_HZG_01_GBO": ["m_h_w_ht1:OUT"],
+            "TST_01_HZG_01_STS": ["m_h_w_ht1:IN", "Load"]
         },
         "output_plot_file": "./test/scenarios/electrolyser_single_bus/output_plot.html",
         "output_plot": {
             "1": {
-                "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]},
+                "key": {"TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"TST_01_HZG_01_HTP": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_01_HZG_01_HTP": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_01_HZG_02_HTP": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_01_HZG_02_HTP": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -48,13 +48,13 @@
                 "scale_factor": 0.001
             },
             "5": {
-                "key": {"TST_01_HZG_01_GBO": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_01_HZG_01_GBO": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "6": {
-                "key": {"TST_01_HZG_01_STS": ["m_h_w_ht1 IN"]},
+                "key": {"TST_01_HZG_01_STS": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -277,11 +277,11 @@
         },
         "TST_01_ELT_01_ELY": {
             "type": "Electrolyser",
-            "output_refs": [
-                "TST_01_HZG_01_HTP",
-                "TST_01_H2_02_DEM",
-                "TST_01_ELT_01_GRO"
-            ],
+            "output_refs": {
+              "m_heat_ht_out": "TST_01_HZG_01_HTP",
+              "m_h2_out": "TST_01_H2_02_DEM",
+              "m_o2_out": "TST_01_ELT_01_GRO"
+            },
             "power_el": 40000,
             "output_temperature_ht": 55.0,
             "m_heat_ht_out": "m_h_w_lt1",

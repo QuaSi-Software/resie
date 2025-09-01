@@ -7,9 +7,9 @@
         "csv_time_unit": "date",
         "csv_output_keys": {
 			"TST_HP_01": [
-                "m_h_w_lt1 IN",
-                "m_h_w_ht1 OUT",
-                "m_e_ac_230v IN",
+                "m_h_w_lt1:IN",
+                "m_h_w_ht1:OUT",
+                "m_e_ac_230v:IN",
                 "COP"
             ],
             "TST_DEM_01": ["Temperature"],
@@ -17,19 +17,19 @@
         },
         "output_plot": {
             "1": {
-                "key": {"TST_HP_01": ["m_h_w_lt1 IN"]},
+                "key": {"TST_HP_01": ["m_h_w_lt1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"TST_HP_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_HP_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_HP_01": ["m_e_ac_230v IN"]},
+                "key": {"TST_HP_01": ["m_e_ac_230v:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
