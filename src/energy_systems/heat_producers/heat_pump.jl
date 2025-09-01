@@ -1143,9 +1143,9 @@ function reset(unit::HeatPump)
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return [string(unit.m_el_in) * " IN",
-            string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_el_in) * ":IN",
+            string(unit.m_heat_in) * ":IN",
+            string(unit.m_heat_out) * ":OUT",
             "COP",
             "Effective_COP",
             "Avg_PLR",

@@ -1135,14 +1135,14 @@ end
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
     output_vals = []
     if unit.regeneration
-        push!(output_vals, string(unit.m_heat_in) * " IN")
+        push!(output_vals, string(unit.m_heat_in) * ":IN")
     end
     if unit.model_type == "detailed"
         push!(output_vals, "fluid_reynolds_number")
         push!(output_vals, "alpha_fluid_pipe")
     end
     append!(output_vals,
-            [string(unit.m_heat_out) * " OUT",
+            [string(unit.m_heat_out) * ":OUT",
              "fluid_temperature",
              "ambient_temperature",
              "global_radiation_power"])

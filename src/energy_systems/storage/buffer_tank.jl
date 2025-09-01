@@ -378,8 +378,8 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::BufferTank)::Vector{String}
-    return [string(unit.medium) * " IN",
-            string(unit.medium) * " OUT",
+    return [string(unit.medium) * ":IN",
+            string(unit.medium) * ":OUT",
             "Load",
             "Load%",
             "Capacity",

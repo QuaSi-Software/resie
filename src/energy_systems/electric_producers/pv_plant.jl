@@ -57,7 +57,7 @@ function process(unit::PVPlant, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::PVPlant)::Vector{String}
-    return [string(unit.m_el_out) * " OUT",
+    return [string(unit.m_el_out) * ":OUT",
             "Supply"]
 end
 

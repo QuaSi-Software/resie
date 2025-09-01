@@ -21,7 +21,7 @@
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"TST_STC_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_STC_01": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001

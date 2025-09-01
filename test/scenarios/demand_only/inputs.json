@@ -6,7 +6,7 @@
         "sankey_plot_file": "./test/scenarios/demand_only/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_keys": {
-            "TST_01_HZG_01_DEM": ["m_h_w_ht1 IN"]
+            "TST_01_HZG_01_DEM": ["m_h_w_ht1:IN"]
         }
     },
     "simulation_parameters": {
