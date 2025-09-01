@@ -300,7 +300,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
             unit = components[unit_key]
 
             for entry in from_config[unit_key]
-                splitted = split(String(entry))
+                splitted = split(String(entry), ":")
                 if length(splitted) > 1
                     medium_key = splitted[1]
                     medium = Symbol(String(medium_key))
@@ -308,9 +308,8 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                         value_key = splitted[2]
                     else
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
-                               "output key. Make sure that the medium \"$medium\" exists and that you have not used " *
-                               "spaces accidentally. Spaces are only allowed if you want to specify an output channel " *
-                               "of a specific medium!"
+                               "output key. Make sure that the medium \"$(String(medium_key))\" exists in the current " *
+                               "component and that you have used \":\" as separator without any extra spaces."
                         throw(InputError)
                     end
                 else

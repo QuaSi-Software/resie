@@ -6,10 +6,10 @@
         "sankey_plot_file": "./test/scenarios/3_busses_GB_3_storages/sankey_plot.html",
         "sankey_plot": "default",
         "csv_output_keys": {
-            "TST_DEM_01": ["m_h_w_ht1 IN"],
+            "TST_DEM_01": ["m_h_w_ht1:IN"],
             "ESS_BUS_TH_01": ["Balance"],
             "ESS_BUS_TH_02": ["Balance"],
-            "ESS_GRI_EG_01": ["m_c_g_natgas OUT"]
+            "ESS_GRI_EG_01": ["m_c_g_natgas:OUT"]
         },
         "output_plot_file": "./test/scenarios/3_busses_GB_3_storages/output_plot.html",
         "output_plot": {
@@ -32,7 +32,7 @@
                 "scale_factor": 0.001
             },
             "4": {
-                "key": {"ESS_GBO_01": ["m_h_w_ht1 OUT"]},
+                "key": {"ESS_GBO_01": ["m_h_w_ht1:OUT"]},
                 "axis": "right",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -56,37 +56,37 @@
                 "scale_factor": 0.001
             },
             "8": {
-                "key": {"TST_BFT_TH_01": ["m_h_w_ht1 IN"]},
+                "key": {"TST_BFT_TH_01": ["m_h_w_ht1:IN"]},
                 "axis": "right",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "9": {
-                "key": {"TST_BFT_TH_02": ["m_h_w_ht1 IN"]},
+                "key": {"TST_BFT_TH_02": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "10": {
-                "key": {"TST_BFT_TH_03": ["m_h_w_ht1 IN"]},
+                "key": {"TST_BFT_TH_03": ["m_h_w_ht1:IN"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "11": {
-                "key": {"TST_BFT_TH_01": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_BFT_TH_01": ["m_h_w_ht1:OUT"]},
                 "axis": "right",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "12": {
-                "key": {"TST_BFT_TH_02": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_BFT_TH_02": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "13": {
-                "key": {"TST_BFT_TH_03": ["m_h_w_ht1 OUT"]},
+                "key": {"TST_BFT_TH_03": ["m_h_w_ht1:OUT"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001

@@ -1203,11 +1203,11 @@ end
 function output_values(unit::GeothermalProbes)::Vector{String}
     output_vals = []
     if unit.regeneration
-        push!(output_vals, string(unit.m_heat_in) * " IN")
+        push!(output_vals, string(unit.m_heat_in) * ":IN")
     end
 
     append!(output_vals,
-            [string(unit.m_heat_out) * " OUT",
+            [string(unit.m_heat_out) * ":OUT",
              "new_fluid_temperature",
              "current_max_output_temperature",
              "current_min_input_temperature",

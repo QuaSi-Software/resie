@@ -119,8 +119,8 @@ function load(unit::Storage, sim_params::Dict{String,Any})
 end
 
 function output_values(unit::Storage)::Vector{String}
-    return [string(unit.medium) * " IN",
-            string(unit.medium) * " OUT",
+    return [string(unit.medium) * ":IN",
+            string(unit.medium) * ":OUT",
             "Load",
             "Load%",
             "Capacity",

@@ -804,7 +804,7 @@ function derivate_spec_thermal_power_func(t_avg, spec_flow_rate, unit::Solarther
 end
 
 function output_values(unit::SolarthermalCollector)::Vector{String}
-    return [string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_heat_out) * ":OUT",
             "Temperature_Output",
             "Temperature_Mean_Collector",
             "direct_normal_irradiance",

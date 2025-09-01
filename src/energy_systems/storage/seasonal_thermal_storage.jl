@@ -1359,8 +1359,8 @@ function reset(unit::SeasonalThermalStorage)
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
-    return [string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_heat_in) * ":IN",
+            string(unit.m_heat_out) * ":OUT",
             "Load",
             "Load%",
             "Capacity",
