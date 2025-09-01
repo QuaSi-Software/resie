@@ -555,7 +555,8 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
         if plot_data
             for plot in project_config["io_settings"]["output_plot"]
                 if occursin("->", first(plot[2]["key"])[2][1])
-                    # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required!
+                    # Here we are dealing with EnergyFlow and TemperatureFlow --> Two meta information required if 
+                    # temperature should be plotted
                     if !isa(plot[2]["axis"], AbstractVector) || length(plot[2]["axis"]) !== 2 ||
                        !isa(plot[2]["unit"], AbstractVector) || length(plot[2]["unit"]) !== 2 ||
                        !isa(plot[2]["scale_factor"], AbstractVector) || length(plot[2]["scale_factor"]) !== 2
@@ -566,13 +567,13 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
                               isa(plot[2]["scale_factor"], AbstractVector) ? plot[2]["scale_factor"][1] :
                               plot[2]["scale_factor"])
 
-                        push!(axis, axis[end])
-                        push!(unit, unit[end])
-                        push!(scale_fact, scale_fact[end])
-                        @warn "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
-                              "do not contain two values. Please provide two sets, one for EnergyFlow and one " *
-                              "for TemperatureFlow using [EnergyFlow, TemperatureFlow] for axis, unit and scale_factor. " *
-                              "For now, the first entry is used for both EnergyFlow and TemperatureFlow."
+                        push!(axis, "nothing")
+                        push!(unit, "nothing")
+                        push!(scale_fact, NaN)
+                        @info "For the generation of the output_plot, the meta information for entry $(plot[1]) " *
+                              "do not contain two values. Therefore, only energy values will be output. If you want " *
+                              "to output also a corresponding temperature, provide two meta information: " *
+                              "[EnergyFlow, TemperatureFlow] for axis, unit and scale_factor."
                     else
                         push!(axis, string(plot[2]["axis"][1]))
                         push!(unit, string(plot[2]["unit"][1]))
@@ -634,6 +635,14 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             elseif all(isnan, outputs_plot_data[:, col])
                 push!(idxs_to_remove, col)
             end
+        end
+        if !plot_all
+            for (idx, ax) in enumerate(axis)
+                if ax == "nothing"
+                    push!(idxs_to_remove, idx + 1)
+                end
+            end
+            idxs_to_remove = unique(idxs_to_remove)
         end
         if !isempty(idxs_to_remove)
             outputs_plot_data = outputs_plot_data[:, setdiff(axes(outputs_plot_data, 2), idxs_to_remove)]
