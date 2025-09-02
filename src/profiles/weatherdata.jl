@@ -531,7 +531,7 @@ end
 
 function gather_weather_data(weather_data_keys, sim_params)
     return_values = Vector{Any}()
-    append!(return_values, sim_params["time"])
+    append!(return_values, sim_params["time_since_output"])
 
     for weather_data_key in weather_data_keys
         append!(return_values,

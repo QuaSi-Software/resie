@@ -90,14 +90,17 @@ Constructs the dictionary of simulation parameters.
 -`Dict{String,Any}`: The simulation parameter dictionary
 """
 function get_simulation_params(project_config::AbstractDict{AbstractString,Any})::Dict{String,Any}
-    time_step, start_date, end_date, nr_of_steps = get_timesteps(project_config["simulation_parameters"])
+    time_step, start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output = get_timesteps(project_config["simulation_parameters"])
 
     sim_params = Dict{String,Any}(
         "time" => 0,
+        "time_since_output" => 0,
         "current_date" => start_date,
         "time_step_seconds" => time_step,
         "number_of_time_steps" => nr_of_steps,
+        "number_of_time_steps_output" => nr_of_steps_output,
         "start_date" => start_date,
+        "start_date_output" => start_date_output,
         "end_date" => end_date,
         "epsilon" => default(project_config["simulation_parameters"], "epsilon", 1e-9),
         "latitude" => default(project_config["simulation_parameters"], "latitude", nothing),
@@ -202,10 +205,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
     # Initialize the array for output plots
     output_data_lineplot = do_create_plot_data ?
-                           zeros(Float64, sim_params["number_of_time_steps"], 1 + length(output_keys_lineplot)) :
+                           zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_lineplot)) :
                            nothing
     output_weather_lineplot = do_create_plot_weather ?
-                              zeros(Float64, sim_params["number_of_time_steps"], 1 + length(weather_data_keys)) :
+                              zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
 
     # reset CSV file
@@ -223,51 +226,71 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         output_sourcenames_sankey,
         output_targetnames_sankey = get_interface_information(components)
         # preallocate for speed: Matrix with data of interfaces in every timestep
-        output_interface_values = zeros(Float64, sim_params["number_of_time_steps"], nr_of_interfaces)
+        output_interface_values = zeros(Float64, sim_params["number_of_time_steps_output"], nr_of_interfaces)
     end
 
     # export order of operation and other additional info like optional plots
     dump_auxiliary_outputs(project_config, components, step_order, sim_params)
 
     @info "-- Start step loop"
+    if sim_params["start_date_output"] == sim_params["start_date"]
+        @info "-- No preheating activated. Starting output from beginning."
+    else
+        @info "-- Starting with preheating, no output will be written until completed."
+    end
     start = now()
     for steps in 1:sim_params["number_of_time_steps"]
+        # check if data should be output
+        do_output = sim_params["current_date"] >= sim_params["start_date_output"]
+        output_steps = Int(max(1,
+                               Int(steps) - (Int(sim_params["number_of_time_steps"]) -
+                                             Int(sim_params["number_of_time_steps_output"]))))
+        if output_steps == 1 && do_output && sim_params["start_date_output"] != sim_params["start_date"]
+            @info "-- Preheating completed. Starting output now."
+        end
+
         # perform the simulation
         perform_steps(components, step_order, sim_params)
 
-        # check if any component was not balanced
-        warnings = check_balances(components, sim_params["epsilon"])
-        if length(warnings) > 0
-            for (key, balance) in warnings
-                @balanceWarn "Balance for component $key was not zero in timestep $(sim_params["time"]): $balance"
+        if do_output
+            # check if any component was not balanced
+            warnings = check_balances(components, sim_params["epsilon"])
+            if length(warnings) > 0
+                for (key, balance) in warnings
+                    @balanceWarn "Balance for component $key was not zero in timestep " *
+                                 "$(sim_params["time_since_output"]): $balance"
+                end
             end
-        end
 
-        # write requested output data of the components to CSV-file
-        # This is currently done in every time step to keep data even if 
-        # an error occurs.
-        if do_write_CSV
-            write_to_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, sim_params, csv_time_unit)
-        end
+            # write requested output data of the components to CSV-file
+            # This is currently done in every time step to keep data even if 
+            # an error occurs.
+            if do_write_CSV
+                write_to_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, sim_params, csv_time_unit)
+            end
 
-        # get the energy transported through each interface in every timestep for Sankey
-        if do_create_sankey
-            output_interface_values[steps, :] = collect_interface_energies(components, nr_of_interfaces)
-        end
+            # get the energy transported through each interface in every timestep for Sankey
+            if do_create_sankey
+                output_interface_values[output_steps, :] = collect_interface_energies(components, nr_of_interfaces)
+            end
 
-        # gather output data of each component for line plot
-        if do_create_plot_data
-            output_data_lineplot[steps, :] = gather_output_data(output_keys_lineplot, sim_params["time"])
-        end
-        if do_create_plot_weather
-            output_weather_lineplot[steps, :] = gather_weather_data(weather_data_keys, sim_params)
+            # gather output data of each component for line plot
+            if do_create_plot_data
+                output_data_lineplot[output_steps, :] = gather_output_data(output_keys_lineplot,
+                                                                           sim_params["time_since_output"])
+            end
+            if do_create_plot_weather
+                output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
+            end
+
+            # simulation update
+            sim_params["time_since_output"] += Int(sim_params["time_step_seconds"])
         end
 
         # simulation update
         sim_params["time"] += Int(sim_params["time_step_seconds"])
         sim_params["current_date"] = add_ignoring_leap_days(sim_params["current_date"],
                                                             Second(sim_params["time_step_seconds"]))
-
         # progress report
         if sim_params["step_info_interval"] > 0 && steps % sim_params["step_info_interval"] == 0
             eta = ((sim_params["number_of_time_steps"] - steps)
@@ -324,7 +347,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             end
         end
         if length(component_list) > 0
-            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: $(join(component_list, ", "))"
+            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: " *
+                  "$(join(component_list, ", "))"
         end
     end
 end

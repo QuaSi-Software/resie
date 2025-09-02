@@ -420,11 +420,11 @@ function write_to_file(filepath::String,
                        csv_time_unit::String)
     open(abspath(filepath), "a") do file_handle
         if csv_time_unit == "seconds"
-            time = sim_params["time"]
+            time = sim_params["time_since_output"]
         elseif csv_time_unit == "minutes"
-            time = sim_params["time"] / 60
+            time = sim_params["time_since_output"] / 60
         elseif csv_time_unit == "hours"
-            time = sim_params["time"] / 60 / 60
+            time = sim_params["time_since_output"] / 60 / 60
         elseif csv_time_unit == "date"
             time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
         end
@@ -671,7 +671,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
             start_date = Dates.DateTime("2015/1/1 00:00:00", "yyyy/m/d HH:MM:SS")
             @info ("Date of first data point in output line plot is set to 01-01-2015 00:00:00, as the simulation start time is not given as date.")
         else
-            start_date = sim_params["start_date"]
+            start_date = sim_params["start_date_output"]
         end
         x = [add_ignoring_leap_days(start_date, Dates.Second(s)) for s in time_x]
     end
@@ -696,7 +696,7 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
     if output_plot_time_unit == "date"
         leap_days_str = string.([Date(year, 2, 29)
                                  for year in
-                                     Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                                     Dates.value(Year(sim_params["start_date_output"])):Dates.value(Year(sim_params["end_date"]))
                                  if isleapyear(year)])
 
         layout = Layout(;
