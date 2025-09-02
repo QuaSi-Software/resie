@@ -63,21 +63,20 @@ mutable struct Profile
     function Profile(file_path::String,                               # file path to a .prf file
                      sim_params::Dict{String,Any};                    # general simulation parameters
                      given_profile_values::Vector{Float64}=Float64[], # optional: Vector{Float64} that holds values of 
-                                                                      # the profile
+                     # the profile
                      given_timestamps::Vector{DateTime}=DateTime[],   # optional: Vector{DateTime} that holds the 
-                                                                      # time step as DateTime
+                     # time step as DateTime
                      given_time_step::Dates.Second=Second(0),         # optional: Dates.Second that indicates the 
-                                                                      # timestep in seconds of the given data
-                     given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, shoule be "intensive" or
-                                                                      # "extensive"
+                     # timestep in seconds of the given data
+                     given_data_type::Union{String,Nothing}=nothing,  # optional: datatype, should be "intensive" or
+                     # "extensive"
                      shift::Dates.Second=Second(0),                   # optional: timeshift for data. A positive shift 
-                                                                      # adds to the timestamp = value is later
+                     # adds to the timestamp = value is later
                      interpolation_type::String="stepwise",           # optional: interpolation type. Can be one of: "stepwise",
-                                                                      # "linear_classic", "linear_time_preserving", "linear_solar_radiation"
-                     sunrise_sunset::Vector{Profile}=Vector{Profile}() # optional: sunrise and sunset times for solar radiation interpolation
-                     )     
-
-          if given_profile_values == []  # read data from file_path
+                     # "linear_classic", "linear_time_preserving", "linear_solar_radiation"
+                     sunrise_sunset::Vector{Profile}=Vector{Profile}(), # optional: sunrise and sunset times for solar radiation interpolation
+                     given_repeat_profile::Bool=false)
+        if given_profile_values == []  # read data from file_path
             profile_values = Vector{Float64}()
             profile_timestamps = Vector{String}()
 
@@ -89,6 +88,8 @@ mutable struct Profile
             profile_start_date_format = nothing
             time_zone = nothing
             time_shift_seconds = nothing
+
+            repeat_profile = false
 
             file_handle = nothing
             current_line = nothing
@@ -121,6 +122,8 @@ mutable struct Profile
                             time_shift_seconds = parse(Int, String(strip(splitted[2])))
                         elseif strip(splitted[1]) == "interpolation_type"
                             interpolation_type = String(strip(splitted[2]))
+                        elseif strip(splitted[1]) == "repeat_profile"
+                            repeat_profile = lowercase(strip(splitted[2])) in ("true", "yes")
                         end
                     else
                         splitted = split(line, ';')
@@ -144,7 +147,7 @@ mutable struct Profile
                 if file_handle !== nothing
                     close(file_handle)
                 end
-            end 
+            end
             profile_timestamps_date = Vector{DateTime}(undef, length(profile_values))
             # convert profile_timestamps to DateTime
             if time_definition == "startdate_timestepsize"
@@ -180,7 +183,7 @@ mutable struct Profile
                            "profile header!"
                     throw(InputError)
                 else
-                    
+
                     # calculate time step from startdate and continuos timestamp
                     start_date = parse_datestamp(profile_start_date,
                                                  convert_String_to_DateFormat(profile_start_date_format, file_path),
@@ -245,6 +248,7 @@ mutable struct Profile
             profile_time_step = Dates.value(given_time_step)
             profile_timestamps_date = given_timestamps
             data_type = given_data_type
+            repeat_profile = given_repeat_profile
             time_zone = nothing
         end
 
@@ -259,6 +263,33 @@ mutable struct Profile
         # remove leap days and daylight savings from profile
         profile_timestamps_date, profile_values = remove_leap_days(profile_timestamps_date, profile_values, file_path)
         profile_timestamps_date = remove_day_light_saving(profile_timestamps_date, time_zone, file_path)
+
+        # repeat profile if requested and required
+        if repeat_profile && profile_timestamps_date[end] < sim_params["end_date"]
+            if profile_timestamps_date[1] > sim_params["start_date"]
+                @error "The profile at $(file_path) should be repeated, but it has to start at or before the " *
+                       "simulation start date!\n " *
+                       "Simulation start: $(Dates.format(sim_params["start_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
+                       "Profile start: $(Dates.format(profile_timestamps_date[1], "yyyy-mm-dd HH:MM:SS"))\n" *
+                       throw(InputError)
+            else
+                nr_to_repeat = Int(ceil((sim_params["end_date"] - profile_timestamps_date[end]) /
+                                        (profile_timestamps_date[end] - profile_timestamps_date[1])))
+                steps_to_add = Int(length(profile_values) * nr_to_repeat)
+                if steps_to_add > 0
+                    last = profile_timestamps_date[end]
+                    new = Vector{typeof(last)}(undef, steps_to_add)
+                    for i in 1:steps_to_add
+                        last = add_ignoring_leap_days(last, Second(profile_time_step))
+                        new[i] = last
+                    end
+                    append!(profile_timestamps_date, new)
+                    profile_values = repeat(profile_values, nr_to_repeat + 1)
+                    @info "The profile at $(file_path) was repeated $(nr_to_repeat) time$(nr_to_repeat > 1 ? "s" : "") " *
+                          "to cover the simulation time."
+                end
+            end
+        end
 
         # shift the profile timestep according to the given shift to get the correct definition:
         # Values are given as the mean/sum over the upcoming time step.
@@ -280,14 +311,14 @@ mutable struct Profile
         temp_diff = Second(max(profile_time_step, sim_params["time_step_seconds"]))
         if profile_timestamps_date[1] > sim_params["start_date"] &&
            profile_timestamps_date[1] - temp_diff <= sim_params["start_date"]
-            while profile_timestamps_date[1] > sim_params["start_date"] 
+            while profile_timestamps_date[1] > sim_params["start_date"]
                 profile_timestamps_date = vcat(profile_timestamps_date[1] - Second(profile_time_step),
-                                            profile_timestamps_date)
+                                               profile_timestamps_date)
                 profile_values = vcat(profile_values[1], profile_values)
             end
             @info "The profile at $(file_path) has been extended by one timestep at the begin by doubling the first value."
         end
-        
+
         time_diff_timesteps = Second(max(0, Int64(sim_params["time_step_seconds"]) - profile_time_step))
         if profile_timestamps_date[end] < sim_params["end_date"] + time_diff_timesteps &&
            profile_timestamps_date[end] + temp_diff >= sim_params["end_date"]
@@ -354,7 +385,7 @@ mutable struct Profile
                                                             data_type,
                                                             file_path,
                                                             sim_params,
-                                                            interpolation_type,
+                                                            interpolation_type;
                                                             sunrise_sunset=sunrise_sunset)
 
         profile_dict = Dict(zip(profile_timestamps_date_converted, values_converted))
@@ -817,20 +848,20 @@ function convert_profile(values::Vector{Float64},
                 throw(InputError)
             end
 
-            if length(sunrise_sunset) == 0 
+            if length(sunrise_sunset) == 0
                 sr_arr = Vector{Float64}(undef, length(timestamps))  # sunrise times for each timestamp
                 ss_arr = Vector{Float64}(undef, length(timestamps))  # sunset times for each timestamp
                 calculated_sr_dates = Date[]
                 for (idx, timestamp) in enumerate(timestamps)
                     if Date(timestamp) in calculated_sr_dates
-                        sr_arr[idx] = sr_arr[idx-1]
-                        ss_arr[idx] = ss_arr[idx-1]
+                        sr_arr[idx] = sr_arr[idx - 1]
+                        ss_arr[idx] = ss_arr[idx - 1]
                     else
                         push!(calculated_sr_dates, Date(timestamp))
                         sr_arr[idx], ss_arr[idx] = get_sunrise_sunset(timestamp,
-                                                    sim_params["latitude"],
-                                                    sim_params["longitude"],
-                                                    sim_params["timezone"])
+                                                                      sim_params["latitude"],
+                                                                      sim_params["longitude"],
+                                                                      sim_params["timezone"])
                     end
                 end
                 sunrise = Profile("sunrise_times",
@@ -848,7 +879,7 @@ function convert_profile(values::Vector{Float64},
                                  given_time_step=Second(new_time_step),
                                  given_data_type="intensive",
                                  shift=Second(0),
-                                 interpolation_type="stepwise") 
+                                 interpolation_type="stepwise")
                 sunrise_sunset = [sunrise, sunset]
             end
 
@@ -856,9 +887,9 @@ function convert_profile(values::Vector{Float64},
                                                  timestamps[end],
                                                  values,
                                                  new_time_step,
-                                                 sim_params,
+                                                 sim_params;
                                                  sunrise_sunset=sunrise_sunset)
-        
+
             # cut values and timestamps to simulation time
             mask = (timestamps .>= sim_params["start_date"]) .&& (timestamps .<= sim_params["end_date"])
             values = values[mask]
@@ -974,14 +1005,14 @@ function segment_interval(hn::Float64, hnp1::Float64,
     if n_eff == 1
         g_mid = hn / dt_h
         boundaries[end] = g_mid
-    
+
     else
         n_mid = Int(floor(n_eff / 2))
         g_mid = 2 * hn / (n_eff * dt_h) - (n_mid * g_start) / n_eff - ((n_eff - n_mid) * effective_G_end) / n_eff
         if g_start == 0.0
             n_mid += 1
         end
-        if g_mid >= 0 
+        if g_mid >= 0
             # First part: interpolate from g_start to g_mid over n_mid subintervals.
             for j in 1:n_mid
                 boundaries[j + 1] = g_start + (j / n_mid) * (g_mid - g_start)
@@ -991,29 +1022,29 @@ function segment_interval(hn::Float64, hnp1::Float64,
             m = n_eff - n_mid
             for k in 1:m
                 boundaries[n_mid + 1 + k] = g_mid + (k / m) * (effective_G_end - g_mid)
-            end 
+            end
 
         else # g_mid smaller zero?
             g_mid = (2 * hn / dt_h - (g_start + effective_G_end)) / (2 * (n_eff - 1))
-            if g_mid >= 0 
+            if g_mid >= 0
                 # only interpolate second and second to last boundary and fill rest with g_mid
                 if n_eff <= 3
                     boundaries[2] = g_mid
                 else
                     boundaries[2] = (g_start + g_mid) / 2
-                    boundaries[end-1] = (g_mid + effective_G_end) / 2
-                    boundaries[3:end-2] = fill(g_mid, n_eff - 3)
+                    boundaries[end - 1] = (g_mid + effective_G_end) / 2
+                    boundaries[3:(end - 2)] = fill(g_mid, n_eff - 3)
                 end
 
             else # g_mid still smaller zero?
                 g_mid = g_start / 2
                 # set second boundary to g_mid and fill rest with effective_G_end
                 boundaries[2] = g_mid
-                boundaries[3:end-1] = fill(effective_G_end, n_eff - 2)
+                boundaries[3:(end - 1)] = fill(effective_G_end, n_eff - 2)
             end
         end
-        boundaries[end] = effective_G_end    
-    end    
+        boundaries[end] = effective_G_end
+    end
 
     # 6. Compute the effective irradiance values (midpoints) over the effective region.
     effective_irr = [(boundaries[i] + boundaries[i + 1]) / 2 for i in 1:(length(boundaries) - 1)]
@@ -1090,9 +1121,9 @@ function segment_profile(begin_dt::DateTime,
             sunset = sunrise_sunset[2].data[current_hour_dt]
         else
             sunrise, sunset = get_sunrise_sunset(current_hour_dt,
-                                                sim_params["latitude"],
-                                                sim_params["longitude"],
-                                                sim_params["timezone"])
+                                                 sim_params["latitude"],
+                                                 sim_params["longitude"],
+                                                 sim_params["timezone"])
         end
 
         # Retrieve current and next hourly integrated irradiation.

@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.1
+* add the possibility to repeat profiles using the parameter "repeat_profile" in the profile header
+
 ### Version 0.12.0
 * Add possibility to output energy and temperature flows between components that are connected via busses in plot and CSV output. Now the following inputs are available for `csv_output_keys` and `output_plot`
   * `nothing`: no information will be plotted or written to CSV file
