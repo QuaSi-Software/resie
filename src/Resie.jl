@@ -109,6 +109,8 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         "step_info_interval" => default(project_config["io_settings"],
                                         "step_info_interval",
                                         Integer(floor(nr_of_steps / 20))),
+        "force_profiles_to_repeat" => default(project_config["simulation_parameters"], "force_profiles_to_repeat",
+                                              false),
     )
 
     # add helper functions to convert power to work and vice-versa. this uses the time step

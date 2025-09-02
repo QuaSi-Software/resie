@@ -36,6 +36,7 @@ mutable struct CM_ProfileLimited <: ControlModule
                                     "time_step_seconds" => 1,
                                     "start_date" => DateTime(2024, 1, 1, 0, 0, 0),
                                     "end_date" => DateTime(2024, 1, 1, 0, 0, 0),
+                                    "force_profiles_to_repeat" => false,
                                 );
                                 given_profile_values=dummy_values,
                                 given_timestamps=dummy_dates,
