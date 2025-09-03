@@ -520,33 +520,13 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
         return proxy_interface === nothing ? [] : balance_on(proxy_interface, unit.proxy)
     end
 
-    input_index = nothing
-    output_index = nothing
-    caller_is_input = false # if interface is input of unit (caller puts energy in unit)
-    caller_is_output = false # if interface is output of unit (caller gets energy from unit)
-
-    # determine if the calling component is an input or output to the bus and remember the
-    # index within the list of input/output interfaces for later
-    for (idx, input_interface) in pairs(unit.input_interfaces)
+    # determine if the calling component is an input or output to the bus, can be only one of both
+    caller_is_input = false
+    for input_interface in unit.input_interfaces
         if input_interface.source.uac == interface.source.uac
-            input_index = idx
             caller_is_input = true
             break
         end
-    end
-
-    for (idx, output_interface) in pairs(unit.output_interfaces)
-        if output_interface.target.uac == interface.target.uac
-            output_index = idx
-            caller_is_output = true
-            break
-        end
-    end
-
-    # sanity check, as this situation should not happen
-    if (caller_is_input && caller_is_output) || (!caller_is_input && !caller_is_output)
-        throw(ArgumentError("Error in connection of components on bus \"$(unit.uac)\". " *
-                            "Caller must be input XOR output."))
     end
 
     inner_distribute!(unit)
