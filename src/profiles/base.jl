@@ -265,7 +265,8 @@ mutable struct Profile
         profile_timestamps_date = remove_day_light_saving(profile_timestamps_date, time_zone, file_path)
 
         # repeat profile if requested and required
-        if repeat_profile && profile_timestamps_date[end] < sim_params["end_date"]
+        if (repeat_profile || sim_params["force_profiles_to_repeat"]) &&
+           profile_timestamps_date[end] < sim_params["end_date"]
             if profile_timestamps_date[1] > sim_params["start_date"]
                 @error "The profile at $(file_path) should be repeated, but it has to start at or before the " *
                        "simulation start date!\n " *
@@ -285,8 +286,12 @@ mutable struct Profile
                     end
                     append!(profile_timestamps_date, new)
                     profile_values = repeat(profile_values, nr_to_repeat + 1)
-                    @info "The profile at $(file_path) was repeated $(nr_to_repeat) time$(nr_to_repeat > 1 ? "s" : "") " *
-                          "to cover the simulation time."
+                    @info "The profile at $(file_path) was repeated $(nr_to_repeat) " *
+                          "time$(nr_to_repeat > 1 ? "s" : "") to cover the simulation time."
+                    if sim_params["force_profiles_to_repeat"] && !repeat_profile
+                        @warn "The repeating of the profile at $(file_path) was done even the profile parameter " *
+                              "\"repeat_profile\" is not true!"
+                    end
                 end
             end
         end
@@ -357,13 +362,19 @@ mutable struct Profile
         # check coverage of simulation time
         if profile_timestamps_date[1] > sim_params["start_date"] ||
            profile_timestamps_date[end] < sim_params["end_date"]
-            @error "In the profile at $(file_path), the simulation time is not fully covered!\n" *
-                   "Provide a profile that covers the simulation time of:\n" *
-                   "Begin: $(Dates.format(sim_params["start_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
-                   "End: $(Dates.format(sim_params["end_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
-                   "The current profile only covers (in local standard time):\n" *
-                   "Begin: $(Dates.format(profile_timestamps_date[1], "yyyy-mm-dd HH:MM:SS"))\n" *
-                   "End: $(Dates.format(profile_timestamps_date[end], "yyyy-mm-dd HH:MM:SS"))"
+            error_msg = "In the profile at $(file_path), the simulation time is not fully covered!\n" *
+                        "Provide a profile that covers the simulation time of:\n" *
+                        "Begin: $(Dates.format(sim_params["start_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
+                        "End: $(Dates.format(sim_params["end_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
+                        "The current profile only covers (in local standard time):\n" *
+                        "Begin: $(Dates.format(profile_timestamps_date[1], "yyyy-mm-dd HH:MM:SS"))\n" *
+                        "End: $(Dates.format(profile_timestamps_date[end], "yyyy-mm-dd HH:MM:SS"))"
+            if profile_timestamps_date[1] <= sim_params["start_date"]
+                error_msg *= "\nConsider activating the \"repeat_profile\" in the profile header or " *
+                             "\"force_profiles_to_repeat\" in the simulation parameters that disables the settings " *
+                             "of all profiles."
+            end
+            @error error_msg
             throw(InputError)
         end
 

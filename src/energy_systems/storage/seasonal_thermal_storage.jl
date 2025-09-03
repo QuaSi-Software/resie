@@ -273,7 +273,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     end
 
     # vector to hold the results of the temperatures for each layer in each simulation time step
-    unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps"], unit.number_of_layer_total)
+    unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps_output"],
+                                          unit.number_of_layer_total)
 end
 
 """
@@ -606,9 +607,9 @@ end
 function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any},
                                    output_path::String)::Bool
     # Plot temperature distribution over time    
-    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date"],
+    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
-                       for s in 1:sim_params["number_of_time_steps"]]
+                       for s in 1:sim_params["number_of_time_steps_output"]]
     layers_to_plot = (unit.number_of_layer_total):-1:1
     traces = PlotlyJS.GenericTrace[]
     for i in layers_to_plot
@@ -625,7 +626,7 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
 
     leap_days_str = string.([Date(year, 2, 29)
                              for year in
-                                 Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                                 Dates.value(Year(sim_params["start_date_output"])):Dates.value(Year(sim_params["end_date"]))
                              if isleapyear(year)])
 
     layout = PlotlyJS.Layout(; title_text="Temperature distribution over time in STES $(unit.uac)",
@@ -647,8 +648,9 @@ function control(unit::SeasonalThermalStorage,
     update(unit.controller)
 
     # write old temperature field for output
-    unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
-
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_distribution_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
+    end
     # set current_energy_input_return_temperature, simplified constant in the current time step
     # always use bottom layer to use the whole storage
     unit.current_energy_input_return_temperature = unit.temperature_segments[1]

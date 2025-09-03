@@ -4,6 +4,10 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.2
+* add optional possibility to start the output of simulation results later using the simulation parameter `start_output` set to a DateTime after `start`
+* add optional parameter `force_profiles_to_repeat` in simulation parameter to force profiles to repeat, even if `repeat_profile` is not set in the profile header
+
 ### Version 0.12.1
 * add the possibility to repeat profiles using the parameter "repeat_profile" in the profile header
 

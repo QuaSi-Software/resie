@@ -422,7 +422,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
 
     # vector to hold the results of the temperatures for each node in each simulation time step
-    unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], n_nodes_y, n_nodes_x)
+    unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps_output"], n_nodes_y, n_nodes_x)
 end
 
 """ 
@@ -648,7 +648,9 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         pipe_thermal_resistance_length_specific = 1 / (k * pi * unit.pipe_d_o)
     end
 
-    unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_field_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
+    end
 
     # calculate specific heat extraction for 1 pipe per length
     specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
@@ -879,7 +881,7 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Di
     surfdata = @lift(unit.temp_field_output[$time, :, :])
     GLMakie.surface!(ax, y_abs, x_abs, surfdata)
     GLMakie.scatter!(ax, y_abs, x_abs, surfdata)
-    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
+    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
 
     on(slg.sliders[1].value) do v
         time[] = v

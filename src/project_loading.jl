@@ -200,10 +200,17 @@ time_step = 900 s
 """
 function get_timesteps(simulation_parameters::AbstractDict{String,Any})
     start_date = DateTime(0)
+    start_date_output = DateTime(0)
     end_date = DateTime(0)
     try
         start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
         end_date = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
+        if haskey(simulation_parameters, "start_output")
+            start_date_output = Dates.DateTime(simulation_parameters["start_output"],
+                                               simulation_parameters["start_end_unit"])
+        else
+            start_date_output = start_date
+        end
     catch e
         @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
                "'start_end_unit' has to be a daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
@@ -212,7 +219,10 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
                "The following error occurred: $e")
         throw(InputError)
     end
-
+    if start_date_output < start_date
+        @error "The start date of the output can not be prior to the start date of the simulation!"
+        throw(InputError)
+    end
     if simulation_parameters["time_step_unit"] == "seconds"
         time_step = simulation_parameters["time_step"]
     elseif simulation_parameters["time_step_unit"] == "minutes"
@@ -226,15 +236,20 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
     end
 
     nr_of_steps = UInt(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
+    nr_of_steps_output = UInt(max(0,
+                                  floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date_output))) /
+                                        time_step)) + 1)
 
     # set end_date to be integer dividable by the timestep
     end_date = add_ignoring_leap_days(start_date, (nr_of_steps - 1) * Second(time_step))
 
-    if (month(start_date) == 2 && day(start_date) == 29) || (month(end_date) == 2 && day(end_date) == 29)
-        @error "The simulation start and end date can not be at a leap day!"
+    if (month(start_date) == 2 && day(start_date) == 29) ||
+       (month(end_date) == 2 && day(end_date) == 29) ||
+       (month(start_date_output) == 2 && day(start_date_output) == 29)
+        @error "The simulation start and end date and the start date of the output can not be at a leap day!"
         throw(InputError)
     end
-    return UInt(time_step), start_date, end_date, nr_of_steps
+    return UInt(time_step), start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output
 end
 
 # calculation of the order of operations has its own include files due to its complexity

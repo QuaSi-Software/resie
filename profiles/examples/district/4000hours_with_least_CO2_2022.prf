@@ -3,6 +3,7 @@
 # profile_start_date:        01.01.2024 00:00
 # profile_start_date_format: dd.mm.yyyy HH:MM
 # timestamp_format:          seconds 
+# repeat_profile:            true
 0	;	1
 900	;	1
 1800	;	1
