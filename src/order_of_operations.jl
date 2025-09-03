@@ -2506,8 +2506,8 @@ end
 function has_grid_input(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
         if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
-            input_idx = bus.balance_table_inputs[inface.source.uac].input_index
-            output_idx = bus.balance_table_outputs[output_interface_uac].output_index
+            input_idx = bus.balance_table_inputs[inface.source.uac].priority
+            output_idx = bus.balance_table_outputs[output_interface_uac].priority
             if (bus.connectivity.energy_flow === nothing ||
                 bus.connectivity.energy_flow[input_idx][output_idx] != 0)
                 return true
@@ -2520,8 +2520,8 @@ end
 function has_grid_output(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
         if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
-            input_idx = bus.balance_table_inputs[input_interface_uac].input_index
-            output_idx = bus.balance_table_outputs[outface.target.uac].output_index
+            input_idx = bus.balance_table_inputs[input_interface_uac].priority
+            output_idx = bus.balance_table_outputs[outface.target.uac].priority
             if (bus.connectivity.energy_flow === nothing ||
                 bus.connectivity.energy_flow[input_idx][output_idx] != 0)
                 return true
@@ -2897,8 +2897,8 @@ if `component` is a bus and the energy flow is denied by the energy flow matrix.
 """
 function connection_allowed(component::Component, input_uac::String, output_uac::String)
     if component.sys_function === EnergySystems.sf_bus
-        input_idx = component.balance_table_inputs[input_uac].input_index
-        output_idx = component.balance_table_outputs[output_uac].output_index
+        input_idx = component.balance_table_inputs[input_uac].priority
+        output_idx = component.balance_table_outputs[output_uac].priority
         if (component.connectivity.energy_flow === nothing ||
             component.connectivity.energy_flow[input_idx][output_idx] != 0)
             return true
