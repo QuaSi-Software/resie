@@ -8,7 +8,7 @@ for bus components.
 Base.@kwdef mutable struct ConnectionMatrix
     input_order::Vector{String}
     output_order::Vector{String}
-    energy_flow::Union{Nothing,Vector{Vector{Bool}}}
+    energy_flow::Union{Nothing,Vector{Vector{Int}}}
 end
 
 """
@@ -34,7 +34,7 @@ function ConnectionMatrix(config::Dict{String,Any})::ConnectionMatrix
     if haskey(config["connections"], "energy_flow")
         energy_flow = []
         for row in config["connections"]["energy_flow"]
-            vec = [Bool(v) for v in row]
+            vec = [Int(v) for v in row]
             push!(energy_flow, vec)
         end
     end
@@ -78,8 +78,8 @@ Container struct for information on an output of a bus relevant to the balance t
 """
 Base.@kwdef mutable struct BTOutputRow
     target::Component
-    priority::Integer
-    output_index::Integer
+    priority::Integer           # represents the priority of this row in the energy matrix
+    output_index::Integer       # represents the index of this row the general order of output rows
     do_storage_transfer::Bool
     energy_potential::MaxEnergy = MaxEnergy()
     energy_potential_temp::MaxEnergy = MaxEnergy()
@@ -261,7 +261,7 @@ function reset(unit::Bus)
         reset!(row)
     end
 
-    reset_balance_table!(unit::Bus, false)
+    reset_balance_table!(unit::Bus)
 end
 
 """
@@ -316,7 +316,7 @@ Returns:
 """
 function energy_flow_is_denied(unit::Bus, input_row::BTInputRow, output_row::BTOutputRow)::Bool
     return (!(unit.connectivity.energy_flow === nothing ||                                       # check energy_flow matrix
-              unit.connectivity.energy_flow[input_row.input_index][output_row.output_index]) ||  # check energy_flow matrix
+              unit.connectivity.energy_flow[input_row.input_index][output_row.output_index] != 0) ||  # check energy_flow matrix
             (output_row.target.sys_function == sf_storage && !input_row.do_storage_transfer) ||  # check storage loading control
             (input_row.source.sys_function == sf_storage && !output_row.do_storage_transfer) ||  # check storage unloading control
             output_row.target.uac == input_row.source.uac ||                                     # do not allow self-feeding of any component
@@ -599,8 +599,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                         energy_pot = 0.0
                     end
                 else  # the caller has performed a potential and has already written a max_energy itself
-                    energy_pot = -(unit.balance_table[input_row.priority, output_row.priority * 2 - 1])
-                    temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
+                    energy_pot = -(unit.balance_table[input_row.input_index, output_row.output_index * 2 - 1])
+                    temperature_min = unit.balance_table[input_row.input_index, output_row.output_index * 2]
                     temperature_max = temperature_min
                 end
             end
@@ -655,8 +655,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                         energy_pot = 0.0
                     end
                 else # max energy is written and was distributed by the bus --> get infos from balance_table
-                    energy_pot = unit.balance_table[input_row.priority, output_row.priority * 2 - 1]
-                    temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
+                    energy_pot = unit.balance_table[input_row.input_index, output_row.output_index * 2 - 1]
+                    temperature_min = unit.balance_table[input_row.input_index, output_row.output_index * 2]
                     temperature_max = temperature_min
                 end
             end
@@ -720,6 +720,41 @@ function temperatures_match(other_temp_min::Temperature,
     end
 end
 
+# TODO move to initialization as this only once has to be done
+function iterate_balance_table(unit::Bus)
+    rows = []
+
+    if unit.connectivity.energy_flow === nothing || all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
+        # no connectivity matrix given or only filled with zeros and ones
+        for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
+            for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
+                push!(rows, (input_row, output_row))
+            end
+        end
+    else
+        # collect (value, row, col) for all non-zeros
+        triples = [(v, i, j) for (i, row) in enumerate(unit.connectivity.energy_flow)
+                   for (j, v) in enumerate(row) if v != 0]
+        sort!(triples; by=t -> t[1])
+
+        vals_sorted = [t[1] for t in triples]
+        row_uac = [unit.input_interfaces[t[2]].source.uac for t in triples]
+        col_uac = [unit.output_interfaces[t[3]].target.uac for t in triples]
+
+        if minimum(vals_sorted) == 1 && allunique(vals_sorted)
+            for idx in 1:length(triples)
+                push!(rows, (unit.balance_table_inputs[row_uac[idx]], unit.balance_table_outputs[col_uac[idx]]))
+            end
+        else
+            # no valid input
+            @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
+                   "They have to be either all 0 and 1, or they can be 0 and consecutively ascending starting from 1."
+            raise(InputError)
+        end
+    end
+    return rows
+end
+
 """
     inner_distribute!(bus)
 
@@ -732,101 +767,100 @@ other purpose.
 `unit::Bus`: The bus for which to calculate energy distribution
 """
 function inner_distribute!(unit::Bus)
-    reset_balance_table!(unit::Bus, false)
-    continue_iteration = true
+    reset_balance_table!(unit)
+    input_priority_to_skip = length(unit.balance_table_inputs)
+    output_priority_to_skip = length(unit.balance_table_outputs)
 
-    for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
-        continue_iteration = continue_iteration && !is_empty(input_row)
-        if !continue_iteration
+    for (input_row, output_row) in iterate_balance_table(unit)
+        # ensure that an input is not distributed to an output if one of them comes after another input/output with 
+        # a higher base priority that has not yet been calculated!
+        if energy_flow_is_denied(unit, input_row, output_row)
+            continue
+        elseif is_empty(output_row) || output_row.output_index > output_priority_to_skip
+            output_priority_to_skip = min(output_priority_to_skip, output_row.output_index)
+            continue
+        elseif is_empty(input_row) || input_row.input_index > input_priority_to_skip
+            input_priority_to_skip = min(input_priority_to_skip, input_row.input_index)
+            continue
+        end
+
+        temperature_highest_min = highest(get_min_temperature(input_row.energy_potential_temp,
+                                                              input_row.energy_pool_temp, output_row.target.uac),
+                                          get_min_temperature(output_row.energy_potential_temp,
+                                                              output_row.energy_pool_temp, input_row.source.uac))
+        temperature_lowest_max = lowest(get_max_temperature(input_row.energy_potential_temp,
+                                                            input_row.energy_pool_temp, output_row.target.uac),
+                                        get_max_temperature(output_row.energy_potential_temp,
+                                                            output_row.energy_pool_temp, input_row.source.uac))
+
+        if temperature_highest_min !== nothing && temperature_lowest_max !== nothing &&
+           temperature_highest_min > temperature_lowest_max
+            continue
+        end
+
+        available_energy = _add(get_max_energy(input_row.energy_potential_temp, output_row.target.uac),
+                                get_max_energy(input_row.energy_pool_temp, output_row.target.uac))
+
+        target_energy = _add(get_max_energy(output_row.energy_potential_temp, input_row.source.uac),
+                             get_max_energy(output_row.energy_pool_temp, input_row.source.uac))
+
+        if available_energy < -unit.epsilon || target_energy < -unit.epsilon
+            @error "A negative energy has been detected during distributing energy in bus $unit. This can have multiple " *
+                   "reasons, e.g. a bug in one of the components or a wrong order of operation. Double check the results " *
+                   "and contact the developers."
             break
         end
 
-        for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
-            if is_empty(output_row)
-                break
+        energy_flow = min(target_energy, available_energy)
+        unit.balance_table[input_row.input_index, output_row.output_index * 2 - 1] += energy_flow
+        # if both min and max temperature are given and differing (can currently only happen during HP bypass), 
+        # the lowest temperature is set:
+        unit.balance_table[input_row.input_index, output_row.output_index * 2] = lowest(temperature_highest_min,
+                                                                                        temperature_lowest_max)
+
+        if energy_flow !== 0.0
+            # extract the already distributed energy from balance table
+            already_distributed_input_energies = Float64.(unit.balance_table[input_row.input_index, 1:2:end])
+            already_distributed_input_temperatures = unit.balance_table[input_row.input_index, 2:2:end]
+
+            already_distributed_output_energies = Float64.(unit.balance_table[:, output_row.output_index * 2 - 1])
+            already_distributed_output_temperatures = unit.balance_table[:, output_row.output_index * 2]
+
+            if !is_max_energy_nothing(input_row.energy_potential_temp)
+                reduce_max_energy!(input_row.energy_potential_temp,
+                                   already_distributed_input_energies,
+                                   already_distributed_input_temperatures,
+                                   output_row.output_index,
+                                   output_row.target.uac,
+                                   input_row.source.uac,
+                                   unit.run_id)
             end
-
-            if energy_flow_is_denied(unit, input_row, output_row)
-                continue
+            if !is_max_energy_nothing(input_row.energy_pool_temp)
+                reduce_max_energy!(input_row.energy_pool_temp,
+                                   already_distributed_input_energies,
+                                   already_distributed_input_temperatures,
+                                   output_row.output_index,
+                                   output_row.target.uac,
+                                   input_row.source.uac,
+                                   unit.run_id)
             end
-
-            temperature_highest_min = highest(get_min_temperature(input_row.energy_potential_temp,
-                                                                  input_row.energy_pool_temp, output_row.target.uac),
-                                              get_min_temperature(output_row.energy_potential_temp,
-                                                                  output_row.energy_pool_temp, input_row.source.uac))
-            temperature_lowest_max = lowest(get_max_temperature(input_row.energy_potential_temp,
-                                                                input_row.energy_pool_temp, output_row.target.uac),
-                                            get_max_temperature(output_row.energy_potential_temp,
-                                                                output_row.energy_pool_temp, input_row.source.uac))
-
-            if temperature_highest_min !== nothing && temperature_lowest_max !== nothing &&
-               temperature_highest_min > temperature_lowest_max
-                continue
+            if !is_max_energy_nothing(output_row.energy_potential_temp)
+                reduce_max_energy!(output_row.energy_potential_temp,
+                                   already_distributed_output_energies,
+                                   already_distributed_output_temperatures,
+                                   input_row.input_index,
+                                   input_row.source.uac,
+                                   output_row.target.uac,
+                                   unit.run_id)
             end
-
-            available_energy = _add(get_max_energy(input_row.energy_potential_temp, output_row.target.uac),
-                                    get_max_energy(input_row.energy_pool_temp, output_row.target.uac))
-
-            target_energy = _add(get_max_energy(output_row.energy_potential_temp, input_row.source.uac),
-                                 get_max_energy(output_row.energy_pool_temp, input_row.source.uac))
-
-            if available_energy < -unit.epsilon || target_energy < -unit.epsilon
-                reset_balance_table!(unit::Bus, true)
-                continue_iteration = false
-                break
-            end
-
-            energy_flow = min(target_energy, available_energy)
-            unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
-            # if both min and max temperature are given and differing (can currently only happen during HP bypass), 
-            # the lowest temperature is set:
-            unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
-                                                                                     temperature_lowest_max)
-
-            if energy_flow !== 0.0
-                # extract the already distributed energy from balance table
-                already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority,
-                                                                                 1:2:(output_row.priority * 2 - 1)])
-                already_distributed_input_temperatures = unit.balance_table[input_row.priority,
-                                                                            2:2:(output_row.priority * 2)]
-
-                already_distributed_output_energies = Float64.(unit.balance_table[1:(input_row.priority),
-                                                                                  output_row.priority * 2 - 1])
-                already_distributed_output_temperatures = unit.balance_table[1:(input_row.priority),
-                                                                             output_row.priority * 2]
-
-                if !is_max_energy_nothing(input_row.energy_potential_temp)
-                    reduce_max_energy!(input_row.energy_potential_temp,
-                                       already_distributed_input_energies,
-                                       already_distributed_input_temperatures,
-                                       output_row.target.uac,
-                                       input_row.source.uac,
-                                       unit.run_id)
-                end
-                if !is_max_energy_nothing(input_row.energy_pool_temp)
-                    reduce_max_energy!(input_row.energy_pool_temp,
-                                       already_distributed_input_energies,
-                                       already_distributed_input_temperatures,
-                                       output_row.target.uac,
-                                       input_row.source.uac,
-                                       unit.run_id)
-                end
-                if !is_max_energy_nothing(output_row.energy_potential_temp)
-                    reduce_max_energy!(output_row.energy_potential_temp,
-                                       already_distributed_output_energies,
-                                       already_distributed_output_temperatures,
-                                       input_row.source.uac,
-                                       output_row.target.uac,
-                                       unit.run_id)
-                end
-                if !is_max_energy_nothing(output_row.energy_pool_temp)
-                    reduce_max_energy!(output_row.energy_pool_temp,
-                                       already_distributed_output_energies,
-                                       already_distributed_output_temperatures,
-                                       input_row.source.uac,
-                                       output_row.target.uac,
-                                       unit.run_id)
-                end
+            if !is_max_energy_nothing(output_row.energy_pool_temp)
+                reduce_max_energy!(output_row.energy_pool_temp,
+                                   already_distributed_output_energies,
+                                   already_distributed_output_temperatures,
+                                   input_row.input_index,
+                                   input_row.source.uac,
+                                   output_row.target.uac,
+                                   unit.run_id)
             end
         end
     end
@@ -841,10 +875,9 @@ This is typically called within inner_distribute! or when resetting a bus.
 
 # Arguments
 `unit::Bus`: The bus containing the balance table
-`call_inner_distribute::Bool`: If true, calls inner_distribute! after resetting the balance
-    table. Please note that this can lead to infinite recursion if used correctly.
+
 """
-function reset_balance_table!(unit::Bus, call_inner_distribute::Bool)
+function reset_balance_table!(unit::Bus)
     unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2 * length(unit.balance_table_outputs)))
     for i in 1:length(unit.balance_table_inputs)
         for j in 2:2:(2 * length(unit.balance_table_outputs))
@@ -860,10 +893,6 @@ function reset_balance_table!(unit::Bus, call_inner_distribute::Bool)
     for output_row in collect(values(unit.balance_table_outputs))
         output_row.energy_potential_temp = copy(output_row.energy_potential)
         output_row.energy_pool_temp = copy(output_row.energy_pool)
-    end
-
-    if call_inner_distribute
-        inner_distribute!(unit)
     end
 end
 

@@ -2509,7 +2509,7 @@ function has_grid_input(bus, output_interface_uac)
             input_idx = bus.balance_table_inputs[inface.source.uac].input_index
             output_idx = bus.balance_table_outputs[output_interface_uac].output_index
             if (bus.connectivity.energy_flow === nothing ||
-                bus.connectivity.energy_flow[input_idx][output_idx])
+                bus.connectivity.energy_flow[input_idx][output_idx] != 0)
                 return true
             end
         end
@@ -2523,7 +2523,7 @@ function has_grid_output(bus, input_interface_uac)
             input_idx = bus.balance_table_inputs[input_interface_uac].input_index
             output_idx = bus.balance_table_outputs[outface.target.uac].output_index
             if (bus.connectivity.energy_flow === nothing ||
-                bus.connectivity.energy_flow[input_idx][output_idx])
+                bus.connectivity.energy_flow[input_idx][output_idx] != 0)
                 return true
             end
         end
@@ -2900,7 +2900,7 @@ function connection_allowed(component::Component, input_uac::String, output_uac:
         input_idx = component.balance_table_inputs[input_uac].input_index
         output_idx = component.balance_table_outputs[output_uac].output_index
         if (component.connectivity.energy_flow === nothing ||
-            component.connectivity.energy_flow[input_idx][output_idx])
+            component.connectivity.energy_flow[input_idx][output_idx] != 0)
             return true
         else
             return false

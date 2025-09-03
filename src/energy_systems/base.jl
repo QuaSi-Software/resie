@@ -725,6 +725,7 @@ is fully distributed.
 function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                             amount::Union{Float64,Vector{Float64}},
                             temperature::Union{Temperature,Vector{Temperature}},
+                            current_amount_index::Int,
                             uac_of_caller::String,
                             uac_of_owner::String,
                             run_id::UUID)
@@ -745,7 +746,7 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
     else
         # here, only the most recent entry in amount is used, as all the distributed energy 
         # from before is not relevant
-        current_amount = isa(amount, AbstractVector) ? amount[end] : amount
+        current_amount = isa(amount, AbstractVector) ? amount[current_amount_index] : amount
         if is_purpose_uac_nothing(max_energy)
             for i in eachindex(max_energy.max_energy)
                 to_reduce = min(current_amount, max_energy.max_energy[i])
