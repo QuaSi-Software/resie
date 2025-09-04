@@ -258,6 +258,9 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
     # reset rebuilds the balance table
     reset(bus)
 
+    # build iteration array for input/output rows
+    bus.input_output_rows_iteration = iterate_balance_table(bus)
+
     return bus
 end
 

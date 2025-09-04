@@ -146,6 +146,7 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table_inputs::Dict{String,BTInputRow}
     balance_table_outputs::Dict{String,BTOutputRow}
     balance_table::Array{Union{Nothing,Float64},2}
+    input_output_rows_iteration::Vector{Tuple{BTInputRow,BTOutputRow}}
     proxy::Union{Nothing,Bus}
 
     run_id::UUID
@@ -181,6 +182,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
                Dict{String,BTInputRow}(),                    # balance_table_inputs
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
+               [],                                           # input_output_rows_iteration
                nothing,                                      # proxy
                uuid1(),                                      # holds the current run ID later
                sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
@@ -215,6 +217,7 @@ function Bus(uac::String,
                Dict{String,BTInputRow}(),                    # balance_table_inputs
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table
+               [],                                           # input_output_rows_iteration
                nothing,                                      # proxy
                run_id,                                       # run ID
                epsilon)
@@ -234,6 +237,8 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
     end
 
     unit.run_id = sim_params["run_ID"]
+
+    unit.input_output_rows_iteration = iterate_balance_table(unit)
 end
 
 function reset(unit::Bus)
@@ -691,10 +696,31 @@ function temperatures_match(other_temp_min::Temperature,
     end
 end
 
-# TODO move to initialization as this only once has to be done
-function iterate_balance_table(unit::Bus)
-    rows = []
+"""
+    iterate_balance_table(bus)
 
+Returns Tuple of InputRows, OutputRows that are iterated during each balance_on call on the bus.
+The order of the InputRows/OutputRows represent the order defined in the bus connectivity matrix.
+
+# Arguments
+`unit::Bus`: The bus for which to calculate the input_output_rows_iteration
+
+# Returns
+`input_output_rows_iteration::Vector{Tuple{BTInputRow, BTOutputRow}}`: All iterations of input and output rows.
+
+"""
+function iterate_balance_table(unit::Bus)
+    # check for proxy busses, but they are not created yet, so check for interconnected busses
+    if (length(filter_inputs(unit, sf_bus, true)) > 0 || length(filter_outputs(unit, sf_bus, true)) > 0) &&
+       unit.connectivity.energy_flow !== nothing && !all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
+        @error "In bus $(unit.uac), a custom order in the energy flow matrix has been specified. " *
+               "Note that this is only allowed for single busses that are not connected to any other bus! " *
+               "You can always adjust your input file to meet this requirement by manually merging all directly " *
+               "connected busses to one big bus."
+        throw(InputError)
+    end
+
+    rows = Vector{Tuple{BTInputRow,BTOutputRow}}()
     if unit.connectivity.energy_flow === nothing || all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
         # no connectivity matrix given or only filled with zeros and ones
         for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
@@ -716,11 +742,16 @@ function iterate_balance_table(unit::Bus)
             for idx in 1:length(triples)
                 push!(rows, (unit.balance_table_inputs[row_uac[idx]], unit.balance_table_outputs[col_uac[idx]]))
             end
+            @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that this " *
+                  "might lead to wrong results if the bus has both transformer in its input and output and/or " *
+                  "deals with temperatures. If wrong results are seen, try to add more potential steps using a " *
+                  "custom order of operation."
         else
             # no valid input
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
-                   "They have to be either all 0 and 1, or they can be 0 and consecutively ascending starting from 1."
-            raise(InputError)
+                   "They have to be either all 0 and 1, or they can be 0 and consecutively ascending starting from 1 " *
+                   "for a custom order."
+            throw(InputError)
         end
     end
     return rows
@@ -742,7 +773,7 @@ function inner_distribute!(unit::Bus)
     input_priority_to_skip = length(unit.balance_table_inputs)
     output_priority_to_skip = length(unit.balance_table_outputs)
 
-    for (input_row, output_row) in iterate_balance_table(unit)
+    for (input_row, output_row) in unit.input_output_rows_iteration
         # ensure that an input is not distributed to an output if one of them comes after another input/output with 
         # a higher base priority that has not yet been calculated!
         if energy_flow_is_denied(unit, input_row, output_row)
