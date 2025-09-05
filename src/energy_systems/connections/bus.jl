@@ -743,9 +743,8 @@ function iterate_balance_table(unit::Bus)
                 push!(rows, (unit.balance_table_inputs[row_uac[idx]], unit.balance_table_outputs[col_uac[idx]]))
             end
             @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that this " *
-                  "might lead to wrong results if the bus has both transformer in its input and output and/or " *
-                  "deals with temperatures. If wrong results are seen, try to add more potential steps using a " *
-                  "custom order of operation."
+                  "might lead to wrong results if the bus has more than one transformer in its input or output " *
+                  "and their order is not the same as the order specified by the input/output order of the bus!"
         else
             # no valid input
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
@@ -780,6 +779,9 @@ function inner_distribute!(unit::Bus)
             continue
         elseif is_empty(output_row) || output_row.priority > output_priority_to_skip
             output_priority_to_skip = min(output_priority_to_skip, output_row.priority)
+            if is_empty(input_row)
+                input_priority_to_skip = min(input_priority_to_skip, input_row.priority)
+            end
             continue
         elseif is_empty(input_row) || input_row.priority > input_priority_to_skip
             input_priority_to_skip = min(input_priority_to_skip, input_row.priority)
