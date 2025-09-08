@@ -2,7 +2,7 @@
 Trait-like type of components that implement the load ratio dependent efficiency (PLRDE)
 functionality.
 """
-const PLRDEComponent = Union{CHPP,Electrolyser,FuelBoiler}
+const PLRDEComponent = Union{CHPP,Electrolyser,FuelBoiler,UTIR}
 
 """
     parse_efficiency_function(eff_def)
@@ -604,14 +604,14 @@ end
 Checks the available energy on the input electricity interface.
 
 # Arguments
-- `unit::Union{Electrolyser,HeatPump}`: The component
+- `unit::Union{Electrolyser,HeatPump,UTIR}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_in(unit::Union{Electrolyser,HeatPump},
+function check_el_in(unit::Union{Electrolyser,HeatPump,UTIR},
                      sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_in"]
         return Inf
@@ -681,14 +681,14 @@ end
 Checks the available energy on the electricity output interface.
 
 # Arguments
-- `unit::CHPP`: The component
+- `unit::Union{CHPP,UTIR}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 - `Floathing`: The available energy on the interface. If the value is nothing, that means
     no energy is available on this interface. The value can be `-Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_el_out(unit::CHPP,
+function check_el_out(unit::Union{CHPP,UTIR},
                       sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_el_out"]
         return -Inf
