@@ -56,7 +56,7 @@ mutable struct UTIR <: Component
                    m_el_out,
                    config["power"] / efficiencies[Symbol("el_out")](1.0),
                    linear_interface,
-                   default(config, "min_power_fraction", 0.1),
+                   default(config, "min_power_fraction", 0.0),
                    efficiencies,
                    interface_list,
                    Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
