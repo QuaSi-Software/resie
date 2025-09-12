@@ -147,6 +147,7 @@ Base.@kwdef mutable struct Bus <: Component
     balance_table_outputs::Dict{String,BTOutputRow}
     balance_table::Array{Union{Nothing,Float64},2}
     input_output_rows_iteration::Vector{Tuple{BTInputRow,BTOutputRow}}
+    has_custom_order::Bool
     proxy::Union{Nothing,Bus}
 
     run_id::UUID
@@ -183,6 +184,7 @@ function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
                [],                                           # input_output_rows_iteration
+               false,                                        # has_custom_order
                nothing,                                      # proxy
                uuid1(),                                      # holds the current run ID later
                sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
@@ -218,6 +220,7 @@ function Bus(uac::String,
                Dict{String,BTOutputRow}(),                   # balance_table_outputs
                Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table
                [],                                           # input_output_rows_iteration
+               false,                                        # has_custom_order
                nothing,                                      # proxy
                run_id,                                       # run ID
                epsilon)
@@ -238,7 +241,7 @@ function initialise!(unit::Bus, sim_params::Dict{String,Any})
 
     unit.run_id = sim_params["run_ID"]
 
-    unit.input_output_rows_iteration = iterate_balance_table(unit)
+    unit.input_output_rows_iteration, unit.has_custom_order = iterate_balance_table(unit)
 end
 
 function reset(unit::Bus)
@@ -539,7 +542,10 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     return_exchanges = []
     if caller_is_input
         input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
-        for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
+        for output_row in sort(collect(values(unit.balance_table_outputs));
+                               by=x -> unit.has_custom_order ?
+                                       unit.connectivity.energy_flow[input_row.priority][x.priority] :
+                                       x.priority)
             if energy_flow_is_denied(unit, input_row, output_row)
                 continue
             end
@@ -595,7 +601,10 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
         end
     else
         output_row = [row for row in values(unit.balance_table_outputs) if row.target.uac == interface.target.uac][1]
-        for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
+        for input_row in sort(collect(values(unit.balance_table_inputs));
+                              by=x -> unit.has_custom_order ?
+                                      unit.connectivity.energy_flow[x.priority][output_row.priority] :
+                                      x.priority)
             if energy_flow_is_denied(unit, input_row, output_row)
                 continue
             end
@@ -707,6 +716,7 @@ The order of the InputRows/OutputRows represent the order defined in the bus con
 
 # Returns
 `input_output_rows_iteration::Vector{Tuple{BTInputRow, BTOutputRow}}`: All iterations of input and output rows.
+`has_custom_order::Bool`: If true, indicated that a custom order has been input
 
 """
 function iterate_balance_table(unit::Bus)
@@ -728,6 +738,7 @@ function iterate_balance_table(unit::Bus)
                 push!(rows, (input_row, output_row))
             end
         end
+        has_custom_order = false
     else
         # collect (value, row, col) for all non-zeros
         triples = [(v, i, j) for (i, row) in enumerate(unit.connectivity.energy_flow)
@@ -742,9 +753,16 @@ function iterate_balance_table(unit::Bus)
             for idx in 1:length(triples)
                 push!(rows, (unit.balance_table_inputs[row_uac[idx]], unit.balance_table_outputs[col_uac[idx]]))
             end
-            @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that this " *
-                  "might lead to wrong results if the bus has more than one transformer in its input or output " *
-                  "and their order is not the same as the order specified by the input/output order of the bus!"
+            if length([inp for inp in unit.input_interfaces if inp.source.sys_function === sf_transformer]) > 1 ||
+               length([outp for outp in unit.output_interfaces if outp.target.sys_function === sf_transformer]) > 1
+                @warn "In bus $(unit.uac), a custom order in the energy flow matrix is used. The bus has more than " *
+                      "one transformer in its input or output what might lead to wrong results if the custom order " *
+                      "of the transformers is not the same as the order specified by the input/output order of the bus!"
+            else
+                @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that there is " *
+                      "no guarantee that this will produce the expected results, especially if several transformers " *
+                      "or a transformer chain are connected to the bus!"
+            end
         else
             # no valid input
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
@@ -752,8 +770,9 @@ function iterate_balance_table(unit::Bus)
                    "for a custom order."
             throw(InputError)
         end
+        has_custom_order = true
     end
-    return rows
+    return rows, has_custom_order
 end
 
 """
@@ -769,7 +788,6 @@ other purpose.
 """
 function inner_distribute!(unit::Bus)
     reset_balance_table!(unit)
-    input_priority_to_skip = length(unit.balance_table_inputs)
     output_priority_to_skip = length(unit.balance_table_outputs)
 
     for (input_row, output_row) in unit.input_output_rows_iteration
@@ -777,14 +795,10 @@ function inner_distribute!(unit::Bus)
         # a higher base priority that has not yet been calculated!
         if energy_flow_is_denied(unit, input_row, output_row)
             continue
+        elseif is_empty(input_row) || (unit.has_custom_order && is_empty(output_row))
+            break
         elseif is_empty(output_row) || output_row.priority > output_priority_to_skip
             output_priority_to_skip = min(output_priority_to_skip, output_row.priority)
-            if is_empty(input_row)
-                input_priority_to_skip = min(input_priority_to_skip, input_row.priority)
-            end
-            continue
-        elseif is_empty(input_row) || input_row.priority > input_priority_to_skip
-            input_priority_to_skip = min(input_priority_to_skip, input_row.priority)
             continue
         end
 

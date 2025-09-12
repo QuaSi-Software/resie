@@ -259,7 +259,7 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
     reset(bus)
 
     # build iteration array for input/output rows
-    bus.input_output_rows_iteration = iterate_balance_table(bus)
+    bus.input_output_rows_iteration, bus.has_custom_order = iterate_balance_table(bus)
 
     return bus
 end
