@@ -23,6 +23,9 @@ Base.@kwdef mutable struct Battery <: Component
     self_discharge_rate::Float64
     max_charge_power::Float64
     max_discharge_power::Float64
+    SOC_min::Float64
+    SOC_max::Float64
+    start_charge_SOC::Float64
     V_n_bat::Float64
     # detailed
     V_n::Float64
@@ -56,6 +59,7 @@ Base.@kwdef mutable struct Battery <: Component
     n_cell_p::Float64
     current_charge::Float64
     capacity_cell_Ah_cutoff::Float64
+    SOC::Float64
 
     process_done::Bool
     load_done::Bool
@@ -116,6 +120,9 @@ Base.@kwdef mutable struct Battery <: Component
                    default(config, "self_discharge_rate", 0.0), # rate of self-discharge in %/month (month=30days)
                    default(config, "max_charge_power", config["capacity"]), # maximum continuos charge power in W
                    default(config, "max_discharge_power", config["capacity"]), # maximum continuos discharge power in W
+                   default(config, "SOC_min", 0),
+                   default(config, "SOC_max", 0),
+                   default(config, "start_charge_SOC", 100), # SOC below which the battery starts charging
                    config["V_n_bat"], # nominal voltage of the battery pack
                    default(config, "V_n", 0.0), # nominal voltage of the cell in V
                    default(config, "r_i", 0.0), # internal resistance of the cell in Ohm
@@ -146,6 +153,7 @@ Base.@kwdef mutable struct Battery <: Component
                    0.0, # number of cells connected in parallel 
                    0.0, # current state of charge of a single cell in Ah
                    0.0, # capacity adjusted with respect to cutoff voltage
+                   0.0, # SOC in the current time step
                    false, # process_done, bool indicating if the process step has already been performed in the current time step
                    false) # load_done, bool indicating if the load step has already been performed in the current time step
     end
@@ -170,12 +178,15 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
         n_cell_s = unit.V_n_bat / unit.V_n
         unit.n_cell_p = (unit.capacity / unit.V_n) / unit.capacity_cell_Ah
 
-        SOC = (((unit.load / unit.V_n) / unit.n_cell_p) / unit.capacity_cell_Ah) * 100 # TODO q_0 = current charge; Q_full = full charge
-        unit.current_charge = unit.capacity_cell_Ah * SOC / 100
+        unit.SOC = (unit.load / unit.capacity) * 100 # TODO q_0 = current charge; Q_full = full charge
+        unit.current_charge = unit.capacity_cell_Ah * unit.SOC / 100
         unit.V_cell = find_zero(V_cell -> V_cell_function(V_cell, 0, unit, sim_params),
                                 unit.V_n,
                                 Order0())
         unit.V_cell_last = copy(unit.V_cell)
+        # charge = (unit.load_end_of_last_timestep - unit.load) / unit.n_cell_p / ((unit.V_cell_last + unit.V_cell) / 2)
+        # unit.current_charge += charge
+        # unit.SOC = max(unit.current_charge / unit.capacity_cell_Ah * 100, 100)
     end
 end
 
@@ -192,27 +203,33 @@ function control(unit::Battery,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    if discharge_is_allowed(unit.controller, sim_params) 
-        discharge_energy_bat = min(sim_params["watt_to_wh"](unit.max_discharge_power), 
-                                   unit.load)
+    if discharge_is_allowed(unit.controller, sim_params) && unit.SOC > unit.SOC_min
+        # discharge_energy_bat = min(sim_params["watt_to_wh"](unit.max_discharge_power), 
+        #                            (unit.SOC - unit.SOC_min)/100 * unit.capacity)
+        # unit.discharge_efficiency, 
+        # unit.V_cell_discharge, 
+        # discharge_energy_bat = calc_efficiency(discharge_energy_bat, unit, sim_params)
+        # unit.max_discharge_energy = discharge_energy_bat # TODO * unit.discharge_efficiency???
         unit.discharge_efficiency, 
         unit.V_cell_discharge, 
-        discharge_energy_bat = calc_efficiency(discharge_energy_bat, unit, sim_params)
-        unit.max_discharge_energy = discharge_energy_bat * unit.discharge_efficiency
+        unit.max_discharge_energy = calc_efficiency(sim_params["watt_to_wh"](unit.max_discharge_power), unit, sim_params)
     else
         unit.max_discharge_energy = 0.0
+        unit.discharge_efficiency = NaN
     end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_discharge_energy)
 
-    if charge_is_allowed(unit.controller, sim_params)
+    if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.start_charge_SOC
+        # end of condition
         charge_energy_bat = min(sim_params["watt_to_wh"](unit.max_charge_power), 
-                                unit.capacity - unit.load)
+                                (unit.SOC_max - unit.SOC)/100 * unit.capacity)
         unit.charge_efficiency, 
         unit.V_cell_charge, 
         charge_energy_bat = calc_efficiency(-charge_energy_bat, unit, sim_params)
-        unit.max_charge_energy = charge_energy_bat / unit.charge_efficiency
+        unit.max_charge_energy = charge_energy_bat # TODO / unit.charge_efficiency???
     else
         unit.max_charge_energy = 0.0
+        unit.charge_efficiency = NaN
     end
     set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge_energy)
 end
@@ -227,138 +244,249 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
     else
         # TODO calculate derivate for speed boost
         # calculate V_cell for constant power charging 
-        if unit.load - energy < 0.01 * unit.capacity
+        if unit.load - energy < 0.01 * unit.capacity # calculation gets problematic close to being empty
             V_cell = unit.V_cell_min + unit.V_n * ((unit.load - energy) / unit.capacity) 
         else
-            V_cell = find_zero(V_cell -> V_cell_function(V_cell, energy/unit.n_cell_p, 
-                                                                unit, sim_params),
+            # V_cell = find_zero(V_cell -> V_cell_function(V_cell, energy/unit.n_cell_p, 
+            #                                                  unit, sim_params),
+            #                    unit.V_n,
+            #                    Order0())
+            try V_cell = find_zero((V_cell -> V_cell_function(V_cell, energy/unit.n_cell_p, 
+                                                             unit, sim_params),
+                                V_cell -> V_cell_derivative(V_cell, energy/unit.n_cell_p, 
+                                                            unit, sim_params)),
                                unit.V_n,
-                               Order0())      
+                               Roots.Newton())     
+            catch
+                if energy < 0
+                    V_cell = unit.V_cell_min - 0.01
+                elseif energy > 0
+                    V_cell = unit.V_cell_max + 0.01
+                else
+                    @infiltrate
+                end
+            end 
         end
 
         if V_cell < unit.V_cell_min && energy > 0
+            # max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_min, 
+            #                                                            energy_cell, 
+            #                                                            unit, sim_params),
+            #                             1,
+            #                             Order0()) 
+            # max_energy_cell = find_zero((energy_cell -> V_cell_function(unit.V_cell_min, 
+            #                                                             energy_cell, 
+            #                                                             unit, sim_params),
+            #                              energy_cell -> energy_cell_derivative(unit.V_cell_min,
+            #                                                               energy_cell, 
+            #                                                               unit, 
+            #                                                               sim_params)),
+            #                             1,
+            #                             Roots.Newton())  
+            as = find_zero((energy_cell -> denom(unit.V_cell_min, energy_cell, unit, 
+                                                 sim_params), 
+                            energy_cell -> denom_derivative(unit.V_cell_min, energy_cell, 
+                                                            unit, sim_params)), 
+                           unit.capacity_cell_Ah, 
+                           Roots.Newton())
             max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_min, 
                                                                        energy_cell, 
-                                                                       unit, sim_params),
-                                        energy / unit.n_cell_p,
-                                        Order0()) 
+                                                                       unit, sim_params), 
+                                        (0,as*0.999), 
+                                        Roots.A42())
+            @infiltrate
             V_cell = unit.V_cell_min
         elseif V_cell > unit.V_cell_max && energy < 0
-            max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_max, 
-                                                                       -energy_cell, 
-                                                                       unit, sim_params),
-                                        energy / unit.n_cell_p,
-                                        Order0())  
+            # try max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_max, 
+            #                                                            energy_cell, 
+            #                                                            unit, sim_params),
+            #                             -unit.capacity * (1 - unit.SOC/100) / unit.n_cell_p,
+            #                             Order0())  
+            try max_energy_cell = find_zero((energy_cell -> V_cell_function(unit.V_cell_max, 
+                                                                        energy_cell, 
+                                                                        unit, sim_params),
+                                         energy_cell -> energy_cell_derivative(unit.V_cell_max,
+                                                                          energy_cell, 
+                                                                          unit, 
+                                                                          sim_params)),
+                                        -unit.capacity * (1 - unit.SOC/100) / unit.n_cell_p,
+                                        Roots.Newton()) 
+            catch
+                @infiltrate
+            end
             V_cell = unit.V_cell_max
         else
             max_energy_cell = energy / unit.n_cell_p
         end
 
         V_cell_avg = (unit.V_cell_last + V_cell) / 2
-        internal_losses = sim_params["watt_to_wh"](unit.r_i * V_cell_avg^2)
+        charge = max_energy_cell / V_cell_avg # TODO V_cell_avg leads to max overflow error
+        internal_losses = unit.r_i * charge
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p
-        efficiency = ifelse(max_energy_bat == 0, NaN, 1- (internal_losses / max_energy_bat))
+        efficiency = ifelse(max_energy_cell == 0, NaN, 1- (internal_losses / max_energy_cell))
+        if V_cell > unit.V_cell_max + 0.01 || max_energy_cell * unit.n_cell_p > unit.load
+            @infiltrate
+        end
         return efficiency, V_cell, max_energy_bat
     end
 end
 
-# calculate the voltage level, after charging with a constant current defined from charging 
-# power and voltage level before charging, positive energy = discharging, negative energy = charging
-# changing voltage levels during charging are ignored
-function calc_V_cell_cc(charge::Number, I::Number, unit::Battery)
-    unit.V_0 - 
-    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - 
-              (unit.capacity_cell_Ah - unit.current_charge + charge))) +
-    unit.A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -
-    unit.r_i * I
-end
-
-# calculate the voltage level, after charging with a constant current defined from charging 
-# power and voltage level before charging, positive energy = discharging, negative energy = charging
-# changing voltage levels during charging are ignored
-function calc_V_cell_cc_sum(sum_charge::Number, I::Number, unit::Battery)
-    unit.V_0 - 
-    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - sum_charge)) +
-    unit.A * exp(-unit.B * sum_charge) -
-    unit.r_i * I
-end
-
-# calculate the voltage level, after charging with a constant current defined from charging 
-# power and voltage level before charging, positive energy = discharging, negative energy = charging
-# changing voltage levels during charging are ignored
-function calc_V_cell_cc_aging(charge::Number, I::Number, n ,T, unit::Battery)
-    # functions describing the dependence of the parameters on cycles n and Temperature T
-    Q = unit.capacity_cell_Ah * (abs(I) / unit.I_ref)^unit.alpha * 
-        (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) *
-        (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2) 
-    V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
-    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
-    K   = unit.K   * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
-    A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
-
-    V_0 - 
-    K * (unit.m * Q) / (unit.m * Q - (unit.capacity_cell_Ah - unit.current_charge + charge)) +
-    A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -
-    r_i * I
-end
-
-# calculate the voltage level, after charging with a constant current defined from charging 
-# power and voltage level before charging, positive energy = discharging, negative energy = charging
-# changing voltage levels during charging are ignored
-function calc_V_cell_cc_sum_aging(sum_charge::Number, I::Number, n, T, unit::Battery)
-    # functions describing the dependence of the parameters on cycles n and Temperature T
-    Q = unit.capacity_cell_Ah * (abs(I) / unit.I_ref)^unit.alpha * 
-        (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) *
-        (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2) 
-
-    V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
-    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
-    K   = unit.K   * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
-    A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
-
-    V_0 - 
-    K * (unit.m * Q) / (unit.m * Q - sum_charge) +
-    A * exp(-unit.B * sum_charge) -
-    r_i * I
-end
-
-# funciton to find the voltage level, after charging with a constant power with no aging 
-# processes considered; positive energy = discharging, negative energy = charging
-function V_cell_function_no_aging(V_cell::Number, energy::Number, unit::Battery, 
-                                    sim_params::Dict{String,Any})
-    unit.V_0 - 
-    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - 
-              (unit.capacity_cell_Ah - unit.current_charge + energy / V_cell))) +
-    unit.A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + energy / V_cell)) -
-    unit.r_i * energy / (sim_params["time_step_seconds"] / 3600) / V_cell -
-    V_cell
-end
-
-# funciton to find the voltage level, after charging with a constant power with aging 
+# function to find the voltage level, after charging with a constant power with aging 
 # processes considered; positive energy = discharging, negative energy = charging
 function V_cell_function(V_cell::Number, energy::Number, unit::Battery, 
                          sim_params::Dict{String,Any}, n::Number=1, T::Number=25)
-    charge = energy / V_cell
+    charge = 2*energy / (unit.V_cell_last + V_cell)
     current = charge / (sim_params["time_step_seconds"] / 3600)
     # functions describing the dependence of the parameters on cycles n and Temperature T
-    if current == 0
-        Q = unit.capacity_cell_Ah
+    if energy == 0
+        f_I = 1
     else        
-        Q = unit.capacity_cell_Ah * (abs(current) / unit.I_ref)^unit.alpha * 
-            (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) *
-            (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2) 
+        f_I = (abs(current) / unit.I_ref)^unit.alpha
     end
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+    f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+    Q = unit.capacity_cell_Ah * f_I * f_n * f_T                                                 # wird kleiner mit größerer energy  
+
     V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
     r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
     K = unit.K * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
     A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
 
     V_0 - 
-    K * (unit.m * Q) / (unit.m * Q - (unit.capacity_cell_Ah - unit.current_charge + charge)) +
-    A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -
-    r_i * current -
+    K * (unit.m * Q) / (unit.m * Q - (unit.capacity_cell_Ah - unit.current_charge + charge)) +  # verhält sich seltsam (vorzeichen wechsel wenn charge zu groß)
+    A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -                 # irrelevant in den meisten Fällen
+    r_i * current -                                                                             # wird größer mit größerer energy
     V_cell
 end
+
+function denom(V_cell, energy, unit, sim_params, n::Number=1, T::Number=25)
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+    f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+    f_I = (abs(2*energy) / (unit.I_ref * (unit.V_cell_last + V_cell) * (sim_params["time_step_seconds"] / 3600)))^unit.alpha
+
+    unit.m * unit.capacity_cell_Ah * f_I * f_n * f_T  - 
+    (unit.capacity_cell_Ah - unit.current_charge + 2*energy / (unit.V_cell_last + V_cell))
+end
+
+function denom_derivative(V_cell, energy, unit, sim_params, n::Number=1, T::Number=25)
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+    f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+    df_I = unit.alpha * (abs(2*energy) / (unit.I_ref * (unit.V_cell_last + V_cell) * (sim_params["time_step_seconds"] / 3600)))^(unit.alpha - 1) * 
+           (2.0 / (unit.I_ref * (sim_params["time_step_seconds"] / 3600.0))) * 
+           sign(energy) * (unit.V_cell_last + V_cell)^(-unit.alpha)
+
+    unit.m * unit.capacity_cell_Ah * df_I * f_n * f_T  - 2 / (unit.V_cell_last + V_cell)
+end
+
+function V_cell_derivative(V_cell::Number, energy::Number, unit::Battery, 
+                           sim_params::Dict{String,Any}, n::Number=1, T::Number=25)
+    charge = 2*energy / (unit.V_cell_last+V_cell)
+    current = charge / (sim_params["time_step_seconds"] / 3600) 
+    if energy == 0
+        return -1
+    elseif V_cell < 0
+        return 0
+    else      
+        f_I = (abs(current) / unit.I_ref)^unit.alpha
+        df_I = -unit.alpha * (abs(current) / unit.I_ref)^unit.alpha * (unit.V_cell_last + V_cell)^(-unit.alpha - 1)
+    end
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+    f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+    Q = unit.capacity_cell_Ah * f_I * f_n * f_T
+    dQ = unit.capacity_cell_Ah * df_I * f_n * f_T
+
+    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
+    K = unit.K * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
+    A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
+
+    C = (unit.capacity_cell_Ah - unit.current_charge + charge)
+
+    K * unit.m * (dQ*C + Q*(2*energy) / (unit.V_cell_last+V_cell)^2) / (unit.m*Q - C)^2 +
+    A * (2*energy*unit.B) / (unit.V_cell_last+V_cell)^2 * exp(-unit.B * C) +
+    r_i * (2*energy) / ((unit.V_cell_last+V_cell)^2 * (sim_params["time_step_seconds"] / 3600)) -
+    1
+end
+
+function energy_cell_derivative(V_cell::Number, energy::Number, unit::Battery, 
+                           sim_params::Dict{String,Any}, n::Number=1, T::Number=25)
+    charge = 2*energy / (unit.V_cell_last+V_cell)
+    current = charge / (sim_params["time_step_seconds"] / 3600) 
+    if energy == 0
+        f_I = 1
+        df_I = 1
+    else      
+        f_I = (abs(current) / unit.I_ref)^unit.alpha
+        df_I = unit.alpha * (abs(current) / unit.I_ref)^(unit.alpha - 1) * 
+               (2.0 / (unit.I_ref * (sim_params["time_step_seconds"] / 3600.0))) * 
+               sign(energy) * (unit.V_cell_last + V_cell)^(-unit.alpha)
+    end
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+    f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+    Q = unit.capacity_cell_Ah * f_I * f_n * f_T
+    dQ = unit.capacity_cell_Ah * df_I * f_n * f_T
+
+    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
+    K = unit.K * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
+    A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
+
+    C = (unit.capacity_cell_Ah - unit.current_charge + charge)
+
+    K * unit.m * (dQ*C - Q * 2/(unit.V_cell_last+V_cell)) / (unit.m*Q - C)^2 -
+    A * (2*unit.B) / (unit.V_cell_last+V_cell) * exp(-unit.B * C) -
+    r_i * 2/((unit.V_cell_last+V_cell) * (sim_params["time_step_seconds"] / 3600))
+end
+
+
+function dV_cell_function_denergy(V_cell::Number, energy::Number, unit::Battery,
+                                  sim_params::Dict{String,Any}, n::Number=1, T::Number=25)
+
+    # charge and its derivative w.r.t. energy
+    # charge = 2*energy / D
+    dcharge_dE = 2 / (unit.V_cell_last + V_cell)
+
+    # Q multiplicative pieces that are independent of energy (f_n, f_T)
+    f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2)
+    f_T = (1 + unit.k_qT[1]*(T - unit.T_ref) + unit.k_qT[2]*(T - unit.T_ref)^2)
+
+    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T - unit.T_ref))
+    K   = unit.K   * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T - unit.T_ref))
+    A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T - unit.T_ref))
+    B   = unit.B
+    m   = unit.m
+
+    # S used in K and A terms
+    C = unit.capacity_cell_Ah - unit.current_charge + 2 * energy / (unit.V_cell_last + V_cell)
+
+    # handle the special branch used in your code: if energy == 0 -> f_I = 1
+    if energy == 0
+        # f_I is constant 1 in the code branch -> df_I/dE = 0
+        df_I = 0.0
+        f_I = 1.0
+    else
+        f_I = abs(2 * energy / (unit.I_ref * (sim_params["time_step_seconds"] / 3600.0)))^unit.alpha * (unit.V_cell_last + V_cell)^(-unit.alpha)
+        df_I = unit.alpha * abs(2 * energy / (unit.I_ref * (sim_params["time_step_seconds"] / 3600.0)))^(unit.alpha - 1) * (2.0 / (unit.I_ref * (sim_params["time_step_seconds"] / 3600.0))) * sign(energy) * (unit.V_cell_last + V_cell)^(-unit.alpha)
+    end
+
+    # Q and its derivative w.r.t energy
+    Q = unit.capacity_cell_Ah * f_I * f_n * f_T
+    dQ = unit.capacity_cell_Ah * df_I * f_n * f_T 
+
+    dT_K_dE = K * m * ( -C * dQ + Q * 2 / (unit.V_cell_last + V_cell) ) / ((m*Q - C)^2)
+
+    dT_A_dE = - A * B * exp(-B * C) * 2 / (unit.V_cell_last + V_cell)
+
+    dT_r_dE = r_i * 2.0 / ((unit.V_cell_last + V_cell) * (sim_params["time_step_seconds"] / 3600.0))
+
+    # The original function: V_0 - T_K + T_A - T_r - V_cell
+    # Derivative w.r.t. energy = 0 - dT_K/dE + dT_A/dE - dT_r/dE - 0
+    derivative = - dT_K_dE + dT_A_dE - dT_r_dE
+
+    - K * m * ( -C * dQ + Q * 2 / (unit.V_cell_last + V_cell) ) / ((m*Q - C)^2) - 
+    A * B * exp(-B * (m*Q - C)) * 2 / (unit.V_cell_last + V_cell) -
+    r_i * 2.0 / ((unit.V_cell_last + V_cell) * (sim_params["time_step_seconds"] / 3600.0))
+    return derivative
+end
+
 
 function process(unit::Battery, sim_params::Dict{String,Any})
     if unit.max_discharge_energy >= sim_params["epsilon"]
@@ -370,15 +498,27 @@ function process(unit::Battery, sim_params::Dict{String,Any})
             set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
             unit.discharge_efficiency = NaN
         else
-            discharge_energy_bat = min(unit.load, abs(energy_demand) / unit.discharge_efficiency)
-            if discharge_energy_bat != unit.max_discharge_energy / unit.discharge_efficiency
-                unit.discharge_efficiency, unit.V_cell, _ = calc_efficiency(discharge_energy_bat, unit, sim_params)
-            else
-                unit.V_cell = unit.V_cell_discharge
+            #TODO discharge_energy_bat is wrong after recalcuting discharge_efficiency leads to load < 0
+            # discharge_energy_bat = min((unit.SOC - unit.SOC_min)/100 * unit.capacity, abs(energy_demand) / unit.discharge_efficiency)
+            # if discharge_energy_bat != unit.max_discharge_energy / unit.discharge_efficiency
+            #     unit.discharge_efficiency, unit.V_cell, discharge_energy_bat_temp = calc_efficiency(discharge_energy_bat, unit, sim_params)
+            if sim_params["time"] >= 118800
+                @infiltrate
             end
-
+            if abs(energy_demand) != unit.max_discharge_energy
+                unit.discharge_efficiency, unit.V_cell, discharge_energy_bat = calc_efficiency(abs(energy_demand), unit, sim_params)
+            else
+                discharge_energy_bat = abs(energy_demand)
+                unit.V_cell = unit.V_cell_discharge
+            end       
             unit.losses += discharge_energy_bat * (1 - unit.discharge_efficiency)
-            unit.load -= discharge_energy_bat
+            if (unit.load + unit.losses - discharge_energy_bat) < 0
+                @infiltrate
+            end
+            if unit.V_cell == unit.V_cell_min
+                @infiltrate
+            end
+            unit.load = unit.load + unit.losses - discharge_energy_bat
             add!(outface, discharge_energy_bat * unit.discharge_efficiency)
         end
     else
@@ -397,12 +537,13 @@ function load(unit::Battery, sim_params::Dict{String,Any})
             set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
             unit.charge_efficiency = NaN
         else
-            charge_energy_bat = min(unit.capacity - unit.load, energy_available * unit.charge_efficiency)
+            charge_energy_bat = min((unit.SOC_max - unit.SOC)/100  * unit.capacity, energy_available * unit.charge_efficiency)
             if charge_energy_bat != unit.max_charge_energy * unit.charge_efficiency || unit.V_cell != unit.V_cell_last
                 unit.charge_efficiency, unit.V_cell, _ = calc_efficiency(-charge_energy_bat, unit, sim_params)
             else
                 unit.V_cell = unit.V_cell_charge
             end
+
             unit.losses += charge_energy_bat  * (1.0 / unit.charge_efficiency - 1)
             unit.load += charge_energy_bat
             sub!(inface, charge_energy_bat / unit.charge_efficiency)
@@ -424,12 +565,17 @@ function handle_component_update!(unit::Battery, step::String)
         if unit.load_end_of_last_timestep == unit.load && unit.load > 0
             # unit.r_sd = unit.V_cell / (unit.self_discharge_rate / 720 * unit.capacity)
             unit.losses += unit.capacity * unit.self_discharge_rate # TODO do i need to recalculate the Voltage?
-            unit.load -= unit.losses
         end
+        unit.load -= unit.losses
         if unit.model_type != "simplified"
-            SOC = ((unit.load / unit.V_n / unit.n_cell_p) / unit.capacity_cell_Ah) * 100 # TODO q_0 = current charge; Q_full = full charge
-            unit.current_charge = 1-unit.self_discharge_rate
-            unit.current_charge = unit.capacity_cell_Ah * SOC / 100
+            # unit.SOC = ((unit.load / unit.V_n / unit.n_cell_p) / unit.capacity_cell_Ah) * 100 # TODO q_0 = current charge; Q_full = full charge
+            # unit.current_charge = unit.capacity_cell_Ah * unit.SOC / 100
+            # charge = (unit.load_end_of_last_timestep - unit.load) / unit.n_cell_p / ((unit.V_cell_last + unit.V_cell) / 2)
+            unit.SOC = unit.load / unit.capacity * 100
+            unit.current_charge = unit.capacity_cell_Ah * unit.SOC / 100
+            if unit.current_charge < 0 || unit.current_charge > unit.capacity_cell_Ah
+                @infiltrate
+            end
             unit.V_cell_last = copy(unit.V_cell)
         end
         unit.load_end_of_last_timestep = copy(unit.load)
@@ -577,6 +723,79 @@ function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_fu
     return V_0, K, A, B, r_i, m, alpha, k_qn, k_qT, k_n, k_T, I_ref, T_ref
 end
 
+
+# calculate the voltage level, after charging with a constant current defined from charging 
+# power and voltage level before charging, positive energy = discharging, negative energy = charging
+# changing voltage levels during charging are ignored
+function calc_V_cell_cc(charge::Number, I::Number, unit::Battery)
+    unit.V_0 - 
+    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - 
+              (unit.capacity_cell_Ah - unit.current_charge + charge))) +
+    unit.A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -
+    unit.r_i * I
+end
+
+# calculate the voltage level, after charging with a constant current defined from charging 
+# power and voltage level before charging, positive energy = discharging, negative energy = charging
+# changing voltage levels during charging are ignored
+function calc_V_cell_cc_sum(sum_charge::Number, I::Number, unit::Battery)
+    unit.V_0 - 
+    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - sum_charge)) +
+    unit.A * exp(-unit.B * sum_charge) -
+    unit.r_i * I
+end
+
+# calculate the voltage level, after charging with a constant current defined from charging 
+# power and voltage level before charging, positive energy = discharging, negative energy = charging
+# changing voltage levels during charging are ignored
+function calc_V_cell_cc_aging(charge::Number, I::Number, n ,T, unit::Battery)
+    # functions describing the dependence of the parameters on cycles n and Temperature T
+    Q = unit.capacity_cell_Ah * (abs(I) / unit.I_ref)^unit.alpha * 
+        (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) *
+        (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2) 
+    V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
+    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
+    K   = unit.K   * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
+    A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
+
+    V_0 - 
+    K * (unit.m * Q) / (unit.m * Q - (unit.capacity_cell_Ah - unit.current_charge + charge)) +
+    A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + charge)) -
+    r_i * I
+end
+
+# calculate the voltage level, after charging with a constant current defined from charging 
+# power and voltage level before charging, positive energy = discharging, negative energy = charging
+# changing voltage levels during charging are ignored
+function calc_V_cell_cc_sum_aging(sum_charge::Number, I::Number, n, T, unit::Battery)
+    # functions describing the dependence of the parameters on cycles n and Temperature T
+    Q = unit.capacity_cell_Ah * (abs(I) / unit.I_ref)^unit.alpha * 
+        (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) *
+        (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2) 
+
+    V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
+    r_i = unit.r_i * (1 + unit.k_n[2]*(n-1)) * (1 + unit.k_T[2]*(T-unit.T_ref))
+    K   = unit.K   * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
+    A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
+
+    V_0 - 
+    K * (unit.m * Q) / (unit.m * Q - sum_charge) +
+    A * exp(-unit.B * sum_charge) -
+    r_i * I
+end
+
+# funciton to find the voltage level, after charging with a constant power with no aging 
+# processes considered; positive energy = discharging, negative energy = charging
+function V_cell_function_no_aging(V_cell::Number, energy::Number, unit::Battery, 
+                                    sim_params::Dict{String,Any})
+    unit.V_0 - 
+    unit.K * (unit.capacity_cell_Ah_cutoff / (unit.capacity_cell_Ah_cutoff - 
+              (unit.capacity_cell_Ah - unit.current_charge + energy / V_cell))) +
+    unit.A * exp(-unit.B * (unit.capacity_cell_Ah - unit.current_charge + energy / V_cell)) -
+    unit.r_i * energy / (sim_params["time_step_seconds"] / 3600) / V_cell -
+    V_cell
+end
+
 function output_values(unit::Battery)::Vector{String}
     return [string(unit.medium) * " IN",
             string(unit.medium) * " OUT",
@@ -610,7 +829,7 @@ function output_value(unit::Battery, key::OutputKey)::Float64
     elseif key.value_key == "CellVoltage"
         return unit.V_cell
     elseif key.value_key == "SOC"
-        return ((unit.load / unit.V_n / unit.n_cell_p) / unit.capacity_cell_Ah) * 100
+        return unit.SOC
     end
     throw(KeyError(key.value_key))
 end
