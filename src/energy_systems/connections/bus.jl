@@ -530,14 +530,29 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
 
     # determine if the calling component is an input or output to the bus, can be only one of both
     caller_is_input = false
+    caller_uac = nothing
     for input_interface in unit.input_interfaces
         if input_interface.source.uac == interface.source.uac
             caller_is_input = true
+            if input_interface.source.sys_function === sf_transformer
+                # if the input is a transformer, set the uac to let the inner_distribute know that 
+                # a transformer is calling
+                caller_uac = interface.source.uac
+            end
             break
         end
     end
-
-    inner_distribute!(unit)
+    # if the caller is no inputs, its a output. Set caller_uac, if its a transformer. 
+    if !caller_is_input
+        for (idx, output_interface) in pairs(unit.output_interfaces)
+            if output_interface.target.sys_function === sf_transformer &&
+               output_interface.target.uac == interface.target.uac
+                caller_uac = interface.target.uac
+                break
+            end
+        end
+    end
+    inner_distribute!(unit; caller_uac_transformer_only=caller_uac, caller_is_input=caller_is_input)
 
     return_exchanges = []
     if caller_is_input
@@ -778,15 +793,26 @@ end
 """
     inner_distribute!(bus)
 
-Perform energy distribution calculation on a bus.
+Perform energy distribution calculation on a bus. The energy from the inputs is distributed to the outputs while
+considering the custom or default order in the energy bus matrix as well as temperature constraints or given
+purpose_uac. The energy distributed from source to target is stored in the balance_table of the bus with the
+following structure:
+          output1:energy output1:temperature output2:energy output2:temperature   
+  input1  energy i1-o1   temperature i1-o1   energy i1-o2   temperature i1-o2
+  input2  energy i2-o1   temperature i2-o1   ...            ...
+  input3  ...            ..                  ...            ...
 
-This function should only be called within the balance_on function for a bus. It serves no
-other purpose.
+If this function is called from the balance_on of the bus, hand over "caller_uac_transformer_only" if the caller is
+a transformer and "caller_is_input". If called at the end of the time step to distribute all energies, ignore the 
+optional parameters.
 
 # Arguments
 `unit::Bus`: The bus for which to calculate energy distribution
+`caller_uac_transformer_only::Stringing`: If the calling component from balance_on is a transformer, this holds the UAC. 
+                                          Otherwise, this has to be nothing!
+`caller_is_input::Bool`: Indicates if the calling component from balance_on is a input or output component
 """
-function inner_distribute!(unit::Bus)
+function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=nothing, caller_is_input::Bool=false)
     reset_balance_table!(unit)
     output_priority_to_skip = length(unit.balance_table_outputs)
 
@@ -796,8 +822,11 @@ function inner_distribute!(unit::Bus)
         if energy_flow_is_denied(unit, input_row, output_row)
             continue
         elseif is_empty(input_row) || (unit.has_custom_order && is_empty(output_row))
+            # If a custom order is specified in the energy matrix, stop also if the output is empty
             break
         elseif is_empty(output_row) || output_row.priority > output_priority_to_skip
+            # If a default order is specified in the energy matrix, allow distribution in the upper-left triangle
+            # of the `balance_table` with known input and output information.
             output_priority_to_skip = min(output_priority_to_skip, output_row.priority)
             continue
         end
@@ -829,7 +858,19 @@ function inner_distribute!(unit::Bus)
             break
         end
 
-        energy_flow = min(target_energy, available_energy)
+        # If a transformer calls the balance_on and it already had a potential (otherwise the max energy would be
+        # empty and we would not reach this point), do not consider the maximum energies the transformer had written 
+        # in the potential step before! 
+        caller_is_transformer_source = caller_is_input && input_row.source.uac === caller_uac_transformer_only
+        caller_is_transformer_target = !caller_is_input && output_row.target.uac === caller_uac_transformer_only
+        if caller_is_transformer_source
+            energy_flow = target_energy
+        elseif caller_is_transformer_target
+            energy_flow = available_energy
+        else
+            energy_flow = min(target_energy, available_energy)
+        end
+
         unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
         # if both min and max temperature are given and differing (can currently only happen during HP bypass), 
         # the lowest temperature is set:
@@ -844,7 +885,7 @@ function inner_distribute!(unit::Bus)
             already_distributed_output_energies = Float64.(unit.balance_table[:, output_row.priority * 2 - 1])
             already_distributed_output_temperatures = unit.balance_table[:, output_row.priority * 2]
 
-            if !is_max_energy_nothing(input_row.energy_potential_temp)
+            if !caller_is_transformer_source && !is_max_energy_nothing(input_row.energy_potential_temp)
                 reduce_max_energy!(input_row.energy_potential_temp,
                                    already_distributed_input_energies,
                                    already_distributed_input_temperatures,
@@ -853,7 +894,7 @@ function inner_distribute!(unit::Bus)
                                    input_row.source.uac,
                                    unit.run_id)
             end
-            if !is_max_energy_nothing(input_row.energy_pool_temp)
+            if !caller_is_transformer_source && !is_max_energy_nothing(input_row.energy_pool_temp)
                 reduce_max_energy!(input_row.energy_pool_temp,
                                    already_distributed_input_energies,
                                    already_distributed_input_temperatures,
@@ -862,7 +903,7 @@ function inner_distribute!(unit::Bus)
                                    input_row.source.uac,
                                    unit.run_id)
             end
-            if !is_max_energy_nothing(output_row.energy_potential_temp)
+            if !caller_is_transformer_target && !is_max_energy_nothing(output_row.energy_potential_temp)
                 reduce_max_energy!(output_row.energy_potential_temp,
                                    already_distributed_output_energies,
                                    already_distributed_output_temperatures,
@@ -871,7 +912,7 @@ function inner_distribute!(unit::Bus)
                                    output_row.target.uac,
                                    unit.run_id)
             end
-            if !is_max_energy_nothing(output_row.energy_pool_temp)
+            if !caller_is_transformer_target && !is_max_energy_nothing(output_row.energy_pool_temp)
                 reduce_max_energy!(output_row.energy_pool_temp,
                                    already_distributed_output_energies,
                                    already_distributed_output_temperatures,
