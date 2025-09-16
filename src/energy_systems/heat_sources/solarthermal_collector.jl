@@ -104,7 +104,7 @@ mutable struct SolarthermalCollector <: Component
         if const_wind_speed === nothing
             const_wind_speed = 0
         else
-            const_wind_speed = max(const_wind_speed * default(config, "wind_speed_reduction", 0.5) - 3, 0)
+            const_wind_speed = max(const_wind_speed * default(config, "wind_speed_reduction", 1.0) - 3, 0)
         end
 
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -140,7 +140,7 @@ mutable struct SolarthermalCollector <: Component
                    long_wave_irradiance_profile,
                    wind_speed_profile,
                    # weather parameters
-                   default(config, "wind_speed_reduction", 0.5), # adjust the wind speed by this factor to account for different wind conditions compared to measured wind speed at 10m height
+                   default(config, "wind_speed_reduction", 1.0), # adjust the wind speed by this factor to account for different wind conditions compared to measured wind speed at 10m height
                    const_ambient_temperature, # ambient temperature [°C]
                    0.0, # beam_solar_irradiance in collector plane [W/m²]
                    0.0, # diffuse_solar_irradiance_in_plane [W/m²]

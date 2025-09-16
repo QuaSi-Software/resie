@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.4
+* Changed default value of parameter wind_speed_reduction of component SolarthermalCollector from 0.5 to 1.0
+
 ### Version 0.12.3
 * Add component `UTIR` as a unified implementation of electric transformers, inverters and rectifiers (UTIR).
 * Add scenario `electric_transformer` to showcase the new component
