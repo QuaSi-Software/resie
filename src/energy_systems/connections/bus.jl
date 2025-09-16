@@ -768,16 +768,8 @@ function iterate_balance_table(unit::Bus)
             for idx in 1:length(triples)
                 push!(rows, (unit.balance_table_inputs[row_uac[idx]], unit.balance_table_outputs[col_uac[idx]]))
             end
-            if length([inp for inp in unit.input_interfaces if inp.source.sys_function === sf_transformer]) > 1 ||
-               length([outp for outp in unit.output_interfaces if outp.target.sys_function === sf_transformer]) > 1
-                @warn "In bus $(unit.uac), a custom order in the energy flow matrix is used. The bus has more than " *
-                      "one transformer in its input or output what might lead to wrong results if the custom order " *
-                      "of the transformers is not the same as the order specified by the input/output order of the bus!"
-            else
-                @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that there is " *
-                      "no guarantee that this will produce the expected results, especially if several transformers " *
-                      "or a transformer chain are connected to the bus!"
-            end
+            @info "In bus $(unit.uac), a custom order in the energy flow matrix is used. Note that this feature " *
+                  "may not perform as expected for all energy systems."
         else
             # no valid input
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
