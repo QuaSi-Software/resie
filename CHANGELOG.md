@@ -4,6 +4,11 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.5
+* The energy flow matrix of a bus can now be used to specify a custom order of each input-output connection using consecutive numbers starting from `1` in the energy flow matrix (or `0` for denied connections). This only works for single busses that are not interconnected to other busses.
+* Now, transformers can increase the energy for inputs/outputs in their process step compared to the MaxEnergies calculated in their potential step (also in a second potential step).  For all other components, however,  the MaxEnergy set during control can never be exceeded. 
+* To input a custom `order_of_operation`, the UAC is now separated from the step by a `:` instead of an empty space to allow UACs to contain empty spaces
+
 ### Version 0.12.4
 * Changed default value of parameter wind_speed_reduction of component SolarthermalCollector from 0.5 to 1.0
 
