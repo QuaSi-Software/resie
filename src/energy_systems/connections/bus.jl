@@ -542,7 +542,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
             break
         end
     end
-    # if the caller is no inputs, its a output. Set caller_uac, if its a transformer. 
+    # if the caller is not an input, it must be an output. Set caller_uac, if it's a transformer.
     if !caller_is_input
         for (idx, output_interface) in pairs(unit.output_interfaces)
             if output_interface.target.sys_function === sf_transformer &&
@@ -565,12 +565,12 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 continue
             end
 
-            #   target is transformer that has not been calculated its potential or process...
+            # target is a transformer that has not calculated its potential or process...
             if output_row.target.sys_function === EnergySystems.sf_transformer &&
                (is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_potential)
                 &&
                 is_max_energy_nothing(unit.balance_table_outputs[output_row.target.uac].energy_pool)
-                # ...or has Inf written in its interface
+                # ... or has Inf written in its interface
                 || get_max_energy(output_row.energy_pool, input_row.source.uac) == Inf
                 || get_max_energy(output_row.energy_potential, input_row.source.uac) == Inf)
                 # end of condition
@@ -584,7 +584,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy)  # the caller has not performed a potential
+                if is_max_energy_nothing(interface.max_energy) # the caller has not calculated its potential
                     temperature_min = get_min_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
                                                           input_row.source.uac)
                     temperature_max = get_max_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
@@ -595,7 +595,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     else
                         energy_pot = 0.0
                     end
-                else  # the caller has performed a potential and has already written a max_energy itself
+                else # the caller has calculated its potential and has already written max_energy itself
                     energy_pot = -(unit.balance_table[input_row.priority, output_row.priority * 2 - 1])
                     temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
                     temperature_max = temperature_min
@@ -624,12 +624,12 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                 continue
             end
 
-            #   source is transformer that has not been calculated its potential or process...
+            # source is a transformer that has not calculated its potential or process...
             if input_row.source.sys_function === EnergySystems.sf_transformer &&
                (is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_potential)
                 &&
                 is_max_energy_nothing(unit.balance_table_inputs[input_row.source.uac].energy_pool)
-                # ...or has Inf written in its interface
+                # ... or has Inf written in its interface
                 || get_max_energy(input_row.energy_pool, output_row.target.uac) == Inf
                 || get_max_energy(input_row.energy_potential, output_row.target.uac) == Inf)
                 # end of condition
@@ -643,7 +643,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy) # no max energy is written, but maybe temperatures --> get infos from input_row
+                if is_max_energy_nothing(interface.max_energy)
+                    # no max_energy is written, but maybe temperatures --> get infos from input_row
                     temperature_min = get_min_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
                                                           output_row.target.uac)
                     temperature_max = get_max_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
@@ -654,7 +655,7 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     else
                         energy_pot = 0.0
                     end
-                else # max energy is written and was distributed by the bus --> get infos from balance_table
+                else # max_energy is written and was distributed by the bus --> get infos from balance_table
                     energy_pot = unit.balance_table[input_row.priority, output_row.priority * 2 - 1]
                     temperature_min = unit.balance_table[input_row.priority, output_row.priority * 2]
                     temperature_max = temperature_min
@@ -731,8 +732,7 @@ The order of the InputRows/OutputRows represent the order defined in the bus con
 
 # Returns
 `input_output_rows_iteration::Vector{Tuple{BTInputRow, BTOutputRow}}`: All iterations of input and output rows.
-`has_custom_order::Bool`: If true, indicated that a custom order has been input
-
+`has_custom_order::Bool`: If true, indicates that a custom order has been defined
 """
 function iterate_balance_table(unit::Bus)
     # check for proxy busses, but they are not created yet, so check for interconnected busses
@@ -755,7 +755,7 @@ function iterate_balance_table(unit::Bus)
         end
         has_custom_order = false
     elseif all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
-        #  connectivity matrix only filled with zeros and ones: return only allowed connections
+        # connectivity matrix only filled with zeros and ones: return only allowed connections
         for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
             for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
                 if unit.connectivity.energy_flow[input_row.priority][output_row.priority] == 1
@@ -813,7 +813,7 @@ optional parameters.
 `unit::Bus`: The bus for which to calculate energy distribution
 `caller_uac_transformer_only::Stringing`: If the calling component from balance_on is a transformer, this holds the UAC. 
                                           Otherwise, this has to be nothing!
-`caller_is_input::Bool`: Indicates if the calling component from balance_on is a input or output component
+`caller_is_input::Bool`: Indicates if the calling component from balance_on is an input or output component
 """
 function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=nothing, caller_is_input::Bool=false)
     reset_balance_table!(unit)
@@ -861,9 +861,10 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
             break
         end
 
-        # If a transformer calls the balance_on and it already had a potential (otherwise the max energy would be
-        # empty and we would not reach this point), do not consider the maximum energies the transformer had written 
-        # in the potential step before! 
+        # If a transformer calls balance_on and it already has calculated its potential
+        # (otherwise the max energy would be empty and we would not have reached this point),
+        # do not consider the maximum energies the transformer has written in the potential
+        # step before!
         caller_is_transformer_source = caller_is_input && input_row.source.uac === caller_uac_transformer_only
         caller_is_transformer_target = !caller_is_input && output_row.target.uac === caller_uac_transformer_only
         if caller_is_transformer_source
@@ -875,13 +876,13 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         end
 
         unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
-        # if both min and max temperature are given and differing (can currently only happen during HP bypass), 
-        # the lowest temperature is set:
+        # if both min and max temperature are given and differ (which currently only happens
+        # during heat pump bypass), the lowest temperature is set:
         unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
                                                                                  temperature_lowest_max)
 
         if energy_flow !== 0.0
-            # extract the already distributed energy from balance table
+            # extract the already distributed energy from the balance table
             already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority, 1:2:end])
             already_distributed_input_temperatures = unit.balance_table[input_row.priority, 2:2:end]
 
@@ -937,7 +938,6 @@ This is typically called within inner_distribute! or when resetting a bus.
 
 # Arguments
 `unit::Bus`: The bus containing the balance table
-
 """
 function reset_balance_table!(unit::Bus)
     unit.balance_table = fill(0.0, (length(unit.balance_table_inputs), 2 * length(unit.balance_table_outputs)))

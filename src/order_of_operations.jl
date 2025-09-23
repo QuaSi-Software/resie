@@ -36,9 +36,9 @@ function load_order_of_operations(order_of_operation_input, components::Grouping
     all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
 
     for entry in order_of_operation_input
-        spitted = split(entry, ":")
-        uac = string(spitted[1])
-        s_step = string(spitted[2])
+        splitted = split(entry, ":")
+        uac = string(splitted[1])
+        s_step = string(splitted[2])
 
         if s_step == "s_reset"
             s_step_component = EnergySystems.s_reset
