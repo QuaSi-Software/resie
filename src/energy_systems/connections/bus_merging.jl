@@ -229,7 +229,6 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
         push!(bus.connectivity.input_order, input.uac)
         bus.balance_table_inputs[input.uac] = BTInputRow(; source=components[input.uac],
                                                          priority=idx,
-                                                         input_index=idx,
                                                          do_storage_transfer=input.do_storage_transfer)
     end
 
@@ -242,7 +241,6 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
         push!(bus.connectivity.output_order, output.uac)
         bus.balance_table_outputs[output.uac] = BTOutputRow(; target=components[output.uac],
                                                             priority=idx,
-                                                            output_index=idx,
                                                             do_storage_transfer=output.do_storage_transfer)
     end
 
@@ -259,6 +257,9 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
 
     # reset rebuilds the balance table
     reset(bus)
+
+    # build iteration array for input/output rows
+    bus.input_output_rows_iteration, bus.has_custom_order = iterate_balance_table(bus)
 
     return bus
 end

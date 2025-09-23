@@ -126,12 +126,12 @@ function test_fully_specified()
     bus.connectivity.output_order[1] == "TST_DEM_01"
     bus.connectivity.output_order[2] == "TST_BAT_01"
     @test length(bus.connectivity.energy_flow) == 3
-    @test bus.connectivity.energy_flow[1][1]
-    @test bus.connectivity.energy_flow[1][2]
-    @test bus.connectivity.energy_flow[2][1]
-    @test !bus.connectivity.energy_flow[2][2]
-    @test bus.connectivity.energy_flow[3][1]
-    @test !bus.connectivity.energy_flow[3][2]
+    @test bus.connectivity.energy_flow[1][1] != 0
+    @test bus.connectivity.energy_flow[1][2] != 0
+    @test bus.connectivity.energy_flow[2][1] != 0
+    @test bus.connectivity.energy_flow[2][2] == 0
+    @test bus.connectivity.energy_flow[3][1] != 0
+    @test bus.connectivity.energy_flow[3][2] == 0
 end
 
 @testset "fully_specified" begin
