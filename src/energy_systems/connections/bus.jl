@@ -746,15 +746,26 @@ function iterate_balance_table(unit::Bus)
     end
 
     rows = Vector{Tuple{BTInputRow,BTOutputRow}}()
-    if unit.connectivity.energy_flow === nothing || all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
-        # no connectivity matrix given or only filled with zeros and ones
+    if unit.connectivity.energy_flow === nothing
+        # no connectivity matrix given: return all connections
         for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
             for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
                 push!(rows, (input_row, output_row))
             end
         end
         has_custom_order = false
+    elseif all(in(0:1), Iterators.flatten(unit.connectivity.energy_flow))
+        #  connectivity matrix only filled with zeros and ones: return only allowed connections
+        for input_row in sort(collect(values(unit.balance_table_inputs)); by=x -> x.priority)
+            for output_row in sort(collect(values(unit.balance_table_outputs)); by=x -> x.priority)
+                if unit.connectivity.energy_flow[input_row.priority][output_row.priority] == 1
+                    push!(rows, (input_row, output_row))
+                end
+            end
+        end
+        has_custom_order = false
     else
+        # custom order in connectivity matrix given: return allowed connections by user-defined order
         # collect (value, row, col) for all non-zeros
         triples = [(v, i, j) for (i, row) in enumerate(unit.connectivity.energy_flow)
                    for (j, v) in enumerate(row) if v != 0]
