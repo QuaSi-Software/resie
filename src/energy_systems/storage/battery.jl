@@ -1,3 +1,5 @@
+using Statistics
+
 """
 Implementation of a battery component holding electric charge.
 
@@ -57,12 +59,18 @@ Base.@kwdef mutable struct Battery <: Component
     V_cell_discharge::Float64
     r_sd::Float64
     n_cell_p::Float64
+    n_cell_s::Float64
     charge_sum::Float64
+    charge_sum_last::Float64
     capacity_cell_Ah_cutoff::Float64
     SOC::Float64
 
     process_done::Bool
     load_done::Bool
+
+    time_array_1::Any
+    time_array_2::Any
+    time_array_3::Any
 
     function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         medium = Symbol(default(config, "medium", "m_e_ac_230v"))
@@ -151,11 +159,16 @@ Base.@kwdef mutable struct Battery <: Component
                    0.0, # battery volatge after discharging
                    0.0, # self-discharge resistance used to calculate the self discharge in Ohm
                    0.0, # number of cells connected in parallel 
+                   0.0, # number of cells connected in series
                    0.0, # sum of all added and removed charge to the cell in Ah
+                   0.0, # sum of all added and removed charge to the cell in the last timestep in Ah
                    0.0, # capacity adjusted with respect to cutoff voltage
                    0.0, # SOC in the current time step
                    false, # process_done, bool indicating if the process step has already been performed in the current time step
-                   false) # load_done, bool indicating if the load step has already been performed in the current time step
+                   false, # load_done, bool indicating if the load step has already been performed in the current time step
+                   [],
+                   [],
+                   []) 
     end
 end
 
@@ -170,17 +183,17 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
 
     if unit.model_type != "simplified"
         # adjust the cell capacity to fit the calculated cutoff voltage of the voltage function
-        C = (-unit.V_cell_min + unit.V_0 - unit.r_i * unit.capacity_cell_Ah * 1/10 + 
-                unit.A * (exp(-unit.B*unit.capacity_cell_Ah))) / unit.K
-        x = unit.capacity_cell_Ah / (C - 1)
-        unit.capacity_cell_Ah_cutoff = unit.capacity_cell_Ah + x
+        # C = (-unit.V_cell_min + unit.V_0 - unit.r_i * unit.capacity_cell_Ah * 1/10 + 
+        #         unit.A * (exp(-unit.B*unit.capacity_cell_Ah))) / unit.K
+        # x = unit.capacity_cell_Ah / (C - 1)
+        # unit.capacity_cell_Ah_cutoff = unit.capacity_cell_Ah + x
 
-        n_cell_s = unit.V_n_bat / unit.V_n
+        unit.n_cell_s = unit.V_n_bat / unit.V_n
         unit.n_cell_p = (unit.capacity / unit.V_n) / unit.capacity_cell_Ah
 
         # calculate minimum and maximum cell voltages for SOC_max and SOC_min
         unit.V_cell_last = unit.V_n
-        @infiltrate
+        
         unit.charge_sum = unit.capacity_cell_Ah * (1 - unit.SOC_min/100)
         unit.V_cell_min = find_zero(V_cell -> V_cell_function(V_cell, 0, unit, sim_params),
                                     unit.V_n,
@@ -215,12 +228,6 @@ function control(unit::Battery,
     update(unit.controller)
 
     if discharge_is_allowed(unit.controller, sim_params) && unit.SOC > unit.SOC_min && unit.V_cell > unit.V_cell_min
-        # discharge_energy_bat = min(sim_params["watt_to_wh"](unit.max_discharge_power), 
-        #                            (unit.SOC - unit.SOC_min)/100 * unit.capacity)
-        # unit.discharge_efficiency, 
-        # unit.V_cell_discharge, 
-        # discharge_energy_bat = calc_efficiency(discharge_energy_bat, unit, sim_params)
-        # unit.max_discharge_energy = discharge_energy_bat # TODO * unit.discharge_efficiency???
         unit.discharge_efficiency, 
         unit.V_cell_discharge, 
         unit.max_discharge_energy = calc_efficiency(sim_params["watt_to_wh"](unit.max_discharge_power), unit, sim_params)
@@ -230,14 +237,11 @@ function control(unit::Battery,
     end
     set_max_energy!(unit.output_interfaces[unit.medium], unit.max_discharge_energy)
 
-    if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.start_charge_SOC
-        # end of condition
-        charge_energy_bat = min(sim_params["watt_to_wh"](unit.max_charge_power), 
-                                (unit.SOC_max - unit.SOC)/100 * unit.capacity)
+    if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.SOC_max
         unit.charge_efficiency, 
         unit.V_cell_charge, 
-        charge_energy_bat = calc_efficiency(-charge_energy_bat, unit, sim_params)
-        unit.max_charge_energy = charge_energy_bat # TODO / unit.charge_efficiency???
+        charge_energy_bat = calc_efficiency(sim_params["watt_to_wh"](-unit.max_charge_power), unit, sim_params)
+        unit.max_charge_energy = charge_energy_bat
     else
         unit.max_charge_energy = 0.0
         unit.charge_efficiency = NaN
@@ -253,67 +257,27 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
             return unit.charge_efficiency, 0, energy
         end
     else
-        # TODO calculate derivate for speed boost
-        # calculate V_cell for constant power charging 
-        if unit.load - energy < 0.01 * unit.capacity # calculation gets problematic close to being empty
-            V_cell = unit.V_cell_min + unit.V_n * ((unit.load - energy) / unit.capacity) 
-        else
-            # V_cell = find_zero(V_cell -> V_cell_function(V_cell, energy/unit.n_cell_p, 
-            #                                                  unit, sim_params),
-            #                    unit.V_n,
-            #                    Order0())
-            try V_cell = find_zero((V_cell -> V_cell_function(V_cell, energy/unit.n_cell_p, 
-                                                             unit, sim_params),
-                                V_cell -> V_cell_derivative(V_cell, energy/unit.n_cell_p, 
-                                                            unit, sim_params)),
-                               unit.V_n,
-                               Roots.Newton())     
-            catch
-                if energy < 0
-                    V_cell = unit.V_cell_min - 0.01
-                elseif energy > 0
-                    V_cell = unit.V_cell_max + 0.01
-                else
-                    @infiltrate
-                end
-            end 
-        end
+        cell_energy = energy / unit.n_cell_p
+        # calculate V_cell
+        if sign(V_cell_function(unit.V_cell_min, cell_energy, unit, sim_params)) != sign(V_cell_function(unit.V_cell_max, cell_energy, unit, sim_params))
+            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, unit, sim_params),
+                               (unit.V_cell_min, unit.V_cell_max),
+                               Roots.Brent())
+            max_energy_cell = cell_energy
 
-        if V_cell < unit.V_cell_min && energy > 0
-            # max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_min, 
-            #                                                            energy_cell, 
-            #                                                            unit, sim_params),
-            #                             1,
-            #                             Order0()) 
-            # max_energy_cell = find_zero((energy_cell -> V_cell_function(unit.V_cell_min, 
-            #                                                             energy_cell, 
-            #                                                             unit, sim_params),
-            #                              energy_cell -> energy_cell_derivative(unit.V_cell_min,
-            #                                                               energy_cell, 
-            #                                                               unit, 
-            #                                                               sim_params)),
-            #                             1,
-            #                             Roots.Newton())  
-            as = find_zero((energy_cell -> denom(unit.V_cell_min, energy_cell, unit, 
-                                                 sim_params), 
-                            energy_cell -> denom_derivative(unit.V_cell_min, energy_cell, 
-                                                            unit, sim_params)), 
-                           unit.capacity_cell_Ah, 
-                           Roots.Newton())
+        elseif energy > 0
+            as = find_zero(energy_cell -> denom(unit.V_cell_min, energy_cell, unit, sim_params), 
+                           unit.capacity_cell_Ah * unit.V_n / 2, 
+                           Roots.Order1())
             max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_min, 
                                                                        energy_cell, 
                                                                        unit, sim_params), 
-                                        (0,as*0.999), 
-                                        Roots.A42())
-            @infiltrate
+                                        (0.001,as*0.999), 
+                                        Roots.Brent())
             V_cell = unit.V_cell_min
-        elseif V_cell > unit.V_cell_max && energy < 0
-            # try max_energy_cell = find_zero(energy_cell -> V_cell_function(unit.V_cell_max, 
-            #                                                            energy_cell, 
-            #                                                            unit, sim_params),
-            #                             -unit.capacity * (1 - unit.SOC/100) / unit.n_cell_p,
-            #                             Order0())  
-            try max_energy_cell = find_zero((energy_cell -> V_cell_function(unit.V_cell_max, 
+
+        elseif energy < 0
+            max_energy_cell = find_zero((energy_cell -> V_cell_function(unit.V_cell_max, 
                                                                         energy_cell, 
                                                                         unit, sim_params),
                                          energy_cell -> energy_cell_derivative(unit.V_cell_max,
@@ -322,20 +286,15 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                                                                           sim_params)),
                                         -unit.capacity * (1 - unit.SOC/100) / unit.n_cell_p,
                                         Roots.Newton()) 
-            catch
-                @infiltrate
-            end
             V_cell = unit.V_cell_max
-        else
-            max_energy_cell = energy / unit.n_cell_p
         end
 
         V_cell_avg = (unit.V_cell_last + V_cell) / 2
-        charge = max_energy_cell / V_cell_avg # TODO V_cell_avg leads to max overflow error
-        internal_losses = unit.r_i * charge
+        charge = max_energy_cell / V_cell_avg
+        internal_losses = unit.r_i * charge^2        
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p
-        efficiency = ifelse(max_energy_cell == 0, NaN, 1- (internal_losses / max_energy_cell))
-        if V_cell > unit.V_cell_max + 0.01 || max_energy_cell * unit.n_cell_p > unit.load
+        efficiency = ifelse(max_energy_cell == 0, NaN, 1- (internal_losses / abs(max_energy_cell)))
+        if V_cell > unit.V_cell_max + 0.01  || V_cell < unit.V_cell_min
             @infiltrate
         end
         return efficiency, V_cell, max_energy_bat
@@ -461,30 +420,35 @@ function process(unit::Battery, sim_params::Dict{String,Any})
             # discharge_energy_bat = min((unit.SOC - unit.SOC_min)/100 * unit.capacity, abs(energy_demand) / unit.discharge_efficiency)
             # if discharge_energy_bat != unit.max_discharge_energy / unit.discharge_efficiency
             #     unit.discharge_efficiency, unit.V_cell, discharge_energy_bat_temp = calc_efficiency(discharge_energy_bat, unit, sim_params)
-            if sim_params["time"] >= 118800
-                @infiltrate
-            end
-            if abs(energy_demand) != unit.max_discharge_energy
+
+            if abs(energy_demand) < unit.max_discharge_energy
                 unit.discharge_efficiency, unit.V_cell, discharge_energy_bat = calc_efficiency(abs(energy_demand), unit, sim_params)
             else
-                discharge_energy_bat = abs(energy_demand)
+                discharge_energy_bat = unit.max_discharge_energy
                 unit.V_cell = unit.V_cell_discharge
             end       
             unit.losses += discharge_energy_bat * (1 - unit.discharge_efficiency)
-            unit.charge_sum += discharge_energy_bat * 2 / (unit.V_cell_last + unit.V_cell)
-            if (unit.load + unit.losses - discharge_energy_bat) < 0
-                @infiltrate
-            end
-            if unit.V_cell == unit.V_cell_min
-                @infiltrate
-            end
-            unit.load = unit.load + unit.losses - discharge_energy_bat
-            add!(outface, discharge_energy_bat * unit.discharge_efficiency)
+            unit.charge_sum += discharge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
+
+            unit.load -= discharge_energy_bat
+            add!(outface, discharge_energy_bat)
         end
     else
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
     end
     handle_component_update!(unit, "process")
+
+    # if sim_params["time"] > 670*900
+    #     unit.time_array_1 = unit.time_array_1[2:end]
+    #     unit.time_array_2 = unit.time_array_2[2:end]
+    #     unit.time_array_3 = unit.time_array_3[2:end]
+    #     @info unit.time_array_1
+    #     @info unit.time_array_2
+    #     @info unit.time_array_3
+    #     @info "Mean:$(round(mean(unit.time_array_1), digits=3)) us; std: $(round(std(unit.time_array_1), digits=3)) us; max:$(round(maximum(unit.time_array_1), digits=3)) us"
+    #     @info "Mean:$(round(mean(unit.time_array_2), digits=3)) us; std: $(round(std(unit.time_array_2), digits=3)) us; max:$(round(maximum(unit.time_array_2), digits=3)) us"
+    #     @info "Mean:$(round(mean(unit.time_array_3), digits=3)) us; std: $(round(std(unit.time_array_3), digits=3)) us; max:$(round(maximum(unit.time_array_3), digits=3)) us"
+    # end
 end
 
 function load(unit::Battery, sim_params::Dict{String,Any})
@@ -497,17 +461,18 @@ function load(unit::Battery, sim_params::Dict{String,Any})
             set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
             unit.charge_efficiency = NaN
         else
-            charge_energy_bat = min((unit.SOC_max - unit.SOC)/100  * unit.capacity, energy_available * unit.charge_efficiency)
-            if charge_energy_bat != unit.max_charge_energy * unit.charge_efficiency || unit.V_cell != unit.V_cell_last
-                unit.charge_efficiency, unit.V_cell, _ = calc_efficiency(-charge_energy_bat, unit, sim_params)
+            if energy_available < unit.max_charge_energy
+                unit.charge_efficiency, unit.V_cell, charge_energy_bat = calc_efficiency(-energy_available, unit, sim_params)
             else
+                charge_energy_bat = unit.max_charge_energy
                 unit.V_cell = unit.V_cell_charge
-            end
+            end 
 
             unit.losses += charge_energy_bat  * (1.0 / unit.charge_efficiency - 1)
-            unit.charge_sum -= charge_energy_bat * 2 / (unit.V_cell_last + unit.V_cell)
+            unit.charge_sum -= charge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
+
             unit.load += charge_energy_bat
-            sub!(inface, charge_energy_bat / unit.charge_efficiency)
+            sub!(inface, charge_energy_bat)
         end
     else
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
@@ -523,22 +488,38 @@ function handle_component_update!(unit::Battery, step::String)
     end
     if unit.process_done && unit.load_done
         # update component
-        if unit.load_end_of_last_timestep == unit.load && unit.load > 0
-            unit.losses += unit.capacity * unit.self_discharge_rate # TODO do i need to recalculate the Voltage?
+        if unit.V_cell < unit.V_cell_min
+            @infiltrate
+        end
+        if unit.load_end_of_last_timestep == unit.load && unit.load > 0 && unit.SOC > unit.SOC_min
+            unit.losses += unit.capacity * unit.self_discharge_rate # TODO fix loss calculation with respect to SOC and charge
         end
         unit.load -= unit.losses
         if unit.model_type != "simplified"
-            if unit.charge_sum > unit.capacity_cell_Ah # TODO maybe change for capacity_cell_Ah_cutoff
-                unit.charge_sum = unit.capacity_cell_Ah
+            # calculated current cell capacity
+            n = 1
+            T = 25
+            current = (unit.charge_sum_last - unit.charge_sum) * 2 / (unit.V_cell_last + unit.V_cell)
+            if current == 0
+                f_I = 1
+            else
+                f_I = (abs(current) / unit.I_ref)^unit.alpha
             end
-            unit.SOC = (unit.capacity_cell_Ah - unit.charge_sum) / unit.capacity_cell_Ah * 100
+            f_n = (1 + unit.k_qn[1]*(n-1)*n / 2 + unit.k_qn[2]*(n-1)*n*(2*n-1) / 2) 
+            f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
+            Q = unit.capacity_cell_Ah * f_I * f_n * f_T
+
+            if unit.charge_sum > unit.m * Q
+                unit.charge_sum = unit.m * Q
+            elseif unit.charge_sum < 0
+                unit.charge_sum = 0
+            end
+            unit.SOC = ((unit.m * Q) - unit.charge_sum) / (unit.m * Q) * 100 
             unit.load = unit.capacity * unit.SOC / 100
-            if unit.charge_sum < 0 || unit.charge_sum > unit.capacity_cell_Ah
-                @infiltrate
-            end
             unit.V_cell_last = copy(unit.V_cell)
         end
         unit.load_end_of_last_timestep = copy(unit.load)
+        unit.charge_sum_last = copy(unit.charge_sum)
         # reset
         unit.process_done = false
         unit.load_done = false
@@ -766,7 +747,8 @@ function output_values(unit::Battery)::Vector{String}
             "charge_efficiency",
             "discharge_efficiency",
             "CellVoltage",
-            "SOC"]
+            "SOC",
+            "Charge"]
 end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
@@ -790,6 +772,8 @@ function output_value(unit::Battery, key::OutputKey)::Float64
         return unit.V_cell
     elseif key.value_key == "SOC"
         return unit.SOC
+    elseif key.value_key == "Charge"
+        return unit.charge_sum
     end
     throw(KeyError(key.value_key))
 end
