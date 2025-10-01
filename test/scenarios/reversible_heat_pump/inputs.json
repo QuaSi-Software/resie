@@ -5,9 +5,9 @@
         "auxiliary_info_file": "./test/scenarios/reversible_heat_pump/auxiliary_info.md",
         "sankey_plot_file": "./test/scenarios/reversible_heat_pump/sankey_plot.html",
         "sankey_plot": "default",
-        "csv_output_keys": {},
+        "csv_output_keys": "nothing",
         "output_plot_file": "./test/scenarios/reversible_heat_pump/output_plot.html",
-        "output_plot": "all"
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -120,8 +120,15 @@
             "output_refs": [
                 "TST_TH_BUS_01"
             ],
+            "control_modules": [
+                {
+                    "name": "forbid_src_to_snk",
+                    "src_uac": "TST_TH_GTP_01",
+                    "snk_uac": "TST_TH_GTP_01"
+                }
+            ],
             "m_heat_out": "m_h_w_ht1",
-            "power_th": 4500,
+            "power_th": 6300,
             "min_power_function": "const:0.0",
             "power_losses_factor": 1.0,
             "heat_losses_factor": 1.0

@@ -4,15 +4,63 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.12.5
+* The energy flow matrix of a bus can now be used to specify a custom order of each input-output connection using consecutive numbers starting from `1` in the energy flow matrix (or `0` for denied connections). This only works for single busses that are not interconnected to other busses.
+* Now, transformers can increase the energy for inputs/outputs in their process step compared to the MaxEnergies calculated in their potential step (also in a second potential step).  For all other components, however,  the MaxEnergy set during control can never be exceeded. 
+* To input a custom `order_of_operation`, the UAC is now separated from the step by a `:` instead of an empty space to allow UACs to contain empty spaces
+
+### Version 0.12.4
+* Changed default value of parameter wind_speed_reduction of component SolarthermalCollector from 0.5 to 1.0
+
+### Version 0.12.3
+* Add component `UTIR` as a unified implementation of electric transformers, inverters and rectifiers (UTIR).
+* Add scenario `electric_transformer` to showcase the new component
+
+### Version 0.12.2
+* add optional possibility to start the output of simulation results later using the simulation parameter `start_output` set to a DateTime after `start`
+* add optional parameter `force_profiles_to_repeat` in simulation parameter to force profiles to repeat, even if `repeat_profile` is not set in the profile header
+
+### Version 0.12.1
+* add the possibility to repeat profiles using the parameter "repeat_profile" in the profile header
+
+### Version 0.12.0
+* Add possibility to output energy and temperature flows between components that are connected via busses in plot and CSV output. Now the following inputs are available for `csv_output_keys` and `output_plot`
+  * `nothing`: no information will be plotted or written to CSV file
+  * `all_excl_flows`: outputs all available information without energy and temperature flows. Note that they are now sorted alphabetically!
+  *  `all_incl_flows`: outputs all available information including energy and temperature flows, as long as the connection via the energy matrix of the bus is allowed. Temperature is only output if energy is flowing. If no temperature is set for the flow, no output will be created. Note that the outputs are now sorted alphabetically, starting with the regular output followed by the flows.
+  *  custom output: see documentation for syntax. Note that now the order of the input represents the order of the output in plot and CSV.
+* Change the definition of `output_refs` for components with multiple outputs to achieve uniqueness in connections independent of the order of the input. Now, the `output_refs` can be defined as dict, the old method of input a list of targets is still valid, but a warn message is thrown for components with more than one output interface (currently CHPP, ELY). For components with only one output, the simple list is fully sufficient.
+* Change separator in input definition for specific IN or OUT output channels from " " to ":" to allow spaces in media names
+* All tests and scenarios were adjusted to be conform with this new syntax.
+
+### Version 0.11.4
+* Add callback `check_src_to_snk` for controlling the flow of energy between a specific source and a specific sink on transformers that implement a layered approach to energy flow calculation, e.g. heat pumps
+* Add control module `forbid_src_to_snk` to implement this callback by forbidding the energy flow between a defined source and sink
+* Refactor control module loading such that it is no longer necessary to hardcode the files and classes, which eases development of new control modules
+
 ### Version 0.11.3
-* Add solar thermal collector model
-* Add complex version seasonal thermal storage model (STES)
-* Add solar radiation model for sun position and beam and diffuse irradiances in a plane
-* Add new control module negotiate_temperature which defines temperature between two components with flexible temperatures. It has four options for temperature_mode:
-  * optimize: Run a optimization algorithm to find the temperature with the maximal available energy. Can significantly increase calculation time.
-  * mean: Take the mean between the lowest and highest possible temperature of both components.
-  * lower: Use the lowest possible temperature.
-  * upper: Use the highest possible temperature.
+* Add solar thermal collector model (STC)
+* Add detailed seasonal thermal storage model (STES)
+* Add solar radiation model for sun position and beam and diffuse irradiance in a plane. Also improves the interpolation method to better represent the needs of irradiation (energy conservation in every hour and consideration of sunset and sunrise)
+* Add new control module "negotiate_temperature" which defines temperature between two components with flexible temperatures. This also includes improvements in the control possibilities of the geothermal probe.
+* Add new control module "limit_cooling_input_temperature" for electrolysers with STES
+* Multiple bug fixes and improvements in the determination of the order of operation to cover more energy system configurations, especially circle-transformer (input and output to the same (Proxy)Bus) and busses with minimum part load ratio set; also differ between general bounded sources/sinks and grid input/output in the base order
+* Complete rework of temperature communication between components. This includes:
+  * Min and max temperatures are now part of the MaxEnergy struct (and no longer in the interfaces) and set during Control/Process and also using the add!() functions in Process. 
+  * Rework of the bus distribute and balance_on to better consider temperatures. Also update all functions dealing with MaxEnergy structs within the bus to consider these temperatures.
+  * Adaptation of the bypass of the heat pump which now limits the temperature during bypass to the actual demanded temperature
+  * Add another method to recalculate energies triggered by the bus ("recalculate_max_energy" in MaxEnergy) as second method in addition to "has_calculated_all_maxima"
+  * Adaptation of the order of Control-Steps in the OoO to allow STES and STC to gather information of temperatures during their control.
+  * Adjust Electrolyser to handle and communicate UACs of energies
+* Changed definition of Losses and Gains: Losses are now negative in output, Gains are positive in output. Note that in the components themselves Losses are still handled as positive and Gains as negative values!
+* Fix typos in multiple files
+* Adapted scenarios according to the changes made and added two new scenarios: "stc_2_demands" and "p2h_stes_stc"
+* Updated example multisector district to use new STES model
+* Add "epsilon" to input simulation parameter
+* Remove balance_on() functions of storages as they are now covered by the general implementation
+* Fix URL to Julia installation page
+*  Multiple bug fixes and improvements in Profiles and other parts of ReSiE
+*  Improve robustness of storages against the order of process and load steps
 
 ### Version 0.11.2
 * Improve error output for reading in profiles from files by including the line where the error occurred
@@ -62,7 +110,7 @@ As per the definition of semantic versioning and the reality of early developmen
 * correct input variable naming for ambient temperature in buffer tank and geothermal collector
 
 ### Version 0.10.4
-* Update of buffer tank / STES model. Now three different models are available, each with and without losses:
+* Update of buffer tank / STTES model. Now three different models are available, each with and without losses:
   * ideally stratified: Supplies energy consistently at "high_temperature". Losses reduce energy but do not affect temperature.
   * ideally mixed: Fully mixed model, with temperature output depending on the current load. Losses decrease both energy and temperature.
   * balanced: Combines both models. A full tank behaves as ideally stratified, transitioning to ideally mixed as the tank empties.

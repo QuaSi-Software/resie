@@ -10,15 +10,15 @@ Currently implemented for
 Source components need to have the following functions:
     - get_output_temperature_bounds()
     - check_temperature_and_get_max_energy()
-    - calculate_output_energy_from_output_temperature() (for optimize_for_max_energy only)
+    - calculate_output_energy_from_output_temperature() (for "optimize" only)
 
 Target components need to have the following functions:
     - get_input_temperature_bounds()
-    - calculate_input_energy_from_input_temperature() (for optimize_for_max_energy only)
+    - calculate_input_energy_from_input_temperature() (for "optimize" only)
 
 """
 
-import Optim
+using Optim: Optim
 
 mutable struct CM_Negotiate_Temperature <: ControlModule
     name::String
@@ -33,28 +33,32 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
             "source_uac" => source_uac,
             "target_uac" => nothing,
             "temperature_mode" => "mean",
-            "limit_max_output_energy_to_avoid_pulsing" => true,
+            "limit_max_output_energy_to_avoid_pulsing" => false,
+            "use_hysteresis" => false,
+            "hysteresis_temp_on" => nothing,
+            "hysteresis_temp_off" => nothing,
             "constant_output_temperature" => nothing,
             "optim_temperature_rel_tol" => 1e-5,   # Looser relative tolerance: 1e-3
             "optim_temperature_abs_tol" => 0.001,  # Looser absolute tolerance: 0.1
+            "running" => true,
         )
         params = Base.merge(default_parameters, parameters)
 
         # check if the temperature mode is allowed
         allowed_parameter_temperature_mode = ["constant_temperature",
-                                              "optimize_for_max_energy",
+                                              "optimize",
                                               "mean",
                                               "upper",
                                               "lower"]
         if !(params["temperature_mode"] in allowed_parameter_temperature_mode)
-            @error "The temperature mode of control module negotiate_temperature of component $(params["source_uac"]) " *
+            @error "The temperature mode of control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "has to be one of $(allowed_parameter_temperature_mode)."
             throw(InputError)
         end
 
         # for temperature mode constant_temperature, check if a constant_output_temperature is provided
         if params["temperature_mode"] == "constant_temperature" && params["constant_output_temperature"] === nothing
-            @error "The control module negotiate_temperature of component $(params["source_uac"]) " *
+            @error "The control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "is set to constant_temperature, but no `constant_output_temperature` is given!"
             throw(InputError)
         end
@@ -63,7 +67,7 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
         if !(params["target_uac"] !== nothing
              && params["target_uac"] in keys(components)
              && components[params["target_uac"]] isa TemperatureNegotiateTarget)
-            @error "The target of the control module negotiate_temperature of component $(params["source_uac"]) is " *
+            @error "The target of the control module `negotiate_temperature` of component $(params["source_uac"]) is " *
                    "not a valid component for this control module!"
             throw(InputError)
         end
@@ -72,12 +76,23 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
         if !(params["source_uac"] !== nothing
              && params["source_uac"] in keys(components)
              && components[params["source_uac"]] isa TemperatureNegotiateSource)
-            @error "The source of the control module negotiate_temperature of component $(params["source_uac"]) " *
+            @error "The source of the control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "is not a valid source for this control module"
             throw(InputError)
         end
 
+        if params["use_hysteresis"] &&
+           (params["hysteresis_temp_on"] === nothing || params["hysteresis_temp_off"] === nothing)
+            @error "In control module `negotiate_temperature` of component $(params["source_uac"]) the hysteresis " *
+                   "is activated but not all temperatures are given. Provide both `hysteresis_temp_on` and `hysteresis_temp_off`!"
+            throw(InputError)
+        end
+
         return new("negotiate_temperature", params)
+    end
+
+    function CM_Negotiate_Temperature()
+        return new("negotiate_temperature", Dict{String,Any}())
     end
 end
 
@@ -96,7 +111,7 @@ end
                                      target_uac::String,
                                      sim_params::Dict{String,Any})
 
-Depending on the control module, this function determines the temperauture and the maximum energy that can be extracted
+Depending on the control module, this function determines the temperature and the maximum energy that can be extracted
 from a given source. Several options are available:
 - Optimisation: Here, the temperature is optimized (within a given bound) to get the maximum possible energy between 
                 the source and the target component.
@@ -125,7 +140,8 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
     # get temperature bounds from source and target
     # would be the same as from exchange, but control might not performed yet
     target_min_in_temperature, target_max_in_temperature = get_input_temperature_bounds(components[target_uac])
-    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac], sim_params)
+    source_min_out_temperature, source_max_out_temperature = get_output_temperature_bounds(components[source_uac],
+                                                                                           sim_params)
 
     # get temperature bounds for connection from source_uac to target
     lower_temperature_bound = highest(source_min_out_temperature, target_min_in_temperature)
@@ -136,7 +152,23 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
         return nothing, 0.0
     end
 
+    # check for activated hysteresis
+    if mod.parameters["use_hysteresis"]
+        if mod.parameters["running"] == false && mod.parameters["hysteresis_temp_on"] <= source_max_out_temperature
+            # run
+            mod.parameters["running"] = true
+        elseif mod.parameters["running"] == true &&
+               mod.parameters["hysteresis_temp_off"] > source_max_out_temperature
+            # do not run
+            mod.parameters["running"] = false
+        end
+        if mod.parameters["running"] == false
+            return nothing, 0.0
+        end
+    end
+
     if mod.parameters["temperature_mode"] == "optimize"
+        # use optimization to determine the temperature for the maximum energy delivery from source to target
         return find_best_temperature_and_get_energy(mod,
                                                     calculate_output_energy_from_output_temperature,
                                                     calculate_input_energy_from_input_temperature,
@@ -146,11 +178,9 @@ function determine_temperature_and_energy(mod::CM_Negotiate_Temperature,
                                                     components[target_uac],
                                                     sim_params)
     else
-        # call the control module to calculate the temperature
+        # determine temperature by other methods
         if mod.parameters["temperature_mode"] == "constant_temperature"
             temperature_output = Float64(mod.parameters["constant_output_temperature"])
-            # elseif mod.parameters["temperature_mode"] == "STES_layer"
-            #     temperature_output = components[dynamic_reference[1]].temperature_segments[dynamic_reference[2]]
         elseif mod.parameters["temperature_mode"] == "mean"
             temperature_output = (lower_temperature_bound + upper_temperature_bound) / 2
         elseif mod.parameters["temperature_mode"] == "upper"
@@ -196,12 +226,12 @@ function find_best_temperature_and_get_energy(mod::CM_Negotiate_Temperature,
         temp_max_current = min(temps[last(active_indices)] + step_size, temp_max)
 
         result = Optim.optimize(temperature -> -f_min(temperature, unit_output, unit_input, sim_params),
-                          temp_min_current,
-                          temp_max_current,
-                          Optim.Brent();
-                          rel_tol=mod.parameters["optim_temperature_rel_tol"],
-                          abs_tol=mod.parameters["optim_temperature_abs_tol"],
-                          show_trace=false)
+                                temp_min_current,
+                                temp_max_current,
+                                Optim.Brent();
+                                rel_tol=mod.parameters["optim_temperature_rel_tol"],
+                                abs_tol=mod.parameters["optim_temperature_abs_tol"],
+                                show_trace=false)
         temperature_opt = Optim.minimizer(result)
         max_energy = f_min(temperature_opt, unit_output, unit_input, sim_params)
         return temperature_opt, max_energy

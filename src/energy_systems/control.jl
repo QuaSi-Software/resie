@@ -138,7 +138,8 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_reorder_inputs
     cmf_reorder_outputs
     cmf_negotiate_temperature
-    cfm_limit_cooling_input_temperature
+    cmf_limit_cooling_input_temperature
+    cmf_check_src_to_snk
 end
 
 """
@@ -155,6 +156,7 @@ mutable struct Controller
                                   "aggregation_plr_limit" => "max",
                                   "aggregation_charge" => "all",
                                   "aggregation_discharge" => "all",
+                                  "aggregation_check_src_to_snk" => "all",
                                   "consider_m_el_in" => true,
                                   "consider_m_el_out" => true,
                                   "consider_m_gas_in" => true,
@@ -443,7 +445,7 @@ function determine_temperature_and_energy(controller::Controller,
 end
 
 """
-Callback for cooling_input_temperature_exeeded
+Callback for cooling_input_temperature_exceeded
 
 
 # Arguments
@@ -452,23 +454,57 @@ Callback for cooling_input_temperature_exeeded
 - `target_uac::String`: The target unit uac.
 
 # Returns
-- `Bool`: A bool indicating if the input temperature is exeeded (true, meaning no energy flow is allowed) 
+- `Bool`: A bool indicating if the input temperature is exceeded (true, meaning no energy flow is allowed) 
           or not (false, energy flow is allowed)
 
 """
-function cooling_input_temperature_exeeded(controller::Controller,
-                                           target_uac::Stringing,
-                                           sim_params::Dict{String,Any})::Bool
+function cooling_input_temperature_exceeded(controller::Controller,
+                                            target_uac::Stringing,
+                                            sim_params::Dict{String,Any})::Bool
     for mod in controller.modules
-        if !has_method_for(mod, cfm_limit_cooling_input_temperature)
+        if !has_method_for(mod, cmf_limit_cooling_input_temperature)
             continue
         end
         if mod.parameters["target_uac"] !== target_uac
             continue
         end
         components = Dict{String,Component}(get_run(sim_params["run_ID"]).components)
-        return cooling_input_temperature_exeeded(mod, components, target_uac)
+        return cooling_input_temperature_exceeded(mod, components, target_uac)
     end
 
     return false
+end
+
+"""
+Callback for checking if a specific source is allowed to be used to supply a specific sink.
+
+If multiple modules exist that implement this callback, the results of all modules are
+aggregated as defined by the control parameter `aggregation_check_src_to_snk` with possible
+options being `all` (all modules have to return true) or `any` (at least one module has to
+return true).
+
+# Arguments
+- `controller::Controller`: The controller containing modules
+- `in_uac::Stringing`: The UAC of the source.
+- `out_uac::Stringing`: The UAC of the sink.
+# Returns
+- `Bool`: True, if the source is allowed to be used to supply the sink. False otherwise.
+"""
+function check_src_to_snk(controller::Controller,
+                          in_uac::Stringing,
+                          out_uac::Stringing)::Bool
+    flags = collect(check_src_to_snk(mod, in_uac, out_uac)
+                    for mod in controller.modules
+                    if has_method_for(mod, cmf_check_src_to_snk))
+    if length(flags) == 0
+        return true
+    end
+
+    if controller.parameters["aggregation_check_src_to_snk"] == "all"
+        return all(flags)
+    elseif controller.parameters["aggregation_check_src_to_snk"] == "any"
+        return any(flags)
+    end
+
+    return true
 end

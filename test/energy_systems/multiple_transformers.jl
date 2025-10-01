@@ -43,7 +43,10 @@ function get_energy_system_ely_and_hp()
         ),
         "TST_ELY_01" => Dict{String,Any}(
             "type" => "Electrolyser",
-            "output_refs" => ["TST_HP_01", "TST_DEM_H2_01", "TST_GRI_O2_01"],
+            "output_refs" => Dict{String,Any}(
+                "m_heat_ht_out" => "TST_HP_01",
+                "m_h2_out" => "TST_DEM_H2_01",
+                "m_o2_out" => "TST_GRI_O2_01"),
             "power_el" => 4000,
             "output_temperature_ht" => 55.0,
             "m_heat_ht_out" => "m_h_w_lt1",
@@ -161,10 +164,10 @@ function test_multiple_transformer_with_limitations()
     # the interface between electrolyser and heat pump can not be met. As a result, the state of the heat pump
     # should also be less that nominal state.
     # 12 test are failing at the moment. Reasons:
-    # - implemented stratey of electrolyse is not considering demand of H2
+    # - implemented strategy of electrolyser is not considering demand of H2
     # - calculation of state of one energy system is only done once. If the required demand are not satisfied, this has
     #   no effect on the actual state of this energy system!
-    #  --> electrolyser is running on 100% instead of 50% due to control stragety
+    #  --> electrolyser is running on 100% instead of 50% due to control strategy
     #  --> if that is fixed, the heat pump is running on 100% instead of 50% due to lack of information that electrolyser
     #      can only run 50% due to a limitation in hydrogen demand
 
@@ -173,7 +176,7 @@ function test_multiple_transformer_with_limitations()
     end
 
     demand_h2.constant_demand = 0.5 * 2400  # reducing h2 demand by half
-    demand_heat.constant_demand = 2240  # same heat demand as bevore
+    demand_heat.constant_demand = 2240  # same heat demand as before
     EnergySystems.control(demand_heat, components, simulation_parameters)
     EnergySystems.control(demand_h2, components, simulation_parameters)
     EnergySystems.control(heat_pump, components, simulation_parameters)

@@ -2,17 +2,46 @@
 # energy system components from the project config file, as well as constructing certain
 # helpful information data structures from the inputs in the config
 using JSON: JSON
+using OrderedCollections: OrderedDict
 
 """
     read_JSON(filepath)
 
 Read and parse the JSON-encoded Dict in the given file.
 """
-function read_JSON(filepath::String)::Dict{AbstractString,Any}
+function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
     open(filepath, "r") do file_handle
         content = read(file_handle, String)
-        return JSON.parse(content)
+        return JSON.parse(content; dicttype=OrderedDict)
     end
+end
+
+"""
+    load_control_module_class_mapping()
+
+Loads the control modules' classes index by their name as used in the input file.
+
+Returns:
+-`Dict{String, Any}`: The mapping from name (String) to the module class, which is probably
+    of type `Symbol`, however `getproperty` does not specify the return type. In any case
+    the entry can be used for calling the constructor as if it was a function.
+"""
+function load_control_module_class_mapping()::Dict{String,Any}
+    mapping = Dict{String,Any}()
+
+    for name in names(EnergySystems; all=true)
+        if startswith(String(name), "CM_")
+            symbol = Symbol(String(name))
+            unit_class = getproperty(EnergySystems, symbol)
+
+            if unit_class <: EnergySystems.ControlModule
+                dummy = unit_class()
+                mapping[dummy.name] = unit_class
+            end
+        end
+    end
+
+    return mapping
 end
 
 """
@@ -36,7 +65,14 @@ required for the particular component. The `type` parameter must be present and 
 the symbol of the component class exactly. The structure is described in more detail in the
 accompanying documentation on the project file.
 """
-function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})::Grouping
+function load_components(config_ordered::AbstractDict{String,Any}, sim_params::Dict{String,Any})::Grouping
+    # convert OrderedDict to normal Dict to have a normal dict in all components as they do not
+    # require any sorting
+    to_dict(x) = x
+    to_dict(x::OrderedDict) = Dict{String,Any}(k => to_dict(v) for (k, v) in x)
+    to_dict(x::AbstractVector) = map(to_dict, x)
+    config = to_dict(config_ordered)
+
     components = Grouping()
 
     # create instances
@@ -54,49 +90,50 @@ function load_components(config::Dict{String,Any}, sim_params::Dict{String,Any})
 
     # link inputs/outputs
     for (unit_key, entry) in pairs(config)
-        if (String(entry["type"]) != "Bus"
-            && haskey(entry, "output_refs")
-            && length(entry["output_refs"]) > 0)
-            # end of condition
-            others = Grouping(key => components[key] for key in entry["output_refs"])
-            link_output_with(components[unit_key], others)
-
-        elseif (String(entry["type"]) == "Bus"
-                && haskey(entry, "connections")
-                && length(entry["connections"]) > 0)
-            # end of condition
-            others = Grouping(key => components[key]
-                              for key in entry["connections"]["output_order"])
-            link_output_with(components[unit_key], others)
+        if String(entry["type"]) != "Bus" && haskey(entry, "output_refs") && length(entry["output_refs"]) > 0
+            if isa(entry["output_refs"], AbstractDict)
+                # components with multiple outputs should enter the output_refs as Dict to achieve uniqueness 
+                media_keys = collect(keys(entry["output_refs"]))
+                target_components = [Grouping(uac => components[uac])
+                                     for uac in [entry["output_refs"][key] for key in media_keys]]
+                media_sym = Symbol[]
+                for medium in media_keys
+                    if hasproperty(components[unit_key], Symbol(medium))
+                        push!(media_sym, getproperty(components[unit_key], Symbol(medium)))
+                    else
+                        @error "For component $unit_key, the key `$medium` in the `output_refs` could not be found!"
+                        throw(InputError)
+                    end
+                end
+                link_output_with(components[unit_key], target_components; given_media=media_sym)
+            else
+                if length(entry["output_refs"]) > 1
+                    @warn "The component $unit_key has more than one output interface, but the `output_refs` are not " *
+                          "specified explicitly! This can work, but it can also cause wrong interconnection between " *
+                          "components! Consider using a mapping of the media to the target components "
+                end
+                target_components = Grouping(uac => components[uac] for uac in entry["output_refs"])
+                link_output_with(components[unit_key], target_components)
+            end
+        elseif String(entry["type"]) == "Bus" && haskey(entry, "connections") && length(entry["connections"]) > 0
+            target_components = Grouping(uac => components[uac] for uac in entry["connections"]["output_order"])
+            link_output_with(components[unit_key], target_components)
         end
     end
 
     # add control modules to components
+    mapping = load_control_module_class_mapping()
     for (unit_key, entry) in pairs(config)
         unit = components[unit_key]
 
-        # TODO: rewrite this for automatic selection of modules so they don't need to be
-        # registered here, compare automatic selection of component class
         for module_config in default(entry, "control_modules", [])
-            if lowercase(module_config["name"]) === "economical_discharge"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_EconomicalDischarge(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "profile_limited"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_ProfileLimited(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "storage_driven"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_StorageDriven(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "temperature_sorting"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_Temperature_Sorting(module_config, components, sim_params))
-            elseif lowercase(module_config["name"]) === "negotiate_temperature"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_Negotiate_Temperature(module_config, components, sim_params, unit.uac))
-            elseif lowercase(module_config["name"]) === "limit_cooling_input_temperature"
-                push!(unit.controller.modules,
-                      EnergySystems.CM_LimitCoolingInputTemperature(module_config, components, sim_params, unit.uac))
+            if !haskey(mapping, module_config["name"])
+                @warn("Unknown control module type $(module_config["name"]) while loading " *
+                      "unit $(unit.uac)")
+                continue
             end
+            module_class = mapping[module_config["name"]]
+            push!(unit.controller.modules, module_class(module_config, components, sim_params, unit.uac))
         end
     end
 
@@ -161,21 +198,31 @@ If no information is given in the input file, the following defaults
 will be set:
 time_step = 900 s
 """
-function get_timesteps(simulation_parameters::Dict{String,Any})
+function get_timesteps(simulation_parameters::AbstractDict{String,Any})
     start_date = DateTime(0)
+    start_date_output = DateTime(0)
     end_date = DateTime(0)
     try
         start_date = Dates.DateTime(simulation_parameters["start"], simulation_parameters["start_end_unit"])
         end_date = Dates.DateTime(simulation_parameters["end"], simulation_parameters["start_end_unit"])
+        if haskey(simulation_parameters, "start_output")
+            start_date_output = Dates.DateTime(simulation_parameters["start_output"],
+                                               simulation_parameters["start_end_unit"])
+        else
+            start_date_output = start_date
+        end
     catch e
         @error("Time given 'start_end_unit' of the simulation parameters does not fit to the data.\n" *
                "'start_end_unit' has to be a daytime format, e.g. 'dd-mm-yyyy HH:MM:SS'.\n" *
                "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start" *
                "and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
-               "The following error occured: $e")
+               "The following error occurred: $e")
         throw(InputError)
     end
-
+    if start_date_output < start_date
+        @error "The start date of the output can not be prior to the start date of the simulation!"
+        throw(InputError)
+    end
     if simulation_parameters["time_step_unit"] == "seconds"
         time_step = simulation_parameters["time_step"]
     elseif simulation_parameters["time_step_unit"] == "minutes"
@@ -189,15 +236,20 @@ function get_timesteps(simulation_parameters::Dict{String,Any})
     end
 
     nr_of_steps = UInt(max(0, floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date))) / time_step)) + 1)
+    nr_of_steps_output = UInt(max(0,
+                                  floor(Dates.value(Second(sub_ignoring_leap_days(end_date, start_date_output))) /
+                                        time_step)) + 1)
 
     # set end_date to be integer dividable by the timestep
     end_date = add_ignoring_leap_days(start_date, (nr_of_steps - 1) * Second(time_step))
 
-    if (month(start_date) == 2 && day(start_date) == 29) || (month(end_date) == 2 && day(end_date) == 29)
-        @error "The simulation start and end date can not be at a leap day!"
+    if (month(start_date) == 2 && day(start_date) == 29) ||
+       (month(end_date) == 2 && day(end_date) == 29) ||
+       (month(start_date_output) == 2 && day(start_date_output) == 29)
+        @error "The simulation start and end date and the start date of the output can not be at a leap day!"
         throw(InputError)
     end
-    return UInt(time_step), start_date, end_date, nr_of_steps
+    return UInt(time_step), start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output
 end
 
 # calculation of the order of operations has its own include files due to its complexity

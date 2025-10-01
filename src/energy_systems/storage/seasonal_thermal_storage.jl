@@ -28,7 +28,7 @@ mutable struct SeasonalThermalStorage <: Component
     shape::String
     rho_medium::Float64
     cp_medium::Float64
-    diffussion_coefficient::Float64
+    diffusion_coefficient::Float64
     surface_area_lid::Float64
     surface_area_bottom::Float64
     surface_area_barrel_segments::Vector{Float64}
@@ -50,8 +50,10 @@ mutable struct SeasonalThermalStorage <: Component
     # loading and unloading
     high_temperature::Temperature
     low_temperature::Temperature
-    max_load_rate::Floathing
-    max_unload_rate::Floathing
+    max_load_rate_energy::Floathing
+    max_unload_rate_energy::Floathing
+    max_load_rate_mass::Floathing
+    max_unload_rate_mass::Floathing
     max_input_energy::Floathing
     max_output_energy::Floathing
 
@@ -61,6 +63,7 @@ mutable struct SeasonalThermalStorage <: Component
     thermal_transmission_bottom::Float64
     ambient_temperature_profile::Union{Profile,Nothing}
     ambient_temperature::Temperature
+    ground_temperature_profile::Union{Profile,Nothing}
     ground_temperature::Temperature
     effective_ambient_temperature::Vector{Temperature}
 
@@ -79,9 +82,13 @@ mutable struct SeasonalThermalStorage <: Component
     current_max_output_energy::Float64
     temperatures_charging::Vector{Temperature}
     current_energy_input_return_temperature::Float64
+    process_done::Bool
+    load_done::Bool
 
     # additional output
     temp_distribution_output::Array{Float64}
+    mass_in_sum::Float64
+    mass_out_sum::Float64
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -98,6 +105,16 @@ mutable struct SeasonalThermalStorage <: Component
                                                                         uac;
                                                                         required=true)
 
+        constant_ground_temperature,
+        ground_temperature_profile = get_parameter_profile_from_config(config,
+                                                                       sim_params,
+                                                                       "ground_temperature",
+                                                                       "ground_temperature_profile_file_path",
+                                                                       "",
+                                                                       "constant_ground_temperature",
+                                                                       uac;
+                                                                       required=true)
+
         # Note: layer numbering starts at the bottom with index 1 and ends at the top with index number_of_layer_total
         return new(uac,                                            # uac
                    Controller(default(config, "control_parameters", nothing)),
@@ -110,11 +127,11 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # capacity of the STES [Wh]
                    default(config, "volume", nothing),             # volume of the STES [m^3]
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
-                   default(config, "sidewall_angle", 0.0),         # angle of the sidewall of the STES with respect to the horizont [°]
-                   default(config, "shape", "cuboid"),             # can be "round" for cylinder/truncated cone or "cuboid" for tank or truncated quadratic pyramid (pit)
+                   default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
+                   default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
                    default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.18),             # specific thermal capacity of medium [kJ/kgK]
-                   default(config, "diffussion_coefficient", 0.143 * 10^-6), # diffussion coefficient of the medium [m^2/s]
+                   default(config, "cp_medium", 4.186),            # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
                    0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
                    0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
                    [],                                             # surface_area_barrel_segments, surface of the barrel segments of the STES [m^2]
@@ -127,16 +144,18 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
                    [],                                             # dz, thickness of the layers of the STES [m]
                    [],                                             # dz_normalized, normalized dz with respect to to the volume of each section
-                   [],                                             # [1/h]  factor for losses to ambiente: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
+                   [],                                             # [1/h]  factor for losses to ambient: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
                    [],                                             # [K/kJ] factor for input/output energy:  1 / (roh * cp * volume_segment ) 
                    [],                                             # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
                    [],                                             # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
                    [],                                             # layer_masses, mass of the medium in each layer [kg]
                    # loading and unloading
-                   default(config, "high_temperature", 75.0),      # upper temperature of the STES [°C]
-                   default(config, "low_temperature", 20),         # lower temperature of the STES [°C]
-                   default(config, "max_load_rate", nothing),      # maximum load rate given in 1/h
-                   default(config, "max_unload_rate", nothing),    # maximum unload rate given in 1/h
+                   default(config, "high_temperature", 90.0),      # upper temperature of the STES [°C]
+                   default(config, "low_temperature", 15.0),       # lower temperature of the STES [°C]
+                   default(config, "max_load_rate_energy", nothing),   # maximum load rate given in 1/h, total energy input related to the total energy capacity of the STES
+                   default(config, "max_unload_rate_energy", nothing), # maximum unload rate given in 1/h, total energy input related to the total volume of the STES
+                   default(config, "max_load_rate_mass", nothing),     # maximum load rate given in 1/h, mass flow per Interface related to the total volume of the STES
+                   default(config, "max_unload_rate_mass", nothing),   # maximum unload rate given in 1/h, mass flow in total related to the total volume of the STES
                    nothing,                                        # max_input_energy, maximum input energy per time step [Wh]
                    nothing,                                        # max_output_energy, maximum output energy per time step [Wh]
                    # Losses
@@ -145,7 +164,8 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "thermal_transmission_bottom", 0.375), # [W/(m^2K)]
                    ambient_temperature_profile,                           # [°C]
                    constant_ambient_temperature,                          # ambient_temperature [°C]
-                   default(config, "ground_temperature", 12),             # [°C]
+                   ground_temperature_profile,                            # [°C]
+                   constant_ground_temperature,                           # ground_temperature [°C]
                    [],                                                    # effective_ambient_temperature corresponding to each layer [°C]          
                    # other
                    0.0,                                            # current_max_output_temperature
@@ -162,8 +182,12 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                            # current_max_output_energy, maximum output energy in current time step [Wh]
                    [],                                             # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
                    0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
+                   false,                                          # process_done, bool indicating if the process step has already been performed in the current time step
+                   false,                                          # load_done, bool indicating if the load step has already been performed in the current time step
                    # additional output
-                   Array{Float64}(undef, 0, 0))                    # temp_distribution_output [°C], holds temperature field of layers for output plot
+                   Array{Float64}(undef, 0, 0),                    # temp_distribution_output [°C], holds temperature field of layers for output plot
+                   0.0,                                            # mass_in_sum [kg]
+                   0.0)                                            # mass_out_sum [kg]
     end
 end
 
@@ -208,15 +232,15 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # calculate the normalized dz with respect to to the volume of each section
     unit.dz_normalized = unit.dz .* sqrt.((unit.volume_segments .* unit.number_of_layer_total) ./ unit.volume)
 
-    # calculate coefficient for losses to ambiente
+    # calculate coefficient for losses to ambient
     unit.sigma = zeros(unit.number_of_layer_total)
     unit.sigma[1] = unit.surface_area_bottom * unit.thermal_transmission_bottom /
-                    (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[1])          # [1/h] losses to ambiente through bottom
+                    (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[1])          # [1/h] losses to ambient through bottom
     unit.sigma[end] = unit.surface_area_lid * unit.thermal_transmission_lid /
-                      (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambiente through lid
+                      (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambient through lid
     unit.sigma = unit.sigma .+
                  unit.surface_area_barrel_segments .* thermal_transmission_barrels ./
-                 (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambiente though barrel
+                 (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambient though barrel
 
     # calculate coefficient for input/output energy --> needed? TODO
     unit.lambda = 1 ./ (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)          # [K/Wh] 
@@ -236,19 +260,21 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.load_end_of_last_timestep = copy(unit.load)
 
     # calculate maximum input and output energy
-    if unit.max_load_rate === nothing
+    if unit.max_load_rate_energy === nothing
         unit.max_input_energy = Inf
     else
-        unit.max_input_energy = unit.max_load_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)     # [Wh per timestep]
+        unit.max_input_energy = unit.max_load_rate_energy * unit.capacity * (sim_params["time_step_seconds"] / 60 / 60)     # [Wh per timestep]
     end
-    if unit.max_unload_rate === nothing
+    if unit.max_unload_rate_energy === nothing
         unit.max_output_energy = Inf
     else
-        unit.max_output_energy = unit.max_unload_rate * unit.capacity / (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
+        unit.max_output_energy = unit.max_unload_rate_energy * unit.capacity *
+                                 (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
     # vector to hold the results of the temperatures for each layer in each simulation time step
-    unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps"], unit.number_of_layer_total)
+    unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps_output"],
+                                          unit.number_of_layer_total)
 end
 
 """
@@ -276,7 +302,7 @@ end
 
 Calculate the geometry of a seasonal thermal energy storage (STES) system, either as a 
 - cylinder or a truncated cone (shape == round) 
-- tank with quadratic base or a truncated quadratic pyramid (pit) (shape == cuboid)
+- tank with quadratic base or a truncated quadratic pyramid (pit) (shape == quadratic)
 
 # Arguments
 - `uac::String`: Unique identifier for the STES
@@ -285,7 +311,7 @@ Calculate the geometry of a seasonal thermal energy storage (STES) system, eithe
                     If `alpha` is 90, the storage is a cylinder.
 - `hr::Float64`: Height-to-radius ratio
 - `n_segments::Int64`: Number of segments to divide the storage into for calculation
-- `shape::String`: Shape of the STES, can be "round" for cylinder/truncated cone or "cuboid" for tank or 
+- `shape::String`: Shape of the STES, can be "round" for cylinder/truncated cone or "quadratic" for tank or 
                    truncated quadratic pyramid (pit)
 
 # Returns
@@ -320,7 +346,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         a_bottom = a_lid
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius, radius
-    elseif alpha == 90 && shape == "cuboid"  # cuboid with square cross-section 
+    elseif alpha == 90 && shape == "quadratic"  # cuboid with square cross-section 
         # calculate radius and height of cuboid
         side_length = cbrt(2 * volume / hr)
         height = hr * (side_length / 2)
@@ -367,7 +393,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         end
 
         return a_lid, a_barrel, a_bottom, v_section, height, radius_small, radius_large
-    elseif shape == "cuboid"   # truncated quadratic pyramid (pit)
+    elseif shape == "quadratic"   # truncated quadratic pyramid (pit)
         alpha_rad = deg2rad(alpha)
         alpha_tan = tan(alpha_rad)
 
@@ -377,7 +403,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
             alpha_min_deg = rad2deg(atan(hr / 2))
             alpha_max_deg = 180 - alpha_min_deg
 
-            @error "For the STES $(uac), reduce the h/r ratio for the truncated quadratic pyramit or increase the slope angle. " *
+            @error "For the STES $(uac), reduce the h/r ratio for the truncated quadratic pyramid or increase the slope angle. " *
                    "For a given h/r ratio of $(hr), the slope angle must be greater than $(round(alpha_min_deg; digits=2))° and " *
                    "smaller than $(round(alpha_max_deg; digits=2))°. " *
                    "For a given slope angle of $(alpha)°, the h/r ratio must be less than $(round(hr_max; digits=2))."
@@ -404,19 +430,20 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
             z_bot = dh * (i - 1)
             z_top = dh * i
 
-            # lineare Interpolation of edge length
+            # linear Interpolation of edge length
             a_bot = base_side + (top_side - base_side) * (z_bot / height)
             a_up = base_side + (top_side - base_side) * (z_top / height)
             # volume of segments
             v_section[i] = (dh / 3) * (a_bot^2 + a_bot * a_up + a_up^2)
 
-            # Segment-laterale area
-            l_seg = sqrt(((a_bot - a_up) / 2)^2 + dh^2)
-            a_lat[i] = 2 * (a_bot + a_up) * l_seg
+            # Segment-lateral area
+            l_side_segment = sqrt(dh^2 + (a_up - a_bot)^2 / 2)
+            h_trapeze = sqrt(l_side_segment^2 - ((a_up - a_bot) / 2)^2)
+            a_lat[i] = 2 * (a_bot + a_up) * h_trapeze
         end
         return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
     else
-        @error "Invalid shape type of seasonal thermal storage $(unit.uac). Shape has to be 'round' or 'cuboid'!"
+        @error "Invalid shape type of seasonal thermal storage $(uac). Shape has to be 'round' or 'quadratic'!"
         throw(InputError)
     end
 end
@@ -448,7 +475,7 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
 
     # Plot geometry of STES: 3D
     Plots.plotlyjs()
-    if unit.shape == "cuboid"
+    if unit.shape == "quadratic"
         # — Cuboid setup — 
         r1 = unit.radius_small    # 1/2 of the bottom side length
         r2 = unit.radius_large    # 1/2 of the top side length
@@ -580,9 +607,9 @@ end
 function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any},
                                    output_path::String)::Bool
     # Plot temperature distribution over time    
-    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date"],
+    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
-                       for s in 1:sim_params["number_of_time_steps"]]
+                       for s in 1:sim_params["number_of_time_steps_output"]]
     layers_to_plot = (unit.number_of_layer_total):-1:1
     traces = PlotlyJS.GenericTrace[]
     for i in layers_to_plot
@@ -599,7 +626,7 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
 
     leap_days_str = string.([Date(year, 2, 29)
                              for year in
-                                 Dates.value(Year(sim_params["start_date"])):Dates.value(Year(sim_params["end_date"]))
+                                 Dates.value(Year(sim_params["start_date_output"])):Dates.value(Year(sim_params["end_date"]))
                              if isleapyear(year)])
 
     layout = PlotlyJS.Layout(; title_text="Temperature distribution over time in STES $(unit.uac)",
@@ -621,8 +648,9 @@ function control(unit::SeasonalThermalStorage,
     update(unit.controller)
 
     # write old temperature field for output
-    unit.temp_distribution_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
-
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_distribution_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
+    end
     # set current_energy_input_return_temperature, simplified constant in the current time step
     # always use bottom layer to use the whole storage
     unit.current_energy_input_return_temperature = unit.temperature_segments[1]
@@ -648,10 +676,11 @@ function control(unit::SeasonalThermalStorage,
 
     max_input_energy = zeros(length(temperatures_charging))
     for (input_idx, temperature) in enumerate(temperatures_charging)
-        max_input_energy[input_idx] = min(calcuate_max_input_energy_by_temperature(unit,
-                                                                                   temperature,
-                                                                                   unit.temperature_segments),
-                                          min(unit.max_input_energy, energy_supply[input_idx]))
+        max_input_energy[input_idx] = min(energy_supply[input_idx],
+                                          calculate_max_input_energy_by_temperature(unit,
+                                                                                    temperature,
+                                                                                    unit.temperature_segments,
+                                                                                    sim_params))
     end
     if isempty(temperatures_charging)
         max_input_energy = [0.0]
@@ -662,7 +691,18 @@ function control(unit::SeasonalThermalStorage,
                     temperatures_charging, source_uac, false, true)
 
     # calculate maximum energies for output
-    unit.current_max_output_energy = max(min(unit.load, unit.max_output_energy), 0.0)
+    if unit.max_unload_rate_mass !== nothing
+        current_max_output_energy_from_mass = convert_mass_in_energy(unit.max_unload_rate_mass * unit.volume *
+                                                                     unit.rho_medium *
+                                                                     (sim_params["time_step_seconds"] / 60 / 60),
+                                                                     unit.low_temperature,
+                                                                     unit.current_max_output_temperature,
+                                                                     unit.cp_medium)
+        unit.current_max_output_energy = max(min(min(unit.load, unit.max_output_energy),
+                                                 current_max_output_energy_from_mass), 0.0)
+    else
+        unit.current_max_output_energy = max(min(unit.load, unit.max_output_energy), 0.0)
+    end
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
                     unit.current_max_output_temperature)
 
@@ -670,13 +710,17 @@ function control(unit::SeasonalThermalStorage,
         unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
     end
 
+    if unit.ground_temperature_profile !== nothing
+        unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
+    end
+
     # effective ambient temperature for each layer of the STES
-    unit.effective_ambient_temperature = vcat(fill(unit.ambient_temperature, unit.number_of_layer_above_ground),
-                                              fill(unit.ground_temperature,
-                                                   unit.number_of_layer_total - unit.number_of_layer_above_ground))
+    unit.effective_ambient_temperature = vcat(fill(unit.ground_temperature,
+                                                   unit.number_of_layer_total - unit.number_of_layer_above_ground),
+                                              fill(unit.ambient_temperature, unit.number_of_layer_above_ground))
 end
 
-# This funtcion sets the current_min_input_temperature and current_max_output_temperature 
+# This function sets the current_min_input_temperature and current_max_output_temperature 
 function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.current_max_output_temperature = unit.temperature_segments[end]
     if unit.temperature_segments[1] == unit.temperature_segments[2] && sim_params["time"] == 0
@@ -687,7 +731,7 @@ function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{
         if unit.temperature_segments[1] == lowest(unit.temperature_segments)
             unit.current_min_input_temperature = unit.temperature_segments[2]
         else
-            # If there is a inverse temperature distrubution within the storage, search for the first layer
+            # If there is a inverse temperature distribution within the storage, search for the first layer
             # where the temperature is higher than the temperature of the bottom layer and use this temperature.
             # If the lowest layer is the hottest one, set the current_min_input_temperature to the temperature
             # of the first layer + 1K
@@ -701,8 +745,22 @@ function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{
     end
 end
 
+function current_max_input_energy_vol(unit::SeasonalThermalStorage, temp_in::Temperature,
+                                      lower_temp::Temperature, sim_params::Dict{String,Any})::Float64
+    if unit.max_load_rate_mass === nothing
+        return Inf
+    else
+        # calculate maximum energy from mass flow / volume limit for current temperature
+        return convert_mass_in_energy(unit.max_load_rate_mass * unit.volume * unit.rho_medium *
+                                      (sim_params["time_step_seconds"] / 60 / 60),
+                                      lower_temp,
+                                      temp_in,
+                                      unit.cp_medium)
+    end
+end
+
 # This function will only be called from a Bus, never in a 1-to-1 connection to another component.
-# energy_input and temperatures_input are all inputs that have alread been put into the STES.
+# energy_input and temperatures_input are all inputs that have already been put into the STES.
 function recalculate_max_energy(unit::SeasonalThermalStorage,
                                 energy_input::Union{Float64,Vector{Float64}},
                                 temperatures_input::Union{Temperature,Vector{Temperature}},
@@ -721,11 +779,12 @@ function recalculate_max_energy(unit::SeasonalThermalStorage,
                                                  temporary_calculation=true)
 
     # calculate new max_energy for the input energy for all elements in max_energy
-    # and limit it by the the alread filled energy and the charging rate limit
+    # and limit it by the the already filled energy and the charging rate limit
     for (input_idx, temperature) in enumerate(highest.(max_energy.temperature_max, max_energy.temperature_min))
-        max_energy.max_energy[input_idx] = min(calcuate_max_input_energy_by_temperature(unit,
-                                                                                        temperature,
-                                                                                        temperature_segments_temporary),
+        max_energy.max_energy[input_idx] = min(calculate_max_input_energy_by_temperature(unit,
+                                                                                         temperature,
+                                                                                         temperature_segments_temporary,
+                                                                                         sim_params),
                                                min(unit.max_input_energy - sum(energy_input; init=0.0),
                                                    max_energy.max_energy[input_idx]))
     end
@@ -754,8 +813,9 @@ function get_input_temperature_bounds(unit::SeasonalThermalStorage)::Tuple{Tempe
 end
 
 """
-    calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
-                                            current_temperature_distribution::Vector{Temperature}) -> Float64
+    calculate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
+                                              current_temperature_distribution::Vector{Temperature},
+                                              sim_params::Dict{String,Any}) -> Float64
 
 Calculates the maximum possible input energy at a given single actual_input_temp for the
 given current_temperature_distribution
@@ -769,27 +829,37 @@ given current_temperature_distribution
 # Returns
 - `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
 """
-function calcuate_max_input_energy_by_temperature(unit::SeasonalThermalStorage, actual_input_temp::Temperature,
-                                                  current_temperature_distribution::Vector{Temperature})::Float64
+function calculate_max_input_energy_by_temperature(unit::SeasonalThermalStorage,
+                                                   actual_input_temp::Temperature,
+                                                   current_temperature_distribution::Vector{Temperature},
+                                                   sim_params::Dict{String,Any})::Float64
     # reduce maximal energy if the input temperature is near the temperature of the lower layer to avoid
     # numerical problems and pulsing during loading. Otherwise, it can happen that the STES is not taking
-    # the energy that it is supposed to take, or a unresonable high temporal resolution has to be used to
+    # the energy that it is supposed to take, or a unreasonable high temporal resolution has to be used to
     # calculate the new temperature distribution within the STES.
     red_factor = 0.0 + clamp(actual_input_temp - current_temperature_distribution[2], 0.0, 5.0) * 1.0 / 5.0
-    return red_factor * sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
-                                                   actual_input_temp, unit.cp_medium)
-                            for (layer, volume) in enumerate(unit.volume_segments)
-                                if current_temperature_distribution[layer] < actual_input_temp; init=0.0)
+    input_energy_limit = min(unit.max_input_energy,
+                             current_max_input_energy_vol(unit,
+                                                          actual_input_temp,
+                                                          current_temperature_distribution[1],
+                                                          sim_params))
+    return min(input_energy_limit,
+               red_factor *
+               sum(convert_mass_in_energy(volume * unit.rho_medium, current_temperature_distribution[layer],
+                                          actual_input_temp, unit.cp_medium)
+                   for (layer, volume) in enumerate(unit.volume_segments)
+                   if current_temperature_distribution[layer] < actual_input_temp; init=0.0))
 end
 
 """
-    calculate_input_energy_from_input_temperature(energy::Float64)
+    calculate_input_energy_from_input_temperature(unit, actual_input_temp, sim_params)
 
 Wrapper function to calculate the maximum input energy for a given input temperature for the STES.
 
 Inputs:
 - `unit::SeasonalThermalStorage`: The seasonal thermal storage unit for which the calculation is performed.
 - `actual_input_temp::Temperature`: The temperature of the input energy being added to the storage.
+- `sim_params::Dict{String,Any}`: A dictionary containing simulation parameters
 
 Returns:
 - `Float64`: The total maximum energy that can be added to the storage at the actual_input_temp
@@ -798,7 +868,10 @@ Returns:
 function calculate_input_energy_from_input_temperature(unit::SeasonalThermalStorage,
                                                        actual_input_temp::Temperature,
                                                        sim_params::Dict{String,Any})::Float64
-    return calcuate_max_input_energy_by_temperature(unit, actual_input_temp, unit.temperature_segments)
+    return calculate_max_input_energy_by_temperature(unit,
+                                                     actual_input_temp,
+                                                     unit.temperature_segments,
+                                                     sim_params)
 end
 
 """ 
@@ -817,9 +890,9 @@ end
 
  # Arguments
 - `energy::Float64`: energy to convert [Wh]
-- `temp_low::Temperature`: lower temperatue [°C]
-- `temp_high::Temperature`: upper temperatur [°C]
-- `cp::Float64`: sppecific heat capacity [kJ/KgK]
+- `temp_low::Temperature`: lower temperature [°C]
+- `temp_high::Temperature`: upper temperature [°C]
+- `cp::Float64`: specific heat capacity [kJ/KgK]
 
 """
 function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
@@ -837,9 +910,9 @@ end
 
  # Arguments
 - `mass::Float64`: mass to convert [kg]
-- `temp_low::Temperature`: lower temperatue [°C]
-- `temp_high::Temperature`: upper temperatur [°C]
-- `cp::Float64`: sppecific heat capacity [kJ/KgK]
+- `temp_low::Temperature`: lower temperature [°C]
+- `temp_high::Temperature`: upper temperature [°C]
+- `cp::Float64`: specific heat capacity [kJ/KgK]
 
 """
 function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
@@ -913,7 +986,7 @@ function update_STES(unit::SeasonalThermalStorage,
     energy_input = energy_input[sortperm(temperatures_input)]
     sort!(temperatures_input)
 
-    # mass_in and mass_out shoud be both posivive! 
+    # mass_in and mass_out should be both positive! 
     # mass_in and the corresponding temperature can be a vector and will be fitted to the most suitable layer.
     # mass_out and the corresponding temperature are single values that will always be drawn from the top layer
     mass_in = convert_energy_in_mass.(energy_input, t_old[lower_node], temperatures_input,
@@ -923,12 +996,14 @@ function update_STES(unit::SeasonalThermalStorage,
 
     # Check if the mass flow is greater than the volume of the smallest segment. 
     # If yes, the internal time step is reduced to avoid numerical instabilities.
-    mass_out_sum = sum(mass_out; init=0.0)
-    mass_in_sum = sum(mass_in; init=0.0)
+    unit.mass_out_sum = sum(mass_out; init=0.0)
+    unit.mass_in_sum = sum(mass_in; init=0.0)
     mass_of_smallest_segment = minimum(unit.volume_segments) * unit.rho_medium
     factor = 5
-    if max(mass_out_sum, mass_in_sum) > (mass_of_smallest_segment / factor) && (mass_out_sum > 0.0 || mass_in_sum > 0.0)
-        number_of_internal_timesteps = ceil(max(mass_out_sum, mass_in_sum) / (mass_of_smallest_segment / factor))
+    if max(unit.mass_out_sum, unit.mass_in_sum) > (mass_of_smallest_segment / factor) &&
+       (unit.mass_out_sum > 0.0 || unit.mass_in_sum > 0.0)
+        number_of_internal_timesteps = ceil(max(unit.mass_out_sum, unit.mass_in_sum) /
+                                            (mass_of_smallest_segment / factor))
         if number_of_internal_timesteps > 10000
             number_of_internal_timesteps = 10000
             @warn "In STES $(unit.uac), a very high internal time step has been determined. " *
@@ -949,44 +1024,44 @@ function update_STES(unit::SeasonalThermalStorage,
                                               unit.cp_medium)
         end
         # mass flow and temperatures for charging
-        mass_in_temp, mass_in_vec = calculate_mass_temperatur_charging(unit, t_old,
-                                                                       mass_in ./ number_of_internal_timesteps,
-                                                                       lower_node, sim_params)
+        mass_in_temp, mass_in_vec = calculate_mass_temperature_charging(unit, t_old,
+                                                                        mass_in ./ number_of_internal_timesteps,
+                                                                        lower_node, sim_params)
         # mass flow and corresponding temperatures into each layer during discharging
-        mass_out_temp, mass_out_vec = calculate_mass_temperatur_discharging(unit, t_old,
-                                                                            mass_out ./
-                                                                            number_of_internal_timesteps,
-                                                                            return_temperature_input,
-                                                                            lower_node, sim_params)
+        mass_out_temp, mass_out_vec = calculate_mass_temperature_discharging(unit, t_old,
+                                                                             mass_out ./
+                                                                             number_of_internal_timesteps,
+                                                                             return_temperature_input,
+                                                                             lower_node, sim_params)
         for n in 1:(unit.number_of_layer_total)
             if n == 1  # bottom layer, single-side
                 t_new[n] = t_old[n] +
                            consider_losses *
-                           (3600 * unit.diffussion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through bottom and side walls
+                           (3600 * unit.diffusion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through bottom and side walls
                            # unit.lambda[n] * (Q_in_out)[n] +                                                            # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
             elseif n == unit.number_of_layer_total  # top layer, single-side
                 t_new[n] = t_old[n] +
                            consider_losses *
-                           (3600 * unit.diffussion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +   # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through lid and side walls
+                           (3600 * unit.diffusion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through lid and side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
             else       # mid layer
                 t_new[n] = t_old[n] +
                            consider_losses *
-                           (3600 * unit.diffussion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
+                           (3600 * unit.diffusion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
                             unit.dz_normalized[n]^2 +                                                                    # thermal diffusion
-                            consider_losses * unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt + # losses through side walls
+                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
             end
 
-            if n > 1   # mixing due to buoancy effecs, if temperature gradient is present
+            if n > 1   # mixing due to buoyancy effects, if temperature gradient is present
                 adjust_temp = max(0, t_new[n - 1] - t_new[n])
                 t_new[n] = t_new[n] + unit.theta[n] * adjust_temp
                 t_new[n - 1] = t_new[n - 1] - (1 - unit.theta[n]) * adjust_temp
@@ -1006,7 +1081,7 @@ function update_STES(unit::SeasonalThermalStorage,
 end
 
 """
-    calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+    calculate_mass_temperature_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
                                        mass_in::Vector{Float64}, lower_node::Int, sim_params::Dict{String,Any})
 
 Calculate the mass flow and its temperature into each single layer of a Seasonal Thermal Energy Storage (STES) during charging.
@@ -1025,9 +1100,9 @@ lowest layer that is below the temperature of the input (e.g. lance)
 - `mass_in_temp::Vector{Float64}`: Vector of temperatures of the mass flow into each layer.
 - `mass_in_vec::Vector{Float64}`: Vector of mass flow into each layer.
 """
-function calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-                                            mass_in::Vector{Float64}, lower_node::Int,
-                                            sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
+function calculate_mass_temperature_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+                                             mass_in::Vector{Float64}, lower_node::Int,
+                                             sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
     number_of_inputs = length(unit.current_energy_input)
     mass_in_temp = zeros(unit.number_of_layer_total)
     mass_in_vec = zeros(unit.number_of_layer_total)
@@ -1061,7 +1136,7 @@ function calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old:
         # write mass input to vector
         mass_in_vec[layer] = min(sum(mass_in_layer), unit.layer_masses[layer])
 
-        # calculate tempearture of mass flow into the layer due to discharging
+        # calculate temperature of mass flow into the layer due to discharging
         if sum(mass_in_layer) <= unit.layer_masses[layer]  # all input mass can be hold in current layer
             mass_in_temp[layer] = weighted_mean(temperature_in_layer, mass_in_layer, sim_params)
 
@@ -1095,7 +1170,7 @@ function calculate_mass_temperatur_charging(unit::SeasonalThermalStorage, t_old:
 end
 
 """
-    calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+    calculate_mass_temperature_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
                                          mass_out::Float64, return_temperature_input::Temperature, lower_node::Int,
                                          sim_params::Dict{String,Any})
 
@@ -1115,16 +1190,16 @@ It handles cases where the mass flow into a layer is greater than the volume of 
 - `mass_out_vec::Vector{Float64}`: Vector of mass flow rates into each layer during discharging
 
 """
-function calculate_mass_temperatur_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-                                               mass_out::Float64, return_temperature_input::Temperature,
-                                               lower_node::Int,
-                                               sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
+function calculate_mass_temperature_discharging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
+                                                mass_out::Float64, return_temperature_input::Temperature,
+                                                lower_node::Int,
+                                                sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
     upper_node_discharging = unit.number_of_layer_total - unit.output_layer_from_top + 1
     mass_out_temp = zeros(unit.number_of_layer_total)
     mass_in_layer = [mass_out]
     temperature_in_layer = [return_temperature_input]
     for layer in lower_node:upper_node_discharging
-        # calculate tempearture of mass flow into the layer due to discharging
+        # calculate temperature of mass flow into the layer due to discharging
         if sum(mass_in_layer) <= unit.layer_masses[layer]
             if layer == lower_node
                 mass_out_temp[layer] = return_temperature_input
@@ -1178,6 +1253,7 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
@@ -1208,16 +1284,18 @@ function process(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         end
         unit.current_temperature_output = unit.current_max_output_temperature
     end
+
+    handle_component_update!(unit, "process", sim_params)
 end
 
-function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    inface = unit.input_interfaces[unit.m_heat_in]
-    exchanges = balance_on(inface, inface.source)
-    energy_available = balance(exchanges) + energy_potential(exchanges)
-
-    # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
-        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
+function handle_component_update!(unit::SeasonalThermalStorage, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # update component
         unit.losses,
         unit.load_end_of_last_timestep,
         unit.load,
@@ -1229,6 +1307,21 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                                 sim_params)
         # set new temperatures limits for the next time step
         set_temperature_limits!(unit, sim_params)
+        # reset
+        unit.process_done = false
+        unit.load_done = false
+    end
+end
+
+function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    inface = unit.input_interfaces[unit.m_heat_in]
+    exchanges = balance_on(inface, inface.source)
+    energy_available = balance(exchanges) + energy_potential(exchanges)
+
+    # shortcut if there is no energy to be used
+    if energy_available <= sim_params["epsilon"]
+        handle_component_update!(unit, "load", sim_params)
+        set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
         return
     end
 
@@ -1247,24 +1340,13 @@ function load(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
         current_exchange_temperature = highest(exchange.temperature_max, unit.current_min_input_temperature)
 
-        # all energies in the exchange can be used as it was already made sure than they do not exeed the STES limit
+        # all energies in the exchange can be used as it was already made sure than they do not exceed the STES limit
         sub!(inface, exchange_energy_available, current_exchange_temperature, nothing, exchange.purpose_uac)
         push!(unit.current_energy_input, exchange_energy_available)
         push!(unit.current_temperature_input, current_exchange_temperature)
     end
 
-    # apply energy input and output and losses
-    unit.losses,
-    unit.load_end_of_last_timestep,
-    unit.load,
-    unit.temperature_segments = update_STES(unit,
-                                            unit.current_energy_input,
-                                            unit.current_temperature_input,
-                                            unit.current_energy_output,
-                                            unit.current_temperature_output,
-                                            sim_params)
-    # set new temperatures limits for the next time step
-    set_temperature_limits!(unit, sim_params)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function reset(unit::SeasonalThermalStorage)
@@ -1279,13 +1361,21 @@ function reset(unit::SeasonalThermalStorage)
 end
 
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
-    return [string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_heat_in) * ":IN",
+            string(unit.m_heat_out) * ":OUT",
             "Load",
             "Load%",
             "Capacity",
             "LossesGains",
-            "CurrentMaxOutTemp"]
+            "CurrentMaxOutTemp",
+            "GroundTemperature",
+            "MassInput",
+            "MassOutput",
+            "Temperature_upper",
+            "Temperature_three_quarter",
+            "Temperature_middle",
+            "Temperature_one_quarter",
+            "Temperature_lower"]
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
@@ -1303,6 +1393,22 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return -unit.losses
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
+    elseif key.value_key == "GroundTemperature"
+        return unit.ground_temperature
+    elseif key.value_key == "MassInput"
+        return unit.mass_in_sum
+    elseif key.value_key == "MassOutput"
+        return unit.mass_out_sum
+    elseif key.value_key == "Temperature_lower"
+        return unit.temperature_segments[1]
+    elseif key.value_key == "Temperature_one_quarter"
+        return unit.temperature_segments[Int(round(0.25 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_middle"
+        return unit.temperature_segments[Int(round(0.5 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_three_quarter"
+        return unit.temperature_segments[Int(round(0.75 * unit.number_of_layer_total))]
+    elseif key.value_key == "Temperature_upper"
+        return unit.temperature_segments[end]
     end
     throw(KeyError(key.value_key))
 end

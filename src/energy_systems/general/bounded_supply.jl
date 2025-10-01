@@ -95,7 +95,7 @@ function process(unit::BoundedSupply, sim_params::Dict{String,Any})
     else # check temperature
         energy_demand,
         temperature_min,
-        temperature_max = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
+        temperature_max, _ = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
     end
 
     if sum(energy_demand; init=0.0) < 0.0
@@ -105,10 +105,10 @@ end
 
 function output_values(unit::BoundedSupply)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium) * " OUT",
+        return [string(unit.medium) * ":OUT",
                 "Max_Energy"]
     else
-        return [string(unit.medium) * " OUT",
+        return [string(unit.medium) * ":OUT",
                 "Max_Energy",
                 "Temperature"]
     end

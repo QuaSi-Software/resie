@@ -144,9 +144,9 @@ end
 function output_values(unit::GridConnection)::Vector{String}
     output_vals = []
     if unit.sys_function == sf_bounded_source
-        append!(output_vals, [string(unit.medium) * " OUT", "Output_sum"])
+        append!(output_vals, [string(unit.medium) * ":OUT", "Output_sum"])
     elseif unit.sys_function == sf_bounded_sink
-        append!(output_vals, [string(unit.medium) * " IN", "Input_sum"])
+        append!(output_vals, [string(unit.medium) * ":IN", "Input_sum"])
     end
     if unit.temperature !== nothing
         push!(output_vals, "Temperature")

@@ -93,10 +93,10 @@ end
 
 function output_values(unit::FixedSupply)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium) * " OUT",
+        return [string(unit.medium) * ":OUT",
                 "Supply"]
     else
-        return [string(unit.medium) * " OUT",
+        return [string(unit.medium) * ":OUT",
                 "Supply",
                 "Temperature"]
     end

@@ -1,0 +1,153 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/stc_2_demands/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/stc_2_demands/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/stc_2_demands/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": "all_excl_flows",
+        "output_plot_file": "./test/scenarios/stc_2_demands/output_plot.html",
+        "output_plot": {
+            "1": {
+                "key": {"TST_DEM_01": ["Temperature"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "2": {
+                "key": {"TST_DEM_01": ["Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"TST_STC_01": ["m_h_w_ht1:OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_STC_01": ["Temperature_Mean_Collector"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "5": {
+                "key": {"TST_STC_01": ["Temperature_Output"]},
+                "axis": "right",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "10": {
+                "key": {"TST_STC_01": ["delta_T"]},
+                "axis": "right",
+                "unit": "K",
+                "scale_factor": 1
+            },
+            "11": {
+                "key": {"TST_STC_01": ["spec_flow_rate"]},
+                "axis": "right",
+                "unit": "l/(h*m²)",
+                "scale_factor": 3600000
+            },
+            "13": {
+                "key": {"TST_STC_01": ["direct_normal_irradiance"]},
+                "axis": "left",
+                "unit": "kW/m²",
+                "scale_factor": 0.001         
+            },
+            "14": {
+                "key": {"TST_DEM_02": ["Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "15": {
+                "key": {"TST_DEM_02": ["Temperature"]},
+                "axis": "left",
+                "unit": "°C",
+                "scale_factor": 1
+            },
+            "16": {
+                "key": {"m_h_w_ht1": ["TST_STC_01->TST_DEM_01"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            },
+            "17": {
+                "key": {"m_h_w_ht1": ["TST_STC_01->TST_DEM_02"]},
+                "axis": ["left", "right"],
+                "unit": ["kWh", "°C"],
+                "scale_factor": [0.001, 1]
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": "01-01-2024 00:00",
+        "end": "07-01-2024 23:45",
+        "start_end_unit": "dd-mm-yyyy HH:MM",
+        "time_step": 15,
+        "time_step_unit": "minutes",
+        "time_zone": 1,
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "constant_temperature": 5,
+            "scale": 250
+        },
+
+        "TST_DEM_02": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "energy_profile_file_path": "./profiles/tests/demand_heating_energy.prf",
+            "constant_temperature": 4,
+            "scale": 500
+        },
+
+        "TST_BUS_01": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "TST_STC_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_DEM_02"
+                ],
+                "energy_flow": [
+                    [ 1, 1]
+                ]
+            }
+        },
+
+        "TST_STC_01": {
+            "type": "SolarthermalCollector",
+            "m_heat_out": "m_h_w_ht1",
+            "output_refs": ["TST_BUS_01"],   
+            "collector_gross_area": 16.38,
+            "tilt_angle": 30,
+            "azimuth_angle": 0,
+            "ground_reflectance":0.4,
+            "eta_0_b": 0.734,
+            "K_b_t_array":[1.00, 1.00, 0.99, 0.98, 0.96, 0.89, 0.71, 0.36, 0.00],
+            "K_b_l_array":[1.00, 1.00, 0.99, 0.98, 0.96, 0.89, 0.71, 0.36, 0.00],
+            "K_d": 0.97,
+            "a_params": [3.96, 0.011, 0.000, 0.00, 11450, 0.000, 0.00, 0.0],
+            "vol_heat_capacity": 3921470,
+            "wind_speed_reduction": 1,
+            "spec_flow_rate": 4e-6,
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "beam_solar_radiation_from_global_file": "beamHorIrr",
+            "diffuse_solar_radiation_from_global_file": "difHorIrr",
+            "infrared_sky_radiation_from_global_file": "longWaveIrr",
+            "wind_speed_from_global_file": "wind_speed"
+        }
+    }
+}

@@ -70,10 +70,14 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
 
         return new("limit_cooling_input_temperature", params)
     end
+
+    function CM_LimitCoolingInputTemperature()
+        return new("limit_cooling_input_temperature", Dict{String,Any}())
+    end
 end
 
 function has_method_for(mod::CM_LimitCoolingInputTemperature, func::ControlModuleFunction)::Bool
-    return func == cfm_limit_cooling_input_temperature
+    return func == cmf_limit_cooling_input_temperature
 end
 
 function update(mod::CM_LimitCoolingInputTemperature)
@@ -81,7 +85,7 @@ function update(mod::CM_LimitCoolingInputTemperature)
 end
 
 """
-    cooling_input_temperature_exeeded(mod::CM_LimitCoolingInputTemperature,
+    cooling_input_temperature_exceeded(mod::CM_LimitCoolingInputTemperature,
                                      components::Grouping,
                                      target_uac::String)
 
@@ -90,11 +94,11 @@ current input temperature of the cooling energy output of the source is exceeded
 actual return temperature provided by the input interface of the target.
 
 """
-function cooling_input_temperature_exeeded(mod::CM_LimitCoolingInputTemperature,
-                                           components::Grouping,
-                                           target_uac::Stringing)::Bool
+function cooling_input_temperature_exceeded(mod::CM_LimitCoolingInputTemperature,
+                                            components::Grouping,
+                                            target_uac::Stringing)::Bool
     if mod.parameters["temperature_limit"] < components[target_uac].current_energy_input_return_temperature
-        # temperature exeeded
+        # temperature exceeded
         return true
     else
         return false

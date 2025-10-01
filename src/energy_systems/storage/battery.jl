@@ -783,8 +783,8 @@ function calc_V_cell_cc_sum_aging(sum_charge::Number, I::Number, n, T, unit::Bat
 end
 
 function output_values(unit::Battery)::Vector{String}
-    return [string(unit.medium) * " IN",
-            string(unit.medium) * " OUT",
+    return [string(unit.medium) * ":IN",
+            string(unit.medium) * ":OUT",
             "Load",
             "Load%",
             "Capacity",

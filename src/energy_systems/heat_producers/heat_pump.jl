@@ -631,9 +631,9 @@ function handle_slice(unit::HeatPump,
     end
 
     if cop < 1.0
+        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check the " *
+               "input for mistakes as this should not happen. COP was set from $(round(cop;digits=2)) to 1.0")
         cop = 1.0
-        @warn ("Calculated COP of heat pump $(unit.uac) was below 1.0. Please check " *
-               "input for mistakes as this should not happen. COP was set to 1.0")
     end
 
     # calculate energies with the current cop
@@ -736,6 +736,12 @@ function calculate_slices(unit::HeatPump,
            sum(energies.available_heat_out; init=0.0) < EPS
             # end of condition
             break
+        end
+
+        # apply restrictions of control modules for a slice
+        if !check_src_to_snk(unit.controller, energies.in_uacs[src_idx], energies.out_uacs[snk_idx])
+            snk_idx += 1
+            continue
         end
 
         # check and determine input temperature of layer, also skip if it's not in the list
@@ -1115,6 +1121,10 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
 end
 
+function component_has_minimum_part_load(unit::HeatPump)
+    return unit.min_usage_fraction > 0.0
+end
+
 # has its own reset function as here more parameters are present that need to be reset in
 # every timestep
 function reset(unit::HeatPump)
@@ -1133,9 +1143,9 @@ function reset(unit::HeatPump)
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return [string(unit.m_el_in) * " IN",
-            string(unit.m_heat_in) * " IN",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_el_in) * ":IN",
+            string(unit.m_heat_in) * ":IN",
+            string(unit.m_heat_out) * ":OUT",
             "COP",
             "Effective_COP",
             "Avg_PLR",

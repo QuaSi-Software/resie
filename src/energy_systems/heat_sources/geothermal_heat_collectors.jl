@@ -116,6 +116,9 @@ mutable struct GeothermalHeatCollector <: Component
     delta_t_lat::Float64
     volume_adjacent_to_pipe::Float64
 
+    process_done::Bool
+    load_done::Bool
+
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -244,7 +247,9 @@ mutable struct GeothermalHeatCollector <: Component
                    0.0,                                                  # sigma_lat; precalculated parameter for freezing function
                    0.0,                                                  # t_lat; precalculated parameter for freezing function
                    0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
-                   0.0)                                                  # volume_adjacent_to_pipe; precalculated parameter
+                   0.0,                                                  # volume_adjacent_to_pipe; precalculated parameter
+                   false,                                                # process_done, bool indicating if the process step has already been performed in the current time step
+                   false)                                                # load_done, bool indicating if the load step has already been performed in the current time step
     end
 end
 
@@ -417,7 +422,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
 
     # vector to hold the results of the temperatures for each node in each simulation time step
-    unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps"], n_nodes_y, n_nodes_x)
+    unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps_output"], n_nodes_y, n_nodes_x)
 end
 
 """ 
@@ -643,7 +648,9 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         pipe_thermal_resistance_length_specific = 1 / (k * pi * unit.pipe_d_o)
     end
 
-    unit.temp_field_output[Int(sim_params["time"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_field_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
+    end
 
     # calculate specific heat extraction for 1 pipe per length
     specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
@@ -874,12 +881,14 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Di
     surfdata = @lift(unit.temp_field_output[$time, :, :])
     GLMakie.surface!(ax, y_abs, x_abs, surfdata)
     GLMakie.scatter!(ax, y_abs, x_abs, surfdata)
-    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps"], label="Time"))
+    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
 
     on(slg.sliders[1].value) do v
         time[] = v
     end
     wait(display(f))
+
+    return false
 end
 
 # function to handle freezing of the soil. Corrects the new temperature to include the enthalpy of fusion
@@ -1028,6 +1037,7 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     # shortcut if there is no energy demanded
     if energy_demanded >= -sim_params["epsilon"]
+        handle_component_update!(unit, "process", sim_params)
         set_max_energy!(unit.output_interfaces[unit.m_heat_out], 0.0)
         return
     end
@@ -1060,13 +1070,27 @@ function process(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     # write output heat flux into vector
     energy_delivered = -(unit.current_max_output_energy - energy_available)
     unit.collector_total_heat_energy_in_out = energy_delivered
+    handle_component_update!(unit, "process", sim_params)
+end
+
+function handle_component_update!(unit::GeothermalHeatCollector, step::String, sim_params::Dict{String,Any})
+    if step == "process"
+        unit.process_done = true
+    elseif step == "load"
+        unit.load_done = true
+    end
+    if unit.process_done && unit.load_done
+        # calculate new temperatures of field to account for possible ambient effects
+        calculate_new_temperature_field!(unit, unit.collector_total_heat_energy_in_out, sim_params)
+        # reset 
+        unit.process_done = false
+        unit.load_done = false
+    end
 end
 
 function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     if !unit.regeneration
-        # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
-                                         sim_params)
+        handle_component_update!(unit, "load", sim_params)
         return
     end
 
@@ -1077,10 +1101,8 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     if energy_available <= sim_params["epsilon"]
         # shortcut if there is no energy to be used
+        handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.m_heat_in], 0.0)
-        # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out,
-                                         sim_params)
         return
     end
 
@@ -1109,20 +1131,20 @@ function load(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
 
     energy_taken = unit.current_max_input_energy - energy_demand
     unit.collector_total_heat_energy_in_out += energy_taken
-    calculate_new_temperature_field!(unit::GeothermalHeatCollector, unit.collector_total_heat_energy_in_out, sim_params)
+    handle_component_update!(unit, "load", sim_params)
 end
 
 function output_values(unit::GeothermalHeatCollector)::Vector{String}
     output_vals = []
     if unit.regeneration
-        push!(output_vals, string(unit.m_heat_in) * " IN")
+        push!(output_vals, string(unit.m_heat_in) * ":IN")
     end
     if unit.model_type == "detailed"
         push!(output_vals, "fluid_reynolds_number")
         push!(output_vals, "alpha_fluid_pipe")
     end
     append!(output_vals,
-            [string(unit.m_heat_out) * " OUT",
+            [string(unit.m_heat_out) * ":OUT",
              "fluid_temperature",
              "ambient_temperature",
              "global_radiation_power"])

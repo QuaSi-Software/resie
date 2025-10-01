@@ -145,10 +145,14 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
     unit.losses = check_epsilon(energies[1] - energies[2] - energies[3], sim_params)
 end
 
+function component_has_minimum_part_load(unit::CHPP)
+    return unit.min_power_fraction > 0.0
+end
+
 function output_values(unit::CHPP)::Vector{String}
-    return [string(unit.m_fuel_in) * " IN",
-            string(unit.m_el_out) * " OUT",
-            string(unit.m_heat_out) * " OUT",
+    return [string(unit.m_fuel_in) * ":IN",
+            string(unit.m_el_out) * ":OUT",
+            string(unit.m_heat_out) * ":OUT",
             "LossesGains"]
 end
 
