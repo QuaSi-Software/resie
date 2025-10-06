@@ -61,8 +61,8 @@ Base.@kwdef mutable struct Battery <: Component
     r_sd::Float64
     n_cell_p::Float64
     n_cell_s::Float64
-    charge_sum::Float64
-    charge_sum_last::Float64
+    removed_charge::Float64
+    removed_charge_last::Float64
     SOC::Float64
 
     process_done::Bool
@@ -195,14 +195,14 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
         # calculate minimum and maximum cell voltages for SOC_max and SOC_min
         if unit.SOC_min > 0
             unit.V_cell_last = unit.V_n
-            unit.charge_sum = unit.m*Q * (1 - unit.SOC_min/100)
+            unit.removed_charge = unit.m*Q * (1 - unit.SOC_min/100)
             unit.V_cell_min = find_zero(V_cell -> V_cell_function(V_cell, 0, unit, sim_params),
                                         unit.V_n,
                                         Order1())
         end
 
         unit.V_cell_last = unit.V_n
-        unit.charge_sum = unit.m*Q * (1 - unit.SOC_max/100)
+        unit.removed_charge = unit.m*Q * (1 - unit.SOC_max/100)
         unit.V_cell_max = find_zero(V_cell -> V_cell_function(V_cell, 0, unit, sim_params),
                                     unit.V_n,
                                     Order1())
@@ -219,20 +219,20 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
             end
         end
         if unit.SOC == 100 || false
-            unit.charge_sum = 0
+            unit.removed_charge = 0
             unit.V_cell = unit.V_cell_max
         elseif unit.SOC == 0 || false
-            unit.charge_sum = unit.m*Q
+            unit.removed_charge = unit.m*Q
             unit.V_cell = unit.V_cell_min
         else
             unit.V_cell_last = unit.V_n
-            unit.charge_sum = unit.m*Q * (1 - unit.SOC/100)
+            unit.removed_charge = unit.m*Q * (1 - unit.SOC/100)
             unit.V_cell = find_zero(V_cell -> V_cell_function(V_cell, 0, unit, sim_params),
                                     unit.V_n,
                                     Order1())
         end
         unit.V_cell_last = copy(unit.V_cell)
-        unit.charge_sum_last = copy(unit.charge_sum)
+        unit.removed_charge_last = copy(unit.removed_charge)
     end
 end
 
@@ -318,13 +318,13 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
             #                             Roots.Newton()) 
             try max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_max, e_cell, 
                                                                       unit, sim_params), 
-                                        (cell_energy, -0.001), 
-                                        Roots.Brent())
+                                            (cell_energy, -0.001), 
+                                            Roots.Brent())
             catch
                 max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_max, e_cell, 
                                                                       unit, sim_params), 
-                                        cell_energy, 
-                                        Roots.Order1())
+                                            -10, 
+                                            Roots.Order1())
             end
             V_cell = unit.V_cell_max
         end
@@ -354,7 +354,7 @@ function V_cell_function(V_cell::Number, energy::Number, unit::Battery,
     f_T = (1 + unit.k_qT[1]*(T-unit.T_ref) + unit.k_qT[2]*(T-unit.T_ref)^2)
     Q = unit.capacity_cell_Ah * f_I * f_n * f_T                     # wird kleiner mit größerer energy  
 
-    if (unit.m * Q - (unit.charge_sum + charge)) < 0
+    if (unit.m * Q - (unit.removed_charge + charge)) < 0
         y = 1
     else
         V_0 = unit.V_0 * (1 + unit.k_n[1]*(n-1)) * (1 + unit.k_T[1]*(T-unit.T_ref))
@@ -363,8 +363,8 @@ function V_cell_function(V_cell::Number, energy::Number, unit::Battery,
         A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
 
         y = V_0 - 
-            K * (unit.m * Q) / (unit.m * Q - (unit.charge_sum + charge)) +  # verhält sich seltsam (vorzeichen wechsel wenn charge zu groß)
-            A * exp(-unit.B * (unit.charge_sum + charge)) -                 # irrelevant in den meisten Fällen
+            K * (unit.m * Q) / (unit.m * Q - (unit.removed_charge + charge)) +  # verhält sich seltsam (vorzeichen wechsel wenn charge zu groß)
+            A * exp(-unit.B * (unit.removed_charge + charge)) -                 # irrelevant in den meisten Fällen
             r_i * current -                                                                             # wird größer mit größerer energy
             V_cell
     end
@@ -377,7 +377,7 @@ function denom(V_cell, energy, unit, sim_params, n::Number=1, T::Number=25)
     f_I = (abs(2*energy) / (unit.I_ref * (unit.V_cell_last + V_cell) * (sim_params["time_step_seconds"] / 3600)))^unit.alpha
 
     unit.m * unit.capacity_cell_Ah * f_I * f_n * f_T  - 
-    (unit.charge_sum + 2*energy / (unit.V_cell_last + V_cell))
+    (unit.removed_charge + 2*energy / (unit.V_cell_last + V_cell))
 end
 
 function denom_derivative(V_cell, energy, unit, sim_params, n::Number=1, T::Number=25)
@@ -411,7 +411,7 @@ function V_cell_derivative(V_cell::Number, energy::Number, unit::Battery,
     K = unit.K * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
     A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
 
-    C = unit.charge_sum + charge
+    C = unit.removed_charge + charge
 
     K * unit.m * (dQ*C + Q*(2*energy) / (unit.V_cell_last+V_cell)^2) / (unit.m*Q - C)^2 +
     A * (2*energy*unit.B) / (unit.V_cell_last+V_cell)^2 * exp(-unit.B * C) +
@@ -441,7 +441,7 @@ function energy_cell_derivative(V_cell::Number, energy::Number, unit::Battery,
     K = unit.K * (1 + unit.k_n[3]*(n-1)) * (1 + unit.k_T[3]*(T-unit.T_ref))
     A = unit.A * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
 
-    C = unit.charge_sum + charge
+    C = unit.removed_charge + charge
 
     K * unit.m * (dQ*C - Q * 2/(unit.V_cell_last+V_cell)) / (unit.m*Q - C)^2 -
     A * (2*unit.B) / (unit.V_cell_last+V_cell) * exp(-unit.B * C) -
@@ -470,7 +470,7 @@ function process(unit::Battery, sim_params::Dict{String,Any})
                 unit.V_cell = unit.V_cell_discharge
             end       
             unit.losses += discharge_energy_bat * (1 - unit.discharge_efficiency)
-            unit.charge_sum += discharge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
+            unit.removed_charge += discharge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
 
             unit.load -= discharge_energy_bat
             add!(outface, discharge_energy_bat)
@@ -511,7 +511,7 @@ function load(unit::Battery, sim_params::Dict{String,Any})
             end 
 
             unit.losses += charge_energy_bat  * (1.0 / unit.charge_efficiency - 1)
-            unit.charge_sum -= charge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
+            unit.removed_charge -= charge_energy_bat / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell)
 
             unit.load += charge_energy_bat
             sub!(inface, charge_energy_bat)
@@ -531,7 +531,7 @@ function handle_component_update!(unit::Battery, step::String, sim_params)
     if unit.process_done && unit.load_done
         # update component
         self_loss = 0.0
-        if unit.load_end_of_last_timestep == unit.load || unit.charge_sum_last == unit.charge_sum && unit.SOC > unit.SOC_min # TODO SOC doesnt change with self discharge for detailted model
+        if unit.load_end_of_last_timestep == unit.load || unit.removed_charge_last == unit.removed_charge && unit.SOC > unit.SOC_min # TODO SOC doesnt change with self discharge for detailted model
             self_loss = unit.capacity * unit.self_discharge_rate # TODO fix loss calculation with respect to SOC and charge
         end
 
@@ -541,23 +541,28 @@ function handle_component_update!(unit::Battery, step::String, sim_params)
             unit.SOC = unit.load / unit.capacity * 100
         else
             # calculated current cell capacity
-            current = (unit.charge_sum - unit.charge_sum_last) * 2 / (unit.V_cell_last + unit.V_cell)
+            current = (unit.removed_charge - unit.removed_charge_last) * 2 / (unit.V_cell_last + unit.V_cell)
             if current == 0
-                #TODO gives weird behaviour because SOC and charge_sum are recalculated differently especially if SOC was set to SOC_max in time step before
+                #TODO gives weird behaviour because SOC and removed_charge are recalculated differently especially if SOC was set to SOC_max in time step before
                 # f_I = (abs(unit.current_last) / unit.I_ref)^unit.alpha
                 # f_n = (1 + unit.k_qn[1]*(unit.n-1)*unit.n / 2 + unit.k_qn[2]*(unit.n-1)*unit.n*(2*unit.n-1) / 2) 
                 # f_T = (1 + unit.k_qT[1]*(unit.T-unit.T_ref) + unit.k_qT[2]*(unit.T-unit.T_ref)^2)
                 # Q = unit.capacity_cell_Ah * f_I * f_n * f_T
 
                 unit.SOC = max(0, (unit.load - self_loss) / unit.capacity * 100)
-                unit.charge_sum = unit.max_capacity_last * (1 - unit.SOC/100) # TODO überprüfen ob das sinnvoll ist
+                if unit.SOC > 0
+                    unit.removed_charge += self_loss  / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell) 
+                end
+                # unit.removed_charge = unit.max_capacity_last * (1 - unit.SOC/100) # TODO überprüfen ob das sinnvoll ist
+                
                 # TODO for testing
                 # _, unit.V_cell, self_loss = calc_efficiency(self_loss, unit, sim_params)
-                # unit.charge_sum += self_loss  / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell) 
+                # unit.removed_charge += self_loss  / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell) 
                 
             # CV charging current cutoff is set at 3% of the nominal cell capacity
             elseif unit.V_cell == unit.V_cell_max && abs(current) < (0.03 * unit.capacity_cell_Ah) && unit.SOC >= unit.SOC_max*0.99
                 unit.SOC = unit.SOC_max
+                unit.load = unit.capacity * unit.SOC / 100 
 
             elseif current != 0
                 f_I = (abs(current) / unit.I_ref)^unit.alpha
@@ -565,21 +570,22 @@ function handle_component_update!(unit::Battery, step::String, sim_params)
                 f_T = (1 + unit.k_qT[1]*(unit.T-unit.T_ref) + unit.k_qT[2]*(unit.T-unit.T_ref)^2)
                 Q = unit.capacity_cell_Ah * f_I * f_n * f_T
                 
-                if unit.charge_sum > unit.m * Q
-                    unit.charge_sum = unit.m * Q
-                elseif unit.charge_sum < 0
-                    unit.charge_sum = 0
+                if unit.removed_charge > unit.m * Q
+                    unit.removed_charge = unit.m * Q
+                elseif unit.removed_charge < 0
+                    unit.removed_charge = 0
                 end
-                unit.SOC = ((unit.m * Q) - unit.charge_sum) / (unit.m * Q) * 100
+
+                unit.SOC = ((unit.m * Q) - unit.removed_charge) / (unit.m * Q) * 100
                 unit.max_capacity_last = unit.m*Q
                 unit.load = unit.capacity * unit.SOC / 100 
             end
-            
+
             unit.V_cell_last = copy(unit.V_cell)
         end
 
         unit.load_end_of_last_timestep = copy(unit.load)
-        unit.charge_sum_last = copy(unit.charge_sum)
+        unit.removed_charge_last = copy(unit.removed_charge)
         # reset
         unit.process_done = false
         unit.load_done = false
@@ -739,8 +745,8 @@ function calc_V_cell_cc_aging(charge::Number, I::Number, n ,T, unit::Battery)
     A   = unit.A   * (1 + unit.k_n[4]*(n-1)) * (1 + unit.k_T[4]*(T-unit.T_ref))
 
     V_0 - 
-    K * (unit.m * Q) / (unit.m * Q - (unit.charge_sum + charge)) +
-    A * exp(-unit.B * (unit.charge_sum + charge)) -
+    K * (unit.m * Q) / (unit.m * Q - (unit.removed_charge + charge)) +
+    A * exp(-unit.B * (unit.removed_charge + charge)) -
     r_i * I
 end
 
@@ -800,7 +806,7 @@ function output_value(unit::Battery, key::OutputKey)::Float64
     elseif key.value_key == "SOC"
         return unit.SOC
     elseif key.value_key == "Charge"
-        return unit.charge_sum
+        return unit.removed_charge
     end
     throw(KeyError(key.value_key))
 end
