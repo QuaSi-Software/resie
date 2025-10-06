@@ -23,8 +23,8 @@ Base.@kwdef mutable struct Battery <: Component
     charge_efficiency::Floathing
     discharge_efficiency::Floathing
     self_discharge_rate::Float64
-    max_charge_power::Float64
-    max_discharge_power::Float64
+    max_charge_C_rate::Float64
+    max_discharge_C_rate::Float64
     SOC_min::Float64
     SOC_max::Float64
     V_n_bat::Float64
@@ -127,8 +127,8 @@ Base.@kwdef mutable struct Battery <: Component
                    default(config, "charge_efficiency", nothing),
                    default(config, "discharge_efficiency", nothing),
                    default(config, "self_discharge_rate", 0.0), # rate of self-discharge inlcuding stand-by losses in %/month (month=30days)
-                   default(config, "max_charge_power", config["capacity"]), # maximum continuos charge power in W
-                   default(config, "max_discharge_power", config["capacity"]), # maximum continuos discharge power in W
+                   default(config, "max_charge_C_rate", 1.0), # maximum continuos charge power in W
+                   default(config, "max_discharge_C_rate", 1.0), # maximum continuos discharge power in W
                    default(config, "SOC_min", 0),
                    default(config, "SOC_max", 0),
                    config["V_n_bat"], # nominal voltage of the battery pack
@@ -252,7 +252,7 @@ function control(unit::Battery,
     if discharge_is_allowed(unit.controller, sim_params) && unit.SOC > unit.SOC_min && unit.V_cell > unit.V_cell_min
         unit.discharge_efficiency, 
         unit.V_cell_discharge, 
-        unit.max_discharge_energy = calc_efficiency(sim_params["watt_to_wh"](unit.max_discharge_power), unit, sim_params)
+        unit.max_discharge_energy = calc_efficiency(unit.max_discharge_C_rate * unit.capacity, unit, sim_params)
     else
         unit.max_discharge_energy = 0.0
         unit.discharge_efficiency = NaN
@@ -262,7 +262,7 @@ function control(unit::Battery,
     if charge_is_allowed(unit.controller, sim_params) && unit.SOC < unit.SOC_max
         unit.charge_efficiency, 
         unit.V_cell_charge, 
-        charge_energy_bat = calc_efficiency(sim_params["watt_to_wh"](-unit.max_charge_power), unit, sim_params)
+        charge_energy_bat = calc_efficiency(-unit.max_discharge_C_rate * unit.capacity, unit, sim_params)
         unit.max_charge_energy = charge_energy_bat
     else
         unit.max_charge_energy = 0.0
@@ -300,13 +300,10 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                            unit.capacity_cell_Ah * unit.V_n / 2, 
                            Roots.Order1())
             ul = min(as*0.999, cell_energy)
-            try max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, e_cell, 
+            max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, e_cell, 
                                                                   unit, sim_params), 
                                         (0.01, ul), 
                                         Roots.Brent())
-            catch
-                @infiltrate
-            end
             V_cell = unit.V_cell_min
 
         elseif energy < 0
@@ -324,13 +321,10 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                                         (cell_energy, -0.001), 
                                         Roots.Brent())
             catch
-                try max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_max, e_cell, 
+                max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_max, e_cell, 
                                                                       unit, sim_params), 
                                         cell_energy, 
                                         Roots.Order1())
-                catch
-                    @infiltrate
-                end
             end
             V_cell = unit.V_cell_max
         end
@@ -340,9 +334,6 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         internal_losses = unit.r_i * charge^2        
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p
         efficiency = ifelse(max_energy_cell == 0, NaN, 1- (internal_losses / abs(max_energy_cell)))
-        if V_cell > unit.V_cell_max + 0.01  || V_cell < unit.V_cell_min
-            @infiltrate
-        end
         return efficiency, V_cell, max_energy_bat
     end
 end
@@ -551,16 +542,6 @@ function handle_component_update!(unit::Battery, step::String, sim_params)
         else
             # calculated current cell capacity
             current = (unit.charge_sum - unit.charge_sum_last) * 2 / (unit.V_cell_last + unit.V_cell)
-            if unit.V_cell == unit.V_cell_max
-                @infiltrate
-            end
-            # CV charging current cutoff is set at 3% of the nominal cell capacity
-            # if unit.V_cell == unit.V_cell_max && abs(current) < (0.03 * unit.capacity_cell_Ah)# && unit.SOC < 100
-            # if current < 0 && abs(current) < (0.03 * unit.max_charge_power/unit.V_n) 
-            # if current < 0 && abs(current) < (0.03 * unit.capacity_cell_Ah) 
-            # if sim_params["time"] >= 41400
-            #     @infiltrate
-            # end
             if current == 0
                 #TODO gives weird behaviour because SOC and charge_sum are recalculated differently especially if SOC was set to SOC_max in time step before
                 # f_I = (abs(unit.current_last) / unit.I_ref)^unit.alpha
@@ -573,7 +554,8 @@ function handle_component_update!(unit::Battery, step::String, sim_params)
                 # TODO for testing
                 # _, unit.V_cell, self_loss = calc_efficiency(self_loss, unit, sim_params)
                 # unit.charge_sum += self_loss  / unit.n_cell_p * 2 / (unit.V_cell_last + unit.V_cell) 
-        
+                
+            # CV charging current cutoff is set at 3% of the nominal cell capacity
             elseif unit.V_cell == unit.V_cell_max && abs(current) < (0.03 * unit.capacity_cell_Ah) && unit.SOC >= unit.SOC_max*0.99
                 unit.SOC = unit.SOC_max
 
