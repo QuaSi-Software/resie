@@ -381,6 +381,9 @@ function process(unit::Battery, sim_params::Dict{String,Any})
 
         if energy_demand >= 0.0 # process is only concerned with moving energy to the target
             set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+            if unit.model_type != "simplified" 
+                unit.discharge_efficiency = NaN 
+            end
         else
             if abs(energy_demand) < unit.max_discharge_energy
                 unit.discharge_efficiency, unit.V_cell, discharge_energy_bat = calc_efficiency(abs(energy_demand), unit, sim_params)
@@ -396,6 +399,9 @@ function process(unit::Battery, sim_params::Dict{String,Any})
         end
     else
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
+        if unit.model_type != "simplified" 
+            unit.discharge_efficiency = NaN 
+        end
     end
     handle_component_update!(unit, "process")
 end
@@ -408,6 +414,9 @@ function load(unit::Battery, sim_params::Dict{String,Any})
 
         if energy_available <= 0.0 # load is only concerned with receiving energy from the source
             set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+            if unit.model_type != "simplified" 
+                unit.charge_efficiency = NaN 
+            end
         else
             if energy_available < unit.max_charge_energy
                 unit.charge_efficiency, unit.V_cell, charge_energy_bat = calc_efficiency(-energy_available, unit, sim_params)
@@ -424,6 +433,9 @@ function load(unit::Battery, sim_params::Dict{String,Any})
         end
     else
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
+        if unit.model_type != "simplified" 
+            unit.charge_efficiency = NaN 
+        end
     end
     handle_component_update!(unit, "load")
 end
@@ -481,12 +493,6 @@ function handle_component_update!(unit::Battery, step::String)
 
                 unit.SOC = ((unit.m * Q) - unit.removed_charge) / (unit.m * Q) * 100
                 unit.load = unit.capacity * unit.SOC / 100 
-            end
-            if current <= 0
-                unit.discharge_efficiency = NaN
-            end
-            if current >= 0 
-                unit.charge_efficiency = NaN
             end
             
             unit.V_cell_last = copy(unit.V_cell)
@@ -689,7 +695,7 @@ function output_values(unit::Battery)::Vector{String}
             "discharge_efficiency",
             "CellVoltage",
             "SOC",
-            "Charge"]
+            "RemovedCharge"]
 end
 
 function output_value(unit::Battery, key::OutputKey)::Float64
@@ -713,7 +719,7 @@ function output_value(unit::Battery, key::OutputKey)::Float64
         return unit.V_cell
     elseif key.value_key == "SOC"
         return unit.SOC
-    elseif key.value_key == "Charge"
+    elseif key.value_key == "RemovedCharge"
         return unit.removed_charge
     end
     throw(KeyError(key.value_key))
