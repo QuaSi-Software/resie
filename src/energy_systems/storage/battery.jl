@@ -287,10 +287,8 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
             max_energy_cell = cell_energy
         
         # if deeply discharged and little energy is added the voltage of the battery can drop below minimum
-        elseif unit.V_cell <= V_min && energy < 0 && abs(cell_energy) < 0.05 * unit.capacity_cell_Ah
-            V_cell = find_zero(V_cell -> V_cell_function(V_cell, cell_energy, unit, sim_params),
-                               V_min,
-                               Roots.Order1())
+        elseif unit.V_cell <= V_min && energy < 0 && abs(cell_energy) < 0.1 * unit.capacity_cell_Ah
+            V_cell = V_min
             max_energy_cell = cell_energy
 
         elseif energy > 0
@@ -298,10 +296,13 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                            unit.capacity_cell_Ah * unit.V_n / 2, 
                            Roots.Order1())
             ul = min(as*0.999, cell_energy)
-            max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, e_cell, 
+            try max_energy_cell = find_zero(e_cell -> V_cell_function(unit.V_cell_min, e_cell, 
                                                                   unit, sim_params), 
                                         (unit.capacity_cell_Ah*0.0001, ul), 
                                         Roots.Brent())
+            catch
+                max_energy_cell = 0.0
+            end
 
             V_cell = unit.V_cell_min
 
