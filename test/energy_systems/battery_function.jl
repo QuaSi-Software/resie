@@ -137,7 +137,7 @@ function calc_and_plot_discharge_charge_curve(c_rate, delta_t, aging_params, n=1
 
         V = calc_V_cell_cc_aging(I*delta_t, I, n, T, battery)
         battery.current_charge -= I*delta_t
-        V_sum = calc_V_cell_cc_sum_aging(discharge_charge, I, n, T, battery)
+        V_sum = f_V_cell(discharge_charge, I, n, T, battery)
         energy_discharge += delta_t * I * (V_cell_arr_sum[end]+V_sum)/2
 
         push!(V_cell_arr_sum, V_sum)
@@ -158,7 +158,7 @@ function calc_and_plot_discharge_charge_curve(c_rate, delta_t, aging_params, n=1
         V = calc_V_cell_cc_aging(I*delta_t, I, n, T, battery)
         battery.current_charge -= I*delta_t
 
-        V_sum = calc_V_cell_cc_sum_aging(charge_charge, I, n, T, battery)
+        V_sum = f_V_cell(charge_charge, I, n, T, battery)
         energy_charge -= delta_t * I * (V_cell_arr_sum[end]+V_sum)/2
 
         push!(V_cell_arr, V)
@@ -167,7 +167,7 @@ function calc_and_plot_discharge_charge_curve(c_rate, delta_t, aging_params, n=1
         push!(charge_arr, charge_charge)        
     end
     V = calc_V_cell_cc_aging(0, 0, n, T, battery)
-    V_sum = calc_V_cell_cc_sum_aging(charge_arr[end], 0, n, T, battery)
+    V_sum = f_V_cell(charge_arr[end], 0, n, T, battery)
     push!(V_cell_arr, V)
     push!(V_cell_arr_sum, V_sum)
     push!(SOC_arr, battery.current_charge/battery.capacity_cell_Ah*100) 
