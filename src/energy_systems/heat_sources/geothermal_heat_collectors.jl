@@ -2,6 +2,8 @@ using GLMakie
 using Roots
 using Plots: plot, savefig
 using Plots: Plots
+using SparseArrays
+using LinearAlgebra
 
 """
 Implementation of a geothermal heat collector.
@@ -118,6 +120,10 @@ mutable struct GeothermalHeatCollector <: Component
 
     process_done::Bool
     load_done::Bool
+
+    time_integration::String
+    max_picard_iter::Int
+    picard_tol::Float64
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -249,7 +255,10 @@ mutable struct GeothermalHeatCollector <: Component
                    0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
                    0.0,                                                  # volume_adjacent_to_pipe; precalculated parameter
                    false,                                                # process_done, bool indicating if the process step has already been performed in the current time step
-                   false)                                                # load_done, bool indicating if the load step has already been performed in the current time step
+                   false,                                                # load_done, bool indicating if the load step has already been performed in the current time step
+                   default(config, "time_integration", "implicit"),               # time_integration
+                   default(config, "max_picard_iter", 3),                # max_picard_iter: Maximum number of iterations during implicit solving (update k(T))
+                   default(config, "picard_tol", 1e-3))                  # picard_tol: Tolerance for picard iteration: absolute temperature difference
     end
 end
 
@@ -403,23 +412,29 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     # specific heat capacity for each node needed, because of apparent heat capacity method.
     unit.cp = fill(unit.soil_specific_heat_capacity, n_nodes_y, n_nodes_x)
 
-    # internal time step according to TRNSYS Type 710 Model (Hirsch, Hüsing & Rockendorf 2017):
-    if unit.dt == 0 # no dt given from input file
-        unit.dt = Int(max(1,
-                          floor(min(sim_params["time_step_seconds"],
-                                    (min(unit.soil_specific_heat_capacity / unit.soil_heat_conductivity,
-                                         unit.soil_specific_heat_capacity_frozen / unit.soil_heat_conductivity_frozen) *
-                                     unit.soil_density * min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) / 4))))
-    end
-    # ensure that dt is a divisor of the simulation time step
-    # find the largest divisor that is smaller than the calculated dt
-    if sim_params["time_step_seconds"] % unit.dt != 0
-        divisors = [i for i in 1:(unit.dt) if sim_params["time_step_seconds"] % i == 0]
-        unit.dt = divisors[end]
-    end
-    @info "The geothermal collector $(unit.uac) will be simulated with an internal time step of $(unit.dt) s."
+    if unit.time_integration == "explicit"
+        # internal time step according to TRNSYS Type 710 Model (Hirsch, Hüsing & Rockendorf 2017):
+        if unit.dt == 0 # no dt given from input file
+            unit.dt = Int(max(1,
+                              floor(min(sim_params["time_step_seconds"],
+                                        (min(unit.soil_specific_heat_capacity / unit.soil_heat_conductivity,
+                                             unit.soil_specific_heat_capacity_frozen /
+                                             unit.soil_heat_conductivity_frozen) *
+                                         unit.soil_density * min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) / 4))))
+        end
+        # ensure that dt is a divisor of the simulation time step
+        # find the largest divisor that is smaller than the calculated dt
+        if sim_params["time_step_seconds"] % unit.dt != 0
+            divisors = [i for i in 1:(unit.dt) if sim_params["time_step_seconds"] % i == 0]
+            unit.dt = divisors[end]
+        end
+        unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
+        @info "The geothermal collector $(unit.uac) will be simulated with an internal time step of $(unit.dt) s."
 
-    unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
+    elseif unit.time_integration == "implicit"
+        unit.n_internal_timesteps = 1
+        unit.dt = sim_params["time_step_seconds"]
+    end
 
     # vector to hold the results of the temperatures for each node in each simulation time step
     unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps_output"], n_nodes_y, n_nodes_x)
@@ -604,7 +619,7 @@ function control(unit::GeothermalHeatCollector,
     end
 end
 
-function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
+function calculate_new_temperature_field_explicit!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
     function determine_soil_heat_conductivity(h1::Int, i1::Int, h2::Int, i2::Int)
         if unit.t1[h1, i1] >= unit.phase_change_upper_boundary_temperature
             soil_heat_conductivity_1 = unit.soil_heat_conductivity
@@ -809,6 +824,265 @@ function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_ou
         end
         unit.t1 = copy(unit.t2)
     end
+end
+
+function calculate_new_temperature_field_implicit!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
+    # Calculate temperature field using implicit Euler
+    # --- helpers ---
+    function idx(nx::Int, h::Int, i::Int)
+        return (h - 1) * nx + i
+    end
+
+    function liquid_fraction(unit::GeothermalHeatCollector, T::Float64)
+        T0 = unit.phase_change_lower_boundary_temperature
+        T1 = unit.phase_change_upper_boundary_temperature
+        if T <= T0
+            return 0.0
+        elseif T >= T1
+            return 1.0
+        else
+            s = (T - T0) / (T1 - T0)   # in (0,1)
+            return s * s * (3.0 - 2.0 * s)   # smoothstep
+        end
+    end
+
+    function dliquid_dT(unit::GeothermalHeatCollector, T::Float64)
+        T0 = unit.phase_change_lower_boundary_temperature
+        T1 = unit.phase_change_upper_boundary_temperature
+        dT = T1 - T0
+        if T <= T0 || T >= T1
+            return 0.0
+        else
+            s = (T - T0) / dT
+            return (6.0 * s * (1.0 - s)) / dT    # d/dT smoothstep
+        end
+    end
+
+    function c_sensible(unit::GeothermalHeatCollector, T::Float64)
+        # linear blend of sensible cp across the interval
+        T0 = unit.phase_change_lower_boundary_temperature
+        T1 = unit.phase_change_upper_boundary_temperature
+        if T <= T0
+            return unit.soil_specific_heat_capacity_frozen
+        elseif T >= T1
+            return unit.soil_specific_heat_capacity
+        else
+            w = (T - T0) / (T1 - T0)
+            return (1.0 - w) * unit.soil_specific_heat_capacity_frozen + w * unit.soil_specific_heat_capacity
+        end
+    end
+
+    # evaluate conductivity at given temperature
+    function k_from_T(unit::GeothermalHeatCollector, T::Float64)
+        T0 = unit.phase_change_lower_boundary_temperature
+        T1 = unit.phase_change_upper_boundary_temperature
+        if T >= T1
+            return unit.soil_heat_conductivity
+        elseif T <= T0
+            return unit.soil_heat_conductivity_frozen
+        else
+            f = (T1 - T) / (T1 - T0)
+            return unit.soil_heat_conductivity * (1.0 - f) + unit.soil_heat_conductivity_frozen * f
+        end
+    end
+
+    function k_between(unit::GeothermalHeatCollector, Tmat::AbstractMatrix, h1::Int, i1::Int, h2::Int, i2::Int)
+        return (k_from_T(unit, Tmat[h1, i1]) + k_from_T(unit, Tmat[h2, i2])) / 2.0
+    end
+
+    # write output
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_field_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
+    end
+
+    # geometry
+    nx = length(unit.dx)
+    ny = length(unit.dy)
+    N = nx * ny
+
+    # ambient & radiation inputs
+    ambient_T = unit.constant_ambient_temperature === nothing ?
+                Profiles.value_at_time(unit.ambient_temperature_profile, sim_params) :
+                unit.constant_ambient_temperature
+
+    global_rad = unit.constant_global_radiation === nothing ?
+                 Profiles.power_at_time(unit.global_radiation_profile, sim_params) :
+                 unit.constant_global_radiation
+
+    infrared_sky_radiation = unit.constant_infrared_sky_radiation === nothing ?
+                             Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params) :
+                             unit.constant_infrared_sky_radiation
+    sky_temperature = (infrared_sky_radiation / unit.boltzmann_constant)^0.25  # [K]
+
+    # pipe source strength
+    specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes) # [W/m]
+    q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length                                      # [W per pipe]
+    hpipe = unit.fluid_node_y_idx
+
+    # initial state
+    T_old = copy(unit.t1)
+
+    # Picard iterations (update k(T))
+    T_guess = copy(T_old)
+
+    for _ in 1:(unit.max_picard_iter)
+        # Assemble A * T^{n+1} = b
+        I = Int[]
+        J = Int[]
+        V = Float64[]
+        b = zeros(Float64, N)
+
+        for h in 1:ny
+            for i in 1:nx
+                p = idx(nx, h, i)
+
+                # Bottom boundary (Dirichlet: undisturbed ground temperature)
+                if h == ny
+                    push!(I, p)
+                    push!(J, p)
+                    push!(V, 1.0)
+                    b[p] = unit.undisturbed_ground_temperature
+                    continue
+                end
+
+                # Capacity term (apparent cp)
+                c_eff = c_sensible(unit, T_guess[h, i]) +
+                        unit.soil_specific_enthalpy_of_fusion * dliquid_dT(unit, T_guess[h, i])
+                C = c_eff * unit.soil_weight[h, i]  # [J/K] for the control volume
+                aP = C / sim_params["time_step_seconds"]
+                rhs = aP * T_old[h, i]
+
+                # Conduction (finite-volume), k at current Picard iterate
+                # East
+                if i < nx
+                    kE = k_between(unit, T_guess, h, i, h, i + 1)
+                    aE = unit.dz * unit.dy[h] * kE / unit.dx_mesh[i]
+                    aP += aE
+                    push!(I, p)
+                    push!(J, idx(nx, h, i + 1))
+                    push!(V, -aE)
+                end
+                # West (omit link into the fluid node)
+                if i > 1
+                    if !(i == 2 && h == hpipe)
+                        kW = k_between(unit, T_guess, h, i, h, i - 1)
+                        aW = unit.dz * unit.dy[h] * kW / unit.dx_mesh[i - 1]
+                        aP += aW
+                        push!(I, p)
+                        push!(J, idx(nx, h, i - 1))
+                        push!(V, -aW)
+                    end
+                end
+                # South (+y)
+                if h < ny
+                    kS = k_between(unit, T_guess, h, i, h + 1, i)
+                    aS = unit.dz * unit.dx[i] * kS / unit.dy_mesh[h]
+                    aP += aS
+                    push!(I, p)
+                    push!(J, idx(nx, h + 1, i))
+                    push!(V, -aS)
+                end
+                # North (-y) (interior only; surface handled below)
+                if h > 1
+                    kN = k_between(unit, T_guess, h, i, h - 1, i)
+                    aN = unit.dz * unit.dx[i] * kN / unit.dy_mesh[h - 1]
+                    aP += aN
+                    push!(I, p)
+                    push!(J, idx(nx, h - 1, i))
+                    push!(V, -aN)
+                end
+
+                # Surface cell: add convection implicitly; radiation & solar explicitly
+                if h == 1
+                    A_surf = unit.dz * unit.dx[i]
+                    hconv = unit.surface_convective_heat_transfer_coefficient
+                    aP += hconv * A_surf
+                    rhs += hconv * A_surf * ambient_T
+
+                    # explicit sources
+                    rhs += A_surf * (1.0 - unit.surface_reflection_factor) * global_rad
+                    rhs += A_surf * unit.surface_emissivity * unit.boltzmann_constant *
+                           (sky_temperature^4 - (T_guess[h, i] + 273.15)^4)
+                end
+
+                # finalize central coeff & RHS
+                push!(I, p)
+                push!(J, p)
+                push!(V, aP)
+                b[p] += rhs
+            end
+        end
+
+        # Pipe source distribution (5 surrounding nodes)
+        b[idx(nx, hpipe - 1, 1)] += (1.0 / 16.0) * q_in_out_surrounding
+        b[idx(nx, hpipe + 1, 1)] += (1.0 / 16.0) * q_in_out_surrounding
+        b[idx(nx, hpipe, 2)] += (1.0 / 8.0) * q_in_out_surrounding
+        b[idx(nx, hpipe - 1, 2)] += (1.0 / 8.0) * q_in_out_surrounding
+        b[idx(nx, hpipe + 1, 2)] += (1.0 / 8.0) * q_in_out_surrounding
+
+        # Solve sparse linear system
+        A = sparse(I, J, V, N, N)
+        T_vec = A \ b
+
+        # Map vector back to (ny, nx)
+        T_new = similar(unit.t1)
+        for hh in 1:ny
+            for ii in 1:nx
+                T_new[hh, ii] = T_vec[idx(nx, hh, ii)]
+            end
+        end
+
+        # Convergence on successive iterates
+        max_dT = 0.0
+        for hh in 1:ny
+            for ii in 1:nx
+                max_dT = max(max_dT, abs(T_guess[hh, ii] - T_new[hh, ii]))
+            end
+        end
+
+        if max_dT < unit.picard_tol
+            break
+        else
+            # light damping helps if many cells cross the phase band in one go
+            T_guess .= 0.5 .* T_guess .+ 0.5 .* T_new
+        end
+    end
+
+    # Commit field
+    unit.t2 .= T_guess
+
+    # Pipe-adjacent average
+    avg_adj = (unit.t2[hpipe - 1, 1] +
+               unit.t2[hpipe + 1, 1] +
+               2.0 * unit.t2[hpipe, 2] +
+               2.0 * unit.t2[hpipe + 1, 2] +
+               2.0 * unit.t2[hpipe - 1, 2]) / 8.0
+    unit.average_temperature_adjacent_to_pipe = avg_adj
+
+    # Fluid temperature using pipe/soil resistance (compute with final local k)
+    if unit.model_type == "simplified"
+        pipe_R_len = unit.pipe_soil_thermal_resistance
+    else
+        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out,
+                                                                                 sim_params["wh_to_watts"])
+        k_loc = k_from_T(unit, unit.t2[hpipe, 2])
+        k_eff = 1.0 / (unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
+                       (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2.0 * unit.pipe_heat_conductivity) +
+                       unit.dx_mesh[2] / (2.0 * k_loc))
+        pipe_R_len = 1.0 / (k_eff * pi * unit.pipe_d_o)
+    end
+
+    unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe +
+                             pipe_R_len * specific_heat_flux_pipe
+    unit.t2[hpipe, 1] = unit.fluid_temperature
+    unit.t2[hpipe - 1, 1] = avg_adj
+    unit.t2[hpipe + 1, 1] = avg_adj
+    unit.t2[hpipe, 2] = avg_adj
+    unit.t2[hpipe - 1, 2] = avg_adj
+    unit.t2[hpipe + 1, 2] = avg_adj
+
+    # advance
+    unit.t1 .= unit.t2
 end
 
 function plot_optional_figures_begin(unit::GeothermalHeatCollector,
@@ -1081,7 +1355,11 @@ function handle_component_update!(unit::GeothermalHeatCollector, step::String, s
     end
     if unit.process_done && unit.load_done
         # calculate new temperatures of field to account for possible ambient effects
-        calculate_new_temperature_field!(unit, unit.collector_total_heat_energy_in_out, sim_params)
+        if unit.time_integration == "explicit"
+            calculate_new_temperature_field_explicit!(unit, unit.collector_total_heat_energy_in_out, sim_params)
+        elseif unit.time_integration == "implicit"
+            calculate_new_temperature_field_implicit!(unit, unit.collector_total_heat_energy_in_out, sim_params)
+        end
         # reset 
         unit.process_done = false
         unit.load_done = false
