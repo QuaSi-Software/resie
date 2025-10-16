@@ -91,7 +91,6 @@ mutable struct GeothermalHeatCollector <: Component
     dx_mesh::Vector{Float64}
     dy_mesh::Vector{Float64}
     dz::Float64
-    dt::Integer
 
     fluid_temperature::Temperature
 
@@ -112,7 +111,6 @@ mutable struct GeothermalHeatCollector <: Component
     undisturbed_ground_temperature::Float64
 
     temp_field_output::Array{Float64}
-    n_internal_timesteps::Int
     sigma_lat::Float64
     t_lat::Float64
     delta_t_lat::Float64
@@ -121,7 +119,6 @@ mutable struct GeothermalHeatCollector <: Component
     process_done::Bool
     load_done::Bool
 
-    time_integration::String
     max_picard_iter::Int
     picard_tol::Float64
 
@@ -233,7 +230,6 @@ mutable struct GeothermalHeatCollector <: Component
                    Array{Float64}(undef, 0),                             # dx_mesh [m] this is dx between the nodes (while dx is the x-width assigned to each node)
                    Array{Float64}(undef, 0),                             # dy_mesh [m] this is dy between the nodes (while dy is the y-width assigned to each node)
                    0.0,                                                  # dz [m] horizontal dimension parallel to ground surface and parallel to pipe (equals the length of one pipe, constant)
-                   default(config, "internal_time_step", 0),             # dt [s], time step width of internal timestep, is calculated depending on ground properties and discretisation
                    0.0,                                                  # fluid_temperature [°C], is set to fluid_start_temperature at the beginning               
                    0.0,                                                  # collector_total_heat_energy_in_out, total heat flux in or out of collector
                    default(config, "pipe_heat_conductivity", 0.4),       # pipe_heat_conductivity [W/(mK)] 
@@ -249,14 +245,12 @@ mutable struct GeothermalHeatCollector <: Component
                    default(config, "start_temperature_fluid_and_pipe", 15.5), # average_temperature_adjacent_to_pipe [°C], used as starting temperature of fluid and soil near pipe during initialisation
                    default(config, "undisturbed_ground_temperature", 9.0),    # undisturbed ground temperature at the bottom of the simulation boundary [°C]
                    Array{Float64}(undef, 0, 0, 0),                       # temp_field_output [°C], holds temperature field of nodes for output plot
-                   0,                                                    # n_internal_timesteps: number of internal time steps within one simulation time step
                    0.0,                                                  # sigma_lat; precalculated parameter for freezing function
                    0.0,                                                  # t_lat; precalculated parameter for freezing function
                    0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
                    0.0,                                                  # volume_adjacent_to_pipe; precalculated parameter
                    false,                                                # process_done, bool indicating if the process step has already been performed in the current time step
                    false,                                                # load_done, bool indicating if the load step has already been performed in the current time step
-                   default(config, "time_integration", "implicit"),               # time_integration
                    default(config, "max_picard_iter", 3),                # max_picard_iter: Maximum number of iterations during implicit solving (update k(T))
                    default(config, "picard_tol", 1e-3))                  # picard_tol: Tolerance for picard iteration: absolute temperature difference
     end
@@ -411,30 +405,6 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
 
     # specific heat capacity for each node needed, because of apparent heat capacity method.
     unit.cp = fill(unit.soil_specific_heat_capacity, n_nodes_y, n_nodes_x)
-
-    if unit.time_integration == "explicit"
-        # internal time step according to TRNSYS Type 710 Model (Hirsch, Hüsing & Rockendorf 2017):
-        if unit.dt == 0 # no dt given from input file
-            unit.dt = Int(max(1,
-                              floor(min(sim_params["time_step_seconds"],
-                                        (min(unit.soil_specific_heat_capacity / unit.soil_heat_conductivity,
-                                             unit.soil_specific_heat_capacity_frozen /
-                                             unit.soil_heat_conductivity_frozen) *
-                                         unit.soil_density * min(minimum(unit.dx_mesh), minimum(unit.dy_mesh))^2) / 4))))
-        end
-        # ensure that dt is a divisor of the simulation time step
-        # find the largest divisor that is smaller than the calculated dt
-        if sim_params["time_step_seconds"] % unit.dt != 0
-            divisors = [i for i in 1:(unit.dt) if sim_params["time_step_seconds"] % i == 0]
-            unit.dt = divisors[end]
-        end
-        unit.n_internal_timesteps = Int(floor(sim_params["time_step_seconds"] / unit.dt))
-        @info "The geothermal collector $(unit.uac) will be simulated with an internal time step of $(unit.dt) s."
-
-    elseif unit.time_integration == "implicit"
-        unit.n_internal_timesteps = 1
-        unit.dt = sim_params["time_step_seconds"]
-    end
 
     # vector to hold the results of the temperatures for each node in each simulation time step
     unit.temp_field_output = zeros(Float64, sim_params["number_of_time_steps_output"], n_nodes_y, n_nodes_x)
@@ -619,214 +589,7 @@ function control(unit::GeothermalHeatCollector,
     end
 end
 
-function calculate_new_temperature_field_explicit!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
-    function determine_soil_heat_conductivity(h1::Int, i1::Int, h2::Int, i2::Int)
-        if unit.t1[h1, i1] >= unit.phase_change_upper_boundary_temperature
-            soil_heat_conductivity_1 = unit.soil_heat_conductivity
-        elseif unit.t1[h1, i1] <= unit.phase_change_lower_boundary_temperature
-            soil_heat_conductivity_1 = unit.soil_heat_conductivity_frozen
-        else # linear interpolation between frozen and unfrozen conductivity
-            factor = (unit.phase_change_upper_boundary_temperature - unit.t1[h1, i1]) /
-                     (unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature)
-            soil_heat_conductivity_1 = unit.soil_heat_conductivity * (1 - factor) +
-                                       unit.soil_heat_conductivity_frozen * factor
-        end
-
-        if unit.t1[h2, i2] >= unit.phase_change_upper_boundary_temperature
-            soil_heat_conductivity_2 = unit.soil_heat_conductivity
-        elseif unit.t1[h2, i2] <= unit.phase_change_lower_boundary_temperature
-            soil_heat_conductivity_2 = unit.soil_heat_conductivity_frozen
-        else # linear interpolation between frozen and unfrozen conductivity
-            factor = (unit.phase_change_upper_boundary_temperature - unit.t1[h2, i2]) /
-                     (unit.phase_change_upper_boundary_temperature - unit.phase_change_lower_boundary_temperature)
-            soil_heat_conductivity_2 = unit.soil_heat_conductivity * (1 - factor) +
-                                       unit.soil_heat_conductivity_frozen * factor
-        end
-
-        # arithmetic mean is used here for simplicity
-        return (soil_heat_conductivity_1 + soil_heat_conductivity_2) / 2
-    end
-
-    if unit.model_type == "simplified"
-        pipe_thermal_resistance_length_specific = unit.pipe_soil_thermal_resistance
-    elseif unit.model_type == "detailed"
-        # calculate heat transfer coefficient and thermal resistance
-        unit.alpha_fluid_pipe, unit.fluid_reynolds_number = calculate_alpha_pipe(unit, q_in_out,
-                                                                                 sim_params["wh_to_watts"])
-
-        # calculation of pipe_thermal_resistance_length_specific with the approach by TRNSYS Type 710 publication
-        k = 1 / ((unit.pipe_d_o / (unit.alpha_fluid_pipe * unit.pipe_d_i) +
-                  (log(unit.pipe_d_o / unit.pipe_d_i) * unit.pipe_d_o) / (2 * unit.pipe_heat_conductivity) +
-                  unit.dx_mesh[2] /
-                  (2 * determine_soil_heat_conductivity(unit.fluid_node_y_idx, 2, unit.fluid_node_y_idx, 2))))
-
-        pipe_thermal_resistance_length_specific = 1 / (k * pi * unit.pipe_d_o)
-    end
-
-    if sim_params["current_date"] >= sim_params["start_date_output"]
-        unit.temp_field_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :, :] = copy(unit.t1)
-    end
-
-    # calculate specific heat extraction for 1 pipe per length
-    specific_heat_flux_pipe = sim_params["wh_to_watts"](q_in_out) / (unit.pipe_length * unit.number_of_pipes)   # [W/m]
-    q_in_out_surrounding = specific_heat_flux_pipe * unit.pipe_length   # [W/pipe]
-
-    # calculate effective mean sky temperature (sky radiative temperature) according to Stefan-Boltzmann law assuming 
-    # the sky being a black body for the current time step:
-    if unit.constant_infrared_sky_radiation !== nothing
-        infrared_sky_radiation = unit.constant_infrared_sky_radiation
-    else
-        infrared_sky_radiation = Profiles.power_at_time(unit.infrared_sky_radiation_profile, sim_params)
-    end
-    sky_temperature = (infrared_sky_radiation / unit.boltzmann_constant)^0.25  # [K]
-
-    # loop over internal timesteps
-    for _ in 1:(unit.n_internal_timesteps)
-
-        # calculate fluid temperature and pipe-surrounding nodes
-        for h in [unit.fluid_node_y_idx]  # vertical direction
-            for i in [1]                  # horizontal direction
-                unit.fluid_temperature = unit.average_temperature_adjacent_to_pipe +
-                                         pipe_thermal_resistance_length_specific * specific_heat_flux_pipe # "+", because specific_heat_flux_pipe is negative during heat extraction.        
-
-                unit.t2[h, i] = unit.fluid_temperature
-
-                #! format: off
-                # upper node
-                unit.t2[h - 1, i] = unit.t1[h - 1, i] +
-                                    (unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h - 1, i, h - 2, i) * (unit.t1[h - 2, i] - unit.t1[h - 1, i]) / unit.dy_mesh[h - 2] +   # heat conduction in negative y-direction
-                                    1 / 16 * q_in_out_surrounding) *                                                                                                       # heat source / sink
-                                    unit.dt / (unit.soil_density_vector[h] * unit.cp[h - 1, i] * unit.volume_adjacent_to_pipe / 8)
-
-                unit.t2[h - 1, i], unit.cp[h - 1, i] = freezing(unit, unit.t1[h - 1, i], unit.t2[h - 1, i], unit.cp[h - 1, i], sim_params)
-
-                # lower node
-                unit.t2[h + 1, i] = unit.t1[h + 1, i] +
-                                    (unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h + 1, i, h + 2, i) *  (unit.t1[h + 2, i] - unit.t1[h + 1, i]) / unit.dy_mesh[h + 1] +  # heat conduction in positive y-direction
-                                    1 / 16 * q_in_out_surrounding) *                                                                                                       # heat source / sink
-                                    unit.dt / (unit.soil_density_vector[h] * unit.cp[h + 1, i] * unit.volume_adjacent_to_pipe / 8)
-
-                unit.t2[h + 1, i], unit.cp[h + 1, i] = freezing(unit, unit.t1[h + 1, i], unit.t2[h + 1, i], unit.cp[h + 1, i], sim_params)
-
-                # right node
-                unit.t2[h, i + 1] = unit.t1[h, i + 1] +
-                                    (unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i + 1, h, i + 2) * (unit.t1[h, i + 2] - unit.t1[h, i + 1]) / unit.dx_mesh[i + 1] +   # heat conduction in positive x-direction
-                                    1 / 8 * q_in_out_surrounding) *                                                                                                        # heat source / sink
-                                    unit.dt / (unit.soil_density_vector[h] * unit.cp[h, i + 1] * unit.volume_adjacent_to_pipe / 4)
-
-                unit.t2[h, i + 1], unit.cp[h, i + 1] = freezing(unit, unit.t1[h, i + 1], unit.t2[h, i + 1], unit.cp[h, i + 1], sim_params)
-
-                # upper right node
-                unit.t2[h - 1, i + 1] = unit.t1[h - 1, i + 1] +
-                                        (unit.dz * unit.dy[h - 1] * determine_soil_heat_conductivity(h - 1, i + 1, h - 1, i + 2) * (unit.t1[h - 1, i + 2] - unit.t1[h - 1, i + 1]) / unit.dx_mesh[i + 1] +  # heat conduction in positive x-direction
-                                        unit.dz * unit.dx[i + 1] * determine_soil_heat_conductivity(h - 1, i + 1, h - 2, i + 1) * (unit.t1[h - 2, i + 1] - unit.t1[h - 1, i + 1]) / unit.dy_mesh[h - 2] +   # heat conduction in negative y-direction
-                                        1 / 8 * q_in_out_surrounding) *                                                                                                                       # heat source / sink
-                                        unit.dt / (unit.soil_density_vector[h] * unit.cp[h - 1, i + 1] * unit.volume_adjacent_to_pipe / 4)
-
-                unit.t2[h - 1, i + 1], unit.cp[h - 1, i + 1] = freezing(unit, unit.t1[h - 1, i + 1], unit.t2[h - 1, i + 1], unit.cp[h - 1, i + 1], sim_params)
-
-                # lower right node
-                unit.t2[h + 1, i + 1] = unit.t1[h + 1, i + 1] +
-                                        (unit.dz * unit.dx[i + 1] * determine_soil_heat_conductivity(h + 1, i + 1, h + 2, i + 1) * (unit.t1[h + 2, i + 1] - unit.t1[h + 1, i + 1]) / unit.dy_mesh[h + 1] +   # heat conduction in positive y-direction
-                                        unit.dz * unit.dy[h + 1] * determine_soil_heat_conductivity(h + 1, i + 1, h + 1, i + 2) * (unit.t1[h + 1, i + 2] - unit.t1[h + 1, i + 1]) / unit.dx_mesh[i + 1] +    # heat conduction in positive x-direction
-                                        1 / 8 * q_in_out_surrounding) *                                                                                                                        # heat source / sink
-                                        unit.dt / (unit.soil_density_vector[h] * unit.cp[h + 1, i + 1] * unit.volume_adjacent_to_pipe / 4)
-
-                unit.t2[h + 1, i + 1], unit.cp[h + 1, i + 1] = freezing(unit, unit.t1[h + 1, i + 1], unit.t2[h + 1, i + 1], unit.cp[h + 1, i + 1], sim_params)
-
-                unit.average_temperature_adjacent_to_pipe = (unit.t2[h - 1, i]     +
-                                                             unit.t2[h + 1, i]     +
-                                                             2 * unit.t2[h, i + 1]     +
-                                                             2 * unit.t2[h + 1, i + 1] +
-                                                             2 * unit.t2[h - 1, i + 1]) / 8
-                #! format: on 
-
-                # average temperature of the nodes around the pipe
-                unit.t2[h - 1, i] = unit.average_temperature_adjacent_to_pipe
-                unit.t2[h + 1, i] = unit.average_temperature_adjacent_to_pipe
-                unit.t2[h, i + 1] = unit.average_temperature_adjacent_to_pipe
-                unit.t2[h + 1, i + 1] = unit.average_temperature_adjacent_to_pipe
-                unit.t2[h - 1, i + 1] = unit.average_temperature_adjacent_to_pipe
-            end
-        end
-
-        # loop over vertical direction
-        for h in 1:(length(unit.dy_mesh))
-            # loop over horizontal direction
-            for i in 1:(length(unit.dx))
-                # calculate temperature of adjacent nodes to fluid
-                if (h == unit.fluid_node_y_idx && i == 1) || unit.is_pipe_surrounding[h, i]
-                    # do nothing, because fluid temperature and surrounding nodes are already calculated before
-                    continue
-                elseif h == 1  # surface layer
-                    #! format: off
-                    # left boundary
-                    if i == 1
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.t1[h, i]) +                            # Convection on surface
-                                         unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
-                                         unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +                            # heat conduction in positve x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-
-                    # right boundary
-                    elseif i == length(unit.dx)
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient * (unit.ambient_temperature - unit.t1[h, i]) +                            # Convection on surfac
-                                         unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surfac
-                                         unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +                        # heat conduction in negative x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-
-                    else
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dx[i] * unit.surface_convective_heat_transfer_coefficient *  (unit.ambient_temperature - unit.t1[h, i]) +                           # Convection on surface
-                                         unit.dz * unit.dx[i] * (1 - unit.surface_reflection_factor) * unit.global_radiation_power +                                                        # Radiation on surface
-                                         unit.dz * unit.dx[i] * unit.surface_emissivity * unit.boltzmann_constant * (sky_temperature^4 - (unit.t1[h, i] + 273.15)^4) +  # Radiation out of surface
-                                         unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +                            # heat conduction in positve x-direction
-                                         unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +                        # heat conduction in negative x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h]) *                           # heat conduction in positive y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-
-                    end
-                else # other layers below surface
-                    # left boundary (forward difference with Neumann condition to the left)
-                    if i == 1
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +       # heat conduction in positve x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h] +       # heat conduction in positive y-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h - 1, i) * (unit.t1[h - 1, i] - unit.t1[h, i]) / unit.dy_mesh[h - 1]) *  # heat conduction in negative y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-
-                    # right boundary (backward difference with Neumann condition to the right)
-                    elseif i == length(unit.dx)
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +   # heat conduction in negative x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h] +       # heat conduction in positive y-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h - 1, i) * (unit.t1[h - 1, i] - unit.t1[h, i]) / unit.dy_mesh[h - 1]) *  # heat conduction in negative y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-                    
-                    else
-                        unit.t2[h, i] = unit.t1[h, i] +
-                                        (unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i + 1) * (unit.t1[h, i + 1] - unit.t1[h, i]) / unit.dx_mesh[i] +       # heat conduction in positve x-direction
-                                         unit.dz * unit.dy[h] * determine_soil_heat_conductivity(h, i, h, i - 1) * (unit.t1[h, i - 1] - unit.t1[h, i]) / unit.dx_mesh[i - 1] +   # heat conduction in negative x-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h + 1, i) * (unit.t1[h + 1, i] - unit.t1[h, i]) / unit.dy_mesh[h] +       # heat conduction in positive y-direction
-                                         unit.dz * unit.dx[i] * determine_soil_heat_conductivity(h, i, h - 1, i) * (unit.t1[h - 1, i] - unit.t1[h, i]) / unit.dy_mesh[h - 1]) *  # heat conduction in negative y-direction
-                                        unit.dt / (unit.cp[h, i] * unit.soil_weight[h, i])
-
-                    end
-                    #! format: on
-                end
-                unit.t2[h, i], unit.cp[h, i] = freezing(unit, unit.t1[h, i], unit.t2[h, i], unit.cp[h, i], sim_params)
-            end
-        end
-        unit.t1 = copy(unit.t2)
-    end
-end
-
-function calculate_new_temperature_field_implicit!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
+function calculate_new_temperature_field!(unit::GeothermalHeatCollector, q_in_out::Float64, sim_params)
     # Calculate temperature field using implicit Euler
     # --- helpers ---
     function idx(nx::Int, h::Int, i::Int)
@@ -1165,64 +928,6 @@ function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Di
     return false
 end
 
-# function to handle freezing of the soil. Corrects the new temperature to include the enthalpy of fusion
-# both for melting and freezing.
-function freezing(unit::GeothermalHeatCollector,
-                  t_old::Float64,
-                  t_new::Float64,
-                  cp::Float64,
-                  sim_params::Dict{String,Any})
-    function f(t_new_correct)
-        function cp_freezing(t_new_correct)
-            return (unit.soil_specific_enthalpy_of_fusion / (unit.sigma_lat * sqrt(2 * pi)) *
-                    exp(-0.5 * (t_new_correct - unit.t_lat)^2 / unit.sigma_lat^2))
-        end
-        if t_new_correct > unit.phase_change_upper_boundary_temperature
-            return t_old -
-                   t_new_correct +
-                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity)
-        elseif t_new_correct < unit.phase_change_lower_boundary_temperature
-            return t_old -
-                   t_new_correct +
-                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity_frozen)
-        else
-            return t_old -
-                   t_new_correct +
-                   coeff / (cp_freezing(t_new_correct) + unit.soil_specific_heat_capacity_frozen +
-                            (unit.soil_specific_heat_capacity - unit.soil_specific_heat_capacity_frozen) *
-                            (t_new_correct - (unit.t_lat - unit.delta_t_lat / 2)) / unit.delta_t_lat)
-        end
-    end
-
-    if (t_old >= unit.phase_change_upper_boundary_temperature && t_new < unit.phase_change_upper_boundary_temperature ||
-        t_old <= unit.phase_change_lower_boundary_temperature && t_new > unit.phase_change_lower_boundary_temperature ||
-        t_old < unit.phase_change_upper_boundary_temperature && t_old > unit.phase_change_lower_boundary_temperature) &&
-       abs(t_old - t_new) > sim_params["epsilon"]
-        # solve t_new_corrected = t_old + coeff / cp_new(t_new_corrected) for t_new_corrected
-        coeff = (t_new - t_old) * cp
-        t_new_corrected = 0.0
-        try
-            t_new_corrected = find_zero(f, (-20, 20), Roots.A42())
-        catch e
-            @warn "Initial solving of freezing function of the geothermal collector $(unit.uac) with strict tolerance " *
-                  "failed, retrying with rougher tolerance for the current time step..."
-            try
-                t_new_corrected = find_zero(f, unit.t_lat; tol=1e-3)
-            catch e2
-                @error "The solving algorithm for the phase change process in the geothermal collector $(unit.uac) was not successful. " *
-                       "Manually decrease the \"internal_time_step\" which is currently $(unit.dt) s or change the accuracy_mode."
-                throw(CalculationError)
-            end
-        end
-        cp_corrected = coeff / (t_new_corrected - t_old)
-        return t_new_corrected, cp_corrected
-    elseif t_new >= unit.phase_change_upper_boundary_temperature
-        return t_new, unit.soil_specific_heat_capacity
-    else # only happens if t_new <= unit.phase_change_lower_boundary_temperature
-        return t_new, unit.soil_specific_heat_capacity_frozen
-    end
-end
-
 # function to calculate heat transfer coefficient alpha.
 function calculate_alpha_pipe(unit::GeothermalHeatCollector, q_in_out::Float64, wh2w::Function)
 
@@ -1355,11 +1060,7 @@ function handle_component_update!(unit::GeothermalHeatCollector, step::String, s
     end
     if unit.process_done && unit.load_done
         # calculate new temperatures of field to account for possible ambient effects
-        if unit.time_integration == "explicit"
-            calculate_new_temperature_field_explicit!(unit, unit.collector_total_heat_energy_in_out, sim_params)
-        elseif unit.time_integration == "implicit"
-            calculate_new_temperature_field_implicit!(unit, unit.collector_total_heat_energy_in_out, sim_params)
-        end
+        calculate_new_temperature_field!(unit, unit.collector_total_heat_energy_in_out, sim_params)
         # reset 
         unit.process_done = false
         unit.load_done = false
