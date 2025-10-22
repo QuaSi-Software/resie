@@ -485,6 +485,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     if default(project_config["io_settings"], "auxiliary_plots", false)
         aux_plots_output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+        aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
             if plot_optional_figures_begin(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
