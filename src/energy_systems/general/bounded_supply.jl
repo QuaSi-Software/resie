@@ -75,6 +75,9 @@ function control(unit::BoundedSupply,
         unit.max_energy = 0.0
     end
 
+    max_plr = upper_plr_limit(unit.controller, sim_params)
+    unit.max_energy *= max_plr
+
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
