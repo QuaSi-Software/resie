@@ -91,8 +91,20 @@ Base.@kwdef mutable struct Battery <: Component
         model_type = default(config, "model_type", "simplified")
         model_type_allowed_values = ["simplified", "no_aging", "with_aging"]
         if !(model_type in model_type_allowed_values)
-            @error "Undefined model type \"$(model_type)\" of battery \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
+            @error "Undefined model type \"$(model_type)\" of battery \"$(uac)\". " *
+                   "Has to be one of: $(model_type_allowed_values)."
             throw(InputError)
+        end
+
+        # check that charge_efficiency and discharge_efficiency are set for simplified model
+        charge_efficiency = default(config, "charge_efficiency", nothing)
+        discharge_efficiency = default(config, "discharge_efficiency", nothing)
+        if model_type == "simplified" && 
+           (charge_efficiency == nothing || discharge_efficiency == nothing)
+           # end of expression
+            @error "If model \"simplified\" is used for battery \"$(uac)\" then " *
+                   "\"charge_efficiency\" and \"discharge_efficiency\" must be given."
+            throw(InputError)      
         end
 
         # NMC
@@ -171,8 +183,8 @@ Base.@kwdef mutable struct Battery <: Component
                    0.0, # battery voltage at the end of the last timestep in V
                    0.0, # battery voltage after charging
                    0.0, # battery voltage after discharging
-                   0.0, # number of cells connected in parallel 
-                   0.0, # number of cells connected in series
+                   1.0, # number of cells connected in parallel 
+                   1.0, # number of cells connected in series
                    0.0, # sum of all added and removed charge to the cell in Ah
                    0.0, # sum of all added and removed charge to the cell in the last timestep in Ah
                    0.0, # SOC in the current time step
@@ -269,7 +281,7 @@ function control(unit::Battery,
     update(unit.controller)
     if discharge_is_allowed(unit.controller, sim_params) && unit.SOC > unit.SOC_min &&
        (unit.V_cell > unit.V_cell_min || unit.model_type == "simplified")
-        # end of expression
+       # end of expression
         discharge_current = unit.max_discharge_C_rate * unit.capacity_cell_Ah
         unit.discharge_efficiency,
         unit.V_cell_discharge,
@@ -287,8 +299,10 @@ function control(unit::Battery,
         unit.V_cell_charge,
         unit.max_charge_energy,
         charge = calc_efficiency_current(charge_current, unit, sim_params)
-        if unit.model_type != "simplified" && -sim_params["wh_to_watts"](charge) < unit.cell_cutoff_current &&
+        if unit.model_type != "simplified" && 
+           -sim_params["wh_to_watts"](charge) < unit.cell_cutoff_current &&
            unit.V_cell_last == unit.V_cell_max
+           # end of expression
             unit.max_charge_energy = 0.0
         end
     else
@@ -304,9 +318,9 @@ end
 function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,Any})
     if unit.model_type == "simplified"
         if energy >= 0
-            return unit.discharge_efficiency, 0, min(energy, unit.load)
+            return unit.discharge_efficiency, 1, min(energy, unit.load), 0
         else
-            return unit.charge_efficiency, 0, min(abs(energy), unit.capacity - unit.load)
+            return unit.charge_efficiency, 1, min(abs(energy), unit.capacity - unit.load), 0
         end
     else
         # calculate V_cell
@@ -447,10 +461,10 @@ function calc_efficiency_current(current::Number, unit::Battery, sim_params::Dic
     if unit.model_type == "simplified"
         if current >= 0
             energy = sim_params["watt_to_wh"](unit.max_discharge_C_rate * unit.capacity)
-            return unit.discharge_efficiency, 0, min(energy, unit.load)
+            return unit.discharge_efficiency, 1, min(energy, unit.load), 0
         else
             energy = sim_params["watt_to_wh"](unit.max_charge_C_rate * unit.capacity)
-            return unit.charge_efficiency, 0, min(abs(energy), unit.capacity - unit.load)
+            return unit.charge_efficiency, 1, min(abs(energy), unit.capacity - unit.load), 0
         end
     else
         # calculate V_cell
@@ -616,7 +630,6 @@ function load(unit::Battery, sim_params::Dict{String,Any})
                 unit.V_cell = unit.V_cell_charge
                 charge = -charge_energy_bat / unit.n_cell_p / unit.n_cell_s * 2 / (unit.V_cell_last + unit.V_cell)
             end
-
             unit.losses += charge_energy_bat * (1.0 / unit.charge_efficiency - 1)
             unit.extracted_charge += charge
 
