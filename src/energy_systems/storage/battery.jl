@@ -32,21 +32,19 @@ Base.@kwdef mutable struct Battery <: Component
     SOC_max::Float64
     # detailed
     V_n_bat::Float64
+    cell_cutoff_current::Float64
+    cycles::Float64
+    Temp::Float64
     V_n::Float64
     r_i::Float64
     V_0::Float64
     K::Float64
     A::Float64
     B::Float64
-    V_cell_min::Float64
-    V_cell_max::Float64
     capacity_cell_Ah::Float64
     m::Float64
     alpha::Float64
-    cell_cutoff_current::Float64
     # with aging
-    cycles::Float64
-    Temp::Float64
     k_qn::Array{Float64,1}
     k_qT::Array{Float64,1}
     k_n::Array{Float64,1}
@@ -60,6 +58,8 @@ Base.@kwdef mutable struct Battery <: Component
     max_discharge_energy::Float64
     V_cell::Float64
     V_cell_last::Float64
+    V_cell_min::Float64
+    V_cell_max::Float64
     V_cell_charge::Float64
     V_cell_discharge::Float64
     n_cell_p::Float64
@@ -103,15 +103,13 @@ Base.@kwdef mutable struct Battery <: Component
             config["K"] =  0.03546
             config["A"] =  0.08165
             config["B"] =  0.1003
-            config["V_cell_min"] =  2.0
-            config["V_cell_max"] =  3.4
             config["capacity_cell_Ah"] =  1090
             config["m"] = 1.0269
             config["alpha"] = -0.01212
-            config["k_qn"] = [-1.27571e-7 1.22095e-11]
-            config["k_qT"] = [1.32729e-3 -7.9763e-6]
-            config["k_n"] = [9.71249e-6 7.51635e-4 -8.59363e-5 -2.92489e-4]
-            config["k_T"] = [1.05135e-3 1.83721e-2 -7.72438e-3 -4.31833e-2]
+            config["k_qn"] = [-1.27571e-7, 1.22095e-11]
+            config["k_qT"] = [1.32729e-3, -7.9763e-6]
+            config["k_n"] = [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]
+            config["k_T"] = [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]
             config["I_ref"] = 100
             config["T_ref"] = 25
         end
@@ -175,24 +173,22 @@ Base.@kwdef mutable struct Battery <: Component
                    default(config, "SOC_min", 0),
                    default(config, "SOC_max", 0),
                    config["V_n_bat"], # nominal voltage of the battery pack
-                   default(config, "V_n", 0.0), # nominal voltage of the cell in V
-                   default(config, "r_i", 0.0), # internal resistance of the cell in Ohm
-                   default(config, "V_0", 0.0), # battery constant voltage in V
-                   default(config, "K", 0.0), # polarisation voltage in V
-                   default(config, "A", 0.0), # exponential zone amplitude in V
-                   default(config, "B", 0.0), # exponential zone time constant inverse in 1/(Ah)
-                   default(config, "V_cell_min", 0.0), # minimum cell voltage that defines the battery as empty in V
-                   default(config, "V_cell_max", 0.0), # maximum cell voltage that defines the battery as full in V
-                   default(config, "capacity_cell_Ah", 0.0), # nominal cell capacity in Ah
-                   default(config, "m", 1.0),
-                   default(config, "alpha", 0.0),
                    default(config, "cell_cutoff_current", 0.003 * default(config, "capacity_cell_Ah", 0.0)),
                    default(config, "cycles", 1.0), # number of cycles
-                   default(config, "T_bat", 25.0), # cell temperature in °C
-                   default(config, "k_qn", [0.0, 0.0]),
-                   default(config, "k_qT", [0.0, 0.0]),
-                   default(config, "k_n", [0.0, 0.0, 0.0, 0.0]),
-                   default(config, "k_T", [0.0, 0.0, 0.0, 0.0]),
+                   default(config, "Temp", 25.0), # cell temperature in °C
+                   default(config, "V_n", 3.2), # nominal voltage of the cell in V
+                   default(config, "r_i", 0.00016), # internal resistance of the cell in Ohm
+                   default(config, "V_0", 3.36964), # battery constant voltage in V
+                   default(config, "K", 0.03546), # polarisation voltage in V
+                   default(config, "A", 0.08165), # exponential zone amplitude in V
+                   default(config, "B", 0.1003), # exponential zone time constant inverse in 1/(Ah)
+                   default(config, "capacity_cell_Ah", 1090), # nominal cell capacity in Ah
+                   default(config, "m", 1.0269),
+                   default(config, "alpha", -0.01212),
+                   default(config, "k_qn",  [-1.27571e-7, 1.22095e-11]),
+                   default(config, "k_qT", [1.32729e-3, -7.9763e-6]),
+                   default(config, "k_n",  [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]),
+                   default(config, "k_T", [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]),
                    default(config, "I_ref", 0.0),
                    default(config, "T_ref", 25.0),
                    0.0, # load_end_of_last_timestep
@@ -201,6 +197,8 @@ Base.@kwdef mutable struct Battery <: Component
                    0.0, # maximum discharge energy in current timestep
                    0.0, # battery voltage in V
                    0.0, # battery voltage at the end of the last timestep in V
+                   0.0, # minimum cell voltage that defines the battery as empty in V
+                   0.0, # maximum cell voltage that defines the battery as full in V
                    0.0, # battery voltage after charging
                    0.0, # battery voltage after discharging
                    1.0, # number of cells connected in parallel 
