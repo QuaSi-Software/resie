@@ -89,11 +89,31 @@ Base.@kwdef mutable struct Battery <: Component
 
         # get model type from input file
         model_type = default(config, "model_type", "simplified")
-        model_type_allowed_values = ["simplified", "no_aging", "with_aging"]
+        model_type_allowed_values = ["simplified", "detailed", "Li-LFP"]
         if !(model_type in model_type_allowed_values)
             @error "Undefined model type \"$(model_type)\" of battery \"$(uac)\". " *
                    "Has to be one of: $(model_type_allowed_values)."
             throw(InputError)
+        end
+
+        if model_type == "Li-LFP"
+            config["V_n"] =  3.2
+            config["r_i"] =  0.00016
+            config["V_0"] =  3.36964
+            config["K"] =  0.03546
+            config["A"] =  0.08165
+            config["B"] =  0.1003
+            config["V_cell_min"] =  2.0
+            config["V_cell_max"] =  3.4
+            config["capacity_cell_Ah"] =  1090
+            config["m"] = 1.0269
+            config["alpha"] = -0.01212
+            config["k_qn"] = [-1.27571e-7 1.22095e-11]
+            config["k_qT"] = [1.32729e-3 -7.9763e-6]
+            config["k_n"] = [9.71249e-6 7.51635e-4 -8.59363e-5 -2.92489e-4]
+            config["k_T"] = [1.05135e-3 1.83721e-2 -7.72438e-3 -4.31833e-2]
+            config["I_ref"] = 100
+            config["T_ref"] = 25
         end
 
         # check that charge_efficiency and discharge_efficiency are set for simplified model
