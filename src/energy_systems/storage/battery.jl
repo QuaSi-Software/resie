@@ -947,8 +947,13 @@ function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_fu
                           T_ref=25)
 
     # basic values new
-    B = -1 / Q_2 * log((V_full - V_3) / (V_full - V_2) - 1)
-    A = (V_full - V_3) / (1 - exp(-B * Q_3))
+    if Q_2 == Q_full_1
+        A=0
+        B=1
+    else
+        B = -1 / Q_2 * log((V_full - V_3) / (V_full - V_2) - 1)
+        A = (V_full - V_3) / (1 - exp(-B * Q_3))
+    end
 
     AB_4 = V_full - V_4 - A * (1 - exp(-B * Q_4)) # exp(-B*Q_4) -> 0
     AB_5 = V_full - V_cut - A * (1 - exp(-B * Q_full_1)) # exp(-B*Q_full) -> 0
