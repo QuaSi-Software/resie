@@ -39,12 +39,20 @@ mutable struct CM_EconomicControl <: ControlModule
         )
         new_connectivity = ConnectionMatrix(config)
         original_connectivity = components[unit_uac].connectivity
+
         new_components = deepcopy(components)
         new_components[unit_uac].connectivity = new_connectivity
+        # follow steps load_components() in project_loading to make sure new_OoO gets 
+        # calculated correctly
         reorder_interfaces_of_bus!(new_components[unit_uac])
         initialise_components(new_components, sim_params)
+        chains = find_chains(values(new_components), sf_bus)
+        merge_bus_chains(chains, new_components, sim_params)
+        # calculate new order_of_operations to have it available for later use
         new_OoO = calculate_order_of_operations(new_components)
+        # remove new_components and chains from memory since they are not needed any more
         new_components = nothing
+        chains = nothing
 
         return new("economic_control", params, price_profile, new_connectivity, 
                    original_connectivity, new_OoO)
