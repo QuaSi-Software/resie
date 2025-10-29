@@ -251,8 +251,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             @info "-- Preheating completed. Starting output now."
         end
 
-        # perform the simulation
-        perform_steps(components, step_order, sim_params)
+        step_order_adjusted = reorder_OoO(components, step_order, sim_params)
+        perform_steps(components, step_order_adjusted, sim_params)
 
         if do_output
             # check if any component was not balanced

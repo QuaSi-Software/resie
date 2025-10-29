@@ -140,6 +140,7 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_negotiate_temperature
     cmf_limit_cooling_input_temperature
     cmf_check_src_to_snk
+    cmf_change_priorities
 end
 
 """
@@ -507,4 +508,20 @@ function check_src_to_snk(controller::Controller,
     end
 
     return true
+end
+
+
+function change_priorities(components::Grouping, 
+                           order_of_operations::StepInstructions,
+                           sim_params::Dict{String,Any})::StepInstructions
+    for unit in each(components)
+        for mod in unit.controller.modules
+            if !has_method_for(mod, cmf_change_priorities)
+                continue
+            end
+
+            order_of_operations = change_priorities(mod, components, order_of_operations, sim_params)
+        end
+    end
+    return order_of_operations
 end
