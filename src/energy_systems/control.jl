@@ -511,9 +511,9 @@ function check_src_to_snk(controller::Controller,
 end
 
 
-function change_priorities(components::Grouping, 
-                           order_of_operations::StepInstructions,
-                           sim_params::Dict{String,Any})::StepInstructions
+function change_priorities(components::Grouping,
+                           order_of_operations::OrderOfOperations,
+                           sim_params::Dict{String,Any})::OrderOfOperations
     for unit in each(components)
         for mod in unit.controller.modules
             if !has_method_for(mod, cmf_change_priorities)

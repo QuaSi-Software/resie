@@ -20,9 +20,9 @@ to the simulation as a whole as well as provide functionality on groups of compo
 """
 module EnergySystems
 
-export check_balances, Component, each, Grouping, link_output_with, perform_steps,
-       output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-       highest, default, plot_optional_figures_begin, plot_optional_figures_end, reorder_OoO
+export check_balances, Component, each, Grouping, link_output_with, perform_operations,
+       output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
+       default, plot_optional_figures_begin, plot_optional_figures_end, reorder_operations
 
 using ..Profiles
 using UUIDs
@@ -103,21 +103,17 @@ model.
       sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """
-Enumerations of a simulation step that can be performed on a component.
+Enumeration of operations that can be performed on a component.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
-@enum Step s_reset s_control s_process s_load s_distribute s_potential
+@enum OperationStep s_reset s_control s_process s_load s_distribute s_potential
 
 """
-Convenience type for holding the instruction for one component and one step.
+Convenvience type to holds the order of operations as instructions for how to perform one
+time step of the simulation.
 """
-const StepInstruction = Tuple{String,Step}
-
-"""
-Holds the order of steps as instructions for how to perform the simulation.
-"""
-const StepInstructions = Vector{StepInstruction}
+const OrderOfOperations = Vector{Tuple{String,OperationStep}}
 
 """
 The basic type of all energy system components.
@@ -1790,40 +1786,22 @@ function check_balances(components::Grouping,
 end
 
 """
-    perform_steps(components, order_of_operations, sim_params)
+    perform_operations(components, order_of_operations, sim_params)
 
-Perform the simulation steps of one time step for the given components in the given order.
+Performs the simulation operations of one time step for the given components in the given order.
 
 # Arguments
 - `components::Grouping`: The entirety of the components
-- `order_of_operations::Vector{Vector{Any}}`: Defines which steps are performed in which order.
-    Each component must go through the simulation steps defined in EnergySystems.Step, but the
-    order is not the same for all simulations. Determining the order must be handled
-    elsewhere, as this function only goes through and calls the appropriate functions. The
-    first item of each entry must be the key of the component for which the following steps
-    are performed.
+- `order_of_operations::OrderOfOperations`: Defines which operations are performed in which
+    order. Each component must go through the simulation operations defined in
+    EnergySystems.OperationStep, but the order is not the same for energy systems.
+    Determining the order must be handled elsewhere, as this function only goes through and
+    calls the appropriate functions.
 - `sim_params::Dict{String, Any}`: Project-wide simulation parameters
-
-# Examples
-```
-    components = Grouping(
-        "component_a" => Component(),
-        "component_b" => Component(),
-    )
-    order = [
-        ["component_a", EnergySystems.s_control]
-        ["component_b", EnergySystems.s_control, EnergySystems.s_process]
-        ["component_a", EnergySystems.s_process]
-    ]
-    sim_params = Dict{String, Any}("time" => 0)
-    perform_steps(components, order, sim_params)
-```
-In this example the control of component A is performed first, then control and processing of
-component B and finally processing of component A.
 """
-function perform_steps(components::Grouping,
-                       order_of_operations::StepInstructions,
-                       sim_params::Dict{String,Any})
+function perform_operations(components::Grouping,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})
     for entry in order_of_operations
         unit = components[entry[1]]
         step = entry[2]
@@ -1844,10 +1822,10 @@ function perform_steps(components::Grouping,
     end
 end
 
-function reorder_OoO(components::Grouping, 
-                     order_of_operations::StepInstructions,
-                     sim_params::Dict{String,Any})::StepInstructions
-        OoO_new = change_priorities(components, order_of_operations, sim_params)
+function reorder_operations(components::Grouping,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})::OrderOfOperations
+    OoO_new = change_priorities(components, order_of_operations, sim_params)
     return OoO_new
 end
 

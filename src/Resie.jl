@@ -151,7 +151,7 @@ Construct and prepare parameters, energy system components and the order of oper
 # Returns
 -`Dict{String,Any}`: Simulation parameters
 -`Grouping`: The constructed energy system components
--`StepInstructions`: Order of operations
+-`OrderOfOperations`: Order of operations
 """
 function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
     sim_params = get_simulation_params(project_config)
@@ -160,15 +160,15 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
     components = load_components(project_config["components"], sim_params)
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        step_order = load_order_of_operations(project_config["order_of_operation"], components)
+        operations = load_order_of_operations(project_config["order_of_operation"], components)
         @info "The order of operations was successfully imported from the input file.\n" *
               "Note that the order of operations has a major impact on the simulation " *
               "result and should only be changed by experienced users!"
     else
-        step_order = calculate_order_of_operations(components)
+        operations = calculate_order_of_operations(components)
     end
 
-    return sim_params, components, step_order
+    return sim_params, components, operations
 end
 
 """
@@ -180,12 +180,12 @@ Performs the simulation as loop over time steps and records outputs.
 -`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
 -`components::Grouping`: The energy system components
--`step_order::StepInstructions`:: Order of operations
+-`operations::OrderOfOperations`:: Order of operations
 """
 function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              sim_params::Dict{String,Any},
                              components::Grouping,
-                             step_order::StepInstructions)
+                             operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
     weather_data_keys = get_weather_data_keys(sim_params)
@@ -232,9 +232,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(project_config, components, step_order, sim_params)
+    dump_auxiliary_outputs(project_config, components, operations, sim_params)
 
-    @info "-- Start step loop"
+    @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
         @info "-- No preheating activated. Starting output from beginning."
     else
@@ -251,8 +251,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             @info "-- Preheating completed. Starting output now."
         end
 
-        step_order_adjusted = reorder_OoO(components, step_order, sim_params)
-        perform_steps(components, step_order_adjusted, sim_params)
+        operations_adjusted = reorder_operations(components, operations, sim_params)
+        perform_operations(components, operations_adjusted, sim_params)
 
         if do_output
             # check if any component was not balanced
@@ -305,7 +305,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             start = now()
         end
     end
-    @info "-- Finished step loop"
+    @info "-- Finished time step loop"
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
@@ -389,13 +389,13 @@ function load_and_run(filepath::String)
 
     @info "-- Now preparing inputs"
     run_ID = uuid1()
-    sim_params, components, step_order = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+    sim_params, components, operations = prepare_inputs(project_config, run_ID)
+    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, step_order)
+    run_simulation_loop(project_config, sim_params, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     return true
 end

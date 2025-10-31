@@ -10,7 +10,7 @@ mutable struct CM_EconomicControl <: ControlModule
     price_profile::Profile
     new_connectivity::ConnectionMatrix
     original_connectivity::ConnectionMatrix
-    new_OoO::StepInstructions
+    new_OoO::OrderOfOperations
 
     function CM_EconomicControl(parameters::Dict{String,Any},
                                 components::Grouping,
@@ -116,8 +116,8 @@ end
 
 function change_priorities(mod::CM_EconomicControl, 
                            components::Grouping,
-                           order_of_operations::StepInstructions, 
-                           sim_params::Dict{String,Any})::StepInstructions
+                           order_of_operations::OrderOfOperations, 
+                           sim_params::Dict{String,Any})::OrderOfOperations
     bus = components[mod.parameters["bus_uac"]]
     if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
         order_of_operations = mod.new_OoO

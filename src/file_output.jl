@@ -460,13 +460,13 @@ general to find out why the energy system behaves in the simulation as it does.
 """
 function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
                                 components::Grouping,
-                                order_of_operations::StepInstructions,
+                                order_of_operations::OrderOfOperations,
                                 sim_params::Dict{String,Any})
-    # export order of operation
+    # export order of operations
     if default(project_config["io_settings"], "auxiliary_info", false)
         aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
         open(abspath(aux_info_file_path), "w") do file_handle
-            write(file_handle, "# Simulation step order\n")
+            write(file_handle, "# Order of operations\n")
 
             for entry in order_of_operations
                 for step in entry[2:lastindex(entry)]

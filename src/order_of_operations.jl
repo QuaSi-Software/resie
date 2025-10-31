@@ -31,7 +31,7 @@ be in the following syntax:
 ]
 ```
 """
-function load_order_of_operations(order_of_operation_input, components::Grouping)::StepInstructions
+function load_order_of_operations(order_of_operation_input, components::Grouping)::OrderOfOperations
     step_instructions = []
     all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
 
@@ -68,7 +68,7 @@ end
 """
 calculate_order_of_operations(components)
 
-Calculate the order of steps that need to be performed to simulate the given components.
+Calculate the order of operations that need to be performed to simulate the given components.
 
 This function works by an algorithm described in more detail in the accompanying
 documentation. The result of this are step-by-step instructions telling the simulation
@@ -78,7 +78,7 @@ not trivial and might not work for each possible grouping of components.
 # Args
 - `components::Grouping`: The components for which an order is required
 # Returns
-- `StepInstructions`: The order in the structure:
+- `OrderOfOperations`: The order in the structure:
 ```
 [
     ["UAC Key", s_step],
@@ -86,7 +86,7 @@ not trivial and might not work for each possible grouping of components.
 ]
 ```
 """
-function calculate_order_of_operations(components::Grouping)::StepInstructions
+function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     components_by_function = categorize_by_function(components)
     simulation_order = base_order(components_by_function)
     simulation_order = remove_double_transformer_process_steps(simulation_order, components)
