@@ -34,7 +34,7 @@
             "scale": 200
         },
         "TST_SRC_01": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "medium": "m_h_w_lt1",
             "output_refs": [
                 "TST_HP_01"
@@ -43,7 +43,7 @@
             "constant_temperature": 5
         },
         "TST_SRC_02": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "medium": "m_h_w_lt1",
             "output_refs": [
                 "TST_HP_02"
@@ -52,7 +52,7 @@
             "constant_temperature": 20
         },
         "TST_SRC_03": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "medium": "m_h_w_ht1",
             "output_refs": [
                 "TST_BUS_TH"

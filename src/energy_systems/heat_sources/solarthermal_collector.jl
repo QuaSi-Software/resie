@@ -112,7 +112,7 @@ mutable struct SolarthermalCollector <: Component
 
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_bounded_source, # sys_function
+                   sf_flexible_source, # sys_function
                    InterfaceMap(), # input_interfaces
                    InterfaceMap(m_heat_out => nothing), # output_interfaces
                    m_heat_out, # medium name of output interface

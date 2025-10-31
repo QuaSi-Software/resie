@@ -16,7 +16,7 @@ function load_order_of_operation()
             "scale" => 1500,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",

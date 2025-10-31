@@ -7,14 +7,14 @@ include("../test_util.jl")
 function energy_system_simple()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
             "constant_supply" => 1500,
             "constant_temperature" => 65,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_02"],
             "constant_supply" => 500,
@@ -93,35 +93,35 @@ end
 function energy_system_complicated()::Dict{String,Any}
     return Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
             "constant_supply" => 1500,
             "constant_temperature" => 65,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_02"],
             "constant_supply" => 500,
             "constant_temperature" => 60,
         ),
         "TST_SRC_03" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_03"],
             "constant_supply" => 500,
             "constant_temperature" => 55,
         ),
         "TST_SRC_04" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_04"],
             "constant_supply" => 500,
             "constant_temperature" => 50,
         ),
         "TST_SRC_05" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_05"],
             "constant_supply" => 500,

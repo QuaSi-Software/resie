@@ -232,7 +232,7 @@
             "is_source": true
         },
         "TST_01_HZG_02_SRC": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "medium": "m_h_w_lt1",
             "output_refs": [
                 "TST_01_HZG_01_HTP"

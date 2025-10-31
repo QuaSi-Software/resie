@@ -99,7 +99,7 @@ Enumerations of the archetype of a component describing its general function.
 These are described in more detail in the accompanying documentation of the simulation
 model.
 """
-@enum(SystemFunction, sf_bounded_sink, sf_bounded_source, sf_fixed_sink,
+@enum(SystemFunction, sf_flexible_sink, sf_flexible_source, sf_fixed_sink,
       sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """
@@ -1583,8 +1583,8 @@ include("control.jl")
 # require the definition of certain basic components such as a bus or a grid connection
 include("general/fixed_sink.jl")
 include("general/fixed_supply.jl")
-include("general/bounded_supply.jl")
-include("general/bounded_sink.jl")
+include("general/flexible_supply.jl")
+include("general/flexible_sink.jl")
 include("general/storage.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
@@ -1968,7 +1968,7 @@ end
 """
 get_wind_speed_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of the wind speed profile for fixed and bounded sinks
+Function to determine the source of the wind speed profile for fixed and flexible sinks
 and sources.
 * If no information is given, nothing will be returned.
 * If a wind_speed_profile_file_path is given, the wind speed will be read from the

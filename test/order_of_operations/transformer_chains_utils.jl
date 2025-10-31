@@ -269,7 +269,7 @@ function test_find_indirect_chains()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_00"],
             "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
@@ -289,7 +289,7 @@ function test_find_indirect_chains()
             "is_source" => true,
         ),
         "TST_SRC_1b" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01b"],
             "is_source" => true,
@@ -471,7 +471,7 @@ function test_find_indirect_chains_denied()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_00"],
             "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
@@ -491,7 +491,7 @@ function test_find_indirect_chains_denied()
             "is_source" => true,
         ),
         "TST_SRC_1b" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01b"],
             "is_source" => true,
@@ -675,7 +675,7 @@ function test_find_indirect_chains_denied2()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_00"],
             "max_power_profile_file_path" => "./profiles/examples/general/src_heat_maxpow_var_lo-amp.prf",
@@ -695,7 +695,7 @@ function test_find_indirect_chains_denied2()
             "is_source" => true,
         ),
         "TST_SRC_1b" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01b"],
             "is_source" => true,

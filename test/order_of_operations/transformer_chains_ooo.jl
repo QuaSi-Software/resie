@@ -105,7 +105,7 @@ function test_base_order()
             "is_source" => true,
         ),
         "TST_01_HZG_02_SRC" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_01_HZG_01_HTP"],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",
@@ -203,7 +203,7 @@ function test_ooo_middle_bus()
             "scale" => 400,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -211,7 +211,7 @@ function test_ooo_middle_bus()
             "scale" => 1000,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_03"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -402,7 +402,7 @@ function test_ooo_middle_bus_different_order()
             "scale" => 400,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -410,7 +410,7 @@ function test_ooo_middle_bus_different_order()
             "scale" => 1000,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_03"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -607,7 +607,7 @@ function test_ooo_middle_transformer()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,
@@ -747,7 +747,7 @@ function test_ooo_parallels()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_TH1"],
             "constant_power" => 500000,
@@ -900,7 +900,7 @@ function test_ooo_parallels_different_order()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_TH1"],
             "constant_power" => 500000,
@@ -1080,7 +1080,7 @@ function test_ooo_parallels_in_chain()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_00"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -1100,7 +1100,7 @@ function test_ooo_parallels_in_chain()
             "is_source" => true,
         ),
         "TST_SRC_1b" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_HP_01b"],
             "is_source" => true,
@@ -1289,7 +1289,7 @@ function test_ooo_parallels_in_a_row()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_TH1"],
             "constant_power" => 500000,
@@ -1512,7 +1512,7 @@ function test_ooo_connected_middle_busses()
             "scale" => 400,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -1520,7 +1520,7 @@ function test_ooo_connected_middle_busses()
             "scale" => 1000,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_07"],
             "max_power_profile_file_path" => "./profiles/tests/demand_electricity.prf",
@@ -1981,7 +1981,7 @@ function test_ooo_connected_middle_transformer_variant()
             "is_source" => false,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_03"],
             "constant_temperature" => 20,
@@ -2177,7 +2177,7 @@ function test_ooo_circle_grid_input_denied()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,
@@ -2296,7 +2296,7 @@ function test_ooo_circle_grid_input_allowed()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,
@@ -2415,7 +2415,7 @@ function test_ooo_circle_middle_transformer_input()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,
@@ -2546,7 +2546,7 @@ function test_ooo_circle_variant()
             "scale" => 1000,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,
@@ -2699,7 +2699,7 @@ function test_ooo_circle_middle_transformer_interconnections()
             "scale" => 500,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "constant_power" => 500000,

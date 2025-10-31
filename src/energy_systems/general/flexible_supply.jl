@@ -1,12 +1,12 @@
 """
-Implementation of a component modeling a generic bounded sink of a chosen medium.
+Implementation of a component modeling an abstract flexible supply of some medium.
 
-This is particularly useful for testing, but can also be used to model any bounded
-component or other equipment unit that consumes energy of a given medium. The component
-might still have a maximum power intake in a single time step, but can consume any fraction
-of this.
+This is particularly useful for testing, but can also be used to model any flexible
+component or other equipment unit that processes energy in a given medium. The component
+might still have a maximum power draw in a single time step, but can provide any fraction
+of this to connected components.
 """
-mutable struct BoundedSink <: Component
+mutable struct FlexibleSupply <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -24,7 +24,7 @@ mutable struct BoundedSink <: Component
     constant_power::Union{Nothing,Float64}
     constant_temperature::Temperature
 
-    function BoundedSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+    function FlexibleSupply(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         max_power_profile = "max_power_profile_file_path" in keys(config) ?
                             Profile(config["max_power_profile_file_path"], sim_params) :
                             nothing
@@ -37,13 +37,14 @@ mutable struct BoundedSink <: Component
                                                                 "temperature_from_global_file",
                                                                 "constant_temperature",
                                                                 uac)
+
         medium = Symbol(config["medium"])
         register_media([medium])
 
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_bounded_sink,                 # sys_function
-                   medium,                          # medium
+                   sf_flexible_source,  # sys_function
+                   medium,              # medium
                    InterfaceMap(medium => nothing), # input_interfaces
                    InterfaceMap(medium => nothing), # output_interfaces
                    max_power_profile,               # max_power_profile
@@ -51,17 +52,17 @@ mutable struct BoundedSink <: Component
                    default(config, "scale", 1.0),   # scaling_factor
                    0.0,                             # max_energy
                    nothing,                         # temperature
-                   default(config, "constant_power", nothing),    # constant_power
+                   default(config, "constant_power", nothing),       # constant_power
                    constant_temperature)            # constant_temperature
     end
 end
 
-function initialise!(unit::BoundedSink, sim_params::Dict{String,Any})
-    set_storage_transfer!(unit.input_interfaces[unit.medium],
-                          unload_storages(unit.controller, unit.medium))
+function initialise!(unit::FlexibleSupply, sim_params::Dict{String,Any})
+    set_storage_transfer!(unit.output_interfaces[unit.medium],
+                          load_storages(unit.controller, unit.medium))
 end
 
-function control(unit::BoundedSink,
+function control(unit::FlexibleSupply,
                  components::Grouping,
                  sim_params::Dict{String,Any})
     update(unit.controller)
@@ -79,42 +80,43 @@ function control(unit::BoundedSink,
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
-    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_energy, unit.temperature, nothing)
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_energy, nothing, unit.temperature)
 end
 
-function process(unit::BoundedSink, sim_params::Dict{String,Any})
-    inface = unit.input_interfaces[unit.medium]
-    exchanges = balance_on(inface, inface.source)
+function process(unit::FlexibleSupply, sim_params::Dict{String,Any})
+    outface = unit.output_interfaces[unit.medium]
+    exchanges = balance_on(outface, outface.target)
 
     # if we get the exchanges from a bus, the temperature check has already been performed
-    if inface.source.sys_function == EnergySystems.sf_bus
-        energy_supply = [e.balance + e.energy_potential for e in exchanges]
-        temperature_min = [e.temperature_min for e in exchanges]
-        temperature_max = [e.temperature_max for e in exchanges]
+    if outface.target.sys_function == EnergySystems.sf_bus
+        energy_demand = [e.balance + e.energy_potential for e in exchanges]
+        temperature_min = [nothing for _ in exchanges]
+        temperature_max = [unit.temperature for _ in exchanges]
     else # check temperature
-        energy_supply,
+        energy_demand,
         temperature_min,
-        temperature_max = check_temperatures_sink(exchanges, unit.temperature, unit.max_energy)
+        temperature_max, _ = check_temperatures_source(exchanges, unit.temperature, unit.max_energy)
     end
-    if sum(energy_supply; init=0.0) > 0.0
-        sub!(inface, energy_supply, temperature_min, temperature_max)
+
+    if sum(energy_demand; init=0.0) < 0.0
+        add!(outface, abs.(energy_demand), temperature_min, temperature_max)
     end
 end
 
-function output_values(unit::BoundedSink)::Vector{String}
+function output_values(unit::FlexibleSupply)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
-        return [string(unit.medium) * ":IN",
+        return [string(unit.medium) * ":OUT",
                 "Max_Energy"]
     else
-        return [string(unit.medium) * ":IN",
+        return [string(unit.medium) * ":OUT",
                 "Max_Energy",
                 "Temperature"]
     end
 end
 
-function output_value(unit::BoundedSink, key::OutputKey)::Float64
-    if key.value_key == "IN"
-        return calculate_energy_flow(unit.input_interfaces[key.medium])
+function output_value(unit::FlexibleSupply, key::OutputKey)::Float64
+    if key.value_key == "OUT"
+        return calculate_energy_flow(unit.output_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
     elseif key.value_key == "Temperature"
@@ -123,4 +125,4 @@ function output_value(unit::BoundedSink, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export BoundedSink
+export FlexibleSupply
