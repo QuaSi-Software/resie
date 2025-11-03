@@ -21,7 +21,7 @@ mutable struct CM_EconomicControl <: ControlModule
             "price_profile_path" => nothing,
             "limit_price" => 0.0,
             "new_connections" => nothing,
-            "bus_uac" => unit_uac
+            "bus_uac" => unit_uac,
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -34,8 +34,8 @@ mutable struct CM_EconomicControl <: ControlModule
             @error "new_connections must be given to be applied when the price is below " *
                    "the limit"
         end
-        config = Dict{String, Any}(
-            "connections" => params["new_connections"]
+        config = Dict{String,Any}(
+            "connections" => params["new_connections"],
         )
         new_connectivity = ConnectionMatrix(config)
         original_connectivity = components[unit_uac].connectivity
@@ -54,28 +54,8 @@ mutable struct CM_EconomicControl <: ControlModule
         new_components = nothing
         chains = nothing
 
-        return new("economic_control", params, price_profile, new_connectivity, 
+        return new("economic_control", params, price_profile, new_connectivity,
                    original_connectivity, new_OoO)
-    end
-
-    function CM_EconomicControl()
-        dummy_dates = DateTime[]
-        push!(dummy_dates, DateTime(2024, 1, 1, 0, 0, 0))
-        dummy_values = Float64[]
-        push!(dummy_values, 0.0)
-        dummy_profile = Profile("dummy",
-                                Dict{String,Any}(
-                                    "time_step_seconds" => 1,
-                                    "start_date" => DateTime(2024, 1, 1, 0, 0, 0),
-                                    "end_date" => DateTime(2024, 1, 1, 0, 0, 0),
-                                    "force_profiles_to_repeat" => false,
-                                );
-                                given_profile_values=dummy_values,
-                                given_timestamps=dummy_dates,
-                                given_time_step=Second(1),
-                                given_data_type="intensive")
-        return new("economic_control", Dict{String,Any}(), dummy_profile, 
-                   ConnectionMatrix([], [], nothing), ConnectionMatrix([], [], nothing))
     end
 end
 
@@ -107,16 +87,16 @@ function reorder_interfaces_of_bus!(bus::Bus)
     output_perm_indices = sortperm([output_order_dict[bus.output_interfaces[i].target.uac]
                                     for i in 1:length(bus.output_interfaces)])
     input_perm_indices = sortperm([input_order_dict[bus.input_interfaces[i].source.uac]
-                                    for i in 1:length(bus.input_interfaces)])
+                                   for i in 1:length(bus.input_interfaces)])
 
     # Reorder the input and output interfaces using the permutation indices
     bus.output_interfaces = bus.output_interfaces[output_perm_indices]
     bus.input_interfaces = bus.input_interfaces[input_perm_indices]
 end
 
-function change_priorities(mod::CM_EconomicControl, 
+function change_priorities(mod::CM_EconomicControl,
                            components::Grouping,
-                           order_of_operations::OrderOfOperations, 
+                           order_of_operations::OrderOfOperations,
                            sim_params::Dict{String,Any})::OrderOfOperations
     bus = components[mod.parameters["bus_uac"]]
     if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
