@@ -251,7 +251,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             @info "-- Preheating completed. Starting output now."
         end
 
-        operations_adjusted = reorder_operations(components, operations, sim_params)
+        operations_adjusted = reorder_operations_in_time_step(components, operations, sim_params)
         perform_operations(components, operations_adjusted, sim_params)
 
         if do_output

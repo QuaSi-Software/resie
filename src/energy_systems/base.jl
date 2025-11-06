@@ -22,7 +22,8 @@ module EnergySystems
 
 export check_balances, Component, each, Grouping, link_output_with, perform_operations,
        output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
-       default, plot_optional_figures_begin, plot_optional_figures_end, reorder_operations
+       default, plot_optional_figures_begin, plot_optional_figures_end,
+       reorder_operations_in_time_step
 
 using ..Profiles
 using UUIDs
@@ -1822,11 +1823,11 @@ function perform_operations(components::Grouping,
     end
 end
 
-function reorder_operations(components::Grouping,
-                            order_of_operations::OrderOfOperations,
-                            sim_params::Dict{String,Any})::OrderOfOperations
-    OoO_new = change_priorities(components, order_of_operations, sim_params)
-    return OoO_new
+function reorder_operations_in_time_step(components::Grouping,
+                                         order_of_operations::OrderOfOperations,
+                                         sim_params::Dict{String,Any})::OrderOfOperations
+    change_bus_priorities!(components, sim_params)
+    return reorder_operations(components, order_of_operations, sim_params)
 end
 
 """

@@ -63,7 +63,7 @@ end
 control_module_name(x::Type{CM_EconomicControl})::String = "economic_control"
 
 function has_method_for(mod::CM_EconomicControl, func::ControlModuleFunction)::Bool
-    return func == cmf_change_priorities
+    return func == cmf_change_bus_priorities || func == cmf_reorder_operations
 end
 
 function update(mod::CM_EconomicControl)
@@ -97,19 +97,24 @@ function reorder_interfaces_of_bus!(bus::Bus)
     bus.input_interfaces = bus.input_interfaces[input_perm_indices]
 end
 
-function change_priorities(mod::CM_EconomicControl,
-                           components::Grouping,
-                           order_of_operations::OrderOfOperations,
-                           sim_params::Dict{String,Any})::OrderOfOperations
+function reorder_operations(mod::CM_EconomicControl,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})::OrderOfOperations
+    if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
+        return mod.new_OoO
+    end
+    return order_of_operations
+end
+
+function change_bus_priorities!(mod::CM_EconomicControl,
+                                components::Grouping,
+                                sim_params::Dict{String,Any})
     bus = components[mod.parameters["bus_uac"]]
     if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
-        order_of_operations = mod.new_OoO
         bus.connectivity = mod.new_connectivity
     else
         bus.connectivity = mod.original_connectivity
     end
     reorder_interfaces_of_bus!(bus)
     initialise!(bus, sim_params)
-
-    return order_of_operations
 end

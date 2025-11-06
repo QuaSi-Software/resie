@@ -140,7 +140,8 @@ to filter modules to a selection of modules that have methods for a specific fun
     cmf_negotiate_temperature
     cmf_limit_cooling_input_temperature
     cmf_check_src_to_snk
-    cmf_change_priorities
+    cmf_change_bus_priorities
+    cmf_reorder_operations
 end
 
 """
@@ -516,18 +517,62 @@ function check_src_to_snk(controller::Controller,
     return true
 end
 
+"""
+Callback for reordering the operations of the simulation for one time step.
 
-function change_priorities(components::Grouping,
-                           order_of_operations::OrderOfOperations,
-                           sim_params::Dict{String,Any})::OrderOfOperations
+If multiple control modules exist that implement this callback, they will be called one
+after the other with the result of the previous one. The order is not deterministic. As
+such it is assumed that they can be called in any order for the same result.
+
+This callback is also not specific to a controller (and thus a component) as the callback
+is used once at the beginning of a new time step.
+
+# Arguments
+- `components::Grouping`: All components of the energy system.
+- `order_of_operations::OrderOfOperations`: The unmodified order of operations determined
+    at the start of the simulation
+- `sim_params::Dict{String,Any})`: Simulation parameters
+# Returns
+- `OrderOfOperations`: The modified order of operations
+"""
+function reorder_operations(components::Grouping,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})::OrderOfOperations
     for unit in each(components)
         for mod in unit.controller.modules
-            if !has_method_for(mod, cmf_change_priorities)
+            if !has_method_for(mod, cmf_change_bus_priorities)
                 continue
             end
 
-            order_of_operations = change_priorities(mod, components, order_of_operations, sim_params)
+            order_of_operations = reorder_operations(mod, order_of_operations, sim_params)
         end
     end
+
     return order_of_operations
+end
+
+"""
+Callback for changing a bus' priorities for one time step.
+
+This is particularly relevant for control modules that also change the order of operations
+as both is required to ensure correct calculations when the priorities on a bus is changed.
+
+This callback is also not specific to a controller (and thus a component) as the callback
+is used once at the beginning of a new time step.
+
+# Arguments
+- `components::Grouping`: All components of the energy system.
+- `sim_params::Dict{String,Any})`: Simulation parameters
+"""
+function change_bus_priorities!(components::Grouping,
+                                sim_params::Dict{String,Any})
+    for unit in each(components)
+        for mod in unit.controller.modules
+            if !has_method_for(mod, cmf_change_bus_priorities)
+                continue
+            end
+
+            change_bus_priorities!(mod, components, sim_params)
+        end
+    end
 end
