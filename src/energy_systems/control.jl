@@ -144,6 +144,12 @@ to filter modules to a selection of modules that have methods for a specific fun
 end
 
 """
+Default method for function control_module_name. Control module files should provide a
+method that returns the name, as used in the project config.
+"""
+control_module_name(::Type{ControlModule})::String = "control_module"
+
+"""
 Wraps around the mechanism of control for the operational strategy of a Component.
 
 Holds general parameters of control and acts as container for control modules.

@@ -24,7 +24,7 @@ Loads the control modules' classes index by their name as used in the input file
 Returns:
 -`Dict{String, Any}`: The mapping from name (String) to the module class, which is probably
     of type `Symbol`, however `getproperty` does not specify the return type. In any case
-    the entry can be used for calling the constructor as if it was a function.
+    the entry can be used for calling the constructor of the control module as a function.
 """
 function load_control_module_class_mapping()::Dict{String,Any}
     mapping = Dict{String,Any}()
@@ -35,8 +35,17 @@ function load_control_module_class_mapping()::Dict{String,Any}
             unit_class = getproperty(EnergySystems, symbol)
 
             if unit_class <: EnergySystems.ControlModule
-                dummy = unit_class()
-                mapping[dummy.name] = unit_class
+                module_name = nothing
+
+                # type-level accessor function implemented per control module as following:
+                # control_module_name(::Type{CM_ModuleTypeName})::String = "module_type_name"
+                try
+                    module_name = EnergySystems.control_module_name(unit_class)
+                    mapping[module_name] = unit_class
+                catch
+                    @error("Control module type $name does not have a method defined for " *
+                           "function control_module_name.")
+                end
             end
         end
     end

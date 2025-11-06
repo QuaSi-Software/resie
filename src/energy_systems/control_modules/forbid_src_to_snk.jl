@@ -24,11 +24,10 @@ mutable struct CM_Forbid_Src_To_Snk <: ControlModule
 
         return new("forbid_src_to_snk", params)
     end
-
-    function CM_Forbid_Src_To_Snk()
-        return new("forbid_src_to_snk", Dict{String,Any}())
-    end
 end
+
+# method for control module name on type-level
+control_module_name(x::Type{CM_Forbid_Src_To_Snk})::String = "forbid_src_to_snk"
 
 function has_method_for(mod::CM_Forbid_Src_To_Snk, func::ControlModuleFunction)::Bool
     return func == cmf_check_src_to_snk

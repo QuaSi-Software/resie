@@ -59,6 +59,9 @@ mutable struct CM_EconomicControl <: ControlModule
     end
 end
 
+# method for control module name on type-level
+control_module_name(x::Type{CM_EconomicControl})::String = "economic_control"
+
 function has_method_for(mod::CM_EconomicControl, func::ControlModuleFunction)::Bool
     return func == cmf_change_priorities
 end

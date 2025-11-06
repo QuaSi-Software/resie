@@ -77,11 +77,10 @@ mutable struct CM_EconomicalDischarge <: ControlModule
 
         return new("economical_discharge", params, state_machine)
     end
-
-    function CM_EconomicalDischarge()
-        return new("economical_discharge", Dict{String,Any}(), StateMachine())
-    end
 end
+
+# method for control module name on type-level
+control_module_name(x::Type{CM_EconomicalDischarge})::String = "economical_discharge"
 
 function has_method_for(mod::CM_EconomicalDischarge, func::ControlModuleFunction)::Bool
     return func == cmf_charge_is_allowed ||
