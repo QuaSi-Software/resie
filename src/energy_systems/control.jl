@@ -73,21 +73,25 @@ end
 """
 Constructor of StateMachine for non-default fields.
 """
-StateMachine(state::UInt,
-state_names::Dict{UInt,String},
-transitions::Dict{UInt,TruthTable}) = StateMachine(state,
-                                                   state_names,
-                                                   transitions,
-                                                   UInt(0))
+function StateMachine(state::UInt,
+                      state_names::Dict{UInt,String},
+                      transitions::Dict{UInt,TruthTable})
+    StateMachine(state,
+                 state_names,
+                 transitions,
+                 UInt(0))
+end
 
 """
 Default constructor of StateMachine that creates a state machine with only one state called
 "Default" and no transitions (as there no other states).
 """
-StateMachine() = StateMachine(UInt(1),
-                              Dict(UInt(1) => "Default"),
-                              Dict(UInt(1) => TruthTable(; conditions=Vector(),
-                                                         table_data=Dict())))
+function StateMachine()
+    StateMachine(UInt(1),
+                 Dict(UInt(1) => "Default"),
+                 Dict(UInt(1) => TruthTable(; conditions=Vector(),
+                                            table_data=Dict())))
+end
 
 """
 Advances the given state machine by checking the conditions in its current state.
