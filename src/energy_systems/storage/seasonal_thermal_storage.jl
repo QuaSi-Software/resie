@@ -8,6 +8,9 @@ temperatures only for the available temperature as the tank is depleted.
 using Plots: Plots
 using Dates
 using PlotlyJS: PlotlyJS
+using SparseArrays
+using LinearAlgebra
+using GLMakie
 
 mutable struct SeasonalThermalStorage <: Component
     # general
@@ -67,6 +70,28 @@ mutable struct SeasonalThermalStorage <: Component
     ground_temperature::Temperature
     effective_ambient_temperature::Vector{Temperature}
 
+    # ground coupling FEM (optional)
+    ground_domain_radius::Floathing
+    ground_domain_depth::Floathing
+    ground_accuracy_mode::String
+    ground_layers_depths::Vector{Floathing}
+    ground_layers_k::Vector{Float64}
+    ground_layers_rho::Vector{Float64}
+    ground_layers_cp::Vector{Float64}
+    soil_surface_hconv::Float64
+
+    # FEM state (unified axisymmetric r-z soil domain)
+    soil_dr::Vector{Float64}
+    soil_dz::Vector{Float64}
+    soil_dr_mesh::Vector{Float64}
+    soil_dz_mesh::Vector{Float64}
+    soil_r_centers::Vector{Float64}
+    soil_z_centers::Vector{Float64}
+    soil_i_wall_face::Int64
+    soil_h_base_face::Int64
+    soil_t1::Array{Float64}
+    soil_t2::Array{Float64}
+
     # state variables
     current_max_output_temperature::Float64
     current_min_input_temperature::Float64
@@ -87,6 +112,9 @@ mutable struct SeasonalThermalStorage <: Component
 
     # additional output
     temp_distribution_output::Array{Float64}
+    temp_difference_to_surrounding_output::Array{Float64}
+    soil_temperature_field_output::Array{Float64}
+
     mass_in_sum::Float64
     mass_out_sum::Float64
 
@@ -115,7 +143,7 @@ mutable struct SeasonalThermalStorage <: Component
                                                                        uac;
                                                                        required=true)
 
-        # Note: layer numbering starts at the bottom with index 1 and ends at the top with index number_of_layer_total
+        # Note: layer numbering within the STES starts at the bottom with index 1 and ends at the top with index number_of_layer_total
         return new(uac,                                            # uac
                    Controller(default(config, "control_parameters", nothing)),
                    sf_storage,                                     # sys_function
@@ -134,30 +162,30 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
                    0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
                    0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
-                   [],                                             # surface_area_barrel_segments, surface of the barrel segments of the STES [m^2]
-                   [],                                             # volume_segments, volume of the segments of the STES [m^3]
+                   Float64[],                                      # surface_area_barrel_segments, surface of the barrel segments of the STES [m^2]
+                   Float64[],                                      # volume_segments, volume of the segments of the STES [m^3]
                    0.0,                                            # height of the STES [m]
                    0.0,                                            # radius_small, small (lower) radius of the STES [m]
                    0.0,                                            # radius_large, large (upper) radius of the STES [m]
                    default(config, "number_of_layer_total", 25),   # number of layers in the STES
                    default(config, "number_of_layer_above_ground", 5), # number of layers above ground in the STES
                    default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
-                   [],                                             # dz, thickness of the layers of the STES [m]
-                   [],                                             # dz_normalized, normalized dz with respect to to the volume of each section
-                   [],                                             # [1/h]  factor for losses to ambient: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
-                   [],                                             # [K/kJ] factor for input/output energy:  1 / (roh * cp * volume_segment ) 
-                   [],                                             # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
-                   [],                                             # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
-                   [],                                             # layer_masses, mass of the medium in each layer [kg]
+                   Float64[],                                      # dz, thickness of the layers of the STES [m]
+                   Float64[],                                      # dz_normalized, normalized dz with respect to to the volume of each section
+                   Float64[],                                      # [1/h]  factor for losses to ambient: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
+                   Float64[],                                      # [K/kJ] factor for input/output energy:  1 / (roh * cp * volume_segment ) 
+                   Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
+                   Float64[],                                      # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
+                   Float64[],                                      # layer_masses, mass of the medium in each layer [kg]
                    # loading and unloading
-                   default(config, "high_temperature", 90.0),      # upper temperature of the STES [°C]
-                   default(config, "low_temperature", 15.0),       # lower temperature of the STES [°C]
+                   default(config, "high_temperature", 90.0),          # upper temperature of the STES [°C]
+                   default(config, "low_temperature", 15.0),           # lower temperature of the STES [°C]
                    default(config, "max_load_rate_energy", nothing),   # maximum load rate given in 1/h, total energy input related to the total energy capacity of the STES
                    default(config, "max_unload_rate_energy", nothing), # maximum unload rate given in 1/h, total energy input related to the total volume of the STES
                    default(config, "max_load_rate_mass", nothing),     # maximum load rate given in 1/h, mass flow per Interface related to the total volume of the STES
                    default(config, "max_unload_rate_mass", nothing),   # maximum unload rate given in 1/h, mass flow in total related to the total volume of the STES
-                   nothing,                                        # max_input_energy, maximum input energy per time step [Wh]
-                   nothing,                                        # max_output_energy, maximum output energy per time step [Wh]
+                   nothing,                                            # max_input_energy, maximum input energy per time step [Wh]
+                   nothing,                                            # max_output_energy, maximum output energy per time step [Wh]
                    # Losses
                    default(config, "thermal_transmission_lid", 0.25),     # [W/(m^2K)]
                    default(config, "thermal_transmission_barrel", 0.375), # [W/(m^2K)]
@@ -166,32 +194,60 @@ mutable struct SeasonalThermalStorage <: Component
                    constant_ambient_temperature,                          # ambient_temperature [°C]
                    ground_temperature_profile,                            # [°C]
                    constant_ground_temperature,                           # ground_temperature [°C]
-                   [],                                                    # effective_ambient_temperature corresponding to each layer [°C]          
-                   # other
+                   Temperature[],                                         # effective_ambient_temperature corresponding to each layer [°C]          
+                   # ground coupling FEM (unified)
+                   default(config, "ground_domain_radius", nothing),             # [m] soil domain radius. If none given, it will be derived from the STES geometry.
+                   default(config, "ground_domain_depth", nothing),              # [m] soil depth from surface. If none given, it will be derived from the STES geometry.
+                   default(config, "ground_accuracy_mode", "normal"),            # mesh preset: very_rough|rough|normal|high|very_high
+                   default(config, "ground_layers_depths", [nothing]),           # [m] Monotonically increasing depths from surface (0.0) downward.
+                   # Defines piecewise-constant soil layers by intervals [d[i], d[i+1]).
+                   # Last value should be ≥ ground_domain_depth; if shorter, code extends.
+                   default(config, "ground_layers_k", Float64[1.5]),           # [W/(m·K)] Thermal conductivity per layer. Length may be
+                   # ≤ (length(depths)-1); last value is repeated if shorter.
+                   default(config, "ground_layers_rho", Float64[2000.0]),        # [kg/m³] Mass density per layer. Same broadcasting rule as above.
+                   default(config, "ground_layers_cp", Float64[1000.0]),        # [J/(kg·K)] Specific heat capacity per layer 
+                   default(config, "soil_surface_hconv", 14.7),                  # [W/(m²·K)] ground surface convective heat transfer coefficient
+
+                   # FEM state (unified axisymmetric r-z soil domain)
+                   Float64[],                                  # soil_dr
+                   Float64[],                                  # soil_dz
+                   Float64[],                                  # soil_dr_mesh
+                   Float64[],                                  # soil_dz_mesh
+                   Float64[],                                  # soil_r_centers
+                   Float64[],                                  # soil_z_centers
+                   0,                                          # soil_i_wall_face
+                   0,                                          # soil_h_base_face
+                   Array{Float64}(undef, 0, 0),                # soil_t1
+                   Array{Float64}(undef, 0, 0),                # soil_t2
+
+                   # state variables
                    0.0,                                            # current_max_output_temperature
                    0.0,                                            # current_min_input_temperature
                    default(config, "initial_load", 0.0),           # initial_load [%/100] assuming perfectly mixed storage at the begin
                    0.0,                                            # load, set to initial_load at the beginning [Wh]
                    0.0,                                            # load_end_of_last_timestep, stores the load of the previous time step without losses
                    0.0,                                            # losses in current time step [Wh]
-                   [],                                             # temperature_segments: temperatures of the segments
-                   [],                                             # current_energy_input, energy input in current time step [Wh]
-                   [],                                             # current_temperature_input, temperature of the input in current time step [°C]
+                   Float64[],                                      # temperature_segments: temperatures of the segments
+                   Float64[],                                      # current_energy_input, energy input in current time step [Wh]
+                   Temperature[],                                  # current_temperature_input, temperature of the input in current time step [°C]
                    0.0,                                            # current_energy_output, energy output in current time step [Wh]
                    0.0,                                            # current_temperature_output, temperature of the output in current time step [°C]
                    0.0,                                            # current_max_output_energy, maximum output energy in current time step [Wh]
-                   [],                                             # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
+                   Float64[],                                      # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
                    0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
                    false,                                          # process_done, bool indicating if the process step has already been performed in the current time step
                    false,                                          # load_done, bool indicating if the load step has already been performed in the current time step
                    # additional output
                    Array{Float64}(undef, 0, 0),                    # temp_distribution_output [°C], holds temperature field of layers for output plot
+                   Array{Float64}(undef, 0, 0),                    # temp_difference_to_surrounding_output [°C], holds temperature difference of storage temperature and surroundings for output plot
+                   Array{Float64}(undef, 0, 0, 0),                 # soil_temperature_field_output  (time × nz × nr)
                    0.0,                                            # mass_in_sum [kg]
                    0.0)                                            # mass_out_sum [kg]
     end
 end
 
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    # Hook up input/output flow control
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
                           unload_storages(unit.controller, unit.m_heat_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
@@ -224,6 +280,25 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                            unit.number_of_layer_total,
                                            unit.shape)
 
+    # get and check soil boundaries
+    if unit.ground_domain_radius === nothing
+        unit.ground_domain_radius = 1.5 * unit.radius_large  # ToDo: Refine with user-definable factor
+    elseif unit.ground_domain_radius <= unit.radius_large
+        @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the upper radius of the " *
+               "STES which is $(unit.radius_large) m for the current configuration."
+    end
+    h_stes_buried = unit.height / unit.number_of_layer_total *
+                    (unit.number_of_layer_total - unit.number_of_layer_above_ground)
+    if unit.ground_domain_depth === nothing
+        unit.ground_domain_depth = 2.0 * h_stes_buried  # ToDo: Refine with user-definable factor
+    elseif unit.ground_domain_depth <= h_stes_buried
+        @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
+               "depth of the STES which is $(h_stes_buried) m for the current configuration."
+    end
+    if unit.ground_layers_depths == [nothing]
+        unit.ground_layers_depths = [0, unit.ground_domain_depth]
+    end
+
     # calculate the mass of the medium in each layer
     unit.layer_masses = unit.rho_medium .* unit.volume_segments
 
@@ -247,7 +322,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # coefficient for input/output mass flow, assuming water as fluid
     cp_water = 4.18                                                                      # [kJ/kgK]
-    unit.phi = cp_water ./ (unit.cp_medium * unit.rho_medium * unit.volume_segments)      # [1/kg]
+    unit.phi = cp_water ./ (unit.cp_medium * unit.rho_medium * unit.volume_segments)     # [1/kg]
 
     # coefficient for buoyancy effects
     unit.theta = [unit.volume_segments[n - 1] / (unit.volume_segments[n] + unit.volume_segments[n - 1])
@@ -272,9 +347,31 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                  (sim_params["time_step_seconds"] / 60 / 60)  # [Wh per timestep]
     end
 
+    # set initial ambient/ground boundary conditions
+    if unit.ambient_temperature_profile !== nothing
+        unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    end
+    if unit.ground_temperature_profile !== nothing
+        unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
+    end
+
     # vector to hold the results of the temperatures for each layer in each simulation time step
     unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps_output"],
                                           unit.number_of_layer_total)
+    unit.temp_difference_to_surrounding_output = zeros(Float64, sim_params["number_of_time_steps_output"],
+                                                       unit.number_of_layer_total)
+    # Prepare unified (r,z) soil FEM and allocate its output field
+    prepare_ground_fem_unified!(unit, sim_params)
+    nz = length(unit.soil_dz)
+    nr = length(unit.soil_dr)
+    unit.soil_temperature_field_output = zeros(Float64,
+                                               sim_params["number_of_time_steps_output"],
+                                               nz, nr)
+
+    # set initial effective_ambient_temperature
+    unit.effective_ambient_temperature = [i <= (unit.number_of_layer_total - unit.number_of_layer_above_ground) ?
+                                          unit.ground_temperature : unit.ambient_temperature
+                                          for i in 1:unit.number_of_layer_total]
 end
 
 """
@@ -455,7 +552,7 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
     Plots.plot!(p, [-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
     Plots.plot!(p, [unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
     Plots.plot!(p, [-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    Plots.plot!(p, ; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
+    Plots.plot!(p,; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
                 xlabel="x-coordinate [m]",
                 ylabel="height [m]",
                 legend=false,
@@ -639,6 +736,77 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
     fig_name = "temperature_distribution_STES_$(unit.uac).html"
     PlotlyJS.savefig(p, output_path * "/" * fig_name)
 
+    # Plot temperature differences to surrounding over time    
+    x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
+                                              Dates.Second((s - 1) * sim_params["time_step_seconds"]))
+                       for s in 1:sim_params["number_of_time_steps_output"]]
+    layers_to_plot = (unit.number_of_layer_total):-1:1
+    traces = PlotlyJS.GenericTrace[]
+    for i in layers_to_plot
+        plot_label = "Layer $(i)"
+        if i == 1
+            plot_label = "Bottom layer"
+        elseif i == unit.number_of_layer_total
+            plot_label = "Top layer"
+        end
+        trace = PlotlyJS.scatter(; x=x_vals_datetime, y=unit.temp_difference_to_surrounding_output[:, i], mode="lines",
+                                 name=plot_label)
+        push!(traces, trace)
+    end
+
+    leap_days_str = string.([Date(year, 2, 29)
+                             for year in
+                                 Dates.value(Year(sim_params["start_date_output"])):Dates.value(Year(sim_params["end_date"]))
+                             if isleapyear(year)])
+
+    layout = PlotlyJS.Layout(;
+                             title_text="Temperature difference to surrounding over time in STES $(unit.uac) (positive: storage is colder than surrounding)",
+                             xaxis_title_text="Date",
+                             yaxis_title_text="Temperature difference [K]",
+                             xaxis=PlotlyJS.attr(; type="date",
+                                                 rangebreaks=[Dict("values" => leap_days_str)]))
+    p = PlotlyJS.plot(traces, layout)
+
+    fig_name = "temperature_difference_surrounding_STES_$(unit.uac).html"
+    PlotlyJS.savefig(p, output_path * "/" * fig_name)
+
+    # plot soil temperatures (GLMakie)
+    try
+        if size(unit.soil_temperature_field_output, 1) > 0
+            f = Figure()
+            ax = Axis3(f[1, 1])
+            ax.zlabel = "Temperature [°C]"
+            ax.xlabel = "Depth z [m]"
+            ax.ylabel = "Radius r [m]"
+
+            min_temp = minimum(unit.soil_temperature_field_output)
+            min_temp = (min_temp < 0.0) ? 1.1 * min_temp : 0.9 * min_temp
+            max_temp = maximum(unit.soil_temperature_field_output)
+            max_temp = (max_temp < 0.0) ? 0.9 * max_temp : 1.1 * max_temp
+            GLMakie.zlims!(ax, min_temp, max_temp)
+
+            r_abs = [unit.soil_dr[1] / 2; cumsum(unit.soil_dr_mesh)]
+            z_abs = [unit.soil_dz[1] / 2; cumsum(unit.soil_dz_mesh)]
+
+            time_idx = Observable(1)
+            surfdata = @lift(unit.soil_temperature_field_output[$time_idx, :, :])
+            GLMakie.surface!(ax, z_abs, r_abs, surfdata)
+            GLMakie.scatter!(ax, z_abs, r_abs, surfdata)
+
+            slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
+            on(slg.sliders[1].value) do v
+                time_idx[] = v
+            end
+            try
+                wait(display(f))
+            catch e
+                @warn "Could not display GLMakie figure: $(e)"
+            end
+        end
+    catch e
+        @warn "Could not show FEM soil plots due to error: $(e)"
+    end
+
     return true
 end
 
@@ -649,10 +817,31 @@ function control(unit::SeasonalThermalStorage,
 
     # write old temperature field for output
     if sim_params["current_date"] >= sim_params["start_date_output"]
+        unit.temp_difference_to_surrounding_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.effective_ambient_temperature .-
+                                                                                                                                         unit.temperature_segments)
         unit.temp_distribution_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
     end
-    # set current_energy_input_return_temperature, simplified constant in the current time step
-    # always use bottom layer to use the whole storage
+
+    # update ambient/ground boundary conditions for the current step
+    if unit.ambient_temperature_profile !== nothing
+        unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
+    end
+    if unit.ground_temperature_profile !== nothing
+        unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
+    end
+
+    # calculate effective ambient temperature for each layer (unified FEM)
+    update_ground_fem_unified_and_set_Teff!(unit, sim_params)
+
+    # save unified FEM soil field for output
+    if sim_params["current_date"] >= sim_params["start_date_output"]
+        sidx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
+        if size(unit.soil_temperature_field_output, 1) >= sidx
+            unit.soil_temperature_field_output[sidx, :, :] = _vis_field_with_tank(unit)
+        end
+    end
+
+    # set current_energy_input_return_temperature (use bottom layer)
     unit.current_energy_input_return_temperature = unit.temperature_segments[1]
 
     # calculate maximum energies for input
@@ -705,21 +894,7 @@ function control(unit::SeasonalThermalStorage,
     end
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], unit.current_max_output_energy, nothing,
                     unit.current_max_output_temperature)
-
-    if unit.ambient_temperature_profile !== nothing
-        unit.ambient_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
-    end
-
-    if unit.ground_temperature_profile !== nothing
-        unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
-    end
-
-    # effective ambient temperature for each layer of the STES
-    unit.effective_ambient_temperature = vcat(fill(unit.ground_temperature,
-                                                   unit.number_of_layer_total - unit.number_of_layer_above_ground),
-                                              fill(unit.ambient_temperature, unit.number_of_layer_above_ground))
 end
-
 # This function sets the current_min_input_temperature and current_max_output_temperature 
 function set_temperature_limits!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.current_max_output_temperature = unit.temperature_segments[end]
@@ -1411,6 +1586,427 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return unit.temperature_segments[end]
     end
     throw(KeyError(key.value_key))
+end
+
+# === Ground coupling FEM for STES (unified axisymmetric r–z domain) ===
+
+# create a 1D geometric mesh along a bound (start at min, expand by factor up to max, until reaching bound)
+function _create_geometric_mesh(min_mesh_width::Float64,
+                                max_mesh_width::Float64,
+                                expansion_factor::Float64,
+                                bound::Float64)
+    dx = Float64[]
+    if bound <= 0.0
+        return dx
+    end
+    push!(dx, min_mesh_width)
+    while sum(dx) + dx[end] < bound
+        push!(dx, min(dx[end] * expansion_factor, max_mesh_width))
+    end
+    # trim last cell to hit bound exactly
+    excess = sum(dx) - bound
+    if excess > 0
+        dx[end] -= excess
+    elseif sum(dx) < bound
+        push!(dx, bound - sum(dx))
+    end
+    return dx
+end
+
+# map depth z [m] (measured from ground surface downward) to soil layer properties
+function _soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
+    zs = unit.ground_layers_depths
+
+    # ensure last depth >= domain depth
+    if zs[end] < unit.ground_domain_depth
+        zs = vcat(zs, unit.ground_domain_depth)
+    end
+    # find interval
+    j = 1
+    for idx in 1:(length(zs) - 1)
+        if zs[idx] <= z < zs[idx + 1]
+            j = idx
+            break
+        end
+    end
+    k = unit.ground_layers_k[min(j, length(unit.ground_layers_k))]
+    rho = unit.ground_layers_rho[min(j, length(unit.ground_layers_rho))]
+    cp = unit.ground_layers_cp[min(j, length(unit.ground_layers_cp))]
+    return k, rho, cp
+end
+
+# r in [0, R_dom], z from ground surface (0) downward.
+# Tank interior (r < R(z) and z ≤ H_below) is masked and treated as boundary with Robin BCs:
+#   - Vertical wall at r = R(z) for z ∈ [0, H_below]   → U_barrel, T_layer(z)
+#   - Base at z = H_below for r ∈ [0, R_bottom]        → U_bottom, T_bottom_layer
+# Top (z=0): convective to ambient
+# Far field side (r=R_dom): adiabatic
+# Far field below (z=Z_dom): Dirichlet with T_ground
+# Axis (r=0): symmetry (∂T/∂r = 0).
+
+function _equivalent_radius_from_bottom(unit::SeasonalThermalStorage)
+    # use bottom area to define an axisymmetric equivalent radius
+    return sqrt(unit.surface_area_bottom / pi)
+end
+
+function prepare_ground_fem_unified!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    # dimensions
+    n_below = unit.number_of_layer_total - unit.number_of_layer_above_ground
+    H_below = sum(unit.dz[1:n_below])
+    R_eq = _equivalent_radius_from_bottom(unit)  # Check TODO
+
+    # mesh resolution knobs
+    mindz = minimum(unit.dz)
+    if unit.ground_accuracy_mode == "very_rough"
+        min_w = mindz / 2
+        max_w = min(8.0, mindz * 128)
+        ef = 2.0
+    elseif unit.ground_accuracy_mode == "rough"
+        min_w = mindz / 4
+        max_w = min(4.0, mindz * 64)
+        ef = 2.0
+    elseif unit.ground_accuracy_mode == "normal"
+        min_w = mindz / 8
+        max_w = min(2.0, mindz * 32)
+        ef = 2.0
+    elseif unit.ground_accuracy_mode == "high"
+        min_w = mindz / 16
+        max_w = min(1.0, mindz * 16)
+        ef = 2.0
+    elseif unit.ground_accuracy_mode == "very_high"
+        min_w = mindz / 32
+        max_w = min(0.5, mindz * 8)
+        ef = 2.0
+    else
+        @error "The ground accuracy mode in STES $(unit.uac) has to be one of very_rough, rough, normal, high or very_high!"
+    end
+
+    # z mesh: exact below-ground layers, then geometric tail
+    dz = copy(unit.dz[1:n_below])
+    remaining = max(unit.ground_domain_depth - H_below, min_w)
+    if remaining > 1e-9
+        tail = _create_geometric_mesh(min_w, max_w, ef, remaining)
+        dz = vcat(dz, tail)
+    end
+    unit.soil_dz = dz
+    unit.soil_dz_mesh = [(dz[i] + dz[i+1]) / 2 for i in 1:(length(dz) - 1)]
+    zc = [sum(dz[1:(h - 1)]) + dz[h]/2 for h in 1:length(dz)]
+    unit.soil_z_centers = zc
+    unit.soil_h_base_face = length(unit.dz[1:n_below])  # index (row) right at the base
+
+    # r mesh: split at equivalent bottom radius so a face sits near the wall
+    dr_left = _create_geometric_mesh(min_w, max_w, ef, R_eq)
+    dr_right = _create_geometric_mesh(min_w, max_w, ef, max(unit.ground_domain_radius - R_eq, min_w))
+    dr = vcat(dr_left, dr_right)
+    unit.soil_dr = dr
+    unit.soil_dr_mesh = [(dr[i] + dr[i+1]) / 2 for i in 1:(length(dr) - 1)]
+    rc = [sum(dr[1:(i - 1)]) + dr[i]/2 for i in 1:length(dr)]
+    unit.soil_r_centers = rc
+    unit.soil_i_wall_face = length(dr_left)
+
+    # initial condition: linear with depth from ambient at surface to ground temp at bottom
+    T_top = unit.ambient_temperature
+    T_bot = unit.ground_temperature
+    T_rows = [T_top + (T_bot - T_top) * (zc[h] / sum(dz)) for h in 1:length(dz)]
+    nr = length(dr)
+    nz = length(dz)
+    unit.soil_t1 = [T_rows[h] for h in 1:nz, _ in 1:nr]
+    unit.soil_t2 = similar(unit.soil_t1)
+
+    return nothing
+end
+
+# radius of STES at a given soil row center (depth-dependent for conical/frustum walls)
+@inline function _radius_at_row(unit::SeasonalThermalStorage, h::Int)
+    z_soil = unit.soil_z_centers[h]  # measured downward from ground surface
+    n_below = unit.number_of_layer_total - unit.number_of_layer_above_ground
+    H_below = sum(unit.dz[1:n_below])
+    if z_soil > H_below
+        return 0.0  # below base: no wall
+    end
+    # map to STES vertical coordinate: 0 at bottom, H_below at ground surface
+    z_storage = H_below - z_soil
+    # linear radius along full storage height
+    return unit.radius_small + (unit.radius_large - unit.radius_small) * (z_storage / max(unit.height, eps(Float64)))
+end
+
+# per-row soil properties for unified domain
+function _row_props(unit::SeasonalThermalStorage)
+    nz = length(unit.soil_dz)
+    zc = unit.soil_z_centers
+    k_row = zeros(Float64, nz)
+    rho_row = zeros(Float64, nz)
+    cp_row = zeros(Float64, nz)
+    for h in 1:nz
+        k, rho, cp = _soil_props_at_depth(unit, zc[h])
+        k_row[h] = k
+        rho_row[h] = rho
+        cp_row[h] = cp
+    end
+    return k_row, rho_row, cp_row
+end
+
+# active soil cell vs. masked tank interior
+@inline function _cell_active(unit::SeasonalThermalStorage, h::Int, i::Int)
+    n_below = unit.number_of_layer_total - unit.number_of_layer_above_ground
+    H_below = sum(unit.dz[1:n_below])
+    return !(unit.soil_z_centers[h] <= H_below &&
+             unit.soil_r_centers[i] < _radius_at_row(unit, h))
+end
+
+# Unified implicit Euler solve and extraction of wall/base interface temperatures
+function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    nz = length(unit.soil_dz)
+    nr = length(unit.soil_dr)
+    N = nz * nr
+
+    k_row, rho_row, cp_row = _row_props(unit)
+    dz = unit.soil_dz
+    dr = unit.soil_dr
+    dzm = unit.soil_dz_mesh
+    drm = unit.soil_dr_mesh
+    rc = unit.soil_r_centers
+
+    dt = sim_params["time_step_seconds"]
+    ambient_T = unit.ambient_temperature
+    R_eq = _equivalent_radius_from_bottom(unit)  # <-- use equivalent bottom radius
+
+    I = Int[];
+    J = Int[];
+    V = Float64[]
+    b = zeros(Float64, N)
+    def_idx(h, i) = (h - 1) * nr + i
+
+    Told = unit.soil_t1
+
+    n_below = unit.number_of_layer_total - unit.number_of_layer_above_ground
+    h_base_face = unit.soil_h_base_face
+    H_below = sum(unit.dz[1:n_below])
+    cum_dz_below = cumsum(unit.dz[1:n_below])  # bottom→top cumulative heights of buried STES layers
+
+    for h in 1:nz, i in 1:nr
+        p = def_idx(h, i)
+        if !_cell_active(unit, h, i)
+            push!(I, p);
+            push!(J, p);
+            push!(V, 1.0)
+            b[p] = Told[h, i]
+            continue
+        end
+
+        # Deep boundary: Dirichlet to ground temp
+        if h == nz
+            push!(I, p);
+            push!(J, p);
+            push!(V, 1.0)
+            b[p] = unit.ground_temperature
+            continue
+        end
+
+        # capacity
+        Vcell = 2pi * rc[i] * dr[i] * dz[h]
+        C = rho_row[h] * cp_row[h] * Vcell
+        aP = C / dt
+        rhs = aP * Told[h, i]
+
+        # EAST (i+1)
+        if i < nr && _cell_active(unit, h, i+1)
+            kE = (k_row[h] + k_row[h]) / 2
+            r_e = rc[i] + dr[i]/2
+            A_e = 2pi * r_e * dz[h]
+            d_e = drm[i]
+            aE = kE * A_e / d_e
+            aP += aE
+            push!(I, p);
+            push!(J, def_idx(h, i+1));
+            push!(V, -aE)
+        end
+
+        # WEST (i-1) or wall boundary
+        if i > 1
+            if _cell_active(unit, h, i-1)
+                kW = (k_row[h] + k_row[h]) / 2
+                r_w = rc[i] - dr[i]/2
+                A_w = 2pi * r_w * dz[h]
+                d_w = drm[i-1]
+                aW = kW * A_w / d_w
+                aP += aW
+                push!(I, p);
+                push!(J, def_idx(h, i-1));
+                push!(V, -aW)
+            else
+                # masked neighbor → wall Robin (below ground only)
+                if h <= n_below
+                    # map soil row h (depth from surface) to buried STES layer k (bottom→top)
+                    z_soil = unit.soil_z_centers[h]
+                    z_storage = H_below - z_soil
+                    k = searchsortedfirst(cum_dz_below, z_storage + eps(Float64))
+                    k = clamp(k, 1, n_below)
+
+                    # local wall face area represented by this cell
+                    r_face = _radius_at_row(unit, h)
+                    A_face = max(2pi * r_face * dz[h], eps(Float64))
+
+                    U = unit.thermal_transmission_barrel
+                    aP += U * A_face
+                    rhs += U * A_face * unit.temperature_segments[k]
+                end
+            end
+        end
+        # (axis i==1 → zero flux; nothing to add)
+
+        # SOUTH (h+1)
+        if h < nz && _cell_active(unit, h+1, i)
+            kS = (k_row[h] + k_row[h+1]) / 2
+            A_s = 2pi * rc[i] * dr[i]
+            d_s = dzm[h]
+            aS = kS * A_s / d_s
+            aP += aS
+            push!(I, p);
+            push!(J, def_idx(h+1, i));
+            push!(V, -aS)
+        end
+
+        # NORTH (h-1) or base/top boundary
+        if h == 1
+            # surface convection
+            A_n = 2pi * rc[i] * dr[i]
+            hconv = unit.soil_surface_hconv
+            aP += hconv * A_n
+            rhs += hconv * A_n * ambient_T
+        else
+            if _cell_active(unit, h-1, i)
+                kN = (k_row[h] + k_row[h-1]) / 2
+                A_n = 2pi * rc[i] * dr[i]
+                d_n = dzm[h-1]
+                aN = kN * A_n / d_n
+                aP += aN
+                push!(I, p);
+                push!(J, def_idx(h-1, i));
+                push!(V, -aN)
+            else
+                # masked neighbor → base Robin within equivalent bottom radius
+                if (rc[i] <= R_eq + 1e-12) && (h == h_base_face + 1)
+                    A_n = 2pi * rc[i] * dr[i]           # rings integrate to π R_eq^2 = true bottom area
+                    hbot = unit.thermal_transmission_bottom
+                    aP += hbot * A_n
+                    rhs += hbot * A_n * unit.temperature_segments[1]
+                end
+            end
+        end
+
+        # finalize
+        push!(I, p);
+        push!(J, p);
+        push!(V, aP)
+        b[p] += rhs
+    end
+
+    A = sparse(I, J, V, N, N)
+    Tvec = A \ b
+
+    # map back
+    Tnew = similar(Told)
+    for h in 1:nz, i in 1:nr
+        Tnew[h, i] = _cell_active(unit, h, i) ? Tvec[def_idx(h, i)] : Told[h, i]
+    end
+    unit.soil_t2 .= Tnew
+    unit.soil_t1 .= unit.soil_t2
+
+    # interface temperatures
+    T_wall_side = Float64[]
+    for k in 1:n_below
+        # center of STES layer k: measured from bottom upwards
+        z_k = cum_dz_below[k] - unit.dz[k] / 2
+        # corresponding soil depth below surface
+        z_soil = H_below - z_k
+
+        # find soil row whose center is just below/at this depth
+        h = searchsortedfirst(unit.soil_z_centers, z_soil + eps(Float64))
+        h = clamp(h, 1, nz)
+
+        # wall radius at that soil row
+        Rloc = _radius_at_row(unit, h)
+
+        # pick soil temp at first radius >= wall radius
+        idx = findfirst(x -> x >= Rloc, unit.soil_r_centers)
+        val = idx === nothing ? unit.ground_temperature : unit.soil_t2[h, idx]
+
+        push!(T_wall_side, val)
+    end
+
+    hbot = unit.soil_h_base_face + 1
+    num = 0.0;
+    den = 0.0
+    for i in 1:length(unit.soil_r_centers)
+        if unit.soil_r_centers[i] <= R_eq + 1e-12
+            w = 2pi * unit.soil_r_centers[i] * unit.soil_dr[i]
+            num += unit.soil_t2[hbot, i] * w
+            den += w
+        else
+            break
+        end
+    end
+    T_base = num / max(den, eps(Float64))
+
+    return T_wall_side, T_base
+end
+
+function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    if isempty(unit.soil_dr) || isempty(unit.soil_dz)
+        prepare_ground_fem_unified!(unit, sim_params)
+    end
+
+    T_wall_side, T_base = _solve_soil_unified!(unit, sim_params)
+
+    n = unit.number_of_layer_total
+    n_below = n - unit.number_of_layer_above_ground
+    Teff = similar(unit.temperature_segments)
+
+    # side: each buried layer k gets its corresponding wall soil temperature
+    for k in 1:n_below
+        Teff[k] = T_wall_side[k]
+    end
+
+    # bottom: UA-weighted mix of side (Teff[1]) and base (T_base)
+    AbotU = unit.surface_area_bottom * unit.thermal_transmission_bottom
+    AsideU = unit.surface_area_barrel_segments[1] * unit.thermal_transmission_barrel
+    if (AbotU + AsideU) > 0
+        Teff[1] = (AsideU * Teff[1] + AbotU * T_base) / (AsideU + AbotU)
+    end
+
+    # above-ground: ambient
+    for k in (n_below + 1):n
+        Teff[k] = unit.ambient_temperature
+    end
+
+    unit.effective_ambient_temperature = Teff
+    return nothing
+end
+
+# Build a view field where tank interior has the with current layer temps
+function _vis_field_with_tank(unit::SeasonalThermalStorage)
+    Tvis = copy(unit.soil_t1)
+    nz, nr = length(unit.soil_dz), length(unit.soil_dr)
+    n_below = unit.number_of_layer_total - unit.number_of_layer_above_ground
+    H_below = sum(unit.dz[1:n_below])
+    cumz = cumsum(unit.dz)  # bottom→top cumulative layer heights
+
+    for h in 1:nz
+        z_soil = unit.soil_z_centers[h]
+        if z_soil <= H_below
+            z_storage = H_below - z_soil
+            k = searchsortedfirst(cumz, z_storage + eps(Float64))  # layer index
+            k = clamp(k, 1, unit.number_of_layer_total)
+            Rloc = _radius_at_row(unit, h)
+            for i in 1:nr
+                if unit.soil_r_centers[i] < Rloc
+                    Tvis[h, i] = Float64(unit.temperature_segments[k])
+                end
+            end
+        end
+    end
+    return Tvis
 end
 
 export SeasonalThermalStorage
