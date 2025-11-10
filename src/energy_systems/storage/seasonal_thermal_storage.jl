@@ -703,7 +703,9 @@ end
 
 function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dict{String,Any},
                                    output_path::String)::Bool
+    # ====================================
     # Plot temperature distribution over time    
+    # ====================================
     x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
                        for s in 1:sim_params["number_of_time_steps_output"]]
@@ -736,7 +738,9 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
     fig_name = "temperature_distribution_STES_$(unit.uac).html"
     PlotlyJS.savefig(p, output_path * "/" * fig_name)
 
+    # ====================================
     # Plot temperature differences to surrounding over time    
+    # ====================================
     x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
                        for s in 1:sim_params["number_of_time_steps_output"]]
@@ -770,41 +774,74 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
     fig_name = "temperature_difference_surrounding_STES_$(unit.uac).html"
     PlotlyJS.savefig(p, output_path * "/" * fig_name)
 
-    # plot soil temperatures (GLMakie)
+    # ====================================
+    # plot soil + storage temperatures
+    # ====================================
+    mirror_domain = false # TODO
+
+    # Dimensions: (time, z, r_half)
+    nt, nz, nr = size(unit.soil_temperature_field_output)
+
+    # Axes (cell centers) for simulated half-domain (r ≥ 0)
+    r_half = [unit.soil_dr[1] / 2; cumsum(unit.soil_dr_mesh)]
+    z_abs = [unit.soil_dz[1] / 2; cumsum(unit.soil_dz_mesh)]
+
+    # Build radius axis (mirrored or not)
+    r_abs = mirror_domain ? vcat(-reverse(r_half), r_half) : r_half
+
+    # Temperature range with small padding
+    Tmin_raw = minimum(unit.soil_temperature_field_output)
+    Tmax_raw = maximum(unit.soil_temperature_field_output)
+    Tmin = (Tmin_raw < 0.0) ? 1.1 * Tmin_raw : 0.9 * Tmin_raw
+    Tmax = (Tmax_raw < 0.0) ? 0.9 * Tmax_raw : 1.1 * Tmax_raw
+
+    # Spatial ranges
+    zmin, zmax = extrema(z_abs)
+    rmin, rmax = extrema(r_abs)
+
+    # Enforce equal spatial scaling (z & r); temperature is independent
+    Δz = max(zmax - zmin, eps(Float64))
+    Δr = max(rmax - rmin, eps(Float64))
+    spatial_ref = max(Δz, Δr)
+    aspect_x = Δz / spatial_ref      # depth axis
+    aspect_y = Δr / spatial_ref      # radius axis
+    aspect_z = 1.0                   # temperature axis (no special scaling)
+
+    # Helper: temperature slice for given time index (handles mirroring)
+    temp_slice(t) = begin
+        A = unit.soil_temperature_field_output[t, :, :]  # (nz × nr) half-domain
+        mirror_domain ? hcat(reverse(A; dims=2), A) : A
+    end
+
+    # ================= GLMakie live viewer =================
     try
-        if size(unit.soil_temperature_field_output, 1) > 0
-            f = Figure()
-            ax = Axis3(f[1, 1])
-            ax.zlabel = "Temperature [°C]"
-            ax.xlabel = "Depth z [m]"
-            ax.ylabel = "Radius r [m]"
+        GLMakie.activate!()
 
-            min_temp = minimum(unit.soil_temperature_field_output)
-            min_temp = (min_temp < 0.0) ? 1.1 * min_temp : 0.9 * min_temp
-            max_temp = maximum(unit.soil_temperature_field_output)
-            max_temp = (max_temp < 0.0) ? 0.9 * max_temp : 1.1 * max_temp
-            GLMakie.zlims!(ax, min_temp, max_temp)
+        time_idx = Observable(1)
+        surf_obs = @lift(temp_slice($time_idx))
 
-            r_abs = [unit.soil_dr[1] / 2; cumsum(unit.soil_dr_mesh)]
-            z_abs = [unit.soil_dz[1] / 2; cumsum(unit.soil_dz_mesh)]
+        f_gl = Figure(; size=(1000, 800))
+        ax_gl = Axis3(f_gl[1, 1];
+                      xlabel="Depth z [m]",
+                      ylabel="Radius r [m]",
+                      zlabel="Temperature [°C]",)
 
-            time_idx = Observable(1)
-            surfdata = @lift(unit.soil_temperature_field_output[$time_idx, :, :])
-            GLMakie.surface!(ax, z_abs, r_abs, surfdata)
-            GLMakie.scatter!(ax, z_abs, r_abs, surfdata)
+        ax_gl.limits = ((zmin, zmax), (rmin, rmax), (Tmin, Tmax))
+        ax_gl.aspect = (aspect_x, aspect_y, aspect_z)
 
-            slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
-            on(slg.sliders[1].value) do v
-                time_idx[] = v
-            end
-            try
-                wait(display(f))
-            catch e
-                @warn "Could not display GLMakie figure: $(e)"
-            end
+        surface!(ax_gl, z_abs, r_abs, surf_obs)
+        scatter!(ax_gl, z_abs, r_abs, surf_obs; markersize=3.5)
+
+        # Simple slider instead of SliderGrid (more robust across Makie versions)
+        slider_gl = GLMakie.Slider(f_gl[2, 1]; range=1:nt, startvalue=1, horizontal=true)
+
+        on(slider_gl.value) do v
+            time_idx[] = v
         end
+
+        display(f_gl)
     catch e
-        @warn "Could not show FEM soil plots due to error: $(e)"
+        @warn "Error while building GLMakie soil/STES figure for $(unit.uac): $(e)"
     end
 
     return true
