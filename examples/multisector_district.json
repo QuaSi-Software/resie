@@ -5,10 +5,10 @@
         "auxiliary_plots": true,
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": {
-            "m_h_w_lt1": "red",
-            "m_h_w_ht1": "darkred",
+            "m_h_w_lt1": "lightblue",
+            "m_h_w_ht1": "red",
             "m_e_ac_230v": "darkgoldenrod1",
-            "m_c_g_natgas": "purple3",
+            "m_c_g_natgas": "grey",
             "m_c_g_h2": "lime",
             "m_c_g_o2": "firebrick1",
             "Losses": "black",
