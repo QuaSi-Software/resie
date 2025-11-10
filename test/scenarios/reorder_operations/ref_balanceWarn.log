@@ -1,0 +1,4 @@
+ReSiE balanceWarn log file of simulation started at: 2025-11-10 09:29:58
+This log file contains only balance warnings written by ReSiE.
+---------------------------------
+[BalanceWarning] Balance for component BUS_Heat was not zero in timestep 163800: 1.877197064459324e-9
