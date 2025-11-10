@@ -1,5 +1,6 @@
 using Dates
-include("../../order_of_operations.jl")
+using ..Resie
+
 """
 Control module for setting limits to the PLR of a component according to a price_profile and 
 available storage capacity or demand.
@@ -44,12 +45,12 @@ mutable struct CM_EconomicControl <: ControlModule
         new_components[unit_uac].connectivity = new_connectivity
         # follow steps load_components() in project_loading to make sure new_OoO gets 
         # calculated correctly
-        reorder_interfaces_of_bus!(new_components[unit_uac])
+        Resie.reorder_interfaces_of_bus!(new_components[unit_uac])
         initialise_components(new_components, sim_params)
-        chains = find_chains(values(new_components), sf_bus)
+        chains = Resie.find_chains(values(new_components), sf_bus)
         merge_bus_chains(chains, new_components, sim_params)
         # calculate new order_of_operations to have it available for later use
-        new_OoO = calculate_order_of_operations(new_components)
+        new_OoO = Resie.calculate_order_of_operations(new_components)
         # remove new_components and chains from memory since they are not needed any more
         new_components = nothing
         chains = nothing
@@ -70,33 +71,6 @@ function update(mod::CM_EconomicControl)
     # nothing to do
 end
 
-"""
-reorder_interfaces_of_bus(components)
-
-Reorder the input and output interfaces of a bus according to the input and output
-priorities given in the connectivity matrix.
-"""
-function reorder_interfaces_of_bus!(bus::Bus)
-    # get correct order according to connectivity matrix
-    output_order = bus.connectivity.output_order
-    input_order = bus.connectivity.input_order
-
-    # Create a dictionary to map 'uac' to its correct position
-    output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
-    input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
-
-    # Get the permutation indices that would sort the 'source'/'target' field by
-    # 'uac' order
-    output_perm_indices = sortperm([output_order_dict[bus.output_interfaces[i].target.uac]
-                                    for i in 1:length(bus.output_interfaces)])
-    input_perm_indices = sortperm([input_order_dict[bus.input_interfaces[i].source.uac]
-                                   for i in 1:length(bus.input_interfaces)])
-
-    # Reorder the input and output interfaces using the permutation indices
-    bus.output_interfaces = bus.output_interfaces[output_perm_indices]
-    bus.input_interfaces = bus.input_interfaces[input_perm_indices]
-end
-
 function reorder_operations(mod::CM_EconomicControl,
                             order_of_operations::OrderOfOperations,
                             sim_params::Dict{String,Any})::OrderOfOperations
@@ -115,6 +89,6 @@ function change_bus_priorities!(mod::CM_EconomicControl,
     else
         bus.connectivity = mod.original_connectivity
     end
-    reorder_interfaces_of_bus!(bus)
+    Resie.reorder_interfaces_of_bus!(bus)
     initialise!(bus, sim_params)
 end
