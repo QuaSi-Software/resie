@@ -117,7 +117,7 @@ mutable struct SeasonalThermalStorage <: Component
     mass_in_sum::Float64
     mass_out_sum::Float64
 
-    epsilon::Float64
+    epsilon_geometry::Float64
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
@@ -243,7 +243,7 @@ mutable struct SeasonalThermalStorage <: Component
                    Array{Float64}(undef, 0, 0, 0),                 # soil_temperature_field_output  (time × nz × nr)
                    0.0,                                            # mass_in_sum [kg]
                    0.0,                                            # mass_out_sum [kg]
-                   sim_params["epsilon"])                          # epsilon
+                   1e-9)                                           # epsilon_geometry
     end
 end
 
@@ -1752,7 +1752,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     dz = n_below > 0 ? copy(unit.dz[1:n_below]) : Float64[]
     remaining = max(unit.ground_domain_depth - H_below, min_w)
 
-    if remaining > unit.epsilon
+    if remaining > unit.epsilon_geometry
         tail = _create_geometric_mesh(min_w, max_w, ef, remaining)
         dz = vcat(dz, tail)
     end
@@ -1783,7 +1783,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     end
 
     # --- Region 2: R_small .. R_wall (only if sloped and buried wall exists) ---
-    if has_slope && (R_wall > R_small + unit.epsilon)
+    if has_slope && (R_wall > R_small + unit.epsilon_geometry)
         wall_width = R_wall - R_small
         # aim for ~ n_below * n_wall cells across wall-contact band
         target_cells = max(n_below * n_wall, 1)
@@ -1797,7 +1797,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     # --- Region 3: R_wall .. R_dom ---
     used_r = sum(dr_segments)
     remaining_r = max(R_dom - used_r, 0.0)
-    if remaining_r > unit.epsilon
+    if remaining_r > unit.epsilon_geometry
         start_w = max(last(dr_segments), min_w)
         append!(dr_segments,
                 _create_geometric_mesh(start_w, max_w, ef, remaining_r))
@@ -1843,7 +1843,7 @@ end
     H_below = sum(unit.dz[1:n_below])
 
     # outside buried section → no side wall
-    if z_soil < -unit.epsilon || z_soil > H_below + unit.epsilon
+    if z_soil > H_below + unit.epsilon_geometry
         return 0.0
     end
 
@@ -1888,12 +1888,12 @@ end
     H_below = sum(unit.dz[1:n_below])
 
     # below the buried part → always soil
-    if z_soil > H_below + unit.epsilon
+    if z_soil > H_below + unit.epsilon_geometry
         return true
     end
 
     Rwall = _radius_at_row(unit, h)
-    if Rwall <= unit.epsilon
+    if Rwall <= unit.epsilon_geometry
         # no wall at this depth → soil
         return true
     end
