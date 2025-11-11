@@ -8,10 +8,10 @@ available storage capacity or demand.
 mutable struct CM_EconomicControl <: ControlModule
     name::String
     parameters::Dict{String,Any}
+    state_machine::StateMachine
     price_profile::Profile
-    new_connectivity::ConnectionMatrix
-    original_connectivity::ConnectionMatrix
-    new_OoO::OrderOfOperations
+    connectivity_by_state::Dict{Int,ConnectionMatrix}
+    ooo_by_state::Dict{Int,OrderOfOperations}
 
     function CM_EconomicControl(parameters::Dict{String,Any},
                                 components::Grouping,
@@ -35,28 +35,69 @@ mutable struct CM_EconomicControl <: ControlModule
             @error "new_connections must be given to be applied when the price is below " *
                    "the limit"
         end
+
+        # record original connectivity
+        connectivities = Dict{Int,ConnectionMatrix}()
+        connectivities[1] = components[unit_uac].connectivity
+
+        # calculate new connectivity
         config = Dict{String,Any}(
             "connections" => params["new_connections"],
         )
         new_connectivity = ConnectionMatrix(config)
-        original_connectivity = components[unit_uac].connectivity
-
         new_components = deepcopy(components)
         new_components[unit_uac].connectivity = new_connectivity
-        # follow steps load_components() in project_loading to make sure new_OoO gets 
-        # calculated correctly
+        # follow steps load_components() in project_loading to make sure new order of
+        # operations gets calculated correctly
         Resie.reorder_interfaces_of_bus!(new_components[unit_uac])
         initialise_components(new_components, sim_params)
         chains = Resie.find_chains(values(new_components), sf_bus)
         merge_bus_chains(chains, new_components, sim_params)
+
         # calculate new order_of_operations to have it available for later use
-        new_OoO = Resie.calculate_order_of_operations(new_components)
-        # remove new_components and chains from memory since they are not needed any more
+        ooo_by_state = Dict{Int,OrderOfOperations}()
+        ooo_by_state[2] = Resie.calculate_order_of_operations(new_components)
+
+        # set new connectivity and remove new_components and chains from memory since
+        # they are not needed any more
+        connectivities[2] = new_connectivity
         new_components = nothing
         chains = nothing
 
-        return new("economic_control", params, price_profile, new_connectivity,
-                   original_connectivity, new_OoO)
+        # setup state machine for switching between states based on price
+        # for now this is a simple two-state threshold switch, but it might implement a
+        # more complicated calculation in the future
+        table_state_off = TruthTable(;  # State: Off
+                                     conditions=[function (state_machine)
+                                                     return value_at_time(price_profile, sim_params) <=
+                                                            params["limit_price"]
+                                                 end],
+                                     table_data=Dict{Tuple,UInt}(
+                                         (false,) => 1,
+                                         (true,) => 2,
+                                     ))
+        table_state_on = TruthTable(;  # State: On
+                                    conditions=[function (state_machine)
+                                                    return value_at_time(price_profile, sim_params) >
+                                                           params["limit_price"]
+                                                end],
+                                    table_data=Dict{Tuple,UInt}(
+                                        (true,) => 1,
+                                        (false,) => 2,
+                                    ))
+
+        state_machine = StateMachine(UInt(1),               # state
+                                     Dict{UInt,String}(     # state_names
+                                         1 => "Off",
+                                         2 => "On",
+                                     ),
+                                     Dict{UInt,TruthTable}( # transitions
+                                         1 => table_state_off,
+                                         2 => table_state_on,
+                                     ))
+
+        return new("economic_control", params, state_machine, price_profile,
+                   connectivities, ooo_by_state)
     end
 end
 
@@ -68,27 +109,34 @@ function has_method_for(mod::CM_EconomicControl, func::ControlModuleFunction)::B
 end
 
 function update(mod::CM_EconomicControl)
-    # nothing to do
+    # ordinarily we would update the state machine in the control modules's update step,
+    # however this control module is special in that it's callbacks are used outside the
+    # normal order of operations, so the update is performed by the callbacks instead
 end
 
 function reorder_operations(mod::CM_EconomicControl,
                             order_of_operations::OrderOfOperations,
                             sim_params::Dict{String,Any})::OrderOfOperations
-    if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
-        return mod.new_OoO
+    # record "original" ooo since it might be the first time the module has access to it
+    # and also it might've changed due to other control modules
+    if mod.state_machine.state == 1
+        mod.ooo_by_state[1] = order_of_operations
     end
-    return order_of_operations
+    return mod.ooo_by_state[mod.state_machine.state]
 end
 
 function change_bus_priorities!(mod::CM_EconomicControl,
                                 components::Grouping,
                                 sim_params::Dict{String,Any})
-    bus = components[mod.parameters["bus_uac"]]
-    if value_at_time(mod.price_profile, sim_params) <= mod.parameters["limit_price"]
-        bus.connectivity = mod.new_connectivity
-    else
-        bus.connectivity = mod.original_connectivity
+    # perform update outside of normal order of operations
+    old_state = mod.state_machine.state
+    move_state(mod.state_machine)
+
+    # now reorder bus interfaces, but only if the state changed
+    if old_state != mod.state_machine.state
+        bus = components[mod.parameters["bus_uac"]]
+        bus.connectivity = mod.connectivity_by_state[mod.state_machine.state]
+        Resie.reorder_interfaces_of_bus!(bus)
+        initialise!(bus, sim_params)
     end
-    Resie.reorder_interfaces_of_bus!(bus)
-    initialise!(bus, sim_params)
 end
