@@ -4,6 +4,12 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+## Version 0.12.6
+* model improvements for geothermal collector: change explicit Euler formulation to implicit Euler for the calculation of heat transfer in the soil around the geothermal collector due to massive computational speed improvements. The results are very close to the former implementation.
+* update scenario "simple_geothermal_collector" accordingly
+* add two new julia packages: LinearAlgebra and SparseArrays
+* improve warn message for profiles with a forgotten TimeZone
+
 ### Version 0.12.5
 * The energy flow matrix of a bus can now be used to specify a custom order of each input-output connection using consecutive numbers starting from `1` in the energy flow matrix (or `0` for denied connections). This only works for single busses that are not interconnected to other busses.
 * Now, transformers can increase the energy for inputs/outputs in their process step compared to the MaxEnergies calculated in their potential step (also in a second potential step).  For all other components, however,  the MaxEnergy set during control can never be exceeded. 
