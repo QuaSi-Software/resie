@@ -87,14 +87,6 @@ function test_base_order()
         "TST_01_ELT_01_BAT" => Dict{String,Any}(
             "type" => "Battery",
             "output_refs" => ["TST_01_ELT_01_BUS"],
-            "control_modules" => [Dict{String,Any}(
-                                      "name" => "economical_discharge",
-                                      "pv_plant_uac" => "TST_01_ELT_01_PVP",
-                                      "battery_uac" => "TST_01_ELT_01_BAT",
-                                      "pv_threshold" => 0.15,
-                                      "min_charge" => 0.2,
-                                      "discharge_limit" => 0.05,
-                                  )],
             "capacity" => 10000,
             "load" => 5000,
         ),
