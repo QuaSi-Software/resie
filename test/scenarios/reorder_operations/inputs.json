@@ -267,7 +267,7 @@
                     "name": "economic_control", 
                     "price_profile_path": "./profiles/tests/operation_electricity_price.prf",
                     "limit_price": 80.0,
-                    "new_connections": {
+                    "new_connections_below_limit": {
                         "input_order": [
                             "Photovoltaic",
                             "Grid_IN",
@@ -285,8 +285,7 @@
                             [1, 1, 1, 1, 0],
                             [0, 0, 1, 0, 0]
                         ]
-                    },
-                    "bus_uac": "BUS_Power"
+                    }
                 }
             ]
         },

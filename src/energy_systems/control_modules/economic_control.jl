@@ -21,7 +21,7 @@ mutable struct CM_EconomicControl <: ControlModule
             "name" => "economic_control",
             "price_profile_path" => nothing,
             "limit_price" => 0.0,
-            "new_connections" => nothing,
+            "new_connections_below_limit" => nothing,
             "bus_uac" => unit_uac,
         )
         params = Base.merge(default_parameters, parameters)
@@ -31,9 +31,9 @@ mutable struct CM_EconomicControl <: ControlModule
         end
         price_profile = Profile(params["price_profile_path"], sim_params)
 
-        if params["new_connections"] === nothing
-            @error "new_connections must be given to be applied when the price is below " *
-                   "the limit"
+        if params["new_connections_below_limit"] === nothing
+            @error "new_connections_below_limit must be given to be applied when the " *
+                   "price is below the limit"
         end
 
         # record original connectivity
@@ -42,7 +42,7 @@ mutable struct CM_EconomicControl <: ControlModule
 
         # calculate new connectivity
         config = Dict{String,Any}(
-            "connections" => params["new_connections"],
+            "connections" => params["new_connections_below_limit"],
         )
         new_connectivity = ConnectionMatrix(config)
         new_components = deepcopy(components)
