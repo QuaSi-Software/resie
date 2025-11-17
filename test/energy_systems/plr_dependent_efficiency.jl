@@ -344,7 +344,7 @@ end
 function test_gas_boiler_supply_driven_plrd()
     components_config = Dict{String,Any}(
         "TST_DEM_01" => Dict{String,Any}(
-            "type" => "BoundedSink",
+            "type" => "FlexibleSink",
             "medium" => "m_h_w_ht1",
             "output_refs" => [],
             "max_power_profile_file_path" => "./profiles/tests/source_heat_max_power.prf",

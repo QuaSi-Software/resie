@@ -24,7 +24,7 @@ Loads the control modules' classes index by their name as used in the input file
 Returns:
 -`Dict{String, Any}`: The mapping from name (String) to the module class, which is probably
     of type `Symbol`, however `getproperty` does not specify the return type. In any case
-    the entry can be used for calling the constructor as if it was a function.
+    the entry can be used for calling the constructor of the control module as a function.
 """
 function load_control_module_class_mapping()::Dict{String,Any}
     mapping = Dict{String,Any}()
@@ -35,8 +35,17 @@ function load_control_module_class_mapping()::Dict{String,Any}
             unit_class = getproperty(EnergySystems, symbol)
 
             if unit_class <: EnergySystems.ControlModule
-                dummy = unit_class()
-                mapping[dummy.name] = unit_class
+                module_name = nothing
+
+                # type-level accessor function implemented per control module as following:
+                # control_module_name(::Type{CM_ModuleTypeName})::String = "module_type_name"
+                try
+                    module_name = EnergySystems.control_module_name(unit_class)
+                    mapping[module_name] = unit_class
+                catch
+                    @error("Control module type $name does not have a method defined for " *
+                           "function control_module_name.")
+                end
             end
         end
     end
@@ -140,7 +149,7 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
     # the input/output interfaces of busses are constructed in the order of appearance in
     # the config, so after all components are loaded they need to be reordered to match
     # the input/output priorities
-    components = reorder_interfaces_of_busses(components)
+    components = reorder_interfaces_of_busses!(components)
 
     # other type-specific initialisation
     EnergySystems.initialise_components(components, sim_params)
@@ -153,41 +162,58 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
 end
 
 """
-reorder_interfaces_of_busses(components)
+    reorder_interfaces_of_busses!(components)
 
-Reorder the input and output interfaces of busses according to their input and output
-priorities given in the connectivity matrix.
+Calls reorder_interfaces_of_bus!() for all busses in the given grouping of components.
+
+Args:
+-`components::Grouping`: The components
+Return:
+-`Grouping`: The components with busses having their interfaces reordered
 """
-function reorder_interfaces_of_busses(components::Grouping)::Grouping
+function reorder_interfaces_of_busses!(components::Grouping)::Grouping
     for unit in each(components)
         if unit.sys_function == EnergySystems.sf_bus
-            # get correct order according to connectivity matrix
-            output_order = unit.connectivity.output_order
-            input_order = unit.connectivity.input_order
-
-            # check for misconfigured bus (it should have at least one input and at least
-            # one output)
-            if length(input_order) == 0 || length(output_order) == 0
-                continue
-            end
-
-            # Create a dictionary to map 'uac' to its correct position
-            output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
-            input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
-
-            # Get the permutation indices that would sort the 'source'/'target' field by
-            # 'uac' order
-            output_perm_indices = sortperm([output_order_dict[unit.output_interfaces[i].target.uac]
-                                            for i in 1:length(unit.output_interfaces)])
-            input_perm_indices = sortperm([input_order_dict[unit.input_interfaces[i].source.uac]
-                                           for i in 1:length(unit.input_interfaces)])
-
-            # Reorder the input and output interfaces using the permutation indices
-            unit.output_interfaces = unit.output_interfaces[output_perm_indices]
-            unit.input_interfaces = unit.input_interfaces[input_perm_indices]
+            reorder_interfaces_of_bus!(unit)
         end
     end
     return components
+end
+
+"""
+    reorder_interfaces_of_bus!(bus)
+
+Reorder the input and output interfaces of busses according to their input and output
+priorities given in the connectivity matrix.
+
+Args:
+-`bus::EnergySystems.Bus`: The bus for which to reorder interfaces
+"""
+function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
+    # get correct order according to connectivity matrix
+    output_order = bus.connectivity.output_order
+    input_order = bus.connectivity.input_order
+
+    # check for misconfigured bus (it should have at least one input and at least
+    # one output)
+    if length(input_order) == 0 || length(output_order) == 0
+        return
+    end
+
+    # Create a dictionary to map 'uac' to its correct position
+    output_order_dict = Dict(uac => idx for (idx, uac) in enumerate(output_order))
+    input_order_dict = Dict(uac => idx for (idx, uac) in enumerate(input_order))
+
+    # Get the permutation indices that would sort the 'source'/'target' field by
+    # 'uac' order
+    output_perm_indices = sortperm([output_order_dict[bus.output_interfaces[i].target.uac]
+                                    for i in 1:length(bus.output_interfaces)])
+    input_perm_indices = sortperm([input_order_dict[bus.input_interfaces[i].source.uac]
+                                   for i in 1:length(bus.input_interfaces)])
+
+    # Reorder the input and output interfaces using the permutation indices
+    bus.output_interfaces = bus.output_interfaces[output_perm_indices]
+    bus.input_interfaces = bus.input_interfaces[input_perm_indices]
 end
 
 """

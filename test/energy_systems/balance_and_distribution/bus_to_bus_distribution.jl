@@ -9,7 +9,7 @@ include("../../test_util.jl")
 function test_short_chain_distribution()
     components_config = Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 8000,
@@ -93,7 +93,7 @@ end
 function test_long_chain_distribution()
     components_config = Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_e_ac_230v",
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 8000,

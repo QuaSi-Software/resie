@@ -56,10 +56,10 @@ end
     test_one_to_one_grid()
 end
 
-function test_one_to_one_bounded_source()
+function test_one_to_one_flexible_source()
     components_config = Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_DEM_01"],
             "constant_temperature" => 50,
@@ -99,6 +99,6 @@ function test_one_to_one_bounded_source()
     @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
 end
 
-@testset "one_to_one_bounded_source" begin
-    test_one_to_one_bounded_source()
+@testset "one_to_one_flexible_source" begin
+    test_one_to_one_flexible_source()
 end

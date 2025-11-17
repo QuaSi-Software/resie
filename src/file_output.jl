@@ -451,6 +451,29 @@ function write_to_file(filepath::String,
 end
 
 """
+    listify_operations(operations)
+
+Turns the given order of operations into a list with entries surrounded in quotation marks
+and seperated by a comma and line feed.
+
+Args:
+-`operations::OrderOfOperations`: The operations to listify
+Returns:
+-`String`: The listified operations
+"""
+function listify_operations(operations::OrderOfOperations)::String
+    list = ""
+    for entry in operations
+        comma = ","
+        if entry == last(operations)
+            comma = ""
+        end
+        list = list * "\"$(entry[1]):$(entry[2])\"$(comma)\n"
+    end
+    return list
+end
+
+"""
     dump_auxiliary_outputs(file_path, components, order_of_operations, sim_params)
 
 Dump a bunch of information to file that might be useful to explain the result of a run.
@@ -460,24 +483,34 @@ general to find out why the energy system behaves in the simulation as it does.
 """
 function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any},
                                 components::Grouping,
-                                order_of_operations::StepInstructions,
+                                order_of_operations::OrderOfOperations,
                                 sim_params::Dict{String,Any})
-    # export order of operation
+    # export order of operations
     if default(project_config["io_settings"], "auxiliary_info", false)
         aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
         open(abspath(aux_info_file_path), "w") do file_handle
-            write(file_handle, "# Simulation step order\n")
+            # write base order (from input or calculated)
+            write(file_handle, "# Order of operations\n")
+            write(file_handle, listify_operations(order_of_operations))
 
-            for entry in order_of_operations
-                for step in entry[2:lastindex(entry)]
-                    if entry == last(order_of_operations)
-                        write(file_handle, "\"$(entry[1]):$(entry[2])\"\n")
-                    else
-                        write(file_handle, "\"$(entry[1]):$(entry[2])\",\n")
+            # look for any control modules that modify it and print the modified one
+            for component in values(components)
+                if component.sys_function == EnergySystems.sf_bus
+                    for control_module in component.controller.modules
+                        # this is very specific for the current implementation of this exact
+                        # control module. @TODO make this more generalized once more control
+                        # modules also modify the order of operations
+                        if control_module.name == "economic_control"
+                            for (state_id, order) in pairs(control_module.ooo_by_state)
+                                write(file_handle, "\n# Order of operations $(component.uac) state #$(state_id)\n")
+                                write(file_handle, listify_operations(order))
+                            end
+                        end
                     end
                 end
             end
         end
+
         @info "Auxiliary info dumped to file $(aux_info_file_path)"
     end
 
