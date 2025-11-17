@@ -13,6 +13,12 @@ As per the definition of semantic versioning and the reality of early developmen
 * Remove control module economical_discharge as it was only used for examplatory purposes and is no longer required
 * Add additional auxiliary output on the modified order of operations if corresponding control modules are active
 
+### Version 0.12.6
+* model improvements for geothermal collector: change explicit Euler formulation to implicit Euler for the calculation of heat transfer in the soil around the geothermal collector due to massive computational speed improvements. The results are very close to the former implementation.
+* update scenario "simple_geothermal_collector" accordingly
+* add two new julia packages: LinearAlgebra and SparseArrays
+* improve warn message for profiles with a forgotten TimeZone
+
 ### Version 0.12.5
 * The energy flow matrix of a bus can now be used to specify a custom order of each input-output connection using consecutive numbers starting from `1` in the energy flow matrix (or `0` for denied connections). This only works for single busses that are not interconnected to other busses.
 * Now, transformers can increase the energy for inputs/outputs in their process step compared to the MaxEnergies calculated in their potential step (also in a second potential step).  For all other components, however,  the MaxEnergy set during control can never be exceeded. 
