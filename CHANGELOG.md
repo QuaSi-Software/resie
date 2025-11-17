@@ -4,6 +4,15 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.0
+* Rename BoundedSupply to FlexibleSupply and BoundedSink to FlexibleSink as well as renaming the system functions bounded_source and bounded_sink to flexible_source and flexible_sink
+* Clarify some terms in the code, doc blocks and comments in regard to the use of "order of operations" and "step"
+* Implement control callbacks that can modifiy the order of operations for a timestep as well as reordering the priorities and energy flow matrix on busses (as both are necessary to ensure correct calculation)
+* Add control module economic_control making use of the new callbacks to implement an operational strategy assigning different priorities and allowed flows depending on a given price profile and a threshold value
+* Add scenario reorder_operations showcasing how control module economic_control can be used
+* Remove control module economical_discharge as it was only used for examplatory purposes and is no longer required
+* Add additional auxiliary output on the modified order of operations if corresponding control modules are active
+
 ### Version 0.12.5
 * The energy flow matrix of a bus can now be used to specify a custom order of each input-output connection using consecutive numbers starting from `1` in the energy flow matrix (or `0` for denied connections). This only works for single busses that are not interconnected to other busses.
 * Now, transformers can increase the energy for inputs/outputs in their process step compared to the MaxEnergies calculated in their potential step (also in a second potential step).  For all other components, however,  the MaxEnergy set during control can never be exceeded. 
