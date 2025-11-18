@@ -1918,7 +1918,6 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
     rc = unit.soil_r_centers
 
     dt = sim_params["time_step_seconds"]
-    ambient_T = unit.ambient_temperature
     R_eq = _equivalent_radius_from_bottom(unit)  # <-- use equivalent bottom radius
 
     I = Int[]
@@ -2021,7 +2020,7 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
             A_n = 2pi * rc[i] * dr[i]
             hconv = unit.soil_surface_hconv
             aP += hconv * A_n
-            rhs += hconv * A_n * ambient_T
+            rhs += hconv * A_n * unit.ambient_temperature
         else
             if _cell_active(unit, h - 1, i)
                 kN = (k_row[h] + k_row[h - 1]) / 2
