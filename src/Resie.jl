@@ -41,6 +41,18 @@ function get_run(id::UUID)::SimulationRun
 end
 
 """
+    close_run(id)
+
+Closes the given run, removing it from the run registry.
+
+# Args
+- `id:UUID`: The ID of the run
+"""
+function close_run(id::UUID)
+    delete!(current_runs, id)
+end
+
+"""
 Custom error handler for exception "InputError".
 Call with throw(InputError)
 """
@@ -362,10 +374,11 @@ Load a project from the given file and run the simulation with it.
 
 # Arguments
 - `filepath::String`: Filepath to the project config file.
+- `UUID`: The run ID used in the run registry
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function load_and_run(filepath::String)
+function load_and_run(filepath::String, run_ID::UUID)::Bool
     start = now()
     @info "---- Simulation setup ----"
     @info "-- Starting simulation at $(start)"
@@ -388,7 +401,6 @@ function load_and_run(filepath::String)
     end
 
     @info "-- Now preparing inputs"
-    run_ID = uuid1()
     sim_params, components, operations = prepare_inputs(project_config, run_ID)
     current_runs[run_ID] = SimulationRun(sim_params, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
