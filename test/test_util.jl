@@ -100,6 +100,9 @@ function get_default_sim_params()::Dict{String,Any}
             return w * 4.0
         end,
         "run_ID" => uuid1(),
+        "run_path" => function (path)
+            return path
+        end,
     )
 end
 

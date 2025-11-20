@@ -134,6 +134,17 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         return wh * SECONDS_PER_HOUR / time_step
     end
 
+    # add helper function for using paths, absolute or relative to the run base path
+    if haskey(project_config["io_settings"], "base_path")
+        run_base_path = abspath(project_config["io_settings"]["base_path"])
+    else
+        run_base_path = abspath(joinpath(dirname(@__FILE__), ".."))
+    end
+    sim_params["run_path"] = function (path)
+        return isabspath(path) ? path : abspath(joinpath(run_base_path, path))
+    end
+
+    # load weather profiles accesible for all components
     weather_file_path = default(project_config["simulation_parameters"],
                                 "weather_file_path",
                                 nothing)
