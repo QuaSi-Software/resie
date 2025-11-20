@@ -238,7 +238,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        reset_file(sim_params["run_path"](csv_output_file_path),
+                   output_keys_to_CSV,
+                   weather_CSV_keys,
+                   csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -291,7 +294,11 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             # This is currently done in every time step to keep data even if 
             # an error occurs.
             if do_write_CSV
-                write_to_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, sim_params, csv_time_unit)
+                write_to_file(sim_params["run_path"](csv_output_file_path),
+                              output_keys_to_CSV,
+                              weather_CSV_keys,
+                              sim_params,
+                              csv_time_unit)
             end
 
             # get the energy transported through each interface in every timestep for Sankey
@@ -341,7 +348,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         filepath = default(project_config["io_settings"],
                            "output_plot_file",
                            "./output/output_plot.html")
-        @info "Line plot created and saved to $(filepath)"
+        @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
     end
 
     # create Sankey diagram
@@ -351,15 +358,16 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                       output_interface_values,
                       medium_of_interfaces,
                       nr_of_interfaces,
-                      project_config["io_settings"])
+                      project_config["io_settings"],
+                      sim_params)
         filepath = default(project_config["io_settings"],
-                           "output_plot_file",
-                           "./output/output_plot.html")
-        @info "Sankey created and saved to $(filepath)"
+                           "sankey_plot_file",
+                           "./output/output_sankey.html")
+        @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
     end
 
     if do_write_CSV
-        @info "CSV-file with outputs written to $(csv_output_file_path)"
+        @info "CSV-file with outputs written to $(sim_params["run_path"](csv_output_file_path))"
     end
 
     # plot additional figures potentially available from components after simulation
@@ -372,7 +380,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             end
         end
         if length(component_list) > 0
-            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: " *
+            @info "(Further) auxiliary plots are saved to folder " *
+                  "$(sim_params["run_path"](output_path)) for the following components: " *
                   "$(join(component_list, ", "))"
         end
     end
@@ -398,16 +407,23 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     project_config = nothing
 
     try
+        # we can't use run_path() here because that is only defined after loading the config
+        # in the first place. so we hope we've been given a valid path and forbid upwards
+        # path traversal for security reasons
+        if occursin("..", filepath)
+            @error "Project config filepath must not contain .. path traversal"
+            return false
+        end
         project_config = read_JSON(abspath(filepath))
     catch exc
         if isa(exc, MethodError)
-            @error "Could not parse project config file at $(filepath)"
+            @error "Could not parse project config file at $(abspath(filepath))"
             return false
         end
     end
 
     if project_config === nothing
-        @error "Could not find or parse project config file at $(filepath)"
+        @error "Could not find or parse project config file at $(abspath(filepath))"
         return false
     end
 

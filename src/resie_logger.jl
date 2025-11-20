@@ -184,14 +184,14 @@ function start_logger(log_to_console::Bool,
         time_now = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
         println(log_file_general, "ReSiE general log file of simulation started at: $(time_now)")
         if input_file !== nothing
-            println(log_file_general, "Input file: ", input_file)
+            println(log_file_general, "Input file: ", abspath(input_file))
         end
         println(log_file_general, "This log file contains general warnings, errors and information written by ReSiE")
         println(log_file_general, "---------------------------------")
 
         println(log_file_balanceWarn, "ReSiE balanceWarn log file of simulation started at: $(time_now)")
         if input_file !== nothing
-            println(log_file_balanceWarn, "Input file: ", input_file)
+            println(log_file_balanceWarn, "Input file: ", abspath(input_file))
         end
         println(log_file_balanceWarn, "This log file contains only balance warnings written by ReSiE.")
         println(log_file_balanceWarn, "---------------------------------")
@@ -209,11 +209,11 @@ Prints final statement and closes the logging file.
 """
 function close_logger(log_file_general::Union{IO,Nothing}, log_file_balanceWarn::Union{IO,Nothing})
     if log_file_general !== nothing
-        @info "general log saved to ./$(match(r"<file (.*?)>", log_file_general.name).captures[1])"
+        @info "general log saved to $(match(r"<file (.*?)>", log_file_general.name).captures[1])"
         close(log_file_general)
     end
     if log_file_balanceWarn !== nothing
-        @info "balanceWarn log saved to ./$(match(r"<file (.*?)>", log_file_balanceWarn.name).captures[1])"
+        @info "balanceWarn log saved to $(match(r"<file (.*?)>", log_file_balanceWarn.name).captures[1])"
         close(log_file_balanceWarn)
     end
 end

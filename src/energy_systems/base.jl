@@ -1888,7 +1888,8 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
     # 2. If a `.prf` file path is specified
     if haskey(config, profile_file_key)
         path = config[profile_file_key]
-        @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file located at: $path"
+        @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file " *
+              "located at: $(sim_params["run_path"](path))"
         return nothing, Profile(path, sim_params)
     end
 

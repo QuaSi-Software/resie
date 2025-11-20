@@ -6,8 +6,8 @@ using .Resie_Logger
 # set up logging
 global log_to_console = false
 global log_to_file = false
-global general_logfile_path = "output/logfile_general.log"
-global balanceWarn_logfile_path = "output/logfile_balanceWarn.log"
+global general_logfile_path = nothing
+global balanceWarn_logfile_path = nothing
 global min_log_level = Resie_Logger.Logging.Debug
 global log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
                                                                           log_to_file,
