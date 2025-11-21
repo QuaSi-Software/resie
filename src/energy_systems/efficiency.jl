@@ -962,8 +962,12 @@ Checks the available energy on the output heat interface.
 function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
-        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)) ||
+       (unit.has_linked_interface &&
+        unit.output_interfaces[unit.m_heat_out_linked].target.sys_function == sf_transformer &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_linked].max_energy))
         # direct connection to transformer that has not had its potential
+        # TODO consider also temperatures of other interface!
         return ([-Inf],
                 [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
                 [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_max[1]],
@@ -972,6 +976,11 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
+            if unit.has_linked_interface
+                exchanges_linked = balance_on(unit.output_interfaces[unit.m_heat_out_linked],
+                                              unit.output_interfaces[unit.m_heat_out_linked].target)
+                # TODO
+            end
             return ([e.balance + e.energy_potential for e in exchanges],
                     temp_min_all(exchanges),
                     temp_max_all(exchanges),

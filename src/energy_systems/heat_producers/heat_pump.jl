@@ -27,7 +27,10 @@ mutable struct HeatPump <: Component
 
     m_el_in::Symbol
     m_heat_out::Symbol
+    m_heat_out_linked::Symbol
     m_heat_in::Symbol
+
+    has_linked_interface::Bool
 
     model_type::String
 
@@ -71,8 +74,11 @@ mutable struct HeatPump <: Component
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        has_linked_interface = default(config, "has_linked_interface", false)
+        m_heat_out_linked = Symbol("###_" * default(config, "m_heat_out_linked", "m_h_w_ht1"))
+
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in])
+        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_linked])
 
         func_def = default(config, "cop_function", "carnot:0.4")
         constant_cop, cop_function = parse_cop_function(func_def)
@@ -110,15 +116,22 @@ mutable struct HeatPump <: Component
             throw(InputError)
         end
 
+        output_interfaces = InterfaceMap(m_heat_out => nothing)
+        if has_linked_interface
+            output_interfaces[m_heat_out_linked] = nothing
+        end
+
         return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
                    sf_transformer,
                    InterfaceMap(m_heat_in => nothing,
                                 m_el_in => nothing),
-                   InterfaceMap(m_heat_out => nothing),
+                   output_interfaces,
                    m_el_in,
                    m_heat_out,
+                   m_heat_out_linked,
                    m_heat_in,
+                   has_linked_interface,
                    model_type,
                    config["power_th"],
                    max_power_function,
@@ -418,10 +431,13 @@ function set_max_energies!(unit::HeatPump,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
+                           heat_out_linked::Union{Floathing,Vector{<:Floathing}},
                            slices_heat_in_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            slices_heat_out_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+                           slices_heat_out_linked_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
+                           purpose_uac_heat_out_linked::Union{Stringing,Vector{Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -429,6 +445,8 @@ function set_max_energies!(unit::HeatPump,
                     purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
                     purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out_linked], heat_out_linked, nothing,
+                    slices_heat_out_linked_temperature, purpose_uac_heat_out_linked, has_calculated_all_maxima_heat_out)
 end
 
 """
@@ -1067,17 +1085,20 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0)
+        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
         return
     end
 
     set_max_energies!(unit,
                       energies.slices_el_in,
                       energies.slices_heat_in,
-                      energies.slices_heat_out,
+                      energies.slices_heat_out ./ 2,  #TODO
+                      energies.slices_heat_out ./ 2,  #TODO
                       energies.slices_heat_in_temperature,
                       energies.slices_heat_out_temperature,
+                      energies.slices_heat_out_temperature,
                       energies.slices_heat_in_uac,
+                      energies.slices_heat_out_uac,
                       energies.slices_heat_out_uac,
                       energies.heat_in_has_inf_energy,
                       energies.heat_out_has_inf_energy)
@@ -1093,7 +1114,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         # due to constant losses we are guarranteed to have an electricity slice, though
         # it might be zero. we also need to set the max_energy values to zero for the
         # heat input and output, as the sub! and add! methods do that when called
-        set_max_energies!(unit, el_in, 0.0, 0.0)
+        set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -1103,7 +1124,12 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
              [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
         add!(unit.output_interfaces[unit.m_heat_out],
-             energies.slices_heat_out,
+             energies.slices_heat_out ./ 2, #TODO
+             [nothing for _ in energies.slices_heat_out_temperature],
+             energies.slices_heat_out_temperature,
+             energies.slices_heat_out_uac)
+        add!(unit.output_interfaces[unit.m_heat_out_linked],
+             energies.slices_heat_out ./ 2,  #TODO
              [nothing for _ in energies.slices_heat_out_temperature],
              energies.slices_heat_out_temperature,
              energies.slices_heat_out_uac)
@@ -1146,6 +1172,7 @@ function output_values(unit::HeatPump)::Vector{String}
     return [string(unit.m_el_in) * ":IN",
             string(unit.m_heat_in) * ":IN",
             string(unit.m_heat_out) * ":OUT",
+            string(unit.m_heat_out_linked) * ":OUT",
             "COP",
             "Effective_COP",
             "Avg_PLR",

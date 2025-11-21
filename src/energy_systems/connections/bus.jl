@@ -55,6 +55,7 @@ Base.@kwdef mutable struct BTInputRow
     energy_potential_temp::MaxEnergy = MaxEnergy()
     energy_pool::MaxEnergy = MaxEnergy()
     energy_pool_temp::MaxEnergy = MaxEnergy()
+    is_linked::Bool
 end
 
 """
@@ -226,11 +227,22 @@ function Bus(uac::String,
                epsilon)
 end
 
+function adjust_uac_if_linked(uac::AbstractString, is_linked::Bool)
+    if is_linked
+        return "###_" * uac
+    else
+        return uac
+    end
+end
+
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
+    # has_linked_inputs = any(inface.is_linked for inface in unit.input_interfaces)
     for (idx, inface) in pairs(unit.input_interfaces)
-        unit.balance_table_inputs[inface.source.uac] = BTInputRow(; source=inface.source,
-                                                                  priority=idx,
-                                                                  do_storage_transfer=inface.do_storage_transfer)
+        uac = adjust_uac_if_linked(inface.source.uac, inface.is_linked)
+        unit.balance_table_inputs[uac] = BTInputRow(; source=inface.source,
+                                                    priority=idx,
+                                                    do_storage_transfer=inface.do_storage_transfer,
+                                                    is_linked=inface.is_linked)
     end
 
     for (idx, outface) in pairs(unit.output_interfaces)
@@ -346,11 +358,13 @@ function set_max_energy!(unit::Bus,
                          temperature_max::Union{Temperature,Vector{<:Temperature}},
                          purpose_uac::Union{Stringing,Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool,
-                         recalculate_max_energy::Bool)
+                         recalculate_max_energy::Bool,
+                         is_linked::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        set_max_energy!(bus.balance_table_inputs[comp.uac].energy_potential,
+        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        set_max_energy!(bus.balance_table_inputs[com_uac].energy_potential,
                         _abs(energy),
                         temperature_min,
                         temperature_max,
@@ -377,7 +391,8 @@ function set_max_energy!(unit::Bus,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        is_linked)
     end
 end
 
@@ -403,15 +418,18 @@ function add_balance!(unit::Bus,
                       energy::Union{Floathing,Vector{<:Floathing}},
                       temperature_min::Union{Temperature,Vector{<:Temperature}},
                       temperature_max::Union{Temperature,Vector{<:Temperature}},
-                      purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
+                      purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing,
+                      is_linked::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
+
     if is_input
-        increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
+        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              energy,
                              temperature_min,
                              temperature_max,
                              purpose_uac)
-        bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
+        bus.balance_table_inputs[com_uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              energy,
@@ -444,15 +462,17 @@ function sub_balance!(unit::Bus,
                       energy::Union{Floathing,Vector{<:Floathing}},
                       temperature_min::Union{Temperature,Vector{<:Temperature}},
                       temperature_max::Union{Temperature,Vector{<:Temperature}},
-                      purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
+                      purpose_uac::Union{Stringing,Vector{Stringing}}=nothing,
+                      is_linked::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
+        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              abs.(energy),
                              temperature_min,
                              temperature_max,
                              purpose_uac)
-        bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
+        bus.balance_table_inputs[com_uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              abs.(energy),
@@ -532,12 +552,13 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     caller_is_input = false
     caller_uac = nothing
     for input_interface in unit.input_interfaces
-        if input_interface.source.uac == interface.source.uac
+        if adjust_uac_if_linked(input_interface.source.uac, input_interface.is_linked) ==
+           adjust_uac_if_linked(interface.source.uac, interface.is_linked)
             caller_is_input = true
             if input_interface.source.sys_function === sf_transformer
                 # if the input is a transformer, set the uac to let the inner_distribute know that 
                 # a transformer is calling
-                caller_uac = interface.source.uac
+                caller_uac = adjust_uac_if_linked(interface.source.uac, interface.is_linked)
             end
             break
         end
@@ -556,7 +577,10 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
 
     return_exchanges = []
     if caller_is_input
-        input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
+        input_row = [row
+                     for row in values(unit.balance_table_inputs)
+                     if adjust_uac_if_linked(row.source.uac, row.is_linked) ==
+                        adjust_uac_if_linked(interface.source.uac, interface.is_linked)][1]
         for output_row in sort(collect(values(unit.balance_table_outputs));
                                by=x -> unit.has_custom_order ?
                                        unit.connectivity.energy_flow[input_row.priority][x.priority] :
@@ -865,8 +889,10 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         # (otherwise the max energy would be empty and we would not have reached this point),
         # do not consider the maximum energies the transformer has written in the potential
         # step before!
-        caller_is_transformer_source = caller_is_input && input_row.source.uac === caller_uac_transformer_only
-        caller_is_transformer_target = !caller_is_input && output_row.target.uac === caller_uac_transformer_only
+        caller_is_transformer_source = caller_is_input &&
+                                       adjust_uac_if_linked(input_row.source.uac, input_row.is_linked) ==
+                                       caller_uac_transformer_only
+        caller_is_transformer_target = !caller_is_input && output_row.target.uac == caller_uac_transformer_only
         if caller_is_transformer_source
             energy_flow = target_energy
         elseif caller_is_transformer_target

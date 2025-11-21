@@ -208,8 +208,12 @@ function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
     # 'uac' order
     output_perm_indices = sortperm([output_order_dict[bus.output_interfaces[i].target.uac]
                                     for i in 1:length(bus.output_interfaces)])
-    input_perm_indices = sortperm([input_order_dict[bus.input_interfaces[i].source.uac]
-                                   for i in 1:length(bus.input_interfaces)])
+
+    # Input side: include is_linked in the key
+    component_key(uac::AbstractString, is_linked::Bool) = is_linked ? string(uac, "#linked") : uac
+    input_perm_indices = sortperm([input_order_dict[component_key(bus.input_interfaces[i].source.uac,
+                                                                  bus.input_interfaces[i].is_linked)]
+                                   for i in eachindex(bus.input_interfaces)])
 
     # Reorder the input and output interfaces using the permutation indices
     bus.output_interfaces = bus.output_interfaces[output_perm_indices]

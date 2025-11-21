@@ -191,12 +191,12 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 push!(output_targetnames_sankey, each_outputinterface.target.uac)
 
                 # get name of medium
-                if isdefined(each_outputinterface.target, :medium)
+                if !(medium === nothing)
+                    push!(medium_of_interfaces, medium)
+                elseif isdefined(each_outputinterface.target, :medium)
                     push!(medium_of_interfaces, each_outputinterface.target.medium)
                 elseif isdefined(each_outputinterface.source, :medium)
                     push!(medium_of_interfaces, each_outputinterface.source.medium)
-                elseif !(medium === nothing)
-                    push!(medium_of_interfaces, medium)
                 else
                     @warn "The name of the medium was not detected. This may lead to wrong colouring in Sankey plot."
                 end

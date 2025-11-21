@@ -243,6 +243,9 @@ Base.@kwdef mutable struct SystemInterface
 
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
+
+    """Flag to indicate if the interface is a linked interface."""
+    is_linked::Bool = false
 end
 
 """
@@ -407,7 +410,8 @@ function add!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_linked)
     end
 end
 
@@ -447,7 +451,8 @@ function sub!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_linked)
     end
 end
 
@@ -530,7 +535,7 @@ function set_max_energy!(interface::SystemInterface,
                         recalculate_max_energy)
     elseif interface.target.sys_function == sf_bus
         set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
-                        has_calculated_all_maxima, recalculate_max_energy)
+                        has_calculated_all_maxima, recalculate_max_energy, interface.is_linked)
         set_max_energy!(interface.target,
                         interface.source,
                         true,
@@ -539,7 +544,8 @@ function set_max_energy!(interface::SystemInterface,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        interface.is_linked)
     else
         # 1-to-1 interface between two components.
         # Assuming that temperatures always match: This is valid as currently only heat pumps
@@ -1668,8 +1674,9 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # is a Vector{Grouping} here with the same order than given_medium.
     if given_media !== nothing
         for (idx, given_medium) in enumerate(given_media)
+            _, m_is_linked = trim_medium(given_medium)
             current_component = only(values(components[idx]))
-            connection = SystemInterface(; source=unit, target=current_component)
+            connection = SystemInterface(; source=unit, target=current_component, is_linked=m_is_linked)
             unit.output_interfaces[given_medium] = connection
             if isa(current_component, Bus)
                 push!(current_component.input_interfaces, connection)
@@ -1683,11 +1690,12 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # source is a component and no media given, we have to look for the right medium for
     # a connection
     for out_medium in keys(unit.output_interfaces)
+        out_medium_trimmed, m_is_linked = trim_medium(out_medium)
         for component in each(components)
             if isa(component, Bus)
                 # link component to bus
-                if out_medium == component.medium
-                    connection = SystemInterface(; source=unit, target=component)
+                if out_medium_trimmed == component.medium
+                    connection = SystemInterface(; source=unit, target=component, is_linked=m_is_linked)
                     push!(component.input_interfaces, connection)
                     unit.output_interfaces[out_medium] = connection
                     break
@@ -1695,8 +1703,8 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
             else
                 # link component to component
                 for in_medium in keys(component.input_interfaces)
-                    if out_medium == in_medium
-                        connection = SystemInterface(; source=unit, target=component)
+                    if out_medium_trimmed == in_medium
+                        connection = SystemInterface(; source=unit, target=component, is_linked=m_is_linked)
                         unit.output_interfaces[out_medium] = connection
                         component.input_interfaces[in_medium] = connection
                         break
@@ -1704,6 +1712,16 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
                 end
             end
         end
+    end
+end
+
+function trim_medium(out_medium::Symbol)
+    prefix = "###_"
+    out_medium_string = String(out_medium)
+    if startswith(out_medium_string, prefix)
+        return Symbol(out_medium_string[(length(prefix) + 1):end]), true
+    else
+        return out_medium, false
     end
 end
 
