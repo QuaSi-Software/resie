@@ -9,7 +9,7 @@ include("../test_util.jl")
 function test_ooo_one_bus_to_many_with_storage()
     components_config = Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_01"],
             "is_source" => true,

@@ -46,6 +46,9 @@ mutable struct CM_ProfileLimited <: ControlModule
     end
 end
 
+# method for control module name on type-level
+control_module_name(x::Type{CM_ProfileLimited})::String = "profile_limited"
+
 function has_method_for(mod::CM_ProfileLimited, func::ControlModuleFunction)::Bool
     return func == cmf_upper_plr_limit
 end

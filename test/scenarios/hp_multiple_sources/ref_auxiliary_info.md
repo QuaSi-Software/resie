@@ -1,4 +1,4 @@
-# Simulation step order
+# Order of operations
 "TST_DEM_02:s_reset",
 "TST_DEM_01:s_reset",
 "TST_BUS_TH_02:s_reset",

@@ -34,7 +34,7 @@
             "scale": 6000
         },
         "TST_SRC_01": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "medium": "m_h_w_lt1",
             "output_refs": [
                 "TST_HP_01"

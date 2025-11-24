@@ -31,7 +31,7 @@ be in the following syntax:
 ]
 ```
 """
-function load_order_of_operations(order_of_operation_input, components::Grouping)::StepInstructions
+function load_order_of_operations(order_of_operation_input, components::Grouping)::OrderOfOperations
     step_instructions = []
     all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
 
@@ -68,7 +68,7 @@ end
 """
 calculate_order_of_operations(components)
 
-Calculate the order of steps that need to be performed to simulate the given components.
+Calculate the order of operations that need to be performed to simulate the given components.
 
 This function works by an algorithm described in more detail in the accompanying
 documentation. The result of this are step-by-step instructions telling the simulation
@@ -78,7 +78,7 @@ not trivial and might not work for each possible grouping of components.
 # Args
 - `components::Grouping`: The components for which an order is required
 # Returns
-- `StepInstructions`: The order in the structure:
+- `OrderOfOperations`: The order in the structure:
 ```
 [
     ["UAC Key", s_step],
@@ -86,7 +86,7 @@ not trivial and might not work for each possible grouping of components.
 ]
 ```
 """
-function calculate_order_of_operations(components::Grouping)::StepInstructions
+function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     components_by_function = categorize_by_function(components)
     simulation_order = base_order(components_by_function)
     simulation_order = remove_double_transformer_process_steps(simulation_order, components)
@@ -266,9 +266,9 @@ function categorize_by_function(components)
             [unit for unit in each(components)
              if unit.sys_function == EnergySystems.sf_storage],
             [unit for unit in each(components)
-             if unit.sys_function == EnergySystems.sf_bounded_source],
+             if unit.sys_function == EnergySystems.sf_flexible_source],
             [unit for unit in each(components)
-             if unit.sys_function == EnergySystems.sf_bounded_sink]]
+             if unit.sys_function == EnergySystems.sf_flexible_sink]]
 end
 
 """
@@ -321,11 +321,11 @@ function base_order(components_by_function)
         initial_nr -= 1
     end
 
-    # process bounded sources/sinks
+    # process flexible sources/sinks
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
             if isa(unit, EnergySystems.GridConnection)
-                # skip grid connections here to place them after general bounded sources/sinks
+                # skip grid connections here to place them after general flexible sources/sinks
                 continue
             end
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -336,7 +336,7 @@ function base_order(components_by_function)
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
             if !isa(unit, EnergySystems.GridConnection)
-                # ignore general bounded sources/sinks here as they are already added
+                # ignore general flexible sources/sinks here as they are already added
                 continue
             end
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -1031,7 +1031,7 @@ function add_transformer_steps(simulation_order,
                                                               current_components,
                                                               parallel_branches,
                                                               step_category;
-                                                              reverse=!reverse,
+                                                              reverse=(!reverse),
                                                               connecting_component=connecting_component,
                                                               checked_components=checked_components,
                                                               exit_on_next_iteration=true)
@@ -2687,7 +2687,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         # for the storage with the highest output priority, place its load step after the
         # process step of the transformer with the lowest input priority, so that the load
         # of storages happen after the last input transformer had its process.
-        # storages act like a bounded source, they have already written a valid max_energy
+        # storages act like a flexible source, they have already written a valid max_energy
         # in their control.
         input_transformer = [i.source
                              for i in bus.input_interfaces

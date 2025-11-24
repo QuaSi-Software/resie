@@ -90,11 +90,10 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
 
         return new("negotiate_temperature", params)
     end
-
-    function CM_Negotiate_Temperature()
-        return new("negotiate_temperature", Dict{String,Any}())
-    end
 end
+
+# method for control module name on type-level
+control_module_name(x::Type{CM_Negotiate_Temperature})::String = "negotiate_temperature"
 
 function has_method_for(mod::CM_Negotiate_Temperature, func::ControlModuleFunction)::Bool
     return func == cmf_negotiate_temperature

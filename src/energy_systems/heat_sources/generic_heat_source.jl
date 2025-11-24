@@ -52,7 +52,7 @@ mutable struct GenericHeatSource <: Component
 
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
-                   sf_bounded_source,               # sys_function
+                   sf_flexible_source,              # sys_function
                    medium,                          # medium
                    InterfaceMap(medium => nothing), # input_interfaces
                    InterfaceMap(medium => nothing), # output_interfaces

@@ -26,14 +26,6 @@ function energy_system()::Dict{String,Any}
         "TST_BAT_01" => Dict{String,Any}(
             "type" => "Battery",
             "output_refs" => ["TST_BUS_01"],
-            "control_modules" => [Dict{String,Any}(
-                                      "name" => "economical_discharge",
-                                      "pv_threshold" => 750.0,
-                                      "min_charge" => 0.2,
-                                      "discharge_limit" => 0.05,
-                                      "pv_plant_uac" => "TST_PVP_01",
-                                      "battery_uac" => "TST_BAT_01",
-                                  )],
             "capacity" => 10000,
             "load" => 5000,
         ),

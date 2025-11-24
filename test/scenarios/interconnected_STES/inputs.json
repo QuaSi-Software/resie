@@ -110,7 +110,7 @@
             "nr_optimisation_passes": 10
         },
         "TST_SRC_01": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "output_refs": [
                 "TST_BUS_01"
             ],
@@ -325,7 +325,7 @@
             "nr_optimisation_passes": 10
         },
         "TST_SRC_02": {
-            "type": "BoundedSupply",
+            "type": "FlexibleSupply",
             "output_refs": [
                 "TST_HP_01"
             ],

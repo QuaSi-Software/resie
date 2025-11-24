@@ -337,7 +337,12 @@ mutable struct Profile
 
         # check timestamp for order, duplicates and consistency
         if !issorted(profile_timestamps_date)
-            @error "The timestamp of the profile at $(file_path) is not sorted in ascending order!"
+            error_msg = "The timestamp of the profile at $(file_path) is not sorted in ascending order!"
+            if given_profile_values == [] && time_definition == "datestamp"
+                error_msg *= " Check if you have specified the correct 'time_zone' in the profile header if the " *
+                             "datestamp of the profile contains daylight savings."
+            end
+            @error error_msg
             throw(InputError)
         elseif length(profile_timestamps_date) !== length(unique(profile_timestamps_date))
             @error "The timestamp of the profile at $(file_path) has duplicates!"
