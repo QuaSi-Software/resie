@@ -227,18 +227,21 @@ function Bus(uac::String,
                epsilon)
 end
 
-function adjust_uac_if_linked(uac::AbstractString, is_linked::Bool)
+function adjust_name_if_linked(name::AbstractString, is_linked::Bool)
     if is_linked
-        return "###_" * uac
+        return "###_" * name
     else
-        return uac
+        return name
     end
+end
+function adjust_name_if_linked(name::Symbol, is_linked::Bool)
+    return Symbol(adjust_name_if_linked(String(name), is_linked))
 end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
     # has_linked_inputs = any(inface.is_linked for inface in unit.input_interfaces)
     for (idx, inface) in pairs(unit.input_interfaces)
-        uac = adjust_uac_if_linked(inface.source.uac, inface.is_linked)
+        uac = adjust_name_if_linked(inface.source.uac, inface.is_linked)
         unit.balance_table_inputs[uac] = BTInputRow(; source=inface.source,
                                                     priority=idx,
                                                     do_storage_transfer=inface.do_storage_transfer,
@@ -288,7 +291,7 @@ function balance_direct(unit::Bus)::Float64
         if isa(inface.source, Bus)
             continue
         else
-            principal = inface.source.output_interfaces[unit.medium]
+            principal = inface.source.output_interfaces[adjust_name_if_linked(unit.medium, inface.is_linked)]
             blnc += balance(balance_on(principal, principal.source))
         end
     end
@@ -363,7 +366,7 @@ function set_max_energy!(unit::Bus,
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        com_uac = adjust_name_if_linked(comp.uac, is_linked)
         set_max_energy!(bus.balance_table_inputs[com_uac].energy_potential,
                         _abs(energy),
                         temperature_min,
@@ -423,7 +426,7 @@ function add_balance!(unit::Bus,
     bus = unit.proxy === nothing ? unit : unit.proxy
 
     if is_input
-        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        com_uac = adjust_name_if_linked(comp.uac, is_linked)
         increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              energy,
                              temperature_min,
@@ -466,7 +469,7 @@ function sub_balance!(unit::Bus,
                       is_linked::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        com_uac = adjust_uac_if_linked(comp.uac, is_linked)
+        com_uac = adjust_name_if_linked(comp.uac, is_linked)
         increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              abs.(energy),
                              temperature_min,
@@ -552,13 +555,13 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     caller_is_input = false
     caller_uac = nothing
     for input_interface in unit.input_interfaces
-        if adjust_uac_if_linked(input_interface.source.uac, input_interface.is_linked) ==
-           adjust_uac_if_linked(interface.source.uac, interface.is_linked)
+        if adjust_name_if_linked(input_interface.source.uac, input_interface.is_linked) ==
+           adjust_name_if_linked(interface.source.uac, interface.is_linked)
             caller_is_input = true
             if input_interface.source.sys_function === sf_transformer
                 # if the input is a transformer, set the uac to let the inner_distribute know that 
                 # a transformer is calling
-                caller_uac = adjust_uac_if_linked(interface.source.uac, interface.is_linked)
+                caller_uac = adjust_name_if_linked(interface.source.uac, interface.is_linked)
             end
             break
         end
@@ -579,8 +582,8 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     if caller_is_input
         input_row = [row
                      for row in values(unit.balance_table_inputs)
-                     if adjust_uac_if_linked(row.source.uac, row.is_linked) ==
-                        adjust_uac_if_linked(interface.source.uac, interface.is_linked)][1]
+                     if adjust_name_if_linked(row.source.uac, row.is_linked) ==
+                        adjust_name_if_linked(interface.source.uac, interface.is_linked)][1]
         for output_row in sort(collect(values(unit.balance_table_outputs));
                                by=x -> unit.has_custom_order ?
                                        unit.connectivity.energy_flow[input_row.priority][x.priority] :
@@ -796,7 +799,8 @@ function iterate_balance_table(unit::Bus)
         sort!(triples; by=t -> t[1])
 
         vals_sorted = [t[1] for t in triples]
-        row_uac = [unit.input_interfaces[t[2]].source.uac for t in triples]
+        row_uac = [adjust_name_if_linked(unit.input_interfaces[t[2]].source.uac, unit.input_interfaces[t[2]].is_linked)
+                   for t in triples]
         col_uac = [unit.output_interfaces[t[3]].target.uac for t in triples]
 
         if minimum(vals_sorted) == 1 && allunique(vals_sorted)
@@ -889,9 +893,9 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         # (otherwise the max energy would be empty and we would not have reached this point),
         # do not consider the maximum energies the transformer has written in the potential
         # step before!
-        caller_is_transformer_source = caller_is_input &&
-                                       adjust_uac_if_linked(input_row.source.uac, input_row.is_linked) ==
-                                       caller_uac_transformer_only
+        # Unless if its a linked interface or has one, then the written MaxEnergy should be considered!
+        caller_is_transformer_source = caller_is_input && input_row.source.uac == caller_uac_transformer_only &&
+                                       !input_row.is_linked && !has_linked_interface(input_row, unit)
         caller_is_transformer_target = !caller_is_input && output_row.target.uac == caller_uac_transformer_only
         if caller_is_transformer_source
             energy_flow = target_energy
@@ -953,6 +957,16 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
             end
         end
     end
+end
+
+function has_linked_interface(input_row::BTInputRow, target::Bus)
+    for outface in input_row.source.output_interfaces
+        outface = isa(outface, Pair) ? outface[2] : outface
+        if outface.is_linked && outface.target == target
+            return true
+        end
+    end
+    return false
 end
 
 """
@@ -1158,7 +1172,7 @@ function distribute!(unit::Bus)
 
     # reset all principal non-bus input interfaces from the original busses
     for inface in filter_inputs(unit, sf_bus, false)
-        principal = inface.source.output_interfaces[unit.medium]
+        principal = inface.source.output_interfaces[adjust_name_if_linked(unit.medium, inface.is_linked)]
         set!(principal, 0.0)
     end
 
@@ -1179,15 +1193,36 @@ function output_values(unit::Bus)::Vector{String}
     # allowed connections
     if unit.proxy === nothing
         outputs_energy_flow = ["EnergyFlow $i->$o"
-                               for i in [inface.source.uac for inface in unit.input_interfaces]
+                               for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
+                                         for inface in unit.input_interfaces]
                                for o in [outface.target.uac for outface in unit.output_interfaces]
-                               if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                         unit.balance_table_outputs[o])]
+                               if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                          unit.balance_table_outputs[o]) &&
+                                   !unit.balance_table_inputs[i].is_linked)]
+        append!(outputs_energy_flow,
+                ["EnergyFlow### $i->$o"
+                 for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
+                           for inface in unit.input_interfaces]
+                 for o in [outface.target.uac for outface in unit.output_interfaces]
+                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                            unit.balance_table_outputs[o]) &&
+                     unit.balance_table_inputs[i].is_linked)])
         outputs_temperature_flow = ["TemperatureFlow $i->$o"
-                                    for i in [inface.source.uac for inface in unit.input_interfaces]
+                                    for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
+                                              for inface in unit.input_interfaces]
                                     for o in [outface.target.uac for outface in unit.output_interfaces]
-                                    if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                              unit.balance_table_outputs[o])]
+                                    if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                               unit.balance_table_outputs[o]) &&
+                                        !unit.balance_table_inputs[i].is_linked)]
+        append!(outputs_temperature_flow,
+                ["TemperatureFlow### $i->$o"
+                 for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
+                           for inface in unit.input_interfaces]
+                 for o in [outface.target.uac for outface in unit.output_interfaces]
+                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                            unit.balance_table_outputs[o]) &&
+                     unit.balance_table_inputs[i].is_linked)])
+
         return ["Balance"; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
     else
         return ["Balance"; outputs_proxies]
@@ -1206,14 +1241,28 @@ function output_value(unit::Bus, key::OutputKey)::Float64
         return calculate_energy_flow(outface)
 
     elseif startswith(key.value_key, "EnergyFlow")
+        if startswith(key.value_key, "EnergyFlow###")
+            nr_to_skip = 15
+            is_linked = true
+        else
+            nr_to_skip = 12
+            is_linked = false
+        end
         # EnergyFlow between inputs and outputs
-        in_uac, out_uac = split(key.value_key[12:end], "->")
+        in_uac, out_uac = split(key.value_key[nr_to_skip:end], "->")
         return unit.balance_table[unit.balance_table_inputs[in_uac].priority,
                                   (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
 
     elseif startswith(key.value_key, "TemperatureFlow")
+        if startswith(key.value_key, "TemperatureFlow###")
+            nr_to_skip = 20
+            is_linked = true
+        else
+            nr_to_skip = 17
+            is_linked = false
+        end
         # TemperatureFlow between inputs and outputs
-        in_uac, out_uac = split(key.value_key[17:end], "->")
+        in_uac, out_uac = split(key.value_key[nr_to_skip:end], "->")
         temperature = unit.balance_table[unit.balance_table_inputs[in_uac].priority,
                                          (unit.balance_table_outputs[out_uac].priority * 2)]
         energy = unit.balance_table[unit.balance_table_inputs[in_uac].priority,

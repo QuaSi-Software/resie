@@ -634,6 +634,40 @@ function check_el_in(unit::Union{Electrolyser,HeatPump,UTIR},
 end
 
 """
+    check_el_in(unit, sim_params)
+
+Checks the available energy on the input electricity interface.
+
+# Arguments
+- `unit::Union{Electrolyser,HeatPump,UTIR}`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Floathing`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `Inf`, which is a special
+    floating point value signifying an infinite value
+"""
+function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR},
+                             sim_params::Dict{String,Any})
+    if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy))
+        # direct connection to transformer that has not had its potential
+        return ([Inf],
+                [unit.input_interfaces[unit.m_el_in].source.uac])
+    else
+        exchanges = balance_on(unit.input_interfaces[unit.m_el_in],
+                               unit.input_interfaces[unit.m_el_in].source)
+        if unit.controller.parameters["consider_m_el_in"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat input, but purpose_uac is still required
+            return ([Inf for _ in exchanges],
+                    [e.purpose_uac for e in exchanges])
+        end
+    end
+end
+
+"""
     check_heat_in_layered(unit, sim_params)
 
 Checks the available energy on the input heat interface.
@@ -979,7 +1013,22 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
             if unit.has_linked_interface
                 exchanges_linked = balance_on(unit.output_interfaces[unit.m_heat_out_linked],
                                               unit.output_interfaces[unit.m_heat_out_linked].target)
-                # TODO
+                for exchange_linked in exchanges_linked
+                    duplicate = false
+                    for exchange in exchanges
+                        duplicate = exchange_linked.balance == exchange.balance &&
+                                    exchange_linked.energy_potential == exchange.energy_potential &&
+                                    exchange_linked.purpose_uac == exchange.purpose_uac &&
+                                    exchange_linked.temperature_min == exchange.temperature_min &&
+                                    exchange_linked.temperature_min == exchange.temperature_min
+                        if duplicate
+                            break
+                        end
+                    end
+                    if !duplicate
+                        push!(exchanges, exchange_linked)
+                    end
+                end
             end
             return ([e.balance + e.energy_potential for e in exchanges],
                     temp_min_all(exchanges),

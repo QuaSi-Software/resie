@@ -535,7 +535,7 @@ function set_max_energy!(interface::SystemInterface,
                         recalculate_max_energy)
     elseif interface.target.sys_function == sf_bus
         set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
-                        has_calculated_all_maxima, recalculate_max_energy, interface.is_linked)
+                        has_calculated_all_maxima, recalculate_max_energy)
         set_max_energy!(interface.target,
                         interface.source,
                         true,

@@ -175,16 +175,18 @@ Unless you're changing the code for heat pumps, this can be ignored entirely.
 """
 mutable struct HPEnergies
     potential_el_in::Floathing
+    potential_el_in_layered::Vector{<:Floathing}
     potentials_heat_in::Vector{<:Floathing}
     potentials_heat_out::Vector{<:Floathing}
     available_el_in::Float64
+    in_uacs_el::Vector{<:Stringing}
     available_heat_in::Vector{<:Floathing}
     available_heat_out::Vector{<:Floathing}
     max_usage_fraction::Float64
     in_indices::Vector{Integer}
     in_temps_min::Vector{<:Temperature}
     in_temps_max::Vector{<:Temperature}
-    in_uacs::Vector{<:Stringing}
+    in_uacs_heat::Vector{<:Stringing}
     out_indices::Vector{Integer}
     out_temps_min::Vector{<:Temperature}
     out_temps_max::Vector{<:Temperature}
@@ -214,7 +216,9 @@ mutable struct HPEnergies
         return new(0.0,
                    Vector{Floathing}(),
                    Vector{Floathing}(),
+                   Vector{Floathing}(),
                    0.0,
+                   Vector{Stringing}(),
                    Vector{Floathing}(),
                    Vector{Floathing}(),
                    0.0,
@@ -537,7 +541,7 @@ function filter_by_transformer(energies::HPEnergies,
                                heat_in::Bool=true)::Vector{Floathing}
     components = get_run(sim_params["run_ID"]).components
     filtered = []
-    for (idx, uac) in enumerate(heat_in ? energies.in_uacs : energies.out_uacs)
+    for (idx, uac) in enumerate(heat_in ? energies.in_uacs_heat : energies.out_uacs)
         if uac !== nothing && components[uac].sys_function === sf_transformer
             if heat_in
                 push!(filtered, energies.potentials_heat_in[idx])
@@ -757,7 +761,7 @@ function calculate_slices(unit::HeatPump,
         end
 
         # apply restrictions of control modules for a slice
-        if !check_src_to_snk(unit.controller, energies.in_uacs[src_idx], energies.out_uacs[snk_idx])
+        if !check_src_to_snk(unit.controller, energies.in_uacs_heat[src_idx], energies.out_uacs[snk_idx])
             snk_idx += 1
             continue
         end
@@ -824,7 +828,7 @@ function calculate_slices(unit::HeatPump,
         # finally all checks done, we add the slice and update remaining energies
         add_temp_slice!(energies, used_el_in, used_heat_in, used_heat_out,
                         src_temperature, snk_temperature,
-                        energies.in_uacs[src_idx],
+                        energies.in_uacs_heat[src_idx],
                         energies.out_uacs[snk_idx],
                         used_time)
 
@@ -945,10 +949,8 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
     # get electricity potential and reduce it by constant power draw (or however much
     # is available)
-    energies.potential_el_in = check_el_in(unit, sim_params)
-    energies.potential_el_in = energies.potential_el_in === nothing ?
-                               0.0 :
-                               energies.potential_el_in
+    energies.potential_el_in_layered, energies.in_uacs_el = check_el_in_layered(unit, sim_params)
+    energies.potential_el_in = sum(energies.potential_el_in_layered)
     unit.current_constant_loss = min(energies.potential_el_in,
                                      unit.constant_loss_energy)
     energies.potential_el_in -= unit.current_constant_loss
@@ -969,7 +971,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies.potentials_heat_in,
         energies.in_temps_min,
         energies.in_temps_max,
-        energies.in_uacs = check_heat_in_layered(unit, sim_params)
+        energies.in_uacs_heat = check_heat_in_layered(unit, sim_params)
 
         energies.potentials_heat_out,
         energies.out_temps_min,
@@ -990,7 +992,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
         energies.in_temps_min = energies.in_temps_min[index]
         energies.in_temps_max = energies.in_temps_max[index]
-        energies.in_uacs = energies.in_uacs[index]
+        energies.in_uacs_heat = energies.in_uacs_heat[index]
         energies.potentials_heat_in = energies.potentials_heat_in[index]
 
         index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
@@ -1089,19 +1091,165 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
+    # split slices regarding electricity source
+    uac_el_good = ["SRC_GOOD"]
+    uac_el_bad = ["SRC_BAD"]
+    good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+                                      energies.in_uacs_el,
+                                      uac_el_good,
+                                      uac_el_bad,
+                                      energies.slices_el_in,
+                                      energies.slices_heat_out,
+                                      energies.slices_heat_out_temperature,
+                                      energies.slices_heat_out_uac)
+
     set_max_energies!(unit,
                       energies.slices_el_in,
                       energies.slices_heat_in,
-                      energies.slices_heat_out ./ 2,  #TODO
-                      energies.slices_heat_out ./ 2,  #TODO
+                      good.slices_heat_out,
+                      bad.slices_heat_out,
                       energies.slices_heat_in_temperature,
-                      energies.slices_heat_out_temperature,
-                      energies.slices_heat_out_temperature,
+                      good.slices_heat_out_temperature,
+                      bad.slices_heat_out_temperature,
                       energies.slices_heat_in_uac,
-                      energies.slices_heat_out_uac,
-                      energies.slices_heat_out_uac,
+                      good.slices_heat_out_uac,
+                      bad.slices_heat_out_uac,
                       energies.heat_in_has_inf_energy,
                       energies.heat_out_has_inf_energy)
+end
+
+function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
+                               in_uacs_el::Vector{String},
+                               good_uac::Vector{String},
+                               bad_uac::Vector{String},
+                               slices_el_in::Vector{Floathing},
+                               slices_heat_out::Vector{Floathing},
+                               slices_heat_out_temperature::Vector{Floathing},
+                               slices_heat_out_uac::Vector{Stringing})
+
+    # --- basic checks ---------------------------------------------------------
+    L = length(potential_el_in_layered)
+    @assert length(in_uacs_el) == L "in_uacs_el and potential_el_in_layered must match"
+
+    N = length(slices_el_in)
+    @assert length(slices_heat_out) == N
+    @assert length(slices_heat_out_temperature) == N
+    @assert length(slices_heat_out_uac) == N
+
+    # convenience
+    good_set = Set(good_uac)
+    bad_set = Set(bad_uac)
+
+    tol = 1e-9
+
+    total_pot = sum(potential_el_in_layered)
+    total_slices = sum(slices_el_in)
+
+    if total_slices > total_pot + tol
+        error("Total slices_el_in ($(total_slices)) is larger than total potential_el_in_layered ($(total_pot)).")
+    end
+
+    # --- outputs --------------------------------------------------------------
+    T = eltype(slices_el_in)
+    good_heat_out = T[]
+    good_heat_out_temperature = T[]
+    good_heat_out_uac_out = Stringing[]
+    good_el_source_uac = Stringing[]   # from in_uacs_el
+
+    bad_heat_out = T[]
+    bad_heat_out_temperature = T[]
+    bad_heat_out_uac_out = Stringing[]
+    bad_el_source_uac = Stringing[]   # from in_uacs_el
+
+    # --- main loop -----------------------------------------------------------
+    layer = 1
+    remaining = layer <= L ? potential_el_in_layered[layer] : 0.0
+
+    for j in eachindex(slices_el_in)
+        slice_total = slices_el_in[j]
+
+        # skip zero slices to avoid division by zero
+        if slice_total ≤ tol
+            continue
+        end
+
+        slice_left = slice_total
+
+        while slice_left > tol
+            # if layer is exhausted, move to next
+            while layer ≤ L && remaining ≤ tol
+                layer += 1
+                if layer ≤ L
+                    remaining = potential_el_in_layered[layer]
+                end
+            end
+
+            if layer > L
+                error("Ran out of potential while assigning slice $j (slice_left = $slice_left).")
+            end
+
+            # take as much as we can from current layer
+            take = min(slice_left, remaining)
+            ratio = take / slice_total         # ∈ (0,1]
+
+            src = in_uacs_el[layer]
+            is_good = src in good_set
+            is_bad = src in bad_set
+
+            if is_good && is_bad
+                error("Source '$src' is in both good_uac and bad_uac.")
+            elseif !is_good && !is_bad
+                error("Source '$src' is in neither good_uac nor bad_uac.")
+            end
+
+            # scale energy quantities
+            heat_out_piece = slices_heat_out[j] * ratio
+
+            # metadata copied 1:1
+            Tout = slices_heat_out_temperature[j]
+            uac_out = slices_heat_out_uac[j]
+
+            if is_good
+                push!(good_heat_out, heat_out_piece)
+                push!(good_heat_out_temperature, Tout)
+                push!(good_heat_out_uac_out, uac_out)
+                push!(good_el_source_uac, src)
+            else
+                push!(bad_heat_out, heat_out_piece)
+                push!(bad_heat_out_temperature, Tout)
+                push!(bad_heat_out_uac_out, uac_out)
+                push!(bad_el_source_uac, src)
+            end
+
+            # update remaining and slice_left
+            slice_left -= take
+            remaining -= take
+        end
+    end
+
+    if isempty(good_heat_out)
+        push!(good_heat_out, 0.0)
+        push!(good_heat_out_temperature, nothing)
+        push!(good_heat_out_uac_out, nothing)
+        push!(good_el_source_uac, nothing)
+    end
+    good = (slices_heat_out=good_heat_out,
+            slices_heat_out_temperature=good_heat_out_temperature,
+            slices_heat_out_uac=good_heat_out_uac_out,
+            source_uac_el=good_el_source_uac)
+
+    if isempty(bad_heat_out)
+        push!(bad_heat_out, 0.0)
+        push!(bad_heat_out_temperature, nothing)
+        push!(bad_heat_out_uac_out, nothing)
+        push!(bad_el_source_uac, nothing)
+    end
+    bad = (slices_heat_out=bad_heat_out,
+           slices_heat_out_temperature=bad_heat_out_temperature,
+           slices_heat_out_uac=bad_heat_out_uac_out,
+           source_uac_el=bad_el_source_uac)
+
+    return good, bad
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
@@ -1117,6 +1265,18 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
+        # split slices regarding electricity source
+        uac_el_good = ["SRC_GOOD"]
+        uac_el_bad = ["SRC_BAD"]
+        good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+                                          energies.in_uacs_el,
+                                          uac_el_good,
+                                          uac_el_bad,
+                                          energies.slices_el_in,
+                                          energies.slices_heat_out,
+                                          energies.slices_heat_out_temperature,
+                                          energies.slices_heat_out_uac)
+
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
         sub!(unit.input_interfaces[unit.m_heat_in],
              energies.slices_heat_in,
@@ -1124,15 +1284,15 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
              [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
         add!(unit.output_interfaces[unit.m_heat_out],
-             energies.slices_heat_out ./ 2, #TODO
-             [nothing for _ in energies.slices_heat_out_temperature],
-             energies.slices_heat_out_temperature,
-             energies.slices_heat_out_uac)
+             good.slices_heat_out,
+             [nothing for _ in good.slices_heat_out_temperature],
+             good.slices_heat_out_temperature,
+             good.slices_heat_out_uac)
         add!(unit.output_interfaces[unit.m_heat_out_linked],
-             energies.slices_heat_out ./ 2,  #TODO
-             [nothing for _ in energies.slices_heat_out_temperature],
-             energies.slices_heat_out_temperature,
-             energies.slices_heat_out_uac)
+             bad.slices_heat_out,
+             [nothing for _ in bad.slices_heat_out_temperature],
+             bad.slices_heat_out_temperature,
+             bad.slices_heat_out_uac)
     end
     # calculate losses, effective COP and mixing temperatures with the final values of
     # processed energies

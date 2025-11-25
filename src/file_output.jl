@@ -66,11 +66,17 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                 temp_dict_incl_flows = Dict{String,Any}()
                 for output_val in output_vals
                     if startswith(output_val, "EnergyFlow")
-                        key = String(unit[2].medium)
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val[12:end])
+                        if startswith(output_val, "EnergyFlow###")
+                            key = "###_" * String(unit[2].medium) # TODO
+                            nr_skip = 15
                         else
-                            temp_dict_incl_flows[key] = [output_val[12:end]]
+                            key = String(unit[2].medium)
+                            nr_skip = 12
+                        end
+                        if haskey(temp_dict_incl_flows, key)
+                            push!(temp_dict_incl_flows[key], output_val[nr_skip:end])
+                        else
+                            temp_dict_incl_flows[key] = [output_val[nr_skip:end]]
                         end
                     elseif startswith(output_val, "TemperatureFlow")
                         # do nothing, temperature are added in output_keys()
@@ -291,8 +297,18 @@ as this transformation has to be done only once at the beginning.
 function output_keys(components::Grouping, from_config::AbstractDict{String,Any})::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
-    all_current_media = String.(unique([bus.medium
-                                        for bus in values(components) if bus.sys_function === EnergySystems.sf_bus]))
+    all_current_media = []
+    for component in values(components)
+        if component.sys_function === EnergySystems.sf_bus
+            push!(all_current_media, String(component.medium))
+            for inface in component.input_interfaces
+                if inface.is_linked
+                    push!(all_current_media, "###_" * String(component.medium)) # TODO
+                end
+            end
+        end
+    end
+    all_current_media = unique(all_current_media)
 
     for key in keys(from_config)
         if key in keys(components)
@@ -329,14 +345,22 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
                     # consider only proxy busses or busses without proxies and busses with correct media
-                    if bus.proxy === nothing && bus.medium == medium
+                    medium_trimmed = startswith(String(medium), "###_") ? Symbol(String(medium)[5:end]) : medium
+                    if bus.proxy === nothing && bus.medium == medium_trimmed
                         # check if input and output exists
                         if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
-                            output_key = "EnergyFlow " * value_key
+                            if bus.balance_table_inputs[in_uac].is_linked
+                                energy_flow = "EnergyFlow### "
+                                temperature_flow = "TemperatureFlow### "
+                            else
+                                energy_flow = "EnergyFlow "
+                                temperature_flow = "TemperatureFlow "
+                            end
+                            output_key = energy_flow * value_key
                             push!(outputs, EnergySystems.OutputKey(; unit=bus,
                                                                    medium=medium,
                                                                    value_key=output_key))
-                            output_key = "TemperatureFlow " * value_key
+                            output_key = temperature_flow * value_key
                             push!(outputs, EnergySystems.OutputKey(; unit=bus,
                                                                    medium=medium,
                                                                    value_key=output_key))
