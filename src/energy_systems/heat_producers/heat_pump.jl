@@ -1091,7 +1091,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    # split slices regarding electricity source
+    # split slices regarding electricity source TODO
     uac_el_good = ["SRC_GOOD"]
     uac_el_bad = ["SRC_BAD"]
     good, bad = split_slices_good_bad(energies.potential_el_in_layered,

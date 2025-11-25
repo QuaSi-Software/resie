@@ -55,7 +55,7 @@ Base.@kwdef mutable struct BTInputRow
     energy_potential_temp::MaxEnergy = MaxEnergy()
     energy_pool::MaxEnergy = MaxEnergy()
     energy_pool_temp::MaxEnergy = MaxEnergy()
-    is_linked::Bool
+    is_linked::Bool = false
 end
 
 """

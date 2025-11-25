@@ -1917,10 +1917,10 @@ function find_parallels(components)
     function find_paths(unit, path, all_paths, old_uac)
         push!(path, unit)
         for outface in values(unit.output_interfaces)
-            outface.is_linked && continue
             if (outface === nothing
                 || outface.target in path
                 || outface.target.sys_function === EnergySystems.sf_storage
+                || outface.is_linked
                 ||
                 (unit.sys_function === EnergySystems.sf_bus
                  && has_grid_input(unit, outface.target.uac)
@@ -2188,8 +2188,8 @@ function add_non_recursive_indirect_outputs!(node_set,
     end
 
     for outface in values(unit.output_interfaces)
-        outface.is_linked && continue
         if outface !== nothing
+            outface.is_linked && continue
             if outface in checked_interfaces
                 continue
             elseif skip_storages && outface.target.sys_function === EnergySystems.sf_storage
@@ -2260,8 +2260,8 @@ function add_non_recursive_indirect_inputs!(node_set,
     end
 
     for inface in values(unit.input_interfaces)
-        inface.is_linked && continue
         if inface !== nothing
+            inface.is_linked && continue
             if inface in checked_interfaces
                 continue
             elseif skip_storages && inface.source.sys_function === EnergySystems.sf_storage
@@ -2317,8 +2317,8 @@ The maximum distance to the furthest sink as Int.
 function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
     is_leaf = function (current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
         for outface in values(current_node.output_interfaces)
-            outface.is_linked && continue
             if outface !== nothing
+                outface.is_linked && continue
                 if outface in checked_interfaces_leaf || outface.target == node
                     continue
                 elseif last_uac == "" || connection_allowed(current_node, last_uac, outface.target.uac)
@@ -2343,8 +2343,8 @@ function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
     else
         max_distance = 0
         for outface in values(node.output_interfaces)
-            outface.is_linked && continue
             if outface !== nothing
+                outface.is_linked && continue
                 if outface in checked_interfaces
                     continue
                 elseif last_unit_uac == "" || connection_allowed(node, last_unit_uac, outface.target.uac)
@@ -2517,7 +2517,7 @@ end
 
 function has_grid_input(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
-        inface.is_linked && continue
+        inface !== nothing && inface.is_linked && continue
         if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
             input_idx = bus.balance_table_inputs[inface.source.uac].priority
             output_idx = bus.balance_table_outputs[output_interface_uac].priority
@@ -2532,7 +2532,7 @@ end
 
 function has_grid_output(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
-        outface.is_linked && continue
+        outface !== nothing && outface.is_linked && continue
         if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
             input_idx = bus.balance_table_inputs[input_interface_uac].priority
             output_idx = bus.balance_table_outputs[outface.target.uac].priority
@@ -2832,8 +2832,8 @@ function check_interface_for_transformer(interface, type)
                 return true
             end
             for inface in values(current_node.input_interfaces)
-                inface.is_linked && continue
                 if inface !== nothing
+                    inface.is_linked && continue
                     if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
                         continue
                     elseif inface in checked_interfaces || inface.source == current_node
@@ -2863,8 +2863,8 @@ function check_interface_for_transformer(interface, type)
                 return true
             end
             for outface in values(current_node.output_interfaces)
-                outface.is_linked && continue
                 if outface !== nothing
+                    outface.is_linked && continue
                     if outface.target.sys_function === EnergySystems.sf_bus && startswith(outface.target.uac, "Proxy")
                         continue
                     elseif outface in checked_interfaces || outface.target == current_node
