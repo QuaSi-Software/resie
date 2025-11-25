@@ -155,12 +155,13 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
     general_logfile_path = abspath(joinpath(dirname(@__FILE__), "..", "output", "logfile_general.log"))
     balanceWarn_logfile_path = abspath(joinpath(dirname(@__FILE__), "..", "output", "logfile_balanceWarn.log"))
     min_log_level = Resie_Logger.Logging.Info
-    log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
-                                                                       log_to_file,
-                                                                       general_logfile_path,
-                                                                       balanceWarn_logfile_path,
-                                                                       min_log_level,
-                                                                       input_filepath)
+    logger = Resie_Logger.start_logger(log_to_console,
+                                       log_to_file,
+                                       general_logfile_path,
+                                       balanceWarn_logfile_path,
+                                       min_log_level,
+                                       input_filepath)
+    global_logger(logger)
 
     success = false
     run_ID = uuid1()
@@ -174,7 +175,7 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
         rethrow(exc)
     finally
         Resie.close_run(run_ID)
-        Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
+        Resie_Logger.close_logger(logger)
     end
 
     return success, exit_after_run

@@ -151,6 +151,8 @@ end
 
 Starts the general and balance warning loggers and opens the files if requested.
 
+Note: This does not set the global logger to the created object. Use `global_logger` for this.
+
 # Arguments
 - `log_to_console::Bool`: If the log should be printed to the console
 - `log_to_file::Bool`: If the log should be printed to a file
@@ -161,15 +163,14 @@ Starts the general and balance warning loggers and opens the files if requested.
     Debug, Info, Warn, Error or a custom LogLevel, like Logging.LogLevel(500) for
     BalanceWarning
 # Returns
-- `Union{IO,Nothing}`: The general log file, if file logging is requested
-- `Union{IO,Nothing}`: The balance warning log file, if file logging is requested
+- `CustomLogger`: The created logger
 """
 function start_logger(log_to_console::Bool,
                       log_to_file::Bool,
                       general_logfile_path::Union{String,Nothing},
                       balanceWarn_logfile_path::Union{String,Nothing},
                       min_log_level::Logging.LogLevel,
-                      input_file::Union{String,Nothing}=nothing)::Tuple{Union{IO,Nothing},Union{IO,Nothing}}
+                      input_file::Union{String,Nothing}=nothing)::CustomLogger
     if log_to_file
         log_file_general = open(general_logfile_path, "w")
         log_file_balanceWarn = open(balanceWarn_logfile_path, "w")
@@ -178,7 +179,6 @@ function start_logger(log_to_console::Bool,
         log_file_balanceWarn = nothing
     end
     logger = CustomLogger(log_file_general, log_file_balanceWarn, log_to_console, log_to_file, min_log_level)
-    global_logger(logger)
 
     if log_to_file
         time_now = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
@@ -196,25 +196,25 @@ function start_logger(log_to_console::Bool,
         println(log_file_balanceWarn, "This log file contains only balance warnings written by ReSiE.")
         println(log_file_balanceWarn, "---------------------------------")
     end
-    return log_file_general, log_file_balanceWarn
+    return logger
 end
 
 """
-    close_logger()
+    close_logger(logger)
 
-Function to close the logger. 
-Prints final statement and closes the logging file.
-    log_file_general::Union{IO, Nothing}            IO handler for general log file (if present), otherwise this should be nothing
-    log_file_balanceWarn::Union{IO, Nothing}        IO handler for balanceWarn log file (if present), otherwise this should be nothing
+Closes the given logger and prints final statements if file logging is activated.
+
+# Args:
+- `logger::CustomLogger`: The logger to close
 """
-function close_logger(log_file_general::Union{IO,Nothing}, log_file_balanceWarn::Union{IO,Nothing})
-    if log_file_general !== nothing
-        @info "general log saved to $(match(r"<file (.*?)>", log_file_general.name).captures[1])"
-        close(log_file_general)
+function close_logger(logger)
+    if logger.log_file_general !== nothing
+        @info "general log saved to $(match(r"<file (.*?)>", logger.log_file_general.name).captures[1])"
+        close(logger.log_file_general)
     end
-    if log_file_balanceWarn !== nothing
-        @info "balanceWarn log saved to $(match(r"<file (.*?)>", log_file_balanceWarn.name).captures[1])"
-        close(log_file_balanceWarn)
+    if logger.log_file_balanceWarn !== nothing
+        @info "balanceWarn log saved to $(match(r"<file (.*?)>", logger.log_file_balanceWarn.name).captures[1])"
+        close(logger.log_file_balanceWarn)
     end
 end
 
