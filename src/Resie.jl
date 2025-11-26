@@ -303,7 +303,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
             if do_return_data
-                output_return_data[output_steps, :] = gather_output_data(output_return_keys,
+                output_return_data[output_steps, :] = gather_output_data(output_keys_return,
                                                                          sim_params["time_since_output"])
             end
 

@@ -13,6 +13,7 @@ they should be created:
 """
 function get_output_keys(io_settings::AbstractDict{String,<:Any},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
     # determine if lineplot and csv should be created
     do_plot_all_outputs_excl_flows = false
