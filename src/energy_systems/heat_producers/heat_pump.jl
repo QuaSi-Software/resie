@@ -420,6 +420,12 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
             @error "In heat pump $(unit.uac), a linked interface is requested. Provide both uac_el_good and uac_el_bad " *
                    "to specify which electricity source should be used for the linked (bad) interface."
         end
+        common = intersect(unit.uac_el_good, unit.uac_el_bad)
+        if !isempty(common)
+            @error "In heat pump $(unit.uac), a linked interface is requested. The following uac(s) are both in " *
+                   "uac_el_good and uac_el_bad, but they need to be unique: $(common)"
+        end
+
         set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_linked],
                               load_storages(unit.controller, unit.m_heat_out_linked))
     end
@@ -1116,7 +1122,8 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                                           energies.slices_heat_out,
                                           energies.slices_heat_out_temperature,
                                           energies.slices_heat_out_uac,
-                                          energies.heat_out_has_inf_energy)
+                                          energies.heat_out_has_inf_energy,
+                                          sim_params["epsilon"])
 
         set_max_energies!(unit,
                           energies.slices_el_in,
@@ -1156,13 +1163,10 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
                                slices_heat_out::Vector{Floathing},
                                slices_heat_out_temperature::Vector{Floathing},
                                slices_heat_out_uac::Vector{Stringing},
-                               heat_out_has_inf_energy::Bool)
+                               heat_out_has_inf_energy::Bool,
+                               epsilon::Float64)
     # convenience
-    L = length(potential_el_in_layered)
-    good_set = Set(good_uac)
-    bad_set = Set(bad_uac)
-
-    tol = 1e-9
+    n_inputs = length(potential_el_in_layered)
 
     # --- outputs --------------------------------------------------------------
     T = eltype(slices_el_in)
@@ -1178,7 +1182,7 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
 
     # --- main loop -----------------------------------------------------------
     layer = 1
-    remaining = layer <= L ? potential_el_in_layered[layer] : 0.0
+    remaining = layer <= n_inputs ? potential_el_in_layered[layer] : 0.0
 
     for j in eachindex(slices_heat_out)
         if heat_out_has_inf_energy
@@ -1186,39 +1190,37 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
             # here, only on slice_el_in is given, but it has to serve multiple slices_heat_out
             slice_total = slices_el_in[1]
             layer = 1
-            remaining = layer <= L ? potential_el_in_layered[layer] : 0.0
+            remaining = layer <= n_inputs ? potential_el_in_layered[layer] : 0.0
         else
             slice_total = slices_el_in[j]
         end
 
         # skip zero slices to avoid division by zero
-        if slice_total ≤ tol
+        if slice_total <= epsilon
             continue
         end
 
         slice_left = slice_total
 
-        while slice_left > tol
+        while slice_left > epsilon
             # if layer is exhausted, move to next
-            while layer ≤ L && remaining ≤ tol
+            while layer <= n_inputs && remaining ≤ epsilon
                 layer += 1
-                if layer ≤ L
+                if layer <= n_inputs
                     remaining = potential_el_in_layered[layer]
                 end
             end
 
             # take as much as we can from current layer
             take = min(slice_left, remaining)
-            ratio = take / slice_total         # ∈ (0,1]
+            ratio = take / slice_total         # in (0,1]
 
             src = in_uacs_el[layer]
-            is_good = src in good_set
-            is_bad = src in bad_set
+            is_good = src in good_uac
+            is_bad = src in bad_uac
 
-            if is_good && is_bad
-                @error "Source '$src' is in both good_uac and bad_uac."
-            elseif !is_good && !is_bad
-                @error "Source '$src' is in neither good_uac nor bad_uac."
+            if !is_good && !is_bad
+                @error "In heat pump $(unit.uac), the source '$src' is in neither good_uac nor bad_uac."
             end
 
             # scale energy quantities
@@ -1292,7 +1294,6 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
              energies.slices_heat_in_uac)
 
         if unit.has_linked_interface
-
             # split slices regarding electricity source
             good, bad = split_slices_good_bad(energies.potential_el_in_layered,
                                               energies.in_uacs_el,
@@ -1302,7 +1303,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
                                               energies.slices_heat_out,
                                               energies.slices_heat_out_temperature,
                                               energies.slices_heat_out_uac,
-                                              energies.heat_out_has_inf_energy)
+                                              energies.heat_out_has_inf_energy,
+                                              sim_params["epsilon"])
 
             add!(unit.output_interfaces[unit.m_heat_out],
                  good.slices_heat_out,
