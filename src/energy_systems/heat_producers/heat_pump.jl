@@ -31,6 +31,8 @@ mutable struct HeatPump <: Component
     m_heat_in::Symbol
 
     has_linked_interface::Bool
+    uac_el_good::Vector{String}
+    uac_el_bad::Vector{String}
 
     model_type::String
 
@@ -131,7 +133,9 @@ mutable struct HeatPump <: Component
                    m_heat_out,
                    m_heat_out_linked,
                    m_heat_in,
-                   has_linked_interface,
+                   has_linked_interface,                # specifies is the unit has a linked interface in heat output to split heat generation from different electricity sources
+                   default(config, "uac_el_good", []),  # electricity source(s) used for the standard heat output interface (only if has_linked_interface)
+                   default(config, "uac_el_bad", []),   # electricity source(s) used for the linked heat output interface (only if has_linked_interface)
                    model_type,
                    config["power_th"],
                    max_power_function,
@@ -411,6 +415,14 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.m_el_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
+    if unit.has_linked_interface
+        if unit.uac_el_good == [] || unit.uac_el_bad == []
+            @error "In heat pump $(unit.uac), a linked interface is requested. Provide both uac_el_good and uac_el_bad " *
+                   "to specify which electricity source should be used for the linked (bad) interface."
+        end
+        set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_linked],
+                              load_storages(unit.controller, unit.m_heat_out_linked))
+    end
 end
 
 function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,Any})
@@ -441,7 +453,7 @@ function set_max_energies!(unit::HeatPump,
                            slices_heat_out_linked_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
-                           purpose_uac_heat_out_linked::Union{Stringing,Vector{Stringing}}=nothing,
+                           purpose_uac_heat_out_linked::Union{<:Stringing,Vector{<:Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -449,8 +461,11 @@ function set_max_energies!(unit::HeatPump,
                     purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
                     purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out_linked], heat_out_linked, nothing,
-                    slices_heat_out_linked_temperature, purpose_uac_heat_out_linked, has_calculated_all_maxima_heat_out)
+    if unit.has_linked_interface
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out_linked], heat_out_linked, nothing,
+                        slices_heat_out_linked_temperature, purpose_uac_heat_out_linked,
+                        has_calculated_all_maxima_heat_out)
+    end
 end
 
 """
@@ -1091,31 +1106,45 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    # split slices regarding electricity source TODO
-    uac_el_good = ["SRC_GOOD"]
-    uac_el_bad = ["SRC_BAD"]
-    good, bad = split_slices_good_bad(energies.potential_el_in_layered,
-                                      energies.in_uacs_el,
-                                      uac_el_good,
-                                      uac_el_bad,
-                                      energies.slices_el_in,
-                                      energies.slices_heat_out,
-                                      energies.slices_heat_out_temperature,
-                                      energies.slices_heat_out_uac)
+    if unit.has_linked_interface
+        # split slices regarding electricity source
+        good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+                                          energies.in_uacs_el,
+                                          unit.uac_el_good,
+                                          unit.uac_el_bad,
+                                          energies.slices_el_in,
+                                          energies.slices_heat_out,
+                                          energies.slices_heat_out_temperature,
+                                          energies.slices_heat_out_uac)
 
-    set_max_energies!(unit,
-                      energies.slices_el_in,
-                      energies.slices_heat_in,
-                      good.slices_heat_out,
-                      bad.slices_heat_out,
-                      energies.slices_heat_in_temperature,
-                      good.slices_heat_out_temperature,
-                      bad.slices_heat_out_temperature,
-                      energies.slices_heat_in_uac,
-                      good.slices_heat_out_uac,
-                      bad.slices_heat_out_uac,
-                      energies.heat_in_has_inf_energy,
-                      energies.heat_out_has_inf_energy)
+        set_max_energies!(unit,
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          good.slices_heat_out,
+                          bad.slices_heat_out,
+                          energies.slices_heat_in_temperature,
+                          good.slices_heat_out_temperature,
+                          bad.slices_heat_out_temperature,
+                          energies.slices_heat_in_uac,
+                          good.slices_heat_out_uac,
+                          bad.slices_heat_out_uac,
+                          energies.heat_in_has_inf_energy,
+                          energies.heat_out_has_inf_energy)
+    else
+        set_max_energies!(unit,
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          energies.slices_heat_out,
+                          Float64[],
+                          energies.slices_heat_in_temperature,
+                          energies.slices_heat_out_temperature,
+                          Float64[],
+                          energies.slices_heat_in_uac,
+                          energies.slices_heat_out_uac,
+                          String[],
+                          energies.heat_in_has_inf_energy,
+                          energies.heat_out_has_inf_energy)
+    end
 end
 
 function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
@@ -1265,34 +1294,42 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
-        # split slices regarding electricity source
-        uac_el_good = ["SRC_GOOD"]
-        uac_el_bad = ["SRC_BAD"]
-        good, bad = split_slices_good_bad(energies.potential_el_in_layered,
-                                          energies.in_uacs_el,
-                                          uac_el_good,
-                                          uac_el_bad,
-                                          energies.slices_el_in,
-                                          energies.slices_heat_out,
-                                          energies.slices_heat_out_temperature,
-                                          energies.slices_heat_out_uac)
-
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
         sub!(unit.input_interfaces[unit.m_heat_in],
              energies.slices_heat_in,
              energies.slices_heat_in_temperature,
              [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
-        add!(unit.output_interfaces[unit.m_heat_out],
-             good.slices_heat_out,
-             [nothing for _ in good.slices_heat_out_temperature],
-             good.slices_heat_out_temperature,
-             good.slices_heat_out_uac)
-        add!(unit.output_interfaces[unit.m_heat_out_linked],
-             bad.slices_heat_out,
-             [nothing for _ in bad.slices_heat_out_temperature],
-             bad.slices_heat_out_temperature,
-             bad.slices_heat_out_uac)
+
+        if unit.has_linked_interface
+
+            # split slices regarding electricity source
+            good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+                                              energies.in_uacs_el,
+                                              unit.uac_el_good,
+                                              unit.uac_el_bad,
+                                              energies.slices_el_in,
+                                              energies.slices_heat_out,
+                                              energies.slices_heat_out_temperature,
+                                              energies.slices_heat_out_uac)
+
+            add!(unit.output_interfaces[unit.m_heat_out],
+                 good.slices_heat_out,
+                 [nothing for _ in good.slices_heat_out_temperature],
+                 good.slices_heat_out_temperature,
+                 good.slices_heat_out_uac)
+            add!(unit.output_interfaces[unit.m_heat_out_linked],
+                 bad.slices_heat_out,
+                 [nothing for _ in bad.slices_heat_out_temperature],
+                 bad.slices_heat_out_temperature,
+                 bad.slices_heat_out_uac)
+        else
+            add!(unit.output_interfaces[unit.m_heat_out],
+                 energies.slices_heat_out,
+                 [nothing for _ in energies.slices_heat_out_temperature],
+                 energies.slices_heat_out_temperature,
+                 energies.slices_heat_out_uac)
+        end
     end
     # calculate losses, effective COP and mixing temperatures with the final values of
     # processed energies
@@ -1329,19 +1366,23 @@ function reset(unit::HeatPump)
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return [string(unit.m_el_in) * ":IN",
-            string(unit.m_heat_in) * ":IN",
-            string(unit.m_heat_out) * ":OUT",
-            string(unit.m_heat_out_linked) * ":OUT",
-            "COP",
-            "Effective_COP",
-            "Avg_PLR",
-            "Time_active",
-            "MixingTemperature_Input",
-            "MixingTemperature_Output",
-            "Losses_power",
-            "Losses_heat",
-            "LossesGains"]
+    output_vals = [string(unit.m_el_in) * ":IN",
+                   string(unit.m_heat_in) * ":IN",
+                   string(unit.m_heat_out) * ":OUT"]
+    if unit.has_linked_interface
+        push!(output_vals, string(unit.m_heat_out_linked) * ":OUT")
+    end
+    append!(output_vals,
+            ["COP",
+             "Effective_COP",
+             "Avg_PLR",
+             "Time_active",
+             "MixingTemperature_Input",
+             "MixingTemperature_Output",
+             "Losses_power",
+             "Losses_heat",
+             "LossesGains"])
+    return output_vals
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64

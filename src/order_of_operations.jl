@@ -113,8 +113,9 @@ function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order; by=fn_first, rev=true)]
 
     # remove transformers potential step if process is directly consecutive to a potential step
-    while contains_double_potential_produce(step_order)
-        step_order = remove_double_potential_produce(step_order)
+    # (only for components without a linked interface)
+    while contains_double_potential_produce(step_order, components)
+        step_order = remove_double_potential_produce(step_order, components)
     end
 
     return step_order
@@ -382,11 +383,14 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
         # check if this transformer is a circle_transformer, meaning it has input and output to the same bus
         is_circle_transformer = transformer_has_circle(values(transformers[1].input_interfaces),
                                                        values(transformers[1].output_interfaces))
+        # check if this transformer has a linked interface
+        has_linked_interface = component_has_linked_interface(transformers[1])
     else
         is_circle_transformer = false
+        has_linked_interface = false
     end
 
-    if length(transformers) > 1 || is_circle_transformer
+    if length(transformers) > 1 || is_circle_transformer || has_linked_interface
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
         filter!(c -> !(c.sys_function === EnergySystems.sf_bus && c.proxy !== nothing), transformers_and_busses)
         # detect parallel branches in the current energy system
@@ -2736,16 +2740,20 @@ end
     contains_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step to later 
-remove the potential step. Also checks for identical consecutive steps.
+remove the potential step (only if the unit has no linked interface). 
+Also checks for identical consecutive steps.
 """
-function contains_double_potential_produce(step_order)
+function contains_double_potential_produce(step_order, components::Grouping)
     last_unit = ""
     last_step = ""
     for entry in step_order
         if entry[1] == last_unit && entry[2] == last_step
             # detect completely identical entries
             return true
-        elseif entry[1] == last_unit && last_step === EnergySystems.s_potential && entry[2] === EnergySystems.s_process
+        elseif entry[1] == last_unit &&
+               last_step === EnergySystems.s_potential &&
+               entry[2] === EnergySystems.s_process &&
+               !component_has_linked_interface(components[entry[1]])
             # detect consecutive potential - process of the same unit
             return true
         else
@@ -2754,6 +2762,10 @@ function contains_double_potential_produce(step_order)
         end
     end
     return false
+end
+
+function component_has_linked_interface(unit)
+    return hasfield(typeof(unit), Symbol("has_linked_interface")) && unit.has_linked_interface
 end
 
 """
@@ -2782,9 +2794,10 @@ end
     remove_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
-removes the potential step. Also removes consecutive identical steps.
+removes the potential step (only for components that have no linked interfaces). 
+Also removes consecutive identical steps.
 """
-function remove_double_potential_produce(step_order)
+function remove_double_potential_produce(step_order, components::Grouping)
     last_unit = ""
     last_step = ""
     to_remove = Int[]
@@ -2793,7 +2806,9 @@ function remove_double_potential_produce(step_order)
         step = entry[2]
 
         if unit == last_unit
-            if step == EnergySystems.s_process && last_step == EnergySystems.s_potential
+            if step == EnergySystems.s_process &&
+               last_step == EnergySystems.s_potential &&
+               !component_has_linked_interface(components[unit])
                 push!(to_remove, idx - 1)
             elseif (step == last_step)
                 push!(to_remove, idx)
