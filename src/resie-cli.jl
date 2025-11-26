@@ -1,4 +1,5 @@
 using UUIDs
+using Logging
 using Resie
 
 include("resie_logger.jl")

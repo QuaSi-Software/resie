@@ -1,4 +1,5 @@
 using Test
+using Logging
 
 include("../src/resie_logger.jl")
 using .Resie_Logger
