@@ -220,7 +220,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
     end
     # create keys consistent with csv_output for return data for return Dict
-    output_return_header = []
+    output_return_header = ["timestep"]
     if do_return_data
         for outkey in output_keys_return
             if outkey.medium === nothing
