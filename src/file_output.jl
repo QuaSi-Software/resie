@@ -11,7 +11,7 @@ they should be created:
         - all possible keys (in-/excluding flows) if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
-function get_output_keys(io_settings::AbstractDict{String,Any},
+function get_output_keys(io_settings::AbstractDict{String,<:Any},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
     # determine if lineplot and csv should be created
