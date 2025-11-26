@@ -208,13 +208,13 @@ Closes the given logger and prints final statements if file logging is activated
 - `logger::CustomLogger`: The logger to close
 """
 function close_logger(logger)
-    if logger.log_file_general !== nothing
-        @info "general log saved to $(match(r"<file (.*?)>", logger.log_file_general.name).captures[1])"
-        close(logger.log_file_general)
+    if logger.io_general !== nothing
+        @info "general log saved to $(match(r"<file (.*?)>", logger.io_general.name).captures[1])"
+        close(logger.io_general)
     end
-    if logger.log_file_balanceWarn !== nothing
-        @info "balanceWarn log saved to $(match(r"<file (.*?)>", logger.log_file_balanceWarn.name).captures[1])"
-        close(logger.log_file_balanceWarn)
+    if logger.io_balanceWarnings !== nothing
+        @info "balanceWarn log saved to $(match(r"<file (.*?)>", logger.io_balanceWarnings.name).captures[1])"
+        close(logger.io_balanceWarnings)
     end
 end
 
