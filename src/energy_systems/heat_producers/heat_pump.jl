@@ -1115,7 +1115,8 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                                           energies.slices_el_in,
                                           energies.slices_heat_out,
                                           energies.slices_heat_out_temperature,
-                                          energies.slices_heat_out_uac)
+                                          energies.slices_heat_out_uac,
+                                          energies.heat_out_has_inf_energy)
 
         set_max_energies!(unit,
                           energies.slices_el_in,
@@ -1154,29 +1155,14 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
                                slices_el_in::Vector{Floathing},
                                slices_heat_out::Vector{Floathing},
                                slices_heat_out_temperature::Vector{Floathing},
-                               slices_heat_out_uac::Vector{Stringing})
-
-    # --- basic checks ---------------------------------------------------------
-    L = length(potential_el_in_layered)
-    @assert length(in_uacs_el) == L "in_uacs_el and potential_el_in_layered must match"
-
-    N = length(slices_el_in)
-    @assert length(slices_heat_out) == N
-    @assert length(slices_heat_out_temperature) == N
-    @assert length(slices_heat_out_uac) == N
-
+                               slices_heat_out_uac::Vector{Stringing},
+                               heat_out_has_inf_energy::Bool)
     # convenience
+    L = length(potential_el_in_layered)
     good_set = Set(good_uac)
     bad_set = Set(bad_uac)
 
     tol = 1e-9
-
-    total_pot = sum(potential_el_in_layered)
-    total_slices = sum(slices_el_in)
-
-    if total_slices > total_pot + tol
-        error("Total slices_el_in ($(total_slices)) is larger than total potential_el_in_layered ($(total_pot)).")
-    end
 
     # --- outputs --------------------------------------------------------------
     T = eltype(slices_el_in)
@@ -1194,8 +1180,16 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
     layer = 1
     remaining = layer <= L ? potential_el_in_layered[layer] : 0.0
 
-    for j in eachindex(slices_el_in)
-        slice_total = slices_el_in[j]
+    for j in eachindex(slices_heat_out)
+        if heat_out_has_inf_energy
+            # for each heat_out entry, start from the beginning of the layers
+            # here, only on slice_el_in is given, but it has to serve multiple slices_heat_out
+            slice_total = slices_el_in[1]
+            layer = 1
+            remaining = layer <= L ? potential_el_in_layered[layer] : 0.0
+        else
+            slice_total = slices_el_in[j]
+        end
 
         # skip zero slices to avoid division by zero
         if slice_total ≤ tol
@@ -1213,10 +1207,6 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
                 end
             end
 
-            if layer > L
-                error("Ran out of potential while assigning slice $j (slice_left = $slice_left).")
-            end
-
             # take as much as we can from current layer
             take = min(slice_left, remaining)
             ratio = take / slice_total         # ∈ (0,1]
@@ -1226,9 +1216,9 @@ function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
             is_bad = src in bad_set
 
             if is_good && is_bad
-                error("Source '$src' is in both good_uac and bad_uac.")
+                @error "Source '$src' is in both good_uac and bad_uac."
             elseif !is_good && !is_bad
-                error("Source '$src' is in neither good_uac nor bad_uac.")
+                @error "Source '$src' is in neither good_uac nor bad_uac."
             end
 
             # scale energy quantities
@@ -1288,7 +1278,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     heat_out = sum(energies.slices_heat_out; init=0.0)
 
     if heat_out < sim_params["epsilon"]
-        # due to constant losses we are guarranteed to have an electricity slice, though
+        # due to constant losses we are guaranteed to have an electricity slice, though
         # it might be zero. we also need to set the max_energy values to zero for the
         # heat input and output, as the sub! and add! methods do that when called
         set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
@@ -1311,7 +1301,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
                                               energies.slices_el_in,
                                               energies.slices_heat_out,
                                               energies.slices_heat_out_temperature,
-                                              energies.slices_heat_out_uac)
+                                              energies.slices_heat_out_uac,
+                                              energies.heat_out_has_inf_energy)
 
             add!(unit.output_interfaces[unit.m_heat_out],
                  good.slices_heat_out,
