@@ -47,17 +47,17 @@ base_input = Resie.read_JSON("./examples/AdJe_Bsp/input_file.json")
 # Pth_HR = thermische Leistung des Heizstabs / Heizelements [W]
 # Cap_Wh = Speicherkapazität des Puffers [Wh]
 Pth_HP_lo = 10_000_000
-Pth_HP_hi = 13_000_000
+Pth_HP_hi = 10_000_000
 Pth_HP_step = 1_000_000
 Pth_HP_vals = collect(range(Pth_HP_lo; step=Pth_HP_step, stop=Pth_HP_hi))
 
 Pth_HR_lo = 500_000
-Pth_HR_hi = 1_000_000
+Pth_HR_hi = 500_000
 Pth_HR_step = 500_000
 Pth_HR_vals = collect(range(Pth_HR_lo; step=Pth_HR_step, stop=Pth_HR_hi))
 
 Cap_lo_Wh = 10_000
-Cap_hi_Wh = 30_000
+Cap_hi_Wh = 10_000
 Cap_step_Wh = 10_000
 Cap_vals_Wh = collect(range(Cap_lo_Wh; step=Cap_step_Wh, stop=Cap_hi_Wh))
 
@@ -178,18 +178,18 @@ function run_resie_variant(outdir::AbstractString, base_input::Union{Dict, Order
                                         balanceWarn_logfile_path,
                                         min_log_level,
                                         fname)
-
-    try
-        _, sim_output = Resie.load_and_run(fname)
-    catch e
-        # Fehler auffangen, kurz protokollieren und im Log ablegen
-        status = "ERROR"
-        info = sprint(showerror, e)
-        @warn "Run fehlgeschlagen: $info"
-    end
+    _, sim_output = Resie.load_and_run(fname)
+    # try
+    #     _, sim_output = Resie.load_and_run(fname)
+    # catch e
+    #     # Fehler auffangen, kurz protokollieren und im Log ablegen
+    #     status = "ERROR"
+    #     info = sprint(showerror, e)
+    #     @warn "Run fehlgeschlagen: $info"
+    # end
 
     # try
-    #     run(`julia --project=. src/resie-cli.jl run $fname --exit_after_run`)
+    #     run(`julia --project=. src/resie-cli.jl run $fname --exit-after-run`)
     # catch e
     #     # Fehler auffangen, kurz protokollieren und im Log ablegen
     #     status = "ERROR"
@@ -215,9 +215,9 @@ total_runs = length(Pth_HP_vals) * length(Pth_HR_vals) * length(Cap_vals_Wh)
 println("Starte Parameterstudie: $total_runs Läufe (vollständiges kartesisches Produkt)")
 
 runidx = 0
+sim_output = OrderedDict()
 for (Pth_HP, Pth_HR, Cap_Wh) in Iterators.product(Pth_HP_vals, Pth_HR_vals, Cap_vals_Wh)
     global runidx += 1
     # Delegiere die eigentliche Erstellung der JSON, das Starten von ReSiE und das Logging an die Funktion
-    sim_output = run_resie_variant(outdir, base_input, Pth_HP, Pth_HR, Cap_Wh, runidx, total_runs)
-    
+    global sim_output = run_resie_variant(outdir, base_input, Pth_HP, Pth_HR, Cap_Wh, runidx, total_runs)
 end

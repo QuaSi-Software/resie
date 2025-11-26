@@ -161,7 +161,7 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
                                                                        min_log_level,
                                                                        input_filepath)
 
-    success = Resie.load_and_run(input_filepath)
+    success, _ = Resie.load_and_run(input_filepath)
 
     Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
     return success, exit_after_run

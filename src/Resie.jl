@@ -186,9 +186,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              sim_params::Dict{String,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
-    # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
-    _, output_return_keys = get_output_keys(Dict("csv_output_keys"=>"all_incl_flows"), components)
+    # get list of requested output keys for lineplot, csv export and function return
+    output_keys_lineplot, output_keys_to_CSV, output_keys_return = get_output_keys(project_config["io_settings"], components)
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing &&
@@ -205,6 +204,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError)
     end
+    do_return_data = output_keys_return !== nothing 
 
     # Initialize the array for output plots
     output_data_lineplot = do_create_plot_data ?
@@ -213,11 +213,27 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
-    output_return_data = zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_return_keys))
+    output_return_data = zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return))
 
     # reset CSV file
     if do_write_CSV
         reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+    end
+    # create keys consistent with csv_output for return data for return Dict
+    output_return_header = []
+    if do_return_data
+        for outkey in output_keys_return
+            if outkey.medium === nothing
+                header = "$(outkey.unit.uac) $(outkey.value_key)"
+            else
+                if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                    header = "$(outkey.medium) $(outkey.value_key)"
+                else
+                    header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+                end
+            end
+            push!(output_return_header, header)
+        end
     end
 
     # check if sankey should be plotted
@@ -286,8 +302,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
-            output_return_data[output_steps, :] = gather_output_data(output_return_keys,
-                                                                     sim_params["time_since_output"])
+            if do_return_data
+                output_return_data[output_steps, :] = gather_output_data(output_return_keys,
+                                                                         sim_params["time_since_output"])
+            end
 
             # simulation update
             sim_params["time_since_output"] += Int(sim_params["time_step_seconds"])
@@ -357,7 +375,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                   "$(join(component_list, ", "))"
         end
     end
-    return output_return_data
+    return OrderedDict(zip(output_return_header, eachcol(output_return_data)))
 end
 
 """

@@ -6,6 +6,7 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "csv_output_keys": "all_incl_flows",
+        "return_output_keys": "all_incl_flows",
         "output_plot": {
 			"1": {
 				"key":{"HeatPump":["m_heat:OUT"]},

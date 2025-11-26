@@ -34,6 +34,18 @@ struct CustomLogger <: Logging.AbstractLogger
     min_level::Logging.LogLevel
 end
 
+# """
+# CustomLevel
+
+# defines a custom warn level for balance errors
+#     level       defines the Logging.LogLevel (see documentation of Logging-module for details)
+#     name        name of the custom logger
+# """
+# struct CustomLevel
+#     level::Int32
+#     name::String
+# end
+
 """
 Adding custom level "BalanceWarning" of level 500.
 This can be used with the @balanceWarn macro.
@@ -43,12 +55,23 @@ CustomLevel struct, the corresponding macro and export the macro.
 Also define the behaviour in Base.show() and Logging.handle_message() below.
 """
 # const BalanceWarning = CustomLevel(500, "BalanceWarning")
-const BalanceWarning = Logging.LogLevel(500)
+const BalanceWarning = LogLevel(500)
 macro balanceWarn(exprs...)
     quote
         @logmsg BalanceWarning $(map(x -> esc(x), exprs)...)
     end
 end
+
+# # define basic functions to handle the CustomLevels
+# Base.isless(a::CustomLevel, b::LogLevel) = isless(a.level, b.level)
+# Base.isless(a::LogLevel, b::CustomLevel) = isless(a.level, b.level)
+# Base.convert(::Type{LogLevel}, level::CustomLevel) = LogLevel(level.level)
+# Base.show(io::IO, level::CustomLevel) =
+#     if level == BalanceWarning
+#         print(io, "BalanceWarning")
+#     else
+#         show(io, LogLevel(level))
+#     end
 
 """
 handle CustomLogger and CustomLevel

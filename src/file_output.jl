@@ -49,8 +49,29 @@ function get_output_keys(io_settings::AbstractDict{String,<:Any},
         end
     end
 
-    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || do_write_all_CSV_outputs_excl_flows
-    plot_all_including_flows = do_write_all_CSV_outputs_incl_flows || do_plot_all_outputs_incl_flows
+    do_return_all_outputs_excl_flows = false
+    do_return_all_outputs_incl_flows = false
+    do_return_data = false
+    if haskey(io_settings, "return_output_keys")
+        do_return_data = true  # if the key exists, set do_create_plot to true by default
+        if io_settings["return_output_keys"] == "all_excl_flows"
+            do_return_all_outputs_excl_flows = true
+        elseif io_settings["return_output_keys"] == "all_incl_flows"
+            do_return_all_outputs_incl_flows = true
+        elseif io_settings["return_output_keys"] == "nothing"
+            do_write_CSV = false
+        elseif io_settings["return_output_keys"] == "all"
+            @error "For \"return_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
+            throw(InputError)
+        end
+    end
+
+    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || 
+                               do_write_all_CSV_outputs_excl_flows || 
+                               do_return_all_outputs_excl_flows
+    plot_all_including_flows = do_plot_all_outputs_incl_flows || 
+                               do_write_all_CSV_outputs_incl_flows || 
+                               do_return_all_outputs_incl_flows
 
     # collect all possible outputs of all units if needed
     if plot_all_excluding_flows || plot_all_including_flows
@@ -121,7 +142,7 @@ function get_output_keys(io_settings::AbstractDict{String,<:Any},
         end
     end
 
-    # collect output keys for lineplot and csv output
+    # collect output keys for lineplot, csv output and function return
     if do_create_plot  # line plot
         if do_plot_all_outputs_incl_flows
             output_keys_lineplot = all_output_keys_incl_flows
@@ -150,7 +171,19 @@ function get_output_keys(io_settings::AbstractDict{String,<:Any},
         output_keys_to_csv = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv
+    if do_return_data  # return data from funtion
+        if do_return_all_outputs_incl_flows
+            output_keys_return = all_output_keys_incl_flows
+        elseif do_return_all_outputs_excl_flows
+            output_keys_return = all_output_keys_excl_flows
+        else  # get only requested output keys from input file for CSV-export
+            output_keys_return = output_keys(components, io_settings["return_output_keys"])
+        end
+    else
+        output_keys_return = nothing
+    end
+
+    return output_keys_lineplot, output_keys_to_csv, output_keys_return
 end
 
 """
