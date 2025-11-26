@@ -180,7 +180,7 @@ function run_resie_variant(outdir::AbstractString, base_input::Union{Dict, Order
                                         fname)
 
     try
-        Resie.load_and_run(fname)
+        _, sim_output = Resie.load_and_run(fname)
     catch e
         # Fehler auffangen, kurz protokollieren und im Log ablegen
         status = "ERROR"

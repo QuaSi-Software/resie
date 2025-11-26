@@ -188,6 +188,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
+    _, output_return_keys = get_output_keys(Dict("csv_output_keys"=>"all_incl_flows"), components)
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing &&
@@ -212,6 +213,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
+    output_return_data = zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_return_keys))
 
     # reset CSV file
     if do_write_CSV
@@ -284,6 +286,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
+            output_return_data[output_steps, :] = gather_output_data(output_return_keys,
+                                                                     sim_params["time_since_output"])
 
             # simulation update
             sim_params["time_since_output"] += Int(sim_params["time_step_seconds"])
@@ -353,6 +357,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                   "$(join(component_list, ", "))"
         end
     end
+    return output_return_data
 end
 
 """
@@ -395,9 +400,9 @@ function load_and_run(filepath::String)
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, operations)
+    output_return_data = run_simulation_loop(project_config, sim_params, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
-    return true
+    return true, output_return_data
 end
 
 end # module
