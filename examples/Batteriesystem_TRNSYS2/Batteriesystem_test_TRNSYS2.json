@@ -1,0 +1,203 @@
+{
+    "io_settings": {
+        "csv_output_file": "./output/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./output/auxiliary_info.md",
+        "sankey_plot": "default",
+        "csv_time_unit": "date",
+        "csv_output_keys": "all_incl_flows",
+        "output_plot": {
+            "1": {
+                "key": {"TST_BAT_01": ["strom:IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"TST_BAT_01": ["strom:OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"PV_sum": ["strom:OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"TST_DEM_01": ["strom:IN"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "5": {
+                "key": {"TST_BAT_01": ["Load"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"TST_BAT_01": ["LossesGains"]},
+                "axis": "right",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"TST_BAT_01": ["charge_efficiency"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "8": {
+                "key": {"TST_BAT_01": ["discharge_efficiency"]},
+                "axis": "right",
+                "unit": "-",
+                "scale_factor": 1
+            },
+            "9": {
+                "key": {"TST_BAT_01": ["CellVoltage"]},
+                "axis": "left",
+                "unit": "V",
+                "scale_factor": 1
+            },
+            "10": {
+                "key": {"TST_BAT_01": ["SOC"]},
+                "axis": "right",
+                "unit": "%",
+                "scale_factor": 1
+            },
+            "11": {
+                "key": {"TST_BAT_01": ["RemovedCharge"]},
+                "axis": "right",
+                "unit": "Ah",
+                "scale_factor": 1
+            }
+        }    
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "start_output": "01.01.2025 00:00",
+        "end": "31.12.2025 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 3600,
+        "time_step_unit": "seconds",
+        "weather_file_path": "./examples/Batteriesystem_TRNSYS2/TRY2015_512010137279_Jahr.dat"
+    },
+    "components": {
+        "TST_BAT_01": {
+            "type": "Battery",
+            "medium": "strom",
+            "output_refs": ["Strombus"],
+            "model_type": "with_aging",
+            "_capacity": 1333000,
+            "capacity": 666700,
+            "load": 0,
+            "self_discharge_rate": 0.03,
+            "max_charge_power": 0.3,
+            "max_discharge_power": 0.3,
+
+            "SOC_min": 20,
+            "SOC_max": 80,
+            
+            "__LITIUM_EISEN_BATTERIE__": "",
+            "_V_n_bat": 153.6,
+            "_V_n": 3.2,
+            "_r_i": 0.00016,
+            "_V_0": 3.36964,
+            "_K": 0.03546,
+            "_A": 0.08165,
+            "_B": 0.1003,
+            "_V_cell_min": 2.0,
+            "_V_cell_max": 3.4,
+            "_capacity_cell_Ah": 1090,
+            "_m":1.0269,
+            "_alpha":-0.01212,
+            "_k_qn":[-1.27571e-7, 1.22095e-11],
+            "_k_qT":[1.32729e-3, -7.9763e-6],
+            "_k_n":[9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4],
+            "_k_T":[1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2],
+            "_I_ref":100,
+            "_T_ref":25,
+
+            "__BLEI__": "",
+            "V_n_bat": 156,
+            "V_n": 12,
+            "r_i": 0.25,
+            "V_0": 12.6463,
+            "K": 0.33,
+            "A": 0.66,
+            "B": 2884.61,
+            "V_cell_min": 10.5,
+            "V_cell_max": 12.3,
+            "capacity_cell_Ah": 1.2,
+            "m":1,
+            "alpha":0,
+            "I_ref":0.13,
+            "T_ref":25
+        },
+        "Stromnetzanschluss_IN_general": {
+            "type": "GridConnection",
+            "output_refs": [
+                "Strombus"
+            ],
+            "medium": "strom",
+            "is_source": true
+        },
+        "Stromnetzanschluss_IN_batterie": {
+            "type": "FlexibleSupply",
+            "medium": "strom",
+            "output_refs": [
+                "Strombus"
+            ],
+            "max_power_profile_file_path": "./examples/Batteriesystem_TRNSYS2/Strompreis_kleiner_gleich_80.prf",
+            "scale": 1000000000000
+        },
+        "Stromnetzanschluss_OUT": {
+            "type": "GridConnection",
+            "output_refs": [],
+            "medium": "strom",
+            "is_source": false
+        },
+        "PV_sum": {
+            "type": "PVPlant",
+            "m_el_out": "strom",
+            "output_refs": [
+                "Strombus"
+            ],
+            "energy_profile_file_path": "./examples/Batteriesystem_TRNSYS2/PV_75kW_15grad_Süd.prf",
+            "scale": 1
+        },
+        "TST_DEM_01": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "strom",
+            "energy_profile_file_path": "./examples/Batteriesystem_TRNSYS2/resultierende_Last_20-100.prf",
+            "_energy_profile_file_path": "./examples/Batteriesystem_TRNSYS2/resultierende_Last_50-100.prf",
+            "scale": 1
+        },
+        "Strombus": {
+            "type": "Bus",
+            "medium": "strom",
+            "connections": {
+                "input_order": [
+                    "PV_sum",
+                    "TST_BAT_01",
+                    "Stromnetzanschluss_IN_general",
+                    "Stromnetzanschluss_IN_batterie"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_BAT_01",
+                    "Stromnetzanschluss_OUT"
+                ],
+                "energy_flow": [
+                    [ 1, 1, 1 ],
+                    [ 1, 0, 0 ],
+                    [ 1, 0, 0 ],
+                    [ 0, 1, 0 ]
+                ]
+            }
+        }
+    }
+}
