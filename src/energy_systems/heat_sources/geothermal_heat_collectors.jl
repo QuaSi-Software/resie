@@ -1,4 +1,4 @@
-using GLMakie
+# using GLMakie
 using Roots
 using Plots: plot, savefig
 using Plots: Plots
@@ -852,78 +852,78 @@ function plot_optional_figures_begin(unit::GeothermalHeatCollector,
                                      output_path::String,
                                      output_formats::Vector{String},
                                      sim_params::Dict{String,Any})
-    # plot mesh of geothermal collector
-    x_positions = cumsum([0; unit.dx])
-    y_positions = cumsum([0; unit.dy]) .* (-1)
+    # # plot mesh of geothermal collector
+    # x_positions = cumsum([0; unit.dx])
+    # y_positions = cumsum([0; unit.dy]) .* (-1)
 
-    plt = plot(;
-               title="Mesh of the collector at \"$(unit.accuracy_mode)\"\n" *
-                     "accuracy (dx_min = $(round(minimum(unit.dx)*100;digits=1)) mm) ",
-               xlabel="horizontal dimension [m]",
-               ylabel="vertical dimension [m]",
-               legend=false,
-               linewidth=6,
-               gridlinewidth=1,
-               size=(900, 1200),
-               titlefontsize=28,
-               guidefontsize=24,
-               tickfontsize=24,
-               legendfontsize=24,
-               margin=15Plots.mm,
-               aspect_ratio=:equal)
+    # plt = plot(;
+    #            title="Mesh of the collector at \"$(unit.accuracy_mode)\"\n" *
+    #                  "accuracy (dx_min = $(round(minimum(unit.dx)*100;digits=1)) mm) ",
+    #            xlabel="horizontal dimension [m]",
+    #            ylabel="vertical dimension [m]",
+    #            legend=false,
+    #            linewidth=6,
+    #            gridlinewidth=1,
+    #            size=(900, 1200),
+    #            titlefontsize=28,
+    #            guidefontsize=24,
+    #            tickfontsize=24,
+    #            legendfontsize=24,
+    #            margin=15Plots.mm,
+    #            aspect_ratio=:equal)
 
-    # Draw vertical lines
-    for x in x_positions
-        Plots.plot!(plt, [x, x], [y_positions[1], y_positions[end]]; color=:black, linewidth=1)
-    end
+    # # Draw vertical lines
+    # for x in x_positions
+    #     Plots.plot!(plt, [x, x], [y_positions[1], y_positions[end]]; color=:black, linewidth=1)
+    # end
 
-    # Draw horizontal lines
-    for y in y_positions
-        Plots.plot!(plt, [x_positions[1], x_positions[end]], [y, y]; color=:black, linewidth=1)
-    end
+    # # Draw horizontal lines
+    # for y in y_positions
+    #     Plots.plot!(plt, [x_positions[1], x_positions[end]], [y, y]; color=:black, linewidth=1)
+    # end
 
-    fig_name = "collector_simulation_mesh_$(unit.uac)"
-    for output_format in output_formats
-        savefig(output_path * "/" * fig_name * "." * output_format)
-    end
+    # fig_name = "collector_simulation_mesh_$(unit.uac)"
+    # for output_format in output_formats
+    #     savefig(output_path * "/" * fig_name * "." * output_format)
+    # end
 
     return true
 end
 
 function plot_optional_figures_end(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}, output_path::String)
     # plot temperature field as 3D mesh with time-slider
-    @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
-          "Close figure to continue..."
+    # @info "Plotting time-shiftable temperature distribution of geothermal collector $(unit.uac). " *
+    #       "Close figure to continue..."
 
-    f = Figure()
-    ax = Axis3(f[1, 1])
+    # f = Figure()
+    # ax = Axis3(f[1, 1])
 
-    ax.zlabel = "Temperature [°C]"
-    ax.xlabel = "Vertical expansion (depth) [m]"
-    ax.ylabel = "Horizontal expansion [m]"
-    min_temp = minimum(unit.temp_field_output)
-    min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
-    max_temp = maximum(unit.temp_field_output)
-    max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
-    Makie.zlims!(ax, min_temp, max_temp)
+    # ax.zlabel = "Temperature [°C]"
+    # ax.xlabel = "Vertical expansion (depth) [m]"
+    # ax.ylabel = "Horizontal expansion [m]"
+    # min_temp = minimum(unit.temp_field_output)
+    # min_temp = min_temp < 0.0 ? 1.1 * min_temp : 0.9 * min_temp
+    # max_temp = maximum(unit.temp_field_output)
+    # max_temp = max_temp < 0.0 ? 0.9 * max_temp : 1.1 * max_temp
+    # Makie.zlims!(ax, min_temp, max_temp)
 
-    x_abs = [0; cumsum(unit.dx_mesh)]               # Absolute x coordinates
-    y_abs = [unit.dy[1] / 2; cumsum(unit.dy_mesh)]  # Absolute y coordinates
+    # x_abs = [0; cumsum(unit.dx_mesh)]               # Absolute x coordinates
+    # y_abs = [unit.dy[1] / 2; cumsum(unit.dy_mesh)]  # Absolute y coordinates
 
-    ## activate for equal axis ratio
-    # xlims!(ax, 0, max(x_abs[end], y_abs[end]))
-    # ylims!(ax, 0, max(x_abs[end], y_abs[end]))
+    # ## activate for equal axis ratio
+    # # xlims!(ax, 0, max(x_abs[end], y_abs[end]))
+    # # ylims!(ax, 0, max(x_abs[end], y_abs[end]))
 
-    time = Observable(1)
-    surfdata = @lift(unit.temp_field_output[$time, :, :])
-    GLMakie.surface!(ax, y_abs, x_abs, surfdata)
-    GLMakie.scatter!(ax, y_abs, x_abs, surfdata)
-    slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
+    # time = Observable(1)
+    # surfdata = @lift(unit.temp_field_output[$time, :, :])
+    # GLMakie.surface!(ax, y_abs, x_abs, surfdata)
+    # GLMakie.scatter!(ax, y_abs, x_abs, surfdata)
+    # slg = SliderGrid(f[2, 1], (; range=1:1:sim_params["number_of_time_steps_output"], label="Time"))
 
-    on(slg.sliders[1].value) do v
-        time[] = v
-    end
-    wait(display(f))
+    # on(slg.sliders[1].value) do v
+    #     time[] = v
+    # end
+    # wait(display(f))
 
     return false
 end
