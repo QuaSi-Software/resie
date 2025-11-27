@@ -66,8 +66,8 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                 temp_dict_incl_flows = Dict{String,Any}()
                 for output_val in output_vals
                     if startswith(output_val, "EnergyFlow")
-                        if startswith(output_val, "EnergyFlow###")
-                            key = "###_" * String(unit[2].medium) # TODO
+                        if startswith(output_val, adjust_name("EnergyFlow"))
+                            key = adjust_name_if_linked(String(unit[2].medium), true)
                             nr_skip = 15
                         else
                             key = String(unit[2].medium)
@@ -303,7 +303,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
             push!(all_current_media, String(component.medium))
             for inface in component.input_interfaces
                 if inface.is_linked
-                    push!(all_current_media, "###_" * String(component.medium)) # TODO
+                    push!(all_current_media, adjust_name_if_linked(String(component.medium), true))
                 end
             end
         end
@@ -345,13 +345,13 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
                     # consider only proxy busses or busses without proxies and busses with correct media
-                    medium_trimmed = startswith(String(medium), "###_") ? Symbol(String(medium)[5:end]) : medium
+                    medium_trimmed, _ = trim_medium(medium)
                     if bus.proxy === nothing && bus.medium == medium_trimmed
                         # check if input and output exists
                         if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
                             if bus.balance_table_inputs[in_uac].is_linked
-                                energy_flow = "EnergyFlow### "
-                                temperature_flow = "TemperatureFlow### "
+                                energy_flow = adjust_name("EnergyFlow") * " "
+                                temperature_flow = adjust_name("TemperatureFlow") * " "
                             else
                                 energy_flow = "EnergyFlow "
                                 temperature_flow = "TemperatureFlow "

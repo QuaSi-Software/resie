@@ -2,6 +2,7 @@ Base.@kwdef mutable struct ComponentNode
     uac::String
     sys_function::SystemFunction
     do_storage_transfer::Bool
+    is_linked::Bool = false
 end
 
 Base.@kwdef mutable struct BusNode
@@ -68,7 +69,8 @@ function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
                 push!(node.inputs,
                       ComponentNode(; uac=input.uac,
                                     sys_function=input.sys_function,
-                                    do_storage_transfer=inface.do_storage_transfer))
+                                    do_storage_transfer=inface.do_storage_transfer,
+                                    is_linked=inface.is_linked))
             end
         end
 
@@ -98,7 +100,9 @@ function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
 end
 
 function input_index(node::BusNode, uac::String)::Int
-    indices = indexin([uac], [n.uac for n in node.inputs])
+    indices = indexin([uac],
+                      [adjust_name_if_linked(n.uac, hasproperty(n, :is_linked) ? n.is_linked : false)
+                       for n in node.inputs])
     return length(indices) != 1 || indices[1] === nothing ? 0 : indices[1]
 end
 
@@ -128,18 +132,22 @@ function merge(parent::BusNode, child::BusNode, new_uac::String)::BusNode
     new_node.energy_flow = fill(1, (length(new_node.inputs), length(new_node.outputs)))
 
     for (new_in_idx, input) in pairs(new_node.inputs)
-        is_input_from_first = input_index(parent, input.uac) > 0
+        is_input_from_first = input_index(parent,
+                                          adjust_name_if_linked(input.uac,
+                                                                isa(input, BusNode) ? false : input.is_linked)) > 0
 
         for (new_out_idx, output) in pairs(new_node.outputs)
             is_output_from_first = output_index(parent, output.uac) > 0
 
             if is_input_from_first && is_output_from_first
-                in_idx = input_index(parent, input.uac)
+                in_idx = input_index(parent,
+                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
                 out_idx = output_index(parent, output.uac)
                 is_allowed = parent.energy_flow[in_idx, out_idx]
 
             elseif is_input_from_first && !is_output_from_first
-                in_idx = input_index(parent, input.uac)
+                in_idx = input_index(parent,
+                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
                 out_idx = output_index(parent, child.uac)
                 is_allowed = parent.energy_flow[in_idx, out_idx]
                 in_idx = input_index(child, parent.uac)
@@ -152,7 +160,8 @@ function merge(parent::BusNode, child::BusNode, new_uac::String)::BusNode
                 is_allowed = 0
 
             else
-                in_idx = input_index(child, input.uac)
+                in_idx = input_index(child,
+                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
                 out_idx = output_index(child, output.uac)
                 is_allowed = child.energy_flow[in_idx, out_idx]
             end
@@ -225,11 +234,14 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
         push!(bus.input_interfaces,
               SystemInterface(; source=components[input.uac],
                               target=bus,
-                              do_storage_transfer=input.do_storage_transfer))
-        push!(bus.connectivity.input_order, input.uac)
-        bus.balance_table_inputs[input.uac] = BTInputRow(; source=components[input.uac],
+                              do_storage_transfer=input.do_storage_transfer,
+                              is_linked=input.is_linked))
+        input_uac = adjust_name_if_linked(input.uac, input.is_linked)
+        push!(bus.connectivity.input_order, input_uac)
+        bus.balance_table_inputs[input_uac] = BTInputRow(; source=components[input.uac],
                                                          priority=idx,
-                                                         do_storage_transfer=input.do_storage_transfer)
+                                                         do_storage_transfer=input.do_storage_transfer,
+                                                         is_linked=input.is_linked)
     end
 
     # create outputs

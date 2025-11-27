@@ -23,7 +23,7 @@ module EnergySystems
 export check_balances, Component, each, Grouping, link_output_with, perform_operations,
        output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
        default, plot_optional_figures_begin, plot_optional_figures_end,
-       reorder_operations_in_time_step
+       reorder_operations_in_time_step, trim_medium, adjust_name_if_linked, adjust_name
 
 using ..Profiles
 using UUIDs
@@ -1715,6 +1715,18 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     end
 end
 
+"""
+    trim_medium(out_medium::Symbol)
+
+Takes a Symbol and trims it if it starts with the defined prefix for linked interfaces.
+Also returns a Bool indicating if the input has been trimmed or not.
+
+# Arguments
+`out_medium::Symbol`: The Symbol that should be trimmed
+# Returns
+- `Symbol`: The trimmed Symbol
+- `Bool`: Bool indicating if the medium has been trimmed (true) or not (false)
+"""
 function trim_medium(out_medium::Symbol)
     prefix = "###_"
     out_medium_string = String(out_medium)
@@ -1723,6 +1735,54 @@ function trim_medium(out_medium::Symbol)
     else
         return out_medium, false
     end
+end
+
+"""
+    adjust_name_if_linked(name::AbstractString, is_linked::Bool)
+
+Takes a string and returns the adjusted name if is_linked is true
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+`is_linked::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function adjust_name_if_linked(name::AbstractString, is_linked::Bool)
+    if is_linked
+        return "###_" * name
+    else
+        return name
+    end
+end
+
+"""
+    adjust_name(name::AbstractString)
+
+Takes a string and returns the adjusted name for linked connections
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function adjust_name(name::AbstractString)
+    return name * "###"
+end
+
+"""
+    adjust_name_if_linked(name::Symbol, is_linked::Bool)
+
+Takes a Symbol and returns the adjusted Symbol if is_linked is true
+
+# Arguments
+`name::Symbol`: The Symbol that should be adapted
+`is_linked::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `Symbol`: The adjusted Symbol
+"""
+function adjust_name_if_linked(name::Symbol, is_linked::Bool)
+    return Symbol(adjust_name_if_linked(String(name), is_linked))
 end
 
 """

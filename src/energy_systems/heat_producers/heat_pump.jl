@@ -77,7 +77,7 @@ mutable struct HeatPump <: Component
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         has_linked_interface = default(config, "has_linked_interface", false)
-        m_heat_out_linked = Symbol("###_" * default(config, "m_heat_out_linked", "m_h_w_ht1"))
+        m_heat_out_linked = Symbol(adjust_name_if_linked(default(config, "m_heat_out_linked", "m_h_w_ht1"), true))
 
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_linked])

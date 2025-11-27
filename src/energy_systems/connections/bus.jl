@@ -227,17 +227,6 @@ function Bus(uac::String,
                epsilon)
 end
 
-function adjust_name_if_linked(name::AbstractString, is_linked::Bool)
-    if is_linked
-        return "###_" * name
-    else
-        return name
-    end
-end
-function adjust_name_if_linked(name::Symbol, is_linked::Bool)
-    return Symbol(adjust_name_if_linked(String(name), is_linked))
-end
-
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
     # has_linked_inputs = any(inface.is_linked for inface in unit.input_interfaces)
     for (idx, inface) in pairs(unit.input_interfaces)
@@ -364,9 +353,9 @@ function set_max_energy!(unit::Bus,
                          recalculate_max_energy::Bool,
                          is_linked::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
+    com_uac = adjust_name_if_linked(comp.uac, is_linked)
 
     if is_input
-        com_uac = adjust_name_if_linked(comp.uac, is_linked)
         set_max_energy!(bus.balance_table_inputs[com_uac].energy_potential,
                         _abs(energy),
                         temperature_min,
@@ -386,7 +375,7 @@ function set_max_energy!(unit::Bus,
 
     if unit.proxy !== nothing
         proxy_interface = is_input ?
-                          bus.input_interfaces[bus.balance_table_inputs[comp.uac].priority] :
+                          bus.input_interfaces[bus.balance_table_inputs[com_uac].priority] :
                           bus.output_interfaces[bus.balance_table_outputs[comp.uac].priority]
         set_max_energy!(proxy_interface.max_energy,
                         energy,
@@ -506,7 +495,8 @@ create new interfaces that point to the non-bus components of the principal buss
 function find_interface_on_proxy(proxy::Bus,
                                  needle::SystemInterface)::Union{Nothing,SystemInterface}
     for inface in proxy.input_interfaces
-        if inface.source == needle.source
+        if adjust_name_if_linked(inface.source.uac, inface.is_linked) ==
+           adjust_name_if_linked(needle.source.uac, needle.is_linked)
             return inface
         end
     end
@@ -962,7 +952,12 @@ end
 function has_linked_interface(input_row::BTInputRow, target::Bus)
     for outface in input_row.source.output_interfaces
         outface = isa(outface, Pair) ? outface[2] : outface
-        if outface.is_linked && outface.target == target
+        if outface.target.sys_function === sf_bus && outface.target.proxy !== nothing
+            outface_target = outface.target.proxy
+        else
+            outface_target = outface.target
+        end
+        if outface.is_linked && outface_target == target
             return true
         end
     end
@@ -1060,13 +1055,13 @@ of any bus in inserted in place of the input priority of that bus in the succeed
 # Returns
 `Vector{Component}`: A list of input components that are "reachable" from the starting bus
 """
-function inputs_recursive(unit::Bus)::Vector{Component}
+function inputs_recursive(unit::Bus)::Vector{Tuple{Component,Bool}}
     inputs = []
     for inface in unit.input_interfaces
         if inface.source.sys_function == sf_bus
             append!(inputs, inputs_recursive(inface.source))
         else
-            push!(inputs, inface.source)
+            push!(inputs, (inface.source, inface.is_linked))
         end
     end
     return inputs
@@ -1115,8 +1110,8 @@ Sum of energy that was transferred from the left bus to the right bus.
 function bus_transfer_sum(proxy::Bus, left::Bus, right::Bus)::Float64
     transfer_sum = 0.0
 
-    for input in inputs_recursive(left)
-        input_row = proxy.balance_table_inputs[input.uac]
+    for (input, is_linked) in inputs_recursive(left)
+        input_row = proxy.balance_table_inputs[adjust_name_if_linked(input.uac, is_linked)]
         input_sum = 0.0
 
         for output in outputs_recursive(right)
@@ -1200,7 +1195,7 @@ function output_values(unit::Bus)::Vector{String}
                                                           unit.balance_table_outputs[o]) &&
                                    !unit.balance_table_inputs[i].is_linked)]
         append!(outputs_energy_flow,
-                ["EnergyFlow### $i->$o"
+                [adjust_name("EnergyFlow") * " $i->$o"
                  for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
                            for inface in unit.input_interfaces]
                  for o in [outface.target.uac for outface in unit.output_interfaces]
@@ -1215,7 +1210,7 @@ function output_values(unit::Bus)::Vector{String}
                                                                unit.balance_table_outputs[o]) &&
                                         !unit.balance_table_inputs[i].is_linked)]
         append!(outputs_temperature_flow,
-                ["TemperatureFlow### $i->$o"
+                [adjust_name("TemperatureFlow") * " $i->$o"
                  for i in [adjust_name_if_linked(inface.source.uac, inface.is_linked)
                            for inface in unit.input_interfaces]
                  for o in [outface.target.uac for outface in unit.output_interfaces]
@@ -1241,7 +1236,7 @@ function output_value(unit::Bus, key::OutputKey)::Float64
         return calculate_energy_flow(outface)
 
     elseif startswith(key.value_key, "EnergyFlow")
-        if startswith(key.value_key, "EnergyFlow###")
+        if startswith(key.value_key, adjust_name("EnergyFlow"))
             nr_to_skip = 15
             is_linked = true
         else
@@ -1254,7 +1249,7 @@ function output_value(unit::Bus, key::OutputKey)::Float64
                                   (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
 
     elseif startswith(key.value_key, "TemperatureFlow")
-        if startswith(key.value_key, "TemperatureFlow###")
+        if startswith(key.value_key, adjust_name("TemperatureFlow"))
             nr_to_skip = 20
             is_linked = true
         else

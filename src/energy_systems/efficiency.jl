@@ -576,8 +576,7 @@ Checks the available energy on the input fuel interface.
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_fuel_in(unit::Union{CHPP,FuelBoiler},
-                       sim_params::Dict{String,Any})
+function check_fuel_in(unit::Union{CHPP,FuelBoiler}, sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_fuel_in"]
         return Inf
     end
@@ -634,17 +633,19 @@ function check_el_in(unit::Union{Electrolyser,HeatPump,UTIR},
 end
 
 """
-    check_el_in(unit, sim_params)
+    check_el_in_layered(unit, sim_params)
 
-Checks the available energy on the input electricity interface.
+Checks the available energy on the input electricity interface and returns energies and The
+uacs of the sources as vectors.
 
 # Arguments
 - `unit::Union{Electrolyser,HeatPump,UTIR}`: The component
 - `sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
-- `Floathing`: The available energy on the interface. If the value is nothing, that means
+- `Vector{Floathing}`: The available energy on the interface. If the value is nothing, that means
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
+- `Vector{Stringing}`: The UACs of the sources on the interface.
 """
 function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR},
                              sim_params::Dict{String,Any})
