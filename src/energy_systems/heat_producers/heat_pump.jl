@@ -1114,7 +1114,8 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
 
     if unit.has_linked_interface
         # split slices regarding electricity source
-        good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+        good, bad = split_slices_good_bad(unit,
+                                          energies.potential_el_in_layered,
                                           energies.in_uacs_el,
                                           unit.uac_el_good,
                                           unit.uac_el_bad,
@@ -1155,7 +1156,8 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     end
 end
 
-function split_slices_good_bad(potential_el_in_layered::Vector{Float64},
+function split_slices_good_bad(unit::HeatPump,
+                               potential_el_in_layered::Vector{Float64},
                                in_uacs_el::Vector{String},
                                good_uac::Vector{String},
                                bad_uac::Vector{String},
@@ -1295,7 +1297,8 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
 
         if unit.has_linked_interface
             # split slices regarding electricity source
-            good, bad = split_slices_good_bad(energies.potential_el_in_layered,
+            good, bad = split_slices_good_bad(unit,
+                                              energies.potential_el_in_layered,
                                               energies.in_uacs_el,
                                               unit.uac_el_good,
                                               unit.uac_el_bad,
