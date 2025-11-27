@@ -164,14 +164,14 @@ Base.@kwdef mutable struct Battery <: Component
                    m_heat_lt_out,
                    model_type, # model_type
                    config["capacity"], # capacity of the battery in Wh
-                   config["load"], # energy load of the battery in Wh
+                   default(config, "load", 0.0), # energy load of the battery in Wh
                    default(config, "charge_efficiency", nothing),
                    default(config, "discharge_efficiency", nothing),
                    default(config, "self_discharge_rate", 0.0), # rate of self-discharge including stand-by losses in %/month (month=30days)
                    default(config, "max_charge_C_rate", 1.0), # maximum continuos charge power in W
                    default(config, "max_discharge_C_rate", 1.0), # maximum continuos discharge power in W
                    default(config, "SOC_min", 0),
-                   default(config, "SOC_max", 0),
+                   default(config, "SOC_max", 100),
                    config["V_n_bat"], # nominal voltage of the battery pack
                    default(config, "cell_cutoff_current", 0.003 * default(config, "capacity_cell_Ah", 0.0)),
                    default(config, "cycles", 1.0), # number of cycles
@@ -997,7 +997,13 @@ function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_fu
                V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2 - 1) A*(n_2 - 1)
                V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2-1)*(m * Q_n/(m * Q_n - Q_nom_n_2)) A*(n_2-1)*exp(-B * Q_nom_n_2)
                V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2-1)*(m * Q_n/(m * Q_n - Q_full_n_2)) A*(n_2-1)*exp(-B * Q_full_n_2)]
-        k_n = G_n \ b_n
+        try k_n = G_n \ b_n
+        catch
+            try k_n = svd(G_n) \ b_n
+            catch 
+                k_n = pinv(G_n) * b_n
+            end
+        end
     end
 
     k_qT = [0.0, 0.0]
@@ -1021,7 +1027,13 @@ function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_fu
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2 - T_ref) A*(T_2 - T_ref)
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_nom_T_2)) A*(T_2-T_ref)*exp(-B * Q_nom_T_2)
                V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_full_T_2)) A*(T_2-T_ref)*exp(-B * Q_full_T_2)]
-        k_T = G_T \ b_T
+        try k_T = G_T \ b_T
+        catch
+            try k_T = svd(G_T) \ b_T
+            catch 
+                k_T = pinv(G_T) * b_T
+            end
+        end
     end
 
     return V_0, K, A, B, r_i, m, alpha, k_qn, k_qT, k_n, k_T, I_ref, T_ref
@@ -1127,4 +1139,5 @@ end
 
 export calc_V_cell_cc_aging # TODO remove
 export f_V_cell # TODO remove
+export calc_cell_values #TODO remove
 export Battery
