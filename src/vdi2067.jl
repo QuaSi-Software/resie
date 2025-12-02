@@ -57,6 +57,8 @@ VDIParams(; T=20,
           include_replacements_at_horizon=true) = VDIParams(T, i_cap, r_cap, i_op, r_op, i_energy, r_energy, i_revenue, r_revenue, f_inst, f_winsp, spec_inspection_hours, grid_price_addon, include_replacements_at_horizon)
 
 # Einfache Komponentendefinition für kapitalbezogene Kalkulationen
+# TODO Component wird als Variable schon in Resie verwendet am besten hier irgendwie anders benennen
+# TODO Die Parameter werden dann wahrscheinlich in Zukunft in die Resie Components integriert und können dann über die input.json auch angepasst werden
 struct Component
     name::String
     A0::Float64    # Investkosten zum Zeitpunkt 0 in EUR
@@ -77,8 +79,7 @@ function annuity_factor(i::Float64, T::Int)
     if isapprox(q, 1.0; atol=1e-12)
         return 1.0 / T
     end
-    qT = q^T
-    return qT * (q - 1.0) / (qT - 1.0)
+    return q^T * (q - 1.0) / (q^T - 1.0)
 end
 
 # Preisänderungsfaktor (transformiert den Betrag des 1. Jahres in Barwert über T),
@@ -165,10 +166,9 @@ end
 
 # Barwert aller kapitalgebundenen Kosten (Anfangsinvestition + Ersatzbeschaffung - Restwert)
 function pv_total_capital(A0::Float64, TN::Int, T::Int, i::Float64, r::Float64)
-    pv_init = A0  # Zeitpunkt 0
     pv_repl = pv_replacements(A0, TN, T, i, r)
     pv_rest = pv_restwert(A0, TN, T, i, r)
-    return pv_init + pv_repl - pv_rest
+    return A0 + pv_repl - pv_rest
 end
 
 # Berechne die jährliche Kapitalannuität für eine Komponente
@@ -192,12 +192,14 @@ function first_year_energy_cost(sim::Dict, params::VDIParams)
     # Aufschlag für Steuern/Abgaben (absoluter Aufschlag in EUR/MWh)
     grid_price = [p + params.grid_price_addon for p in grid_price]
     # Für Eigenerzeugung falls ein Preisprofil angegeben ist (z. B. Grenzkosten)
-    feedin_price = haskey(sim, "FeedIn_price") ? vecize_price(sim["FeedIn_price"], N) : zeros(N)
+    # TODO wird nicht weiter verwendet; entweder rausnehmen oder von den Kosten abziehen; wird auch in function first_year_revenues nochmal verwendet
+    feedin_price = haskey(sim, "FeedIn_price") ? vecize_price(sim["FeedIn_price"], N) : zeros(N) 
     selfgen_price = haskey(sim, "SelfGen_price") ? vecize_price(sim["SelfGen_price"], N) : fill(0.0, N)
 
     # Kosten für Netzbezug:
     cost_grid = sum( Grid_IN .* grid_price ) * 1e-6   # EUR
     # Kosten für selbstverbrauchte Eigenerzeugung (falls Grenzkosten vorhanden)
+    # TODO erzeugt der selbstverbrauch Kosten oder sind diese nicht schon in der Annuität der PV-Anlage eingepreist oder bezieht sich das auf was anderes?
     cost_self = sum( pv_self .* selfgen_price ) * 1e-6
     return cost_grid + cost_self
 end

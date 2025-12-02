@@ -213,15 +213,17 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
-    output_return_data = zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return))
+    output_return_data = do_return_data ?
+                         zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return)) :
+                         nothing
 
     # reset CSV file
     if do_write_CSV
         reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
     end
     # create keys consistent with csv_output for return data for return Dict
-    output_return_header = ["timestep"]
     if do_return_data
+        output_return_header = ["timestep"]
         for outkey in output_keys_return
             if outkey.medium === nothing
                 header = "$(outkey.unit.uac) $(outkey.value_key)"
@@ -375,7 +377,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                   "$(join(component_list, ", "))"
         end
     end
-    return OrderedDict(zip(output_return_header, eachcol(output_return_data)))
+    return do_return_data ? OrderedDict(zip(output_return_header, eachcol(output_return_data))) : nothing
 end
 
 """

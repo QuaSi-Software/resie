@@ -369,6 +369,7 @@ function run_resie_variant(outdir::AbstractString, base_input::Union{Dict, Order
         cfg["io_settings"]["csv_output_keys"] = "nothing"
         cfg["io_settings"]["auxiliary_info"] = false
         cfg["io_settings"]["sankey_plot"] = "nothing"
+        cfg["io_settings"]["output_plot"] = "nothing"
     end
 
     # --- Lauf-spezifische Input-JSON speichern (Dateiname ebenfalls in kompakten Einheiten) ---
