@@ -30,6 +30,8 @@ include("resie_logger.jl")
 using .Resie_Logger
 using OrderedCollections: OrderedDict
 using UUIDs
+include("vdi2067.jl")
+using .VDI2067
 
 # Basis-Input laden (Vorlage JSON)
 # Default: kann per Kommandozeilen-Argument überschrieben werden, z.B.:
@@ -490,9 +492,13 @@ function main()
 
     runidx = 0
     sim_output = OrderedDict()
+    # TODO Komponentenkosten definieren; VDIParams evtl. anpassen
+    components = [Component(), Component()]
+    params = VDIParams()
     for (Pth_HP, Pth_HR, Cap_Wh, BattCap_Wh, p_stock_marginal, p_reserve_marginal) in Iterators.product(Pth_HP_loop_vals, Pth_HR_loop_vals, Cap_loop_vals, Batt_loop_vals, p_stock_loop_vals, p_reserve_loop_vals)
         runidx += 1
-        print(@elapsed sim_output[UUIDs.uuid4()] = run_resie_variant(outdir, base_input,
+        uuid = UUIDs.uuid4()
+        print(@elapsed sim_output[uuid] = run_resie_variant(outdir, base_input,
                                                                     Pth_HP, Pth_HR,
                                                                     Cap_Wh, BattCap_Wh,
                                                                     p_stock_marginal, p_reserve_marginal,
@@ -500,6 +506,10 @@ function main()
                                                                     variant,
                                                                     buffer_param, battery_param;
                                                                     write_output=false))
+        # TODO Output korrekt zuweisen
+        vdi_input = Dict()
+        vdi_input["Grid_IN"] = sim_output[uuid]["GridConnection:IN"]
+        vdi2067_annuity(vdi_input, components, params)
     end
 end
 
