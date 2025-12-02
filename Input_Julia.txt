@@ -1,0 +1,21 @@
+Installation:
+-------------
+cd "C:\Users\jenter\Documents\ReSiE\resie"
+julia
+]
+activate .
+instantiate
+____________________________________________________________________________________________________________________
+
+Benutzung
+---------
+cd "C:\Users\jenter\Documents\ReSiE\resie"
+julia --project=. src/resie-cli.jl
+run "C:\Users\jenter\Documents\ReSiE\resie"\input_file.json"
+
+cd "C:\Users\jenter\Documents\ReSiE\resie"
+julia
+]
+activate .
+include("src/run_resie.jl")
+run_repl(raw"C:\Users\jenter\Documents\ReSiE\resie\input_file.json")

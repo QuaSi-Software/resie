@@ -6,6 +6,7 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "csv_output_keys": "all_incl_flows",
+        "return_output_keys": "all_incl_flows",
         "output_plot": {
 			"1": {
 				"key":{"HeatPump":["m_heat:OUT"]},
@@ -98,7 +99,7 @@
             "output_refs": [
                 "BUS_Power"
             ],
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/MA/pv_power_w_germersheim.prf",
+            "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
             "scale": 1,
             "m_el_out": "m_power"
         },
@@ -107,7 +108,7 @@
             "output_refs": [
                 "BUS_Power"
             ],
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/MA/wind_power_w_germersheim.prf",
+            "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
             "scale": 1,
             "m_el_out": "m_power"
         },
@@ -209,7 +210,7 @@
             "control_modules": [
                             {
                     "name": "economic_control", 
-                    "price_profile_path": "c:/Users/jenter/Documents/ReSiE/resie/profiles/MA/boersenpreis_EUR_kWh.prf",
+                    "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
                     "limit_price": 80.0,
                     "new_connections": {
                         "input_order": [
@@ -276,7 +277,7 @@
             "type": "Demand",
             "output_refs": [],
             "medium": "m_heat",
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/Hafner/DEM_Heat_Waerme.prf",
+            "energy_profile_file_path": "./profiles/Hafner/DEM_Heat_Waerme.prf",
             "constant_temperature": 90,
             "scale": 1000
         },
@@ -284,7 +285,7 @@
             "type": "Demand",
             "output_refs": [],
             "medium": "m_power",
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/Hafner/DEM_Strom_ges.prf",
+            "energy_profile_file_path": "./profiles/Hafner/DEM_Strom_ges.prf",
             "scale": 1000
         }
         
