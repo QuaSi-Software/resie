@@ -654,7 +654,7 @@ function handle_slice(unit::HeatPump,
                       available_heat_out::Floathing,
                       in_temp::Temperature,
                       out_temp::Temperature,
-                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
+                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature,Float64}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
     if unit.constant_cop !== nothing
         cop = unit.constant_cop * unit.plf_function(plr)
@@ -682,7 +682,11 @@ function handle_slice(unit::HeatPump,
     # calculate energies with the current cop
     # energies for current slice with potential heat in as basis
     used_heat_in = available_heat_in
-    used_el_in = used_heat_in / (cop - 1.0)
+    if cop == 1.0
+        used_el_in = available_el_in
+    else
+        used_el_in = used_heat_in / (cop - 1.0)
+    end
     used_heat_out = used_heat_in + used_el_in
 
     # check heat out as limiter
@@ -703,7 +707,8 @@ function handle_slice(unit::HeatPump,
             used_el_in,
             used_heat_out,
             in_temp,
-            out_temp)
+            out_temp,
+            cop)
 end
 
 """
@@ -773,9 +778,10 @@ function calculate_slices(unit::HeatPump,
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
         # we can skip calculation if there is no energy left to be distributed. this can
         # happen for example during potential calculations when another transformer has
-        # already used up all available energies
+        # already used up all available energies. Do not consider heat_in in process 
+        # to account for COP == 1.0.
         if energies.available_el_in < EPS ||
-           sum(energies.available_heat_in; init=0.0) < EPS ||
+           ((unit.cop == 0.0 || unit.cop > 1.0) && sum(energies.available_heat_in; init=0.0) < EPS) ||
            sum(energies.available_heat_out; init=0.0) < EPS
             # end of condition
             break
@@ -835,13 +841,14 @@ function calculate_slices(unit::HeatPump,
         used_el_in,
         used_heat_out,
         src_temperature,
-        snk_temperature = handle_slice(unit,
-                                       energies.available_el_in,
-                                       energies.available_heat_in[src_idx],
-                                       available_heat_out,
-                                       src_temperature,
-                                       snk_temperature,
-                                       plrs[plr_idx])
+        snk_temperature,
+        cop = handle_slice(unit,
+                           energies.available_el_in,
+                           energies.available_heat_in[src_idx],
+                           available_heat_out,
+                           src_temperature,
+                           snk_temperature,
+                           plrs[plr_idx])
 
         used_time = used_heat_out * 3600 / used_power
         energies.used_plrs[plr_idx] = used_heat_out / sim_params["watt_to_wh"](max_power)
@@ -865,13 +872,13 @@ function calculate_slices(unit::HeatPump,
         # layers have energy left, this was caused by the PLR of the slice being too low or
         # the heat pump being undersized. in either case we need to advance both indices so
         # we don't recalculate the same slice twice
-        if energies.available_heat_in[src_idx] >= EPS &&
+        if (energies.available_heat_in[src_idx] >= EPS && cop !== 1.0) &&
            energies.available_heat_out[snk_idx] >= EPS
             # end of condition
             src_idx += 1
             snk_idx += 1
         else
-            if energies.available_heat_in[src_idx] < EPS
+            if energies.available_heat_in[src_idx] < EPS && cop !== 1.0
                 src_idx += 1
             end
             if energies.available_heat_out[snk_idx] < EPS
