@@ -27,12 +27,12 @@ mutable struct HeatPump <: Component
 
     m_el_in::Symbol
     m_heat_out::Symbol
-    m_heat_out_linked::Symbol
+    m_heat_out_secondary::Symbol
     m_heat_in::Symbol
 
-    has_linked_interface::Bool
-    uac_el_good::Vector{String}
-    uac_el_bad::Vector{String}
+    has_secondary_interface::Bool
+    primary_el_sources::Vector{String}
+    secondary_el_sources::Vector{String}
 
     model_type::String
 
@@ -75,12 +75,14 @@ mutable struct HeatPump <: Component
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        has_linked_interface = default(config, "has_linked_interface", false)
-        m_heat_out_linked = Symbol(adjust_name_if_linked(default(config, "m_heat_out_linked", "m_h_w_ht1"), true))
+        has_secondary_interface = default(config, "has_secondary_interface", false)
+        m_heat_out_secondary = Symbol(adjust_name_if_secondary(default(config, "m_heat_out_secondary", "m_h_w_ht1"),
+                                                               true))
 
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_linked])
+        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
 
         func_def = default(config, "cop_function", "carnot:0.4")
         constant_cop, cop_function = parse_cop_function(func_def)
@@ -119,8 +121,8 @@ mutable struct HeatPump <: Component
         end
 
         output_interfaces = InterfaceMap(m_heat_out => nothing)
-        if has_linked_interface
-            output_interfaces[m_heat_out_linked] = nothing
+        if has_secondary_interface
+            output_interfaces[m_heat_out_secondary] = nothing
         end
 
         return new(uac,
@@ -131,11 +133,11 @@ mutable struct HeatPump <: Component
                    output_interfaces,
                    m_el_in,
                    m_heat_out,
-                   m_heat_out_linked,
+                   m_heat_out_secondary,
                    m_heat_in,
-                   has_linked_interface,                # specifies is the unit has a linked interface in heat output to split heat generation from different electricity sources
-                   default(config, "uac_el_good", []),  # electricity source(s) used for the standard heat output interface (only if has_linked_interface)
-                   default(config, "uac_el_bad", []),   # electricity source(s) used for the linked heat output interface (only if has_linked_interface)
+                   has_secondary_interface,                            # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
+                   default(config, "primary_el_sources", []),     # electricity source(s) used for the standard heat output interface (only if has_secondary_interface)
+                   default(config, "secondary_el_sources", []),   # electricity source(s) used for the secondary heat output interface (only if has_secondary_interface)
                    model_type,
                    config["power_th"],
                    max_power_function,
@@ -415,19 +417,19 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.m_el_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
-    if unit.has_linked_interface
-        if unit.uac_el_good == [] || unit.uac_el_bad == []
-            @error "In heat pump $(unit.uac), a linked interface is requested. Provide both uac_el_good and uac_el_bad " *
-                   "to specify which electricity source should be used for the linked (bad) interface."
+    if unit.has_secondary_interface
+        if unit.primary_el_sources == [] || unit.secondary_el_sources == []
+            @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both primary_el_sources and secondary_el_sources " *
+                   "to specify which electricity source should be used for the secondary (bad) interface."
         end
-        common = intersect(unit.uac_el_good, unit.uac_el_bad)
+        common = intersect(unit.primary_el_sources, unit.secondary_el_sources)
         if !isempty(common)
-            @error "In heat pump $(unit.uac), a linked interface is requested. The following uac(s) are both in " *
-                   "uac_el_good and uac_el_bad, but they need to be unique: $(common)"
+            @error "In heat pump $(unit.uac), a secondary interface is requested. The following uac(s) are both in " *
+                   "primary_el_sources and secondary_el_sources, but they need to be unique: $(common)"
         end
 
-        set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_linked],
-                              load_storages(unit.controller, unit.m_heat_out_linked))
+        set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_secondary],
+                              load_storages(unit.controller, unit.m_heat_out_secondary))
     end
 end
 
@@ -453,13 +455,13 @@ function set_max_energies!(unit::HeatPump,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
-                           heat_out_linked::Union{Floathing,Vector{<:Floathing}},
+                           heat_out_secondary::Union{Floathing,Vector{<:Floathing}},
                            slices_heat_in_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            slices_heat_out_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
-                           slices_heat_out_linked_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+                           slices_heat_out_secondary_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
-                           purpose_uac_heat_out_linked::Union{<:Stringing,Vector{<:Stringing}}=nothing,
+                           purpose_uac_heat_out_secondary::Union{<:Stringing,Vector{<:Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -467,9 +469,9 @@ function set_max_energies!(unit::HeatPump,
                     purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
                     purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
-    if unit.has_linked_interface
-        set_max_energy!(unit.output_interfaces[unit.m_heat_out_linked], heat_out_linked, nothing,
-                        slices_heat_out_linked_temperature, purpose_uac_heat_out_linked,
+    if unit.has_secondary_interface
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out_secondary], heat_out_secondary, nothing,
+                        slices_heat_out_secondary_temperature, purpose_uac_heat_out_secondary,
                         has_calculated_all_maxima_heat_out)
     end
 end
@@ -1119,13 +1121,13 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
         return
     end
 
-    if unit.has_linked_interface
+    if unit.has_secondary_interface
         # split slices regarding electricity source
         good, bad = split_slices_good_bad(unit,
                                           energies.potential_el_in_layered,
                                           energies.in_uacs_el,
-                                          unit.uac_el_good,
-                                          unit.uac_el_bad,
+                                          unit.primary_el_sources,
+                                          unit.secondary_el_sources,
                                           energies.slices_el_in,
                                           energies.slices_heat_out,
                                           energies.slices_heat_out_temperature,
@@ -1302,13 +1304,13 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
              [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
 
-        if unit.has_linked_interface
+        if unit.has_secondary_interface
             # split slices regarding electricity source
             good, bad = split_slices_good_bad(unit,
                                               energies.potential_el_in_layered,
                                               energies.in_uacs_el,
-                                              unit.uac_el_good,
-                                              unit.uac_el_bad,
+                                              unit.primary_el_sources,
+                                              unit.secondary_el_sources,
                                               energies.slices_el_in,
                                               energies.slices_heat_out,
                                               energies.slices_heat_out_temperature,
@@ -1321,7 +1323,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
                  [nothing for _ in good.slices_heat_out_temperature],
                  good.slices_heat_out_temperature,
                  good.slices_heat_out_uac)
-            add!(unit.output_interfaces[unit.m_heat_out_linked],
+            add!(unit.output_interfaces[unit.m_heat_out_secondary],
                  bad.slices_heat_out,
                  [nothing for _ in bad.slices_heat_out_temperature],
                  bad.slices_heat_out_temperature,
@@ -1372,8 +1374,8 @@ function output_values(unit::HeatPump)::Vector{String}
     output_vals = [string(unit.m_el_in) * ":IN",
                    string(unit.m_heat_in) * ":IN",
                    string(unit.m_heat_out) * ":OUT"]
-    if unit.has_linked_interface
-        push!(output_vals, string(unit.m_heat_out_linked) * ":OUT")
+    if unit.has_secondary_interface
+        push!(output_vals, string(unit.m_heat_out_secondary) * ":OUT")
     end
     append!(output_vals,
             ["COP",

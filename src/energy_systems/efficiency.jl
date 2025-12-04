@@ -998,9 +998,9 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)) ||
-       (unit.has_linked_interface &&
-        unit.output_interfaces[unit.m_heat_out_linked].target.sys_function == sf_transformer &&
-        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_linked].max_energy))
+       (unit.has_secondary_interface &&
+        unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function == sf_transformer &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_secondary].max_energy))
         # direct connection to transformer that has not had its potential
         # TODO consider also temperatures of other interface!
         return ([-Inf],
@@ -1011,21 +1011,21 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
-            if unit.has_linked_interface
-                # If a linked interface exists, call balance_on on this interface as well...
-                exchanges_linked = balance_on(unit.output_interfaces[unit.m_heat_out_linked],
-                                              unit.output_interfaces[unit.m_heat_out_linked].target)
+            if unit.has_secondary_interface
+                # If a secondary interface exists, call balance_on on this interface as well...
+                exchanges_secondary = balance_on(unit.output_interfaces[unit.m_heat_out_secondary],
+                                                 unit.output_interfaces[unit.m_heat_out_secondary].target)
                 # ...and merge them together depending on the dynamic order of them at the target bus
-                linked_prio = unit.output_interfaces[unit.m_heat_out_linked].target.balance_table_inputs[adjust_name_if_linked(unit.uac,
-                                                                                                                               true)].priority
+                secondary_prio = unit.output_interfaces[unit.m_heat_out_secondary].target.balance_table_inputs[adjust_name_if_secondary(unit.uac,
+                                                                                                                                        true)].priority
                 regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
 
-                if linked_prio > regular_prio
-                    exchanges_first = exchanges_linked
+                if secondary_prio > regular_prio
+                    exchanges_first = exchanges_secondary
                     exchanges_second = exchanges
                 else
                     exchanges_first = exchanges
-                    exchanges_second = exchanges_linked
+                    exchanges_second = exchanges_secondary
                 end
 
                 for exchange_second in exchanges_second
@@ -1044,6 +1044,8 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
                         push!(exchanges_first, exchange_second)
                     end
                 end
+            else
+                exchanges_first = exchanges
             end
             return ([e.balance + e.energy_potential for e in exchanges_first],
                     temp_min_all(exchanges_first),

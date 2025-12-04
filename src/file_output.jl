@@ -66,9 +66,9 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                 temp_dict_incl_flows = Dict{String,Any}()
                 for output_val in output_vals
                     if startswith(output_val, "EnergyFlow")
-                        if startswith(output_val, adjust_name("EnergyFlow"))
-                            key = adjust_name_if_linked(String(unit[2].medium), true)
-                            nr_skip = 15
+                        if startswith(output_val, create_secondary_name("EnergyFlow"))
+                            key = adjust_name_if_secondary(String(unit[2].medium), true)
+                            nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
                         else
                             key = String(unit[2].medium)
                             nr_skip = 12
@@ -302,8 +302,8 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
         if component.sys_function === EnergySystems.sf_bus
             push!(all_current_media, String(component.medium))
             for inface in component.input_interfaces
-                if inface.is_linked
-                    push!(all_current_media, adjust_name_if_linked(String(component.medium), true))
+                if inface.is_secondary_interface
+                    push!(all_current_media, adjust_name_if_secondary(String(component.medium), true))
                 end
             end
         end
@@ -345,25 +345,18 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
                     # consider only proxy busses or busses without proxies and busses with correct media
-                    medium_trimmed, _ = trim_medium(medium)
+                    medium_trimmed, _ = trim_secondary_medium(medium)
                     if bus.proxy === nothing && bus.medium == medium_trimmed
                         # check if input and output exists
                         if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
-                            if bus.balance_table_inputs[in_uac].is_linked
-                                energy_flow = adjust_name("EnergyFlow") * " "
-                                temperature_flow = adjust_name("TemperatureFlow") * " "
-                            else
-                                energy_flow = "EnergyFlow "
-                                temperature_flow = "TemperatureFlow "
-                            end
-                            output_key = energy_flow * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
-                            output_key = temperature_flow * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="EnergyFlow " * value_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="TemperatureFlow " * value_key))
                             success = true
                             break
                         end

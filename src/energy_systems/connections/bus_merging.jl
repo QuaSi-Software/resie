@@ -2,7 +2,7 @@ Base.@kwdef mutable struct ComponentNode
     uac::String
     sys_function::SystemFunction
     do_storage_transfer::Bool
-    is_linked::Bool = false
+    is_secondary_interface::Bool = false
 end
 
 Base.@kwdef mutable struct BusNode
@@ -70,7 +70,7 @@ function nodes_from_components(bus_components::Grouping)::Dict{String,BusNode}
                       ComponentNode(; uac=input.uac,
                                     sys_function=input.sys_function,
                                     do_storage_transfer=inface.do_storage_transfer,
-                                    is_linked=inface.is_linked))
+                                    is_secondary_interface=inface.is_secondary_interface))
             end
         end
 
@@ -101,7 +101,9 @@ end
 
 function input_index(node::BusNode, uac::String)::Int
     indices = indexin([uac],
-                      [adjust_name_if_linked(n.uac, hasproperty(n, :is_linked) ? n.is_linked : false)
+                      [adjust_name_if_secondary(n.uac,
+                                                hasproperty(n, :is_secondary_interface) ? n.is_secondary_interface :
+                                                false)
                        for n in node.inputs])
     return length(indices) != 1 || indices[1] === nothing ? 0 : indices[1]
 end
@@ -133,21 +135,26 @@ function merge(parent::BusNode, child::BusNode, new_uac::String)::BusNode
 
     for (new_in_idx, input) in pairs(new_node.inputs)
         is_input_from_first = input_index(parent,
-                                          adjust_name_if_linked(input.uac,
-                                                                isa(input, BusNode) ? false : input.is_linked)) > 0
+                                          adjust_name_if_secondary(input.uac,
+                                                                   isa(input, BusNode) ? false :
+                                                                   input.is_secondary_interface)) > 0
 
         for (new_out_idx, output) in pairs(new_node.outputs)
             is_output_from_first = output_index(parent, output.uac) > 0
 
             if is_input_from_first && is_output_from_first
                 in_idx = input_index(parent,
-                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
+                                     adjust_name_if_secondary(input.uac,
+                                                              isa(input, BusNode) ? false :
+                                                              input.is_secondary_interface))
                 out_idx = output_index(parent, output.uac)
                 is_allowed = parent.energy_flow[in_idx, out_idx]
 
             elseif is_input_from_first && !is_output_from_first
                 in_idx = input_index(parent,
-                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
+                                     adjust_name_if_secondary(input.uac,
+                                                              isa(input, BusNode) ? false :
+                                                              input.is_secondary_interface))
                 out_idx = output_index(parent, child.uac)
                 is_allowed = parent.energy_flow[in_idx, out_idx]
                 in_idx = input_index(child, parent.uac)
@@ -161,7 +168,9 @@ function merge(parent::BusNode, child::BusNode, new_uac::String)::BusNode
 
             else
                 in_idx = input_index(child,
-                                     adjust_name_if_linked(input.uac, isa(input, BusNode) ? false : input.is_linked))
+                                     adjust_name_if_secondary(input.uac,
+                                                              isa(input, BusNode) ? false :
+                                                              input.is_secondary_interface))
                 out_idx = output_index(child, output.uac)
                 is_allowed = child.energy_flow[in_idx, out_idx]
             end
@@ -235,13 +244,13 @@ function bus_from_node(node::BusNode, template::Bus, components::Grouping)::Bus
               SystemInterface(; source=components[input.uac],
                               target=bus,
                               do_storage_transfer=input.do_storage_transfer,
-                              is_linked=input.is_linked))
-        input_uac = adjust_name_if_linked(input.uac, input.is_linked)
+                              is_secondary_interface=input.is_secondary_interface))
+        input_uac = adjust_name_if_secondary(input.uac, input.is_secondary_interface)
         push!(bus.connectivity.input_order, input_uac)
         bus.balance_table_inputs[input_uac] = BTInputRow(; source=components[input.uac],
                                                          priority=idx,
                                                          do_storage_transfer=input.do_storage_transfer,
-                                                         is_linked=input.is_linked)
+                                                         is_secondary_interface=input.is_secondary_interface)
     end
 
     # create outputs

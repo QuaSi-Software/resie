@@ -383,14 +383,14 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
         # check if this transformer is a circle_transformer, meaning it has input and output to the same bus
         is_circle_transformer = transformer_has_circle(values(transformers[1].input_interfaces),
                                                        values(transformers[1].output_interfaces))
-        # check if this transformer has a linked interface
-        has_linked_interface = component_has_linked_interface(transformers[1])
+        # check if this transformer has a secondary interface
+        has_secondary_interface = component_has_secondary_interface(transformers[1])
     else
         is_circle_transformer = false
-        has_linked_interface = false
+        has_secondary_interface = false
     end
 
-    if length(transformers) > 1 || is_circle_transformer || has_linked_interface
+    if length(transformers) > 1 || is_circle_transformer || has_secondary_interface
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
         filter!(c -> !(c.sys_function === EnergySystems.sf_bus && c.proxy !== nothing), transformers_and_busses)
         # detect parallel branches in the current energy system
@@ -1066,7 +1066,7 @@ function transformer_has_circle(input_interfaces, output_interfaces)
     end
     all_input_busses = [i.source.proxy === nothing ? i.source.uac : i.source.proxy.uac
                         for i in input_interfaces
-                        if (i.source.sys_function === EnergySystems.sf_bus && !i.is_linked)]
+                        if (i.source.sys_function === EnergySystems.sf_bus && !i.is_secondary_interface)]
     all_output_busses = [i.target.proxy === nothing ? i.target.uac : i.target.proxy.uac
                          for i in output_interfaces
                          if i.target.sys_function === EnergySystems.sf_bus]
@@ -1598,7 +1598,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
                 continue
             end
             for inface in values(component.input_interfaces)
-                inface.is_linked && continue
+                inface.is_secondary_interface && continue
                 if has_grid_output(component, inface.source.uac)
                     continue # skip all interfaces with connection to a grid
                 end
@@ -1622,7 +1622,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
                 end
             end
             for outface in values(component.output_interfaces)
-                outface.is_linked && continue
+                outface.is_secondary_interface && continue
                 if has_grid_input(component, outface.target.uac)
                     continue # skip all interfaces with connection to a grid
                 end
@@ -1783,7 +1783,7 @@ function detect_first_middle_transformer(current_components, checked_components)
         transformer_in_input_interface = Any[]
         if component.sys_function === EnergySystems.sf_transformer
             for inface in values(component.input_interfaces)
-                inface.is_linked && continue
+                inface.is_secondary_interface && continue
                 if check_interface_for_transformer(inface, "input")
                     other_infaces = [x for x in values(component.input_interfaces) if x !== inface]
                     inface_transformers = Any[]
@@ -1807,7 +1807,7 @@ function detect_first_middle_transformer(current_components, checked_components)
                 end
             end
             for outface in values(component.output_interfaces)
-                outface.is_linked && continue
+                outface.is_secondary_interface && continue
                 if check_interface_for_transformer(outface, "output")
                     other_outfaces = [x for x in values(component.output_interfaces) if x !== outface]
                     outface_transformers = Any[]
@@ -1924,7 +1924,7 @@ function find_parallels(components)
             if (outface === nothing
                 || outface.target in path
                 || outface.target.sys_function === EnergySystems.sf_storage
-                || outface.is_linked
+                || outface.is_secondary_interface
                 ||
                 (unit.sys_function === EnergySystems.sf_bus
                  && has_grid_input(unit, outface.target.uac)
@@ -2134,7 +2134,7 @@ function add_non_recursive!(node_set, unit, caller_uac)
     push!(node_set, unit)
 
     for inface in values(unit.input_interfaces)
-        inface.is_linked && continue
+        inface.is_secondary_interface && continue
         if inface.source.uac == caller_uac
             continue
         elseif inface.source.sys_function === unit.sys_function
@@ -2143,7 +2143,7 @@ function add_non_recursive!(node_set, unit, caller_uac)
     end
 
     for outface in values(unit.output_interfaces)
-        outface.is_linked && continue
+        outface.is_secondary_interface && continue
         if outface.target.uac == caller_uac
             continue
         elseif outface.target.sys_function === unit.sys_function
@@ -2193,7 +2193,7 @@ function add_non_recursive_indirect_outputs!(node_set,
 
     for outface in values(unit.output_interfaces)
         if outface !== nothing
-            outface.is_linked && continue
+            outface.is_secondary_interface && continue
             if outface in checked_interfaces
                 continue
             elseif skip_storages && outface.target.sys_function === EnergySystems.sf_storage
@@ -2265,7 +2265,7 @@ function add_non_recursive_indirect_inputs!(node_set,
 
     for inface in values(unit.input_interfaces)
         if inface !== nothing
-            inface.is_linked && continue
+            inface.is_secondary_interface && continue
             if inface in checked_interfaces
                 continue
             elseif skip_storages && inface.source.sys_function === EnergySystems.sf_storage
@@ -2322,7 +2322,7 @@ function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
     is_leaf = function (current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
         for outface in values(current_node.output_interfaces)
             if outface !== nothing
-                outface.is_linked && continue
+                outface.is_secondary_interface && continue
                 if outface in checked_interfaces_leaf || outface.target == node
                     continue
                 elseif last_uac == "" || connection_allowed(current_node, last_uac, outface.target.uac)
@@ -2348,7 +2348,7 @@ function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
         max_distance = 0
         for outface in values(node.output_interfaces)
             if outface !== nothing
-                outface.is_linked && continue
+                outface.is_secondary_interface && continue
                 if outface in checked_interfaces
                     continue
                 elseif last_unit_uac == "" || connection_allowed(node, last_unit_uac, outface.target.uac)
@@ -2521,7 +2521,7 @@ end
 
 function has_grid_input(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
-        inface !== nothing && inface.is_linked && continue
+        inface !== nothing && inface.is_secondary_interface && continue
         if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
             input_idx = bus.balance_table_inputs[inface.source.uac].priority
             output_idx = bus.balance_table_outputs[output_interface_uac].priority
@@ -2536,7 +2536,7 @@ end
 
 function has_grid_output(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
-        outface !== nothing && outface.is_linked && continue
+        outface !== nothing && outface.is_secondary_interface && continue
         if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
             input_idx = bus.balance_table_inputs[input_interface_uac].priority
             output_idx = bus.balance_table_outputs[outface.target.uac].priority
@@ -2740,7 +2740,7 @@ end
     contains_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step to later 
-remove the potential step (only if the unit has no linked interface). 
+remove the potential step (only if the unit has no secondary interface). 
 Also checks for identical consecutive steps.
 """
 function contains_double_potential_produce(step_order, components::Grouping)
@@ -2753,7 +2753,7 @@ function contains_double_potential_produce(step_order, components::Grouping)
         elseif entry[1] == last_unit &&
                last_step === EnergySystems.s_potential &&
                entry[2] === EnergySystems.s_process &&
-               !component_has_linked_interface(components[entry[1]])
+               !component_has_secondary_interface(components[entry[1]])
             # detect consecutive potential - process of the same unit
             return true
         else
@@ -2764,8 +2764,8 @@ function contains_double_potential_produce(step_order, components::Grouping)
     return false
 end
 
-function component_has_linked_interface(unit)
-    return hasfield(typeof(unit), Symbol("has_linked_interface")) && unit.has_linked_interface
+function component_has_secondary_interface(unit)
+    return hasfield(typeof(unit), Symbol("has_secondary_interface")) && unit.has_secondary_interface
 end
 
 """
@@ -2794,7 +2794,7 @@ end
     remove_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
-removes the potential step (only for components that have no linked interfaces). 
+removes the potential step (only for components that have no secondary interfaces). 
 Also removes consecutive identical steps.
 """
 function remove_double_potential_produce(step_order, components::Grouping)
@@ -2808,7 +2808,7 @@ function remove_double_potential_produce(step_order, components::Grouping)
         if unit == last_unit
             if step == EnergySystems.s_process &&
                last_step == EnergySystems.s_potential &&
-               !component_has_linked_interface(components[unit])
+               !component_has_secondary_interface(components[unit])
                 push!(to_remove, idx - 1)
             elseif (step == last_step)
                 push!(to_remove, idx)
@@ -2848,7 +2848,7 @@ function check_interface_for_transformer(interface, type)
             end
             for inface in values(current_node.input_interfaces)
                 if inface !== nothing
-                    inface.is_linked && continue
+                    inface.is_secondary_interface && continue
                     if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
                         continue
                     elseif inface in checked_interfaces || inface.source == current_node
@@ -2879,7 +2879,7 @@ function check_interface_for_transformer(interface, type)
             end
             for outface in values(current_node.output_interfaces)
                 if outface !== nothing
-                    outface.is_linked && continue
+                    outface.is_secondary_interface && continue
                     if outface.target.sys_function === EnergySystems.sf_bus && startswith(outface.target.uac, "Proxy")
                         continue
                     elseif outface in checked_interfaces || outface.target == current_node

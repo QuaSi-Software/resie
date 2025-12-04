@@ -110,7 +110,7 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
                     if hasproperty(components[unit_key], Symbol(medium))
                         push!(media_sym, getproperty(components[unit_key], Symbol(medium)))
                     else
-                        @error "For component $unit_key, the key `$medium` in the `output_refs` could not be found!"
+                        @error "For component $unit_key, the given key `$medium` in the `output_refs` is not a valid key!"
                         throw(InputError)
                     end
                 end
@@ -209,10 +209,11 @@ function reorder_interfaces_of_bus!(bus::EnergySystems.Bus)
     output_perm_indices = sortperm([output_order_dict[bus.output_interfaces[i].target.uac]
                                     for i in 1:length(bus.output_interfaces)])
 
-    # Input side: include is_linked in the key
-    component_key(uac::AbstractString, is_linked::Bool) = is_linked ? string(uac, "#linked") : uac
+    # Input side: include is_secondary_interface in the key
+    component_key(uac::AbstractString, is_secondary_interface::Bool) = is_secondary_interface ?
+                                                                       string(uac, "#secondary") : uac
     input_perm_indices = sortperm([input_order_dict[component_key(bus.input_interfaces[i].source.uac,
-                                                                  bus.input_interfaces[i].is_linked)]
+                                                                  bus.input_interfaces[i].is_secondary_interface)]
                                    for i in eachindex(bus.input_interfaces)])
 
     # Reorder the input and output interfaces using the permutation indices
