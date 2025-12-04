@@ -1196,7 +1196,7 @@ function split_slices_good_bad(unit::HeatPump,
     for j in eachindex(slices_heat_out)
         if heat_out_has_inf_energy
             # for each heat_out entry, start from the beginning of the layers
-            # here, only on slice_el_in is given, but it has to serve multiple slices_heat_out
+            # here, only one slice_el_in is given, but it has to serve multiple slices_heat_out
             slice_total = slices_el_in[1]
             layer = 1
             remaining = layer <= n_inputs ? potential_el_in_layered[layer] : 0.0

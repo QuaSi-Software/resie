@@ -1012,29 +1012,43 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
             if unit.has_linked_interface
+                # If a linked interface exists, call balance_on on this interface as well...
                 exchanges_linked = balance_on(unit.output_interfaces[unit.m_heat_out_linked],
                                               unit.output_interfaces[unit.m_heat_out_linked].target)
-                for exchange_linked in exchanges_linked
+                # ...and merge them together depending on the dynamic order of them at the target bus
+                linked_prio = unit.output_interfaces[unit.m_heat_out_linked].target.balance_table_inputs[adjust_name_if_linked(unit.uac,
+                                                                                                                               true)].priority
+                regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
+
+                if linked_prio > regular_prio
+                    exchanges_first = exchanges_linked
+                    exchanges_second = exchanges
+                else
+                    exchanges_first = exchanges
+                    exchanges_second = exchanges_linked
+                end
+
+                for exchange_second in exchanges_second
                     duplicate = false
-                    for exchange in exchanges
-                        duplicate = exchange_linked.balance == exchange.balance &&
-                                    exchange_linked.energy_potential == exchange.energy_potential &&
-                                    exchange_linked.purpose_uac == exchange.purpose_uac &&
-                                    exchange_linked.temperature_min == exchange.temperature_min &&
-                                    exchange_linked.temperature_min == exchange.temperature_min
+                    for exchange_first in exchanges_first
+                        duplicate = exchange_second.balance == exchange_first.balance &&
+                                    exchange_second.energy_potential == exchange_first.energy_potential &&
+                                    exchange_second.purpose_uac == exchange_first.purpose_uac &&
+                                    exchange_second.temperature_min == exchange_first.temperature_min &&
+                                    exchange_second.temperature_min == exchange_first.temperature_min
                         if duplicate
                             break
                         end
                     end
                     if !duplicate
-                        push!(exchanges, exchange_linked)
+                        push!(exchanges_first, exchange_second)
                     end
                 end
             end
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
+            return ([e.balance + e.energy_potential for e in exchanges_first],
+                    temp_min_all(exchanges_first),
+                    temp_max_all(exchanges_first),
+                    [e.purpose_uac for e in exchanges_first])
         else # ignore the energy of the heat output, but temperature is still required
             return ([Inf for _ in exchanges],
                     temp_min_all(exchanges),
