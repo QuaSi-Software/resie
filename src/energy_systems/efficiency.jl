@@ -576,8 +576,7 @@ Checks the available energy on the input fuel interface.
     no energy is available on this interface. The value can be `Inf`, which is a special
     floating point value signifying an infinite value
 """
-function check_fuel_in(unit::Union{CHPP,FuelBoiler},
-                       sim_params::Dict{String,Any})
+function check_fuel_in(unit::Union{CHPP,FuelBoiler}, sim_params::Dict{String,Any})
     if !unit.controller.parameters["consider_m_fuel_in"]
         return Inf
     end
@@ -630,6 +629,42 @@ function check_el_in(unit::Union{Electrolyser,HeatPump,UTIR},
             return nothing
         end
         return potential_energy_el
+    end
+end
+
+"""
+    check_el_in_layered(unit, sim_params)
+
+Checks the available energy on the input electricity interface and returns energies and The
+uacs of the sources as vectors.
+
+# Arguments
+- `unit::Union{Electrolyser,HeatPump,UTIR}`: The component
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Vector{Floathing}`: The available energy on the interface. If the value is nothing, that means
+    no energy is available on this interface. The value can be `Inf`, which is a special
+    floating point value signifying an infinite value
+- `Vector{Stringing}`: The UACs of the sources on the interface.
+"""
+function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR},
+                             sim_params::Dict{String,Any})
+    if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
+        &&
+        is_max_energy_nothing(unit.input_interfaces[unit.m_el_in].max_energy))
+        # direct connection to transformer that has not had its potential
+        return ([Inf],
+                [unit.input_interfaces[unit.m_el_in].source.uac])
+    else
+        exchanges = balance_on(unit.input_interfaces[unit.m_el_in],
+                               unit.input_interfaces[unit.m_el_in].source)
+        if unit.controller.parameters["consider_m_el_in"]
+            return ([e.balance + e.energy_potential for e in exchanges],
+                    [e.purpose_uac for e in exchanges])
+        else # ignore the energy of the heat input, but purpose_uac is still required
+            return ([Inf for _ in exchanges],
+                    [e.purpose_uac for e in exchanges])
+        end
     end
 end
 
@@ -944,9 +979,13 @@ function check_heat_lt_out(unit::Electrolyser,
 end
 
 """
-    check_heat_out_layered(unit, sim_params)
+    check_heat_out_layered(unit::HeatPump, sim_params)
 
 Checks the available energy on the output heat interface.
+
+This specific implementation also considers potentially available secondary output interfaces on the heat pump. 
+The function calls balance_on() on both output interfaces and merges the returned exchanges, depending on the
+actual input priority of the primary and secondary input interface at the target bus.
 
 # Arguments
 - `unit::HeatPump`: The component
@@ -962,7 +1001,10 @@ Checks the available energy on the output heat interface.
 function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
-        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy))
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)) ||
+       (unit.has_secondary_interface &&
+        unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function == sf_transformer &&
+        is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_secondary].max_energy))
         # direct connection to transformer that has not had its potential
         return ([-Inf],
                 [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
@@ -972,10 +1014,54 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
-            return ([e.balance + e.energy_potential for e in exchanges],
-                    temp_min_all(exchanges),
-                    temp_max_all(exchanges),
-                    [e.purpose_uac for e in exchanges])
+            if unit.has_secondary_interface
+                # If a secondary interface exists, call balance_on on this interface as well...
+                exchanges_secondary = balance_on(unit.output_interfaces[unit.m_heat_out_secondary],
+                                                 unit.output_interfaces[unit.m_heat_out_secondary].target)
+                # ...and merge them together depending on the dynamic order of them at the target bus
+                if unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function === sf_bus &&
+                   unit.output_interfaces[unit.m_heat_out].target.sys_function === sf_bus
+                    secondary_prio = unit.output_interfaces[unit.m_heat_out_secondary].target.balance_table_inputs[adjust_name_if_secondary(unit.uac,
+                                                                                                                                            true)].priority
+                    regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
+                else
+                    # if no bus is present, set secondary interface to second priority
+                    secondary_prio = 2
+                    regular_prio = 1
+                end
+                if secondary_prio < regular_prio
+                    # secondary interface has higher priority (smaller number)
+                    exchanges_first = exchanges_secondary
+                    exchanges_second = exchanges
+                else
+                    # secondary interface has lower priority (higher number)                    
+                    exchanges_first = exchanges
+                    exchanges_second = exchanges_secondary
+                end
+
+                for exchange_second in exchanges_second
+                    duplicate = false
+                    for exchange_first in exchanges_first
+                        duplicate = exchange_second.balance == exchange_first.balance &&
+                                    exchange_second.energy_potential == exchange_first.energy_potential &&
+                                    exchange_second.purpose_uac == exchange_first.purpose_uac &&
+                                    exchange_second.temperature_min == exchange_first.temperature_min &&
+                                    exchange_second.temperature_min == exchange_first.temperature_min
+                        if duplicate
+                            break
+                        end
+                    end
+                    if !duplicate
+                        push!(exchanges_first, exchange_second)
+                    end
+                end
+            else
+                exchanges_first = exchanges
+            end
+            return ([e.balance + e.energy_potential for e in exchanges_first],
+                    temp_min_all(exchanges_first),
+                    temp_max_all(exchanges_first),
+                    [e.purpose_uac for e in exchanges_first])
         else # ignore the energy of the heat output, but temperature is still required
             return ([Inf for _ in exchanges],
                     temp_min_all(exchanges),

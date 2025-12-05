@@ -55,6 +55,7 @@ Base.@kwdef mutable struct BTInputRow
     energy_potential_temp::MaxEnergy = MaxEnergy()
     energy_pool::MaxEnergy = MaxEnergy()
     energy_pool_temp::MaxEnergy = MaxEnergy()
+    is_secondary_interface::Bool = false
 end
 
 """
@@ -228,9 +229,11 @@ end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
     for (idx, inface) in pairs(unit.input_interfaces)
-        unit.balance_table_inputs[inface.source.uac] = BTInputRow(; source=inface.source,
-                                                                  priority=idx,
-                                                                  do_storage_transfer=inface.do_storage_transfer)
+        uac = adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+        unit.balance_table_inputs[uac] = BTInputRow(; source=inface.source,
+                                                    priority=idx,
+                                                    do_storage_transfer=inface.do_storage_transfer,
+                                                    is_secondary_interface=inface.is_secondary_interface)
     end
 
     for (idx, outface) in pairs(unit.output_interfaces)
@@ -276,7 +279,8 @@ function balance_direct(unit::Bus)::Float64
         if isa(inface.source, Bus)
             continue
         else
-            principal = inface.source.output_interfaces[unit.medium]
+            principal = inface.source.output_interfaces[adjust_name_if_secondary(unit.medium,
+                                                                                 inface.is_secondary_interface)]
             blnc += balance(balance_on(principal, principal.source))
         end
     end
@@ -346,11 +350,13 @@ function set_max_energy!(unit::Bus,
                          temperature_max::Union{Temperature,Vector{<:Temperature}},
                          purpose_uac::Union{Stringing,Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool,
-                         recalculate_max_energy::Bool)
+                         recalculate_max_energy::Bool,
+                         is_secondary_interface::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
+    com_uac = adjust_name_if_secondary(comp.uac, is_secondary_interface)
 
     if is_input
-        set_max_energy!(bus.balance_table_inputs[comp.uac].energy_potential,
+        set_max_energy!(bus.balance_table_inputs[com_uac].energy_potential,
                         _abs(energy),
                         temperature_min,
                         temperature_max,
@@ -369,7 +375,7 @@ function set_max_energy!(unit::Bus,
 
     if unit.proxy !== nothing
         proxy_interface = is_input ?
-                          bus.input_interfaces[bus.balance_table_inputs[comp.uac].priority] :
+                          bus.input_interfaces[bus.balance_table_inputs[com_uac].priority] :
                           bus.output_interfaces[bus.balance_table_outputs[comp.uac].priority]
         set_max_energy!(proxy_interface.max_energy,
                         energy,
@@ -377,7 +383,8 @@ function set_max_energy!(unit::Bus,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        is_secondary_interface)
     end
 end
 
@@ -403,15 +410,18 @@ function add_balance!(unit::Bus,
                       energy::Union{Floathing,Vector{<:Floathing}},
                       temperature_min::Union{Temperature,Vector{<:Temperature}},
                       temperature_max::Union{Temperature,Vector{<:Temperature}},
-                      purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
+                      purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing,
+                      is_secondary_interface::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
+
     if is_input
-        increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
+        com_uac = adjust_name_if_secondary(comp.uac, is_secondary_interface)
+        increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              energy,
                              temperature_min,
                              temperature_max,
                              purpose_uac)
-        bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
+        bus.balance_table_inputs[com_uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              energy,
@@ -444,15 +454,17 @@ function sub_balance!(unit::Bus,
                       energy::Union{Floathing,Vector{<:Floathing}},
                       temperature_min::Union{Temperature,Vector{<:Temperature}},
                       temperature_max::Union{Temperature,Vector{<:Temperature}},
-                      purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
+                      purpose_uac::Union{Stringing,Vector{Stringing}}=nothing,
+                      is_secondary_interface::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
     if is_input
-        increase_max_energy!(bus.balance_table_inputs[comp.uac].energy_pool,
+        com_uac = adjust_name_if_secondary(comp.uac, is_secondary_interface)
+        increase_max_energy!(bus.balance_table_inputs[com_uac].energy_pool,
                              abs.(energy),
                              temperature_min,
                              temperature_max,
                              purpose_uac)
-        bus.balance_table_inputs[comp.uac].energy_potential = MaxEnergy()
+        bus.balance_table_inputs[com_uac].energy_potential = MaxEnergy()
     else
         increase_max_energy!(bus.balance_table_outputs[comp.uac].energy_pool,
                              abs.(energy),
@@ -483,7 +495,8 @@ create new interfaces that point to the non-bus components of the principal buss
 function find_interface_on_proxy(proxy::Bus,
                                  needle::SystemInterface)::Union{Nothing,SystemInterface}
     for inface in proxy.input_interfaces
-        if inface.source == needle.source
+        if adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface) ==
+           adjust_name_if_secondary(needle.source.uac, needle.is_secondary_interface)
             return inface
         end
     end
@@ -532,12 +545,13 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
     caller_is_input = false
     caller_uac = nothing
     for input_interface in unit.input_interfaces
-        if input_interface.source.uac == interface.source.uac
+        if adjust_name_if_secondary(input_interface.source.uac, input_interface.is_secondary_interface) ==
+           adjust_name_if_secondary(interface.source.uac, interface.is_secondary_interface)
             caller_is_input = true
             if input_interface.source.sys_function === sf_transformer
                 # if the input is a transformer, set the uac to let the inner_distribute know that 
                 # a transformer is calling
-                caller_uac = interface.source.uac
+                caller_uac = adjust_name_if_secondary(interface.source.uac, interface.is_secondary_interface)
             end
             break
         end
@@ -556,7 +570,10 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
 
     return_exchanges = []
     if caller_is_input
-        input_row = [row for row in values(unit.balance_table_inputs) if row.source.uac == interface.source.uac][1]
+        input_row = [row
+                     for row in values(unit.balance_table_inputs)
+                     if adjust_name_if_secondary(row.source.uac, row.is_secondary_interface) ==
+                        adjust_name_if_secondary(interface.source.uac, interface.is_secondary_interface)][1]
         for output_row in sort(collect(values(unit.balance_table_outputs));
                                by=x -> unit.has_custom_order ?
                                        unit.connectivity.energy_flow[input_row.priority][x.priority] :
@@ -772,7 +789,9 @@ function iterate_balance_table(unit::Bus)
         sort!(triples; by=t -> t[1])
 
         vals_sorted = [t[1] for t in triples]
-        row_uac = [unit.input_interfaces[t[2]].source.uac for t in triples]
+        row_uac = [adjust_name_if_secondary(unit.input_interfaces[t[2]].source.uac,
+                                            unit.input_interfaces[t[2]].is_secondary_interface)
+                   for t in triples]
         col_uac = [unit.output_interfaces[t[3]].target.uac for t in triples]
 
         if minimum(vals_sorted) == 1 && allunique(vals_sorted)
@@ -865,8 +884,10 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         # (otherwise the max energy would be empty and we would not have reached this point),
         # do not consider the maximum energies the transformer has written in the potential
         # step before!
-        caller_is_transformer_source = caller_is_input && input_row.source.uac === caller_uac_transformer_only
-        caller_is_transformer_target = !caller_is_input && output_row.target.uac === caller_uac_transformer_only
+        # Unless if its a secondary interface or has one, then the written MaxEnergy should be considered!
+        caller_is_transformer_source = caller_is_input && input_row.source.uac == caller_uac_transformer_only &&
+                                       !input_row.is_secondary_interface && !has_secondary_interface(input_row, unit)
+        caller_is_transformer_target = !caller_is_input && output_row.target.uac == caller_uac_transformer_only
         if caller_is_transformer_source
             energy_flow = target_energy
         elseif caller_is_transformer_target
@@ -927,6 +948,21 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
             end
         end
     end
+end
+
+function has_secondary_interface(input_row::BTInputRow, target::Bus)
+    for outface in input_row.source.output_interfaces
+        outface = isa(outface, Pair) ? outface[2] : outface
+        if outface.target.sys_function === sf_bus && outface.target.proxy !== nothing
+            outface_target = outface.target.proxy
+        else
+            outface_target = outface.target
+        end
+        if outface.is_secondary_interface && outface_target == target
+            return true
+        end
+    end
+    return false
 end
 
 """
@@ -1020,13 +1056,13 @@ of any bus in inserted in place of the input priority of that bus in the succeed
 # Returns
 `Vector{Component}`: A list of input components that are "reachable" from the starting bus
 """
-function inputs_recursive(unit::Bus)::Vector{Component}
+function inputs_recursive(unit::Bus)::Vector{Tuple{Component,Bool}}
     inputs = []
     for inface in unit.input_interfaces
         if inface.source.sys_function == sf_bus
             append!(inputs, inputs_recursive(inface.source))
         else
-            push!(inputs, inface.source)
+            push!(inputs, (inface.source, inface.is_secondary_interface))
         end
     end
     return inputs
@@ -1075,8 +1111,8 @@ Sum of energy that was transferred from the left bus to the right bus.
 function bus_transfer_sum(proxy::Bus, left::Bus, right::Bus)::Float64
     transfer_sum = 0.0
 
-    for input in inputs_recursive(left)
-        input_row = proxy.balance_table_inputs[input.uac]
+    for (input, is_secondary_interface) in inputs_recursive(left)
+        input_row = proxy.balance_table_inputs[adjust_name_if_secondary(input.uac, is_secondary_interface)]
         input_sum = 0.0
 
         for output in outputs_recursive(right)
@@ -1132,7 +1168,8 @@ function distribute!(unit::Bus)
 
     # reset all principal non-bus input interfaces from the original busses
     for inface in filter_inputs(unit, sf_bus, false)
-        principal = inface.source.output_interfaces[unit.medium]
+        principal = inface.source.output_interfaces[adjust_name_if_secondary(unit.medium,
+                                                                             inface.is_secondary_interface)]
         set!(principal, 0.0)
     end
 
@@ -1153,15 +1190,37 @@ function output_values(unit::Bus)::Vector{String}
     # allowed connections
     if unit.proxy === nothing
         outputs_energy_flow = ["EnergyFlow $i->$o"
-                               for i in [inface.source.uac for inface in unit.input_interfaces]
+                               for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+                                         for inface in unit.input_interfaces]
                                for o in [outface.target.uac for outface in unit.output_interfaces]
-                               if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                         unit.balance_table_outputs[o])]
+                               if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                          unit.balance_table_outputs[o]) &&
+                                   !unit.balance_table_inputs[i].is_secondary_interface)]
+        append!(outputs_energy_flow,
+                [create_secondary_name("EnergyFlow") * " $i->$o"
+                 for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+                           for inface in unit.input_interfaces]
+                 for o in [outface.target.uac for outface in unit.output_interfaces]
+                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                            unit.balance_table_outputs[o]) &&
+                     unit.balance_table_inputs[i].is_secondary_interface)])
         outputs_temperature_flow = ["TemperatureFlow $i->$o"
-                                    for i in [inface.source.uac for inface in unit.input_interfaces]
+                                    for i in
+                                        [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+                                         for inface in unit.input_interfaces]
                                     for o in [outface.target.uac for outface in unit.output_interfaces]
-                                    if !energy_flow_is_denied(unit, unit.balance_table_inputs[i],
-                                                              unit.balance_table_outputs[o])]
+                                    if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                                               unit.balance_table_outputs[o]) &&
+                                        !unit.balance_table_inputs[i].is_secondary_interface)]
+        append!(outputs_temperature_flow,
+                [create_secondary_name("TemperatureFlow") * " $i->$o"
+                 for i in [adjust_name_if_secondary(inface.source.uac, inface.is_secondary_interface)
+                           for inface in unit.input_interfaces]
+                 for o in [outface.target.uac for outface in unit.output_interfaces]
+                 if (!energy_flow_is_denied(unit, unit.balance_table_inputs[i],
+                                            unit.balance_table_outputs[o]) &&
+                     unit.balance_table_inputs[i].is_secondary_interface)])
+
         return ["Balance"; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
     else
         return ["Balance"; outputs_proxies]
@@ -1186,6 +1245,7 @@ function output_value(unit::Bus, key::OutputKey)::Float64
                                   (unit.balance_table_outputs[out_uac].priority * 2 - 1)]
 
     elseif startswith(key.value_key, "TemperatureFlow")
+
         # TemperatureFlow between inputs and outputs
         in_uac, out_uac = split(key.value_key[17:end], "->")
         temperature = unit.balance_table[unit.balance_table_inputs[in_uac].priority,

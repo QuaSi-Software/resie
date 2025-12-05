@@ -66,11 +66,17 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                 temp_dict_incl_flows = Dict{String,Any}()
                 for output_val in output_vals
                     if startswith(output_val, "EnergyFlow")
-                        key = String(unit[2].medium)
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val[12:end])
+                        if startswith(output_val, create_secondary_name("EnergyFlow"))
+                            key = adjust_name_if_secondary(String(unit[2].medium), true)
+                            nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
                         else
-                            temp_dict_incl_flows[key] = [output_val[12:end]]
+                            key = String(unit[2].medium)
+                            nr_skip = 12
+                        end
+                        if haskey(temp_dict_incl_flows, key)
+                            push!(temp_dict_incl_flows[key], output_val[nr_skip:end])
+                        else
+                            temp_dict_incl_flows[key] = [output_val[nr_skip:end]]
                         end
                     elseif startswith(output_val, "TemperatureFlow")
                         # do nothing, temperature are added in output_keys()
@@ -191,12 +197,12 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 push!(output_targetnames_sankey, each_outputinterface.target.uac)
 
                 # get name of medium
-                if isdefined(each_outputinterface.target, :medium)
+                if !(medium === nothing)
+                    push!(medium_of_interfaces, medium)
+                elseif isdefined(each_outputinterface.target, :medium)
                     push!(medium_of_interfaces, each_outputinterface.target.medium)
                 elseif isdefined(each_outputinterface.source, :medium)
                     push!(medium_of_interfaces, each_outputinterface.source.medium)
-                elseif !(medium === nothing)
-                    push!(medium_of_interfaces, medium)
                 else
                     @warn "The name of the medium was not detected. This may lead to wrong colouring in Sankey plot."
                 end
@@ -291,8 +297,18 @@ as this transformation has to be done only once at the beginning.
 function output_keys(components::Grouping, from_config::AbstractDict{String,Any})::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
-    all_current_media = String.(unique([bus.medium
-                                        for bus in values(components) if bus.sys_function === EnergySystems.sf_bus]))
+    all_current_media = []
+    for component in values(components)
+        if component.sys_function === EnergySystems.sf_bus
+            push!(all_current_media, String(component.medium))
+            for inface in component.input_interfaces
+                if inface.is_secondary_interface
+                    push!(all_current_media, adjust_name_if_secondary(String(component.medium), true))
+                end
+            end
+        end
+    end
+    all_current_media = unique(all_current_media)
 
     for key in keys(from_config)
         if key in keys(components)
@@ -329,17 +345,18 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
                     # consider only proxy busses or busses without proxies and busses with correct media
-                    if bus.proxy === nothing && bus.medium == medium
+                    medium_trimmed, _ = trim_secondary_medium(medium)
+                    if bus.proxy === nothing && bus.medium == medium_trimmed
                         # check if input and output exists
                         if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
-                            output_key = "EnergyFlow " * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
-                            output_key = "TemperatureFlow " * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="EnergyFlow " * value_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="TemperatureFlow " * value_key))
                             success = true
                             break
                         end
