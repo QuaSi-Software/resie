@@ -704,6 +704,10 @@ function add_transformer_steps(simulation_order,
         if isempty(middle_transformer_branches)
             # This can happen with multiple interconnected middle transformer. Then only process/potential the MT 
             if step_category == "process"
+                if requires_potential_ahead_of_process(first_middle_transformer, simulation_order)
+                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                end
                 push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
             else
                 push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
@@ -715,6 +719,10 @@ function add_transformer_steps(simulation_order,
 
                 # add process of middle_transformer before the first branch makes its process
                 if idx == 1 && step_category == "process"
+                    if requires_potential_ahead_of_process(simulation_order, first_middle_transformer)
+                        push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                        initial_nr -= 1
+                    end
                     push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
                     initial_nr -= 1
                 end
@@ -962,6 +970,11 @@ function add_transformer_steps(simulation_order,
                                 if step_category == "potential"
                                     push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_potential)])
                                 else
+                                    if requires_potential_ahead_of_process(simulation_order, component)
+                                        push!(simulation_order,
+                                              [initial_nr, (component.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                     push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_process)])
                                 end
                                 initial_nr -= 1
@@ -997,6 +1010,11 @@ function add_transformer_steps(simulation_order,
                             elseif length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches &&
                                    step_category == "process"
                                 for current_middle_transformer in current_middle_transformers
+                                    if requires_potential_ahead_of_process(simulation_order, current_middle_transformer)
+                                        push!(simulation_order,
+                                              [initial_nr, (current_middle_transformer.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                     push!(simulation_order,
                                           [initial_nr, (current_middle_transformer.uac, EnergySystems.s_process)])
                                     initial_nr -= 1
@@ -1010,6 +1028,10 @@ function add_transformer_steps(simulation_order,
                         if step_category == "potential"
                             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
                         else
+                            if requires_potential_ahead_of_process(simulation_order, unit)
+                                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                                initial_nr -= 1
+                            end
                             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
                         end
                         initial_nr -= 1
@@ -1045,6 +1067,40 @@ function add_transformer_steps(simulation_order,
     end
 
     return simulation_order, initial_nr, checked_components, parallel_branches
+end
+
+"""
+    requires_potential_ahead_of_process(simulation_order, unit)
+
+Checks if a components requires a potential step ahead of its process step. Returns true if yes.
+
+# Arguments
+-`simulation_order::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+- `unit`: The unit for that should be checked if a potential step is requires ahead of the process step
+
+# Returns 
+- `Bool`: A bool indicating if a potential step is required (true) or not (false)
+"""
+function requires_potential_ahead_of_process(simulation_order, unit)
+    return component_has_secondary_interface(unit) && no_potential_before(simulation_order, unit)
+end
+
+"""
+    no_potential_before(simulation_order, unit)
+
+Checks if the last step in the simulation_order is a potential step of the given unit.
+Returns false if there is a potential step of the unit at the last step and true if there is no.
+
+# Arguments
+-`simulation_order::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+- `unit`: The unit for that should be checked if a potential step exists at the last step
+
+# Returns 
+- `Bool`: A bool indicating if the potential step exists (false) or not (true)
+"""
+function no_potential_before(simulation_order, unit)
+    _, (last_uac, last_step) = simulation_order[end]
+    return !(last_uac == unit.uac && last_step == EnergySystems.s_potential)
 end
 
 """
