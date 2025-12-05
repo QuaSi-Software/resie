@@ -1020,10 +1020,12 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
                                                                                                                                         true)].priority
                 regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
 
-                if secondary_prio > regular_prio
+                if secondary_prio < regular_prio
+                    # secondary interface has higher priority (smaller number)
                     exchanges_first = exchanges_secondary
                     exchanges_second = exchanges
                 else
+                    # secondary interface has lower priority (higher number)                    
                     exchanges_first = exchanges
                     exchanges_second = exchanges_secondary
                 end
