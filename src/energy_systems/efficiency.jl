@@ -1002,7 +1002,6 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function == sf_transformer &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_secondary].max_energy))
         # direct connection to transformer that has not had its potential
-        # TODO consider also temperatures of other interface!
         return ([-Inf],
                 [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_min[1]],
                 [unit.output_interfaces[unit.m_heat_out].max_energy.temperature_max[1]],

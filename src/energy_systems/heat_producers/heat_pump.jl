@@ -427,7 +427,12 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
             @error "In heat pump $(unit.uac), a secondary interface is requested. The following uac(s) are both in " *
                    "primary_el_sources and secondary_el_sources, but they need to be unique: $(common)"
         end
-
+        if unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function !== sf_bus ||
+           unit.output_interfaces[unit.m_heat_out].target.sys_function !== sf_bus ||
+           unit.output_interfaces[unit.m_heat_out_secondary].target !== unit.output_interfaces[unit.m_heat_out].target
+            @error "In heat pump $(unit.uac), a secondary interface is requested. Then, for both output interfaces, " *
+                   "the same bus has to be connected, which is not the case!"
+        end
         set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_secondary],
                               load_storages(unit.controller, unit.m_heat_out_secondary))
     end
