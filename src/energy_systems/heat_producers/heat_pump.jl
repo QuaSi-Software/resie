@@ -135,8 +135,8 @@ mutable struct HeatPump <: Component
                    m_heat_out,
                    m_heat_out_secondary,
                    m_heat_in,
-                   has_secondary_interface,                            # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
-                   default(config, "primary_el_sources", []),     # electricity source(s) used for the standard heat output interface (only if has_secondary_interface)
+                   has_secondary_interface,                       # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
+                   default(config, "primary_el_sources", []),     # electricity source(s) used for the primary heat output interface (only if has_secondary_interface)
                    default(config, "secondary_el_sources", []),   # electricity source(s) used for the secondary heat output interface (only if has_secondary_interface)
                    model_type,
                    config["power_th"],
@@ -419,13 +419,13 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
                           load_storages(unit.controller, unit.m_heat_out))
     if unit.has_secondary_interface
         if unit.primary_el_sources == [] || unit.secondary_el_sources == []
-            @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both primary_el_sources and secondary_el_sources " *
-                   "to specify which electricity source should be used for the secondary (bad) interface."
+            @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both `primary_el_sources` and " *
+                   "`secondary_el_sources` to specify which electricity source should be used for the secondary interface."
         end
         common = intersect(unit.primary_el_sources, unit.secondary_el_sources)
         if !isempty(common)
             @error "In heat pump $(unit.uac), a secondary interface is requested. The following uac(s) are both in " *
-                   "primary_el_sources and secondary_el_sources, but they need to be unique: $(common)"
+                   "`primary_el_sources` and `secondary_el_sources`, but they need to be unique: $(common)"
         end
         if unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function !== sf_bus ||
            unit.output_interfaces[unit.m_heat_out].target.sys_function !== sf_bus ||
@@ -1128,29 +1128,29 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
 
     if unit.has_secondary_interface
         # split slices regarding electricity source
-        good, bad = split_slices_good_bad(unit,
-                                          energies.potential_el_in_layered,
-                                          energies.in_uacs_el,
-                                          unit.primary_el_sources,
-                                          unit.secondary_el_sources,
-                                          energies.slices_el_in,
-                                          energies.slices_heat_out,
-                                          energies.slices_heat_out_temperature,
-                                          energies.slices_heat_out_uac,
-                                          energies.heat_out_has_inf_energy,
-                                          sim_params["epsilon"])
+        primary, secondary = split_slices_primary_secondary(unit,
+                                                            energies.potential_el_in_layered,
+                                                            energies.in_uacs_el,
+                                                            unit.primary_el_sources,
+                                                            unit.secondary_el_sources,
+                                                            energies.slices_el_in,
+                                                            energies.slices_heat_out,
+                                                            energies.slices_heat_out_temperature,
+                                                            energies.slices_heat_out_uac,
+                                                            energies.heat_out_has_inf_energy,
+                                                            sim_params["epsilon"])
 
         set_max_energies!(unit,
                           energies.slices_el_in,
                           energies.slices_heat_in,
-                          good.slices_heat_out,
-                          bad.slices_heat_out,
+                          primary.slices_heat_out,
+                          secondary.slices_heat_out,
                           energies.slices_heat_in_temperature,
-                          good.slices_heat_out_temperature,
-                          bad.slices_heat_out_temperature,
+                          primary.slices_heat_out_temperature,
+                          secondary.slices_heat_out_temperature,
                           energies.slices_heat_in_uac,
-                          good.slices_heat_out_uac,
-                          bad.slices_heat_out_uac,
+                          primary.slices_heat_out_uac,
+                          secondary.slices_heat_out_uac,
                           energies.heat_in_has_inf_energy,
                           energies.heat_out_has_inf_energy)
     else
@@ -1170,31 +1170,62 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     end
 end
 
-function split_slices_good_bad(unit::HeatPump,
-                               potential_el_in_layered::Vector{Float64},
-                               in_uacs_el::Vector{String},
-                               good_uac::Vector{String},
-                               bad_uac::Vector{String},
-                               slices_el_in::Vector{Floathing},
-                               slices_heat_out::Vector{Floathing},
-                               slices_heat_out_temperature::Vector{Floathing},
-                               slices_heat_out_uac::Vector{Stringing},
-                               heat_out_has_inf_energy::Bool,
-                               epsilon::Float64)
+"""
+    split_slices_primary_secondary(unit, ...)
+
+Splits the heat pump output slices into "primary" and "secondary" groups based on the user-defined mapping of 
+the electricity sources to primary/secondary output interfaces.
+
+# Arguments
+- `unit::HeatPump`: The heat pump unit.
+- `potential_el_in_layered::Vector{Float64}`: Available electricity input as layer.
+- `in_uacs_el::Vector{String}`: UACs for each electricity input layer.
+- `primary_uac::Vector{String}`: UACs considered as "primary" sources.
+- `secondary_uac::Vector{String}`: UACs considered as "secondary" sources.
+- `slices_el_in::Vector{Floathing}`: Electricity used per output slice.
+- `slices_heat_out::Vector{Floathing}`: Heat output per slice.
+- `slices_heat_out_temperature::Vector{Floathing}`: Output temperature per slice.
+- `slices_heat_out_uac::Vector{Stringing}`: UACs for each heat output slice.
+- `heat_out_has_inf_energy::Bool`: Whether any output slice has infinite energy.
+- `epsilon::Float64`: Numerical tolerance for slice splitting.
+
+# Returns
+- `primary::NamedTuple`: Slices attributed to primary sources for the primary output interface, with fields:
+    - `slices_heat_out::Vector{Floathing}`
+    - `slices_heat_out_temperature::Vector{Floathing}`
+    - `slices_heat_out_uac::Vector{Stringing}`
+    - `source_uac_el::Vector{Stringing}`
+- `secondary::NamedTuple`: Slices attributed to secondary sources for the secondary output interface, with fields:
+    - `slices_heat_out::Vector{Floathing}`
+    - `slices_heat_out_temperature::Vector{Floathing}`
+    - `slices_heat_out_uac::Vector{Stringing}`
+    - `source_uac_el::Vector{Stringing}`
+"""
+function split_slices_primary_secondary(unit::HeatPump,
+                                        potential_el_in_layered::Vector{Float64},
+                                        in_uacs_el::Vector{String},
+                                        primary_uac::Vector{String},
+                                        secondary_uac::Vector{String},
+                                        slices_el_in::Vector{Floathing},
+                                        slices_heat_out::Vector{Floathing},
+                                        slices_heat_out_temperature::Vector{Floathing},
+                                        slices_heat_out_uac::Vector{Stringing},
+                                        heat_out_has_inf_energy::Bool,
+                                        epsilon::Float64)
     # convenience
     n_inputs = length(potential_el_in_layered)
 
     # --- outputs --------------------------------------------------------------
     T = eltype(slices_el_in)
-    good_heat_out = T[]
-    good_heat_out_temperature = T[]
-    good_heat_out_uac_out = Stringing[]
-    good_el_source_uac = Stringing[]   # from in_uacs_el
+    primary_heat_out = T[]
+    primary_heat_out_temperature = T[]
+    primary_heat_out_uac_out = Stringing[]
+    primary_el_source_uac = Stringing[]   # from in_uacs_el
 
-    bad_heat_out = T[]
-    bad_heat_out_temperature = T[]
-    bad_heat_out_uac_out = Stringing[]
-    bad_el_source_uac = Stringing[]   # from in_uacs_el
+    secondary_heat_out = T[]
+    secondary_heat_out_temperature = T[]
+    secondary_heat_out_uac_out = Stringing[]
+    secondary_el_source_uac = Stringing[]   # from in_uacs_el
 
     # --- main loop -----------------------------------------------------------
     layer = 1
@@ -1232,11 +1263,11 @@ function split_slices_good_bad(unit::HeatPump,
             ratio = take / slice_total         # in (0,1]
 
             src = in_uacs_el[layer]
-            is_good = src in good_uac
-            is_bad = src in bad_uac
+            is_primary = src in primary_uac
+            is_secondary = src in secondary_uac
 
-            if !is_good && !is_bad
-                @error "In heat pump $(unit.uac), the source '$src' is in neither good_uac nor bad_uac."
+            if is_primary && is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
             end
 
             # scale energy quantities
@@ -1246,16 +1277,16 @@ function split_slices_good_bad(unit::HeatPump,
             Tout = slices_heat_out_temperature[j]
             uac_out = slices_heat_out_uac[j]
 
-            if is_good
-                push!(good_heat_out, heat_out_piece)
-                push!(good_heat_out_temperature, Tout)
-                push!(good_heat_out_uac_out, uac_out)
-                push!(good_el_source_uac, src)
+            if is_primary
+                push!(primary_heat_out, heat_out_piece)
+                push!(primary_heat_out_temperature, Tout)
+                push!(primary_heat_out_uac_out, uac_out)
+                push!(primary_el_source_uac, src)
             else
-                push!(bad_heat_out, heat_out_piece)
-                push!(bad_heat_out_temperature, Tout)
-                push!(bad_heat_out_uac_out, uac_out)
-                push!(bad_el_source_uac, src)
+                push!(secondary_heat_out, heat_out_piece)
+                push!(secondary_heat_out_temperature, Tout)
+                push!(secondary_heat_out_uac_out, uac_out)
+                push!(secondary_el_source_uac, src)
             end
 
             # update remaining and slice_left
@@ -1264,29 +1295,29 @@ function split_slices_good_bad(unit::HeatPump,
         end
     end
 
-    if isempty(good_heat_out)
-        push!(good_heat_out, 0.0)
-        push!(good_heat_out_temperature, nothing)
-        push!(good_heat_out_uac_out, nothing)
-        push!(good_el_source_uac, nothing)
+    if isempty(primary_heat_out)
+        push!(primary_heat_out, 0.0)
+        push!(primary_heat_out_temperature, nothing)
+        push!(primary_heat_out_uac_out, nothing)
+        push!(primary_el_source_uac, nothing)
     end
-    good = (slices_heat_out=good_heat_out,
-            slices_heat_out_temperature=good_heat_out_temperature,
-            slices_heat_out_uac=good_heat_out_uac_out,
-            source_uac_el=good_el_source_uac)
+    primary = (slices_heat_out=primary_heat_out,
+               slices_heat_out_temperature=primary_heat_out_temperature,
+               slices_heat_out_uac=primary_heat_out_uac_out,
+               source_uac_el=primary_el_source_uac)
 
-    if isempty(bad_heat_out)
-        push!(bad_heat_out, 0.0)
-        push!(bad_heat_out_temperature, nothing)
-        push!(bad_heat_out_uac_out, nothing)
-        push!(bad_el_source_uac, nothing)
+    if isempty(secondary_heat_out)
+        push!(secondary_heat_out, 0.0)
+        push!(secondary_heat_out_temperature, nothing)
+        push!(secondary_heat_out_uac_out, nothing)
+        push!(secondary_el_source_uac, nothing)
     end
-    bad = (slices_heat_out=bad_heat_out,
-           slices_heat_out_temperature=bad_heat_out_temperature,
-           slices_heat_out_uac=bad_heat_out_uac_out,
-           source_uac_el=bad_el_source_uac)
+    secondary = (slices_heat_out=secondary_heat_out,
+                 slices_heat_out_temperature=secondary_heat_out_temperature,
+                 slices_heat_out_uac=secondary_heat_out_uac_out,
+                 source_uac_el=secondary_el_source_uac)
 
-    return good, bad
+    return primary, secondary
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
@@ -1311,28 +1342,28 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
 
         if unit.has_secondary_interface
             # split slices regarding electricity source
-            good, bad = split_slices_good_bad(unit,
-                                              energies.potential_el_in_layered,
-                                              energies.in_uacs_el,
-                                              unit.primary_el_sources,
-                                              unit.secondary_el_sources,
-                                              energies.slices_el_in,
-                                              energies.slices_heat_out,
-                                              energies.slices_heat_out_temperature,
-                                              energies.slices_heat_out_uac,
-                                              energies.heat_out_has_inf_energy,
-                                              sim_params["epsilon"])
+            primary, secondary = split_slices_primary_secondary(unit,
+                                                                energies.potential_el_in_layered,
+                                                                energies.in_uacs_el,
+                                                                unit.primary_el_sources,
+                                                                unit.secondary_el_sources,
+                                                                energies.slices_el_in,
+                                                                energies.slices_heat_out,
+                                                                energies.slices_heat_out_temperature,
+                                                                energies.slices_heat_out_uac,
+                                                                energies.heat_out_has_inf_energy,
+                                                                sim_params["epsilon"])
 
             add!(unit.output_interfaces[unit.m_heat_out],
-                 good.slices_heat_out,
-                 [nothing for _ in good.slices_heat_out_temperature],
-                 good.slices_heat_out_temperature,
-                 good.slices_heat_out_uac)
+                 primary.slices_heat_out,
+                 [nothing for _ in primary.slices_heat_out_temperature],
+                 primary.slices_heat_out_temperature,
+                 primary.slices_heat_out_uac)
             add!(unit.output_interfaces[unit.m_heat_out_secondary],
-                 bad.slices_heat_out,
-                 [nothing for _ in bad.slices_heat_out_temperature],
-                 bad.slices_heat_out_temperature,
-                 bad.slices_heat_out_uac)
+                 secondary.slices_heat_out,
+                 [nothing for _ in secondary.slices_heat_out_temperature],
+                 secondary.slices_heat_out_temperature,
+                 secondary.slices_heat_out_uac)
         else
             add!(unit.output_interfaces[unit.m_heat_out],
                  energies.slices_heat_out,
