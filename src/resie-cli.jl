@@ -1,3 +1,5 @@
+using UUIDs
+using Logging
 using Resie
 
 include("resie_logger.jl")
@@ -151,19 +153,32 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
 
     log_to_console = true
     log_to_file = true
-    general_logfile_path = "output/logfile_general.log"
-    balanceWarn_logfile_path = "output/logfile_balanceWarn.log"
+    general_logfile_path = abspath(joinpath(dirname(@__FILE__), "..", "output", "logfile_general.log"))
+    balanceWarn_logfile_path = abspath(joinpath(dirname(@__FILE__), "..", "output", "logfile_balanceWarn.log"))
     min_log_level = Resie_Logger.Logging.Info
-    log_file_general, log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
-                                                                       log_to_file,
-                                                                       general_logfile_path,
-                                                                       balanceWarn_logfile_path,
-                                                                       min_log_level,
-                                                                       input_filepath)
+    logger = Resie_Logger.start_logger(log_to_console,
+                                       log_to_file,
+                                       general_logfile_path,
+                                       balanceWarn_logfile_path,
+                                       min_log_level,
+                                       input_filepath)
+    global_logger(logger)
 
-    success = Resie.load_and_run(input_filepath)
+    success = false
+    run_ID = uuid1()
+    try
+        success = Resie.load_and_run(input_filepath, run_ID)
+    catch exc
+        # exceptions should just be rethrown, but the finally block should also make sure
+        # that the logger is closed and the run removed from the run registry.
+        # it's not fully clear if this actually works since rethrow might quit out of the
+        # execution entirely
+        rethrow(exc)
+    finally
+        Resie.close_run(run_ID)
+        Resie_Logger.close_logger(logger)
+    end
 
-    Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
     return success, exit_after_run
 end
 
