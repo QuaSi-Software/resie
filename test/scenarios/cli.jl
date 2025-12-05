@@ -25,6 +25,7 @@ include("../../src/resie_logger.jl")
 using .Resie_Logger
 using Resie
 using UUIDs
+using Logging
 
 KNOWN_COMMANDS = Set(["generate_output",
                       "set_reference",
@@ -42,8 +43,7 @@ directory and to not output to the console.
 # Arguments
 - `subdir::String`: The directory in which to setup loggers
 # Returns
--`IO`: The file stream for the general log
--`IO`: The file stream for the balance warning log
+-`CustomLogger`: The created logger
 """
 function setup_logger(subdir)
     log_to_console = false
@@ -52,14 +52,14 @@ function setup_logger(subdir)
     balanceWarn_logfile_path = joinpath(subdir, "balanceWarn.log")
     min_log_level = Resie_Logger.Logging.Debug
 
-    log_file_general,
-    log_file_balanceWarn = Resie_Logger.start_logger(log_to_console,
-                                                     log_to_file,
-                                                     general_logfile_path,
-                                                     balanceWarn_logfile_path,
-                                                     min_log_level)
+    logger = Resie_Logger.start_logger(log_to_console,
+                                       log_to_file,
+                                       general_logfile_path,
+                                       balanceWarn_logfile_path,
+                                       min_log_level)
+    global_logger(logger)
     @info "Logging set up"
-    return log_file_general, log_file_balanceWarn
+    return logger
 end
 
 """
@@ -109,7 +109,7 @@ function generate_output(name::String, subdir::String)
     println("Generating scenario $name in dir $subdir")
     println("|Logr+|RdJsn|SmPrm|LdCmp|OrdOp|RnSim|Logr-|")
 
-    log_file_general, log_file_balanceWarn = setup_logger(subdir)
+    logger = setup_logger(subdir)
     print("|  ✓  ")
 
     project_config = nothing
@@ -182,7 +182,7 @@ function generate_output(name::String, subdir::String)
         print("|     ")
     end
 
-    Resie_Logger.close_logger(log_file_general, log_file_balanceWarn)
+    Resie_Logger.close_logger(logger)
     print("|  ✓  ")
 
     println("|")

@@ -388,7 +388,7 @@ function reset_file(filepath::String,
                     output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                     weather_data_keys::Union{Nothing,Vector{String}},
                     csv_time_unit::String)
-    open(abspath(filepath), "w") do file_handle
+    open(filepath, "w") do file_handle
         if csv_time_unit == "seconds"
             time_unit = "[s]"
         elseif csv_time_unit == "minutes"
@@ -435,7 +435,7 @@ function write_to_file(filepath::String,
                        weather_data_keys::Union{Nothing,Vector{String}},
                        sim_params::Dict{String,Any},
                        csv_time_unit::String)
-    open(abspath(filepath), "a") do file_handle
+    open(filepath, "a") do file_handle
         if csv_time_unit == "seconds"
             time = sim_params["time_since_output"]
         elseif csv_time_unit == "minutes"
@@ -505,7 +505,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     # export order of operations
     if default(project_config["io_settings"], "auxiliary_info", false)
         aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
-        open(abspath(aux_info_file_path), "w") do file_handle
+        open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
             write(file_handle, listify_operations(order_of_operations))
@@ -528,12 +528,14 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
             end
         end
 
-        @info "Auxiliary info dumped to file $(aux_info_file_path)"
+        @info "Auxiliary info dumped to file $(sim_params["run_path"](aux_info_file_path))"
     end
 
     # plot additional figures potentially available from components after initialisation
     if default(project_config["io_settings"], "auxiliary_plots", false)
-        aux_plots_output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        aux_plots_output_path = sim_params["run_path"](default(project_config["io_settings"],
+                                                               "auxiliary_plots_path",
+                                                               "./output/"))
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
         component_list = []
         for component in components
@@ -768,9 +770,9 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     p = plot(traces, layout)
 
-    file_path = default(project_config["io_settings"],
-                        "output_plot_file",
-                        "./output/output_plot.html")
+    file_path = sim_params["run_path"](default(project_config["io_settings"],
+                                               "output_plot_file",
+                                               "./output/output_plot.html"))
     savefig(p, file_path)
 end
 
@@ -789,7 +791,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::AbstractDict{String,Any})
+                       io_settings::AbstractDict{String,Any},
+                       sim_params::Dict{String,Any})
 
     # sum up data of each interface
     output_all_value_sum = zeros(Float64, nr_of_interfaces)
@@ -927,6 +930,6 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = default(io_settings, "sankey_plot_file", "./output/output_sankey.html")
+    file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
     savefig(p, file_path)
 end
