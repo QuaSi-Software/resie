@@ -1016,10 +1016,16 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
                 exchanges_secondary = balance_on(unit.output_interfaces[unit.m_heat_out_secondary],
                                                  unit.output_interfaces[unit.m_heat_out_secondary].target)
                 # ...and merge them together depending on the dynamic order of them at the target bus
-                secondary_prio = unit.output_interfaces[unit.m_heat_out_secondary].target.balance_table_inputs[adjust_name_if_secondary(unit.uac,
-                                                                                                                                        true)].priority
-                regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
-
+                if unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function === sf_bus &&
+                   unit.output_interfaces[unit.m_heat_out].target.sys_function === sf_bus
+                    secondary_prio = unit.output_interfaces[unit.m_heat_out_secondary].target.balance_table_inputs[adjust_name_if_secondary(unit.uac,
+                                                                                                                                            true)].priority
+                    regular_prio = unit.output_interfaces[unit.m_heat_out].target.balance_table_inputs[unit.uac].priority
+                else
+                    # if no bus is present, set secondary interface to second priority
+                    secondary_prio = 2
+                    regular_prio = 1
+                end
                 if secondary_prio < regular_prio
                     # secondary interface has higher priority (smaller number)
                     exchanges_first = exchanges_secondary
