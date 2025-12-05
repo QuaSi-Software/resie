@@ -979,9 +979,13 @@ function check_heat_lt_out(unit::Electrolyser,
 end
 
 """
-    check_heat_out_layered(unit, sim_params)
+    check_heat_out_layered(unit::HeatPump, sim_params)
 
 Checks the available energy on the output heat interface.
+
+This specific implementation also considers potentially available secondary output interfaces on the heat pump. 
+The function calls balance_on() on both output interfaces and merges the returned exchanges, depending on the
+actual input priority of the primary and secondary input interface at the target bus.
 
 # Arguments
 - `unit::HeatPump`: The component
