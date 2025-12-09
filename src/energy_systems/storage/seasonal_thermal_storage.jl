@@ -1640,7 +1640,23 @@ end
 
 # === Ground coupling FEM for STES (unified axisymmetric r–z domain) ===
 
-# create a 1D geometric mesh along a bound (start at min, expand by factor up to max, until reaching bound)
+"""
+    _create_geometric_mesh(min_mesh_width::Float64,
+                           max_mesh_width::Float64,
+                           expansion_factor::Float64,
+                           bound::Float64) -> Vector{Float64}
+
+Build a 1D vector of cell widths `dx` that covers length `bound` using geometric growth
+from the origin. Start at `min_mesh_width`, multiply by `expansion_factor` (capped at
+`max_mesh_width`) until near `bound`, then trim/append the last cell so `sum(dx) == bound`.
+Returns `Float64[]` if `bound ≤ 0`.
+
+Args:
+- `min_mesh_width` (>0) start size.
+- `max_mesh_width` (≥ min) cap.
+- `expansion_factor` (>1 for growth; ≈1 → near-uniform).
+- `bound` total length.
+"""
 function _create_geometric_mesh(min_mesh_width::Float64,
                                 max_mesh_width::Float64,
                                 expansion_factor::Float64,
@@ -1659,6 +1675,83 @@ function _create_geometric_mesh(min_mesh_width::Float64,
         dx[end] -= excess
     elseif sum(dx) < bound
         push!(dx, bound - sum(dx))
+    end
+    return dx
+end
+
+"""
+    _create_geometric_mesh_two_sided(min_mesh_width::Float64,
+                                     max_mesh_width::Float64,
+                                     expansion_factor::Float64,
+                                     bound::Float64)
+
+Build a 1D mesh on [0, bound] that is fine near both ends:
+- geometric growth from each end starting at `min_mesh_width` with factor `expansion_factor`,
+  capped at `max_mesh_width`
+- middle region filled with equidistant cells of width `max_mesh_width`
+- robust for small `bound` (returns two equal cells if the domain is too short)
+
+Returns a vector `dx` with sum(dx) == bound (up to floating roundoff).
+"""
+function _create_geometric_mesh_two_sided(min_mesh_width::Float64,
+                                          max_mesh_width::Float64,
+                                          expansion_factor::Float64,
+                                          bound::Float64)
+    if bound <= 0.0
+        return Float64[]
+    end
+
+    # very short domain: split into two equal cells
+    if bound <= 2*min_mesh_width
+        return [bound/2, bound/2]
+    end
+
+    # geometric ramp sequence up to the cap
+    w = Float64[min_mesh_width]
+    while w[end] < max_mesh_width - eps(Float64)
+        nextw = min(w[end]*expansion_factor, max_mesh_width)
+        if nextw == w[end]      # handles expansion_factor == 1
+            break
+        end
+        push!(w, nextw)
+    end
+
+    # choose how many ramp cells per side can fit
+    s = 0.0
+    n = 0
+    for j in eachindex(w)
+        if 2*(s + w[j]) <= bound
+            s += w[j]
+            n = j
+        else
+            break
+        end
+    end
+
+    # middle length and fill with max-sized equidistant cells
+    middle_len = bound - 2*s
+    dx = Float64[]
+    append!(dx, w[1:n])
+
+    if middle_len > 0
+        if middle_len <= max_mesh_width + 1e-12
+            push!(dx, middle_len)
+        else
+            nmid = floor(Int, middle_len / max_mesh_width)
+            append!(dx, fill(max_mesh_width, nmid))
+            rem = middle_len - nmid*max_mesh_width
+            if rem > 1e-12
+                push!(dx, rem)
+            end
+        end
+    end
+
+    append!(dx, reverse(w[1:n]))
+
+    # tiny correction to hit 'bound' exactly
+    err = bound - sum(dx)
+    if abs(err) > 1e-10
+        dx[end] += err
     end
     return dx
 end
@@ -1774,7 +1867,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     unit.soil_dz = dz
     unit.soil_dz_mesh = [(dz[i] + dz[i + 1]) / 2 for i in 1:(length(dz) - 1)]
 
-    zc = [sum(dz[1:(h - 1)]) + dz[h] / 2 for h in 1:length(dz)]
+    zc = [sum(dz[1:(h - 1)]) + dz[h] / 2 for h in eachindex(dz)]
     unit.soil_z_centers = zc
 
     unit.soil_h_base_face = max(unit.number_of_STES_layer_below_ground, 1)  # row at / just below tank base
@@ -1790,7 +1883,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     # --- Region 1: 0 .. R_small ---
     if R_small > 0
         append!(dr_segments,
-                _create_geometric_mesh(min_w, max_w, ef, R_small))
+                _create_geometric_mesh_two_sided(min_w, max_w, ef, R_small))
     end
 
     # --- Region 2: R_small .. R_wall (only if sloped and buried wall exists) ---
@@ -1821,7 +1914,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     dr = dr_segments
     unit.soil_dr = dr
     unit.soil_dr_mesh = [(dr[i] + dr[i + 1]) / 2 for i in 1:(length(dr) - 1)]
-    rc = [sum(dr[1:(i - 1)]) + dr[i] / 2 for i in 1:length(dr)]
+    rc = [sum(dr[1:(i - 1)]) + dr[i] / 2 for i in eachindex(dr)]
     unit.soil_r_centers = rc
 
     # ----------------------------
