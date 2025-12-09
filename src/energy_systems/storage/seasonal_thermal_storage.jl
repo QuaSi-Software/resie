@@ -65,7 +65,9 @@ mutable struct SeasonalThermalStorage <: Component
 
     # losses
     thermal_transmission_lid::Float64
-    thermal_transmission_barrel::Float64
+    thermal_transmission_barrel_above_ground::Float64
+    thermal_transmission_barrel_below_ground::Float64
+    thermal_transmission_barrels::Vector{Float64}
     thermal_transmission_bottom::Float64
     ambient_temperature_profile::Union{Profile,Nothing}
     ambient_temperature::Temperature
@@ -202,9 +204,11 @@ mutable struct SeasonalThermalStorage <: Component
                    nothing,                                            # max_input_energy, maximum input energy per time step [Wh]
                    nothing,                                            # max_output_energy, maximum output energy per time step [Wh]
                    # Losses
-                   default(config, "thermal_transmission_lid", 0.25),     # [W/(m^2K)]
-                   default(config, "thermal_transmission_barrel", 0.375), # [W/(m^2K)]
-                   default(config, "thermal_transmission_bottom", 0.375), # [W/(m^2K)]
+                   default(config, "thermal_transmission_lid", 0.25),                  # [W/(m^2K)]
+                   default(config, "thermal_transmission_barrel_above_ground", 0.375), # [W/(m^2K)]
+                   default(config, "thermal_transmission_barrel_below_ground", 12.0),  # [W/(m^2K)]
+                   Float64[],                                                          # thermal_transmission_barrels
+                   default(config, "thermal_transmission_bottom", 0.375),              # [W/(m^2K)]
                    ambient_temperature_profile,                           # [°C]
                    constant_ambient_temperature,                          # ambient_temperature [°C]
                    ground_temperature_profile,                            # [°C]
@@ -286,9 +290,6 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # set initial current_energy_input_return_temperature, always use bottom layer to use the whole storage
     unit.current_energy_input_return_temperature = unit.temperature_segments[1]
 
-    # calculate thermal transmission coefficients # TODO other transmission below ground
-    thermal_transmission_barrels = [unit.thermal_transmission_barrel for _ in 1:(unit.number_of_layer_total)]
-
     # calculate geometry of the STES
     unit.surface_area_lid,
     unit.surface_area_barrel_segments,
@@ -331,6 +332,16 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         unit.ground_layers_depths = [0, unit.ground_domain_depth]
     end
 
+    # calculate thermal transmission coefficients
+    unit.thermal_transmission_barrels = zeros(unit.number_of_layer_total)
+    for layer in 1:unit.number_of_layer_total
+        if layer <= unit.number_of_STES_layer_below_ground
+            unit.thermal_transmission_barrels[layer] = unit.thermal_transmission_barrel_below_ground
+        else
+            unit.thermal_transmission_barrels[layer] = unit.thermal_transmission_barrel_above_ground
+        end
+    end
+
     # calculate the mass of the medium in each layer
     unit.layer_masses = unit.rho_medium .* unit.volume_segments
 
@@ -346,7 +357,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.sigma[end] = unit.surface_area_lid * unit.thermal_transmission_lid /
                       (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambient through lid
     unit.sigma = unit.sigma .+
-                 unit.surface_area_barrel_segments .* thermal_transmission_barrels ./
+                 unit.surface_area_barrel_segments .* unit.thermal_transmission_barrels ./
                  (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambient though barrel
 
     # calculate coefficient for input/output energy. 
@@ -1829,7 +1840,7 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
 end
 
 # map depth z [m] (measured from ground surface downward) to soil layer properties
-# TODO interpolate at transition areas!
+# Note that currently the soil properties are considered at a single depth without taking overlaps into account!
 function soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
     zs = unit.ground_layers_depths
 
@@ -2081,7 +2092,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                     # local wall face area represented by this cell
                     A_face = max(2pi * unit.radius_at_row[h] * dz[h], eps(Float64))
 
-                    U = unit.thermal_transmission_barrel
+                    U = unit.thermal_transmission_barrels[k]
                     aP += U * A_face
                     rhs += U * A_face * unit.temperature_segments[k]
                 end
@@ -2195,7 +2206,7 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
 
     # bottom: UA-weighted mix of side (Teff[1]) and base (T_base)
     AbotU = unit.surface_area_bottom * unit.thermal_transmission_bottom
-    AsideBotU = unit.surface_area_barrel_segments[1] * unit.thermal_transmission_barrel
+    AsideBotU = unit.surface_area_barrel_segments[1] * unit.thermal_transmission_barrels[1]
     if (AbotU + AsideBotU) > 0
         Teff[1] = (AsideBotU * Teff[1] + AbotU * T_base) / (AsideBotU + AbotU)
     end
@@ -2203,7 +2214,7 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
     if unit.number_of_layer_above_ground == 0
         # top: UA-weighted mix of side (Teff[end]) and ambient temperature as lid is assumed to always face the ambient
         AtopU = unit.surface_area_lid * unit.thermal_transmission_lid
-        AsideTopU = unit.surface_area_barrel_segments[end] * unit.thermal_transmission_barrel
+        AsideTopU = unit.surface_area_barrel_segments[end] * unit.thermal_transmission_barrels[end]
         Teff[end] = (AsideTopU * Teff[end] + AtopU * unit.ambient_temperature) / (AsideTopU + AtopU)
     else
         # just use ambient temperature, no weighting required
