@@ -23,7 +23,8 @@ module EnergySystems
 export check_balances, Component, each, Grouping, link_output_with, perform_operations,
        output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
        default, plot_optional_figures_begin, plot_optional_figures_end,
-       reorder_operations_in_time_step
+       reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
+       create_secondary_name
 
 using ..Profiles
 using UUIDs
@@ -243,6 +244,9 @@ Base.@kwdef mutable struct SystemInterface
 
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
+
+    """Flag to indicate if the interface is a secondary interface."""
+    is_secondary_interface::Bool = false
 end
 
 """
@@ -407,7 +411,8 @@ function add!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_secondary_interface)
     end
 end
 
@@ -447,7 +452,8 @@ function sub!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_secondary_interface)
     end
 end
 
@@ -539,7 +545,8 @@ function set_max_energy!(interface::SystemInterface,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        interface.is_secondary_interface)
     else
         # 1-to-1 interface between two components.
         # Assuming that temperatures always match: This is valid as currently only heat pumps
@@ -1668,8 +1675,10 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # is a Vector{Grouping} here with the same order than given_medium.
     if given_media !== nothing
         for (idx, given_medium) in enumerate(given_media)
+            _, m_is_secondary_interface = trim_secondary_medium(given_medium)
             current_component = only(values(components[idx]))
-            connection = SystemInterface(; source=unit, target=current_component)
+            connection = SystemInterface(; source=unit, target=current_component,
+                                         is_secondary_interface=m_is_secondary_interface)
             unit.output_interfaces[given_medium] = connection
             if isa(current_component, Bus)
                 push!(current_component.input_interfaces, connection)
@@ -1683,11 +1692,13 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # source is a component and no media given, we have to look for the right medium for
     # a connection
     for out_medium in keys(unit.output_interfaces)
+        out_medium_trimmed, m_is_secondary_interface = trim_secondary_medium(out_medium)
         for component in each(components)
             if isa(component, Bus)
                 # link component to bus
-                if out_medium == component.medium
-                    connection = SystemInterface(; source=unit, target=component)
+                if out_medium_trimmed == component.medium
+                    connection = SystemInterface(; source=unit, target=component,
+                                                 is_secondary_interface=m_is_secondary_interface)
                     push!(component.input_interfaces, connection)
                     unit.output_interfaces[out_medium] = connection
                     break
@@ -1695,8 +1706,9 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
             else
                 # link component to component
                 for in_medium in keys(component.input_interfaces)
-                    if out_medium == in_medium
-                        connection = SystemInterface(; source=unit, target=component)
+                    if out_medium_trimmed == in_medium
+                        connection = SystemInterface(; source=unit, target=component,
+                                                     is_secondary_interface=m_is_secondary_interface)
                         unit.output_interfaces[out_medium] = connection
                         component.input_interfaces[in_medium] = connection
                         break
@@ -1705,6 +1717,76 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
             end
         end
     end
+end
+
+"""
+    trim_secondary_medium(out_medium::Symbol)
+
+Takes a Symbol and trims it if it starts with the defined prefix for secondary interfaces.
+Also returns a Bool indicating if the input has been trimmed or not.
+
+# Arguments
+`out_medium::Symbol`: The Symbol that should be trimmed
+# Returns
+- `Symbol`: The trimmed Symbol
+- `Bool`: Bool indicating if the medium has been trimmed (true) or not (false)
+"""
+function trim_secondary_medium(out_medium::Symbol)
+    prefix = "secondary_"
+    out_medium_string = String(out_medium)
+    if startswith(out_medium_string, prefix)
+        return Symbol(out_medium_string[(length(prefix) + 1):end]), true
+    else
+        return out_medium, false
+    end
+end
+
+"""
+    adjust_name_if_secondary(name::AbstractString, is_secondary_interface::Bool)
+
+Takes a string and returns the adjusted name if is_secondary_interface is true
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+`is_secondary_interface::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function adjust_name_if_secondary(name::AbstractString, is_secondary_interface::Bool)
+    if is_secondary_interface
+        return "secondary_" * name
+    else
+        return name
+    end
+end
+
+"""
+    create_secondary_name(name::AbstractString)
+
+Takes a string and returns the adjusted name for secondary connections
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function create_secondary_name(name::AbstractString)
+    return name * "secondary"
+end
+
+"""
+    adjust_name_if_secondary(name::Symbol, is_secondary_interface::Bool)
+
+Takes a Symbol and returns the adjusted Symbol if is_secondary_interface is true
+
+# Arguments
+`name::Symbol`: The Symbol that should be adapted
+`is_secondary_interface::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `Symbol`: The adjusted Symbol
+"""
+function adjust_name_if_secondary(name::Symbol, is_secondary_interface::Bool)
+    return Symbol(adjust_name_if_secondary(String(name), is_secondary_interface))
 end
 
 """
