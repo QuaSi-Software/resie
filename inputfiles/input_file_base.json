@@ -6,6 +6,7 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "csv_output_keys": "all_incl_flows",
+        "return_output_keys": "all_incl_flows",
         "output_plot": {
 			"1": {
 				"key":{"HeatPump":["m_heat:OUT"]},
@@ -81,6 +82,14 @@
             "medium": "m_power",
             "constant_power": 9999999999999999999999999999
         },
+        "ControlReserve": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "medium": "m_power",
+            "constant_power": 1e6
+        },
         "Grid_OUT": {
             "type": "GridConnection",
             "output_refs": [],
@@ -96,10 +105,29 @@
             "scale": 100000,
             "m_el_out": "m_power"
         },
-        "Heat_Source": {
+        "WindFarm": {
+            "type": "PVPlant",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
+            "scale": 1,
+            "m_el_out": "m_power"
+        },
+        "Heat_Source_HP": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
+            ],
+            "medium": "m_heat_source",
+            "constant_power": 9999999999,
+            "temperature_from_global_file": "temp_ambient_air",
+            "scale": 1
+        },
+            "Heat_Source_FB": {
+            "type": "GenericHeatSource",
+            "output_refs": [
+                "FuelBoiler"
             ],
             "medium": "m_heat_source",
             "constant_power": 9999999999,
@@ -132,47 +160,40 @@
             "optimal_plr": 0.5,
             "nr_optimisation_passes": 10
         },
-        "HeatingRod": {
-            "type": "FuelBoiler",
+        "FuelBoiler": {
+            "type": "HeatPump",
             "output_refs": [
                 "BUS_Heat"
             ],
-            "m_fuel_in": "m_power",
-            "m_heat_out": "m_heat",
             "power_th": 3.5e6,
-            "__OPTIONAL__": "",
-            "efficiency_fuel_in": "const:1.0",
-            "efficiency_heat_out": "const:1.0",
-            "linear_interface": "heat_out",
-            "min_power_fraction": 0.1,
-            "output_temperature": 90.0
-        },
-        "BUS_Heat": {
-            "type": "Bus",
-            "medium": "m_heat",
-            "connections": {
-                "input_order": [
-                    "HeatPump",
-                    "HeatingRod",
-                    "BufferTank"
-                ],
-                "output_order": [
-                    "Demand_Heat",
-					"BufferTank"
-                ],
-                "energy_flow": [
-                    [1, 1],
-					[1, 1],
-					[1, 0]
-                ]
-            }        
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_heat_source",
+            "m_el_in": "m_power",
+            "m_heat_out": "m_heat",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "const:1.0",
+            "bypass_cop": 15.0,
+            "min_power_function": "const:0.0",
+            "max_power_function": "const:1.0",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 1.0,
+            "power_losses_factor": 1.0,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": false,
+            "icing_coefficients": "3,-0.42,15,2,30",
+            "__OPTIONAL_OPTIMISATION_FOR_INVERTER_HP__": "",
+            "optimise_slice_dispatch": false,
+            "optimal_plr": 0.5,
+            "nr_optimisation_passes": 10
         },
         "BUS_Power": {
             "type": "Bus",
             "medium": "m_power",
             "connections": {
                 "input_order": [
+                    "ControlReserve",
                     "Photovoltaic",
+                    "WindFarm",
                     "Grid_IN",
                     "Battery"
                 ],
@@ -184,11 +205,37 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
+                    [1, 1, 0, 0, 0],
+                    [1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 0],
 					[0, 0, 1, 0, 0]
                 ]
             }          
+        },
+        "BUS_Heat": {
+            "type": "Bus",
+            "medium": "m_heat",
+            "connections": {
+                "input_order": [
+                    "HeatPump_primary",
+                    "FuelBoiler_primary",
+                    "HeatPump_secondary",
+                    "FuelBoiler_secondary",
+                    "BufferTank"
+                ],
+                "output_order": [
+                    "Demand_Heat",
+					"BufferTank"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 1],
+					[1, 1],
+					[1, 1],
+					[1, 0]
+                ]
+            }        
         },
         "BufferTank": {
             "type": "BufferTank",
@@ -230,7 +277,7 @@
             "type": "Demand",
             "output_refs": [],
             "medium": "m_heat",
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/Hafner/DEM_Heat_Waerme.prf",
+            "energy_profile_file_path": "./profiles/MA/germersheim_heat.prf",
             "constant_temperature": 90,
             "scale": 1000
         },
@@ -238,7 +285,7 @@
             "type": "Demand",
             "output_refs": [],
             "medium": "m_power",
-            "energy_profile_file_path": "C:/Users/jenter/Documents/ReSiE/resie/profiles/Hafner/DEM_Strom_ges.prf",
+            "energy_profile_file_path": "./profiles/MA/germersheim_power.prf",
             "scale": 1000
         }
         
