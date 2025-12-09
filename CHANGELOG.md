@@ -4,6 +4,21 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.2
+* Add secondary interfaces for the heat pump: 
+  * The heat pump thermal output can now provide a secondary interface (`m_heat_out_secondary`) to the same heat bus as the primary output interface (`m_heat_out`).
+  * Both outputs appear as separate bus inputs (e.g. `HP_01` and `HP_01#secondary`) at the bus and can be ordered in `input_order` to realise strategies like: “PV-driven heat first, other bus inputs next, grid-driven heat last”. This also works dynamically and for proxy busses.
+  * If a component has a secondary interface, a potential step is always added ahead of its produce to ensure correct calculation.
+  * **Beta:** only supported for the heat pump’s thermal output and may not work for all control-module / system combinations.
+* Bugfix in heat pump: can now operate with COP = 1.0 
+* Add new scenario `secondary_interfaces` to illustrate the functionality
+
+### Version 0.13.1
+* Change use of paths to be relative to a configurable base path instead of relying on paths relative to the CWD
+* Fix run registry accumulating simulation runs and the CLI not removing runs after finishing them
+* Move setting the global logger out of Resie_Logger into the code calling the logger
+  * This is required because some use of ReSiE does not want to use a global logger
+
 ### Version 0.13.0
 * Rename BoundedSupply to FlexibleSupply and BoundedSink to FlexibleSink as well as renaming the system functions bounded_source and bounded_sink to flexible_source and flexible_sink
 * Clarify some terms in the code, doc blocks and comments in regard to the use of "order of operations" and "step"

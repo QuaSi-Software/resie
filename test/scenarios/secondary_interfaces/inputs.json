@@ -1,0 +1,177 @@
+{    "io_settings": {
+        "csv_output_file": "./test/scenarios/secondary_interfaces/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/secondary_interfaces/auxiliary_info.md",
+        "sankey_plot_file": "./test/scenarios/secondary_interfaces/sankey_plot.html",
+        "sankey_plot": "default",
+        "csv_output_keys": "nothing",
+        "output_plot_file": "./test/scenarios/secondary_interfaces/output_plot.html",
+        "output_plot": "all_incl_flows"
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds"
+    },
+    "components": {
+        "DEM_1": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "constant_demand": 10,
+            "constant_temperature": 50
+        },
+        "DEM_2": {
+            "type": "Demand",
+            "medium": "m_h_w_ht1",
+            "output_refs": [],
+            "constant_demand": 20,
+            "constant_temperature": 50
+        },
+        "BFT_01": {
+            "type": "BufferTank",
+            "medium": "m_h_w_ht1",
+            "output_refs": [
+                "BUS_TH"
+            ],
+            "model_type": "ideally_stratified",
+            "capacity": 500,
+            "initial_load": 0.5,
+            "high_temperature": 50.0
+        },
+        "SRC_LT": {
+            "type": "FlexibleSupply",
+            "medium": "m_h_w_lt1",
+            "output_refs": [
+                "HP_01"
+            ],
+            "constant_power": 100,
+            "constant_temperature": 10
+        },
+        "SRC_PV_01": {
+            "type": "FlexibleSupply",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "BUS_EL"
+            ],
+            "constant_power": 3
+        },
+        "SRC_PV_02": {
+            "type": "FlexibleSupply",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "BUS_EL"
+            ],
+            "constant_power": 2
+        },
+        "SRC_GRID": {
+            "type": "GridConnection",
+            "medium": "m_e_ac_230v",
+            "output_refs": [
+                "BUS_EL"
+            ],
+            "is_source": true
+        },
+        "BUS_EL": {
+            "type": "Bus",
+            "medium": "m_e_ac_230v",
+            "connections": {
+                "input_order": [
+                    "SRC_PV_01",
+                    "SRC_PV_02",
+                    "SRC_GRID"
+                ],
+                "output_order": [
+                    "HP_01",
+                    "BOILER"
+                ],
+                "energy_flow": [
+                    [ 1, 1 ],
+                    [ 1, 1 ],
+                    [ 1, 1 ]
+                ]
+            }
+        },
+        "BUS_TH": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "HP_01",
+                    "BFT_01",
+                    "HP_01#secondary"
+                ],
+                "output_order": [
+                    "DEM_1",
+                    "BUS_TH_2",
+                    "BFT_01"
+                ],
+                "energy_flow": [
+                    [1, 1, 1],
+                    [1, 1, 1],
+                    [1, 1, 0]
+                ]
+            }
+        },
+        "BUS_TH_2": {
+            "type": "Bus",
+            "medium": "m_h_w_ht1",
+            "connections": {
+                "input_order": [
+                    "BOILER",                    
+                    "BUS_TH",
+                    "BOILER#secondary"                    
+                ],
+                "output_order": [
+                    "DEM_2"
+                ],
+                "energy_flow": [
+                    [1],
+                    [1],
+                    [1]
+                ]
+            }
+        },
+        "HP_01": {
+            "type": "HeatPump",
+            "output_refs": {
+                "m_heat_out": "BUS_TH",
+                "m_heat_out_secondary": "BUS_TH"
+            },
+            "has_secondary_interface": true,
+            "primary_el_sources": ["SRC_PV_01", "SRC_PV_02"],
+            "secondary_el_sources": ["SRC_GRID"],
+            "power_th": 16,
+            "cop_function": "carnot:0.3",
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
+        },
+        "BOILER": {
+            "type": "HeatPump",
+            "output_refs": {
+                "m_heat_out": "BUS_TH_2",
+                "m_heat_out_secondary": "BUS_TH_2"
+            },
+            "has_secondary_interface": true,
+            "primary_el_sources": ["SRC_PV_01", "SRC_PV_02"],
+            "secondary_el_sources": ["SRC_GRID"],
+            "power_th": 9000,
+            "cop_function": "const:1.0",
+            "min_power_function": "const:0.0",
+            "power_losses_factor": 1.0,
+            "heat_losses_factor": 1.0
+        },
+        "SRC_LT2": {
+            "type": "FlexibleSupply",
+            "medium": "m_h_w_lt1",
+            "output_refs": [
+                "BOILER"
+            ],
+            "constant_power": 100,
+            "constant_temperature": 10
+        }
+    }
+}

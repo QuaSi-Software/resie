@@ -88,11 +88,17 @@ function get_output_keys(io_settings::AbstractDict{String,<:Any},
                 temp_dict_incl_flows = Dict{String,Any}()
                 for output_val in output_vals
                     if startswith(output_val, "EnergyFlow")
-                        key = String(unit[2].medium)
-                        if haskey(temp_dict_incl_flows, key)
-                            push!(temp_dict_incl_flows[key], output_val[12:end])
+                        if startswith(output_val, create_secondary_name("EnergyFlow"))
+                            key = adjust_name_if_secondary(String(unit[2].medium), true)
+                            nr_skip = 2 + length(create_secondary_name("EnergyFlow"))
                         else
-                            temp_dict_incl_flows[key] = [output_val[12:end]]
+                            key = String(unit[2].medium)
+                            nr_skip = 12
+                        end
+                        if haskey(temp_dict_incl_flows, key)
+                            push!(temp_dict_incl_flows[key], output_val[nr_skip:end])
+                        else
+                            temp_dict_incl_flows[key] = [output_val[nr_skip:end]]
                         end
                     elseif startswith(output_val, "TemperatureFlow")
                         # do nothing, temperature are added in output_keys()
@@ -225,12 +231,12 @@ function get_interface_information(components::Grouping)::Tuple{Int64,Vector{Any
                 push!(output_targetnames_sankey, each_outputinterface.target.uac)
 
                 # get name of medium
-                if isdefined(each_outputinterface.target, :medium)
+                if !(medium === nothing)
+                    push!(medium_of_interfaces, medium)
+                elseif isdefined(each_outputinterface.target, :medium)
                     push!(medium_of_interfaces, each_outputinterface.target.medium)
                 elseif isdefined(each_outputinterface.source, :medium)
                     push!(medium_of_interfaces, each_outputinterface.source.medium)
-                elseif !(medium === nothing)
-                    push!(medium_of_interfaces, medium)
                 else
                     @warn "The name of the medium was not detected. This may lead to wrong colouring in Sankey plot."
                 end
@@ -325,8 +331,18 @@ as this transformation has to be done only once at the beginning.
 function output_keys(components::Grouping, from_config::AbstractDict{String,Any})::Vector{EnergySystems.OutputKey}
     outputs = Vector{EnergySystems.OutputKey}()
 
-    all_current_media = String.(unique([bus.medium
-                                        for bus in values(components) if bus.sys_function === EnergySystems.sf_bus]))
+    all_current_media = []
+    for component in values(components)
+        if component.sys_function === EnergySystems.sf_bus
+            push!(all_current_media, String(component.medium))
+            for inface in component.input_interfaces
+                if inface.is_secondary_interface
+                    push!(all_current_media, adjust_name_if_secondary(String(component.medium), true))
+                end
+            end
+        end
+    end
+    all_current_media = unique(all_current_media)
 
     for key in keys(from_config)
         if key in keys(components)
@@ -363,17 +379,18 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 in_uac, out_uac = split(value_key, "->")
                 for bus in [unit for unit in values(components) if unit.sys_function === EnergySystems.sf_bus]
                     # consider only proxy busses or busses without proxies and busses with correct media
-                    if bus.proxy === nothing && bus.medium == medium
+                    medium_trimmed, _ = trim_secondary_medium(medium)
+                    if bus.proxy === nothing && bus.medium == medium_trimmed
                         # check if input and output exists
                         if in_uac in keys(bus.balance_table_inputs) && out_uac in keys(bus.balance_table_outputs)
-                            output_key = "EnergyFlow " * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
-                            output_key = "TemperatureFlow " * value_key
-                            push!(outputs, EnergySystems.OutputKey(; unit=bus,
-                                                                   medium=medium,
-                                                                   value_key=output_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="EnergyFlow " * value_key))
+                            push!(outputs,
+                                  EnergySystems.OutputKey(; unit=bus,
+                                                          medium=medium,
+                                                          value_key="TemperatureFlow " * value_key))
                             success = true
                             break
                         end
@@ -405,7 +422,7 @@ function reset_file(filepath::String,
                     output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
                     weather_data_keys::Union{Nothing,Vector{String}},
                     csv_time_unit::String)
-    open(abspath(filepath), "w") do file_handle
+    open(filepath, "w") do file_handle
         if csv_time_unit == "seconds"
             time_unit = "[s]"
         elseif csv_time_unit == "minutes"
@@ -452,7 +469,7 @@ function write_to_file(filepath::String,
                        weather_data_keys::Union{Nothing,Vector{String}},
                        sim_params::Dict{String,Any},
                        csv_time_unit::String)
-    open(abspath(filepath), "a") do file_handle
+    open(filepath, "a") do file_handle
         if csv_time_unit == "seconds"
             time = sim_params["time_since_output"]
         elseif csv_time_unit == "minutes"
@@ -522,7 +539,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
     # export order of operations
     if default(project_config["io_settings"], "auxiliary_info", false)
         aux_info_file_path = default(project_config["io_settings"], "auxiliary_info_file", "./output/auxiliary_info.md")
-        open(abspath(aux_info_file_path), "w") do file_handle
+        open(sim_params["run_path"](aux_info_file_path), "w") do file_handle
             # write base order (from input or calculated)
             write(file_handle, "# Order of operations\n")
             write(file_handle, listify_operations(order_of_operations))
@@ -545,12 +562,14 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
             end
         end
 
-        @info "Auxiliary info dumped to file $(aux_info_file_path)"
+        @info "Auxiliary info dumped to file $(sim_params["run_path"](aux_info_file_path))"
     end
 
     # plot additional figures potentially available from components after initialisation
     if default(project_config["io_settings"], "auxiliary_plots", false)
-        aux_plots_output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
+        aux_plots_output_path = sim_params["run_path"](default(project_config["io_settings"],
+                                                               "auxiliary_plots_path",
+                                                               "./output/"))
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
         component_list = []
         for component in components
@@ -785,9 +804,9 @@ function create_profile_line_plots(outputs_plot_data::Union{Nothing,Matrix{Float
 
     p = plot(traces, layout)
 
-    file_path = default(project_config["io_settings"],
-                        "output_plot_file",
-                        "./output/output_plot.html")
+    file_path = sim_params["run_path"](default(project_config["io_settings"],
+                                               "output_plot_file",
+                                               "./output/output_plot.html"))
     savefig(p, file_path)
 end
 
@@ -806,7 +825,8 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                        output_all_values::Matrix{Float64},
                        medium_of_interfaces::Vector{Any},
                        nr_of_interfaces::Int64,
-                       io_settings::AbstractDict{String,Any})
+                       io_settings::AbstractDict{String,Any},
+                       sim_params::Dict{String,Any})
 
     # sum up data of each interface
     output_all_value_sum = zeros(Float64, nr_of_interfaces)
@@ -944,6 +964,6 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                     font_size=14))
 
     # save plot
-    file_path = default(io_settings, "sankey_plot_file", "./output/output_sankey.html")
+    file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
     savefig(p, file_path)
 end
