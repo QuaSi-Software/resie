@@ -67,11 +67,10 @@ mutable struct CM_StorageDriven <: ControlModule
 
         return new("storage_driven", params, state_machine)
     end
-
-    function CM_StorageDriven()
-        return new("storage_driven", Dict{String,Any}(), StateMachine())
-    end
 end
+
+# method for control module name on type-level
+control_module_name(::Type{CM_StorageDriven})::String = "storage_driven"
 
 function has_method_for(mod::CM_StorageDriven, func::ControlModuleFunction)::Bool
     return func == cmf_upper_plr_limit

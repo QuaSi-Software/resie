@@ -41,6 +41,18 @@ function get_run(id::UUID)::SimulationRun
 end
 
 """
+    close_run(id)
+
+Closes the given run, removing it from the run registry.
+
+# Args
+- `id:UUID`: The ID of the run
+"""
+function close_run(id::UUID)
+    delete!(current_runs, id)
+end
+
+"""
 Custom error handler for exception "InputError".
 Call with throw(InputError)
 """
@@ -122,6 +134,17 @@ function get_simulation_params(project_config::AbstractDict{AbstractString,Any})
         return wh * SECONDS_PER_HOUR / time_step
     end
 
+    # add helper function for using paths, absolute or relative to the run base path
+    if haskey(project_config["io_settings"], "base_path")
+        run_base_path = abspath(project_config["io_settings"]["base_path"])
+    else
+        run_base_path = abspath(joinpath(dirname(@__FILE__), ".."))
+    end
+    sim_params["run_path"] = function (path)
+        return isabspath(path) ? path : abspath(joinpath(run_base_path, path))
+    end
+
+    # load weather profiles accesible for all components
     weather_file_path = default(project_config["simulation_parameters"],
                                 "weather_file_path",
                                 nothing)
@@ -151,7 +174,7 @@ Construct and prepare parameters, energy system components and the order of oper
 # Returns
 -`Dict{String,Any}`: Simulation parameters
 -`Grouping`: The constructed energy system components
--`StepInstructions`: Order of operations
+-`OrderOfOperations`: Order of operations
 """
 function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID::UUID)
     sim_params = get_simulation_params(project_config)
@@ -160,15 +183,15 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
     components = load_components(project_config["components"], sim_params)
 
     if haskey(project_config, "order_of_operation") && length(project_config["order_of_operation"]) > 0
-        step_order = load_order_of_operations(project_config["order_of_operation"], components)
+        operations = load_order_of_operations(project_config["order_of_operation"], components)
         @info "The order of operations was successfully imported from the input file.\n" *
               "Note that the order of operations has a major impact on the simulation " *
               "result and should only be changed by experienced users!"
     else
-        step_order = calculate_order_of_operations(components)
+        operations = calculate_order_of_operations(components)
     end
 
-    return sim_params, components, step_order
+    return sim_params, components, operations
 end
 
 """
@@ -180,12 +203,12 @@ Performs the simulation as loop over time steps and records outputs.
 -`project_config::Dict{AbstractString,Any}`: The project config
 -`sim_params::Dict{String,Any}`: Simulation parameters
 -`components::Grouping`: The energy system components
--`step_order::StepInstructions`:: Order of operations
+-`operations::OrderOfOperations`:: Order of operations
 """
 function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              sim_params::Dict{String,Any},
                              components::Grouping,
-                             step_order::StepInstructions)
+                             operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
     output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
     weather_data_keys = get_weather_data_keys(sim_params)
@@ -215,7 +238,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
     # reset CSV file
     if do_write_CSV
-        reset_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        reset_file(sim_params["run_path"](csv_output_file_path),
+                   output_keys_to_CSV,
+                   weather_CSV_keys,
+                   csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -232,9 +258,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
 
     # export order of operation and other additional info like optional plots
-    dump_auxiliary_outputs(project_config, components, step_order, sim_params)
+    dump_auxiliary_outputs(project_config, components, operations, sim_params)
 
-    @info "-- Start step loop"
+    @info "-- Start time step loop"
     if sim_params["start_date_output"] == sim_params["start_date"]
         @info "-- No preheating activated. Starting output from beginning."
     else
@@ -251,8 +277,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             @info "-- Preheating completed. Starting output now."
         end
 
-        # perform the simulation
-        perform_steps(components, step_order, sim_params)
+        operations_adjusted = reorder_operations_in_time_step(components, operations, sim_params)
+        perform_operations(components, operations_adjusted, sim_params)
 
         if do_output
             # check if any component was not balanced
@@ -268,7 +294,11 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             # This is currently done in every time step to keep data even if 
             # an error occurs.
             if do_write_CSV
-                write_to_file(csv_output_file_path, output_keys_to_CSV, weather_CSV_keys, sim_params, csv_time_unit)
+                write_to_file(sim_params["run_path"](csv_output_file_path),
+                              output_keys_to_CSV,
+                              weather_CSV_keys,
+                              sim_params,
+                              csv_time_unit)
             end
 
             # get the energy transported through each interface in every timestep for Sankey
@@ -305,7 +335,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             start = now()
         end
     end
-    @info "-- Finished step loop"
+    @info "-- Finished time step loop"
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
@@ -318,7 +348,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         filepath = default(project_config["io_settings"],
                            "output_plot_file",
                            "./output/output_plot.html")
-        @info "Line plot created and saved to $(filepath)"
+        @info "Line plot created and saved to $(sim_params["run_path"](filepath))"
     end
 
     # create Sankey diagram
@@ -328,15 +358,16 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                       output_interface_values,
                       medium_of_interfaces,
                       nr_of_interfaces,
-                      project_config["io_settings"])
+                      project_config["io_settings"],
+                      sim_params)
         filepath = default(project_config["io_settings"],
-                           "output_plot_file",
-                           "./output/output_plot.html")
-        @info "Sankey created and saved to $(filepath)"
+                           "sankey_plot_file",
+                           "./output/output_sankey.html")
+        @info "Sankey created and saved to $(sim_params["run_path"](filepath))"
     end
 
     if do_write_CSV
-        @info "CSV-file with outputs written to $(csv_output_file_path)"
+        @info "CSV-file with outputs written to $(sim_params["run_path"](csv_output_file_path))"
     end
 
     # plot additional figures potentially available from components after simulation
@@ -349,7 +380,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             end
         end
         if length(component_list) > 0
-            @info "(Further) auxiliary plots are saved to folder $(output_path) for the following components: " *
+            @info "(Further) auxiliary plots are saved to folder " *
+                  "$(sim_params["run_path"](output_path)) for the following components: " *
                   "$(join(component_list, ", "))"
         end
     end
@@ -362,10 +394,11 @@ Load a project from the given file and run the simulation with it.
 
 # Arguments
 - `filepath::String`: Filepath to the project config file.
+- `UUID`: The run ID used in the run registry
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function load_and_run(filepath::String)
+function load_and_run(filepath::String, run_ID::UUID)::Bool
     start = now()
     @info "---- Simulation setup ----"
     @info "-- Starting simulation at $(start)"
@@ -374,28 +407,34 @@ function load_and_run(filepath::String)
     project_config = nothing
 
     try
+        # we can't use run_path() here because that is only defined after loading the config
+        # in the first place. so we hope we've been given a valid path and forbid upwards
+        # path traversal for security reasons
+        if occursin("..", filepath)
+            @error "Project config filepath must not contain .. path traversal"
+            return false
+        end
         project_config = read_JSON(abspath(filepath))
     catch exc
         if isa(exc, MethodError)
-            @error "Could not parse project config file at $(filepath)"
+            @error "Could not parse project config file at $(abspath(filepath))"
             return false
         end
     end
 
     if project_config === nothing
-        @error "Could not find or parse project config file at $(filepath)"
+        @error "Could not find or parse project config file at $(abspath(filepath))"
         return false
     end
 
     @info "-- Now preparing inputs"
-    run_ID = uuid1()
-    sim_params, components, step_order = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, step_order)
+    sim_params, components, operations = prepare_inputs(project_config, run_ID)
+    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, step_order)
+    run_simulation_loop(project_config, sim_params, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     return true
 end

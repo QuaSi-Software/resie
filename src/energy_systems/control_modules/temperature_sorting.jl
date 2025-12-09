@@ -23,11 +23,10 @@ mutable struct CM_Temperature_Sorting <: ControlModule
 
         return new("temperature_sorting", params)
     end
-
-    function CM_Temperature_Sorting()
-        return new("temperature_sorting", Dict{String,Any}())
-    end
 end
+
+# method for control module name on type-level
+control_module_name(x::Type{CM_Temperature_Sorting})::String = "temperature_sorting"
 
 function has_method_for(mod::CM_Temperature_Sorting, func::ControlModuleFunction)::Bool
     return func == cmf_reorder_inputs || func == cmf_reorder_outputs

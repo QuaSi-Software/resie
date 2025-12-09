@@ -45,6 +45,9 @@ function test_profile_aggregation_two()
         "wh_to_watts" => function (w)
             return w * 2.0
         end,
+        "run_path" => function (path)
+            return path
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -88,6 +91,9 @@ function test_profile_aggregation_four()
         "wh_to_watts" => function (w)
             return w * 1.0
         end,
+        "run_path" => function (path)
+            return path
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -126,6 +132,9 @@ function test_profile_segmentation_half()
         end,
         "wh_to_watts" => function (w)
             return w * 8.0
+        end,
+        "run_path" => function (path)
+            return path
         end,
     )
 
@@ -206,6 +215,9 @@ function test_profile_segmentation_third()
         end,
         "wh_to_watts" => function (w)
             return w * 12.0
+        end,
+        "run_path" => function (path)
+            return path
         end,
     )
 
@@ -330,6 +342,9 @@ function test_profile_segmentation_half_linear_classic()
         "wh_to_watts" => function (w)
             return w * 8.0
         end,
+        "run_path" => function (path)
+            return path
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -409,6 +424,9 @@ function test_profile_segmentation_third_linear_classic()
         end,
         "wh_to_watts" => function (w)
             return w * 12.0
+        end,
+        "run_path" => function (path)
+            return path
         end,
     )
 
@@ -531,6 +549,9 @@ function test_profile_segmentation_half_linear_time_preserving()
         "wh_to_watts" => function (w)
             return w * 8.0
         end,
+        "run_path" => function (path)
+            return path
+        end,
     )
 
     components = Resie.load_components(components_config, simulation_parameters)
@@ -610,6 +631,9 @@ function test_profile_segmentation_third_linear_time_preserving()
         end,
         "wh_to_watts" => function (w)
             return w * 12.0
+        end,
+        "run_path" => function (path)
+            return path
         end,
     )
 

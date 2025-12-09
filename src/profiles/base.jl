@@ -91,11 +91,12 @@ mutable struct Profile
 
             repeat_profile = false
 
+            file_path = sim_params["run_path"](file_path)
             file_handle = nothing
             current_line = nothing
 
             try
-                file_handle = open(abspath(file_path), "r")
+                file_handle = open(file_path, "r")
                 for (line_idx, line) in enumerate(readlines(file_handle))
                     current_line = line_idx
                     line = strip(line)

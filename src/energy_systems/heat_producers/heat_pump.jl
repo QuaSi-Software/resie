@@ -27,7 +27,12 @@ mutable struct HeatPump <: Component
 
     m_el_in::Symbol
     m_heat_out::Symbol
+    m_heat_out_secondary::Symbol
     m_heat_in::Symbol
+
+    has_secondary_interface::Bool
+    primary_el_sources::Vector{String}
+    secondary_el_sources::Vector{String}
 
     model_type::String
 
@@ -70,9 +75,14 @@ mutable struct HeatPump <: Component
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
+        has_secondary_interface = default(config, "has_secondary_interface", false)
+        m_heat_out_secondary = Symbol(adjust_name_if_secondary(default(config, "m_heat_out_secondary", "m_h_w_ht1"),
+                                                               true))
+
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in])
+        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
 
         func_def = default(config, "cop_function", "carnot:0.4")
         constant_cop, cop_function = parse_cop_function(func_def)
@@ -110,15 +120,24 @@ mutable struct HeatPump <: Component
             throw(InputError)
         end
 
+        output_interfaces = InterfaceMap(m_heat_out => nothing)
+        if has_secondary_interface
+            output_interfaces[m_heat_out_secondary] = nothing
+        end
+
         return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
                    sf_transformer,
                    InterfaceMap(m_heat_in => nothing,
                                 m_el_in => nothing),
-                   InterfaceMap(m_heat_out => nothing),
+                   output_interfaces,
                    m_el_in,
                    m_heat_out,
+                   m_heat_out_secondary,
                    m_heat_in,
+                   has_secondary_interface,                       # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
+                   default(config, "primary_el_sources", []),     # electricity source(s) used for the primary heat output interface (only if has_secondary_interface)
+                   default(config, "secondary_el_sources", []),   # electricity source(s) used for the secondary heat output interface (only if has_secondary_interface)
                    model_type,
                    config["power_th"],
                    max_power_function,
@@ -162,16 +181,18 @@ Unless you're changing the code for heat pumps, this can be ignored entirely.
 """
 mutable struct HPEnergies
     potential_el_in::Floathing
+    potential_el_in_layered::Vector{<:Floathing}
     potentials_heat_in::Vector{<:Floathing}
     potentials_heat_out::Vector{<:Floathing}
     available_el_in::Float64
+    in_uacs_el::Vector{<:Stringing}
     available_heat_in::Vector{<:Floathing}
     available_heat_out::Vector{<:Floathing}
     max_usage_fraction::Float64
     in_indices::Vector{Integer}
     in_temps_min::Vector{<:Temperature}
     in_temps_max::Vector{<:Temperature}
-    in_uacs::Vector{<:Stringing}
+    in_uacs_heat::Vector{<:Stringing}
     out_indices::Vector{Integer}
     out_temps_min::Vector{<:Temperature}
     out_temps_max::Vector{<:Temperature}
@@ -201,7 +222,9 @@ mutable struct HPEnergies
         return new(0.0,
                    Vector{Floathing}(),
                    Vector{Floathing}(),
+                   Vector{Floathing}(),
                    0.0,
+                   Vector{Stringing}(),
                    Vector{Floathing}(),
                    Vector{Floathing}(),
                    0.0,
@@ -394,6 +417,25 @@ function initialise!(unit::HeatPump, sim_params::Dict{String,Any})
                           unload_storages(unit.controller, unit.m_el_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
                           load_storages(unit.controller, unit.m_heat_out))
+    if unit.has_secondary_interface
+        if unit.primary_el_sources == [] || unit.secondary_el_sources == []
+            @error "In heat pump $(unit.uac), a secondary interface is requested. Provide both `primary_el_sources` and " *
+                   "`secondary_el_sources` to specify which electricity source should be used for the secondary interface."
+        end
+        common = intersect(unit.primary_el_sources, unit.secondary_el_sources)
+        if !isempty(common)
+            @error "In heat pump $(unit.uac), a secondary interface is requested. The following uac(s) are both in " *
+                   "`primary_el_sources` and `secondary_el_sources`, but they need to be unique: $(common)"
+        end
+        if unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function !== sf_bus ||
+           unit.output_interfaces[unit.m_heat_out].target.sys_function !== sf_bus ||
+           unit.output_interfaces[unit.m_heat_out_secondary].target !== unit.output_interfaces[unit.m_heat_out].target
+            @error "In heat pump $(unit.uac), a secondary interface is requested. Then, for both output interfaces, " *
+                   "the same bus has to be connected, which is not the case!"
+        end
+        set_storage_transfer!(unit.output_interfaces[unit.m_heat_out_secondary],
+                              load_storages(unit.controller, unit.m_heat_out_secondary))
+    end
 end
 
 function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,Any})
@@ -418,10 +460,13 @@ function set_max_energies!(unit::HeatPump,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
+                           heat_out_secondary::Union{Floathing,Vector{<:Floathing}},
                            slices_heat_in_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            slices_heat_out_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
+                           slices_heat_out_secondary_temperature::Union{Temperature,Vector{<:Temperature}}=nothing,
                            purpose_uac_heat_in::Union{Stringing,Vector{Stringing}}=nothing,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
+                           purpose_uac_heat_out_secondary::Union{<:Stringing,Vector{<:Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
     set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -429,6 +474,11 @@ function set_max_energies!(unit::HeatPump,
                     purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
                     purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
+    if unit.has_secondary_interface
+        set_max_energy!(unit.output_interfaces[unit.m_heat_out_secondary], heat_out_secondary, nothing,
+                        slices_heat_out_secondary_temperature, purpose_uac_heat_out_secondary,
+                        has_calculated_all_maxima_heat_out)
+    end
 end
 
 """
@@ -519,7 +569,7 @@ function filter_by_transformer(energies::HPEnergies,
                                heat_in::Bool=true)::Vector{Floathing}
     components = get_run(sim_params["run_ID"]).components
     filtered = []
-    for (idx, uac) in enumerate(heat_in ? energies.in_uacs : energies.out_uacs)
+    for (idx, uac) in enumerate(heat_in ? energies.in_uacs_heat : energies.out_uacs)
         if uac !== nothing && components[uac].sys_function === sf_transformer
             if heat_in
                 push!(filtered, energies.potentials_heat_in[idx])
@@ -611,7 +661,7 @@ function handle_slice(unit::HeatPump,
                       available_heat_out::Floathing,
                       in_temp::Temperature,
                       out_temp::Temperature,
-                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature}
+                      plr::Float64)::Tuple{Floathing,Floathing,Floathing,Temperature,Temperature,Float64}
     # determine COP depending on three cases. a constant COP precludes the use of a bypass
     if unit.constant_cop !== nothing
         cop = unit.constant_cop * unit.plf_function(plr)
@@ -639,7 +689,11 @@ function handle_slice(unit::HeatPump,
     # calculate energies with the current cop
     # energies for current slice with potential heat in as basis
     used_heat_in = available_heat_in
-    used_el_in = used_heat_in / (cop - 1.0)
+    if cop == 1.0
+        used_el_in = available_el_in
+    else
+        used_el_in = used_heat_in / (cop - 1.0)
+    end
     used_heat_out = used_heat_in + used_el_in
 
     # check heat out as limiter
@@ -660,7 +714,8 @@ function handle_slice(unit::HeatPump,
             used_el_in,
             used_heat_out,
             in_temp,
-            out_temp)
+            out_temp,
+            cop)
 end
 
 """
@@ -730,16 +785,17 @@ function calculate_slices(unit::HeatPump,
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
         # we can skip calculation if there is no energy left to be distributed. this can
         # happen for example during potential calculations when another transformer has
-        # already used up all available energies
+        # already used up all available energies. Do not consider heat_in in process 
+        # to account for COP == 1.0.
         if energies.available_el_in < EPS ||
-           sum(energies.available_heat_in; init=0.0) < EPS ||
+           ((unit.cop == 0.0 || unit.cop > 1.0) && sum(energies.available_heat_in; init=0.0) < EPS) ||
            sum(energies.available_heat_out; init=0.0) < EPS
             # end of condition
             break
         end
 
         # apply restrictions of control modules for a slice
-        if !check_src_to_snk(unit.controller, energies.in_uacs[src_idx], energies.out_uacs[snk_idx])
+        if !check_src_to_snk(unit.controller, energies.in_uacs_heat[src_idx], energies.out_uacs[snk_idx])
             snk_idx += 1
             continue
         end
@@ -792,13 +848,14 @@ function calculate_slices(unit::HeatPump,
         used_el_in,
         used_heat_out,
         src_temperature,
-        snk_temperature = handle_slice(unit,
-                                       energies.available_el_in,
-                                       energies.available_heat_in[src_idx],
-                                       available_heat_out,
-                                       src_temperature,
-                                       snk_temperature,
-                                       plrs[plr_idx])
+        snk_temperature,
+        cop = handle_slice(unit,
+                           energies.available_el_in,
+                           energies.available_heat_in[src_idx],
+                           available_heat_out,
+                           src_temperature,
+                           snk_temperature,
+                           plrs[plr_idx])
 
         used_time = used_heat_out * 3600 / used_power
         energies.used_plrs[plr_idx] = used_heat_out / sim_params["watt_to_wh"](max_power)
@@ -806,7 +863,7 @@ function calculate_slices(unit::HeatPump,
         # finally all checks done, we add the slice and update remaining energies
         add_temp_slice!(energies, used_el_in, used_heat_in, used_heat_out,
                         src_temperature, snk_temperature,
-                        energies.in_uacs[src_idx],
+                        energies.in_uacs_heat[src_idx],
                         energies.out_uacs[snk_idx],
                         used_time)
 
@@ -822,13 +879,13 @@ function calculate_slices(unit::HeatPump,
         # layers have energy left, this was caused by the PLR of the slice being too low or
         # the heat pump being undersized. in either case we need to advance both indices so
         # we don't recalculate the same slice twice
-        if energies.available_heat_in[src_idx] >= EPS &&
+        if (energies.available_heat_in[src_idx] >= EPS && cop !== 1.0) &&
            energies.available_heat_out[snk_idx] >= EPS
             # end of condition
             src_idx += 1
             snk_idx += 1
         else
-            if energies.available_heat_in[src_idx] < EPS
+            if energies.available_heat_in[src_idx] < EPS && cop !== 1.0
                 src_idx += 1
             end
             if energies.available_heat_out[snk_idx] < EPS
@@ -927,10 +984,8 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
 
     # get electricity potential and reduce it by constant power draw (or however much
     # is available)
-    energies.potential_el_in = check_el_in(unit, sim_params)
-    energies.potential_el_in = energies.potential_el_in === nothing ?
-                               0.0 :
-                               energies.potential_el_in
+    energies.potential_el_in_layered, energies.in_uacs_el = check_el_in_layered(unit, sim_params)
+    energies.potential_el_in = sum(energies.potential_el_in_layered)
     unit.current_constant_loss = min(energies.potential_el_in,
                                      unit.constant_loss_energy)
     energies.potential_el_in -= unit.current_constant_loss
@@ -951,7 +1006,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         energies.potentials_heat_in,
         energies.in_temps_min,
         energies.in_temps_max,
-        energies.in_uacs = check_heat_in_layered(unit, sim_params)
+        energies.in_uacs_heat = check_heat_in_layered(unit, sim_params)
 
         energies.potentials_heat_out,
         energies.out_temps_min,
@@ -972,7 +1027,7 @@ function calculate_energies(unit::HeatPump, sim_params::Dict{String,Any})
         index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
         energies.in_temps_min = energies.in_temps_min[index]
         energies.in_temps_max = energies.in_temps_max[index]
-        energies.in_uacs = energies.in_uacs[index]
+        energies.in_uacs_heat = energies.in_uacs_heat[index]
         energies.potentials_heat_in = energies.potentials_heat_in[index]
 
         index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
@@ -1067,20 +1122,202 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0)
+        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
         return
     end
 
-    set_max_energies!(unit,
-                      energies.slices_el_in,
-                      energies.slices_heat_in,
-                      energies.slices_heat_out,
-                      energies.slices_heat_in_temperature,
-                      energies.slices_heat_out_temperature,
-                      energies.slices_heat_in_uac,
-                      energies.slices_heat_out_uac,
-                      energies.heat_in_has_inf_energy,
-                      energies.heat_out_has_inf_energy)
+    if unit.has_secondary_interface
+        # split slices regarding electricity source
+        primary, secondary = split_slices_primary_secondary(unit,
+                                                            energies.potential_el_in_layered,
+                                                            energies.in_uacs_el,
+                                                            unit.primary_el_sources,
+                                                            unit.secondary_el_sources,
+                                                            energies.slices_el_in,
+                                                            energies.slices_heat_out,
+                                                            energies.slices_heat_out_temperature,
+                                                            energies.slices_heat_out_uac,
+                                                            energies.heat_out_has_inf_energy,
+                                                            sim_params["epsilon"])
+
+        set_max_energies!(unit,
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          primary.slices_heat_out,
+                          secondary.slices_heat_out,
+                          energies.slices_heat_in_temperature,
+                          primary.slices_heat_out_temperature,
+                          secondary.slices_heat_out_temperature,
+                          energies.slices_heat_in_uac,
+                          primary.slices_heat_out_uac,
+                          secondary.slices_heat_out_uac,
+                          energies.heat_in_has_inf_energy,
+                          energies.heat_out_has_inf_energy)
+    else
+        set_max_energies!(unit,
+                          energies.slices_el_in,
+                          energies.slices_heat_in,
+                          energies.slices_heat_out,
+                          Float64[],
+                          energies.slices_heat_in_temperature,
+                          energies.slices_heat_out_temperature,
+                          Float64[],
+                          energies.slices_heat_in_uac,
+                          energies.slices_heat_out_uac,
+                          String[],
+                          energies.heat_in_has_inf_energy,
+                          energies.heat_out_has_inf_energy)
+    end
+end
+
+"""
+    split_slices_primary_secondary(unit, ...)
+
+Splits the heat pump output slices into "primary" and "secondary" groups based on the user-defined mapping of 
+the electricity sources to primary/secondary output interfaces.
+
+# Arguments
+- `unit::HeatPump`: The heat pump unit.
+- `potential_el_in_layered::Vector{Float64}`: Available electricity input as layer.
+- `in_uacs_el::Vector{String}`: UACs for each electricity input layer.
+- `primary_uac::Vector{String}`: UACs considered as "primary" sources.
+- `secondary_uac::Vector{String}`: UACs considered as "secondary" sources.
+- `slices_el_in::Vector{Floathing}`: Electricity used per output slice.
+- `slices_heat_out::Vector{Floathing}`: Heat output per slice.
+- `slices_heat_out_temperature::Vector{Floathing}`: Output temperature per slice.
+- `slices_heat_out_uac::Vector{Stringing}`: UACs for each heat output slice.
+- `heat_out_has_inf_energy::Bool`: Whether any output slice has infinite energy.
+- `epsilon::Float64`: Numerical tolerance for slice splitting.
+
+# Returns
+- `primary::NamedTuple`: Slices attributed to primary sources for the primary output interface, with fields:
+    - `slices_heat_out::Vector{Floathing}`
+    - `slices_heat_out_temperature::Vector{Floathing}`
+    - `slices_heat_out_uac::Vector{Stringing}`
+    - `source_uac_el::Vector{Stringing}`
+- `secondary::NamedTuple`: Slices attributed to secondary sources for the secondary output interface, with fields:
+    - `slices_heat_out::Vector{Floathing}`
+    - `slices_heat_out_temperature::Vector{Floathing}`
+    - `slices_heat_out_uac::Vector{Stringing}`
+    - `source_uac_el::Vector{Stringing}`
+"""
+function split_slices_primary_secondary(unit::HeatPump,
+                                        potential_el_in_layered::Vector{Float64},
+                                        in_uacs_el::Vector{String},
+                                        primary_uac::Vector{String},
+                                        secondary_uac::Vector{String},
+                                        slices_el_in::Vector{Floathing},
+                                        slices_heat_out::Vector{Floathing},
+                                        slices_heat_out_temperature::Vector{Floathing},
+                                        slices_heat_out_uac::Vector{Stringing},
+                                        heat_out_has_inf_energy::Bool,
+                                        epsilon::Float64)
+    # convenience
+    n_inputs = length(potential_el_in_layered)
+
+    # --- outputs --------------------------------------------------------------
+    T = eltype(slices_el_in)
+    primary_heat_out = T[]
+    primary_heat_out_temperature = T[]
+    primary_heat_out_uac_out = Stringing[]
+    primary_el_source_uac = Stringing[]   # from in_uacs_el
+
+    secondary_heat_out = T[]
+    secondary_heat_out_temperature = T[]
+    secondary_heat_out_uac_out = Stringing[]
+    secondary_el_source_uac = Stringing[]   # from in_uacs_el
+
+    # --- main loop -----------------------------------------------------------
+    layer = 1
+    remaining = layer <= n_inputs ? potential_el_in_layered[layer] : 0.0
+
+    for j in eachindex(slices_heat_out)
+        if heat_out_has_inf_energy
+            # for each heat_out entry, start from the beginning of the layers
+            # here, only one slice_el_in is given, but it has to serve multiple slices_heat_out
+            slice_total = slices_el_in[1]
+            layer = 1
+            remaining = layer <= n_inputs ? potential_el_in_layered[layer] : 0.0
+        else
+            slice_total = slices_el_in[j]
+        end
+
+        # skip zero slices to avoid division by zero
+        if slice_total <= epsilon
+            continue
+        end
+
+        slice_left = slice_total
+
+        while slice_left > epsilon
+            # if layer is exhausted, move to next
+            while layer <= n_inputs && remaining ≤ epsilon
+                layer += 1
+                if layer <= n_inputs
+                    remaining = potential_el_in_layered[layer]
+                end
+            end
+
+            # take as much as we can from current layer
+            take = min(slice_left, remaining)
+            ratio = take / slice_total         # in (0,1]
+
+            src = in_uacs_el[layer]
+            is_primary = src in primary_uac
+            is_secondary = src in secondary_uac
+
+            if is_primary && is_secondary
+                @error "In heat pump $(unit.uac), the source '$src' is in neither primary_uac nor secondary_uac."
+            end
+
+            # scale energy quantities
+            heat_out_piece = slices_heat_out[j] * ratio
+
+            # metadata copied 1:1
+            Tout = slices_heat_out_temperature[j]
+            uac_out = slices_heat_out_uac[j]
+
+            if is_primary
+                push!(primary_heat_out, heat_out_piece)
+                push!(primary_heat_out_temperature, Tout)
+                push!(primary_heat_out_uac_out, uac_out)
+                push!(primary_el_source_uac, src)
+            else
+                push!(secondary_heat_out, heat_out_piece)
+                push!(secondary_heat_out_temperature, Tout)
+                push!(secondary_heat_out_uac_out, uac_out)
+                push!(secondary_el_source_uac, src)
+            end
+
+            # update remaining and slice_left
+            slice_left -= take
+            remaining -= take
+        end
+    end
+
+    if isempty(primary_heat_out)
+        push!(primary_heat_out, 0.0)
+        push!(primary_heat_out_temperature, nothing)
+        push!(primary_heat_out_uac_out, nothing)
+        push!(primary_el_source_uac, nothing)
+    end
+    primary = (slices_heat_out=primary_heat_out,
+               slices_heat_out_temperature=primary_heat_out_temperature,
+               slices_heat_out_uac=primary_heat_out_uac_out,
+               source_uac_el=primary_el_source_uac)
+
+    if isempty(secondary_heat_out)
+        push!(secondary_heat_out, 0.0)
+        push!(secondary_heat_out_temperature, nothing)
+        push!(secondary_heat_out_uac_out, nothing)
+        push!(secondary_el_source_uac, nothing)
+    end
+    secondary = (slices_heat_out=secondary_heat_out,
+                 slices_heat_out_temperature=secondary_heat_out_temperature,
+                 slices_heat_out_uac=secondary_heat_out_uac_out,
+                 source_uac_el=secondary_el_source_uac)
+
+    return primary, secondary
 end
 
 function process(unit::HeatPump, sim_params::Dict{String,Any})
@@ -1090,10 +1327,10 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
     heat_out = sum(energies.slices_heat_out; init=0.0)
 
     if heat_out < sim_params["epsilon"]
-        # due to constant losses we are guarranteed to have an electricity slice, though
+        # due to constant losses we are guaranteed to have an electricity slice, though
         # it might be zero. we also need to set the max_energy values to zero for the
         # heat input and output, as the sub! and add! methods do that when called
-        set_max_energies!(unit, el_in, 0.0, 0.0)
+        set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -1102,11 +1339,38 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
              energies.slices_heat_in_temperature,
              [nothing for _ in energies.slices_heat_in_temperature],
              energies.slices_heat_in_uac)
-        add!(unit.output_interfaces[unit.m_heat_out],
-             energies.slices_heat_out,
-             [nothing for _ in energies.slices_heat_out_temperature],
-             energies.slices_heat_out_temperature,
-             energies.slices_heat_out_uac)
+
+        if unit.has_secondary_interface
+            # split slices regarding electricity source
+            primary, secondary = split_slices_primary_secondary(unit,
+                                                                energies.potential_el_in_layered,
+                                                                energies.in_uacs_el,
+                                                                unit.primary_el_sources,
+                                                                unit.secondary_el_sources,
+                                                                energies.slices_el_in,
+                                                                energies.slices_heat_out,
+                                                                energies.slices_heat_out_temperature,
+                                                                energies.slices_heat_out_uac,
+                                                                energies.heat_out_has_inf_energy,
+                                                                sim_params["epsilon"])
+
+            add!(unit.output_interfaces[unit.m_heat_out],
+                 primary.slices_heat_out,
+                 [nothing for _ in primary.slices_heat_out_temperature],
+                 primary.slices_heat_out_temperature,
+                 primary.slices_heat_out_uac)
+            add!(unit.output_interfaces[unit.m_heat_out_secondary],
+                 secondary.slices_heat_out,
+                 [nothing for _ in secondary.slices_heat_out_temperature],
+                 secondary.slices_heat_out_temperature,
+                 secondary.slices_heat_out_uac)
+        else
+            add!(unit.output_interfaces[unit.m_heat_out],
+                 energies.slices_heat_out,
+                 [nothing for _ in energies.slices_heat_out_temperature],
+                 energies.slices_heat_out_temperature,
+                 energies.slices_heat_out_uac)
+        end
     end
     # calculate losses, effective COP and mixing temperatures with the final values of
     # processed energies
@@ -1143,18 +1407,23 @@ function reset(unit::HeatPump)
 end
 
 function output_values(unit::HeatPump)::Vector{String}
-    return [string(unit.m_el_in) * ":IN",
-            string(unit.m_heat_in) * ":IN",
-            string(unit.m_heat_out) * ":OUT",
-            "COP",
-            "Effective_COP",
-            "Avg_PLR",
-            "Time_active",
-            "MixingTemperature_Input",
-            "MixingTemperature_Output",
-            "Losses_power",
-            "Losses_heat",
-            "LossesGains"]
+    output_vals = [string(unit.m_el_in) * ":IN",
+                   string(unit.m_heat_in) * ":IN",
+                   string(unit.m_heat_out) * ":OUT"]
+    if unit.has_secondary_interface
+        push!(output_vals, string(unit.m_heat_out_secondary) * ":OUT")
+    end
+    append!(output_vals,
+            ["COP",
+             "Effective_COP",
+             "Avg_PLR",
+             "Time_active",
+             "MixingTemperature_Input",
+             "MixingTemperature_Output",
+             "Losses_power",
+             "Losses_heat",
+             "LossesGains"])
+    return output_vals
 end
 
 function output_value(unit::HeatPump, key::OutputKey)::Float64

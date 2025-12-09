@@ -23,7 +23,7 @@ function get_energy_system_fuel_boiler_direct()
             "power_th" => 20000,
         ),
         "TST_DEM_01" => Dict{String,Any}(
-            "type" => "BoundedSink",
+            "type" => "FlexibleSink",
             "output_refs" => [],
             "medium" => "m_h_w_ht1",
             "constant_power" => 20000,
@@ -105,7 +105,7 @@ end
 function get_energy_system_heat_pump_cascade()
     components_config = Dict{String,Any}(
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "output_refs" => ["TST_HP_01"],
             "is_source" => true,
             "medium" => "m_h_w_lt1",

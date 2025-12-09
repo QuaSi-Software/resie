@@ -266,8 +266,9 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                                       "L_configuration" => "L_configurations_5m_v1.0.json"
                                       )
 
-    libfile_path = "src/energy_systems/heat_sources/g-function_library_1.0/" *
-                   probe_field_configurations[unit.probe_field_geometry]
+    libfile_path = joinpath(@__DIR__,
+                            "g-function_library_1.0/",
+                            probe_field_configurations[unit.probe_field_geometry])
     if !isfile(libfile_path)
         @error "The library for the geothermal probe field \"$(unit.uac)\" could not be found at $libfile_path"
         throw(InputError)
@@ -291,7 +292,11 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                                                       libfile_path)
     else
         # Get pre-calculated g-function values from custom input file
-        g_values_long_term, log_time_stamp, number_of_probes, probe_coordinates = get_g_values_from_file(unit)
+        g_values_long_term,
+        log_time_stamp,
+        number_of_probes,
+        probe_coordinates = get_g_values_from_file(unit,
+                                                   sim_params)
     end
 
     # Change normalized time values to absolute time and round to fit into simulation step width.
@@ -444,7 +449,7 @@ function round_to_simulation_step_width(grid_points_time::Vector{Float64}, simul
 end
 
 """
-   	get_g_values_from_file(unit::GeothermalProbes)
+    get_g_values_from_file(unit::GeothermalProbes, sim_params)
 
 Read out g-function values from given profile file.
 The file needs to have the following structure (without the notes!):
@@ -469,22 +474,24 @@ The second column, separately by a semicolon, holds the g-function values.
 Note that the number of probes has to be given as well in the header.
 
 """
-function get_g_values_from_file(unit::GeothermalProbes)
+function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,Any})
     num_probes = 0
     g_func_vals = Float64[]
     ln_time_normalized = Float64[]
     reading_data = false
+    file_path = sim_params["run_path"](unit.g_function_file_path)
 
     try
-        open(unit.g_function_file_path, "r") do file
+        open(file_path, "r") do file
             for line in eachline(file)
                 line = strip(line)
                 if occursin("number_of_probes:", line)
                     num_probes = try
                         parse(Int, split(line, ":")[2])
                     catch e
-                        @error "The number_of_probes could not be read out of the file with given g-function values for the " *
-                               "\"$(unit.uac)\" at $(unit.g_function_file_path). Please specify them in the header section."
+                        @error "The number_of_probes could not be read out of the file with " *
+                               "given g-function values for the \"$(unit.uac)\" at " *
+                               "$(file_path). Please specify them in the header section."
                         throw(InputError)
                     end
                     continue
@@ -504,7 +511,7 @@ function get_g_values_from_file(unit::GeothermalProbes)
                             push!(g_func_vals, parse(Float64, strip(values[2])))
                         catch e
                             @error "Invalid data line \"$line\" in the file with given g-function values for the " *
-                                   "\"$(unit.uac)\" at $(unit.g_function_file_path). The following error occurred: $e. " *
+                                   "\"$(unit.uac)\" at $(file_path). The following error occurred: $e. " *
                                    "Please check the data given in the file."
                             throw(InputError)
                         end
@@ -515,24 +522,24 @@ function get_g_values_from_file(unit::GeothermalProbes)
 
         if num_probes == 0
             @error "The number_of_probes could not be read out of the file with given g-function values for the " *
-                   "\"$(unit.uac)\" at $(unit.g_function_file_path). Please specify them in the header section."
+                   "\"$(unit.uac)\" at $(file_path). Please specify them in the header section."
             throw(InputError)
         elseif !reading_data || length(ln_time_normalized) == 0 || length(g_func_vals) == 0
             @error "No data could not be read out of the file with given g-function values for the " *
-                   "\"$(unit.uac)\" at $(unit.g_function_file_path). Please make sure the data starts with ***."
+                   "\"$(unit.uac)\" at $(file_path). Please make sure the data starts with ***."
             throw(InputError)
         else
-            @info "Successfully read out the g-function values from $(unit.g_function_file_path) for \"$(unit.uac)\"."
+            @info "Successfully read out the g-function values from $(file_path) for \"$(unit.uac)\"."
             return g_func_vals, ln_time_normalized, num_probes, nothing
         end
     catch e
         if isa(e, SystemError)
             @error "Could not open the file with given g-function values for the \"$(unit.uac)\" at " *
-                   "$(unit.g_function_file_path). The following error occurred: $e"
+                   "$(file_path). The following error occurred: $e"
             throw(InputError)
         else
             @error "An error occurred reading the file with given g-function values for the \"$(unit.uac)\" at " *
-                   "$(unit.g_function_file_path). The following error occurred: $e"
+                   "$(file_path). The following error occurred: $e"
             throw(InputError)
         end
     end

@@ -20,9 +20,11 @@ to the simulation as a whole as well as provide functionality on groups of compo
 """
 module EnergySystems
 
-export check_balances, Component, each, Grouping, link_output_with, perform_steps,
-       output_values, output_value, StepInstruction, StepInstructions, calculate_energy_flow,
-       highest, default, plot_optional_figures_begin, plot_optional_figures_end
+export check_balances, Component, each, Grouping, link_output_with, perform_operations,
+       output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
+       default, plot_optional_figures_begin, plot_optional_figures_end,
+       reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
+       create_secondary_name
 
 using ..Profiles
 using UUIDs
@@ -99,25 +101,21 @@ Enumerations of the archetype of a component describing its general function.
 These are described in more detail in the accompanying documentation of the simulation
 model.
 """
-@enum(SystemFunction, sf_bounded_sink, sf_bounded_source, sf_fixed_sink,
+@enum(SystemFunction, sf_flexible_sink, sf_flexible_source, sf_fixed_sink,
       sf_fixed_source, sf_transformer, sf_storage, sf_bus)
 
 """
-Enumerations of a simulation step that can be performed on a component.
+Enumeration of operations that can be performed on a component.
 
 The names are prefixed with `s` to avoid shadowing functions of the same name.
 """
-@enum Step s_reset s_control s_process s_load s_distribute s_potential
+@enum OperationStep s_reset s_control s_process s_load s_distribute s_potential
 
 """
-Convenience type for holding the instruction for one component and one step.
+Convenvience type to holds the order of operations as instructions for how to perform one
+time step of the simulation.
 """
-const StepInstruction = Tuple{String,Step}
-
-"""
-Holds the order of steps as instructions for how to perform the simulation.
-"""
-const StepInstructions = Vector{StepInstruction}
+const OrderOfOperations = Vector{Tuple{String,OperationStep}}
 
 """
 The basic type of all energy system components.
@@ -246,6 +244,9 @@ Base.@kwdef mutable struct SystemInterface
 
     """Flag to decide if storage potentials are transferred over the interface."""
     do_storage_transfer::Bool = true
+
+    """Flag to indicate if the interface is a secondary interface."""
+    is_secondary_interface::Bool = false
 end
 
 """
@@ -410,7 +411,8 @@ function add!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_secondary_interface)
     end
 end
 
@@ -450,7 +452,8 @@ function sub!(interface::SystemInterface,
     if interface.source.sys_function == sf_bus
         sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
     elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac)
+        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
+                     interface.is_secondary_interface)
     end
 end
 
@@ -542,7 +545,8 @@ function set_max_energy!(interface::SystemInterface,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        interface.is_secondary_interface)
     else
         # 1-to-1 interface between two components.
         # Assuming that temperatures always match: This is valid as currently only heat pumps
@@ -1587,8 +1591,8 @@ include("control.jl")
 # require the definition of certain basic components such as a bus or a grid connection
 include("general/fixed_sink.jl")
 include("general/fixed_supply.jl")
-include("general/bounded_supply.jl")
-include("general/bounded_sink.jl")
+include("general/flexible_supply.jl")
+include("general/flexible_sink.jl")
 include("general/storage.jl")
 include("connections/grid_connection.jl")
 include("connections/bus.jl")
@@ -1671,8 +1675,10 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # is a Vector{Grouping} here with the same order than given_medium.
     if given_media !== nothing
         for (idx, given_medium) in enumerate(given_media)
+            _, m_is_secondary_interface = trim_secondary_medium(given_medium)
             current_component = only(values(components[idx]))
-            connection = SystemInterface(; source=unit, target=current_component)
+            connection = SystemInterface(; source=unit, target=current_component,
+                                         is_secondary_interface=m_is_secondary_interface)
             unit.output_interfaces[given_medium] = connection
             if isa(current_component, Bus)
                 push!(current_component.input_interfaces, connection)
@@ -1686,11 +1692,13 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
     # source is a component and no media given, we have to look for the right medium for
     # a connection
     for out_medium in keys(unit.output_interfaces)
+        out_medium_trimmed, m_is_secondary_interface = trim_secondary_medium(out_medium)
         for component in each(components)
             if isa(component, Bus)
                 # link component to bus
-                if out_medium == component.medium
-                    connection = SystemInterface(; source=unit, target=component)
+                if out_medium_trimmed == component.medium
+                    connection = SystemInterface(; source=unit, target=component,
+                                                 is_secondary_interface=m_is_secondary_interface)
                     push!(component.input_interfaces, connection)
                     unit.output_interfaces[out_medium] = connection
                     break
@@ -1698,8 +1706,9 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
             else
                 # link component to component
                 for in_medium in keys(component.input_interfaces)
-                    if out_medium == in_medium
-                        connection = SystemInterface(; source=unit, target=component)
+                    if out_medium_trimmed == in_medium
+                        connection = SystemInterface(; source=unit, target=component,
+                                                     is_secondary_interface=m_is_secondary_interface)
                         unit.output_interfaces[out_medium] = connection
                         component.input_interfaces[in_medium] = connection
                         break
@@ -1708,6 +1717,76 @@ function link_output_with(unit::Component, components::Union{Grouping,Vector{Gro
             end
         end
     end
+end
+
+"""
+    trim_secondary_medium(out_medium::Symbol)
+
+Takes a Symbol and trims it if it starts with the defined prefix for secondary interfaces.
+Also returns a Bool indicating if the input has been trimmed or not.
+
+# Arguments
+`out_medium::Symbol`: The Symbol that should be trimmed
+# Returns
+- `Symbol`: The trimmed Symbol
+- `Bool`: Bool indicating if the medium has been trimmed (true) or not (false)
+"""
+function trim_secondary_medium(out_medium::Symbol)
+    prefix = "secondary_"
+    out_medium_string = String(out_medium)
+    if startswith(out_medium_string, prefix)
+        return Symbol(out_medium_string[(length(prefix) + 1):end]), true
+    else
+        return out_medium, false
+    end
+end
+
+"""
+    adjust_name_if_secondary(name::AbstractString, is_secondary_interface::Bool)
+
+Takes a string and returns the adjusted name if is_secondary_interface is true
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+`is_secondary_interface::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function adjust_name_if_secondary(name::AbstractString, is_secondary_interface::Bool)
+    if is_secondary_interface
+        return "secondary_" * name
+    else
+        return name
+    end
+end
+
+"""
+    create_secondary_name(name::AbstractString)
+
+Takes a string and returns the adjusted name for secondary connections
+
+# Arguments
+`name::AbstractString`: The name that should be adapted as String
+# Returns
+- `AbstractString`: The adjusted name as String
+"""
+function create_secondary_name(name::AbstractString)
+    return name * "secondary"
+end
+
+"""
+    adjust_name_if_secondary(name::Symbol, is_secondary_interface::Bool)
+
+Takes a Symbol and returns the adjusted Symbol if is_secondary_interface is true
+
+# Arguments
+`name::Symbol`: The Symbol that should be adapted
+`is_secondary_interface::Bool`: Bool indicating if the name should be adapted
+# Returns
+- `Symbol`: The adjusted Symbol
+"""
+function adjust_name_if_secondary(name::Symbol, is_secondary_interface::Bool)
+    return Symbol(adjust_name_if_secondary(String(name), is_secondary_interface))
 end
 
 """
@@ -1790,40 +1869,22 @@ function check_balances(components::Grouping,
 end
 
 """
-    perform_steps(components, order_of_operations, sim_params)
+    perform_operations(components, order_of_operations, sim_params)
 
-Perform the simulation steps of one time step for the given components in the given order.
+Performs the simulation operations of one time step for the given components in the given order.
 
 # Arguments
 - `components::Grouping`: The entirety of the components
-- `order_of_operations::Vector{Vector{Any}}`: Defines which steps are performed in which order.
-    Each component must go through the simulation steps defined in EnergySystems.Step, but the
-    order is not the same for all simulations. Determining the order must be handled
-    elsewhere, as this function only goes through and calls the appropriate functions. The
-    first item of each entry must be the key of the component for which the following steps
-    are performed.
+- `order_of_operations::OrderOfOperations`: Defines which operations are performed in which
+    order. Each component must go through the simulation operations defined in
+    EnergySystems.OperationStep, but the order is not the same for energy systems.
+    Determining the order must be handled elsewhere, as this function only goes through and
+    calls the appropriate functions.
 - `sim_params::Dict{String, Any}`: Project-wide simulation parameters
-
-# Examples
-```
-    components = Grouping(
-        "component_a" => Component(),
-        "component_b" => Component(),
-    )
-    order = [
-        ["component_a", EnergySystems.s_control]
-        ["component_b", EnergySystems.s_control, EnergySystems.s_process]
-        ["component_a", EnergySystems.s_process]
-    ]
-    sim_params = Dict{String, Any}("time" => 0)
-    perform_steps(components, order, sim_params)
-```
-In this example the control of component A is performed first, then control and processing of
-component B and finally processing of component A.
 """
-function perform_steps(components::Grouping,
-                       order_of_operations::StepInstructions,
-                       sim_params::Dict{String,Any})
+function perform_operations(components::Grouping,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})
     for entry in order_of_operations
         unit = components[entry[1]]
         step = entry[2]
@@ -1842,6 +1903,13 @@ function perform_steps(components::Grouping,
             distribute!(unit)
         end
     end
+end
+
+function reorder_operations_in_time_step(components::Grouping,
+                                         order_of_operations::OrderOfOperations,
+                                         sim_params::Dict{String,Any})::OrderOfOperations
+    change_bus_priorities!(components, sim_params)
+    return reorder_operations(components, order_of_operations, sim_params)
 end
 
 """
@@ -1902,7 +1970,8 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
     # 2. If a `.prf` file path is specified
     if haskey(config, profile_file_key)
         path = config[profile_file_key]
-        @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file located at: $path"
+        @info "For '$uac', the '$param_symbol' is taken from the user-defined .prf file " *
+              "located at: $(sim_params["run_path"](path))"
         return nothing, Profile(path, sim_params)
     end
 
@@ -1983,7 +2052,7 @@ end
 """
 get_wind_speed_profile_from_config(config, simulation_parameter, uac)
 
-Function to determine the source of the wind speed profile for fixed and bounded sinks
+Function to determine the source of the wind speed profile for fixed and flexible sinks
 and sources.
 * If no information is given, nothing will be returned.
 * If a wind_speed_profile_file_path is given, the wind speed will be read from the

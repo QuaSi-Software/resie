@@ -41,9 +41,9 @@ mutable struct GridConnection <: Component
         return new(uac,         # uac
                    Controller(default(config, "control_parameters", nothing)),
                    if Bool(config["is_source"])
-                       sf_bounded_source
+                       sf_flexible_source
                    else
-                       sf_bounded_sink
+                       sf_flexible_sink
                    end,         # sys_function
                    medium,      # medium
                    InterfaceMap(medium => nothing), # input_interfaces
@@ -57,7 +57,7 @@ mutable struct GridConnection <: Component
 end
 
 function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
-    if unit.sys_function === sf_bounded_source
+    if unit.sys_function === sf_flexible_source
         set_storage_transfer!(unit.output_interfaces[unit.medium],
                               load_storages(unit.controller, unit.medium))
     else
@@ -77,7 +77,7 @@ function control(unit::GridConnection,
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
 
-    if unit.sys_function === sf_bounded_source
+    if unit.sys_function === sf_flexible_source
         set_max_energy!(unit.output_interfaces[unit.medium], Inf, nothing, unit.temperature)
     else
         set_max_energy!(unit.input_interfaces[unit.medium], Inf, unit.temperature, nothing)
@@ -85,7 +85,7 @@ function control(unit::GridConnection,
 end
 
 function process(unit::GridConnection, sim_params::Dict{String,Any})
-    if unit.sys_function === sf_bounded_source
+    if unit.sys_function === sf_flexible_source
         outface = unit.output_interfaces[unit.medium]
         exchanges = balance_on(outface, outface.target)
 
@@ -143,9 +143,9 @@ end
 
 function output_values(unit::GridConnection)::Vector{String}
     output_vals = []
-    if unit.sys_function == sf_bounded_source
+    if unit.sys_function == sf_flexible_source
         append!(output_vals, [string(unit.medium) * ":OUT", "Output_sum"])
-    elseif unit.sys_function == sf_bounded_sink
+    elseif unit.sys_function == sf_flexible_sink
         append!(output_vals, [string(unit.medium) * ":IN", "Input_sum"])
     end
     if unit.temperature !== nothing

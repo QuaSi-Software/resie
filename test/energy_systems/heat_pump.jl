@@ -17,7 +17,7 @@ function get_config_heat_pump_1S1D()
             "scale" => 1500,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_HP_01"],
             "max_power_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
@@ -532,14 +532,14 @@ function get_config_heat_pump_2S2D()
             "constant_temperature" => 50,
         ),
         "TST_SRC_01" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 4000,
             "constant_temperature" => 40,
         ),
         "TST_SRC_02" => Dict{String,Any}(
-            "type" => "BoundedSupply",
+            "type" => "FlexibleSupply",
             "medium" => "m_h_w_lt1",
             "output_refs" => ["TST_BUS_01"],
             "constant_power" => 8000,

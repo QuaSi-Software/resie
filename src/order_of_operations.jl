@@ -31,7 +31,7 @@ be in the following syntax:
 ]
 ```
 """
-function load_order_of_operations(order_of_operation_input, components::Grouping)::StepInstructions
+function load_order_of_operations(order_of_operation_input, components::Grouping)::OrderOfOperations
     step_instructions = []
     all_components_uac = collect(keys(components)) # [unit.uac for unit in keys(components)]
 
@@ -68,7 +68,7 @@ end
 """
 calculate_order_of_operations(components)
 
-Calculate the order of steps that need to be performed to simulate the given components.
+Calculate the order of operations that need to be performed to simulate the given components.
 
 This function works by an algorithm described in more detail in the accompanying
 documentation. The result of this are step-by-step instructions telling the simulation
@@ -78,7 +78,7 @@ not trivial and might not work for each possible grouping of components.
 # Args
 - `components::Grouping`: The components for which an order is required
 # Returns
-- `StepInstructions`: The order in the structure:
+- `OrderOfOperations`: The order in the structure:
 ```
 [
     ["UAC Key", s_step],
@@ -86,7 +86,7 @@ not trivial and might not work for each possible grouping of components.
 ]
 ```
 """
-function calculate_order_of_operations(components::Grouping)::StepInstructions
+function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     components_by_function = categorize_by_function(components)
     simulation_order = base_order(components_by_function)
     simulation_order = remove_double_transformer_process_steps(simulation_order, components)
@@ -113,8 +113,9 @@ function calculate_order_of_operations(components::Grouping)::StepInstructions
     step_order = [(u[2][1], u[2][2]) for u in sort(simulation_order; by=fn_first, rev=true)]
 
     # remove transformers potential step if process is directly consecutive to a potential step
-    while contains_double_potential_produce(step_order)
-        step_order = remove_double_potential_produce(step_order)
+    # (only for components without a linked interface)
+    while contains_double_potential_produce(step_order, components)
+        step_order = remove_double_potential_produce(step_order, components)
     end
 
     return step_order
@@ -266,9 +267,9 @@ function categorize_by_function(components)
             [unit for unit in each(components)
              if unit.sys_function == EnergySystems.sf_storage],
             [unit for unit in each(components)
-             if unit.sys_function == EnergySystems.sf_bounded_source],
+             if unit.sys_function == EnergySystems.sf_flexible_source],
             [unit for unit in each(components)
-             if unit.sys_function == EnergySystems.sf_bounded_sink]]
+             if unit.sys_function == EnergySystems.sf_flexible_sink]]
 end
 
 """
@@ -321,11 +322,11 @@ function base_order(components_by_function)
         initial_nr -= 1
     end
 
-    # process bounded sources/sinks
+    # process flexible sources/sinks
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
             if isa(unit, EnergySystems.GridConnection)
-                # skip grid connections here to place them after general bounded sources/sinks
+                # skip grid connections here to place them after general flexible sources/sinks
                 continue
             end
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -336,7 +337,7 @@ function base_order(components_by_function)
     for sf_order in 6:7
         for unit in values(components_by_function[sf_order])
             if !isa(unit, EnergySystems.GridConnection)
-                # ignore general bounded sources/sinks here as they are already added
+                # ignore general flexible sources/sinks here as they are already added
                 continue
             end
             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
@@ -382,11 +383,14 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
         # check if this transformer is a circle_transformer, meaning it has input and output to the same bus
         is_circle_transformer = transformer_has_circle(values(transformers[1].input_interfaces),
                                                        values(transformers[1].output_interfaces))
+        # check if this transformer has a secondary interface
+        has_secondary_interface = component_has_secondary_interface(transformers[1])
     else
         is_circle_transformer = false
+        has_secondary_interface = false
     end
 
-    if length(transformers) > 1 || is_circle_transformer
+    if length(transformers) > 1 || is_circle_transformer || has_secondary_interface
         transformers_and_busses = vcat(components_by_function[4], components_by_function[3])
         filter!(c -> !(c.sys_function === EnergySystems.sf_bus && c.proxy !== nothing), transformers_and_busses)
         # detect parallel branches in the current energy system
@@ -700,6 +704,10 @@ function add_transformer_steps(simulation_order,
         if isempty(middle_transformer_branches)
             # This can happen with multiple interconnected middle transformer. Then only process/potential the MT 
             if step_category == "process"
+                if requires_potential_ahead_of_process(first_middle_transformer, simulation_order)
+                    push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                    initial_nr -= 1
+                end
                 push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
             else
                 push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
@@ -711,6 +719,10 @@ function add_transformer_steps(simulation_order,
 
                 # add process of middle_transformer before the first branch makes its process
                 if idx == 1 && step_category == "process"
+                    if requires_potential_ahead_of_process(simulation_order, first_middle_transformer)
+                        push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_potential)])
+                        initial_nr -= 1
+                    end
                     push!(simulation_order, [initial_nr, (first_middle_transformer.uac, EnergySystems.s_process)])
                     initial_nr -= 1
                 end
@@ -958,6 +970,11 @@ function add_transformer_steps(simulation_order,
                                 if step_category == "potential"
                                     push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_potential)])
                                 else
+                                    if requires_potential_ahead_of_process(simulation_order, component)
+                                        push!(simulation_order,
+                                              [initial_nr, (component.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                     push!(simulation_order, [initial_nr, (component.uac, EnergySystems.s_process)])
                                 end
                                 initial_nr -= 1
@@ -993,6 +1010,11 @@ function add_transformer_steps(simulation_order,
                             elseif length(current_middle_transformers) > 0 && branch_idx == nr_parallel_branches &&
                                    step_category == "process"
                                 for current_middle_transformer in current_middle_transformers
+                                    if requires_potential_ahead_of_process(simulation_order, current_middle_transformer)
+                                        push!(simulation_order,
+                                              [initial_nr, (current_middle_transformer.uac, EnergySystems.s_potential)])
+                                        initial_nr -= 1
+                                    end
                                     push!(simulation_order,
                                           [initial_nr, (current_middle_transformer.uac, EnergySystems.s_process)])
                                     initial_nr -= 1
@@ -1006,6 +1028,10 @@ function add_transformer_steps(simulation_order,
                         if step_category == "potential"
                             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
                         else
+                            if requires_potential_ahead_of_process(simulation_order, unit)
+                                push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_potential)])
+                                initial_nr -= 1
+                            end
                             push!(simulation_order, [initial_nr, (unit.uac, EnergySystems.s_process)])
                         end
                         initial_nr -= 1
@@ -1031,7 +1057,7 @@ function add_transformer_steps(simulation_order,
                                                               current_components,
                                                               parallel_branches,
                                                               step_category;
-                                                              reverse=!reverse,
+                                                              reverse=(!reverse),
                                                               connecting_component=connecting_component,
                                                               checked_components=checked_components,
                                                               exit_on_next_iteration=true)
@@ -1041,6 +1067,40 @@ function add_transformer_steps(simulation_order,
     end
 
     return simulation_order, initial_nr, checked_components, parallel_branches
+end
+
+"""
+    requires_potential_ahead_of_process(simulation_order, unit)
+
+Checks if a components requires a potential step ahead of its process step. Returns true if yes.
+
+# Arguments
+-`simulation_order::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+- `unit`: The unit for that should be checked if a potential step is requires ahead of the process step
+
+# Returns 
+- `Bool`: A bool indicating if a potential step is required (true) or not (false)
+"""
+function requires_potential_ahead_of_process(simulation_order, unit)
+    return component_has_secondary_interface(unit) && no_potential_before(simulation_order, unit)
+end
+
+"""
+    no_potential_before(simulation_order, unit)
+
+Checks if the last step in the simulation_order is a potential step of the given unit.
+Returns false if there is a potential step of the unit at the last step and true if there is no.
+
+# Arguments
+-`simulation_order::Vector{Tuple{Integer,Tuple{String,SystemFunction}}}`: The list of step instructions
+- `unit`: The unit for that should be checked if a potential step exists at the last step
+
+# Returns 
+- `Bool`: A bool indicating if the potential step exists (false) or not (true)
+"""
+function no_potential_before(simulation_order, unit)
+    _, (last_uac, last_step) = simulation_order[end]
+    return !(last_uac == unit.uac && last_step == EnergySystems.s_potential)
 end
 
 """
@@ -1062,7 +1122,7 @@ function transformer_has_circle(input_interfaces, output_interfaces)
     end
     all_input_busses = [i.source.proxy === nothing ? i.source.uac : i.source.proxy.uac
                         for i in input_interfaces
-                        if i.source.sys_function === EnergySystems.sf_bus]
+                        if (i.source.sys_function === EnergySystems.sf_bus && !i.is_secondary_interface)]
     all_output_busses = [i.target.proxy === nothing ? i.target.uac : i.target.proxy.uac
                          for i in output_interfaces
                          if i.target.sys_function === EnergySystems.sf_bus]
@@ -1594,6 +1654,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
                 continue
             end
             for inface in values(component.input_interfaces)
+                inface.is_secondary_interface && continue
                 if has_grid_output(component, inface.source.uac)
                     continue # skip all interfaces with connection to a grid
                 end
@@ -1617,6 +1678,7 @@ function detect_middle_bus(current_components, reverse, checked_components, step
                 end
             end
             for outface in values(component.output_interfaces)
+                outface.is_secondary_interface && continue
                 if has_grid_input(component, outface.target.uac)
                     continue # skip all interfaces with connection to a grid
                 end
@@ -1777,6 +1839,7 @@ function detect_first_middle_transformer(current_components, checked_components)
         transformer_in_input_interface = Any[]
         if component.sys_function === EnergySystems.sf_transformer
             for inface in values(component.input_interfaces)
+                inface.is_secondary_interface && continue
                 if check_interface_for_transformer(inface, "input")
                     other_infaces = [x for x in values(component.input_interfaces) if x !== inface]
                     inface_transformers = Any[]
@@ -1800,6 +1863,7 @@ function detect_first_middle_transformer(current_components, checked_components)
                 end
             end
             for outface in values(component.output_interfaces)
+                outface.is_secondary_interface && continue
                 if check_interface_for_transformer(outface, "output")
                     other_outfaces = [x for x in values(component.output_interfaces) if x !== outface]
                     outface_transformers = Any[]
@@ -1916,6 +1980,7 @@ function find_parallels(components)
             if (outface === nothing
                 || outface.target in path
                 || outface.target.sys_function === EnergySystems.sf_storage
+                || outface.is_secondary_interface
                 ||
                 (unit.sys_function === EnergySystems.sf_bus
                  && has_grid_input(unit, outface.target.uac)
@@ -2125,6 +2190,7 @@ function add_non_recursive!(node_set, unit, caller_uac)
     push!(node_set, unit)
 
     for inface in values(unit.input_interfaces)
+        inface.is_secondary_interface && continue
         if inface.source.uac == caller_uac
             continue
         elseif inface.source.sys_function === unit.sys_function
@@ -2133,6 +2199,7 @@ function add_non_recursive!(node_set, unit, caller_uac)
     end
 
     for outface in values(unit.output_interfaces)
+        outface.is_secondary_interface && continue
         if outface.target.uac == caller_uac
             continue
         elseif outface.target.sys_function === unit.sys_function
@@ -2182,6 +2249,7 @@ function add_non_recursive_indirect_outputs!(node_set,
 
     for outface in values(unit.output_interfaces)
         if outface !== nothing
+            outface.is_secondary_interface && continue
             if outface in checked_interfaces
                 continue
             elseif skip_storages && outface.target.sys_function === EnergySystems.sf_storage
@@ -2253,6 +2321,7 @@ function add_non_recursive_indirect_inputs!(node_set,
 
     for inface in values(unit.input_interfaces)
         if inface !== nothing
+            inface.is_secondary_interface && continue
             if inface in checked_interfaces
                 continue
             elseif skip_storages && inface.source.sys_function === EnergySystems.sf_storage
@@ -2309,6 +2378,7 @@ function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
     is_leaf = function (current_node, checked_interfaces_leaf; is_leafe_result=true, last_uac="")
         for outface in values(current_node.output_interfaces)
             if outface !== nothing
+                outface.is_secondary_interface && continue
                 if outface in checked_interfaces_leaf || outface.target == node
                     continue
                 elseif last_uac == "" || connection_allowed(current_node, last_uac, outface.target.uac)
@@ -2334,6 +2404,7 @@ function distance_to_sink(node, sys_function, checked_interfaces, last_unit_uac)
         max_distance = 0
         for outface in values(node.output_interfaces)
             if outface !== nothing
+                outface.is_secondary_interface && continue
                 if outface in checked_interfaces
                     continue
                 elseif last_unit_uac == "" || connection_allowed(node, last_unit_uac, outface.target.uac)
@@ -2506,6 +2577,7 @@ end
 
 function has_grid_input(bus, output_interface_uac)
     for inface in values(bus.input_interfaces)
+        inface !== nothing && inface.is_secondary_interface && continue
         if inface !== nothing && nameof(typeof(inface.source)) == :GridConnection
             input_idx = bus.balance_table_inputs[inface.source.uac].priority
             output_idx = bus.balance_table_outputs[output_interface_uac].priority
@@ -2520,6 +2592,7 @@ end
 
 function has_grid_output(bus, input_interface_uac)
     for outface in values(bus.output_interfaces)
+        outface !== nothing && outface.is_secondary_interface && continue
         if outface !== nothing && nameof(typeof(outface.target)) == :GridConnection
             input_idx = bus.balance_table_inputs[input_interface_uac].priority
             output_idx = bus.balance_table_outputs[outface.target.uac].priority
@@ -2687,7 +2760,7 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
         # for the storage with the highest output priority, place its load step after the
         # process step of the transformer with the lowest input priority, so that the load
         # of storages happen after the last input transformer had its process.
-        # storages act like a bounded source, they have already written a valid max_energy
+        # storages act like a flexible source, they have already written a valid max_energy
         # in their control.
         input_transformer = [i.source
                              for i in bus.input_interfaces
@@ -2723,16 +2796,20 @@ end
     contains_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step to later 
-remove the potential step. Also checks for identical consecutive steps.
+remove the potential step (only if the unit has no secondary interface). 
+Also checks for identical consecutive steps.
 """
-function contains_double_potential_produce(step_order)
+function contains_double_potential_produce(step_order, components::Grouping)
     last_unit = ""
     last_step = ""
     for entry in step_order
         if entry[1] == last_unit && entry[2] == last_step
             # detect completely identical entries
             return true
-        elseif entry[1] == last_unit && last_step === EnergySystems.s_potential && entry[2] === EnergySystems.s_process
+        elseif entry[1] == last_unit &&
+               last_step === EnergySystems.s_potential &&
+               entry[2] === EnergySystems.s_process &&
+               !component_has_secondary_interface(components[entry[1]])
             # detect consecutive potential - process of the same unit
             return true
         else
@@ -2741,6 +2818,10 @@ function contains_double_potential_produce(step_order)
         end
     end
     return false
+end
+
+function component_has_secondary_interface(unit)
+    return hasfield(typeof(unit), Symbol("has_secondary_interface")) && unit.has_secondary_interface
 end
 
 """
@@ -2769,9 +2850,10 @@ end
     remove_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step and 
-removes the potential step. Also removes consecutive identical steps.
+removes the potential step (only for components that have no secondary interfaces). 
+Also removes consecutive identical steps.
 """
-function remove_double_potential_produce(step_order)
+function remove_double_potential_produce(step_order, components::Grouping)
     last_unit = ""
     last_step = ""
     to_remove = Int[]
@@ -2780,7 +2862,9 @@ function remove_double_potential_produce(step_order)
         step = entry[2]
 
         if unit == last_unit
-            if step == EnergySystems.s_process && last_step == EnergySystems.s_potential
+            if step == EnergySystems.s_process &&
+               last_step == EnergySystems.s_potential &&
+               !component_has_secondary_interface(components[unit])
                 push!(to_remove, idx - 1)
             elseif (step == last_step)
                 push!(to_remove, idx)
@@ -2820,6 +2904,7 @@ function check_interface_for_transformer(interface, type)
             end
             for inface in values(current_node.input_interfaces)
                 if inface !== nothing
+                    inface.is_secondary_interface && continue
                     if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
                         continue
                     elseif inface in checked_interfaces || inface.source == current_node
@@ -2850,6 +2935,7 @@ function check_interface_for_transformer(interface, type)
             end
             for outface in values(current_node.output_interfaces)
                 if outface !== nothing
+                    outface.is_secondary_interface && continue
                     if outface.target.sys_function === EnergySystems.sf_bus && startswith(outface.target.uac, "Proxy")
                         continue
                     elseif outface in checked_interfaces || outface.target == current_node
