@@ -82,6 +82,9 @@ mutable struct SeasonalThermalStorage <: Component
     ground_layers_k::Vector{Float64}
     ground_layers_rho::Vector{Float64}
     ground_layers_cp::Vector{Float64}
+    row_k::Vector{Float64}
+    row_rho::Vector{Float64}
+    row_cp::Vector{Float64}
     soil_surface_hconv::Float64
 
     # FEM state (unified axisymmetric r-z soil domain)
@@ -94,6 +97,9 @@ mutable struct SeasonalThermalStorage <: Component
     soil_h_base_face::Int64
     soil_t1::Array{Float64}
     soil_t2::Array{Float64}
+    cells_active::Matrix{Bool}
+    radius_at_row::Array{Float64}
+    equivalent_radius_from_bottom::Float64
 
     # state variables
     current_max_output_temperature::Float64
@@ -211,11 +217,14 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "ground_layers_depths", [nothing]),           # [m] Monotonically increasing depths from surface (0.0) downward.
                    # Defines piecewise-constant soil layers by intervals [d[i], d[i+1]).
                    # Last value should be ≥ ground_domain_depth; if shorter, code extends.
-                   default(config, "ground_layers_k", Float64[1.5]),           # [W/(m·K)] Thermal conductivity per layer. Length may be
+                   default(config, "ground_layers_k", Float64[1.5]),            # [W/(m·K)] Thermal conductivity per layer. Length may be
                    # ≤ (length(depths)-1); last value is repeated if shorter.
-                   default(config, "ground_layers_rho", Float64[2000.0]),        # [kg/m³] Mass density per layer. Same broadcasting rule as above.
+                   default(config, "ground_layers_rho", Float64[2000.0]),       # [kg/m³] Mass density per layer. Same broadcasting rule as above.
                    default(config, "ground_layers_cp", Float64[1000.0]),        # [J/(kg·K)] Specific heat capacity per layer 
-                   default(config, "soil_surface_hconv", 14.7),                  # [W/(m²·K)] ground surface convective heat transfer coefficient
+                   Float64[],                                                   # row_k: Thermal conductivity per row
+                   Float64[],                                                   # row_rho: Mass density per row
+                   Float64[],                                                   # row_cp: Specific heat capacity per row
+                   default(config, "soil_surface_hconv", 14.7),                 # [W/(m²·K)] ground surface convective heat transfer coefficient
 
                    # FEM state (unified axisymmetric r-z soil domain)
                    Float64[],                                  # soil_dr
@@ -227,6 +236,9 @@ mutable struct SeasonalThermalStorage <: Component
                    0,                                          # soil_h_base_face
                    Array{Float64}(undef, 0, 0),                # soil_t1
                    Array{Float64}(undef, 0, 0),                # soil_t2
+                   Matrix{Bool}(undef, 0, 0),                  # cells_active
+                   Float64[],                                  # radius_at_row
+                   0.0,                                        # equivalent_radius_from_bottom
 
                    # state variables
                    0.0,                                            # current_max_output_temperature
@@ -374,7 +386,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.temp_difference_to_surrounding_output = zeros(Float64, sim_params["number_of_time_steps_output"],
                                                        unit.number_of_layer_total)
     # Prepare unified (r,z) soil FEM and allocate its output field
-    prepare_ground_fem_unified!(unit, sim_params)
+    prepare_ground_fem_unified!(unit)
     nz = length(unit.soil_dz)
     nr = length(unit.soil_dr)
     unit.soil_temperature_field_output = zeros(Float64,
@@ -385,6 +397,100 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.effective_ambient_temperature = [i <= unit.number_of_STES_layer_below_ground ?
                                           unit.ground_temperature : unit.ambient_temperature
                                           for i in 1:(unit.number_of_layer_total)]
+
+    # get soil properties per row
+    unit.row_k = zeros(Float64, nz)
+    unit.row_rho = zeros(Float64, nz)
+    unit.row_cp = zeros(Float64, nz)
+    for h in 1:nz
+        unit.row_k[h], unit.row_rho[h], unit.row_cp[h] = soil_props_at_depth(unit, unit.soil_z_centers[h])
+    end
+
+    # calculate radius for each row
+    unit.radius_at_row = zeros(Float64, nz)
+    for h in 1:nz
+        unit.radius_at_row[h] = radius_at_row(unit, h)
+    end
+
+    # get mask for storage area
+    # true → this cell is *soil* and part of the PDE
+    # false → this cell lies inside the STES volume (masked, handled separately)
+    unit.cells_active = fill(false, nz, nr)
+    for h in 1:nz, i in 1:nr
+        unit.cells_active[h, i] = cell_active(unit, h, i)
+    end
+
+    # set equivalent radius from bottom
+    unit.equivalent_radius_from_bottom, _ = equiv_radii_for_ground(unit)
+end
+
+"""
+    radius_at_row(unit::SeasonalThermalStorage, h::Int) -> Float64
+
+Compute the STES (equivalent) wall radius at a given soil row center (depth-dependent for conical/frustum walls)
+
+Args:
+- `unit::SeasonalThermalStorage`: Uses these fields:
+- `h::Int`: 1-based index into `unit.soil_z_centers`; must satisfy `1 ≤ h ≤ length(unit.soil_z_centers)`.
+
+Returns:
+- `Float64`: Wall radius at that depth [m]; returns `0.0` if the row lies below the tank base.
+"""
+function radius_at_row(unit::SeasonalThermalStorage, h::Int)::Float64
+    z_soil = unit.soil_z_centers[h]
+
+    if unit.number_of_STES_layer_below_ground <= 0
+        return 0.0
+    end
+
+    # outside buried section → no side wall
+    if z_soil > unit.h_stes_buried + unit.epsilon_geometry
+        return 0.0
+    end
+
+    # Map to storage coordinate
+    z_storage = unit.h_stes_buried - z_soil
+    z_storage = clamp(z_storage, 0.0, unit.height)
+
+    # Use equivalent radii for ground coupling
+    R_bot_eq, R_top_eq = equiv_radii_for_ground(unit)
+
+    return R_bot_eq +
+           (R_top_eq - R_bot_eq) * (z_storage / max(unit.height, eps(Float64)))
+end
+
+"""
+    cell_active(unit::SeasonalThermalStorage, h::Int, i::Int)::Bool
+
+Active-soil mask for cell (h,i). Returns `true` if the cell is soil (part of the PDE),
+`false` if it lies inside the STES.
+
+# Arguments
+- `unit::SeasonalThermalStorage`: The STES unit
+- `h::Int`: Depth index (row).
+- `i::Int`: Radius index (column).
+
+# Returns
+- `Bool`: `true` for soil/active; `false` for interior/masked.
+"""
+function cell_active(unit::SeasonalThermalStorage, h::Int, i::Int)::Bool
+    # true → this cell is *soil* and part of the PDE
+    # false → this cell lies inside the STES volume (masked, handled separately)
+
+    # below the buried part  → always soil
+    if unit.soil_z_centers[h] > unit.h_stes_buried + unit.epsilon_geometry
+        return true
+    end
+
+    if unit.radius_at_row[h] <= unit.epsilon_geometry
+        # no wall at this depth → soil
+        return true
+    end
+
+    # inside tank if clearly left of wall; use tolerance to avoid isolated flips
+    inside = (unit.soil_r_centers[i] < unit.radius_at_row[h] + unit.epsilon_geometry)
+
+    return !inside
 end
 
 """
@@ -887,7 +993,7 @@ function control(unit::SeasonalThermalStorage,
     if sim_params["current_date"] >= sim_params["start_date_output"]
         sidx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
         if size(unit.soil_temperature_field_output, 1) >= sidx
-            unit.soil_temperature_field_output[sidx, :, :] = _vis_field_with_tank(unit)
+            unit.soil_temperature_field_output[sidx, :, :] = vis_field_with_tank!(unit)
         end
     end
 
@@ -1641,10 +1747,10 @@ end
 # === Ground coupling FEM for STES (unified axisymmetric r–z domain) ===
 
 """
-    _create_geometric_mesh(min_mesh_width::Float64,
-                           max_mesh_width::Float64,
-                           expansion_factor::Float64,
-                           bound::Float64) -> Vector{Float64}
+    create_geometric_mesh(min_mesh_width::Float64,
+                          max_mesh_width::Float64,
+                          expansion_factor::Float64,
+                          bound::Float64) -> Vector{Float64}
 
 Build a 1D vector of cell widths `dx` that covers length `bound` using geometric growth
 from the origin. Start at `min_mesh_width`, multiply by `expansion_factor` (capped at
@@ -1657,10 +1763,10 @@ Args:
 - `expansion_factor` (>1 for growth; ≈1 → near-uniform).
 - `bound` total length.
 """
-function _create_geometric_mesh(min_mesh_width::Float64,
-                                max_mesh_width::Float64,
-                                expansion_factor::Float64,
-                                bound::Float64)
+function create_geometric_mesh(min_mesh_width::Float64,
+                               max_mesh_width::Float64,
+                               expansion_factor::Float64,
+                               bound::Float64)
     dx = Float64[]
     if bound <= 0.0
         return dx
@@ -1680,10 +1786,10 @@ function _create_geometric_mesh(min_mesh_width::Float64,
 end
 
 """
-    _create_geometric_mesh_two_sided(min_mesh_width::Float64,
-                                     max_mesh_width::Float64,
-                                     expansion_factor::Float64,
-                                     bound::Float64)
+    create_geometric_mesh_two_sided(min_mesh_width::Float64,
+                                    max_mesh_width::Float64,
+                                    expansion_factor::Float64,
+                                    bound::Float64)
 
 Build a 1D mesh on [0, bound] that is fine near both ends:
 - geometric growth from each end starting at `min_mesh_width` with factor `expansion_factor`,
@@ -1693,10 +1799,10 @@ Build a 1D mesh on [0, bound] that is fine near both ends:
 
 Returns a vector `dx` with sum(dx) == bound (up to floating roundoff).
 """
-function _create_geometric_mesh_two_sided(min_mesh_width::Float64,
-                                          max_mesh_width::Float64,
-                                          expansion_factor::Float64,
-                                          bound::Float64)
+function create_geometric_mesh_two_sided(min_mesh_width::Float64,
+                                         max_mesh_width::Float64,
+                                         expansion_factor::Float64,
+                                         bound::Float64)
     if bound <= 0.0
         return Float64[]
     end
@@ -1757,7 +1863,7 @@ function _create_geometric_mesh_two_sided(min_mesh_width::Float64,
 end
 
 # map depth z [m] (measured from ground surface downward) to soil layer properties
-function _soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
+function soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
     zs = unit.ground_layers_depths
 
     # ensure last depth >= domain depth
@@ -1778,24 +1884,11 @@ function _soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
     return k, rho, cp
 end
 
-# r in [0, R_dom], z from ground surface (0) downward.
-# Tank interior (r < R(z) and z ≤ unit.h_stes_buried) is masked and treated as boundary with Robin BCs:
-#   - Vertical wall at r = R(z) for z ∈ [0, unit.h_stes_buried]   → U_barrel, T_layer(z)
-#   - Base at z = unit.h_stes_buried for r ∈ [0, R_bottom]        → U_bottom, T_bottom_layer
-# Top (z=0): convective to ambient
-# Far field side (r=R_dom): adiabatic
-# Far field below (z=Z_dom): Dirichlet with T_ground
-# Axis (r=0): symmetry (∂T/∂r = 0).
-function _equivalent_radius_from_bottom(unit::SeasonalThermalStorage)
-    R_bot_eq, _ = _equiv_radii_for_ground(unit)
-    return R_bot_eq
-end
-
 # Return radii to be used for soil/axisymmetric coupling.
 # - For round shapes: use actual radii.
 # - For quadratic shapes: use area-equivalent circular radii
 #   so that π R^2 matches the actual lid/bottom areas.
-function _equiv_radii_for_ground(unit::SeasonalThermalStorage)
+function equiv_radii_for_ground(unit::SeasonalThermalStorage)
     if unit.shape == "quadratic"
         # Protect against uninitialized/zero
         R_bot = unit.surface_area_bottom > 0 ? sqrt(unit.surface_area_bottom / pi) : unit.radius_small
@@ -1806,13 +1899,11 @@ function _equiv_radii_for_ground(unit::SeasonalThermalStorage)
     end
 end
 
-function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
-                                     sim_params::Dict{String,Any})
-
+function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     # ----------------------------
     # 1) Basic geometry
     # ----------------------------
-    R_bot_eq, R_top_eq = _equiv_radii_for_ground(unit)
+    R_bot_eq, R_top_eq = equiv_radii_for_ground(unit)
 
     R_dom = unit.ground_domain_radius
     R_small = max(R_bot_eq, 0.0)
@@ -1857,7 +1948,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     remaining = max(unit.ground_domain_depth - unit.h_stes_buried, min_w)
 
     if remaining > unit.epsilon_geometry
-        tail = _create_geometric_mesh(min_w, max_w, ef, remaining)
+        tail = create_geometric_mesh(min_w, max_w, ef, remaining)
         dz = vcat(dz, tail)
     end
     if isempty(dz)
@@ -1883,7 +1974,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     # --- Region 1: 0 .. R_small ---
     if R_small > 0
         append!(dr_segments,
-                _create_geometric_mesh_two_sided(min_w, max_w, ef, R_small))
+                create_geometric_mesh_two_sided(min_w, max_w, ef, R_small))
     end
 
     # --- Region 2: R_small .. R_wall (only if sloped and buried wall exists) ---
@@ -1892,7 +1983,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
         # aim for ~ number_of_STES_layer_below_ground * n_wall cells across wall-contact band
         target_cells = max(unit.number_of_STES_layer_below_ground * n_wall, 1)
         dr_wall = wall_width / target_cells
-        dr_wall = max(dr_wall, min_w / 4)  # reasonably fine, not crazy
+        dr_wall = max(dr_wall, min_w / 4)  # reasonably fine
         n2 = max(1, round(Int, wall_width / dr_wall))
         dr2 = wall_width / n2
         append!(dr_segments, fill(dr2, n2))
@@ -1904,7 +1995,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     if remaining_r > unit.epsilon_geometry
         start_w = max(last(dr_segments), min_w)
         append!(dr_segments,
-                _create_geometric_mesh(start_w, max_w, ef, remaining_r))
+                create_geometric_mesh(start_w, max_w, ef, remaining_r))
     end
 
     if isempty(dr_segments)
@@ -1935,83 +2026,18 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage,
     return nothing
 end
 
-# (equivalent) radius of STES at a given soil row center (depth-dependent for conical/frustum walls)
-@inline function _radius_at_row(unit::SeasonalThermalStorage, h::Int)
-    z_soil = unit.soil_z_centers[h]
-
-    if unit.number_of_STES_layer_below_ground <= 0
-        return 0.0
-    end
-
-    # outside buried section → no side wall
-    if z_soil > unit.h_stes_buried + unit.epsilon_geometry
-        return 0.0
-    end
-
-    # Map to storage coordinate
-    z_storage = unit.h_stes_buried - z_soil
-    z_storage = clamp(z_storage, 0.0, unit.height)
-
-    # Use equivalent radii for ground coupling
-    R_bot_eq, R_top_eq = _equiv_radii_for_ground(unit)
-
-    return R_bot_eq +
-           (R_top_eq - R_bot_eq) * (z_storage / max(unit.height, eps(Float64)))
-end
-
-# per-row soil properties for unified domain
-function _row_props(unit::SeasonalThermalStorage)
-    nz = length(unit.soil_dz)
-    zc = unit.soil_z_centers
-    k_row = zeros(Float64, nz)
-    rho_row = zeros(Float64, nz)
-    cp_row = zeros(Float64, nz)
-    for h in 1:nz
-        k, rho, cp = _soil_props_at_depth(unit, zc[h])
-        k_row[h] = k
-        rho_row[h] = rho
-        cp_row[h] = cp
-    end
-    return k_row, rho_row, cp_row
-end
-
-# active soil cell vs. masked tank interior
-@inline function _cell_active(unit::SeasonalThermalStorage, h::Int, i::Int)
-    # true → this cell is *soil* and part of the PDE
-    # false → this cell lies inside the STES volume (masked, handled separately)
-
-    # below the buried part  → always soil
-    if unit.soil_z_centers[h] > unit.h_stes_buried + unit.epsilon_geometry
-        return true
-    end
-
-    Rwall = _radius_at_row(unit, h)
-    if Rwall <= unit.epsilon_geometry
-        # no wall at this depth → soil
-        return true
-    end
-
-    # inside tank if clearly left of wall; use tolerance to avoid isolated flips
-    inside = (unit.soil_r_centers[i] < Rwall + unit.epsilon_geometry)
-
-    return !inside
-end
-
 # Unified implicit Euler solve and extraction of wall/base interface temperatures
-function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+    # aliases for convenience
     nz = length(unit.soil_dz)
     nr = length(unit.soil_dr)
     N = nz * nr
 
-    k_row, rho_row, cp_row = _row_props(unit)
     dz = unit.soil_dz
     dr = unit.soil_dr
     dzm = unit.soil_dz_mesh
     drm = unit.soil_dr_mesh
     rc = unit.soil_r_centers
-
-    dt = sim_params["time_step_seconds"]
-    R_eq = _equivalent_radius_from_bottom(unit)  # <-- use equivalent bottom radius
 
     I = Int[]
     J = Int[]
@@ -2021,12 +2047,11 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
 
     Told = unit.soil_t1
 
-    h_base_face = unit.soil_h_base_face
     cum_dz_below = cumsum(unit.dz[1:(unit.number_of_STES_layer_below_ground)])  # bottom→top cumulative heights of buried STES layers
 
     for h in 1:nz, i in 1:nr
         p = def_idx(h, i)
-        if !_cell_active(unit, h, i)
+        if !unit.cells_active[h, i]
             push!(I, p)
             push!(J, p)
             push!(V, 1.0)
@@ -2045,13 +2070,13 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
 
         # capacity
         Vcell = 2pi * rc[i] * dr[i] * dz[h]
-        C = rho_row[h] * cp_row[h] * Vcell
-        aP = C / dt
+        C = unit.row_rho[h] * unit.row_cp[h] * Vcell
+        aP = C / sim_params["time_step_seconds"]
         rhs = aP * Told[h, i]
 
         # EAST (i+1)
-        if i < nr && _cell_active(unit, h, i + 1)
-            kE = (k_row[h] + k_row[h]) / 2
+        if i < nr && unit.cells_active[h, i + 1]
+            kE = (unit.row_k[h] + unit.row_k[h]) / 2
             r_e = rc[i] + dr[i] / 2
             A_e = 2pi * r_e * dz[h]
             d_e = drm[i]
@@ -2064,8 +2089,8 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
 
         # WEST (i-1) or wall boundary
         if i > 1
-            if _cell_active(unit, h, i - 1)
-                kW = (k_row[h] + k_row[h]) / 2
+            if unit.cells_active[h, i - 1]
+                kW = (unit.row_k[h] + unit.row_k[h]) / 2
                 r_w = rc[i] - dr[i] / 2
                 A_w = 2pi * r_w * dz[h]
                 d_w = drm[i - 1]
@@ -2084,8 +2109,7 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
                     k = clamp(k, 1, unit.number_of_STES_layer_below_ground)
 
                     # local wall face area represented by this cell
-                    r_face = _radius_at_row(unit, h)
-                    A_face = max(2pi * r_face * dz[h], eps(Float64))
+                    A_face = max(2pi * unit.radius_at_row[h] * dz[h], eps(Float64))
 
                     U = unit.thermal_transmission_barrel
                     aP += U * A_face
@@ -2096,8 +2120,8 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
         # (axis i==1 → zero flux; nothing to add)
 
         # SOUTH (h+1)
-        if h < nz && _cell_active(unit, h + 1, i)
-            kS = (k_row[h] + k_row[h + 1]) / 2
+        if h < nz && unit.cells_active[h + 1, i]
+            kS = (unit.row_k[h] + unit.row_k[h + 1]) / 2
             A_s = 2pi * rc[i] * dr[i]
             d_s = dzm[h]
             aS = kS * A_s / d_s
@@ -2115,8 +2139,8 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
             aP += hconv * A_n
             rhs += hconv * A_n * unit.ambient_temperature
         else
-            if _cell_active(unit, h - 1, i)
-                kN = (k_row[h] + k_row[h - 1]) / 2
+            if unit.cells_active[h - 1, i]
+                kN = (unit.row_k[h] + unit.row_k[h - 1]) / 2
                 A_n = 2pi * rc[i] * dr[i]
                 d_n = dzm[h - 1]
                 aN = kN * A_n / d_n
@@ -2126,8 +2150,8 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
                 push!(V, -aN)
             else
                 # masked neighbor → base Robin within equivalent bottom radius
-                if (rc[i] <= R_eq + 1e-12) && (h == h_base_face + 1)
-                    A_n = 2pi * rc[i] * dr[i]           # rings integrate to π R_eq^2 = true bottom area
+                if (rc[i] <= unit.equivalent_radius_from_bottom + 1e-12) && (h == unit.soil_h_base_face + 1)
+                    A_n = 2pi * rc[i] * dr[i]           # rings integrate to π unit.equivalent_radius_from_bottom^2 = true bottom area
                     hbot = unit.thermal_transmission_bottom
                     aP += hbot * A_n
                     rhs += hbot * A_n * unit.temperature_segments[1]
@@ -2148,7 +2172,7 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
     # map back
     Tnew = similar(Told)
     for h in 1:nz, i in 1:nr
-        Tnew[h, i] = _cell_active(unit, h, i) ? Tvec[def_idx(h, i)] : Told[h, i]
+        Tnew[h, i] = unit.cells_active[h, i] ? Tvec[def_idx(h, i)] : Told[h, i]
     end
     unit.soil_t2 .= Tnew
     unit.soil_t1 .= unit.soil_t2
@@ -2165,11 +2189,8 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
         h = searchsortedfirst(unit.soil_z_centers, z_soil + eps(Float64))
         h = clamp(h, 1, nz)
 
-        # wall radius at that soil row
-        Rloc = _radius_at_row(unit, k) # TODO k or h? was h...
-
         # pick soil temp at first radius >= wall radius
-        idx = findfirst(x -> x >= Rloc, unit.soil_r_centers)
+        idx = findfirst(x -> x >= unit.radius_at_row[k], unit.soil_r_centers)
         val = idx === nothing ? unit.ground_temperature : unit.soil_t2[h, idx]
 
         push!(T_wall_side, val)
@@ -2179,7 +2200,7 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
     num = 0.0
     den = 0.0
     for i in 1:length(unit.soil_r_centers)
-        if unit.soil_r_centers[i] <= R_eq + 1e-12
+        if unit.soil_r_centers[i] <= unit.equivalent_radius_from_bottom + 1e-12
             w = 2pi * unit.soil_r_centers[i] * unit.soil_dr[i]
             num += unit.soil_t2[hbot, i] * w
             den += w
@@ -2193,11 +2214,7 @@ function _solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Str
 end
 
 function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    if isempty(unit.soil_dr) || isempty(unit.soil_dz)
-        prepare_ground_fem_unified!(unit, sim_params)
-    end
-
-    T_wall_side, T_base = _solve_soil_unified!(unit, sim_params)
+    T_wall_side, T_base = solve_soil_unified!(unit, sim_params)
 
     Teff = similar(unit.temperature_segments)
 
@@ -2223,7 +2240,7 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
 end
 
 # Build a view field where tank interior has the current layer temps
-function _vis_field_with_tank(unit::SeasonalThermalStorage)
+function vis_field_with_tank!(unit::SeasonalThermalStorage)
     Tvis = copy(unit.soil_t1)
     nz, nr = length(unit.soil_dz), length(unit.soil_dr)
     cumz = cumsum(unit.dz)  # bottom→top cumulative layer heights
@@ -2235,7 +2252,7 @@ function _vis_field_with_tank(unit::SeasonalThermalStorage)
             k = searchsortedfirst(cumz, z_storage + eps(Float64))  # layer index
             k = clamp(k, 1, unit.number_of_layer_total)
             for i in 1:nr
-                if !_cell_active(unit, h, i)
+                if !unit.cells_active[h, i]
                     Tvis[h, i] = Float64(unit.temperature_segments[k])
                 end
             end
