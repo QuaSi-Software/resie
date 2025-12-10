@@ -47,7 +47,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
-            "scale": 100000,
+            "scale": 1,
             "m_el_out": "m_power"
         },
         "WindFarm": {
@@ -294,14 +294,14 @@
             "medium": "m_heat",
             "energy_profile_file_path": "./profiles/MA/germersheim_heat.prf",
             "constant_temperature": 90,
-            "scale": 1000
+            "scale": 1
         },
         "Demand_Power": {
             "type": "Demand",
             "output_refs": [],
             "medium": "m_power",
             "energy_profile_file_path": "./profiles/MA/germersheim_power.prf",
-            "scale": 1000
+            "scale": 1
         }
         
     }

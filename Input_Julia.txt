@@ -9,13 +9,13 @@ ________________________________________________________________________________
 
 Benutzung
 ---------
-cd "C:\Users\jenter\Documents\ReSiE\resie"
+cd "C:\Users\jenter\Documents\ReSiE"
 julia --project=. src/resie-cli.jl
-run "C:\Users\jenter\Documents\ReSiE\resie"\input_file.json"
+run "C:\Users\jenter\Documents\Resie\inputfiles\input_file_base.json"
 
-cd "C:\Users\jenter\Documents\ReSiE\resie"
+cd "C:\Users\jenter\Documents\ReSiE"
 julia
 ]
 activate .
 include("src/run_resie.jl")
-run_repl(raw"C:\Users\jenter\Documents\ReSiE\resie\input_file.json")
+run_repl(raw"c:\Users\jenter\Documents\Resie\inputfiles\input_file_base.json)
