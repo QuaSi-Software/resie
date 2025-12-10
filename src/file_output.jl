@@ -60,7 +60,7 @@ function get_output_keys(io_settings::AbstractDict{String,<:Any},
         elseif io_settings["return_output_keys"] == "all_incl_flows"
             do_return_all_outputs_incl_flows = true
         elseif io_settings["return_output_keys"] == "nothing"
-            do_write_CSV = false
+            do_return_data = false
         elseif io_settings["return_output_keys"] == "all"
             @error "For \"return_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
             throw(InputError)

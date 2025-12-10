@@ -423,7 +423,7 @@ Load a project from the given file and run the simulation with it.
 # Returns
 - `Bool`: `true` if the simulation was successful, `false` otherwise.
 """
-function load_and_run(filepath::String, run_ID::UUID)::Bool
+function load_and_run(filepath::String, run_ID::UUID)::Tuple{Bool, Union{OrderedDict, Nothing}}
     start = now()
     @info "---- Simulation setup ----"
     @info "-- Starting simulation at $(start)"
