@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.3
+* hotfix for infinite loop in heat pump with COP=1.0
+
 ### Version 0.13.2
 * Add secondary interfaces for the heat pump: 
   * The heat pump thermal output can now provide a secondary interface (`m_heat_out_secondary`) to the same heat bus as the primary output interface (`m_heat_out`).
