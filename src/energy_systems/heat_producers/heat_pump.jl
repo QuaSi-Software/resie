@@ -78,8 +78,7 @@ mutable struct HeatPump <: Component
 
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         has_secondary_interface = default(config, "has_secondary_interface", false)
-        m_heat_out_secondary = Symbol(adjust_name_if_secondary(default(config, "m_heat_out_secondary", "m_h_w_ht1"),
-                                                               true))
+        m_heat_out_secondary = Symbol(adjust_name_if_secondary(m_heat_out, true))
 
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
@@ -879,10 +878,13 @@ function calculate_slices(unit::HeatPump,
         # layers have energy left, this was caused by the PLR of the slice being too low or
         # the heat pump being undersized. in either case we need to advance both indices so
         # we don't recalculate the same slice twice
-        if (energies.available_heat_in[src_idx] >= EPS && cop !== 1.0) &&
+        if energies.available_heat_in[src_idx] >= EPS &&
            energies.available_heat_out[snk_idx] >= EPS
             # end of condition
-            src_idx += 1
+            if cop !== 1.0
+                # do not go into next heat_in layer if we have cop = 1 as we do not need heat input
+                src_idx += 1
+            end
             snk_idx += 1
         else
             if energies.available_heat_in[src_idx] < EPS && cop !== 1.0
