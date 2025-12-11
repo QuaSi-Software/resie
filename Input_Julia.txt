@@ -11,11 +11,11 @@ Benutzung
 ---------
 cd "C:\Users\jenter\Documents\resie"
 julia --project=. src/resie-cli.jl
-run "C:\Users\jenter\Documents\resie\inputfiles\input_file_base.json"
+run "C:\Users\jenter\Documents\resie\inputfiles\inputfile_base.json"
 
 cd "C:\Users\jenter\Documents\resie"
 julia
 ]
 activate .
 include("src/run_resie.jl")
-run_repl(raw"c:\Users\jenter\Documents\resie\inputfiles\input_file_base.json)
+run_repl(raw"c:\Users\jenter\Documents\resie\inputfiles\inputfile_base.json)

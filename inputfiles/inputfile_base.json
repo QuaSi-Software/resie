@@ -11,7 +11,7 @@
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "07.01.2024 23:45",
+        "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",
@@ -26,7 +26,8 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "constant_power": 9999999999999999999999999999
+            "is_source": true,
+            "constant_power": 15.0e6
         },
         "ControlReserve": {
             "type": "FlexibleSupply",
@@ -228,7 +229,7 @@
                             {
                     "name": "economic_control", 
                     "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
-                    "limit_price": -10000.0,
+                    "limit_price": 10000.0,
                     "new_connections_below_limit": {
                         "input_order": [
                             "HeatPump",
