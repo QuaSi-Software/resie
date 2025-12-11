@@ -22,8 +22,7 @@ using .VDI2067
 # Basis-Input laden
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "./inputfiles/inputfile_base.json"
-base_input = Resie.read_JSON(base_input_path)
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/input_file_base.json"
 
 
 ############################################################
@@ -90,7 +89,7 @@ end
 
 function run_resie_variant(
         outdir::String,
-        base_input::Dict,
+        base_input::OrderedDict,
         Pth_HP::Number,
         Pth_Boiler::Number,
         Cap_Wh::Number,
@@ -176,10 +175,12 @@ function run_resie_variant(
 
     println("[$runidx/$total_runs] → Starte Simulation: $(basename(fname))")
 
-    _, _ = Resie_Logger.start_logger(true, false, nothing, nothing,
-        Resie_Logger.Logging.Warn, fname)
+    logger = Resie_Logger.start_logger(true, false, nothing, nothing,
+                                       Resie_Logger.Logging.Warn, fname)
 
-    _, sim_output = Resie.load_and_run(fname)
+    success, sim_output = Resie.load_and_run(fname, UUID(runidx))
+
+    Resie_Logger.close_logger(logger)
 
     return sim_output
 end
@@ -190,7 +191,8 @@ end
 # Hauptschleife
 ############################################################
 
-function main()
+function main(base_input_path)
+    base_input = Resie.read_JSON(base_input_path)
     outdir = "./output/parameterstudy"
     mkpath(outdir)
 
@@ -213,7 +215,6 @@ function main()
                           BattCap_vals_Wh, p_stock_vals, p_reserve_vals)
 
         runidx += 1
-        uuid = uuid4()
 
         ####################################################
         # Simulation
@@ -227,7 +228,7 @@ function main()
         )
 
         # SimOutput wieder im alten Format
-        sim_output[uuid] = Dict("sim" => raw_sim)
+        sim_output[runidx] = Dict("sim" => raw_sim)
 
 
         ####################################################
@@ -238,20 +239,20 @@ function main()
         A0_Buffer = 25  * (Cap_Wh / 1e3)
         A0_Batt   = 150 * (BattCap_Wh / 1e3)
 
-        components = VDIComponents[
+        components = VDIComponent[
             heatpump_component(A0_HP,     20),
             boiler_component(A0_Boiler,   20),
             buffertank_component(A0_Buffer, 30),
             battery_component(A0_Batt,    15)
         ]
 
-        sim_output[uuid]["VDI_NO"] =
+        sim_output[runidx]["VDI_NO"] =
             vdi2067_annuity(raw_sim, components, VDI_SCENARIO_NO)
 
-        sim_output[uuid]["VDI_MOD"] =
+        sim_output[runidx]["VDI_MOD"] =
             vdi2067_annuity(raw_sim, components, VDI_SCENARIO_MOD)
 
-        sim_output[uuid]["VDI_PRO"] =
+        sim_output[runidx]["VDI_PRO"] =
             vdi2067_annuity(raw_sim, components, VDI_SCENARIO_PRO)
     end
 
@@ -261,5 +262,5 @@ function main()
 end
 
 
-main()
+main(base_input_path)
 

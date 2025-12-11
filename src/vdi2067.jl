@@ -1,6 +1,7 @@
 module VDI2067
+using OrderedCollections: OrderedDict
 
-export VDIParams, VDIComponents, vdi2067_annuity,
+export VDIParams, VDIComponent, vdi2067_annuity,
        VDI_SCENARIO_NO, VDI_SCENARIO_MOD, VDI_SCENARIO_PRO,
        heatpump_component, boiler_component, buffertank_component, battery_component
 
@@ -29,7 +30,7 @@ end
 # f_instand : repair / reinstatement factor (share of A0 in year 1)
 ############################################################
 
-struct VDIComponents
+struct VDIComponent
     name::String
     A0::Float64
     TN::Int
@@ -48,19 +49,19 @@ end
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
 heatpump_component(A0::Real, TN::Int) =
-    VDIComponents("HeatPump", float(A0), TN, 0.015, 0.01)
+    VDIComponent("HeatPump", float(A0), TN, 0.015, 0.01)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real, TN::Int) =
-    VDIComponents("Boiler", float(A0), TN, 0.02, 0.01)
+    VDIComponent("Boiler", float(A0), TN, 0.02, 0.01)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real, TN::Int) =
-    VDIComponents("BufferTank", float(A0), TN, 0.005, 0.005)
+    VDIComponent("BufferTank", float(A0), TN, 0.005, 0.005)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real, TN::Int) =
-    VDIComponents("Battery", float(A0), TN, 0.01, 0.02)
+    VDIComponent("Battery", float(A0), TN, 0.01, 0.02)
 
 
 ############################################################
@@ -160,7 +161,7 @@ function npv_restwert(A0, TN, T, i, r)
     return rest_T / (1+i)^T
 end
 
-function capital_annuity(comp::VDIComponents, p::VDIParams)
+function capital_annuity(comp::VDIComponent, p::VDIParams)
     pv_total = comp.A0 +
         npv_replacements(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap) -
         npv_restwert(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap)
@@ -173,7 +174,7 @@ end
 #  OPERATING COSTS: MAINTENANCE (B) + REPAIR (IN)
 ############################################################
 
-function op_annuity(components::Vector{VDIComponents}, p::VDIParams)
+function op_annuity(components::Vector{VDIComponent}, p::VDIParams)
     # First-year maintenance & inspection cost
     A_B1  = sum(c.A0 * c.f_wartung for c in components)
     # First-year repair / reinstatement cost
@@ -191,7 +192,7 @@ end
 #  MISCELLANEOUS COSTS (INSURANCE, ADMIN,…)
 ############################################################
 
-function misc_annuity(components::Vector{VDIComponents}, p::VDIParams)
+function misc_annuity(components::Vector{VDIComponent}, p::VDIParams)
     total_cap = sum(c.A0 for c in components)
     A1 = 0.02 * total_cap        # rule-of-thumb: 2% of investment
 
@@ -206,7 +207,7 @@ end
 #  ENERGY COSTS — TIME-RESOLVED → ANNUITY
 ############################################################
 
-function energy_annuity(sim::Dict, p::VDIParams)
+function energy_annuity(sim::Union{Dict, OrderedDict}, p::VDIParams)
     IN = sim["Grid_IN"]                                         # Wh time series
     base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
@@ -229,7 +230,7 @@ end
 #  REVENUES — CONTROL ENERGY AND FEED-IN
 ############################################################
 
-function revenue_control(sim::Dict, p::VDIParams)
+function revenue_control(sim::Union{Dict, OrderedDict}, p::VDIParams)
     haskey(sim, "Regelenergie_Wh") || return 0.0
 
     RE = sim["Regelenergie_Wh"]
@@ -243,7 +244,7 @@ function revenue_control(sim::Dict, p::VDIParams)
     return A1 * a * b
 end
 
-function revenue_feedin(sim::Dict, p::VDIParams)
+function revenue_feedin(sim::Union{Dict, OrderedDict}, p::VDIParams)
     OUT = sim["Grid_Out"]
     price = vecize_price(sim["FeedIn_price"], length(OUT))
 
@@ -260,7 +261,7 @@ end
 #  MAIN FUNCTION — TOTAL ANNUITY AND HEAT PRICE
 ############################################################
 
-function vdi2067_annuity(sim::Dict, components::Vector{VDIComponents}, p::VDIParams)
+function vdi2067_annuity(sim::Union{Dict, OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
 
     A_cap   = sum(capital_annuity(c, p) for c in components)
     A_op    = op_annuity(components, p)
