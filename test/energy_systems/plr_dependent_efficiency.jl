@@ -108,13 +108,11 @@ end
 end
 
 function test_cop_parsing()
-    const_val, cop_func = EnergySystems.parse_cop_function("const:0.314")
-    @test const_val == 0.314
+    cop_func = EnergySystems.parse_cop_function("const:0.314")
     @test cop_func(30.0, 50.0) ≈ 0.314
     @test cop_func(10.0, 70.0) ≈ 0.314
 
-    const_val, cop_func = EnergySystems.parse_cop_function("carnot:0.4")
-    @test const_val === nothing
+    cop_func = EnergySystems.parse_cop_function("carnot:0.4")
     @test cop_func(30.0, 50.0) ≈ 6.463
     @test cop_func(10.0, 70.0) ≈ 2.2876666666666
 
@@ -123,8 +121,7 @@ function test_cop_parsing()
                 " 0,30,20,10, 5;" *
                 "10,30,30,20,10;" *
                 "20,30,30,30,20"
-    const_val, cop_func = EnergySystems.parse_cop_function(field_def)
-    @test const_val === nothing
+    cop_func = EnergySystems.parse_cop_function(field_def)
     @test cop_func(5.0, 5.0) ≈ 30.0
     @test cop_func(10.0, 5.0) ≈ 30.0
     @test cop_func(5.0, 10.0) ≈ 25.0
@@ -143,15 +140,13 @@ function test_cop_parsing()
                 " 0,30,20,10, 5;" *
                 "10,30,30,25,10;" *
                 "20,30,30,30,20"
-    const_val, cop_func = EnergySystems.parse_cop_function(field_def)
-    @test const_val === nothing
+    cop_func = EnergySystems.parse_cop_function(field_def)
     @test cop_func(12.5, 26.9) ≈ 17.15
 
     func_def = "poly-2:1.52e+1,1.44e-1,-6.45e-1,1.07e-3,-1.51e-3,1.19e-2,-8.20e-5," *
                "2.13e-5,-6.04e-7,-7.60e-5"
-    const_val, cop_func = EnergySystems.parse_cop_function(func_def)
+    cop_func = EnergySystems.parse_cop_function(func_def)
     plf_func = EnergySystems.parse_efficiency_function("poly:1.0,0.0")
-    @test const_val === nothing
     @test cop_func(20, 60) * plf_func(1.0) ≈ 4.231712
     @test cop_func(10, 50) * plf_func(0.5) ≈ 2.0007
 end

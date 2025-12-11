@@ -242,11 +242,10 @@ Four different function prototypes are implemented:
 # Arguments
 - `eff_def::String`: The function definition as described above
 # Returns
-- `Floathing`: If the COP is constant this is the constant value, nothing otherwise.
 - `Function`: A callable function which, when called with the input and output temperatures
     as arguments, returns the COP value at a PLR of 1.0.
 """
-function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
+function parse_cop_function(eff_def::String)::Function
     splitted = split(eff_def, ":")
 
     if length(splitted) > 1
@@ -255,22 +254,22 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
 
         if method_cop == "const"
             c = parse(Float64, data_cop)
-            return c, function (src, snk)
-                       return c
-                   end
+            return function (src, snk)
+                return c
+            end
 
         elseif method_cop == "carnot"
             c = parse(Float64, data_cop)
-            return nothing, function (src, snk)
-                       if src === nothing || snk === nothing
-                           return nothing
-                       end
-                       return c * (273.15 + snk) / (snk - src)
-                   end
+            return function (src, snk)
+                if src === nothing || snk === nothing
+                    return nothing
+                end
+                return c * (273.15 + snk) / (snk - src)
+            end
 
         elseif method_cop == "poly-2"
             poly = parse_2dim_function(method_cop * ":" * data_cop)
-            return nothing, poly
+            return poly
 
         elseif method_cop == "field"
             rows = split(data_cop, ';')
@@ -287,40 +286,39 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
             # first dim of values is source, second is sink. source is vertical (one row is
             # at the same source temp), sink is horizontal (one column is at the same sink
             # temp). first row is sink temperatures, first column is source temperatures
-            return nothing,
-                   function (src, snk)
-                       src_idx = nothing
-                       for idx in 2:(dim_src - 1)
-                           if src >= values[idx, 1] && src < values[idx + 1, 1]
-                               src_idx = idx
-                           end
-                       end
-                       snk_idx = nothing
-                       for idx in 2:(dim_snk - 1)
-                           if snk >= values[1, idx] && snk < values[1, idx + 1]
-                               snk_idx = idx
-                           end
-                       end
-                       if snk_idx === nothing || src_idx === nothing
-                           @error "Given temperatures $src and $snk outside of COP field."
-                           throw(BoundsError(values, (src_idx, snk_idx)))
-                       end
-                       return bilinear_interpolate(values[1, snk_idx],
-                                                   snk,
-                                                   values[1, snk_idx + 1],
-                                                   values[src_idx, 1],
-                                                   src,
-                                                   values[src_idx + 1, 1],
-                                                   values[src_idx, snk_idx],
-                                                   values[src_idx, snk_idx + 1],
-                                                   values[src_idx + 1, snk_idx],
-                                                   values[src_idx + 1, snk_idx + 1])
-                   end
+            return function (src, snk)
+                src_idx = nothing
+                for idx in 2:(dim_src - 1)
+                    if src >= values[idx, 1] && src < values[idx + 1, 1]
+                        src_idx = idx
+                    end
+                end
+                snk_idx = nothing
+                for idx in 2:(dim_snk - 1)
+                    if snk >= values[1, idx] && snk < values[1, idx + 1]
+                        snk_idx = idx
+                    end
+                end
+                if snk_idx === nothing || src_idx === nothing
+                    @error "Given temperatures $src and $snk outside of COP field."
+                    throw(BoundsError(values, (src_idx, snk_idx)))
+                end
+                return bilinear_interpolate(values[1, snk_idx],
+                                            snk,
+                                            values[1, snk_idx + 1],
+                                            values[src_idx, 1],
+                                            src,
+                                            values[src_idx + 1, 1],
+                                            values[src_idx, snk_idx],
+                                            values[src_idx, snk_idx + 1],
+                                            values[src_idx + 1, snk_idx],
+                                            values[src_idx + 1, snk_idx + 1])
+            end
         end
     end
 
     @error "Cannot parse COP function from: $eff_def"
-    return nothing, ((x, y) -> 0.0)
+    return (x, y) -> 0.0
 end
 
 """

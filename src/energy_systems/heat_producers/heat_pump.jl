@@ -85,7 +85,11 @@ mutable struct HeatPump <: Component
         register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
 
         func_def = default(config, "cop_function", "carnot:0.4")
-        constant_cop, cop_function = parse_cop_function(func_def)
+        cop_function = parse_cop_function(func_def)
+        constant_cop = nothing
+        if occursin("const", func_def)
+            constant_cop = cop_function(1.0)
+        end
 
         func_def = default(config, "plf_function", "const:1.0")
         plf_function = parse_efficiency_function(func_def)
