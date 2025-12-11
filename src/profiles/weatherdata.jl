@@ -61,7 +61,7 @@ mutable struct WeatherData
                          weather_interpolation_type_solar::String,
                          weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
-            @error "The weather file could not be found in: \n $weather_file_path"
+            @error "The weather file could not be found in: \n $(sim_params["run_path"](weather_file_path))"
             throw(InputError)
         end
 
@@ -74,7 +74,7 @@ mutable struct WeatherData
         nr_of_years = end_year - start_year + 1
 
         if endswith(lowercase(weather_file_path), ".dat")
-            weatherdata_dict, headerdata = read_dat_file(weather_file_path)
+            weatherdata_dict, headerdata = read_dat_file(weather_file_path, sim_params)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
             inProj = "EPSG:3034"   # Input Projection: EPSG system used by DWD for TRY data (Lambert-konforme konische Projektion)
@@ -159,7 +159,7 @@ mutable struct WeatherData
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
         elseif endswith(lowercase(weather_file_path), ".epw")
-            weatherdata_dict, headerdata = read_epw_file(weather_file_path)
+            weatherdata_dict, headerdata = read_epw_file(weather_file_path, sim_params)
 
             latitude = headerdata["latitude"]
             longitude = headerdata["longitude"]
@@ -309,7 +309,7 @@ function calc_sunrise_sunset(timestamps::Vector{DateTime}, time_step::Second, te
 end
 
 """
-read_dat_file(weather_file_path)
+read_dat_file(weather_file_path, sim_params)
 
 Function to read in a .dat weather file from the DWD 
 (German weather service, download from https://kunden.dwd.de/obt/)
@@ -350,13 +350,14 @@ E  Bestrahlungsstaerke d. terr. Waermestrahlung                  [W/m^2]   aufwa
 IL Qualitaetsbit bezueglich der Auswahlkriterien                           {0;1;2;3;4}
 
 """
-function read_dat_file(weather_file_path::String)
+function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
     local datfile
     expected_length = 8760  # timesteps
+    file_path = sim_params["run_path"](weather_file_path)
     try
-        datfile = open(weather_file_path, "r")
+        datfile = open(file_path, "r")
     catch e
-        @error "Error reading the DWD .dat file in $weather_file_path\n" *
+        @error "Error reading the DWD .dat file in $file_path\n" *
                "Please check the file. The following error occurred: $e"
         throw(InputError)
     end
@@ -382,7 +383,7 @@ function read_dat_file(weather_file_path::String)
                 headerdata["years"] = row[2]
             end
         catch e
-            @error "Error reading the header of the DWD .dat file in $weather_file_path\n" *
+            @error "Error reading the header of the DWD .dat file in $file_path\n" *
                    "Check if the header meets the requirements. The following error occurred: $e"
             throw(InputError)
         end
@@ -424,7 +425,7 @@ function read_dat_file(weather_file_path::String)
 
     # Check length
     if dataline - 1 !== expected_length
-        @warn "Error reading the .dat weather dataset from $weather_file_path:\n" *
+        @warn "Error reading the .dat weather dataset from $file_path:\n" *
               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
               "Check the file and make sure the data block starts with ***."
         throw(InputError)
@@ -440,13 +441,15 @@ read_epw_file(weather_file_path)
 Function to read in an .epw weather file (EnergyPlus Weather File).
 For details, see: https://designbuilder.co.uk/cahelp/Content/EnergyPlusWeatherFileFormat.htm
 """
-function read_epw_file(weather_file_path::String)
+function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     local ewpfile
     expected_length = 8760  # timesteps
+    file_path = sim_params["run_path"](weather_file_path)
+
     try
-        ewpfile = open(weather_file_path, "r")
+        ewpfile = open(file_path, "r")
     catch e
-        @error "Error reading the DWD .dat file in $weather_file_path. Please check the file.\n" *
+        @error "Error reading the DWD .dat file in $file_path. Please check the file.\n" *
                "The following error occurred: $e"
         throw(InputError)
     end
@@ -510,7 +513,7 @@ function read_epw_file(weather_file_path::String)
 
     # Check length
     if dataline - 1 !== expected_length
-        @error "Error reading the EPW weather dataset from $weather_file_path\n" *
+        @error "Error reading the EPW weather dataset from $file_path\n" *
                "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
                "Check the file for corruption."
         throw(InputError)

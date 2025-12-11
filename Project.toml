@@ -1,7 +1,7 @@
 name = "Resie"
 uuid = "2e0f99b1-0d8f-4296-8d0c-1c50a50d04c8"
 authors = ["Elias Demartin <elias.demartin@siz-energieplus.de>", "Maksim Helmann <maksim.helmann@siz-energieplus.de>", "Etienne Ott <etienne.ott@siz-energieplus.de>", "Heiner Steinacker <heiner.steinacker@siz-energieplus.de>", "Adrian Vollmer <adrian.vollmer@siz-energieplus.de>"]
-version = "0.13.1"
+version = "0.13.3"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
