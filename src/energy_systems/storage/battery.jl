@@ -118,7 +118,7 @@ Base.@kwdef mutable struct Battery <: Component
         charge_efficiency = default(config, "charge_efficiency", nothing)
         discharge_efficiency = default(config, "discharge_efficiency", nothing)
         if model_type == "simplified" && 
-           (charge_efficiency == nothing || discharge_efficiency == nothing)
+           (charge_efficiency === nothing || discharge_efficiency === nothing)
            # end of expression
             @error "If model \"simplified\" is used for battery \"$(uac)\" then " *
                    "\"charge_efficiency\" and \"discharge_efficiency\" must be given."
@@ -427,9 +427,9 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         # calculate losses and efficiency
         V_cell_avg = (unit.V_cell_last + V_cell) / 2
         charge = max_energy_cell / V_cell_avg
-        internal_losses = unit.r_i * charge^2
+        max_current = sim_params["wh_to_watts"](max_energy_cell) / V_cell_avg
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p * unit.n_cell_s
-        efficiency = ifelse(max_energy_cell == 0, NaN, 1 - (internal_losses / abs(max_energy_cell)))
+        efficiency = ifelse(max_energy_cell == 0, NaN, 1 - abs(unit.r_i * max_current / V_cell_avg))
         return efficiency, V_cell, max_energy_bat, charge
     end
 end
@@ -540,10 +540,9 @@ function calc_efficiency_current(current::Number, unit::Battery, sim_params::Dic
         # calculate losses and efficiency
         V_cell_avg = (unit.V_cell_last + V_cell) / 2
         charge = sim_params["watt_to_wh"](max_current)
-        internal_losses = unit.r_i * charge^2
-        max_energy_cell = charge * V_cell_avg
+        max_energy_cell = sim_params["watt_to_wh"](V_cell_avg * max_current)
         max_energy_bat = abs(max_energy_cell) * unit.n_cell_p * unit.n_cell_s
-        efficiency = ifelse(max_energy_cell == 0, NaN, 1 - (internal_losses / abs(max_energy_cell)))
+        efficiency = ifelse(max_energy_cell == 0, NaN, 1 - abs(unit.r_i * max_current / V_cell_avg))
         return efficiency, V_cell, max_energy_bat, charge
     end
 end
@@ -650,7 +649,6 @@ function load(unit::Battery, sim_params::Dict{String,Any})
             end
             unit.losses += charge_energy_bat * (1.0 / unit.charge_efficiency - 1)
             unit.extracted_charge += charge
-
             unit.load += charge_energy_bat
             sub!(unit.input_interfaces[unit.m_el_in], charge_energy_bat)
         end
@@ -685,7 +683,6 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
             # calculate current and check for different conditions
             charge_diff = unit.extracted_charge - unit.extracted_charge_last
             current = sim_params["wh_to_watts"](charge_diff)
-            unit.cycles += abs(charge_diff) / unit.capacity_cell_Ah / 2
             # if no current is flowing just consider self_discharge
             if current == 0
                 if (unit.load - unit.losses) < 0
@@ -713,8 +710,8 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                 f_T = (1 + unit.k_qT[1] * (unit.Temp - unit.T_ref) + unit.k_qT[2] * (unit.Temp - unit.T_ref)^2)
                 Q = unit.capacity_cell_Ah * f_I * f_n * f_T
 
-                if unit.extracted_charge > Q
-                    unit.extracted_charge = Q
+                if unit.extracted_charge > unit.m * Q
+                    unit.extracted_charge = unit.m * Q
                 elseif unit.extracted_charge < 0
                     unit.extracted_charge = 0
                 end
@@ -722,6 +719,7 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                 unit.SOC = ((unit.m * Q) - unit.extracted_charge) / (unit.m * Q) * 100
                 unit.load = unit.capacity * unit.SOC / 100
             end
+            unit.cycles += abs(unit.extracted_charge - unit.extracted_charge_last) / unit.capacity_cell_Ah / 2
             unit.V_cell_last = copy(unit.V_cell)
         end
 
@@ -742,8 +740,11 @@ end
 function plot_optional_figures_begin(unit::Battery, output_path::String, output_formats::Vector{String},
                                      sim_params::Dict{String,Any})::Bool
     # discharge curves of the cell chemistry at different discharge rates
-    Q_max = find_zero(Q -> f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 1, 50) - unit.V_cell_min,
-                      unit.capacity_cell_Ah) * 1.001
+    Q_max = unit.capacity_cell_Ah * 1.3
+    try Q_max = find_zero(Q -> f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 1, 50) - unit.V_cell_min,
+                          unit.capacity_cell_Ah) * 1.001
+    catch    
+    end
     x = 0:(Q_max / 500):Q_max
     y1 = fill(NaN, length(x))
     y2 = fill(NaN, length(x))
@@ -814,7 +815,7 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     p = Plots.plot(x, [y1, y2, y3], 
                    labels=["$(unit.T_ref) °C" "0 °C" "50 °C"], 
                    lw=3)
-    Plots.plot!(p, ; title="Battery discharge curve for $(unit.uac) at different C-rates",
+    Plots.plot!(p, ; title="Battery discharge curve for $(unit.uac) at different Temperatures",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
                 ylims=(unit.V_cell_min, unit.V_cell_max),
@@ -845,19 +846,19 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
         end
     end
     for (idx, Q) in enumerate(x)
-        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 3000, unit.T_ref)
+        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 1000, unit.T_ref)
         if y2[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 2000, unit.T_ref)
+        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 3000, unit.T_ref)
         if y3[idx] <= unit.V_cell_min
             break
         end
     end
     p = Plots.plot(x, [y1, y2, y3], 
-                   labels=["$(unit.cycles) cycles" "3000 cycles" "2000 cycles"], 
+                   labels=["$(unit.cycles) cycles" "1000 cycles" "3000 cycles"], 
                    lw=3)
     Plots.plot!(p, ; title="Battery discharge curve for $(unit.uac) after different number of cycles",
                 xlabel="Removed Cell Charge / Ah",
@@ -909,7 +910,7 @@ calc_cell_values(100, 3.4, 3.346, 10, 3.332, 20, 3.216, 820, 2.0, 1087.5,
                  nothing, 3.141, 550,
                  500, 1000, 1026,
                  3000, 3.2, 3.15, 400, 806,
-                 500, 25, 1002,         
+                 500, -20, 987,         
                  55, 3.31, 3.277, 696, 1035,
                  25)
 
@@ -933,17 +934,24 @@ calc_cell_values(100, 3.4, 3.3483, 10, 3.3293, 20, 3.2295, 800, 2.0, 1090,
                  500, 1000, 1027,
                  3000, 3.2, 3.15, 400, 809,
                  500, -20, 987,
-                 55, 3.4, 3.2782, 757.57, 1102, 25)
+                 55, 3.4, 3.2782, 757.57, 1102, 
+                 25)
+calc_cell_values(10, 3.4, 3.3483, 1.0, 3.3293, 2.0, 3.2295, 80, 2.0, 109,
+                 100, 106.0,
+                 nothing, 3.141, 55.0,
+                 50, 1000, 102.7,
+                 3000, 3.2, 3.15, 40.0, 80.9,
+                 50, -20, 98.7,
+                 55, 3.4, 3.2782, 75.757, 110.2, 
+                 25)
 """
 function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_full_1,
                           I_2, Q_full_2,
                           r_i::Union{Number,Nothing}=nothing, V_6=0.0, Q_6=0.0,
                           I_n=0.0, n_1=0.0, Q_full_n_1=0.0,
-                          n_2::Union{Number,Nothing}=nothing, V_full_n_2=0.0, V_nom_n_2=0.0, Q_nom_n_2=0.0,
-                          Q_full_n_2=0.0,
+                          n_2::Union{Number,Nothing}=nothing, V_full_n_2=0.0, V_nom_n_2=0.0, Q_nom_n_2=0.0, Q_full_n_2=0.0,
                           I_T=0.0, T_1=0.0, Q_full_T_1=0.0,
-                          T_2::Union{Number,Nothing}=nothing, V_full_T_2=0.0, V_nom_T_2=0.0, Q_nom_T_2=0.0,
-                          Q_full_T_2=0.0,
+                          T_2::Union{Number,Nothing}=nothing, V_full_T_2=0.0, V_nom_T_2=0.0, Q_nom_T_2=0.0,Q_full_T_2=0.0,
                           T_ref=25)
 
     # basic values new
