@@ -167,7 +167,7 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
     success = false
     run_ID = uuid1()
     try
-        success = Resie.load_and_run(input_filepath, run_ID)
+       success, return_data = Resie.load_and_run(input_filepath, run_ID) 
     catch exc
         # exceptions should just be rethrown, but the finally block should also make sure
         # that the logger is closed and the run removed from the run registry.

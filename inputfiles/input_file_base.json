@@ -7,14 +7,15 @@
         "csv_time_unit": "date",
         "csv_output_keys": "nothing",
         "return_output_keys": "all_incl_flows",
-        "output_plot": "nothing"
+        "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.01.2024 23:45",
+        "end": "07.01.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",
+        "epsilon": 1e-7,
         "weather_file_path": "M:/SIZ 2020/S20203 Hafner_KliEn/AB 4 Energiekonzept/AP 4.2 Auslegung & Bewertung Energieerzeugungsanlagen/GenSim/Wetterdatensatz mit Verschiebung/TRY_476921091528/TRY2015_Konstanz_Jahr.dat"
 
     },
@@ -33,7 +34,7 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "constant_power": 1e6
+            "constant_power": 0.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
@@ -172,7 +173,7 @@
                             {
                     "name": "economic_control", 
                     "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
-                    "limit_price": 80.0,
+                    "limit_price": 10000.0,
                     "new_connections_below_limit": {
                         "input_order": [
                             "ControlReserve",
@@ -227,7 +228,7 @@
                             {
                     "name": "economic_control", 
                     "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
-                    "limit_price": 80.0,
+                    "limit_price": -10000.0,
                     "new_connections_below_limit": {
                         "input_order": [
                             "HeatPump",
