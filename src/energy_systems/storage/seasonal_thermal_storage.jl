@@ -73,7 +73,9 @@ mutable struct SeasonalThermalStorage <: Component
     ambient_temperature::Temperature
     ground_temperature_profile::Union{Profile,Nothing}
     ground_temperature::Temperature
-    effective_ambient_temperature::Vector{Temperature}
+    effective_ambient_temperature_barrels::Vector{Temperature}
+    effective_ambient_temperature_top::Temperature
+    effective_ambient_temperature_bottom::Temperature
 
     # ground coupling FEM (optional)
     ground_domain_radius_factor::Float64
@@ -97,7 +99,6 @@ mutable struct SeasonalThermalStorage <: Component
     soil_dz_mesh::Vector{Float64}
     soil_r_centers::Vector{Float64}
     soil_z_centers::Vector{Float64}
-    soil_h_base_face::Int64
     soil_t1::Array{Float64}
     soil_t2::Array{Float64}
     cells_active::Matrix{Bool}
@@ -213,10 +214,12 @@ mutable struct SeasonalThermalStorage <: Component
                    constant_ambient_temperature,                          # ambient_temperature [°C]
                    ground_temperature_profile,                            # [°C]
                    constant_ground_temperature,                           # ground_temperature [°C]
-                   Temperature[],                                         # effective_ambient_temperature corresponding to each layer [°C]          
+                   Temperature[],                                         # effective_ambient_temperature_barrels corresponding to each layer [°C]          
+                   0.0,                                                   # effective_ambient_temperature_top 
+                   0.0,                                                   # effective_ambient_temperature_bottom
                    # ground coupling FEM (unified)
                    default(config, "ground_domain_radius_factor", 1.5),          # [m] ground_domain_radius_factor: Factor for the ground domain width, is multiplied with the radius of the storage at the ground surface.
-                   default(config, "ground_domain_depth_factor", 2.0),           # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the buried depth of the storage.
+                   default(config, "ground_domain_depth_factor", 2.0),           # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the total height of the storage.
                    default(config, "ground_domain_radius", nothing),             # [m] soil domain radius. If none given, it will be derived from the STES geometry.
                    default(config, "ground_domain_depth", nothing),              # [m] soil depth from surface. If none given, it will be derived from the STES geometry.
                    default(config, "ground_accuracy_mode", "normal"),            # mesh preset: very_rough|rough|normal|high|very_high
@@ -239,7 +242,6 @@ mutable struct SeasonalThermalStorage <: Component
                    Float64[],                                  # soil_dz_mesh
                    Float64[],                                  # soil_r_centers
                    Float64[],                                  # soil_z_centers
-                   0,                                          # soil_h_base_face
                    Array{Float64}(undef, 0, 0),                # soil_t1
                    Array{Float64}(undef, 0, 0),                # soil_t2
                    Matrix{Bool}(undef, 0, 0),                  # cells_active
@@ -305,11 +307,6 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                                            unit.shape)
 
     unit.number_of_STES_layer_below_ground = unit.number_of_layer_total - unit.number_of_layer_above_ground
-    if unit.number_of_STES_layer_below_ground == 0
-        @error "In STES $(unit.uac), as least one layer needs to be buried under ground! " *
-               "Adjust the parameter `number_of_layer_above_ground`."
-    end
-
     unit.h_stes_buried = unit.height / unit.number_of_layer_total * unit.number_of_STES_layer_below_ground
 
     # get and check soil boundaries
@@ -323,7 +320,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                "STES at the surface which is $(storage_radius_surface) m for the current configuration."
     end
     if unit.ground_domain_depth === nothing
-        unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.h_stes_buried
+        unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.height
     elseif unit.ground_domain_depth <= unit.h_stes_buried
         @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
                "depth of the STES which is $(unit.h_stes_buried) m for the current configuration."
@@ -334,7 +331,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # calculate thermal transmission coefficients
     unit.thermal_transmission_barrels = zeros(unit.number_of_layer_total)
-    for layer in 1:unit.number_of_layer_total
+    for layer in 1:(unit.number_of_layer_total)
         if layer <= unit.number_of_STES_layer_below_ground
             unit.thermal_transmission_barrels[layer] = unit.thermal_transmission_barrel_below_ground
         else
@@ -403,17 +400,16 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # vector to hold the results of the temperatures for each layer in each simulation time step
     unit.temp_distribution_output = zeros(Float64, sim_params["number_of_time_steps_output"],
                                           unit.number_of_layer_total)
+    # top and bottom get their own surrounding temperature
     unit.temp_difference_to_surrounding_output = zeros(Float64, sim_params["number_of_time_steps_output"],
-                                                       unit.number_of_layer_total)
+                                                       unit.number_of_layer_total + 2)
 
     # set initial effective_ambient_temperature
-    unit.effective_ambient_temperature = [i <= unit.number_of_STES_layer_below_ground ?
-                                          unit.ground_temperature : unit.ambient_temperature
-                                          for i in 1:(unit.number_of_layer_total)]
-    # set bottom layer always to ground and top layer always to ambient temperature.
-    # Note that this also affects the side walls of the bottom and top layer of the STES! The FEM handel this better...
-    unit.effective_ambient_temperature[1] = unit.ground_temperature
-    unit.effective_ambient_temperature[end] = unit.ambient_temperature
+    unit.effective_ambient_temperature_barrels = [i <= unit.number_of_STES_layer_below_ground ?
+                                                  unit.ground_temperature : unit.ambient_temperature
+                                                  for i in 1:(unit.number_of_layer_total)]
+    unit.effective_ambient_temperature_top = unit.ambient_temperature
+    unit.effective_ambient_temperature_bottom = unit.ground_temperature
 
     if unit.ground_model == "FEM"
         # Prepare unified (r,z) soil FEM and allocate its output field
@@ -825,14 +821,18 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
     x_vals_datetime = [add_ignoring_leap_days(sim_params["start_date_output"],
                                               Dates.Second((s - 1) * sim_params["time_step_seconds"]))
                        for s in 1:sim_params["number_of_time_steps_output"]]
-    layers_to_plot = (unit.number_of_layer_total):-1:1
+    layers_to_plot = (unit.number_of_layer_total + 2):-1:1
     traces = PlotlyJS.GenericTrace[]
     for i in layers_to_plot
-        plot_label = "Layer $(i)"
+        plot_label = "STES Layer $(i-1)"
         if i == 1
-            plot_label = "Bottom layer"
-        elseif i == unit.number_of_layer_total
-            plot_label = "Top layer"
+            plot_label = "Below storage"
+        elseif i == 2
+            plot_label = "Bottom STES layer"
+        elseif i == (unit.number_of_layer_total + 2) - 1
+            plot_label = "Top STES layer"
+        elseif i == (unit.number_of_layer_total + 2)
+            plot_label = "Above storage"
         end
         trace = PlotlyJS.scatter(; x=x_vals_datetime, y=unit.temp_difference_to_surrounding_output[:, i], mode="lines",
                                  name=plot_label)
@@ -938,9 +938,15 @@ function control(unit::SeasonalThermalStorage,
 
     # write old temperature field for output
     if sim_params["current_date"] >= sim_params["start_date_output"]
-        unit.temp_difference_to_surrounding_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.effective_ambient_temperature .-
-                                                                                                                                         unit.temperature_segments)
-        unit.temp_distribution_output[Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1, :] = copy(unit.temperature_segments)
+        time_idx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
+        unit.temp_difference_to_surrounding_output[time_idx, 1] = unit.effective_ambient_temperature_bottom -
+                                                                  unit.temperature_segments[1]
+        unit.temp_difference_to_surrounding_output[time_idx, 2:(end - 1)] = unit.effective_ambient_temperature_barrels .-
+                                                                            unit.temperature_segments
+        unit.temp_difference_to_surrounding_output[time_idx, end] = unit.effective_ambient_temperature_top -
+                                                                    unit.temperature_segments[end]
+
+        unit.temp_distribution_output[time_idx, :] = copy(unit.temperature_segments)
     end
 
     # update ambient/ground boundary conditions for the current step
@@ -959,19 +965,16 @@ function control(unit::SeasonalThermalStorage,
         if sim_params["current_date"] >= sim_params["start_date_output"]
             sidx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
             if size(unit.soil_temperature_field_output, 1) >= sidx
-                unit.soil_temperature_field_output[sidx, :, :] = vis_field_with_tank!(unit)
+                unit.soil_temperature_field_output[sidx, :, :] = vis_field_with_tank(unit)
             end
         end
     elseif unit.ground_model == "simple"
         # update surrounding effective_ambient_temperature
-        unit.effective_ambient_temperature = [i <= unit.number_of_STES_layer_below_ground ?
-                                              unit.ground_temperature : unit.ambient_temperature
-                                              for i in 1:(unit.number_of_layer_total)]
-        # set bottom layer always to ground and top layer always to ambient temperature.
-        # Note that this also affects the side walls of the bottom and top layer of the STES!
-        # The FEM handles this better...
-        unit.effective_ambient_temperature[1] = unit.ground_temperature
-        unit.effective_ambient_temperature[end] = unit.ambient_temperature
+        unit.effective_ambient_temperature_barrels = [i <= unit.number_of_STES_layer_below_ground ?
+                                                      unit.ground_temperature : unit.ambient_temperature
+                                                      for i in 1:(unit.number_of_layer_total)]
+        unit.effective_ambient_temperature_top = unit.ambient_temperature
+        unit.effective_ambient_temperature_bottom = unit.ground_temperature
     end
 
     # set current_energy_input_return_temperature (use bottom layer)
@@ -1346,7 +1349,7 @@ function update_STES(unit::SeasonalThermalStorage,
                 t_new[n] = t_old[n] +
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through bottom and side walls
+                            unit.sigma[n] * (unit.effective_ambient_temperature_bottom - t_old[n])) * dt +               # losses through bottom and side walls
                            # unit.lambda[n] * (Q_in_out)[n] +                                                            # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1354,7 +1357,7 @@ function update_STES(unit::SeasonalThermalStorage,
                 t_new[n] = t_old[n] +
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through lid and side walls
+                            unit.sigma[n] * (unit.effective_ambient_temperature_top - t_old[n])) * dt +                  # losses through lid and side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1363,7 +1366,7 @@ function update_STES(unit::SeasonalThermalStorage,
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
                             unit.dz_normalized[n]^2 +                                                                    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature[n] - t_old[n])) * dt +                   # losses through side walls
+                            unit.sigma[n] * (unit.effective_ambient_temperature_barrels[n] - t_old[n])) * dt +            # losses through side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1785,14 +1788,14 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
     end
 
     # very short domain: split into two equal cells
-    if bound <= 2*min_mesh_width
-        return [bound/2, bound/2]
+    if bound <= 2 * min_mesh_width
+        return [bound / 2, bound / 2]
     end
 
     # geometric ramp sequence up to the cap
     w = Float64[min_mesh_width]
     while w[end] < max_mesh_width - eps(Float64)
-        nextw = min(w[end]*expansion_factor, max_mesh_width)
+        nextw = min(w[end] * expansion_factor, max_mesh_width)
         if nextw == w[end]      # handles expansion_factor == 1
             break
         end
@@ -1803,7 +1806,7 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
     s = 0.0
     n = 0
     for j in eachindex(w)
-        if 2*(s + w[j]) <= bound
+        if 2 * (s + w[j]) <= bound
             s += w[j]
             n = j
         else
@@ -1812,7 +1815,7 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
     end
 
     # middle length and fill with max-sized equidistant cells
-    middle_len = bound - 2*s
+    middle_len = bound - 2 * s
     dx = Float64[]
     append!(dx, w[1:n])
 
@@ -1822,7 +1825,7 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
         else
             nmid = floor(Int, middle_len / max_mesh_width)
             append!(dx, fill(max_mesh_width, nmid))
-            rem = middle_len - nmid*max_mesh_width
+            rem = middle_len - nmid * max_mesh_width
             if rem > 1e-12
                 push!(dx, rem)
             end
@@ -1941,8 +1944,6 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
 
     zc = [sum(dz[1:(h - 1)]) + dz[h] / 2 for h in eachindex(dz)]
     unit.soil_z_centers = zc
-
-    unit.soil_h_base_face = max(unit.number_of_STES_layer_below_ground, 1)  # row at / just below tank base
 
     # ----------------------------
     # 4) r mesh (global):
@@ -2114,11 +2115,19 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
 
         # NORTH (h-1) or base/top boundary
         if h == 1
-            # surface convection
-            A_n = 2pi * rc[i] * dr[i]
-            hconv = unit.soil_surface_hconv
-            aP += hconv * A_n
-            rhs += hconv * A_n * unit.ambient_temperature
+            if unit.number_of_STES_layer_below_ground == 0 && rc[i] <= unit.equivalent_radius_from_bottom + 1e-12
+                # handle case if STES has zero layer below ground
+                A_n = 2pi * rc[i] * dr[i]
+                hbot = unit.thermal_transmission_bottom
+                aP += hbot * A_n
+                rhs += hbot * A_n * unit.temperature_segments[1]
+            else
+                # surface convection
+                A_n = 2pi * rc[i] * dr[i]
+                hconv = unit.soil_surface_hconv
+                aP += hconv * A_n
+                rhs += hconv * A_n * unit.ambient_temperature
+            end
         else
             if unit.cells_active[h - 1, i]
                 kN = (unit.row_k[h] + unit.row_k[h - 1]) / 2
@@ -2131,8 +2140,9 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 push!(V, -aN)
             else
                 # masked neighbor → base Robin within equivalent bottom radius
-                if (rc[i] <= unit.equivalent_radius_from_bottom + 1e-12) && (h == unit.soil_h_base_face + 1)
-                    A_n = 2pi * rc[i] * dr[i]           # rings integrate to π unit.equivalent_radius_from_bottom^2 = true bottom area
+                if (rc[i] <= unit.equivalent_radius_from_bottom + 1e-12) &&
+                   (h == unit.number_of_STES_layer_below_ground + 1)
+                    A_n = 2pi * rc[i] * dr[i]
                     hbot = unit.thermal_transmission_bottom
                     aP += hbot * A_n
                     rhs += hbot * A_n * unit.temperature_segments[1]
@@ -2177,7 +2187,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
         push!(T_wall_side, val)
     end
 
-    hbot = unit.soil_h_base_face + 1
+    hbot = unit.number_of_STES_layer_below_ground + 1
     num = 0.0
     den = 0.0
     for i in 1:length(unit.soil_r_centers)
@@ -2197,42 +2207,24 @@ end
 function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     T_wall_side, T_base = solve_soil_unified!(unit, sim_params)
 
-    Teff = similar(unit.temperature_segments)
-
-    # side: each buried layer k gets its corresponding wall soil temperature
+    # side below ground: each buried layer k gets its corresponding wall soil temperature
+    # T_wall_side is already in order of the STES layer (bottom STES layer is index 1)
     for k in 1:(unit.number_of_STES_layer_below_ground)
-        Teff[k] = T_wall_side[k]
+        unit.effective_ambient_temperature_barrels[k] = T_wall_side[k]
+    end
+    # side above ground: ambient temperature
+    for k in (unit.number_of_STES_layer_below_ground + 1):(unit.number_of_layer_total)
+        unit.effective_ambient_temperature_barrels[k] = unit.ambient_temperature
     end
 
-    # bottom: UA-weighted mix of side (Teff[1]) and base (T_base)
-    AbotU = unit.surface_area_bottom * unit.thermal_transmission_bottom
-    AsideBotU = unit.surface_area_barrel_segments[1] * unit.thermal_transmission_barrels[1]
-    if (AbotU + AsideBotU) > 0
-        Teff[1] = (AsideBotU * Teff[1] + AbotU * T_base) / (AsideBotU + AbotU)
-    end
-
-    if unit.number_of_layer_above_ground == 0
-        # top: UA-weighted mix of side (Teff[end]) and ambient temperature as lid is assumed to always face the ambient
-        AtopU = unit.surface_area_lid * unit.thermal_transmission_lid
-        AsideTopU = unit.surface_area_barrel_segments[end] * unit.thermal_transmission_barrels[end]
-        Teff[end] = (AsideTopU * Teff[end] + AtopU * unit.ambient_temperature) / (AsideTopU + AtopU)
-    else
-        # just use ambient temperature, no weighting required
-        for k in (unit.number_of_STES_layer_below_ground + 1):(unit.number_of_layer_total)
-            if k == 1
-                # for the bottom layer, use the above calculated weighted temperature
-                continue
-            end
-            Teff[k] = unit.ambient_temperature
-        end
-    end
-
-    unit.effective_ambient_temperature = Teff
-    return nothing
+    # lid is assumed to always face the ambient
+    unit.effective_ambient_temperature_top = unit.ambient_temperature
+    # bottom is assumed to always face the ground
+    unit.effective_ambient_temperature_bottom = T_base
 end
 
 # Build a view field where tank interior has the current layer temps
-function vis_field_with_tank!(unit::SeasonalThermalStorage)
+function vis_field_with_tank(unit::SeasonalThermalStorage)
     Tvis = copy(unit.soil_t1)
     nz, nr = length(unit.soil_dz), length(unit.soil_dr)
     cumz = cumsum(unit.dz)  # bottom→top cumulative layer heights
