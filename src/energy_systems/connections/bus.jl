@@ -874,9 +874,12 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
                              get_max_energy(output_row.energy_pool_temp, input_row.source.uac))
 
         if available_energy < -unit.epsilon || target_energy < -unit.epsilon
-            @error "A negative energy has been detected during distributing energy in bus $unit. This can have multiple " *
-                   "reasons, e.g. a bug in one of the components or a wrong order of operation. Double check the results " *
-                   "and contact the developers."
+            sim_params = get_run(unit.run_id).parameters
+            @error "A negative energy $(available_energy)/$(target_energy) from $(input_row.source.uac) to " *
+                   "$(output_row.target.uac) has been detected during distributing energy in bus $(unit.uac) at time " *
+                   "$(sim_params["time"])/$(sim_params["current_date"]). This can have multiple reasons, e.g. a bug " *
+                   "in one of the components or a wrong order of operation. Double check the results and contact " *
+                   "the developers."
             break
         end
 
