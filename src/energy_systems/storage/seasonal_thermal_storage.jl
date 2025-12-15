@@ -91,6 +91,9 @@ mutable struct SeasonalThermalStorage <: Component
     row_rho::Vector{Float64}
     row_cp::Vector{Float64}
     soil_surface_hconv::Float64
+    has_top_insulation_overlap::Bool
+    top_insulation_overlap_width::Float64
+    thermal_transmission_overlap::Float64
 
     # FEM state (unified axisymmetric r-z soil domain)
     soil_dr::Vector{Float64}
@@ -234,6 +237,9 @@ mutable struct SeasonalThermalStorage <: Component
                    Float64[],                                                   # row_rho: Mass density per row
                    Float64[],                                                   # row_cp: Specific heat capacity per row
                    default(config, "soil_surface_hconv", 14.7),                 # [W/(m²·K)] ground surface convective heat transfer coefficient
+                   default(config, "has_top_insulation_overlap", false),        # [Bool] has_top_insulation_overlap
+                   default(config, "top_insulation_overlap_width", 5.0),        # [m] top_insulation_overlap_width
+                   default(config, "thermal_transmission_overlap", 0.25),       # [W/(m²·K)] thermal_transmission_overlap
 
                    # FEM state (unified axisymmetric r-z soil domain)
                    Float64[],                                  # soil_dr
@@ -308,26 +314,6 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     unit.number_of_STES_layer_below_ground = unit.number_of_layer_total - unit.number_of_layer_above_ground
     unit.h_stes_buried = unit.height / unit.number_of_layer_total * unit.number_of_STES_layer_below_ground
-
-    # get and check soil boundaries
-    storage_radius_surface = unit.radius_large -
-                             (unit.radius_large - unit.radius_small) / unit.number_of_layer_total *
-                             unit.number_of_layer_above_ground
-    if unit.ground_domain_radius === nothing
-        unit.ground_domain_radius = unit.ground_domain_radius_factor * storage_radius_surface
-    elseif unit.ground_domain_radius <= storage_radius_surface
-        @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of the " *
-               "STES at the surface which is $(storage_radius_surface) m for the current configuration."
-    end
-    if unit.ground_domain_depth === nothing
-        unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.height
-    elseif unit.ground_domain_depth <= unit.h_stes_buried
-        @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
-               "depth of the STES which is $(unit.h_stes_buried) m for the current configuration."
-    end
-    if unit.ground_layers_depths == [nothing]
-        unit.ground_layers_depths = [0, unit.ground_domain_depth]
-    end
 
     # calculate thermal transmission coefficients
     unit.thermal_transmission_barrels = zeros(unit.number_of_layer_total)
@@ -412,6 +398,37 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.effective_ambient_temperature_bottom = unit.ground_temperature
 
     if unit.ground_model == "FEM"
+        # get equivalent radii of bottom and lid of STES
+        unit.equivalent_radius_from_bottom, equivalent_radius_top = equiv_radii_for_ground(unit)
+
+        # sanitary checks
+        # get and check soil boundaries
+        storage_radius_surface = equivalent_radius_top -
+                                 (equivalent_radius_top - unit.equivalent_radius_from_bottom) /
+                                 unit.number_of_layer_total * unit.number_of_layer_above_ground
+        if unit.ground_domain_radius === nothing
+            unit.ground_domain_radius = unit.ground_domain_radius_factor * storage_radius_surface
+        elseif unit.ground_domain_radius <= storage_radius_surface
+            @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of the " *
+                   "STES at the surface which is $(storage_radius_surface) m for the current configuration."
+        end
+        if unit.ground_domain_depth === nothing
+            unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.height
+        elseif unit.ground_domain_depth <= unit.h_stes_buried
+            @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
+                   "depth of the STES which is $(unit.h_stes_buried) m for the current configuration."
+        end
+        if unit.has_top_insulation_overlap &&
+           (storage_radius_surface + unit.top_insulation_overlap_width) > unit.ground_domain_radius
+            @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of " *
+                   "the insulation overlap of the STES! Increase the `ground_domain_radius_factor` or decrease " *
+                   "the `top_insulation_overlap_width`."
+        end
+
+        if unit.ground_layers_depths == [nothing]
+            unit.ground_layers_depths = [0, unit.ground_domain_depth]
+        end
+
         # Prepare unified (r,z) soil FEM and allocate its output field
         prepare_ground_fem_unified!(unit)
         nz = length(unit.soil_dz)
@@ -440,9 +457,6 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         for h in 1:nz, i in 1:nr
             unit.cells_active[h, i] = cell_active(unit, h, i)
         end
-
-        # set equivalent radius from bottom
-        unit.equivalent_radius_from_bottom, _ = equiv_radii_for_ground(unit)
     elseif unit.ground_model == "simple"
         # do nothing here
     else
@@ -1912,7 +1926,10 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     # 2) Mesh resolution knobs
     # ----------------------------
     mindz = minimum(unit.dz)
-
+    # min_w: minimum mesh width
+    # max_w: maximum mesh width
+    # n_wall: number of vertical nodes per layer step of STES
+    # ef: expansion factor
     min_w, max_w, n_wall, ef = unit.ground_accuracy_mode == "very_rough" ? (mindz / 1, 16.0, 1, 2.0) :
                                unit.ground_accuracy_mode == "rough" ? (mindz / 2, 8.0, 1, 2.0) :
                                unit.ground_accuracy_mode == "normal" ? (mindz / 3, 4.0, 1, 2.0) :
@@ -1927,7 +1944,8 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     # ----------------------------
     # 3) z mesh: exact below STES, then tail
     # ----------------------------
-    dz = unit.number_of_STES_layer_below_ground > 0 ? copy(unit.dz[1:(unit.number_of_STES_layer_below_ground)]) :
+    dz = unit.number_of_STES_layer_below_ground > 0 ?
+         copy(unit.dz[1:(unit.number_of_STES_layer_below_ground)]) :
          Float64[]
     remaining = max(unit.ground_domain_depth - unit.h_stes_buried, min_w)
 
@@ -1949,14 +1967,14 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     # 4) r mesh (global):
     #    [0, R_small]   : coarser center
     #    [R_small, R_wall]: refined along buried sidewall
-    #    [R_wall, R_dom]: geometric coarsening
+    #    [R_wall], [R_overlap]: optional if an insulation overlap is activated
+    #    [R_overlap, R_dom]: geometric coarsening
     # ----------------------------
     dr_segments = Float64[]
 
     # --- Region 1: 0 .. R_small ---
     if R_small > 0
-        append!(dr_segments,
-                create_geometric_mesh_two_sided(min_w, max_w, ef, R_small))
+        append!(dr_segments, create_geometric_mesh_two_sided(min_w, max_w, ef, R_small))
     end
 
     # --- Region 2: R_small .. R_wall (only if sloped and buried wall exists) ---
@@ -1971,13 +1989,18 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
         append!(dr_segments, fill(dr2, n2))
     end
 
-    # --- Region 3: R_wall .. R_dom ---
+    # --- Region 3: R_wall .. R_overlap (only if overlap is activated) ---
+    if unit.has_top_insulation_overlap
+        start_w = max(last(dr_segments), min_w)
+        append!(dr_segments, create_geometric_mesh_two_sided(start_w, max_w, ef, unit.top_insulation_overlap_width))
+    end
+
+    # --- Region 4: R_overlap .. R_dom ---
     used_r = sum(dr_segments)
     remaining_r = max(R_dom - used_r, 0.0)
     if remaining_r > unit.epsilon_geometry
         start_w = max(last(dr_segments), min_w)
-        append!(dr_segments,
-                create_geometric_mesh(start_w, max_w, ef, remaining_r))
+        append!(dr_segments, create_geometric_mesh(start_w, max_w, ef, remaining_r))
     end
 
     if isempty(dr_segments)
@@ -1997,8 +2020,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     T_bot = unit.ground_temperature
     total_depth = sum(dz)
 
-    T_rows = [T_top + (T_bot - T_top) * (zc[h] / total_depth)
-              for h in 1:length(dz)]
+    T_rows = [T_top + (T_bot - T_top) * (zc[h] / total_depth) for h in 1:length(dz)]
 
     nz = length(dz)
     nr = length(dr)
@@ -2118,15 +2140,25 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
             if unit.number_of_STES_layer_below_ground == 0 && rc[i] <= unit.equivalent_radius_from_bottom + 1e-12
                 # handle case if STES has zero layer below ground
                 A_n = 2pi * rc[i] * dr[i]
-                hbot = unit.thermal_transmission_bottom
-                aP += hbot * A_n
-                rhs += hbot * A_n * unit.temperature_segments[1]
+                htop = unit.thermal_transmission_bottom
+                aP += htop * A_n
+                rhs += htop * A_n * unit.temperature_segments[1]
             else
-                # surface convection
+                # top boundary on ground surface
                 A_n = 2pi * rc[i] * dr[i]
-                hconv = unit.soil_surface_hconv
-                aP += hconv * A_n
-                rhs += hconv * A_n * unit.ambient_temperature
+
+                # choose the boundary U-value:
+                # - use overlap U within the surface ring
+                # - otherwise default to ambient convection
+                if unit.has_top_insulation_overlap &&
+                   (rc[i] >= unit.radius_at_row[h] - eps(Float64)) &&
+                   (rc[i] <= unit.radius_at_row[h] + unit.top_insulation_overlap_width + eps(Float64))
+                    htop = unit.thermal_transmission_overlap
+                else
+                    htop = unit.soil_surface_hconv
+                end
+                aP += htop * A_n
+                rhs += htop * A_n * unit.ambient_temperature
             end
         else
             if unit.cells_active[h - 1, i]
