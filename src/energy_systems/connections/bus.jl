@@ -875,8 +875,8 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
 
         if available_energy < -unit.epsilon || target_energy < -unit.epsilon
             @error "A negative energy has been detected during distributing energy in bus $unit. This can have multiple " *
-                   "reasons, e.g. a bug in one of the components or a wrong order of operation. Double check the results " *
-                   "and contact the developers."
+                   "reasons, e.g. a bug in one of the components or a wrong order of operation. Double check the results, " *
+                   "increase the epsilon in the input file or contact the developers."
             break
         end
 
@@ -895,6 +895,8 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         else
             energy_flow = min(target_energy, available_energy)
         end
+        # trim energy_flows between -epsilon and zero to zero.
+        energy_flow = max(0.0, energy_flow)
 
         unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
         # if both min and max temperature are given and differ (which currently only happens
