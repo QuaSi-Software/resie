@@ -428,6 +428,12 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         if unit.ground_layers_depths == [nothing]
             unit.ground_layers_depths = [0, unit.ground_domain_depth]
         end
+        # ensure last depth >= domain depth
+        if unit.ground_layers_depths[end] < unit.ground_domain_depth
+            unit.ground_layers_depths[end] = unit.ground_domain_depth
+            @info "In STES $(unit.uac), the given `ground_layers_depths` has been extended to $(unit.ground_domain_depth) m " *
+                  "to cover the whole ground depth. The corresponding ground properties were copied from the last given depth."
+        end
 
         # Prepare unified (r,z) soil FEM and allocate its output field
         prepare_ground_fem_unified!(unit)
@@ -1859,19 +1865,10 @@ end
 # map depth z [m] (measured from ground surface downward) to soil layer properties
 # Note that currently the soil properties are considered at a single depth without taking overlaps into account!
 function soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
-    zs = unit.ground_layers_depths
-
-    # ensure last depth >= domain depth
-    if zs[end] < unit.ground_domain_depth
-        unit.ground_layers_depths[end] = unit.ground_domain_depth
-        zs = unit.ground_layers_depths
-        @info "In STES $(unit.uac), the given `ground_layers_depths` has been extended to $(unit.ground_domain_depth) m " *
-              "to cover the whole ground depth. The corresponding ground properties were copied from the last given depth."
-    end
     # find interval
     j = 1
-    for idx in 1:(length(zs) - 1)
-        if zs[idx] <= z < zs[idx + 1]
+    for idx in 1:(length(unit.ground_layers_depths) - 1)
+        if unit.ground_layers_depths[idx] <= z < unit.ground_layers_depths[idx + 1]
             j = idx
             break
         end
@@ -1955,6 +1952,38 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     end
     if isempty(dz)
         dz = [min_w]
+    end
+
+    # add additional segments at ground property transitions if given
+    # keep only interior depths (not 0 or unit.ground_domain_depth) and sort
+    transitions = sort!([d
+                         for d in unit.ground_layers_depths
+                         if (unit.epsilon_geometry < d < unit.ground_domain_depth - unit.epsilon_geometry)])
+
+    if !isempty(transitions)
+        dz_new = Float64[]
+        cum = 0.0              # cumulative depth at start of current cell
+        t_idx = 1              # pointer into transitions
+
+        for delta in dz
+            seg_start = cum
+            seg_end = cum + delta
+
+            # insert cuts that fall strictly inside this cell
+            while t_idx <= length(transitions) && transitions[t_idx] < seg_end - unit.epsilon_geometry
+                if transitions[t_idx] > seg_start + unit.epsilon_geometry
+                    push!(dz_new, transitions[t_idx] - seg_start)   # upper piece [seg_start, transitions[t_idx]]
+                end
+                seg_start = transitions[t_idx]                      # start next piece at the cut
+                t_idx += 1
+            end
+
+            # remainder of the cell
+            push!(dz_new, seg_end - seg_start)
+            cum = seg_end
+        end
+
+        dz = dz_new
     end
 
     unit.soil_dz = dz
