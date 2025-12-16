@@ -1939,7 +1939,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     max_w = max(max_w, min_w)
 
     # ----------------------------
-    # 3) z mesh: exact below STES, then tail
+    # 3) z mesh: first represents the layers of the STES in z-direction, then fine grid below STES and wide far below
     # ----------------------------
     dz = unit.number_of_STES_layer_below_ground > 0 ?
          copy(unit.dz[1:(unit.number_of_STES_layer_below_ground)]) :
@@ -2136,17 +2136,13 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 # masked neighbor → wall Robin (below ground only)
                 if h <= unit.number_of_STES_layer_below_ground
                     # map soil row h (depth from surface) to buried STES layer k (bottom→top)
-                    z_soil = unit.soil_z_centers[h]
-                    z_storage = unit.h_stes_buried - z_soil
+                    z_storage = unit.h_stes_buried - unit.soil_z_centers[h]
                     k = searchsortedfirst(cum_dz_below, z_storage + eps(Float64))
                     k = clamp(k, 1, unit.number_of_STES_layer_below_ground)
 
-                    # local wall face area represented by this cell
-                    A_face = max(2pi * unit.radius_at_row[h] * dz[h], eps(Float64))
-
                     U = unit.thermal_transmission_barrels[k]
-                    aP += U * A_face
-                    rhs += U * A_face * unit.temperature_segments[k]
+                    aP += U * unit.surface_area_barrel_segments[k]
+                    rhs += U * unit.surface_area_barrel_segments[k] * unit.temperature_segments[k]
                 end
             end
         end
