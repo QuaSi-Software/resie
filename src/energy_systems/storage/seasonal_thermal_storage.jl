@@ -175,7 +175,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
                    default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
                    default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
-                   default(config, "ground_model", "FEM"),         # ground_model. Can be one of "simple" or "FEM"
+                   default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FEM"
                    default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
                    default(config, "cp_medium", 4.186),            # specific thermal capacity of medium [kJ/kgK]
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
@@ -210,7 +210,7 @@ mutable struct SeasonalThermalStorage <: Component
                    # Losses
                    default(config, "thermal_transmission_lid", 0.25),                  # [W/(m^2K)]
                    default(config, "thermal_transmission_barrel_above_ground", 0.375), # [W/(m^2K)]
-                   default(config, "thermal_transmission_barrel_below_ground", 12.0),  # [W/(m^2K)]
+                   default(config, "thermal_transmission_barrel_below_ground", 0.375), # [W/(m^2K)]
                    Float64[],                                                          # thermal_transmission_barrels
                    default(config, "thermal_transmission_bottom", 0.375),              # [W/(m^2K)]
                    ambient_temperature_profile,                           # [°C]
