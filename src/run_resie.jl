@@ -19,6 +19,8 @@ function run_repl(input_filepath::String)
                                        min_log_level,
                                        input_filepath)
     run_ID = uuid1()
+    Resie_Logger.Logging.global_logger(logger)
     success, return_data = Resie.load_and_run(input_filepath, run_ID)
+    Resie.close_run(run_ID)
     Resie_Logger.close_logger(logger)
 end

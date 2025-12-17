@@ -13,16 +13,20 @@ include("resie_logger.jl")
 using .Resie_Logger
 using OrderedCollections: OrderedDict
 using UUIDs
+using CSV
 
 include("vdi2067.jl")
 using .VDI2067
 
+include("profiles/base.jl")
+using .Profiles
+using Infiltrator
 
 ############################################################
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/input_file_base.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base.json"
 
 
 ############################################################
@@ -116,10 +120,10 @@ function run_resie_variant(
     cfg["components"]["BufferTank"]["capacity"] = Cap_Wh
     cfg["components"]["Battery"]["capacity"]    = BattCap_Wh
     
-    # set price profiles 
+    # set price profiles paths
     price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_kWh.prf"
-    price_profile_path_reserve_power = ""
-    price_profile_path_reserve_energy = ""
+    price_profile_path_reserve_power = "./profiles/MA/boersenpreis_EUR_kWh.prf"
+    price_profile_path_reserve_energy = "./profiles/MA/boersenpreis_EUR_kWh.prf"
 
     ########################################################
     # Set limits / benchmark for economic_control.jl
@@ -187,10 +191,32 @@ function run_resie_variant(
 
     logger = Resie_Logger.start_logger(true, false, nothing, nothing,
                                        Resie_Logger.Logging.Warn, fname)
+    Resie_Logger.Logging.global_logger(logger)
 
-    success, sim_output = Resie.load_and_run(fname, UUID(runidx))
+    run_ID = UUID(runidx)
+    success, sim_output = Resie.load_and_run(fname, run_ID)
+    Resie.close_run(run_ID)
 
     Resie_Logger.close_logger(logger)
+
+    # create correct profiles from price_profile_paths and add the to sim_output
+    sim_params, _, _ = Resie.prepare_inputs(cfg, run_ID)
+    price_profile_stock = Profiles.Profile(price_profile_path_stock, sim_params)
+    price_profile_reserve_power = Profiles.Profile(price_profile_path_reserve_power, sim_params)
+    price_profile_reserve_energy = Profiles.Profile(price_profile_path_reserve_energy, sim_params)
+
+    stock_values = []
+    reserve_power_values = []
+    reserve_energy_values = []
+    for dt in keys(price_profile_stock.data)
+        push!(stock_values, price_profile_stock.data[dt])
+        push!(reserve_power_values, price_profile_reserve_power.data[dt])
+        push!(reserve_energy_values, price_profile_reserve_energy.data[dt])
+    end 
+    sim_output["Stock_Price"] = stock_values
+    sim_output["Reserve_Power_Price"] = reserve_power_values
+    sim_output["Reserve_Energy_Price"] = reserve_energy_values
+    
 
     return sim_output
 end
@@ -201,7 +227,7 @@ end
 # Main Loop
 ############################################################
 
-function main(base_input_path)
+function main(base_input_path, write_output)
     base_input = Resie.read_JSON(base_input_path)
     outdir = "./output/parameterstudy"
     mkpath(outdir)
@@ -215,6 +241,18 @@ function main(base_input_path)
         length(p_reserve_vals)
 
     println("Parameterstudy starts: $total_runs runs")
+
+    out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
+    touch(out_file_path)
+    header = join(["Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", 
+                   "Battery_Capacity / Wh", "Stock_Price / €/MWh", "Reserve_Price / €/4h", 
+                   "annuity_no / €", "annuity_mod / €", "annuity_pro / €", 
+                   "balance_power", "balance_heat"], ';') * "\n"
+    open(out_file_path, "a") do file_handle
+        write(file_handle, header)
+    end
+
+    println("Results file at $out_file_path created.")
 
     sim_output = OrderedDict()
     runidx = 0
@@ -234,11 +272,13 @@ function main(base_input_path)
             Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
             p_stock, p_reserve,
             runidx, total_runs;
-            write_output=true
+            write_output=write_output
         )
 
         # SimOutput in old format again
-        sim_output[runidx] = Dict("sim" => raw_sim)
+        sim_output[runidx] = Dict{String, Any}("sim" => raw_sim)
+        sim_output[runidx]["Balance_heat"] = sum(raw_sim["BUS_Heat Balance"])
+        sim_output[runidx]["Balance_power"] = sum(raw_sim["BUS_Power Balance"])
 
 
         ####################################################
@@ -250,22 +290,36 @@ function main(base_input_path)
         A0_Boiler = 80  * (Pth_Boiler / 1e3)
         A0_Buffer = 25  * (Cap_Wh / 1e3)
         A0_Batt   = 150 * (BattCap_Wh / 1e3)
+        # component lifetimes # TODO Adjust values in front and double check years
+        TN_HP = 20
+        TN_Boiler = 20
+        TN_Buffer = 20
+        TN_Batt = 12
 
-        components = VDIComponent[
-            heatpump_component(A0_HP),
-            boiler_component(A0_Boiler),
-            buffertank_component(A0_Buffer),
-            battery_component(A0_Batt)
+        components = VDI2067.VDIComponent[
+            VDI2067.heatpump_component(A0_HP, TN_HP),
+            VDI2067.boiler_component(A0_Boiler, TN_Boiler),
+            VDI2067.buffertank_component(A0_Buffer, TN_Buffer),
+            VDI2067.battery_component(A0_Batt, TN_Batt)
         ]
 
-        sim_output[runidx]["VDI_NO"] =
-            vdi2067_annuity(raw_sim, components, VDI_SCENARIO_NO)
+        sim_output[runidx]["VDI_NO"] = 1
+            # VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_NO)
 
-        sim_output[runidx]["VDI_MOD"] =
-            vdi2067_annuity(raw_sim, components, VDI_SCENARIO_MOD)
+        sim_output[runidx]["VDI_MOD"] = 2
+            # VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
 
-        sim_output[runidx]["VDI_PRO"] =
-            vdi2067_annuity(raw_sim, components, VDI_SCENARIO_PRO)
+        sim_output[runidx]["VDI_PRO"] = 3
+            # VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
+
+        # write important results to seperate file
+        parameters = [Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve]
+        annuities = collect(getindex.(Ref(sim_output[runidx]), ("VDI_NO", "VDI_MOD", "VDI_PRO")))
+        balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
+        row = join(vcat(parameters, annuities, balances), ';') * "\n"
+        open(out_file_path, "a") do file_handle
+            write(file_handle, row)
+        end
     end
 
     println("✔ Parameterstudy completed.")
@@ -274,5 +328,5 @@ function main(base_input_path)
 end
 
 
-main(base_input_path)
+main(base_input_path, false)
 
