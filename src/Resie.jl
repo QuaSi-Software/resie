@@ -409,7 +409,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                   "$(join(component_list, ", "))"
         end
     end
-    return do_return_data ? OrderedDict(zip(output_return_header, eachcol(output_return_data))) : nothing
+    return do_return_data ? OrderedDict{String, AbstractArray}(zip(output_return_header, eachcol(output_return_data))) : nothing
 end
 
 """
@@ -437,19 +437,19 @@ function load_and_run(filepath::String, run_ID::UUID)::Tuple{Bool, Union{Ordered
         # path traversal for security reasons
         if occursin("..", filepath)
             @error "Project config filepath must not contain .. path traversal"
-            return false
+            return false, nothing
         end
         project_config = read_JSON(abspath(filepath))
     catch exc
         if isa(exc, MethodError)
             @error "Could not parse project config file at $(abspath(filepath))"
-            return false
+            return false, nothing
         end
     end
 
     if project_config === nothing
         @error "Could not find or parse project config file at $(abspath(filepath))"
-        return false
+        return false, nothing
     end
 
     @info "-- Now preparing inputs"
