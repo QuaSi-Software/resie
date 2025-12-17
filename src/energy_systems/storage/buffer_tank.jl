@@ -294,10 +294,9 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        tank_temp = temperature_at_load(unit)
         if (exchange.temperature_min !== nothing
             &&
-            exchange.temperature_min > tank_temp)
+            exchange.temperature_min > unit.current_max_output_temperature)
             # we can only supply energy at a temperature at or below the tank's current
             # output temperature
             continue
@@ -307,10 +306,10 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
         if unit.load > used_heat
             unit.load -= used_heat
-            add!(outface, used_heat, nothing, tank_temp)
+            add!(outface, used_heat, nothing, unit.current_max_output_temperature)
             energy_demanded += used_heat
         else
-            add!(outface, unit.load, nothing, tank_temp)
+            add!(outface, unit.load, nothing, unit.current_max_output_temperature)
             energy_demanded += unit.load
             unit.load = 0.0
         end
