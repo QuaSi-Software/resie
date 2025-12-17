@@ -782,13 +782,14 @@ function calculate_slices(unit::HeatPump,
 
     # keep running until we ran out of either sources or sinks to check
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
-        # we can skip calculation if there is no energy left to be distributed. this can
-        # happen for example during potential calculations when another transformer has
-        # already used up all available energies. Do not consider heat_in in process 
-        # to account for COP == 1.0.
+        # we can skip calculation if there is no energy left to be distributed or we ran out
+        # of available time. this can happen for example during potential calculations when
+        # another transformer has already used up all available energies. Do not consider
+        # heat_in in process to account for COP == 1.0.
         if energies.available_el_in < EPS ||
            ((unit.cop == 0.0 || unit.cop > 1.0) && sum(energies.available_heat_in; init=0.0) < EPS) ||
-           sum(energies.available_heat_out; init=0.0) < EPS
+           sum(energies.available_heat_out; init=0.0) < EPS ||
+           available_time < EPS
             # end of condition
             break
         end
