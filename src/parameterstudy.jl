@@ -1,9 +1,9 @@
 ############################################################
-# parameterstudy.jl — neue Version ohne Varianten
+# parameterstudy.jl - a parameterstudy tool for resie
 # -----------------------------------------------------------
-# - Alle Komponenten sind immer vorhanden.
-# - Eine Komponente wird deaktiviert, indem ihr Parameter = 0 ist.
-# - Simulationsausgabe + VDI2067-Wirtschaftlichkeit pro UUID.
+# - All components are defined here
+# - A component is deactivated by setting power parameters = 0
+# - Parameterstudy calls for vdi2067.jl and outputs annuity and  heat price per MWh
 ############################################################
 
 using JSON
@@ -19,72 +19,76 @@ using .VDI2067
 
 
 ############################################################
-# Basis-Input laden
+# Load base input
 ############################################################
 
 base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/input_file_base.json"
 
 
 ############################################################
-# Parameterdefinition: untere Grenze, obere Grenze, Schrittweite
+# Definition of variable component parameters: lower limit, upper limit, step size
 ############################################################
 
-# Wärmepumpe (HeatPump)
-Pth_HP_lo   = 0e6
-Pth_HP_hi   = 20e6
-Pth_HP_step = 5e6
-Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)
+# HeatPump power (W)
+Pth_HP_lo   = 0.0e6         # lower limit
+Pth_HP_hi   = 9.0e6         # upper limit
+Pth_HP_step = 3.0e6         # step size
+Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
 
-# Boiler (Elektrodenkessel)
-Pth_Boiler_lo   = 0e6
-Pth_Boiler_hi   = 10e6
-Pth_Boiler_step = 5e6
-Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)
+# Boiler power (W)
+Pth_Boiler_lo   = 0.0e6     # lower limit
+Pth_Boiler_hi   = 7.0e6     # upper limit
+Pth_Boiler_step = 3.5e6     # step size
+Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
 
-# Pufferspeicher
-Cap_lo_Wh   = 0
-Cap_hi_Wh   = 200e6
-Cap_step_Wh = 50e6
-Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)
+# BufferTank capacity (Wh)
+Cap_lo_Wh   = 0.0e6         # lower limit
+Cap_hi_Wh   = 90.0e6        # upper limit
+Cap_step_Wh = 30.0e6        # step size
+Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
-# Batterie
-Batt_lo_Wh   = 0
-Batt_hi_Wh   = 200e3
-Batt_step_Wh = 100e3
-BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)
+# Battery capacity (Wh)
+Batt_lo_Wh   = 0            # lower limit
+Batt_hi_Wh   = 200e3        # upper limit
+Batt_step_Wh = 100e3        # step size
+BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
-# Marktpreisgrenzen
-p_stock_lo   = 80.0
-p_stock_hi   = 80.0
-p_stock_step = 10.0
-p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)
+# limit for energy stock prices for economic_control.jl (EUR/MWh)
+# if no grid price limit is to be considered, limit is set "towards infinity"
+# TODO adjust limits
+p_stock_lo   = 20.0         # lower limit
+p_stock_hi   = 100.0        # upper limit
+p_stock_step = 20.0         # step size
+p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
 
-# Regelenergiepreise
-p_res_lo   = 10.0
-p_res_hi   = 10.0
-p_res_step = 1.0
-p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)
+# benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot for economic_control.jl (EUR/4h-slot)
+# if control energy is not to be considerd, benchmark is set "towards infinity"
+# TODO adjust limits
+p_res_lo   = 10.0           # lower limit
+p_res_hi   = 10.0           # upper limit
+p_res_step = 1.0            # step size
+p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
 
 
 ############################################################
-# Hilfsfunktionen
+# helper functions
 ############################################################
 
-function safe(x)
-    replace(string(x), "." => "p")
+function safe(x)            
+    replace(string(x), "." => "p")  # creates a filename-safe string
 end
 
-function display_MW(W)
-    round(W / 1e6; digits=3)
+function display_MW(W)      
+    round(W / 1e6; digits=3)        # displays MW
 end
 
-function display_MWh(Wh)
-    round(Wh / 1e6; digits=3)
+function display_MWh(Wh)    
+    round(Wh / 1e6; digits=3)       # displays MWh
 end
 
 
 ############################################################
-# Simulation eines einzelnen Laufs
+# Simulation of a single run
 ############################################################
 
 function run_resie_variant(
@@ -100,20 +104,25 @@ function run_resie_variant(
         total_runs::Int;
         write_output::Bool=true
     )
-
+    # TODO variable timestamp has beed assigned but not used?
     timestamp = Dates.format(now(), "yyyy-mm-dd_HH:MM:SS")
     cfg = deepcopy(base_input)
 
     ########################################################
-    # Komponenten setzen (0 = deaktivieren)
+    # Set components
     ########################################################
     cfg["components"]["HeatPump"]["power_th"] = Pth_HP
     cfg["components"]["Boiler"]["power_th"]   = Pth_Boiler
     cfg["components"]["BufferTank"]["capacity"] = Cap_Wh
     cfg["components"]["Battery"]["capacity"]    = BattCap_Wh
+    
+    # set price profiles 
+    price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_kWh.prf"
+    price_profile_path_reserve_power = ""
+    price_profile_path_reserve_energy = ""
 
     ########################################################
-    # Economic control Preise setzen (falls verfügbar)
+    # Set limits / benchmark for economic_control.jl
     ########################################################
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
@@ -129,7 +138,8 @@ function run_resie_variant(
     end
 
     ########################################################
-    # Output-Dateien
+    # Output file
+    # TODO write all simulation outputs into one single file to reduce amount of files
     ########################################################
 
     if write_output
@@ -154,7 +164,7 @@ function run_resie_variant(
     end
 
     ########################################################
-    # Lauf-spezifische JSON speichern
+    # safe run specific inputfile_"xxx".json
     ########################################################
 
     fname = joinpath(
@@ -170,10 +180,10 @@ function run_resie_variant(
     end
 
     ########################################################
-    # Simulation durchführen
+    # run simulation
     ########################################################
 
-    println("[$runidx/$total_runs] → Starte Simulation: $(basename(fname))")
+    println("[$runidx/$total_runs] → start simulation: $(basename(fname))")
 
     logger = Resie_Logger.start_logger(true, false, nothing, nothing,
                                        Resie_Logger.Logging.Warn, fname)
@@ -188,7 +198,7 @@ end
 
 
 ############################################################
-# Hauptschleife
+# Main Loop
 ############################################################
 
 function main(base_input_path)
@@ -204,7 +214,7 @@ function main(base_input_path)
         length(p_stock_vals) *
         length(p_reserve_vals)
 
-    println("Parameterstudy startet: $total_runs Läufe")
+    println("Parameterstudy starts: $total_runs runs")
 
     sim_output = OrderedDict()
     runidx = 0
@@ -227,23 +237,25 @@ function main(base_input_path)
             write_output=true
         )
 
-        # SimOutput wieder im alten Format
+        # SimOutput in old format again
         sim_output[runidx] = Dict("sim" => raw_sim)
 
 
         ####################################################
-        # Wirtschaftlichkeit VDI 2067
+        # Econcomy based on VDI 2067 principles
         ####################################################
-        A0_HP     = 300 * (Pth_HP / 1e3)
+        # function for component investment costs based on installed capacity (EUR/kW)
+        # TODO Adjust factors in front
+        A0_HP     = 300 * (Pth_HP / 1e3)        
         A0_Boiler = 80  * (Pth_Boiler / 1e3)
         A0_Buffer = 25  * (Cap_Wh / 1e3)
         A0_Batt   = 150 * (BattCap_Wh / 1e3)
 
         components = VDIComponent[
-            heatpump_component(A0_HP,     20),
-            boiler_component(A0_Boiler,   20),
-            buffertank_component(A0_Buffer, 30),
-            battery_component(A0_Batt,    15)
+            heatpump_component(A0_HP),
+            boiler_component(A0_Boiler),
+            buffertank_component(A0_Buffer),
+            battery_component(A0_Batt)
         ]
 
         sim_output[runidx]["VDI_NO"] =
@@ -256,7 +268,7 @@ function main(base_input_path)
             vdi2067_annuity(raw_sim, components, VDI_SCENARIO_PRO)
     end
 
-    println("✔ Parameterstudy abgeschlossen.")
+    println("✔ Parameterstudy completed.")
 
     return sim_output
 end
