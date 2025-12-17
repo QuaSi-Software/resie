@@ -48,10 +48,10 @@ sim = Dict(
 ############################################################
 
 components = [
-    heatpump_component(25000, 20),      # A0=25k€, lifetime 20y
-    boiler_component(5000, 15),         # A0=5k€
-    buffertank_component(10000, 25),    # A0=10k€
-    battery_component(8000, 12)         # A0=8k€, lifetime 12y
+    heatpump_component(25000),      # A0=25k€
+    boiler_component(5000),         # A0=5k€
+    buffertank_component(10000),    # A0=10k€
+    battery_component(8000)         # A0=8k€
 ]
 
 
@@ -68,8 +68,8 @@ function print_results(label, result)
 end
 
 # Scenario 1: no escalation
-res_no = vdi2067_annuity(sim, components, VDI_SCENARIO_NO)
-print_results("NO ESCALATION", res_no)
+res_none = vdi2067_annuity(sim, components, VDI_SCENARIO_NONE)
+print_results("NO ESCALATION", res_none)
 
 # Scenario 2: moderate escalation
 res_mod = vdi2067_annuity(sim, components, VDI_SCENARIO_MOD)

@@ -1,0 +1,17 @@
+﻿Alle Werte in ct/kWh;Jan 2025;Feb 2025;Mär 2025;Apr 2025;Mai 2025;Jun 2025;Jul 2025;Aug 2025;Sep 2025;Okt 2025;Nov 2025;Dez 2025
+; ; ; ; ; ; ; ; ; ; ; ; 
+Spotmarktpreis; 11,414; 12,852; 9,473; 7,794; 6,734; 6,399; 8,780; 7,699; 8,351; 8,440; 10,188; 
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Wind an Land; 8,506; 11,591; 7,513; 7,314; 6,171; 5,141; 8,171; 6,824; 6,267; 5,579; 8,930; 
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Wind auf See; 9,702; 11,741; 8,136; 7,318; 6,338; 5,823; 8,294; 6,689; 6,748; 6,867; 9,091; 
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Solar; 11,511; 11,099; 5,027; 3,041; 1,997; 1,843; 5,923; 3,832; 4,307; 6,980; 9,102; 
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW; 11,414; 12,852; 9,473; 7,794; 6,734; 6,399; 8,780; 7,699; 8,351; 8,440; 10,188; 
+; ; ; ; ; ; ; ; ; ; ; ; 
+Negative Stunden (6H); Ja; Nein; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Nein; 
+Negative Stunden (4H); Ja; Nein; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Nein; 
+Negative Stunden (3H); Ja; Nein; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Nein; 
+Negative Stunden (1H); Ja; Nein; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Nein; 
+Negative Stunden (15MIN); ; ; ; ; ; ; ; ; ; Ja; Nein; 

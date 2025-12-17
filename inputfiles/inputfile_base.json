@@ -6,7 +6,13 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "csv_output_keys": "nothing",
-        "return_output_keys": "all_incl_flows",
+        "return_output_keys":  {
+	        "m_power":  ["Grid_In->HeatPump", "Grid_In->Boiler", "Grid_In->Demand_Power", "Grid_In->Battery", 
+			            "Photovoltaik->Grid_OUT", "WindFarm->Grid_OUT"],
+	        "ControlReserve": ["m_power:OUT"],
+            "Demand_Heat":  ["Demand"],
+            "Demand_Power": ["Demand"]
+        },
         "output_plot": "all_incl_flows"
     },
     "simulation_parameters": {
@@ -21,7 +27,7 @@
     },
     "components": {
         "Grid_IN": {
-            "type": "FlexibleSupply",
+            "type": "GridConnection",
             "output_refs": [
                 "BUS_Power"
             ],

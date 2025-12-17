@@ -1,0 +1,16 @@
+﻿Alle Werte in ct/kWh;Jan 2024;Feb 2024;Mär 2024;Apr 2024;Mai 2024;Jun 2024;Jul 2024;Aug 2024;Sep 2024;Okt 2024;Nov 2024;Dez 2024
+; ; ; ; ; ; ; ; ; ; ; ; 
+Spotmarktpreis; 7,657; 6,134; 6,470; 6,236; 6,721; 8,445; 6,770; 8,205; 7,831; 8,610; 11,391; 10,832
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Wind an Land; 6,502; 5,335; 5,538; 4,800; 5,608; 6,356; 4,985; 6,168; 6,266; 6,822; 8,881; 7,237
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Wind auf See; 7,138; 5,655; 5,937; 5,288; 5,582; 6,533; 5,781; 6,804; 6,579; 7,386; 9,499; 8,077
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW Solar; 7,535; 5,875; 4,965; 3,795; 3,161; 4,635; 3,554; 4,263; 4,512; 6,752; 10,076; 11,171
+; ; ; ; ; ; ; ; ; ; ; ; 
+MW; 7,657; 6,134; 6,470; 6,236; 6,721; 8,445; 6,770; 8,205; 7,831; 8,610; 11,391; 10,832
+; ; ; ; ; ; ; ; ; ; ; ; 
+Negative Stunden (6H); Ja; Nein; Nein; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja
+Negative Stunden (4H); Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja
+Negative Stunden (3H); Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja
+Negative Stunden (1H); Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja; Ja

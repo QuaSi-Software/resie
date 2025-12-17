@@ -1,4 +1,10 @@
-timestep;Benchmark_control_reserve
+# data_type:	intensive
+# time_definition:	startdate_timestamp
+# profile_start_date:	01.01.2024 00:00
+# profile_start_date_format:	dd.mm.yyyy HH:MM
+# timestamp_format:	seconds
+# interpolation_type:	linear_classic
+# time_shift_seconds:	0
 0;216.8590282
 900;216.8590282
 1800;216.8590282
