@@ -1,6 +1,5 @@
 module VDI2067
 using OrderedCollections: OrderedDict
-
 export VDIParams, VDIComponent, vdi2067_annuity,
        VDI_SCENARIO_NONE, VDI_SCENARIO_MOD, VDI_SCENARIO_PRO,
        heatpump_component, boiler_component, buffertank_component, battery_component
@@ -45,19 +44,19 @@ end
 ############################################################
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
-heatpump_component(A0::Real) =
+heatpump_component(A0::Real, TN::Number) =
     VDIComponent("HeatPump", float(A0), Int(TN), 0.015, 0.01)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
-boiler_component(A0::Real) =
+boiler_component(A0::Real, TN::Number) =
     VDIComponent("Boiler", float(A0), Int(TN), 0.02, 0.01)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
-buffertank_component(A0::Real) =
+buffertank_component(A0::Real, TN::Number) =
     VDIComponent("BufferTank", float(A0), Int(TN), 0.005, 0.005)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
-battery_component(A0::Real) =
+battery_component(A0::Real, TN::Number) =
     VDIComponent("Battery", float(A0), Int(TN), 0.01, 0.02)
 
 
@@ -226,19 +225,14 @@ end
 #  ENERGY COSTS — TIME-RESOLVED → ANNUITY
 ############################################################
 
-function energy_annuity(sim::Union{Dict, OrderedDict}, p::VDIParams)
+function energy_annuity(sim::Dict, p::VDIParams)
     # TODO not only Grid_IN but also control_reserve?
     IN = sim["Grid_IN"]                                         # Wh time series
     base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
-    # Add fixed components (taxes, grid fees, levies)
-    # This is a linear addition: total electricity price = market + fixed components
-    # TODO make more complex (e.g. peak-based grid fees)
-    price_eur_mwh = base_price .+ p.grid_price_addon
-
     # A_V1: energy costs of first year [EUR]
     # Convert Wh * €/MWh → EUR
-    A1 = sum(IN .* price_eur_mwh) * 1e-6
+    A1 = sum(IN .* base_price) * 1e-6
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
@@ -344,7 +338,7 @@ Returns:
 - Annualized feed-in revenue [EUR/a]
 """
 
-function revenue_feedin(sim::Union{Dict, OrderedDict}, p::VDIParams)
+function revenue_feedin(sim::Dict, p::VDIParams)
 
     # 1) PHOTOVOLTAIC
     A_E_PV = 0.0
@@ -391,32 +385,34 @@ end
 #  MAIN FUNCTION — TOTAL ANNUITY AND HEAT PRICE
 ############################################################
 
-function vdi2067_annuity(sim::Union{Dict, OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
+function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
+    sim_new = Dict()
+    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->Boiler"] .+
+                         sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+ sim["m_power EnergyFlow Grid_IN->Battery"]
+    sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
+    sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
+    sim_new["Control_energy"] = sim["ControlReserve m_power OUT"]
+    sim_new["Control_power_price"] = sim["Reserve_Power_Price"]
+    sim_new["Control_energy_price"] = sim["Reserve_Energy_Price"]
+    sim_new["Grid_price"] = sim["Stock_Price"]
+    sim_new["Market_Value_PV"] = sim["Market_Price_PV"]
+    sim_new["Market_Value_Wind"] = sim["Market_Price_Wind"]
 
-    sim["Grid_IN"] = sim["m_power Grid_In->HeatPump"] .+ sim["m_power Grid_In->Boiler"] .+
-                     sim["m_power Grid_In->Demand_Power"] .+ sim["m_power Grid_In->Battery"]
-    sim["Grid_Out_PV"] = sim["m_power Photovoltaic->Grid_OUT"]
-    sim["Grid_Out_Wind"] = sim["m_power WindFarm->Grid_OUT"]
-    sim["Control_energy"] = sim["ControlReserve m_power OUT"]
-    sim["Control_power_price"] = sim["Reserve_Power_Price"]
-    sim["Control_energy_price"] = sim["Reserve_Energy_Price"]
-    sim["Grid_price"] = sim["Stock_Price"]
-    sim["Market_Value_PV"] = sim["Market_Price_PV"]
-    sim["Market_Value_Wind"] = sim["Market_Price_Wind"]
+    sim = OrderedDict()
 
     A_cap   = round(sum(capital_annuity(c, p) for c in components), digits=2)
     A_op    = round(op_annuity(components, p), digits=2)
     A_misc  = round(misc_annuity(components, p), digits=2)
-    A_energy = round(energy_annuity(sim, p), digits=2)
+    A_energy = round(energy_annuity(sim_new, p), digits=2)
 
-    A_rev_control = round(revenue_control(sim, p), digits=2)
-    A_rev_feed    = round(revenue_feedin(sim, p), digits=2)
+    A_rev_control = round(revenue_control(sim_new, p), digits=2)
+    A_rev_feed    = round(revenue_feedin(sim_new, p), digits=2)
 
     A_total = round(A_cap + A_op + A_misc + A_energy -
               (A_rev_control + A_rev_feed), digits=2)
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
-        # Q_heat_kWh = sum(sim["Heat"]) / 1000.0
+        # Q_heat_kWh = sum(sim_new["Heat"]) / 1000.0
         # heat_price = round(A_total / Q_heat_kWh, digits=2)   # EUR/kWh
 
 
