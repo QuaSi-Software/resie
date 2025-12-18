@@ -122,8 +122,10 @@ function run_resie_variant(
     
     # set price profiles paths
     price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_kWh.prf"
-    price_profile_path_reserve_power = "./profiles/MA/boersenpreis_EUR_kWh.prf"
-    price_profile_path_reserve_energy = "./profiles/MA/boersenpreis_EUR_kWh.prf"
+    price_profile_path_reserve_power = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
+    price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
+    price_profile_path_market_value_pv = "./profiles/MA/market_value_PV_EUR_kWh.prf"
+    price_profile_path_market_value_wind = "./profiles/MA/market_value_Wind_EUR_kWh.prf"
 
     ########################################################
     # Set limits / benchmark for economic_control.jl
@@ -204,19 +206,26 @@ function run_resie_variant(
     price_profile_stock = Profiles.Profile(price_profile_path_stock, sim_params)
     price_profile_reserve_power = Profiles.Profile(price_profile_path_reserve_power, sim_params)
     price_profile_reserve_energy = Profiles.Profile(price_profile_path_reserve_energy, sim_params)
+    price_profile_market_value_pv = Profiles.Profile(price_profile_path_market_value_pv, sim_params)
+    price_profile_market_value_wind = Profiles.Profile(price_profile_path_market_value_wind, sim_params)
 
     stock_values = []
     reserve_power_values = []
     reserve_energy_values = []
+    market_value_pv_values = []
+    market_value_wind_values = []
     for dt in keys(price_profile_stock.data)
         push!(stock_values, price_profile_stock.data[dt])
         push!(reserve_power_values, price_profile_reserve_power.data[dt])
         push!(reserve_energy_values, price_profile_reserve_energy.data[dt])
+        push!(market_value_pv_values, price_profile_market_value_pv.data[dt])
+        push!(market_value_wind_values, price_profile_market_value_wind.data[dt])
     end 
     sim_output["Stock_Price"] = stock_values
     sim_output["Reserve_Power_Price"] = reserve_power_values
     sim_output["Reserve_Energy_Price"] = reserve_energy_values
-    
+    sim_output["Market_Price_PV"] = market_value_pv_values
+    sim_output["Market_Price_Wind"] = market_value_wind_values
 
     return sim_output
 end

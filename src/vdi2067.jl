@@ -46,19 +46,19 @@ end
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
 heatpump_component(A0::Real) =
-    VDIComponent("HeatPump", float(A0), 20, 0.015, 0.01)
+    VDIComponent("HeatPump", float(A0), Int(TN), 0.015, 0.01)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 15, 0.02, 0.01)
+    VDIComponent("Boiler", float(A0), Int(TN), 0.02, 0.01)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 15, 0.005, 0.005)
+    VDIComponent("BufferTank", float(A0), Int(TN), 0.005, 0.005)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real) =
-    VDIComponent("Battery", float(A0), 12, 0.01, 0.02)
+    VDIComponent("Battery", float(A0), Int(TN), 0.01, 0.02)
 
 
 ############################################################
@@ -318,6 +318,32 @@ end
 #  REVENUES — FEED-IN
 ############################################################
 
+"""
+    revenue_feedin(sim::Dict, p::VDIParams)
+
+Calculates annualized feed-in revenues for PV and wind plantsaccording to EEG.
+
+Assumptions:
+- Time resolution: 15 minutes (900 s)
+- Feed-in is remunerated via market value + market premium
+- Market premium is defined as: max(0, AW - market price)
+- PV and wind are treated separately with individual market values
+  and "anzulegender Wert" (AW)
+
+Required entries in `sim`:
+- "Grid_Out_PV"                :: Vector{Float64}
+- "Grid_Out_Wind"              :: Vector{Float64}
+- "Market_Value_PV"            :: Vector{Float64}
+- "Market_Value_Wind"          :: Vector{Float64}
+
+Required entries in `p`:
+- p.AW_PV     :: €/MWh
+- p.AW_Wind   :: €/MWh
+
+Returns:
+- Annualized feed-in revenue [EUR/a]
+"""
+
 function revenue_feedin(sim::Union{Dict, OrderedDict}, p::VDIParams)
 
     # 1) PHOTOVOLTAIC
@@ -325,9 +351,10 @@ function revenue_feedin(sim::Union{Dict, OrderedDict}, p::VDIParams)
 
     if haskey(sim, "Grid_Out_PV")
         E_PV = sim["Grid_Out_PV"]                                  
-        market_value_PV = vecize_price(sim["Market_price_PV"], length(E_PV))
+        market_value_PV = vecize_price(sim["Market_Value_PV"], length(E_PV))
 
         # Effective remuneration per timestep: max(MW, AW)
+        # the bigger number (market value or AW) per timestep is used
         price_eff_PV = max.(market_value_PV, p.AW_PV)
 
         # Wh * €/MWh → EUR
@@ -339,9 +366,10 @@ function revenue_feedin(sim::Union{Dict, OrderedDict}, p::VDIParams)
 
     if haskey(sim, "Grid_Out_Wind_Wh")
         E_Wind = sim["Grid_Out_Wind_Wh"]
-        market_value_Wind = vecize_price(sim["Market_price_Wind"], length(E_Wind))
+        market_value_Wind = vecize_price(sim["Market_Value_Wind"], length(E_Wind))
 
         # Effective remuneration per timestep: max(MW, AW)
+        # the bigger number (market value or AW) per timestep is used
         price_eff_Wind = max.(market_value_Wind, p.AW_Wind)
 
         # Wh * €/MWh → EUR
@@ -370,10 +398,12 @@ function vdi2067_annuity(sim::Union{Dict, OrderedDict}, components::Vector{VDICo
     sim["Grid_Out_PV"] = sim["m_power Photovoltaic->Grid_OUT"]
     sim["Grid_Out_Wind"] = sim["m_power WindFarm->Grid_OUT"]
     sim["Control_energy"] = sim["ControlReserve m_power OUT"]
-    sim["Control_power_price"] =
-    sim["Control_energy_price"] =
-    sim["Grid_price"] =
-    
+    sim["Control_power_price"] = sim["Reserve_Power_Price"]
+    sim["Control_energy_price"] = sim["Reserve_Energy_Price"]
+    sim["Grid_price"] = sim["Stock_Price"]
+    sim["Market_Value_PV"] = sim["Market_Price_PV"]
+    sim["Market_Value_Wind"] = sim["Market_Price_Wind"]
+
     A_cap   = round(sum(capital_annuity(c, p) for c in components), digits=2)
     A_op    = round(op_annuity(components, p), digits=2)
     A_misc  = round(misc_annuity(components, p), digits=2)
@@ -386,8 +416,8 @@ function vdi2067_annuity(sim::Union{Dict, OrderedDict}, components::Vector{VDICo
               (A_rev_control + A_rev_feed), digits=2)
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
-    # Q_heat_kWh = sum(sim["Heat"]) / 1000.0
-    # heat_price = round(A_total / Q_heat_kWh, digits=2)   # EUR/kWh
+        # Q_heat_kWh = sum(sim["Heat"]) / 1000.0
+        # heat_price = round(A_total / Q_heat_kWh, digits=2)   # EUR/kWh
 
 
     return Dict(

@@ -11,9 +11,17 @@
 			            "Photovoltaik->Grid_OUT", "WindFarm->Grid_OUT"],
 	        "ControlReserve": ["m_power:OUT"],
             "Demand_Heat":  ["Demand"],
-            "Demand_Power": ["Demand"]
+            "Demand_Power": ["Demand"],
+            "BUS_Power": ["Balance"], 
+            "BUS_Heat": ["Balance"]
         },
-        "output_plot": "all_incl_flows"
+        "output_plot": {
+            "m_power":  ["Grid_In->HeatPump", "Grid_In->Boiler", "Grid_In->Demand_Power", "Grid_In->Battery", 
+			            "Photovoltaik->Grid_OUT", "WindFarm->Grid_OUT"],
+	        "ControlReserve": ["m_power:OUT"],
+            "Demand_Heat":  ["Demand"],
+            "Demand_Power": ["Demand"]
+        }
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
