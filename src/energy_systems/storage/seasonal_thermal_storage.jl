@@ -106,7 +106,8 @@ mutable struct SeasonalThermalStorage <: Component
     soil_t2::Array{Float64}
     cells_active::Matrix{Bool}
     radius_at_row::Array{Float64}
-    equivalent_radius_from_bottom::Float64
+    equivalent_radius_bottom::Float64
+    sidewall_increase_factor::Float64
 
     # state variables
     current_max_output_temperature::Float64
@@ -252,7 +253,8 @@ mutable struct SeasonalThermalStorage <: Component
                    Array{Float64}(undef, 0, 0),                # soil_t2
                    Matrix{Bool}(undef, 0, 0),                  # cells_active
                    Float64[],                                  # radius_at_row
-                   0.0,                                        # equivalent_radius_from_bottom
+                   0.0,                                        # equivalent_radius_bottom
+                   0.0,                                        # sidewall_increase_factor
 
                    # state variables
                    0.0,                                            # current_max_output_temperature
@@ -399,12 +401,18 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     if unit.ground_model == "FEM"
         # get equivalent radii of bottom and lid of STES
-        unit.equivalent_radius_from_bottom, equivalent_radius_top = equiv_radii_for_ground(unit)
+        unit.equivalent_radius_bottom, equivalent_radius_top = equiv_radii_for_ground(unit)
+
+        # calculate factor for increasing the sidewall area in relation to a cylinder with 90° sidewall angle
+        a_barrel_cylinder = 2pi * (unit.equivalent_radius_bottom + equivalent_radius_top) / 2 * unit.height
+        a_barrel_cone = pi * (unit.equivalent_radius_bottom + equivalent_radius_top) *
+                        sqrt((equivalent_radius_top - unit.equivalent_radius_bottom)^2 + unit.height^2)
+        unit.sidewall_increase_factor = a_barrel_cone / a_barrel_cylinder  # >= 1.0
 
         # sanitary checks
         # get and check soil boundaries
         storage_radius_surface = equivalent_radius_top -
-                                 (equivalent_radius_top - unit.equivalent_radius_from_bottom) /
+                                 (equivalent_radius_top - unit.equivalent_radius_bottom) /
                                  unit.number_of_layer_total * unit.number_of_layer_above_ground
         if unit.ground_domain_radius === nothing
             unit.ground_domain_radius = unit.ground_domain_radius_factor * storage_radius_surface
@@ -1322,7 +1330,7 @@ function update_STES(unit::SeasonalThermalStorage,
     # mass_out and the corresponding temperature are single values that will always be drawn from the top layer
     mass_in = convert_energy_in_mass.(energy_input, t_old[lower_node], temperatures_input,
                                       unit.cp_medium)
-    mass_out = convert_energy_in_mass(energy_output, unit.low_temperature, temperature_output,
+    mass_out = convert_energy_in_mass(energy_output, return_temperature_input, temperature_output,
                                       unit.cp_medium)
 
     # Check if the mass flow is greater than the volume of the smallest segment. 
@@ -1350,7 +1358,7 @@ function update_STES(unit::SeasonalThermalStorage,
             mass_in = convert_energy_in_mass.(energy_input, t_old[lower_node],
                                               temperatures_input,
                                               unit.cp_medium)
-            mass_out = convert_energy_in_mass(energy_output, unit.low_temperature,
+            mass_out = convert_energy_in_mass(energy_output, return_temperature_input,
                                               t_old[unit.number_of_layer_total - unit.output_layer_from_top + 1],
                                               unit.cp_medium)
         end
@@ -2140,9 +2148,12 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                     k = searchsortedfirst(cum_dz_below, z_storage + eps(Float64))
                     k = clamp(k, 1, unit.number_of_STES_layer_below_ground)
 
+                    # local wall face area represented by this cell
+                    A_face = 2pi * unit.radius_at_row[h] * dz[h] * unit.sidewall_increase_factor
+
                     U = unit.thermal_transmission_barrels[k]
-                    aP += U * unit.surface_area_barrel_segments[k]
-                    rhs += U * unit.surface_area_barrel_segments[k] * unit.temperature_segments[k]
+                    aP += U * A_face
+                    rhs += U * A_face * unit.temperature_segments[k]
                 end
             end
         end
@@ -2162,7 +2173,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
 
         # NORTH (h-1) or base/top boundary
         if h == 1
-            if unit.number_of_STES_layer_below_ground == 0 && rc[i] <= unit.equivalent_radius_from_bottom + 1e-12
+            if unit.number_of_STES_layer_below_ground == 0 && rc[i] <= unit.equivalent_radius_bottom + 1e-12
                 # handle case if STES has zero layer below ground
                 A_n = 2pi * rc[i] * dr[i]
                 htop = unit.thermal_transmission_bottom
@@ -2197,7 +2208,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 push!(V, -aN)
             else
                 # masked neighbor → base Robin within equivalent bottom radius
-                if (rc[i] <= unit.equivalent_radius_from_bottom + 1e-12) &&
+                if (rc[i] <= unit.equivalent_radius_bottom + 1e-12) &&
                    (h == unit.number_of_STES_layer_below_ground + 1)
                     A_n = 2pi * rc[i] * dr[i]
                     hbot = unit.thermal_transmission_bottom
@@ -2248,7 +2259,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
     num = 0.0
     den = 0.0
     for i in 1:length(unit.soil_r_centers)
-        if unit.soil_r_centers[i] <= unit.equivalent_radius_from_bottom + 1e-12
+        if unit.soil_r_centers[i] <= unit.equivalent_radius_bottom + 1e-12
             w = 2pi * unit.soil_r_centers[i] * unit.soil_dr[i]
             num += unit.soil_t2[hbot, i] * w
             den += w
