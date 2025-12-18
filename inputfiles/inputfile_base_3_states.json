@@ -5,10 +5,9 @@
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
         "csv_time_unit": "date",
-        "csv_output_keys": "nothing",
         "return_output_keys":  {
 	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
-			            "Photovoltaik->Grid_OUT", "WindFarm->Grid_OUT"],
+			            "Photovoltaic->Grid_OUT", "WindFarm->Grid_OUT"],
 	        "ControlReserve": ["m_power:OUT"],
             "Demand_Heat":  ["Demand"],
             "Demand_Power": ["Demand"],
@@ -17,7 +16,7 @@
         },
         "output_plot": {
             "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
-			            "Photovoltaik->Grid_OUT", "WindFarm->Grid_OUT"],
+			            "Photovoltaic->Grid_OUT", "WindFarm->Grid_OUT"],
 	        "ControlReserve": ["m_power:OUT"],
             "Demand_Heat":  ["Demand"],
             "Demand_Power": ["Demand"]
@@ -31,10 +30,11 @@
         "time_step_unit": "seconds",
         "epsilon": 1e-7,
         "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
+
     },
     "components": {
         "Grid_IN": {
-            "type": "GridConnection",
+            "type": "FlexibleSupply",
             "output_refs": [
                 "BUS_Power"
             ],
@@ -142,7 +142,7 @@
             "m_heat_out": "m_heat",
             "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
-            "cop_function": "const:2.0",
+            "cop_function": "const:1.0",
             "bypass_cop": 15.0,
             "min_power_function": "const:0.0",
             "max_power_function": "const:1.0",
@@ -176,7 +176,7 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
-                    [0, 1, 1, 0, 0],
+                    [0, 0, 0, 0, 0],
                     [1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1],
                     [1, 1, 1, 0, 0],
@@ -185,10 +185,12 @@
             },
             "control_modules": [
                             {
-                    "name": "economic_control", 
-                    "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
-                    "limit_price": 10000.0,
-                    "new_connections_below_limit": {
+                    "name": "economic_control_3_states", 
+                    "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
+                                            "./profiles/MA/boersenpreis_EUR_kWh.prf"],
+                    "limit_prices": [100000, 0, 100],
+                    "new_connections_below_limits": [
+                        {
                         "input_order": [
                             "ControlReserve",
                             "Photovoltaic",
@@ -204,14 +206,43 @@
                             "Grid_OUT"
                         ],
                         "energy_flow": [
-                            [0, 1, 1, 0, 0],
+                            [0, 0, 0, 0, 0],
                             [1, 1, 1, 1, 1],
                             [1, 1, 1, 1, 1],
-                            [1, 1, 1, 1, 0],
+                            [1, 1, 1, 0, 0],
                             [1, 0, 0, 0, 0]
                         ]
                         },
-                    "bus_uac": "BUS_Power"   
+                        {
+                        "input_order": [
+                            "ControlReserve",
+                            "Photovoltaic",
+                            "WindFarm",
+                            "Grid_IN",
+                            "Battery"
+                        ],
+                        "output_order": [
+                            "Demand_Power",
+                            "HeatPump",
+                            "Boiler",
+                            "Battery",
+                            "Grid_OUT"
+                        ],
+                        "energy_flow": [
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1],
+                            [1, 0, 0, 0, 0]
+                        ]
+                        }
+                    ],
+                    "bus_uac": "BUS_Power",
+                    "storage_uac": "BufferTank",
+                    "demand_uac": "Demand_Heat",
+                    "hp_uac": "HeatPump",
+                    "boiler_uac": "Boiler",
+                    "reserve_uac": "ControlReserve"  
                     }
                 ]          
         },
@@ -234,16 +265,37 @@
                     [1, 1],
                     [1, 1],
 					[1, 0],
-					[1, 1],
-					[1, 1]
+					[1, 0],
+					[1, 0]
                 ]
             },
             "control_modules": [
                             {
-                    "name": "economic_control", 
-                    "price_profile_path": "./profiles/MA/boersenpreis_EUR_kWh.prf",
-                    "limit_price": 10000.0,
-                    "new_connections_below_limit": {
+                    "name": "economic_control_3_states", 
+                    "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
+                                            "./profiles/MA/boersenpreis_EUR_kWh.prf"],
+                    "limit_prices": [100000, 0, 100],
+                    "new_connections_below_limits": [{
+                        "input_order": [
+                            "HeatPump",
+                            "Boiler",
+                            "BufferTank",
+                            "HeatPump#secondary",
+                            "Boiler#secondary"
+                        ],
+                        "output_order": [
+                            "Demand_Heat",
+                            "BufferTank"
+                        ],
+                        "energy_flow": [
+                            [1, 1],
+                            [1, 1],
+                            [1, 0],
+                            [1, 0],
+                            [1, 0]
+                        ]
+                        },
+                        {
                         "input_order": [
                             "HeatPump",
                             "Boiler",
@@ -262,8 +314,14 @@
                             [1, 1],
                             [1, 0]
                         ]
-                        },
-                    "bus_uac": "BUS_Heat"   
+                        }
+                    ],
+                    "bus_uac": "BUS_Heat",
+                    "storage_uac": "BufferTank",
+                    "demand_uac": "Demand_Heat",
+                    "hp_uac": "HeatPump",
+                    "boiler_uac": "Boiler",
+                    "reserve_uac": "ControlReserve"   
                     }
                 ]        
         },
