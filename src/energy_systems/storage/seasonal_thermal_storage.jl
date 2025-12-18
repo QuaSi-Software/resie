@@ -177,8 +177,8 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
                    default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
                    default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FEM"
-                   default(config, "rho_medium", 1000.0),          # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.186),            # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "rho_medium", 1000.0),          # [kg/m^3] density of the medium 
+                   default(config, "cp_medium", 4186),             # [J/kgK] specific thermal capacity of medium 
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
                    0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
                    0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
@@ -286,9 +286,9 @@ end
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # Hook up input/output flow control
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          unload_storages(unit.controller, unit.m_heat_in))
+                          load_storages(unit.controller, unit.m_heat_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          load_storages(unit.controller, unit.m_heat_out))
+                          unload_storages(unit.controller, unit.m_heat_out))
 
     # set temperature vector: assuming a uniform temperature profile (mixed storage)
     mean_temperature = unit.initial_load * (unit.high_temperature - unit.low_temperature) + unit.low_temperature
@@ -338,20 +338,20 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # calculate coefficient for losses to ambient
     unit.sigma = zeros(unit.number_of_layer_total)
     unit.sigma[1] = unit.surface_area_bottom * unit.thermal_transmission_bottom /
-                    (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[1])          # [1/h] losses to ambient through bottom
+                    (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])          # [1/h] losses to ambient through bottom
     unit.sigma[end] = unit.surface_area_lid * unit.thermal_transmission_lid /
-                      (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambient through lid
+                      (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambient through lid
     unit.sigma = unit.sigma .+
                  unit.surface_area_barrel_segments .* unit.thermal_transmission_barrels ./
-                 (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambient though barrel
+                 (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambient though barrel
 
     # calculate coefficient for input/output energy. 
     # Currently not used, as no direct loading of energy into the storage through heat exchangers is implemented.
     # But may this is useful in the future...
-    # unit.lambda = 1 ./ (unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) * unit.volume_segments)          # [K/Wh] 
+    # unit.lambda = 1 ./ (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments)          # [K/Wh] 
 
     # coefficient for input/output mass flow, assuming water as fluid
-    cp_water = 4.18                                                                      # [kJ/kgK]
+    cp_water = 4180                                                                      # [J/kgK]
     unit.phi = cp_water ./ (unit.cp_medium * unit.rho_medium * unit.volume_segments)     # [1/kg]
 
     # coefficient for buoyancy effects
@@ -359,7 +359,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                   for n in 2:(unit.number_of_layer_total)]
     pushfirst!(unit.theta, 0.0)  # Set first element to 0
 
-    unit.capacity = unit.volume * unit.rho_medium * convert_kJ_in_Wh(unit.cp_medium) *
+    unit.capacity = unit.volume * unit.rho_medium * convert_J_in_Wh(unit.cp_medium) *
                     (unit.high_temperature - unit.low_temperature)  # [Wh]
     unit.load = unit.initial_load * unit.capacity
     unit.load_end_of_last_timestep = copy(unit.load)
@@ -456,6 +456,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         unit.row_cp = zeros(Float64, nz)
         for h in 1:nz
             unit.row_k[h], unit.row_rho[h], unit.row_cp[h] = soil_props_at_depth(unit, unit.soil_z_centers[h])
+            #[W/(m·K)]     [kg/m³]          [Wh/(kg*K)]
         end
 
         # calculate radius for each row
@@ -1214,12 +1215,12 @@ function calculate_input_energy_from_input_temperature(unit::SeasonalThermalStor
 end
 
 """ 
-convert_kJ_in_Wh(energy::Float64)
+convert_J_in_Wh(energy::Float64)
 
-takes energy in [kJ] and convert it to [Wh]
+takes energy in [J] and convert it to [Wh]
 """
-function convert_kJ_in_Wh(energy::Float64)::Float64
-    return energy / 3.6
+function convert_J_in_Wh(energy::Float64)::Float64
+    return energy / 3600
 end
 
 """
@@ -1231,14 +1232,14 @@ convert_energy_in_mass(energy, temp_low, temp_high, cp, roh)
 - `energy::Float64`: energy to convert [Wh]
 - `temp_low::Temperature`: lower temperature [°C]
 - `temp_high::Temperature`: upper temperature [°C]
-- `cp::Float64`: specific heat capacity [kJ/KgK]
+- `cp::Float64`: specific heat capacity [J/KgK]
 
 """
 function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
     if energy == 0.0
         return 0.0
     else
-        return energy / (convert_kJ_in_Wh(cp) * (temp_high - temp_low))
+        return energy / (convert_J_in_Wh(cp) * (temp_high - temp_low))
     end
 end
 
@@ -1255,7 +1256,7 @@ convert_mass_in_energy(mass, temp_low, temp_high, cp, roh)
 
 """
 function convert_mass_in_energy(mass::Float64, temp_low::Temperature, temp_high::Temperature, cp::Float64)::Float64
-    return mass * convert_kJ_in_Wh(cp) * (temp_high - temp_low)
+    return mass * convert_J_in_Wh(cp) * (temp_high - temp_low)
 end
 
 """
@@ -1883,7 +1884,7 @@ function soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
     end
     k = unit.ground_layers_k[min(j, length(unit.ground_layers_k))]
     rho = unit.ground_layers_rho[min(j, length(unit.ground_layers_rho))]
-    cp = unit.ground_layers_cp[min(j, length(unit.ground_layers_cp))]
+    cp = convert_J_in_Wh(unit.ground_layers_cp[min(j, length(unit.ground_layers_cp))])  # in Wh/(kgK)
     return k, rho, cp
 end
 
@@ -2151,9 +2152,12 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                     # local wall face area represented by this cell
                     A_face = 2pi * unit.radius_at_row[h] * dz[h] * unit.sidewall_increase_factor
 
-                    U = unit.thermal_transmission_barrels[k]
-                    aP += U * A_face
-                    rhs += U * A_face * unit.temperature_segments[k]
+                    # distance from wall face to this soil cell center
+                    d_wall_sc = max(rc[i] - unit.radius_at_row[h], dr[i] / 2)
+                    Ueff = effective_U_to_cellcenter(unit.thermal_transmission_barrels[k], unit.row_k[h], d_wall_sc)
+
+                    aP += Ueff * A_face
+                    rhs += Ueff * A_face * unit.temperature_segments[k]
                 end
             end
         end
@@ -2176,9 +2180,10 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
             if unit.number_of_STES_layer_below_ground == 0 && rc[i] <= unit.equivalent_radius_bottom + 1e-12
                 # handle case if STES has zero layer below ground
                 A_n = 2pi * rc[i] * dr[i]
-                htop = unit.thermal_transmission_bottom
-                aP += htop * A_n
-                rhs += htop * A_n * unit.temperature_segments[1]
+                Ueff = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[h], dz[h] / 2)
+
+                aP += Ueff * A_n
+                rhs += Ueff * A_n * unit.temperature_segments[1]
             else
                 # top boundary on ground surface
                 A_n = 2pi * rc[i] * dr[i]
@@ -2211,9 +2216,10 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 if (rc[i] <= unit.equivalent_radius_bottom + 1e-12) &&
                    (h == unit.number_of_STES_layer_below_ground + 1)
                     A_n = 2pi * rc[i] * dr[i]
-                    hbot = unit.thermal_transmission_bottom
-                    aP += hbot * A_n
-                    rhs += hbot * A_n * unit.temperature_segments[1]
+                    Ueff = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[h], dz[h] / 2)
+
+                    aP += Ueff * A_n
+                    rhs += Ueff * A_n * unit.temperature_segments[1]
                 end
             end
         end
@@ -2236,25 +2242,6 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
     unit.soil_t2 .= Tnew
     unit.soil_t1 .= unit.soil_t2
 
-    # interface temperatures
-    T_wall_side = Float64[]
-    for k in 1:(unit.number_of_STES_layer_below_ground)
-        # center of STES layer k: measured from bottom upwards
-        z_k = cum_dz_below[k] - unit.dz[k] / 2
-        # corresponding soil depth below surface
-        z_soil = unit.h_stes_buried - z_k
-
-        # find soil row whose center is just below/at this depth
-        h = searchsortedfirst(unit.soil_z_centers, z_soil + eps(Float64))
-        h = clamp(h, 1, nz)
-
-        # pick soil temp at first radius >= wall radius
-        idx = findfirst(x -> x >= unit.radius_at_row[k], unit.soil_r_centers)
-        val = idx === nothing ? unit.ground_temperature : unit.soil_t2[h, idx]
-
-        push!(T_wall_side, val)
-    end
-
     hbot = unit.number_of_STES_layer_below_ground + 1
     num = 0.0
     den = 0.0
@@ -2269,26 +2256,72 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
     end
     T_base = num / max(den, eps(Float64))
 
-    return T_wall_side, T_base
+    return T_base
+end
+
+function effective_U_to_cellcenter(U::Float64, k::Float64, d_soil::Float64)::Float64
+    if U <= 0.0
+        return 0.0
+    end
+    k_eff = max(k, eps(Float64))
+    d_soil_eff = max(d_soil, eps(Float64))
+    if !isfinite(U)   # treat Inf as "perfect contact" limited only by soil conduction
+        return k_eff / d_soil_eff
+    end
+    return 1.0 / (1.0 / U + d_soil_eff / k_eff)
+end
+
+function teff_from_cellcenter(T_tank::Float64, T_cell::Float64, U::Float64, Ueff::Float64)::Float64
+    # Choose Teff such that: U*(T_tank - Teff) == Ueff*(T_tank - T_cell)
+    if U <= 0.0 || Ueff <= 0.0
+        return T_tank  # zero flux
+    end
+    return T_tank - (Ueff / U) * (T_tank - T_cell)
 end
 
 function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
-    T_wall_side, T_base = solve_soil_unified!(unit, sim_params)
+    T_base = solve_soil_unified!(unit, sim_params)
 
-    # side below ground: each buried layer k gets its corresponding wall soil temperature
-    # T_wall_side is already in order of the STES layer (bottom STES layer is index 1)
-    for k in 1:(unit.number_of_STES_layer_below_ground)
-        unit.effective_ambient_temperature_barrels[k] = T_wall_side[k]
+    nz = length(unit.soil_z_centers)
+    nr = length(unit.soil_r_centers)
+
+    cum_dz_below = unit.number_of_STES_layer_below_ground > 0 ?
+                   cumsum(unit.dz[1:unit.number_of_STES_layer_below_ground]) : Float64[]
+
+    # --- side below ground: compute Teff so that STES loss term uses the SAME flux as the FEM Robin ---
+    for k in 1:unit.number_of_STES_layer_below_ground
+        # map STES layer k (bottom→top) to soil row h
+        z_k = cum_dz_below[k] - unit.dz[k] / 2                 # depth from tank bottom
+        z_soil = unit.h_stes_buried - z_k                      # depth from ground surface
+        h = searchsortedfirst(unit.soil_z_centers, z_soil + eps(Float64))
+        h = clamp(h, 1, nz)
+
+        r_wall = unit.radius_at_row[h]
+        idx = findfirst(j -> unit.cells_active[h, j] && (unit.soil_r_centers[j] >= r_wall - 1e-12), 1:nr)
+
+        Tc = (idx === nothing) ? unit.ground_temperature : unit.soil_t1[h, idx]
+        d_soil = (idx === nothing) ? (unit.soil_dr[1] / 2) :
+                 max(unit.soil_r_centers[idx] - r_wall, unit.soil_dr[idx] / 2)
+        Ueff = effective_U_to_cellcenter(unit.thermal_transmission_barrels[k], unit.row_k[h], d_soil)
+
+        unit.effective_ambient_temperature_barrels[k] = teff_from_cellcenter(unit.temperature_segments[k], Tc,
+                                                                             unit.thermal_transmission_barrels[k], Ueff)
     end
-    # side above ground: ambient temperature
-    for k in (unit.number_of_STES_layer_below_ground + 1):(unit.number_of_layer_total)
+
+    # --- side above ground: ambient temperature ---
+    for k in (unit.number_of_STES_layer_below_ground + 1):unit.number_of_layer_total
         unit.effective_ambient_temperature_barrels[k] = unit.ambient_temperature
     end
 
-    # lid is assumed to always face the ambient
+    # --- lid faces ambient ---
     unit.effective_ambient_temperature_top = unit.ambient_temperature
-    # bottom is assumed to always face the ground
-    unit.effective_ambient_temperature_bottom = T_base
+
+    # --- bottom: use the same idea with the area-weighted soil cell-center average T_base ---
+    hbot = clamp(unit.number_of_STES_layer_below_ground + 1, 1, nz)
+    Ueff = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[hbot], unit.soil_dz[hbot] / 2)
+
+    unit.effective_ambient_temperature_bottom = teff_from_cellcenter(unit.temperature_segments[1], T_base,
+                                                                     unit.thermal_transmission_bottom, Ueff)
 end
 
 # Build a view field where tank interior has the current layer temps
