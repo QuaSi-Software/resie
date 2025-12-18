@@ -286,9 +286,9 @@ end
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # Hook up input/output flow control
     set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
-                          load_storages(unit.controller, unit.m_heat_in))
+                          unload_storages(unit.controller, unit.m_heat_in))
     set_storage_transfer!(unit.output_interfaces[unit.m_heat_out],
-                          unload_storages(unit.controller, unit.m_heat_out))
+                          load_storages(unit.controller, unit.m_heat_out))
 
     # set temperature vector: assuming a uniform temperature profile (mixed storage)
     mean_temperature = unit.initial_load * (unit.high_temperature - unit.low_temperature) + unit.low_temperature
