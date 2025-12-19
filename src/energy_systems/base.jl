@@ -1556,6 +1556,144 @@ function calculate_energy_flow(interface::SystemInterface)::Float64
 end
 
 """
+    component_parameters(x::Type{HeatPump})::Dict{String,Any}
+
+Lists all configuration parameters accepted by the constructor of the component with the
+given type.
+
+# Args
+-`x::Type{Component}`: The subtype of Component
+# Returns
+-`Dict{String,NamedTuple}`: Definition of the parameters where keys are parameter names and
+    values contain metadata about each parameter (default value, description, type, required
+    status, unit and any conditionals with other parameters).
+"""
+function component_parameters(x::Type{Component})::Dict{String,NamedTuple}
+    # the abstract base type of all components doesn't accept any parameters, but also this
+    # base method of the function shouldn't be called on the abstract type
+    return Dict{String,NamedTuple}()
+end
+
+"""
+    extract_parameter(config::Dict, param_name::String, param_def::NamedTuple)
+
+Helper to extract and process a parameter from config using its definition.
+Handles special processing like function parsing where needed.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method.
+- `config::Dict{String,Any}`: The component config
+- `param_name::String`: Name of the parameter. Has to be an exact match, this is not checked
+    in this function.
+- `param_def::NamedTuple`: The parameter definition with its metadata
+- `sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any})
+    if isdefined(param_def, :default)
+        value = default(config, param_name, param_def.default)
+    elseif param_name in keys(config)
+        value = config[param_name]
+    else
+        throw(InputError("Missing required parameter $param_name"))
+    end
+
+    # cast to the type of the component
+    try
+        value = convert(param_def.type, value)
+    catch
+        throw(InputError("Can't convert given value for parameter $param_name to type $(param_def.type)"))
+    end
+
+    # special handling for function-type parameters
+    if isdefined(param_def, :function_type)
+        if param_def.function_type == "cop"
+            return parse_cop_function(value)
+        elseif param_def.function_type == "1dim"
+            return parse_efficiency_function(value)
+        elseif param_def.function_type == "2dim"
+            return parse_2dim_function(value)
+        else
+            throw(InputError("Unknown function type $(param_def.function_type)"))
+        end
+    end
+
+    return value
+end
+
+"""
+    extract_control_parameters(x::Type{Component}, config::Dict{String,Any})::Dict{String,Any}
+
+Extracts the control parameters from the config ready to be given to the `Controller` constructor.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method.
+- `config::Dict{String,Any}`: The config with the raw parameters
+# Returns
+- `Dict{String,Any}`: The extracted parameters
+"""
+function extract_control_parameters(x::Type{Component}, config::Dict{String,Any})::Dict{String,Any}
+    # TODO: for now this just carries the subconfig, if any, over to the Controller
+    # constructor. in the future we want to have those, as well as the control module,
+    # parameters being handled the same as the component parameters via a SSOT approach
+    if "control_parameters" in keys(config)
+        return config["control_parameters"]
+    end
+    return Dict{String,Any}()
+end
+
+"""
+    validate_config(x::Type{Component}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String)
+
+Validates the given configuration for interdependencies and consistency.
+
+Throws `InputError` if validation fails.
+
+# Args
+- `x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method. 
+- `config::Dict{String,Any}`: The raw parameter input config
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+- `sim_params::Dict{String,Any}`: Simulation parameters
+"""
+function validate_config(x::Type{Component}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    type_def = component_parameters(x)
+
+    # check, for parameters with field options, if the value is one of the options
+    for (name, value) in pairs(extracted)
+        if name in keys(type_def) && isdefined(type_def[name], :options)
+            if !(value in type_def.options)
+                throw(InputError("Given value $value is not in the allowed options for " *
+                                 "parameter $name of component $uac."))
+            end
+        end
+    end
+end
+
+"""
+    x::Type{Component}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any})::Tuple
+
+Constructs the initial values for the component's fields.
+
+# Args
+-`x::Type{Component}`: Not a required input, instead used for leveraging multiple
+    dispatch for type-specific methods that may invoke the base method
+-`uac::String`: The UAC of the component
+-`params::Dict{String,Any}`: The extracted and validated parameters
+-`raw_params::Dict{String,Any}`: The original component config before extraction
+# Returns
+-`Tuple`: A tuple matching the order expected by the `new()` constructor of the component
+"""
+function init_from_params(x::Type{Component}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any})::Tuple
+    return Tuple()
+end
+
+"""
     output_value(unit, key)
 
 Return the value for the output with the given output key.
