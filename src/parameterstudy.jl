@@ -194,20 +194,21 @@ function display_MWh(Wh)
     round(Wh / 1e6; digits=3)       # displays MWh
 end
 
-function save_to_prf(timestamps, values, filepath)
+function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
                         "# profile_start_date_format:", "# timestamp_format:", 
                         "# interpolation_type:"]
     header_values = ["intensive", "startdate_timestamp", "01.01.2024 00:00", 
                      "dd.mm.yyyy HH:MM", "seconds", "stepwise"]
-    open(filepath, "a") do file_handle
+    open(filepath, "w") do file_handle
         for (var, val) in zip(header_variables, header_values)
-            write(file_handle, var * "\t" * val)
+            write(file_handle, var * "\t" * val * "\n")
         end
         for (ts, val) in zip(timestamps, values)
-            write(file_handle, ts * ";" * val)
+            write(file_handle, string(ts) * ";" * string(val) * "\n")
         end      
     end
+
     println("Profile file at $filepath created.")
 end
 
@@ -295,7 +296,9 @@ function run_resie_variant(
     reserve_energy_values = []
     market_value_pv_values = []
     market_value_wind_values = []
-    for dt in keys(price_profile_stock.data)
+    date_range = Profiles.remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+
+    for dt in date_range
         push!(stock_values, price_profile_stock.data[dt] .* stock_mult .+ stock_addon)
         push!(reserve_power_values, price_profile_reserve_power.data[dt] .* reserve_power_mult .+ reserve_power_addon)
         push!(reserve_energy_values, price_profile_reserve_energy.data[dt] .* reserve_energy_mult .+ reserve_energy_addon)
@@ -305,25 +308,20 @@ function run_resie_variant(
 
     #calculate reserve_bench_profile from other profiles
     reserve_bench_values = zeros(size(stock_values, 1))
-    for (idx, dt) in enumerate(keys(price_profile_stock.data))
+    timestamps = zeros(Int, size(stock_values, 1))
+    for (idx, dt) in enumerate(date_range)
+        timestamps[idx] = Int((idx - 1) * sim_params["time_step_seconds"])
         if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
             idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
+            if idx_end ==35044 @infiltrate end
             reserve_bench_values[idx:idx_end] .= (mean(reserve_energy_values[idx:idx_end]) - mean(stock_values[idx:idx_end])) + # * 1
                                                  reserve_power_values[idx] * 4
         end
     end
-    timestamps = collect(0:sim_params["time_step_seconds"]:(sim_params["time_step_seconds"]*(length(reserve_bench_values)-1)))
 
     # reserve_bench profile will be overwritten with each run
     price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
     save_to_prf(timestamps, reserve_bench_values, price_profile_path_reserve_bench)
-
-    sim_output["Stock_Price"] = stock_values
-    sim_output["Reserve_Power_Price"] = reserve_power_values
-    sim_output["Reserve_Energy_Price"] = reserve_energy_values
-    sim_output["Market_Price_PV"] = market_value_pv_values
-    sim_output["Market_Price_Wind"] = market_value_wind_values
-    sim_output["Reserve_Bench_Price"] = reserve_bench_values
 
     ########################################################
     # Set limits / benchmark for economic_control.jl
@@ -368,6 +366,14 @@ function run_resie_variant(
 
     success, sim_output = Resie.load_and_run(fname, run_ID)
     Resie.close_run(run_ID)
+
+    # add the profiles to the sim_output to be used in vdi2067 calculation
+    sim_output["Stock_Price"] = stock_values
+    sim_output["Reserve_Power_Price"] = reserve_power_values
+    sim_output["Reserve_Energy_Price"] = reserve_energy_values
+    sim_output["Market_Price_PV"] = market_value_pv_values
+    sim_output["Market_Price_Wind"] = market_value_wind_values
+    sim_output["Reserve_Bench_Price"] = reserve_bench_values
 
     return sim_output
 end
@@ -479,7 +485,7 @@ function main(base_input_path, write_output)
         annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
-        replace!(row, '.' => ',')
+        row = replace(row, '.' => ',')
         open(out_file_path, "a") do file_handle
             write(file_handle, row)
         end
