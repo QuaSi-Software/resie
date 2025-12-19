@@ -1,6 +1,231 @@
 using Optim: optimize, minimizer, Options, NelderMead
 using ..Resie: get_run
 
+# // TODO: is_editable (für SUSI), typen sprachunabhängig, display name
+#! format: off
+const HEAT_PUMP_PARAMETERS = Dict(
+    "m_el_in" => (
+        default="m_e_ac_230v",
+        description="Electrical input medium",
+        required=false,
+        type=String,
+        unit="-"
+    ),
+    "m_heat_in" => (
+        default="m_h_w_lt1",
+        description="Heat input medium",
+        required=false,
+        type=String,
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        required=false,
+        type=String,
+        unit="-"
+    ),
+    "m_heat_out_secondary" => (
+        default="m_h_w_ht1",
+        description="Heat output medium on secondary interface",
+        required=false,
+        type=String,
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "has_secondary_interface" => (
+        default=false,
+        description="Secondary interface toggle",
+        required=false,
+        type=Bool,
+        unit="-"
+    ),
+    "primary_el_sources" => (
+        default=Vector{String}(),
+        description="Primary electricity sources",
+        required=false,
+        type=Vector{String},
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "secondary_el_sources" => (
+        default=Vector{String}(),
+        description="Secondary electricity sources",
+        required=false,
+        type=Vector{String},
+        conditionals=[("has_secondary_interface", "is_true")],
+        unit="-"
+    ),
+    "cop_function" => (
+        default="carnot:0.4",
+        description="COP function definition (e.g., 'carnot:0.4' or 'const:3.0')",
+        required=false,
+        type=String,
+        function_type="cop",
+        unit="-"
+    ),
+    "plf_function" => (
+        default="const:1.0",
+        description="Part Load Fraction function",
+        required=false,
+        type=String,
+        function_type="1dim",
+        conditional="model_type != 'simplified' or must be const",
+        unit="-"
+    ),
+    "max_power_function" => (
+        default="const:1.0",
+        description="Maximum power function as fraction of design power",
+        required=false,
+        type=String,
+        function_type="2dim",
+        unit="-"
+    ),
+    "min_power_function" => (
+        default="const:0.2",
+        description="Minimum power function as fraction of design power",
+        required=false,
+        type=String,
+        function_type="2dim",
+        unit="-"
+    ),
+    "icing_coefficients" => (
+        default="3,-0.42,15,2,30",
+        description="Icing loss coefficients (comma-separated)",
+        required=false,
+        type=String,
+        unit="-"
+    ),
+    "model_type" => (
+        default="simplified",
+        description="Operation model: 'simplified', 'on-off', or 'inverter'",
+        required=false,
+        type=String,
+        options=["simplified", "on-off", "inverter"],
+        unit="-"
+    ),
+    "power_th" => (
+        default=nothing,
+        description="Design thermal power",
+        required=true,
+        type=Float64,
+        unit="W"
+    ),
+    "bypass_cop" => (
+        default=15.0,
+        description="COP in bypass operation (when input >= output temp)",
+        required=false,
+        type=Float64,
+        unit="-"
+    ),
+    "min_usage_fraction" => (
+        default=0.0,
+        description="Minimum part-load ratio to operate",
+        required=false,
+        type=Float64,
+        unit="-"
+    ),
+    "consider_icing" => (
+        default=false,
+        description="Account for icing losses on evaporator",
+        required=false,
+        type=Bool,
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        required=false,
+        type=Floathing,
+        unit="°C"
+    ),
+    "input_temperature" => (
+        default=nothing,
+        description="Fixed input temperature, or nothing for auto-detection",
+        required=false,
+        type=Floathing,
+        unit="°C"
+    ),
+    "nr_optimisation_passes" => (
+        default=20,
+        description="Maximum iterations for PLR optimization",
+        required=false,
+        type=UInt,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_heat" => (
+        default=5.0,
+        description="Weight for heat demand matching in optimization",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_time" => (
+        default=1.0,
+        description="Weight for time usage in optimization (on-off only)",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "eval_factor_elec" => (
+        default=1.0,
+        description="Weight for electricity minimization in optimization (inverter only)",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "fudge_factor" => (
+        default=1.001,
+        description="Overestimation factor for available heat output",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "x_abstol" => (
+        default=0.01,
+        description="Absolute tolerance for PLR optimization",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "f_abstol" => (
+        default=0.001,
+        description="Objective function tolerance for PLR optimization",
+        required=false,
+        type=Float64,
+        conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
+        unit="-"
+    ),
+    "power_losses_factor" => (
+        default=0.97,
+        description="Fraction of input power used (losses: 1 - factor)",
+        required=false,
+        type=Float64,
+        unit="-"
+    ),
+    "heat_losses_factor" => (
+        default=0.95,
+        description="Fraction of input heat used (losses: 1 - factor)",
+        required=false,
+        type=Float64,
+        unit="-"
+    ),
+    "constant_loss_power" => (
+        default=0.0,
+        description="Constant standby power loss",
+        required=false,
+        type=Float64,
+        unit="W"
+    ),
+)
+#! format: on
+
 """
 Implementation of a heat pump component, elevating heat to a higher temperature using
 electricity.
@@ -74,108 +299,152 @@ mutable struct HeatPump <: Component
     time_active::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
+        constructor_errored = false
 
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        has_secondary_interface = default(config, "has_secondary_interface", false)
-        m_heat_out_secondary = Symbol(adjust_name_if_secondary(default(config, "m_heat_out_secondary", "m_h_w_ht1"),
-                                                               true))
-
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
-
-        func_def = default(config, "cop_function", "carnot:0.4")
-        cop_function = parse_cop_function(func_def)
-        constant_cop = nothing
-        if occursin("const", func_def)
-            constant_cop = cop_function(1.0)
+        # extract all parameters using the parameter dictionary as the source of truth
+        extracted_params = Dict{String,Any}()
+        for (param_name, param_def) in HEAT_PUMP_PARAMETERS
+            try
+                extracted_params[param_name] = extract_parameter(HeatPump, config, param_name, param_def, sim_params)
+            catch err
+                @error "$err"
+                constructor_errored = true
+            end
         end
 
-        func_def = default(config, "plf_function", "const:1.0")
-        plf_function = parse_efficiency_function(func_def)
+        try
+            # extract control_parameters, which is essentially a subconfig
+            extracted_params["control_parameters"] = extract_control_parameters(Component, config)
 
-        func_def = default(config, "max_power_function", "const:1.0")
-        max_power_function = parse_2dim_function(func_def)
-
-        func_def = default(config, "min_power_function", "const:0.2")
-        min_power_function = parse_2dim_function(func_def)
-
-        coeff_def = default(config, "icing_coefficients", "3,-0.42,15,2,30")
-        icing_coefficients = parse.(Float64, split(coeff_def, ","))
-
-        model_type = lowercase(default(config, "model_type", "simplified"))
-        if !(model_type in ("simplified", "on-off", "inverter"))
-            @error "Unknown model type $(model_type) given for heat pump $(uac)."
-            throw(InputError)
+            # validate configuration, e.g. for interdependencies and allowed values
+            validate_config(HeatPump, config, extracted_params, uac, sim_params)
+        catch
+            @error "$err"
+            constructor_errored = true
         end
 
-        if model_type in ("inverter", "on-off") && constant_cop !== nothing
-            @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
-                   "or on-off operation, but has a constant COP. Toggle optimisation off " *
-                   "by switching to simplified model type as the algorithm is unstable " *
-                   "this case."
-            throw(InputError)
+        # we delayed throwing the errors upwards so that many errors are caught at once
+        if constructor_errored
+            throw(InputError("Can't construct component $uac because of errors parsing " *
+                             "the parameter config. Check the error log for more " *
+                             "information on each error."))
         end
 
-        if model_type == "simplified" && !occursin("const", default(config, "plf_function", "const:1.0"))
-            @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
-                   "function. The simplified model cannot handle this correctly. Please " *
-                   "use a different model type or switch to a constant PLF function."
-            throw(InputError)
-        end
-
-        output_interfaces = InterfaceMap(m_heat_out => nothing)
-        if has_secondary_interface
-            output_interfaces[m_heat_out_secondary] = nothing
-        end
-
-        return new(uac,
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,
-                   InterfaceMap(m_heat_in => nothing,
-                                m_el_in => nothing),
-                   output_interfaces,
-                   m_el_in,
-                   m_heat_out,
-                   m_heat_out_secondary,
-                   m_heat_in,
-                   has_secondary_interface,                       # specifies is the unit has a secondary interface in heat output to split heat generation from different electricity sources
-                   default(config, "primary_el_sources", []),     # electricity source(s) used for the primary heat output interface (only if has_secondary_interface)
-                   default(config, "secondary_el_sources", []),   # electricity source(s) used for the secondary heat output interface (only if has_secondary_interface)
-                   model_type,
-                   config["power_th"],
-                   max_power_function,
-                   min_power_function,
-                   plf_function,
-                   constant_cop,
-                   cop_function,
-                   default(config, "bypass_cop", 15.0),
-                   default(config, "min_usage_fraction", 0.0),
-                   default(config, "consider_icing", false),
-                   icing_coefficients,
-                   default(config, "output_temperature", nothing),
-                   default(config, "input_temperature", nothing),
-                   UInt(default(config, "nr_optimisation_passes", 20)),
-                   default(config, "eval_factor_heat", 5.0),
-                   default(config, "eval_factor_time", 1.0),
-                   default(config, "eval_factor_elec", 1.0),
-                   default(config, "fudge_factor", 1.001),
-                   default(config, "x_abstol", 0.01),
-                   default(config, "f_abstol", 0.001),
-                   default(config, "power_losses_factor", 0.97),
-                   default(config, "heat_losses_factor", 0.95),
-                   sim_params["watt_to_wh"](default(config, "constant_loss_power", 0.0)),
-                   0.0, # current_constant_loss
-                   0.0, # losses_power
-                   0.0, # losses_heat
-                   0.0, # losses
-                   0.0, # cop
-                   0.0, # effective_cop
-                   0.0, # mixing temperature in the input interface
-                   0.0, # mixing temperature in the output interface
-                   0.0, # avg_plr
-                   0.0) # time_active
+        # initialize and construct the object
+        init_values = init_from_params(HeatPump, uac, extracted_params, config)
+        return new(init_values...)
     end
+end
+
+function component_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
+    return deepcopy(HEAT_PUMP_PARAMETERS) # Return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any})
+    if param_name == "icing_coefficients"
+        value = default(config, param_name, param_def.default)
+        return parse.(Float64, split(value, ","))
+    end
+
+    if param_name == "constant_loss_power"
+        value = default(config, param_name, param_def.default)
+        return sim_params["watt_to_wh"](value)
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params)
+end
+
+function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, config, extracted, uac, sim_params)
+
+    model_type = extracted["model_type"]
+    cop_func_def = default(config, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
+    plf_func_def = default(config, "plf_function", HEAT_PUMP_PARAMETERS["plf_function"].default)
+
+    if model_type in ("inverter", "on-off") && occursin("const", cop_func_def)
+        @error "Heat pump $(uac) is configured to use optimisation for inverter-driven" *
+               "or on-off operation, but has a constant COP. Toggle optimisation off " *
+               "by switching to simplified model type as the algorithm is unstable " *
+               "this case."
+        throw(InputError)
+    end
+
+    if model_type == "simplified" && !occursin("const", plf_func_def)
+        @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
+               "function. The simplified model cannot handle this correctly. Please " *
+               "use a different model type or switch to a constant PLF function."
+        throw(InputError)
+    end
+end
+
+function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    m_el_in = Symbol(params["m_el_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    m_heat_out_secondary = Symbol(adjust_name_if_secondary(m_heat_out, true))
+    m_heat_in = Symbol(params["m_heat_in"])
+    register_media([m_el_in, m_heat_out, m_heat_in, m_heat_out_secondary])
+
+    # set constant COP if the function is defined that way
+    constant_cop = nothing
+    func_def = default(raw_params, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)
+    if occursin("const", func_def)
+        constant_cop = params["cop_function"](0.0, 0.0)
+    end
+
+    output_interfaces = InterfaceMap(m_heat_out => nothing)
+    if params["has_secondary_interface"]
+        output_interfaces[m_heat_out_secondary] = nothing
+    end
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_heat_in => nothing, m_el_in => nothing),
+            output_interfaces,
+            m_el_in,
+            m_heat_out,
+            m_heat_out_secondary,
+            m_heat_in,
+            params["has_secondary_interface"],
+            params["primary_el_sources"],
+            params["secondary_el_sources"],
+            params["model_type"],
+            params["power_th"],
+            params["max_power_function"],
+            params["min_power_function"],
+            params["plf_function"],
+            constant_cop,
+            params["cop_function"],
+            params["bypass_cop"],
+            params["min_usage_fraction"],
+            params["consider_icing"],
+            params["icing_coefficients"],
+            params["output_temperature"],
+            params["input_temperature"],
+            params["nr_optimisation_passes"],
+            params["eval_factor_heat"],
+            params["eval_factor_time"],
+            params["eval_factor_elec"],
+            params["fudge_factor"],
+            params["x_abstol"],
+            params["f_abstol"],
+            params["power_losses_factor"],
+            params["heat_losses_factor"],
+            params["constant_loss_power"],
+            0.0,  # current_constant_loss
+            0.0,  # losses_power
+            0.0,  # losses_heat
+            0.0,  # losses
+            0.0,  # cop
+            0.0,  # effective_cop
+            0.0,  # mix_temp_input
+            0.0,  # mix_temp_output
+            0.0,  # avg_plr
+            0.0)  # time_active
 end
 
 """
