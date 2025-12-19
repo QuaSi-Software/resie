@@ -26,7 +26,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_3_states.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
 
 
 ############################################################
@@ -131,8 +131,6 @@ state_earn_power =Dict{String,Any}(
                 [1, 0, 0, 0, 0]
             ])
 
-states_power_bus = [state_save_power, state_earn_power]
-
 # if price_profile_stock > p_stock
 state_save_heat = Dict{String,Any}(
              "input_order"=> [
@@ -177,6 +175,7 @@ state_earn_heat =Dict{String,Any}(
 
 
 states_heat_bus = [state_save_heat, state_earn_heat]
+states_power_bus = [state_save_power, state_earn_power]
 
 ############################################################
 # helper functions
@@ -331,15 +330,9 @@ function run_resie_variant(
         cm = cfg["components"]["BUS_Power"]["control_modules"][1]
         cm["price_profile_paths"] = [price_profile_path_stock, price_profile_path_reserve_bench]
         cm["limit_prices"] = [p_stock, 0, p_reserve]
-        cm["new_connections_below_limits"] = states_power_bus
-    end
-
-    if haskey(cfg["components"], "BUS_Heat") &&
-       haskey(cfg["components"]["BUS_Heat"], "control_modules")
-        cm = cfg["components"]["BUS_Heat"]["control_modules"][1]
-        cm["price_profile_paths"] = [price_profile_path_stock, price_profile_path_reserve_bench]
-        cm["limit_prices"] = [p_stock, 0, p_reserve]
-        cm["new_connections_below_limits"] = states_heat_bus
+        cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
+        cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 
+                                                  "BUS_Heat" => states_heat_bus)
     end
 
     ########################################################
