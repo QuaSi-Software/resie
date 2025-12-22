@@ -2,8 +2,7 @@ using Revise
 using Resie
 using UUIDs
 Revise.track(Resie)
-include("resie_logger.jl")
-using .Resie_Logger
+using Resie.Resie_Logger
 
 function run_repl(input_filepath::String)
     revise()

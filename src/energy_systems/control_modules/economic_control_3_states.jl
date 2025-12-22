@@ -1,7 +1,5 @@
 using Dates
 using ..Resie
-using Infiltrator
-include("../../file_output.jl")
 using OrderedCollections: OrderedDict
 """
 Control module for setting limits to the PLR of a component according to a price_profile and 
@@ -140,7 +138,7 @@ mutable struct CM_EconomicControl3States <: ControlModule
                 mod_params["storage_uac"] => ["Load", "Capacity"],
                 mod_params["hp_uac"] =>  ["m_power:IN", "m_heat:OUT"]
             )
-            output_data_keys = output_keys(comps, output_keys_dict)
+            output_data_keys = Resie.output_keys(comps, output_keys_dict)
             output_data = zeros(Float64, length(sim_range), 1 + length(output_data_keys))
             output_data_keys_string = []
             for key in output_data_keys
@@ -156,11 +154,10 @@ mutable struct CM_EconomicControl3States <: ControlModule
             for (step, ts_ahead) in enumerate(sim_range)
                 sp["current_date"] = ts_ahead
                 perform_operations(comps, ops, sp)
-                output_data[step, :] = gather_output_data(output_data_keys, sp["time_since_output"])
+                output_data[step, :] = Resie.gather_output_data(output_data_keys, sp["time_since_output"])
                 sp["time_since_output"] += Int(sp["time_step_seconds"])
             end
             output_data = OrderedDict(zip(output_data_keys_string, eachcol(output_data)))
-            @infiltrate
             # logic to evaluate if reserve control energy can be used
             storage = comps[mod_params["storage_uac"]]
             hp = comps[mod_params["storage_uac"]]

@@ -9,18 +9,14 @@
 using JSON
 using Dates
 using Resie
-include("resie_logger.jl")
-using .Resie_Logger
+import Resie.Resie_Logger: start_logger, Logging, close_logger
+using Resie.Profiles 
 using OrderedCollections: OrderedDict
 using UUIDs
 using Statistics: mean
 
 include("vdi2067.jl")
-using .VDI2067
-
-include("profiles/base.jl")
-using .Profiles
-using Infiltrator
+import .VDI2067
 
 ############################################################
 # Load base input
@@ -237,7 +233,6 @@ function run_resie_variant(
     stock_addon, reserve_power_addon, reserve_energy_addon, market_value_pv_addon, market_value_wind_addon = profile_addons
     stock_mult, reserve_power_mult, reserve_energy_mult, market_value_pv_mult, market_value_wind_mult = profile_multipliers
     p_stock = p_stock / stock_mult - stock_addon
-    p_reserve = p_reserve / reserve_power_mult - reserve_power_addon
 
     cfg = deepcopy(base_input)
 
@@ -245,9 +240,9 @@ function run_resie_variant(
     # Set components
     ########################################################
     cfg["components"]["HeatPump"]["power_th"] = Pth_HP
-    cfg["components"]["Boiler"]["power_th"]   = Pth_Boiler
+    cfg["components"]["Boiler"]["power_th"] = Pth_Boiler
     cfg["components"]["BufferTank"]["capacity"] = Cap_Wh
-    cfg["components"]["Battery"]["capacity"]    = BattCap_Wh
+    cfg["components"]["Battery"]["capacity"] = BattCap_Wh
     
     ########################################################
     # Output file
@@ -284,18 +279,18 @@ function run_resie_variant(
     # create correct profiles from price_profile_paths and add the to sim_output
     run_ID = UUID(runidx)
     sim_params, _, _ = Resie.prepare_inputs(cfg, run_ID)
-    price_profile_stock = Profiles.Profile(price_profile_path_stock, sim_params)
-    price_profile_reserve_power = Profiles.Profile(price_profile_path_reserve_power, sim_params)
-    price_profile_reserve_energy = Profiles.Profile(price_profile_path_reserve_energy, sim_params)
-    price_profile_market_value_pv = Profiles.Profile(price_profile_path_market_value_pv, sim_params)
-    price_profile_market_value_wind = Profiles.Profile(price_profile_path_market_value_wind, sim_params)
+    price_profile_stock = Profile(price_profile_path_stock, sim_params)
+    price_profile_reserve_power = Profile(price_profile_path_reserve_power, sim_params)
+    price_profile_reserve_energy = Profile(price_profile_path_reserve_energy, sim_params)
+    price_profile_market_value_pv = Profile(price_profile_path_market_value_pv, sim_params)
+    price_profile_market_value_wind = Profile(price_profile_path_market_value_wind, sim_params)
 
     stock_values = []
     reserve_power_values = []
     reserve_energy_values = []
     market_value_pv_values = []
     market_value_wind_values = []
-    date_range = Profiles.remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+    date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
 
     for dt in date_range
         push!(stock_values, price_profile_stock.data[dt] .* stock_mult .+ stock_addon)
@@ -312,14 +307,20 @@ function run_resie_variant(
         timestamps[idx] = Int((idx - 1) * sim_params["time_step_seconds"])
         if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
             idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
-            if idx_end ==35044 @infiltrate end
             reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1 # TODO variable time?
                                                  reserve_power_values[idx] * 4
         end
     end
 
-    # reserve_bench profile will be overwritten with each run
-    price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
+    # reserve_bench profile will be overwritten for every run to make sure the 
+    # profile_multipliers and profile_addons calculated correctly.
+    # If multiple threads are used each thread gets their own profile.
+    if Threads.nthreads() > 1
+        price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_profiles/reserve_bench_price_EUR_MW_$(Threads.threadid()).prf" 
+    else
+        price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
+        # reserve_bench profile will be only created when it's not there
+    end
     save_to_prf(timestamps, reserve_bench_values, price_profile_path_reserve_bench)
 
     ########################################################
@@ -388,7 +389,7 @@ function main(base_input_path, write_output)
         length(p_stock_vals) *
         length(p_reserve_vals)
 
-    println("Parameterstudy starts: $total_runs runs")
+    println("Parameterstudy starts: $total_runs runs on $(Threads.nthreads()) parallel Threads")
 
     out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
     touch(out_file_path)
@@ -407,20 +408,21 @@ function main(base_input_path, write_output)
 
     println("Results file at $out_file_path created.")
 
-    sim_output = OrderedDict()
-    runidx = 0
+    output_lock = ReentrantLock()
 
-    logger = Resie_Logger.start_logger(true, false, nothing, nothing,
-                                       Resie_Logger.Logging.Warn, nothing)
-    Resie_Logger.Logging.global_logger(logger)
+    runidx_global = Threads.Atomic{Int}(1)
 
+    logger = start_logger(true, false, nothing, nothing,
+                          Logging.Warn, nothing)
+    Logging.global_logger(logger)
 
-    for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve) in
-        Iterators.product(Pth_HP_vals, Pth_Boiler_vals, Cap_vals_Wh,
-                          BattCap_vals_Wh, p_stock_vals, p_reserve_vals)
-
-        runidx += 1
-
+    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve) in
+        collect(Iterators.product(Pth_HP_vals, Pth_Boiler_vals, Cap_vals_Wh,
+                                  BattCap_vals_Wh, p_stock_vals, p_reserve_vals))
+        
+        runidx = Threads.atomic_add!(runidx_global, 1)
+        sim_output = OrderedDict()
+        start_time = now()
         ####################################################
         # Simulation
         ####################################################
@@ -474,17 +476,25 @@ function main(base_input_path, write_output)
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
         row = replace(row, '.' => ',')
-        open(out_file_path, "a") do file_handle
-            write(file_handle, row)
+        # Lock the file writing
+        Threads.lock(output_lock)
+        try
+            open(out_file_path, "a") do file_handle
+                write(file_handle, row)
+            end
+        finally
+            Threads.unlock(output_lock)
         end
+
+        runtime = round(Int, Dates.seconds(now() - start_time))
+        eta = (total_runs - runidx) * runtime / Threads.nthreads() / 60
+        println("[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min")
     end
 
-    Resie_Logger.close_logger(logger)
+    close_logger(logger)
     println("✔ Parameterstudy completed.")
 
     return sim_output
 end
 
-
 main(base_input_path, false)
-

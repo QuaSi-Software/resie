@@ -14,7 +14,7 @@
             "BUS_Power": ["Balance"], 
             "BUS_Heat": ["Balance"]
         },
-        "output_plot": "output_plot": {
+        "output_plot": {
              "1": {
                 "key": {"Grid_IN": ["Grid_IN->HeatPump"]},
                 "axis": "left",

@@ -1,9 +1,6 @@
 using UUIDs
-using Logging
 using Resie
-
-include("resie_logger.jl")
-using .Resie_Logger
+using Resie.Resie_Logger
 
 """
     parse_arguments(input)
@@ -162,7 +159,7 @@ function run(arguments::Array{String})::Tuple{Bool,Bool}
                                        balanceWarn_logfile_path,
                                        min_log_level,
                                        input_filepath)
-    global_logger(logger)
+    Resie_Logger.Logging.global_logger(logger)
 
     success = false
     run_ID = uuid1()
