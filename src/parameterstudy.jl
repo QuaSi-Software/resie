@@ -34,44 +34,44 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.js
 ############################################################
 
 # HeatPump power (W)
-Pth_HP_lo   = 0.0e6         # lower limit
-Pth_HP_hi   = 9.0e6         # upper limit
-Pth_HP_step = 3.0e6         # step size
+Pth_HP_lo   = 5.0e6         # lower limit
+Pth_HP_hi   = 7.0e6         # upper limit
+Pth_HP_step = 1.0e6         # step size
 Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
 
 # Boiler power (W)
-Pth_Boiler_lo   = 0.0e6     # lower limit
-Pth_Boiler_hi   = 7.0e6     # upper limit
-Pth_Boiler_step = 3.5e6     # step size
+Pth_Boiler_lo   = 3.0e6     # lower limit
+Pth_Boiler_hi   = 4.0e6     # upper limit
+Pth_Boiler_step = 0.5e6     # step size
 Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 0.0e6         # lower limit
-Cap_hi_Wh   = 90.0e6        # upper limit
-Cap_step_Wh = 30.0e6        # step size
+Cap_lo_Wh   = 50.0e6         # lower limit
+Cap_hi_Wh   = 70.0e6        # upper limit
+Cap_step_Wh = 10.0e6        # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 0            # lower limit
+Batt_lo_Wh   = 1000            # lower limit
 Batt_hi_Wh   = 200e3        # upper limit
-Batt_step_Wh = 100e3        # step size
+Batt_step_Wh = 50e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # limit for energy stock prices for economic_control.jl (EUR/MWh)
 # if no grid price limit is to be considered, limit is set "towards infinity"
 # TODO adjust limits
-p_stock_lo   = 20.0         # lower limit
-p_stock_hi   = 100.0        # upper limit
-p_stock_step = 20.0         # step size
+p_stock_lo   = 100.0         # lower limit
+p_stock_hi   = 200.0        # upper limit
+p_stock_step = 50.0         # step size
 p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
 
 # benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
 # of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
 # if control energy is not to be considerd, benchmark is set "towards infinity"
 # TODO adjust limits
-p_res_lo   = 10.0           # lower limit
-p_res_hi   = 10.0           # upper limit
-p_res_step = 1.0            # step size
+p_res_lo   = 250.0           # lower limit
+p_res_hi   = 1000.0           # upper limit
+p_res_step = 250.0            # step size
 p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -313,7 +313,7 @@ function run_resie_variant(
         if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
             idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
             if idx_end ==35044 @infiltrate end
-            reserve_bench_values[idx:idx_end] .= (mean(reserve_energy_values[idx:idx_end]) - mean(stock_values[idx:idx_end])) + # * 1
+            reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1 # TODO variable time?
                                                  reserve_power_values[idx] * 4
         end
     end
@@ -444,22 +444,17 @@ function main(base_input_path, write_output)
         # Econcomy based on VDI 2067 principles
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
-        # TODO Adjust factors in front
+        # TODO Adjust factors in front (EUR/kW or EUR/kWh)
         A0_HP     = 300 * (Pth_HP / 1e3)        
         A0_Boiler = 80  * (Pth_Boiler / 1e3)
         A0_Buffer = 25  * (Cap_Wh / 1e3)
         A0_Batt   = 150 * (BattCap_Wh / 1e3)
-        # component lifetimes # TODO Adjust values in front and double check years
-        TN_HP = 20
-        TN_Boiler = 20
-        TN_Buffer = 20
-        TN_Batt = 12
-
+       
         components = VDI2067.VDIComponent[
-            VDI2067.heatpump_component(A0_HP, TN_HP),
-            VDI2067.boiler_component(A0_Boiler, TN_Boiler),
-            VDI2067.buffertank_component(A0_Buffer, TN_Buffer),
-            VDI2067.battery_component(A0_Batt, TN_Batt)
+            VDI2067.heatpump_component(A0_HP),
+            VDI2067.boiler_component(A0_Boiler),
+            VDI2067.buffertank_component(A0_Buffer),
+            VDI2067.battery_component(A0_Batt)
         ]
 
         sim_output[runidx]["VDI_NO"] = 

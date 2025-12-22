@@ -33,31 +33,28 @@ struct VDIComponent
     TN::Int                 # technical lifetime (years)
     f_wartung::Float64      # maintenance + inspection factor (share of A0 in year 1)
     f_instand::Float64      # repair / reinstatement factor (share of A0 in year 1)
+    f_bedien::Float64       # operation factor (share of A0 in year 1)
 end
 
-
-############################################################
-#  COMPONENT CONSTRUCTORS FOR THE FOUR CONSIDERED COMPONENT TYPES
-############################################################
+# COMPONENT CONSTRUCTORS FOR THE FOUR CONSIDERED COMPONENT TYPES
 # Only initial investment cost must be provided by parameterstudy.jl
-# The technical component lifetime and maintenance/repair factors are hard-coded according to VDI specification and own assumptions
-############################################################
+# The technical component lifetime and maintenance/repair/operating factors are hard-coded according to VDI specification and own assumptions
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
-heatpump_component(A0::Real, TN::Number) =
-    VDIComponent("HeatPump", float(A0), Int(TN), 0.015, 0.01)
+heatpump_component(A0::Real) =
+    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
-boiler_component(A0::Real, TN::Number) =
-    VDIComponent("Boiler", float(A0), Int(TN), 0.02, 0.01)
+boiler_component(A0::Real) =
+    VDIComponent("Boiler", float(A0), 20.0, 0.02, 0.01, 5.0)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
-buffertank_component(A0::Real, TN::Number) =
-    VDIComponent("BufferTank", float(A0), Int(TN), 0.005, 0.005)
+buffertank_component(A0::Real) =
+    VDIComponent("BufferTank", float(A0), 20.0, 0.005, 0.005, 0.0)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
-battery_component(A0::Real, TN::Number) =
-    VDIComponent("Battery", float(A0), Int(TN), 0.01, 0.02)
+battery_component(A0::Real) =
+    VDIComponent("Battery", float(A0), 20.0, 0.01, 0.02, 0.0)
 
 
 ############################################################
@@ -193,8 +190,9 @@ end
 
 function op_annuity(components::Vector{VDIComponent}, p::VDIParams)     # operation cost-related annuity
     # First-year operating costs
-    # TODO keep no operating costs (h/a and EUR/h) ?
-    A_B1  = 0.0
+    # Operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
+    # TODO only use f_bedien if component is aactually used -> p_th > 0
+    A_B1  = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0)
     # First-year inspection, maintenance, repair and reinstatement cost
     A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components)
 
@@ -227,12 +225,12 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     # TODO not only Grid_IN but also control_reserve?
-    IN = sim["Grid_IN"]                                         # Wh time series
+    IN = sim["Grid_IN"] .* 1e-6                                 # convert Wh time series in MWh
     base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
     # A_V1: energy costs of first year [EUR]
-    # Convert Wh * €/MWh → EUR
-    A1 = sum(IN .* base_price) * 1e-6
+    # MWh * EUR/MWh → EUR
+    A1 = sum(IN .* base_price)
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
@@ -276,11 +274,11 @@ function revenue_control(sim::Dict, p::VDIParams)
     A_E_energy = 0.0
 
     if haskey(sim, "Control_energy") && haskey(sim, "Control_energy_price")
-        E = sim["Control_energy"]     # Wh
+        E = sim["Control_energy"] .* 1e-6     # convert Wh in MWh
         price_E = vecize_price(sim["Control_energy_price"], length(E))
 
-        # Wh * EUR/MWh → EUR
-        A_E_energy = sum(E .* price_E) * 1e-6
+        # MWh * EUR/MWh → EUR
+        A_E_energy = sum(E .* price_E)
     end
 
     # 2) CONTROL CAPACITY (POWER) REVENUE
@@ -294,8 +292,8 @@ function revenue_control(sim::Dict, p::VDIParams)
         # P_t = E_t / Δt  → Wh / h = W → MW
         P_MW = (E ./ Δt) .* 1e-6
 
-        # EUR/MW * MW * h → EUR
-        A_E_capacity = sum(P_MW .* price_P .* Δt)
+        # MW * EUR/MW → EUR
+        A_E_capacity = sum(P_MW .* price_P)
     end
 
     # 3) TOTAL FIRST-YEAR CONTROL RESERVE REVENUE
@@ -400,23 +398,23 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
 
     sim = OrderedDict()
 
-    A_cap   = round(sum(capital_annuity(c, p) for c in components), digits=2)
-    A_op    = round(op_annuity(components, p), digits=2)
-    A_misc  = round(misc_annuity(components, p), digits=2)
-    A_energy = round(energy_annuity(sim_new, p), digits=2)
+    A_cap   = sum(capital_annuity(c, p) for c in components)
+    A_op    = op_annuity(components, p)
+    A_misc  = misc_annuity(components, p)
+    A_energy = energy_annuity(sim_new, p)
 
-    A_rev_control = round(revenue_control(sim_new, p), digits=2)
-    A_rev_feed    = round(revenue_feedin(sim_new, p), digits=2)
+    A_rev_control = revenue_control(sim_new, p)
+    A_rev_feed    = revenue_feedin(sim_new, p)
 
-    A_total = round(A_cap + A_op + A_misc + A_energy -
-              (A_rev_control + A_rev_feed), digits=2)
+    A_total = A_cap + A_op + A_misc + A_energy -
+              (A_rev_control + A_rev_feed)
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
         # Q_heat_kWh = sum(sim_new["Heat"]) / 1000.0
         # heat_price = round(A_total / Q_heat_kWh, digits=2)   # EUR/kWh
 
 
-    return Dict(
+    return OrderedDict(
         "A_cap" => A_cap,
         "A_op" => A_op,
         "A_misc" => A_misc,
