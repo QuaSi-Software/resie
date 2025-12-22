@@ -316,6 +316,7 @@ function run_resie_variant(
     # profile_multipliers and profile_addons calculated correctly.
     # If multiple threads are used each thread gets their own profile.
     if Threads.nthreads() > 1
+        mkpath("./profiles/MA/reserve_bench_price_profiles")
         price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_profiles/reserve_bench_price_EUR_MW_$(Threads.threadid()).prf" 
     else
         price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
