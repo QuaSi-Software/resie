@@ -9,7 +9,7 @@ one-way connection they are split into two instances for providing or receiving 
 must be handled as such in the input for constructing a project. A grid can also require or 
 provide a given temperature.
 """
-mutable struct GridConnection <: Component
+mutable struct GridConnection{IsSource} <: Component
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -24,39 +24,50 @@ mutable struct GridConnection <: Component
 
     output_sum::Float64
     input_sum::Float64
+end
 
-    function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(config["medium"])
-        register_media([medium])
+# Outer constructor that uses the type parameter `IsSource` to determine whether this
+# connection is a source or a sink.
+function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}) where {IsSource}
+    medium = Symbol(config["medium"])
+    register_media([medium])
 
-        constant_temperature,
-        temperature_profile = get_parameter_profile_from_config(config,
-                                                                sim_params,
-                                                                "temperature",
-                                                                "temperature_profile_file_path",
-                                                                "temperature_from_global_file",
-                                                                "constant_temperature",
-                                                                uac)
+    constant_temperature,
+    temperature_profile = get_parameter_profile_from_config(config,
+                                                            sim_params,
+                                                            "temperature",
+                                                            "temperature_profile_file_path",
+                                                            "temperature_from_global_file",
+                                                            "constant_temperature",
+                                                            uac)
 
-        return new(uac,         # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   if Bool(config["is_source"])
-                       sf_flexible_source
-                   else
-                       sf_flexible_sink
-                   end,         # sys_function
-                   medium,      # medium
-                   InterfaceMap(medium => nothing), # input_interfaces
-                   InterfaceMap(medium => nothing), # output_interfaces
-                   temperature_profile,    # temperature_profile
-                   constant_temperature,   # constant_temperature
-                   nothing,     # temperature
-                   0.0,         # output_sum,
-                   0.0)         # input_sum
+    sys_function = IsSource ? sf_flexible_source : sf_flexible_sink
+
+    return GridConnection{IsSource}(uac,                        # uac
+                                    Controller(default(config, "control_parameters", nothing)),
+                                    sys_function,               # sys_function
+                                    medium,                     # medium
+                                    InterfaceMap(medium => nothing), # input_interfaces
+                                    InterfaceMap(medium => nothing), # output_interfaces
+                                    temperature_profile,        # temperature_profile
+                                    constant_temperature,       # constant_temperature
+                                    nothing,                    # temperature
+                                    0.0,                        # output_sum
+                                    0.0)                        # input_sum
+end
+
+# Backwards-compatible constructor: if no type parameter is provided, use the
+# `is_source` entry in `config` (if present) to pick the correct parametric type.
+function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+    is_src = Bool(default(config, "is_source", false))
+    if is_src
+        return GridConnection{true}(uac, config, sim_params)
+    else
+        return GridConnection{false}(uac, config, sim_params)
     end
 end
 
-function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
+function initialise!(unit::GridConnection{IsSource}, sim_params::Dict{String,Any}) where {IsSource}
     if unit.sys_function === sf_flexible_source
         set_storage_transfer!(unit.output_interfaces[unit.medium],
                               load_storages(unit.controller, unit.medium))
@@ -66,9 +77,9 @@ function initialise!(unit::GridConnection, sim_params::Dict{String,Any})
     end
 end
 
-function control(unit::GridConnection,
+function control(unit::GridConnection{IsSource},
                  components::Grouping,
-                 sim_params::Dict{String,Any})
+                 sim_params::Dict{String,Any}) where {IsSource}
     update(unit.controller)
 
     if unit.constant_temperature !== nothing
@@ -84,7 +95,7 @@ function control(unit::GridConnection,
     end
 end
 
-function process(unit::GridConnection, sim_params::Dict{String,Any})
+function process(unit::GridConnection{IsSource}, sim_params::Dict{String,Any}) where {IsSource}
     if unit.sys_function === sf_flexible_source
         outface = unit.output_interfaces[unit.medium]
         exchanges = balance_on(outface, outface.target)
@@ -141,7 +152,7 @@ function process(unit::GridConnection, sim_params::Dict{String,Any})
     end
 end
 
-function output_values(unit::GridConnection)::Vector{String}
+function output_values(unit::GridConnection{IsSource})::Vector{String} where {IsSource}
     output_vals = []
     if unit.sys_function == sf_flexible_source
         append!(output_vals, [string(unit.medium) * ":OUT", "Output_sum"])
@@ -154,7 +165,7 @@ function output_values(unit::GridConnection)::Vector{String}
     return output_vals
 end
 
-function output_value(unit::GridConnection, key::OutputKey)::Float64
+function output_value(unit::GridConnection{IsSource}, key::OutputKey)::Float64 where {IsSource}
     if key.value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "OUT"
@@ -169,4 +180,8 @@ function output_value(unit::GridConnection, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export GridConnection
+const GridInput = GridConnection{true}
+
+const GridOutput = GridConnection{false}
+
+export GridConnection, GridInput, GridOutput
