@@ -8,9 +8,8 @@ include("../test_util.jl")
 function test_load_from_dict()
     components_config = Dict{String,Any}(
         "TST_GRI_01" => Dict{String,Any}(
-            "type" => "GridConnection",
+            "type" => "GridInput",
             "output_refs" => ["TST_HP_01"],
-            "is_source" => true,
             "medium" => "m_h_w_lt1",
         ),
         "TST_GRI_02" => Dict{String,Any}(
