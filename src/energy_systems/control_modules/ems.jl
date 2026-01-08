@@ -1,6 +1,7 @@
 using Dates
 using ..Resie
 using OrderedCollections: OrderedDict
+using Statistics
 """
 Control module for setting limits to the PLR of a component according to a price_profile and 
 available storage capacity or demand.
@@ -87,7 +88,7 @@ mutable struct CM_EMS <: ControlModule
             ooo_by_state[idx] = Resie.calculate_order_of_operations(new_components)
         end
 
-        # remove new_components and chains from memory sincethey are not needed any more
+        # remove new_components and chains from memory since they are not needed any more
         new_components = nothing
         chains = nothing
         
@@ -107,11 +108,20 @@ mutable struct CM_EMS <: ControlModule
             return value_at_time(price_profiles[pp_idx], sim_params) <= params["limit_prices"][lp_idx]
         end
 
+        # TODO for testing
+        time_array_1 = []
+        time_array_2 = []
+        time_array_3 = []
+
         function future_sim(mod_params, ooo_by_state, components::Grouping, sim_params::Dict{String,Any})
+            # t1 = 0.0
+            # t1 = @elapsed begin
             # create deep copies of simulation relevant variables
-            sp = deepcopy(sim_params)
             comps = deepcopy(components)
+            sp = deepcopy(sim_params)
             ops = ooo_by_state[1]
+            # end 
+            # append!(time_array_1, t1*10^6)
 
             hp_uac = mod_params["hp_uac"]
             boiler_uac = mod_params["boiler_uac"]
@@ -132,7 +142,7 @@ mutable struct CM_EMS <: ControlModule
             )
             output_data_keys = Resie.output_keys(comps, output_keys_dict)
             output_data = zeros(Float64, length(sim_range), 1 + length(output_data_keys))
-            output_data_keys_string = []
+            output_data_keys_string = ["time"]
             for key in output_data_keys
                 if key.medium === nothing
                     push!(output_data_keys_string, key.unit.uac * key.value_key)
@@ -140,17 +150,26 @@ mutable struct CM_EMS <: ControlModule
                     push!(output_data_keys_string, key.unit.uac * String(key.medium) * key.value_key)
                 end
             end
-            # output_data = OrderedDict()
 
+            # t2 = 0.0
+            # t2 = @elapsed begin
             # excecute future simulation and save relevant data
             for (step, ts_ahead) in enumerate(sim_range)
                 sp["current_date"] = ts_ahead
-                perform_operations(comps, ops, sp)
+                try
+                    perform_operations(comps, ops, sp)
+                catch
+                    @info "Undefined Error in future_sim()"
+                end
                 output_data[step, :] = Resie.gather_output_data(output_data_keys, sp["time_since_output"])
                 sp["time_since_output"] += Int(sp["time_step_seconds"])
             end
             output_data = OrderedDict(zip(output_data_keys_string, eachcol(output_data)))
 
+            # end 
+            # append!(time_array_2, t2*10^6)
+            # t3 = 0.0
+            # t3 = @elapsed begin
             # logic to evaluate if reserve control energy can be used
             available_storage_capacity = output_data[storage_uac * "Capacity"] .-
                                          output_data[storage_uac * "Load"]
@@ -162,35 +181,40 @@ mutable struct CM_EMS <: ControlModule
             hp = comps[hp_uac]
             used_th_power_hp = sim_params["wh_to_watts"].(output_data[hp_uac * "m_heat" * "OUT"]) .+ 
                                sim_params["wh_to_watts"].(output_data[hp_uac * "secondary_m_heat" * "OUT"])
-            if used_th_power_hp == 0
-                src_temp = hp.input_interfaces[hp.m_heat_in].source.temperature_src_in
-                snk_temp = comps[storage_uac].high_temperature
-                available_th_power_hp = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
-                available_th_power_hp = max.(available_storage_power, available_th_power_hp)
-                available_el_power_hp = available_th_power_hp ./ hp.dynamic_cop(src_temp, snk_temp)
-            else
-                available_th_power_hp = used_th_power_hp ./ output_data[hp_uac * "Avg_PLR"] .- used_th_power_hp
-                available_th_power_hp = max.(available_storage_power, available_th_power_hp)
-                available_el_power_hp = available_th_power_hp ./ output_data[hp_uac * "COP"]
+            available_th_power_hp = zeros(length(used_th_power_hp))
+            available_el_power_hp = []
+            for (idx, th_power) in enumerate(used_th_power_hp)
+                if th_power == 0
+                    src_temp = hp.input_interfaces[hp.m_heat_in].source.temperature_src_in
+                    snk_temp = comps[storage_uac].high_temperature
+                    available_th_power_hp[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
+                    available_th_power_hp[idx] = min(available_storage_power[idx], available_th_power_hp[idx])
+                    push!(available_el_power_hp, available_th_power_hp[idx] / hp.dynamic_cop(src_temp, snk_temp))
+                else
+                    available_th_power_hp[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx] - th_power
+                    available_th_power_hp[idx] = min(available_storage_power[idx], available_th_power_hp[idx])
+                    push!(available_el_power_hp, available_th_power_hp[idx] / output_data[hp_uac * "COP"][idx])
+                end
             end
 
             # calculate available power from boiler 
             used_th_power_boiler = sim_params["wh_to_watts"].(output_data[boiler_uac * "m_heat" * "OUT"]) .+ 
                                    sim_params["wh_to_watts"].(output_data[boiler_uac * "secondary_m_heat" * "OUT"])
-            if used_th_power_boiler == 0
-                available_th_power_boiler = comps[boiler_uac].design_power_th
-            else
-                available_th_power_boiler = used_th_power_boiler ./ output_data[boiler_uac * "Avg_PLR"] .- used_th_power_boiler
+            available_th_power_boiler = []
+            for (idx, th_power) in enumerate(used_th_power_boiler)
+                if th_power == 0
+                    push!(available_th_power_boiler, comps[boiler_uac].design_power_th)
+                else
+                    push!(available_th_power_boiler, th_power / output_data[boiler_uac * "Avg_PLR"][idx] - th_power)
+                end
             end
             available_el_power_boiler = min.(available_storage_power .- available_th_power_hp, available_th_power_boiler)
-
-            # find the time_step that has minimal thermal demand availabilty
-            min_idx = argmin(available_storage_power .- available_th_power_hp .+ available_th_power_boiler)
 
             # add the feed-in power from renewables to the reserve control power since it 
             # can be marketed additionally
             feed_in_el_power = output_data[grid_out_uac * "m_power" * "IN"]
-            available_el_power = available_el_power_hp[min_idx] + available_el_power_boiler[min_idx] + feed_in_el_power[min_idx]
+            available_el_power = minimum(available_el_power_hp .+ available_el_power_boiler .+ feed_in_el_power)
+            # available_el_power = available_el_power_hp[min_idx] + available_el_power_boiler[min_idx] + feed_in_el_power[min_idx]
 
             # check if minimum el power of 1 MW can be provided
             if available_el_power/10^6 >= 1.0
@@ -200,13 +224,27 @@ mutable struct CM_EMS <: ControlModule
             else
                 energy_indicator = false
             end
-            price_indicator = smaller_than_price(2, 3, sim_params)
-
+            # check if Regelreservevergütung (2) > Mindestwert Regelreserve (3)
+            price_indicator = !smaller_than_price(2, 3, sim_params)
             # cleanup sim relevant variables to save memory; TODO might not be significant
             # sp = nothing
             # comps = nothing
             # ops = nothing
 
+            # end 
+            # append!(time_array_3, t3*10^6)
+
+            if sim_params["time"] > 24*365*4*900 - 7200*4
+                time_array_1 = time_array_1[2:end]
+                # @info time_array_1
+                @info "Mean t1:$(round(mean(time_array_1), digits=3)) us; std: $(round(std(time_array_1), digits=3)) us; max:$(round(maximum(time_array_1), digits=3)) us"
+                time_array_2 = time_array_2[2:end]
+                # @info time_array_2
+                @info "Mean t2:$(round(mean(time_array_2), digits=3)) us; std: $(round(std(time_array_2), digits=3)) us; max:$(round(maximum(time_array_2), digits=3)) us"
+                time_array_3 = time_array_3[2:end]
+                # @info time_array_3
+                @info "Mean t3:$(round(mean(time_array_3), digits=3)) us; std: $(round(std(time_array_3), digits=3)) us; max:$(round(maximum(time_array_3), digits=3)) us"
+            end
             return energy_indicator && price_indicator
         end
 
@@ -250,9 +288,6 @@ mutable struct CM_EMS <: ControlModule
                 available_el_power = 0.0
             end
 
-            #
-            # available_el_power - pv_ertrag - wind_ertrag #TODO integrate 
-
             # check if minimum el power of 1 MW can be provided
             if available_el_power/10^6 >= 1.0
                 energy_indicator = true
@@ -261,7 +296,7 @@ mutable struct CM_EMS <: ControlModule
             else
                 energy_indicator = false
             end
-            price_indicator = smaller_than_price(2, 3, sim_params)
+            price_indicator = !smaller_than_price(2, 3, sim_params)
 
             return energy_indicator && price_indicator
         end
@@ -327,7 +362,7 @@ mutable struct CM_EMS <: ControlModule
                                         return future_sim(params, ooo_by_state, components, sim_params)
                                     end
                                     # function (state_machine)
-                                    #     return requirements_balance(params, components, sim_params)
+                                    #     return true
                                     # end
                                     function (state_machine)
                                         return smaller_than_price(1, 1, sim_params)

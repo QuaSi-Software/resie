@@ -16,43 +16,37 @@
         },
         "output_plot": {
              "1": {
-                "key": {"Grid_IN": ["Grid_IN->HeatPump"]},
+                "key": {"m_power": ["Grid_IN->HeatPump"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"Grid_IN": ["Grid_IN->Boiler"]},
+                "key": {"m_power": ["Grid_IN->Boiler"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
             },
             "3": {
-                "key": {"Grid_IN": ["Grid_IN->Demand_Power"]},
+                "key": {"m_power": ["Grid_IN->Demand_Power"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
             },
             "4": {
-                "key": {"Grid_IN": ["Grid_IN->Battery"]},
-                "axis": "left",
-                "unit": "kW",
-                "scale_factor": 0.001
-            },
-            "5": {
-                "key": {"Grid_IN": ["Grid_IN->Demand_Power"]},
+                "key": {"m_power": ["Grid_IN->Battery"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
             },
             "6": {
-                "key": {"Photovoltaic": ["Photovoltaic->Grid_OUT"]},
+                "key": {"m_power": ["Photovoltaic->Grid_OUT"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
             },
             "7": {
-                "key": {"WindFarm": ["WindFarm->Grid_OUT"]},
+                "key": {"m_power": ["WindFarm->Grid_OUT"]},
                 "axis": "left",
                 "unit": "kW",
                 "scale_factor": 0.001
@@ -70,7 +64,7 @@
                 "scale_factor": 0.001
             },
             "10": {
-                "key": {"Buffertank": ["Load%"]},
+                "key": {"BufferTank": ["Load%"]},
                 "axis": "left",
                 "unit": "%",
                 "scale_factor": 1
@@ -109,7 +103,7 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "constant_power": 0.0
+            "constant_power": 15.0e6
         },
         "Grid_OUT": {
             "type": "GridConnection",

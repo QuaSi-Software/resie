@@ -42,36 +42,37 @@ Pth_Boiler_step = 0.5e6     # step size
 Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 50.0e6         # lower limit
+Cap_lo_Wh   = 50.0e6        # lower limit
 Cap_hi_Wh   = 70.0e6        # upper limit
 Cap_step_Wh = 10.0e6        # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 1000            # lower limit
-Batt_hi_Wh   = 200e3        # upper limit
+Batt_lo_Wh   = 100e3      # lower limit
+Batt_hi_Wh   = 200e3       # upper limit
 Batt_step_Wh = 50e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # limit for energy stock prices for economic_control.jl (EUR/MWh)
 # if no grid price limit is to be considered, limit is set "towards infinity"
 # TODO adjust limits
-p_stock_lo   = 100.0         # lower limit
-p_stock_hi   = 200.0        # upper limit
-p_stock_step = 50.0         # step size
+p_stock_lo   = 100        # lower limit
+p_stock_hi   = 200        # upper limit
+p_stock_step = 50         # step size
 p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
 
 # benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
 # of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
 # if control energy is not to be considerd, benchmark is set "towards infinity"
 # TODO adjust limits
-p_res_lo   = 250.0           # lower limit
-p_res_hi   = 1000.0           # upper limit
-p_res_step = 250.0            # step size
+p_res_lo   = 400            # lower limit
+p_res_hi   = 1200           # upper limit
+p_res_step = 400            # step size
 p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
 
 # define adjustments to the different price profiles in the order of
 # [stock_price, reserve_power_price, reserve_energy_price, market_value_pv, market_value_wind]
+# TODO adjust values
 profile_addons = [0.0, 0.0, 0.0, 0.0, 0.0]
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0]
 
@@ -189,6 +190,10 @@ function display_MWh(Wh)
     round(Wh / 1e6; digits=3)       # displays MWh
 end
 
+function display_kWh(Wh)    
+    round(Wh / 1e3; digits=3)       # displays kWh
+end
+
 function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
                         "# profile_start_date_format:", "# timestamp_format:", 
@@ -252,8 +257,9 @@ function run_resie_variant(
         csv_name = "out_HP$(safe(display_MW(Pth_HP)))MW_" *
                    "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
                    "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-                   "BAT$(safe(display_MWh(BattCap_Wh)))MWh_" *
-                   "P$(safe(p_stock))EUR_R$(safe(p_reserve))EUR.csv"
+                   "BAT$(safe(display_kWh(BattCap_Wh)))kWh_" *
+                   "P$(safe(p_stock))EUR_" * 
+                   "R$(safe(p_reserve))EUR.csv"
 
         aux_name = replace(csv_name, ".csv" => ".md")
 
@@ -346,7 +352,9 @@ function run_resie_variant(
         "input_HP$(safe(display_MW(Pth_HP)))MW_" *
         "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
         "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-        "BAT$(safe(display_MWh(BattCap_Wh)))MWh.json"
+        "BAT$(safe(display_kWh(BattCap_Wh)))kWh_" *
+        "P$(safe(p_stock))€MWh_" *
+        "R$(safe(p_reserve))€MW4h.json"
     )
 
     open(fname, "w") do io
@@ -488,14 +496,12 @@ function main(base_input_path, write_output)
         end
 
         runtime = round(Int, Dates.seconds(now() - start_time))
-        eta = (total_runs - runidx) * runtime / Threads.nthreads() / 60
+        eta = round(Int, (total_runs - runidx) * runtime / Threads.nthreads() / 60)
         println("[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min")
     end
 
     close_logger(logger)
     println("✔ Parameterstudy completed.")
-
-    return sim_output
 end
 
 main(base_input_path, false)
