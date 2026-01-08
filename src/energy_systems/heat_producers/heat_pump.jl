@@ -1,74 +1,91 @@
 using Optim: optimize, minimizer, Options, NelderMead
 using ..Resie: get_run
 
-# // TODO: is_editable (für SUSI), typen sprachunabhängig, display name
 #! format: off
 const HEAT_PUMP_PARAMETERS = Dict(
     "m_el_in" => (
         default="m_e_ac_230v",
         description="Electrical input medium",
+        display_name="Medium el_in",
         required=false,
         type=String,
+        json_type="string",
         unit="-"
     ),
     "m_heat_in" => (
         default="m_h_w_lt1",
         description="Heat input medium",
+        display_name="Medium heat_in",
         required=false,
         type=String,
+        json_type="string",
         unit="-"
     ),
     "m_heat_out" => (
         default="m_h_w_ht1",
         description="Heat output medium",
+        display_name="Medium heat_out",
         required=false,
         type=String,
+        json_type="string",
         unit="-"
     ),
     "m_heat_out_secondary" => (
         default="m_h_w_ht1",
         description="Heat output medium on secondary interface",
+        display_name="Medium heat_out_secondary",
         required=false,
         type=String,
+        json_type="string",
         conditionals=[("has_secondary_interface", "is_true")],
         unit="-"
     ),
     "has_secondary_interface" => (
         default=false,
-        description="Secondary interface toggle",
+        description="Toggles the secondary heat output interface on/off",
+        display_name="Has secondary interface?",
         required=false,
         type=Bool,
+        json_type="boolean",
         unit="-"
     ),
     "primary_el_sources" => (
         default=Vector{String}(),
-        description="Primary electricity sources",
+        description="Electricity sources for the primary heat output",
+        display_name="Primary electricity sources",
         required=false,
         type=Vector{String},
+        json_type="array",
         conditionals=[("has_secondary_interface", "is_true")],
         unit="-"
     ),
     "secondary_el_sources" => (
         default=Vector{String}(),
-        description="Secondary electricity sources",
+        description="Electricity sources for the secondary heat output",
+        display_name="Secondary electricity sources",
         required=false,
         type=Vector{String},
+        json_type="array",
         conditionals=[("has_secondary_interface", "is_true")],
         unit="-"
     ),
     "cop_function" => (
         default="carnot:0.4",
         description="COP function definition (e.g., 'carnot:0.4' or 'const:3.0')",
+        display_name="COP function",
         required=false,
         type=String,
+        json_type="string",
         function_type="cop",
         unit="-"
     ),
     "plf_function" => (
         default="const:1.0",
-        description="Part Load Fraction function",
+        description="Part-load factor function definition",
+        display_name="PLF function",
         required=false,
         type=String,
+        json_type="string",
         function_type="1dim",
         conditional="model_type != 'simplified' or must be const",
         unit="-"
@@ -76,151 +93,191 @@ const HEAT_PUMP_PARAMETERS = Dict(
     "max_power_function" => (
         default="const:1.0",
         description="Maximum power function as fraction of design power",
+        display_name="Max. power function",
         required=false,
         type=String,
+        json_type="string",
         function_type="2dim",
         unit="-"
     ),
     "min_power_function" => (
         default="const:0.2",
         description="Minimum power function as fraction of design power",
+        display_name="Min. power function",
         required=false,
         type=String,
+        json_type="string",
         function_type="2dim",
         unit="-"
     ),
     "icing_coefficients" => (
         default="3,-0.42,15,2,30",
         description="Icing loss coefficients (comma-separated)",
+        display_name="Icing coefficients",
         required=false,
         type=String,
+        json_type="string",
         unit="-"
     ),
     "model_type" => (
         default="simplified",
         description="Operation model: 'simplified', 'on-off', or 'inverter'",
+        display_name="Model type",
         required=false,
         type=String,
+        json_type="string",
         options=["simplified", "on-off", "inverter"],
         unit="-"
     ),
     "power_th" => (
         default=nothing,
         description="Design thermal power",
+        display_name="Thermal power",
         required=true,
         type=Float64,
+        json_type="number",
         unit="W"
     ),
     "bypass_cop" => (
         default=15.0,
-        description="COP in bypass operation (when input >= output temp)",
+        description="COP in bypass operation (when input >= output temperature)",
+        display_name="Bypass COP",
         required=false,
         type=Float64,
+        json_type="number",
         unit="-"
     ),
     "min_usage_fraction" => (
         default=0.0,
         description="Minimum part-load ratio to operate",
+        display_name="Min. usage fraction",
         required=false,
         type=Float64,
+        json_type="number",
         unit="-"
     ),
     "consider_icing" => (
         default=false,
-        description="Account for icing losses on evaporator",
+        description="Toogle to account for icing losses on heat input side",
+        display_name="Consider icing?",
         required=false,
         type=Bool,
+        json_type="boolean",
         unit="-"
     ),
     "output_temperature" => (
         default=nothing,
         description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
         required=false,
         type=Floathing,
+        json_type="number",
         unit="°C"
     ),
     "input_temperature" => (
         default=nothing,
         description="Fixed input temperature, or nothing for auto-detection",
+        display_name="Input temperature",
         required=false,
         type=Floathing,
+        json_type="number",
         unit="°C"
     ),
     "nr_optimisation_passes" => (
         default=20,
-        description="Maximum iterations for PLR optimization",
+        description="Maximum iterations for PLR optimisation",
+        display_name="Nr. optimisation passes",
         required=false,
         type=UInt,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "eval_factor_heat" => (
         default=5.0,
         description="Weight for heat demand matching in optimization",
+        display_name="Eval. factor heat",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "eval_factor_time" => (
         default=1.0,
-        description="Weight for time usage in optimization (on-off only)",
+        description="Weight for time usage in optimisation",
+        display_name="Eval. factor time",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "eval_factor_elec" => (
         default=1.0,
-        description="Weight for electricity minimization in optimization (inverter only)",
+        description="Weight for electricity minimization in optimisation",
+        display_name="Eval. factor electricity",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "fudge_factor" => (
         default=1.001,
-        description="Overestimation factor for available heat output",
+        description="Overestimation factor for available heat output in optimisation",
+        display_name="Fudge factor",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "x_abstol" => (
         default=0.01,
         description="Absolute tolerance for PLR optimization",
+        display_name="Abs. tolerance PLR",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "f_abstol" => (
         default=0.001,
         description="Objective function tolerance for PLR optimization",
+        display_name="Abs. tolerance obj. function",
         required=false,
         type=Float64,
+        json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
         unit="-"
     ),
     "power_losses_factor" => (
         default=0.97,
         description="Fraction of input power used (losses: 1 - factor)",
+        display_name="Power losses factor",
         required=false,
         type=Float64,
+        json_type="number",
         unit="-"
     ),
     "heat_losses_factor" => (
         default=0.95,
         description="Fraction of input heat used (losses: 1 - factor)",
+        display_name="Heat losses factor",
         required=false,
         type=Float64,
+        json_type="number",
         unit="-"
     ),
     "constant_loss_power" => (
         default=0.0,
-        description="Constant standby power loss",
+        description="Constant power loss, e.g. standby power",
+        display_name="Constant power loss",
         required=false,
         type=Float64,
+        json_type="number",
         unit="W"
     ),
 )
