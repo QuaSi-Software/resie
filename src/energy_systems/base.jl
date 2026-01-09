@@ -2126,14 +2126,14 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
         else
             @error "In '$uac', the '$param_symbol' given as '$field_name_str' must be one of: " *
                    "$(join(string.(field_symbols), ", "))."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
     # 4. Otherwise, nothing is set
     if required
         @error "For '$uac', no '$param_symbol' is set, but it is required."
-        throw(InputError)
+        throw(InputError())
     else
         @info "For '$uac', no '$param_symbol' is set."
         return nothing, nothing
@@ -2180,7 +2180,7 @@ function get_diff_solar_radiation_profile_from_config(config::Dict{String,Any}, 
         else
             @error "For '$uac', the'diffuse_solar_radiation_from_global_file' has to be one of: " *
                    "$(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))."
-            throw(InputError)
+            throw(InputError())
         end
     else
         @info "For '$uac', no diffuse solar radiation is set."
@@ -2226,7 +2226,7 @@ function get_wind_speed_profile_from_config(config::Dict{String,Any}, sim_params
             return getfield(sim_params["weather_data"], Symbol(config["wind_speed_from_global_file"]))
         else
             @error "For '$uac', the'wind_speed_from_global_file' has to be one of: $(join(string.(fieldnames(typeof(sim_params["weather_data"]))), ", "))"
-            throw(InputError)
+            throw(InputError())
         end
     else
         @info "For '$uac', no wind speed is set."

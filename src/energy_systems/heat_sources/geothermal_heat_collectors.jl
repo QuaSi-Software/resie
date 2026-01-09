@@ -162,7 +162,7 @@ mutable struct GeothermalHeatCollector <: Component
         model_type_allowed_values = ["simplified", "detailed"]
         if !(model_type in model_type_allowed_values)
             @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
-            throw(InputError)
+            throw(InputError())
         end
 
         return new(uac,                                                  # uac
@@ -309,7 +309,7 @@ function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any}
     else
         @error "In geothermal collector $(unit.uac), the accuracy_mode has to be one of: very_rough, rough, " *
                "normal, high or very_high"
-        throw(InputError)
+        throw(InputError())
     end
 
     # dy_mesh holds the delta between the nodes, while dy is the y-width assigned to each node
@@ -991,7 +991,7 @@ function calculate_Nu_laminar(unit::GeothermalHeatCollector, fluid_reynolds_numb
                           (unit.fluid_prandtl_number / pr_water)^0.11
     else
         @error "In geothermal collector $(unit.uac), the nusselt_approach has to be one of: Ramming, Stephan."
-        throw(InputError)
+        throw(InputError())
     end
     return nusselt_laminar
 end

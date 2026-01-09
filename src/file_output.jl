@@ -28,7 +28,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             do_create_plot = false
         elseif io_settings["output_plot"] == "all"
             @error "For \"output_plot\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -45,7 +45,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             do_write_CSV = false
         elseif io_settings["csv_output_keys"] == "all"
             @error "For \"csv_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -326,7 +326,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
                                "output key. Make sure that the medium \"$(String(medium_key))\" exists in the current " *
                                "component and that you have used \":\" as separator without any extra spaces."
-                        throw(InputError)
+                        throw(InputError())
                     end
                 else
                     medium = nothing
@@ -366,13 +366,13 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                     @error "The requested energy flow between components \"$(value_key)\" for medium \"$(media_key)\" could not " *
                            "be found for the CSV output or the plot output. Note that only connections between " *
                            "components with one or more busses but without any other component in between can be exported!"
-                    throw(InputError)
+                    throw(InputError())
                 end
             end
         else
             @error "The key \"$(key)\" in the provided output keys for CSV output or plot output could not be found. " *
                    "It either has to be a medium or a component used in the current energy system."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -872,7 +872,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                 @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
                        "The following error occurred: $e\n" *
                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
-                throw(InputError)
+                throw(InputError())
             end
         end
         for medium in unique_medium_labels
@@ -882,7 +882,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
                 @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
-                throw(InputError)
+                throw(InputError())
             end
         end
     end

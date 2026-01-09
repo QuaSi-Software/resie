@@ -424,14 +424,14 @@ function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted:
                "or on-off operation, but has a constant COP. Toggle optimisation off " *
                "by switching to simplified model type as the algorithm is unstable " *
                "this case."
-        throw(InputError)
+        throw(InputError())
     end
 
     if model_type == "simplified" && !occursin("const", plf_func_def)
         @error "Heat pump $(uac) has model type simplified and a non-constant PLF " *
                "function. The simplified model cannot handle this correctly. Please " *
                "use a different model type or switch to a constant PLF function."
-        throw(InputError)
+        throw(InputError())
     end
 end
 
@@ -839,7 +839,7 @@ function get_layer_temperature(unit::HeatPump,
             @error "Error: The $(term) temperature for $(unit.uac) could not be detected. " *
                    "Please specify one with the parameter '$(term)_temperature' or check " *
                    "the connected components."
-            throw(InputError)
+            throw(InputError())
         end
         return false, layer_temp
     end
@@ -1001,7 +1001,7 @@ function handle_slice(unit::HeatPump,
         if cop === nothing
             @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
                     "given. Provide temperatures or fixed cop.")
-            throw(InputError)
+            throw(InputError())
         end
         cop *= unit.plf_function(plr)
         if unit.consider_icing
