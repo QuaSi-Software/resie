@@ -63,7 +63,7 @@ mutable struct WeatherData
                          weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
             @error "The weather file could not be found in: \n $(sim_params["run_path"](weather_file_path))"
-            throw(InputError)
+            throw(InputError())
         end
 
         time_step = Second(3600)  # set fixed time step width for weather data
@@ -360,7 +360,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
     catch e
         @error "Error reading the DWD .dat file in $file_path\n" *
                "Please check the file. The following error occurred: $e"
-        throw(InputError)
+        throw(InputError())
     end
 
     # Read header 
@@ -386,7 +386,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
         catch e
             @error "Error reading the header of the DWD .dat file in $file_path\n" *
                    "Check if the header meets the requirements. The following error occurred: $e"
-            throw(InputError)
+            throw(InputError())
         end
         if row[1] == "***"
             break
@@ -429,7 +429,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
         @warn "Error reading the .dat weather dataset from $file_path:\n" *
               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
               "Check the file and make sure the data block starts with ***."
-        throw(InputError)
+        throw(InputError())
     end
 
     @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
@@ -452,7 +452,7 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     catch e
         @error "Error reading the DWD .dat file in $file_path. Please check the file.\n" *
                "The following error occurred: $e"
-        throw(InputError)
+        throw(InputError())
     end
 
     # Read fist line with metadata
@@ -517,7 +517,7 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
         @error "Error reading the EPW weather dataset from $file_path\n" *
                "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
                "Check the file for corruption."
-        throw(InputError)
+        throw(InputError())
     end
 
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."

@@ -78,7 +78,7 @@ mutable struct BufferTank <: Component
         else
             @error "For the buffer tank $uac, the model_type could not be detected. Is has to be one of: " *
                    "'ideally_stratified', 'balanced', 'ideally_mixed'."
-            throw(InputError)
+            throw(InputError())
         end
 
         consider_losses = default(config, "consider_losses", false)
@@ -145,7 +145,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     # calculate volume and capacity
     if unit.capacity === nothing && unit.volume === nothing
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but none of them is given."
-        throw(InputError)
+        throw(InputError())
     elseif unit.capacity === nothing && unit.volume !== nothing
         unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
@@ -156,7 +156,7 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         end
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
-        throw(InputError)
+        throw(InputError())
     end
 
     # calculate maximum input and output energy

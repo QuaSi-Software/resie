@@ -759,7 +759,7 @@ function iterate_balance_table(unit::Bus)
                "Note that this is only allowed for single busses that are not connected to any other bus! " *
                "You can always adjust your input file to meet this requirement by manually merging all directly " *
                "connected busses to one big bus."
-        throw(InputError)
+        throw(InputError())
     end
 
     rows = Vector{Tuple{BTInputRow,BTOutputRow}}()
@@ -805,7 +805,7 @@ function iterate_balance_table(unit::Bus)
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
                    "They have to be either all 0 and 1, or they can be 0 and consecutively ascending starting from 1 " *
                    "for a custom order."
-            throw(InputError)
+            throw(InputError())
         end
         has_custom_order = true
     end

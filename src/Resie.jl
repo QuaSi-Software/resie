@@ -226,7 +226,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
     if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(InputError)
+        throw(InputError())
     end
 
     # Initialize the array for output plots

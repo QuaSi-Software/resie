@@ -40,14 +40,14 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
         if params["temperature_limit"] === nothing
             @error "The control module limit_cooling_input_temperature of component $(params["source_uac"]) " *
                    "has no temperature_limit given!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if "target_uac" is given
         if params["target_uac"] === nothing
             @error "The control module limit_cooling_input_temperature of component $(params["source_uac"]) " *
                    "has no target_uac given!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if a valid target uac is specified
@@ -56,7 +56,7 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
              && components[params["target_uac"]] isa LimitCoolingInputTemperatureTarget)
             @error "The target of the control module limit_cooling_input_temperature of component $(params["source_uac"]) is " *
                    "not a valid component for this control module!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if a valid source uac is specified
@@ -65,7 +65,7 @@ mutable struct CM_LimitCoolingInputTemperature <: ControlModule
              && components[params["source_uac"]] isa LimitCoolingInputTemperatureSource)
             @error "The source of the control module limit_cooling_input_temperature of component $(params["source_uac"]) " *
                    "is not a valid source for this control module"
-            throw(InputError)
+            throw(InputError())
         end
 
         return new("limit_cooling_input_temperature", params)
