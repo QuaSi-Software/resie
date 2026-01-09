@@ -1,3 +1,67 @@
+#! format: off
+const GRID_CONNECTION_PARAMETERS = Dict(
+    "medium" => (
+        default="m_e_ac_230v",
+        description="Medium of the grid connection (e.g. electrical or thermal medium)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "is_source" => (
+        default=false,
+        description="If true, the connection provides energy (source); if false, it " *
+                    "receives energy (sink). Can be omitted if aliases GridInput and " *
+                    "GridOutput are used.",
+        display_name="Is source?",
+        required=true,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a temperature profile file",
+        display_name="Temperature profile file",
+        required=false,
+        conditionals=[
+            ("temperature_from_global_file", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_from_global_file" => (
+        default=false,
+        description="If true, take the temperature profile from the global weather data file",
+        display_name="Temperature from global file",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "constant_temperature" => (
+        default=nothing,
+        description="Constant temperature value for the grid connection",
+        display_name="Constant temperature",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+)
+#! format: on
+
 """
 Implementation of a component modeling the connection to a public grid of a certain medium.
 
@@ -29,31 +93,41 @@ end
 # Outer constructor that uses the type parameter `IsSource` to determine whether this
 # connection is a source or a sink.
 function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any}) where {IsSource}
-    medium = Symbol(config["medium"])
-    register_media([medium])
+    constructor_errored = false
 
-    constant_temperature,
-    temperature_profile = get_parameter_profile_from_config(config,
-                                                            sim_params,
-                                                            "temperature",
-                                                            "temperature_profile_file_path",
-                                                            "temperature_from_global_file",
-                                                            "constant_temperature",
-                                                            uac)
+    # extract all parameters using the parameter dictionary as the source of truth
+    extracted_params = Dict{String,Any}()
+    for (param_name, param_def) in GRID_CONNECTION_PARAMETERS
+        try
+            extracted_params[param_name] = extract_parameter(GridConnection{IsSource}, config, param_name,
+                                                             param_def, sim_params, uac)
+        catch e
+            @error "$(sprint(showerror, e))"
+            constructor_errored = true
+        end
+    end
 
-    sys_function = IsSource ? sf_flexible_source : sf_flexible_sink
+    try
+        # extract control_parameters, which is essentially a subconfig
+        extracted_params["control_parameters"] = extract_control_parameters(Component, config)
 
-    return GridConnection{IsSource}(uac,                        # uac
-                                    Controller(default(config, "control_parameters", nothing)),
-                                    sys_function,               # sys_function
-                                    medium,                     # medium
-                                    InterfaceMap(medium => nothing), # input_interfaces
-                                    InterfaceMap(medium => nothing), # output_interfaces
-                                    temperature_profile,        # temperature_profile
-                                    constant_temperature,       # constant_temperature
-                                    nothing,                    # temperature
-                                    0.0,                        # output_sum
-                                    0.0)                        # input_sum
+        # validate configuration, e.g. for interdependencies and allowed values
+        validate_config(GridConnection, config, extracted_params, uac, sim_params)
+    catch e
+        @error "$(sprint(showerror, e))"
+        constructor_errored = true
+    end
+
+    # we delayed throwing the errors upwards so that many errors are caught at once
+    if constructor_errored
+        throw(InputError("Can't construct component $uac because of errors parsing " *
+                         "the parameter config. Check the error log for more " *
+                         "information on each error."))
+    end
+
+    # initialize and construct the object
+    init_values = init_from_params(GridConnection, uac, extracted_params, config)
+    return GridConnection{IsSource}(init_values...)
 end
 
 # Backwards-compatible constructor: if no type parameter is provided, use the
@@ -65,6 +139,57 @@ function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{
     else
         return GridConnection{false}(uac, config, sim_params)
     end
+end
+
+function component_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
+    return deepcopy(GRID_CONNECTION_PARAMETERS) # Return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String) where {IsSource}
+    if param_name == "is_source"
+        return IsSource
+    end
+
+    if param_name == "constant_temperature" || param_name == "temperature_profile_file_path"
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "temperature",
+                                                                "temperature_profile_file_path",
+                                                                "temperature_from_global_file",
+                                                                "constant_temperature",
+                                                                uac)
+        return param_name == "constant_temperature" ? constant_temperature : temperature_profile
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params)
+end
+
+function validate_config(x::Type{GridConnection}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, config, extracted, uac, sim_params)
+end
+
+function init_from_params(x::Type{GridConnection}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+    register_media([medium])
+
+    sys_function = params["is_source"] ? sf_flexible_source : sf_flexible_sink
+
+    # return tuple in the order expected by new()
+    return (uac,                                     # uac
+            Controller(params["control_parameters"]),
+            sys_function,                            # sys_function
+            medium,                                  # medium
+            InterfaceMap(medium => nothing),         # input_interfaces
+            InterfaceMap(medium => nothing),         # output_interfaces
+            params["temperature_profile_file_path"], # temperature_profile, might be from global weather data
+            params["constant_temperature"],          # constant_temperature
+            nothing,                                 # temperature
+            0.0,                                     # output_sum
+            0.0)                                     # input_sum
 end
 
 function initialise!(unit::GridConnection{IsSource}, sim_params::Dict{String,Any}) where {IsSource}
