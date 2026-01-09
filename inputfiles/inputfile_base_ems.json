@@ -139,7 +139,7 @@
             "temperature_from_global_file": "temp_ambient_air",
             "scale": 1
         },
-            "Heat_Source_FB": {
+        "Heat_Source_FB": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "Boiler"
@@ -243,7 +243,7 @@
                     "name": "EMS", 
                     "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
                                             "./profiles/MA/boersenpreis_EUR_kWh.prf"],
-                    "limit_prices": [100000, 0, 100],
+                    "limit_prices": [100, 0, 1000],
                     "new_connections_below_limits": {
                         "BUS_Power":[
                             {

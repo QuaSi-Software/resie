@@ -1,6 +1,6 @@
 using CSV
 using DataFrames
-filepath = raw"c:\Users\jenter\Documents\resie\profiles\Profile Rohdaten\aFRR\aFRR_neg_energy.csv" # TODO change
+filepath = raw"c:\Users\jenter\Documents\resie\profiles\Profile Rohdaten\Marktwerte\Monatsmarktwerte_PV_2024.csv" # TODO change
 timestep_col_name = "timestep" # TODO change
 profile_start_date = "01.01.2024 00:00" # TODO change
 

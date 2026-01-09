@@ -73,7 +73,8 @@ p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of va
 # define adjustments to the different price profiles in the order of
 # [stock_price, reserve_power_price, reserve_energy_price, market_value_pv, market_value_wind]
 # TODO adjust values
-profile_addons = [0.0, 0.0, 0.0, 0.0, 0.0]
+# Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
+profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0]
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
@@ -279,8 +280,8 @@ function run_resie_variant(
     price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_kWh.prf"
     price_profile_path_reserve_power = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
-    price_profile_path_market_value_pv = "./profiles/MA/boersenpreis_EUR_kWh.prf" #TODO "./profiles/MA/market_value_PV_EUR_kWh.prf"
-    price_profile_path_market_value_wind = "./profiles/MA/boersenpreis_EUR_kWh.prf" #TODO "./profiles/MA/market_value_Wind_EUR_kWh.prf"
+    price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
+    price_profile_path_market_value_wind = "./profiles/MA/MW_Solar.prf"
 
     # create correct profiles from price_profile_paths and add the to sim_output
     run_ID = UUID(runidx)
@@ -456,10 +457,10 @@ function main(base_input_path, write_output)
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
-        A0_HP     = 300 * (Pth_HP / 1e3)        
+        A0_HP     = 200 * (Pth_HP / 1e3)        
         A0_Boiler = 80  * (Pth_Boiler / 1e3)
-        A0_Buffer = 25  * (Cap_Wh / 1e3)
-        A0_Batt   = 150 * (BattCap_Wh / 1e3)
+        A0_Buffer = 25  * (Cap_Wh / 1e3)        # estimate from FACT document: 2.06 Mio € for 80 MWh
+        A0_Batt   = 500 * (BattCap_Wh / 1e3)
        
         components = VDI2067.VDIComponent[
             VDI2067.heatpump_component(A0_HP),

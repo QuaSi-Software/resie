@@ -17,7 +17,7 @@ struct VDIParams
     r_inst::Float64             # Escalation of repair / reinstatement
     r_misc::Float64             # Escalation of miscellaneous costs (insurance, admin,…)
     r_rev::Float64              # Escalation of revenues (feed-in, control energy)
-    grid_price_addon::Float64   # taxes, levies, grid fees
+    grid_price_addon::Float64   # taxes, levies, grid fees  #TODO is this needed?
     AW_PV::Float64              # "Anzusetzender Wert" bei Direktvermarktung"
     AW_Wind::Float64            # "Anzusetzender Wert" bei Direktvermarktung"
 end
@@ -33,7 +33,7 @@ struct VDIComponent
     TN::Int                 # technical lifetime (years)
     f_wartung::Float64      # maintenance + inspection factor (share of A0 in year 1)
     f_instand::Float64      # repair / reinstatement factor (share of A0 in year 1)
-    f_bedien::Float64       # operation factor (share of A0 in year 1)
+    f_bedien::Float64       # operation factor (h/a in year 1)
 end
 
 # COMPONENT CONSTRUCTORS FOR THE FOUR CONSIDERED COMPONENT TYPES
@@ -46,15 +46,15 @@ heatpump_component(A0::Real) =
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 20.0, 0.02, 0.01, 5.0)
+    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 20.0, 0.005, 0.005, 0.0)
+    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real) =
-    VDIComponent("Battery", float(A0), 20.0, 0.01, 0.02, 0.0)
+    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0)
 
 
 ############################################################
@@ -71,7 +71,6 @@ VDI_SCENARIO_NONE = VDIParams(
     0.000,    # no repair cost (Excel)
     0.000,    # no revenues
     0.000,    # no miscellaneous (Excel)
-    #TODO grid fees based on peak power demand  
     120.0,     # grid price addon €/MWh
     79.90,     # AW_PV €/MWh
     7.35*1.42 # AW_Wind €/MWh
@@ -87,7 +86,7 @@ VDI_SCENARIO_MOD = VDIParams(
     0.010,    # repair cost +0.5% (Excel)
     -0.01,    # revenues -10%
     0.010,    # miscellaneous +0.5% (Excel)
-    #TODO grid fees based on peak power demand 
+    #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     79.90,    # AW_PV €/MWh
@@ -104,7 +103,7 @@ VDI_SCENARIO_PRO = VDIParams(
     0.020,    # repair +1.0% (Excel)
     -0.02,    # revenues -2.0%
     0.020,    # miscellaneous +1.0% (Excel)
-    #TODO grid fees based on peak power demand 
+    #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     79.90,     # AW_PV €/MWh
@@ -189,10 +188,10 @@ end
 ############################################################
 
 function op_annuity(components::Vector{VDIComponent}, p::VDIParams)     # operation cost-related annuity
-    # First-year operating costs
-    # Operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
-    # TODO only use f_bedien if component is aactually used -> p_th > 0
-    A_B1  = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0)
+
+    # first year operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
+    A_B1  = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0)  # only use f_bedien if component is actually used -> p_th > 0
+
     # First-year inspection, maintenance, repair and reinstatement cost
     A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components)
 
@@ -224,13 +223,14 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    # TODO not only Grid_IN but also control_reserve?
-    IN = sim["Grid_IN"] .* 1e-6                                 # convert Wh time series in MWh
+    IN = sim["Grid_IN"] + sim["Control_Reserve"] .* 1e-6        # convert Wh time series in MWh
     base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
+
+    real_price_power = base_price .+ 105     # Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
-    A1 = sum(IN .* base_price)
+    A1 = sum(IN .* real_price_power)  
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
