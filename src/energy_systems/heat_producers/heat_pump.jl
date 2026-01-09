@@ -362,8 +362,8 @@ mutable struct HeatPump <: Component
         for (param_name, param_def) in HEAT_PUMP_PARAMETERS
             try
                 extracted_params[param_name] = extract_parameter(HeatPump, config, param_name, param_def, sim_params)
-            catch err
-                @error "$err"
+            catch e
+                @error "$(sprint(showerror, e))"
                 constructor_errored = true
             end
         end
@@ -374,8 +374,8 @@ mutable struct HeatPump <: Component
 
             # validate configuration, e.g. for interdependencies and allowed values
             validate_config(HeatPump, config, extracted_params, uac, sim_params)
-        catch
-            @error "$err"
+        catch e
+            @error "$(sprint(showerror, e))"
             constructor_errored = true
         end
 
