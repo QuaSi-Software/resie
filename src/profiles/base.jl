@@ -7,10 +7,11 @@ export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
+Custom error type for exception `InputError` as alias to `ArgumentError`.
+Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-struct InputError <: Exception end
+const InputError = ArgumentError
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
