@@ -87,7 +87,6 @@ const HEAT_PUMP_PARAMETERS = Dict(
         type=String,
         json_type="string",
         function_type="1dim",
-        conditional="model_type != 'simplified' or must be const",
         unit="-"
     ),
     "max_power_function" => (
