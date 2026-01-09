@@ -30,10 +30,11 @@ using ..Profiles
 using UUIDs
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
+Custom error type for exception `InputError` as alias to `ArgumentError`.
+Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-struct InputError <: Exception end
+const InputError = ArgumentError
 
 """
 Convenience function to get the value of a key from a config dict using a default value.
