@@ -1600,11 +1600,19 @@ function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_n
         throw(InputError("Missing required parameter $param_name"))
     end
 
-    # cast to the type of the component
-    try
-        value = convert(param_def.type, value)
-    catch
-        throw(InputError("Can't convert given value for parameter $param_name to type $(param_def.type)"))
+    # check if it is required but has a value of nothing (meaning both the default is
+    # nothing and no value was given)
+    if param_def.required && value === nothing
+        throw(InputError("Required parameter $param_name has no given value and no default."))
+    end
+
+    # cast to the type of the component, unless the value is nothing
+    if value !== nothing
+        try
+            value = convert(param_def.type, value)
+        catch
+            throw(InputError("Can't convert given value for parameter $param_name to type $(param_def.type)"))
+        end
     end
 
     # special handling for function-type parameters
