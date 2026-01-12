@@ -34,6 +34,8 @@ struct VDIComponent
     f_wartung::Float64      # maintenance + inspection factor (share of A0 in year 1)
     f_instand::Float64      # repair / reinstatement factor (share of A0 in year 1)
     f_bedien::Float64       # operation factor (h/a in year 1)
+    incentive_p::Float64    # incentive percentage to be multiplied with A0
+    incentive_max::Float64  # maximum incentive for single investment
 end
 
 # COMPONENT CONSTRUCTORS FOR THE FOUR CONSIDERED COMPONENT TYPES
@@ -42,19 +44,19 @@ end
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
 heatpump_component(A0::Real) =
-    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0)
+    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.4, Inf)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0)
+    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.4, Inf)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0)
+    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.4, Inf)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real) =
-    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0)
+    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0, 0.0, Inf)
 
 
 ############################################################
@@ -179,6 +181,14 @@ function capital_annuity(comp::VDIComponent, p::VDIParams)      # capital cost-r
     return  (comp.A0 +
             npv_replacements(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap) -
             residual_value(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap)) * 
+            annuity_factor(p.i_cap, p.T)
+end
+
+function capital_annuity_incentive(comp::VDIComponent, p::VDIParams)      # capital cost-related annuity with incentive considered
+    A0_inc = max(comp.A0 * comp.incentive_p, comp.incentive_max)
+    return  (A0_inc +
+            npv_replacements(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap) -
+            residual_value(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap)) * 
             annuity_factor(p.i_cap, p.T)
 end
 
@@ -402,12 +412,16 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     A_op    = op_annuity(components, p)
     A_misc  = misc_annuity(components, p)
     A_energy = energy_annuity(sim_new, p)
-
+    A_cap_incentive = sum(capital_annuity_incentive(c, p) for c in components)
     A_rev_control = revenue_control(sim_new, p)
     A_rev_feed    = revenue_feedin(sim_new, p)
 
     A_total = A_cap + A_op + A_misc + A_energy -
               (A_rev_control + A_rev_feed)
+              
+    A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
+                        (A_rev_control + A_rev_feed)
+
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
         # Q_heat_kWh = sum(sim_new["Heat"]) / 1000.0
@@ -416,12 +430,14 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
 
     return OrderedDict(
         "A_cap" => A_cap,
+        "A_cap_incentive" => A_cap_incentive,
         "A_op" => A_op,
         "A_misc" => A_misc,
         "A_energy" => A_energy,
         "A_rev_control" => A_rev_control,
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
+        "A_total_incentive" => A_total_incentive
         # "heat_price_eur_per_kwh" => heat_price
     )
 end

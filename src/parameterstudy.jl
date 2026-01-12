@@ -325,11 +325,15 @@ function run_resie_variant(
     if Threads.nthreads() > 1
         mkpath("./profiles/MA/reserve_bench_price_profiles")
         price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_profiles/reserve_bench_price_EUR_MW_$(Threads.threadid()).prf" 
+        mkpath("./profiles/MA/stock_price_profiles")
+        price_profile_path_stock_new = "./profiles/MA/stock_price_profiles/stock_price_EUR_MWh_$(Threads.threadid()).prf" 
     else
         price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
+        price_profile_path_stock_new = "./profiles/MA/stock_price_EUR_MWh.prf" 
         # reserve_bench profile will be only created when it's not there
     end
     save_to_prf(timestamps, reserve_bench_values, price_profile_path_reserve_bench)
+    save_to_prf(timestamps, stock_values, price_profile_path_stock_new)
 
     ########################################################
     # Set limits / benchmark for economic_control.jl
@@ -337,7 +341,7 @@ function run_resie_variant(
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
         cm = cfg["components"]["BUS_Power"]["control_modules"][1]
-        cm["price_profile_paths"] = [price_profile_path_stock, price_profile_path_reserve_bench]
+        cm["price_profile_paths"] = [price_profile_path_stock_new, price_profile_path_reserve_bench]
         cm["limit_prices"] = [p_stock, 0, p_reserve]
         cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
         cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 

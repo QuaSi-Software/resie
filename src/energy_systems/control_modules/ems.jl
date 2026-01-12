@@ -217,10 +217,10 @@ mutable struct CM_EMS <: ControlModule
             # available_el_power = available_el_power_hp[min_idx] + available_el_power_boiler[min_idx] + feed_in_el_power[min_idx]
 
             # check if minimum el power of 1 MW can be provided
-            if available_el_power/10^6 >= 1.0
+            if available_el_power >= 10^6
                 energy_indicator = true
                 # scale controlreserve profile with available_energy 
-                components[mod_params["reserve_uac"]].scaling_factor = available_el_power/10^6 # TODO check basic scaling_factor
+                components[mod_params["reserve_uac"]].scaling_factor = available_el_power # TODO check basic scaling_factor
             else
                 energy_indicator = false
             end
@@ -234,17 +234,17 @@ mutable struct CM_EMS <: ControlModule
             # end 
             # append!(time_array_3, t3*10^6)
 
-            if sim_params["time"] > 24*365*4*900 - 7200*4
-                time_array_1 = time_array_1[2:end]
-                # @info time_array_1
-                @info "Mean t1:$(round(mean(time_array_1), digits=3)) us; std: $(round(std(time_array_1), digits=3)) us; max:$(round(maximum(time_array_1), digits=3)) us"
-                time_array_2 = time_array_2[2:end]
-                # @info time_array_2
-                @info "Mean t2:$(round(mean(time_array_2), digits=3)) us; std: $(round(std(time_array_2), digits=3)) us; max:$(round(maximum(time_array_2), digits=3)) us"
-                time_array_3 = time_array_3[2:end]
-                # @info time_array_3
-                @info "Mean t3:$(round(mean(time_array_3), digits=3)) us; std: $(round(std(time_array_3), digits=3)) us; max:$(round(maximum(time_array_3), digits=3)) us"
-            end
+            # if sim_params["time"] > 24*365*4*900 - 7200*4
+            #     time_array_1 = time_array_1[2:end]
+            #     # @info time_array_1
+            #     @info "Mean t1:$(round(mean(time_array_1), digits=3)) us; std: $(round(std(time_array_1), digits=3)) us; max:$(round(maximum(time_array_1), digits=3)) us"
+            #     time_array_2 = time_array_2[2:end]
+            #     # @info time_array_2
+            #     @info "Mean t2:$(round(mean(time_array_2), digits=3)) us; std: $(round(std(time_array_2), digits=3)) us; max:$(round(maximum(time_array_2), digits=3)) us"
+            #     time_array_3 = time_array_3[2:end]
+            #     # @info time_array_3
+            #     @info "Mean t3:$(round(mean(time_array_3), digits=3)) us; std: $(round(std(time_array_3), digits=3)) us; max:$(round(maximum(time_array_3), digits=3)) us"
+            # end
             return energy_indicator && price_indicator
         end
 
