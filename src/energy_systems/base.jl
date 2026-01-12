@@ -2257,4 +2257,26 @@ function get_wind_speed_profile_from_config(config::Dict{String,Any}, sim_params
     end
 end
 
+"""
+    all_component_parameters()::Dict{String,Any}
+
+Returns a dictionary, with type names as keys, of the parameters of all components.
+
+# Returns
+- `Dict{String,Any}`: The parameter definition for all components, indexed by type names.
+"""
+function all_component_parameters()::Dict{String,Any}
+    types = [GridInput, GridOutput, HeatPump]
+
+    all_parameters = Dict{String,Any}()
+    for cmp_type in types
+        # turning the Type into a Symbol gives the fully qualified name including modules,
+        # but we care only about the last part, the actual type name
+        name = String(Symbol(cmp_type))
+        splitted = split(name, ".")
+        all_parameters[last(splitted)] = component_parameters(cmp_type)
+    end
+    return all_parameters
+end
+
 end
