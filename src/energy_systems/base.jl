@@ -1670,12 +1670,29 @@ Throws `InputError` if validation fails.
 """
 function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
-    # check, for parameters with field options, if the value is one of the options
     for (name, value) in pairs(extracted)
+        # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
             if !(value in type_def[name].options)
                 throw(InputError("Given value $value is not in the allowed options for " *
                                  "parameter $name of component $uac."))
+            end
+        end
+
+        # check for mutually exclusive parameters
+        if name in keys(type_def) && isdefined(type_def[name], :conditionals)
+            for cond in type_def[name].conditionals
+                if length(cond) >= 2 && cond[2] == "mutex"
+                    other_name = cond[1]
+                    other_value = other_name in keys(extracted) ? extracted[other_name] : nothing
+                    if ((type_def[name].type != Bool && value !== nothing) ||
+                        (type_def[name].type == Bool && value === true)) &&
+                       ((type_def[other_name].type != Bool && other_value !== nothing) ||
+                        (type_def[other_name].type == Bool && other_value === true))
+                        # end of condition
+                        throw(InputError("Parameters $name and $other_name of component $uac are mutually exclusive."))
+                    end
+                end
             end
         end
     end
