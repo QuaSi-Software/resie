@@ -281,7 +281,7 @@ function run_resie_variant(
     price_profile_path_reserve_power = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
-    price_profile_path_market_value_wind = "./profiles/MA/MW_Solar.prf"
+    price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
 
     # create correct profiles from price_profile_paths and add the to sim_output
     run_ID = UUID(runidx)
@@ -314,7 +314,7 @@ function run_resie_variant(
         timestamps[idx] = Int((idx - 1) * sim_params["time_step_seconds"])
         if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
             idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
-            reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1 # TODO variable time?
+            reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1
                                                  reserve_power_values[idx] * 4
         end
     end
@@ -457,10 +457,10 @@ function main(base_input_path, write_output)
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
-        A0_HP     = 200 * (Pth_HP / 1e3)        
-        A0_Boiler = 80  * (Pth_Boiler / 1e3)
+        A0_HP     = 700 * (Pth_HP / 1e3)        #   
+        A0_Boiler = 285  * (Pth_Boiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen
         A0_Buffer = 25  * (Cap_Wh / 1e3)        # estimate from FACT document: 2.06 Mio € for 80 MWh
-        A0_Batt   = 500 * (BattCap_Wh / 1e3)
+        A0_Batt   = 375 * (BattCap_Wh / 1e3)    # TODO Jule fragen
        
         components = VDI2067.VDIComponent[
             VDI2067.heatpump_component(A0_HP),

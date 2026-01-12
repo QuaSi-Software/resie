@@ -103,7 +103,8 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "constant_power": 15.0e6
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 1e6
         },
         "Grid_OUT": {
             "type": "GridConnection",

@@ -226,11 +226,11 @@ function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] + sim["Control_Reserve"] .* 1e-6        # convert Wh time series in MWh
     base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
-    real_price_power = base_price .+ 105     # Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
+    
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
-    A1 = sum(IN .* real_price_power)  
+    A1 = sum(IN .* base_price)  
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
