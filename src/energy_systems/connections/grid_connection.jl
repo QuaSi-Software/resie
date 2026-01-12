@@ -1,7 +1,6 @@
 #! format: off
 const GRID_CONNECTION_PARAMETERS = Dict(
     "medium" => (
-        default="m_e_ac_230v",
         description="Medium of the grid connection (e.g. electrical or thermal medium)",
         display_name="Medium",
         required=true,
