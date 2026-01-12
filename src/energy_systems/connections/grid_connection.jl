@@ -140,8 +140,24 @@ function GridConnection(uac::String, config::Dict{String,Any}, sim_params::Dict{
     end
 end
 
+# type-aliases for more convenient construction
+const GridInput = GridConnection{true}
+const GridOutput = GridConnection{false}
+
 function component_parameters(x::Type{GridConnection{IsSource}})::Dict{String,NamedTuple} where {IsSource}
-    return deepcopy(GRID_CONNECTION_PARAMETERS) # Return a copy to prevent external modification
+    return deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+end
+
+function component_parameters(x::Type{GridInput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is true for GridInput by definition
+    return params
+end
+
+function component_parameters(x::Type{GridOutput})::Dict{String,NamedTuple}
+    params = deepcopy(GRID_CONNECTION_PARAMETERS) # return a copy to prevent external modification
+    delete!(params, "is_source") # remove is_source as this is false for GridOutput by definition
+    return params
 end
 
 function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, param_name::String,
@@ -303,9 +319,5 @@ function output_value(unit::GridConnection{IsSource}, key::OutputKey)::Float64 w
     end
     throw(KeyError(key.value_key))
 end
-
-const GridInput = GridConnection{true}
-
-const GridOutput = GridConnection{false}
 
 export GridConnection, GridInput, GridOutput
