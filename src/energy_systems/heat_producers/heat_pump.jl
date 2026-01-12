@@ -413,7 +413,7 @@ end
 
 function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
                          uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, config, extracted, uac, sim_params)
+    validate_config(Component, extracted, uac, sim_params, component_parameters(HeatPump))
 
     model_type = extracted["model_type"]
     cop_func_def = default(config, "cop_function", HEAT_PUMP_PARAMETERS["cop_function"].default)

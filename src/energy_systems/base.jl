@@ -1654,7 +1654,7 @@ function extract_control_parameters(x::Type{Component}, config::Dict{String,Any}
 end
 
 """
-    validate_config(x::Type{Component}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String)
+    validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
 
 Validates the given configuration for interdependencies and consistency.
 
@@ -1662,20 +1662,18 @@ Throws `InputError` if validation fails.
 
 # Args
 - `x::Type{Component}`: Not a required input, instead used for leveraging multiple
-    dispatch for type-specific methods that may invoke the base method. 
-- `config::Dict{String,Any}`: The raw parameter input config
+    dispatch for type-specific methods that may invoke the base method.
 - `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
 - `uac::String`: The UAC of the component, mostly used in error messages
 - `sim_params::Dict{String,Any}`: Simulation parameters
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
 """
-function validate_config(x::Type{Component}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    type_def = component_parameters(x)
-
+function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
     # check, for parameters with field options, if the value is one of the options
     for (name, value) in pairs(extracted)
         if name in keys(type_def) && isdefined(type_def[name], :options)
-            if !(value in type_def.options)
+            if !(value in type_def[name].options)
                 throw(InputError("Given value $value is not in the allowed options for " *
                                  "parameter $name of component $uac."))
             end

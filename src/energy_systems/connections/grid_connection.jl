@@ -112,7 +112,7 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
         extracted_params["control_parameters"] = extract_control_parameters(Component, config)
 
         # validate configuration, e.g. for interdependencies and allowed values
-        validate_config(GridConnection, config, extracted_params, uac, sim_params)
+        validate_config(GridConnection{IsSource}, config, extracted_params, uac, sim_params)
     catch e
         @error "$(sprint(showerror, e))"
         constructor_errored = true
@@ -166,9 +166,9 @@ function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{Strin
     return extract_parameter(Component, config, param_name, param_def, sim_params)
 end
 
-function validate_config(x::Type{GridConnection}, config::Dict{String,Any}, extracted::Dict{String,Any},
-                         uac::String, sim_params::Dict{String,Any})
-    validate_config(Component, config, extracted, uac, sim_params)
+function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any}) where {IsSource}
+    validate_config(Component, extracted, uac, sim_params, component_parameters(GridConnection{IsSource}))
 end
 
 function init_from_params(x::Type{GridConnection}, uac::String, params::Dict{String,Any},
