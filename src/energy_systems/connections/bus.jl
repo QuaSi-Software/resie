@@ -121,6 +121,19 @@ function is_empty(row::Union{BTInputRow,BTOutputRow})::Bool
             is_max_energy_nothing(row.energy_pool))
 end
 
+#! format: off
+const BUS_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the bus (e.g. electricity, heat, gas, etc.)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a bus component for balancing multiple inputs and outputs.
 
@@ -170,25 +183,40 @@ Config-constructor for a Bus.
 `Bus`: The constructed bus
 """
 function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
-    medium = Symbol(config["medium"])
-    register_media([medium])
+    constructor_errored = false
 
-    return Bus(uac,                                          # uac
-               Controller(default(config, "control_parameters", nothing)),
-               sf_bus,                                       # sys_function
-               medium,                                       # medium
-               [],                                           # input_interfaces
-               [],                                           # output_interfaces,
-               ConnectionMatrix(config),                     # connectivity
-               0.0,                                          # remainder
-               Dict{String,BTInputRow}(),                    # balance_table_inputs
-               Dict{String,BTOutputRow}(),                   # balance_table_outputs
-               Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
-               [],                                           # input_output_rows_iteration
-               false,                                        # has_custom_order
-               nothing,                                      # proxy
-               uuid1(),                                      # holds the current run ID later
-               sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
+    # extract all parameters using the parameter dictionary as the source of truth
+    extracted_params = Dict{String,Any}()
+    for (param_name, param_def) in BUS_PARAMETERS
+        try
+            extracted_params[param_name] = extract_parameter(Bus, config, param_name, param_def, sim_params, uac)
+        catch e
+            @error "$(sprint(showerror, e))"
+            constructor_errored = true
+        end
+    end
+
+    try
+        # extract control_parameters, which is essentially a subconfig
+        extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+        # validate configuration, e.g. for interdependencies and allowed values
+        validate_config(Bus, config, extracted_params, uac, sim_params)
+    catch e
+        @error "$(sprint(showerror, e))"
+        constructor_errored = true
+    end
+
+    # we delayed throwing the errors upwards so that many errors are caught at once
+    if constructor_errored
+        throw(InputError("Can't construct component $uac because of errors parsing " *
+                         "the parameter config. Check the error log for more " *
+                         "information on each error."))
+    end
+
+    # initialize and construct the object
+    init_values = init_from_params(Bus, uac, extracted_params, config, sim_params)
+    return Bus(init_values...)
 end
 
 """
@@ -225,6 +253,44 @@ function Bus(uac::String,
                nothing,                                      # proxy
                run_id,                                       # run ID
                epsilon)
+end
+
+function component_parameters(x::Type{Bus})::Dict{String,NamedTuple}
+    return deepcopy(BUS_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params)
+end
+
+function validate_config(x::Type{Bus}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(Bus))
+end
+
+function init_from_params(x::Type{Bus}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any},
+                          sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+    register_media([medium])
+
+    # return tuple in the order expected by new()
+    return (uac,                                          # uac
+            Controller(params["control_parameters"]),
+            sf_bus,                                       # sys_function
+            medium,                                       # medium
+            [],                                           # input_interfaces
+            [],                                           # output_interfaces,
+            ConnectionMatrix(raw_params),                 # connectivity
+            0.0,                                          # remainder
+            Dict{String,BTInputRow}(),                    # balance_table_inputs
+            Dict{String,BTOutputRow}(),                   # balance_table_outputs
+            Array{Union{Nothing,Float64},2}(undef, 0, 0), # balance_table, filled in reset()
+            [],                                           # input_output_rows_iteration
+            false,                                        # has_custom_order
+            nothing,                                      # proxy
+            uuid1(),                                      # holds the current run ID later
+            sim_params["epsilon"])                        # system-wide epsilon for easy access within the bus functions
 end
 
 function initialise!(unit::Bus, sim_params::Dict{String,Any})
