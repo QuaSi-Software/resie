@@ -47,7 +47,9 @@ mutable struct SeasonalThermalStorage <: Component
     output_layer_from_top::Int64
     dz::Vector{Float64}
     dz_normalized::Vector{Float64}
-    sigma::Vector{Float64}
+    sigma_bottom_only::Float64
+    sigma_lid_only::Float64
+    sigma_barrel::Vector{Float64}
     lambda::Vector{Float64}
     phi::Vector{Float64}
     theta::Vector{Float64}
@@ -195,7 +197,9 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
                    Float64[],                                      # dz, thickness of the layers of the STES [m]
                    Float64[],                                      # dz_normalized, normalized dz with respect to to the volume of each section
-                   Float64[],                                      # [1/h]  factor for losses to ambient: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
+                   0.0,                                            # [1/h] sigma factor for losses to ambient through bottom: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
+                   0.0,                                            # [1/h] sigma factor for losses to ambient through top: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
+                   Float64[],                                      # [1/h] sigma factor for losses to ambient through barrels: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
                    Float64[],                                      # [K/kJ] factor for input/output energy:  1 / (roh * cp * volume_segment ) 
                    Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
                    Float64[],                                      # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
@@ -338,15 +342,14 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # calculate the normalized dz with respect to to the volume of each section
     unit.dz_normalized = unit.dz .* sqrt.((unit.volume_segments .* unit.number_of_layer_total) ./ unit.volume)
 
-    # calculate coefficient for losses to ambient
-    unit.sigma = zeros(unit.number_of_layer_total)
-    unit.sigma[1] = unit.surface_area_bottom * unit.thermal_transmission_bottom /
-                    (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])          # [1/h] losses to ambient through bottom
-    unit.sigma[end] = unit.surface_area_lid * unit.thermal_transmission_lid /
-                      (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[end])      # [1/h] losses to ambient through lid
-    unit.sigma = unit.sigma .+
-                 unit.surface_area_barrel_segments .* unit.thermal_transmission_barrels ./
-                 (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments)                # [1/h]  losses to ambient though barrel
+    # calculate coefficient for losses to ambient						  
+    unit.sigma_bottom_only = unit.surface_area_bottom * unit.thermal_transmission_bottom /
+                             (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])  # [1/h] losses to ambient through bottom
+    unit.sigma_lid_only = unit.surface_area_lid * unit.thermal_transmission_lid /
+                          (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[end])    # [1/h] losses to ambient through lid
+
+    unit.sigma_barrel = unit.surface_area_barrel_segments .* unit.thermal_transmission_barrels ./
+                        (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) .* unit.volume_segments)          # [1/h]  losses to ambient though barrel
 
     # calculate coefficient for input/output energy. 
     # Currently not used, as no direct loading of energy into the storage through heat exchangers is implemented.
@@ -1381,7 +1384,8 @@ function update_STES(unit::SeasonalThermalStorage,
                 t_new[n] = t_old[n] +
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n + 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature_bottom - t_old[n])) * dt +               # losses through bottom and side walls
+                            unit.sigma_bottom_only * (unit.effective_ambient_temperature_bottom - t_old[n]) +            # losses through bottom
+                            unit.sigma_barrel[n] * (unit.effective_ambient_temperature_barrels[n] - t_old[n])) * dt +    # losses through lower side wall
                            # unit.lambda[n] * (Q_in_out)[n] +                                                            # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1389,7 +1393,8 @@ function update_STES(unit::SeasonalThermalStorage,
                 t_new[n] = t_old[n] +
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n - 1] - t_old[n]) / unit.dz_normalized[n]^2 +    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature_top - t_old[n])) * dt +                  # losses through lid and side walls
+                            unit.sigma_lid_only * (unit.effective_ambient_temperature_top - t_old[n]) +                  # losses through lid
+                            unit.sigma_barrel[n] * (unit.effective_ambient_temperature_barrels[n] - t_old[n])) * dt +    # losses through top side wall
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
@@ -1398,7 +1403,7 @@ function update_STES(unit::SeasonalThermalStorage,
                            consider_losses *
                            (3600 * unit.diffusion_coefficient * (t_old[n + 1] + t_old[n - 1] - 2 * t_old[n]) /
                             unit.dz_normalized[n]^2 +                                                                    # thermal diffusion
-                            unit.sigma[n] * (unit.effective_ambient_temperature_barrels[n] - t_old[n])) * dt +            # losses through side walls
+                            unit.sigma_barrel[n] * (unit.effective_ambient_temperature_barrels[n] - t_old[n])) * dt +    # losses through side walls
                            # unit.lambda[n] * Q_in_out[n] +                                                              # thermal input and output
                            unit.phi[n] * mass_in_vec[n] * (mass_in_temp[n] - t_old[n]) +                                 # mass input
                            unit.phi[n] * mass_out_vec[n] * (mass_out_temp[n] - t_old[n])                                 # mass output
