@@ -119,6 +119,9 @@ mutable struct SeasonalThermalStorage <: Component
     load::Float64
     load_end_of_last_timestep::Float64
     losses::Float64
+    losses_top::Float64
+    losses_sidewalls::Float64
+    losses_bottom::Float64
     temperature_segments::Vector{Temperature}
     current_energy_input::Vector{Float64}
     current_temperature_input::Vector{Temperature}
@@ -269,7 +272,10 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "initial_load", 0.0),           # initial_load [%/100] assuming perfectly mixed storage at the begin
                    0.0,                                            # load, set to initial_load at the beginning [Wh]
                    0.0,                                            # load_end_of_last_timestep, stores the load of the previous time step without losses
-                   0.0,                                            # losses in current time step [Wh]
+                   0.0,                                            # losses total in current time step [Wh]
+                   0.0,                                            # losses_top  [Wh]
+                   0.0,                                            # losses_sidewalls [Wh]
+                   0.0,                                            # losses_bottom [Wh]
                    Float64[],                                      # temperature_segments: temperatures of the segments
                    Float64[],                                      # current_energy_input, energy input in current time step [Wh]
                    Temperature[],                                  # current_temperature_input, temperature of the input in current time step [°C]
@@ -1424,6 +1430,19 @@ function update_STES(unit::SeasonalThermalStorage,
         load_new = (weighted_mean(t_new, unit.volume_segments, sim_params) - unit.low_temperature) /
                    (unit.high_temperature - unit.low_temperature) * unit.capacity
         losses = unit.load + sum(energy_input) - energy_output - load_new # + sum(Q_in_out)  # losses are positive here
+
+        # calculate separate losses 
+        unit.losses_top = (sim_params["time_step_seconds"] / 60 / 60) *
+                          unit.surface_area_lid * unit.thermal_transmission_lid *
+                          (unit.temperature_segments[end] - unit.effective_ambient_temperature_top)
+        unit.losses_bottom = (sim_params["time_step_seconds"] / 60 / 60) * unit.surface_area_bottom *
+                             unit.thermal_transmission_bottom *
+                             (unit.temperature_segments[1] - unit.effective_ambient_temperature_bottom)
+        unit.losses_sidewalls = (sim_params["time_step_seconds"] / 60 / 60) *
+                                sum(unit.surface_area_barrel_segments[k] * unit.thermal_transmission_barrels[k] *
+                                    (unit.temperature_segments[k] - unit.effective_ambient_temperature_barrels[k])
+                                    for k in 1:(unit.number_of_layer_total))
+
         return losses, unit.load, load_new, t_new
     end
 end
@@ -1715,6 +1734,9 @@ function output_values(unit::SeasonalThermalStorage)::Vector{String}
             "Load%",
             "Capacity",
             "LossesGains",
+            "LossesGains_top",
+            "LossesGains_sidewalls",
+            "LossesGains_bottom",
             "CurrentMaxOutTemp",
             "GroundTemperature",
             "MassInput",
@@ -1739,6 +1761,12 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return unit.capacity
     elseif key.value_key == "LossesGains"
         return -unit.losses
+    elseif key.value_key == "LossesGains_top"
+        return unit.losses_top
+    elseif key.value_key == "LossesGains_sidewalls"
+        return unit.losses_sidewalls
+    elseif key.value_key == "LossesGains_bottom"
+        return unit.losses_bottom
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
     elseif key.value_key == "GroundTemperature"
