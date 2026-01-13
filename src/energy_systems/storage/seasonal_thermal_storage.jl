@@ -2030,14 +2030,18 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
     # --- Region 3: R_wall .. R_overlap (only if overlap is activated) ---
     if unit.has_top_insulation_overlap
         start_w = max(last(dr_segments), min_w)
-        append!(dr_segments, create_geometric_mesh_two_sided(start_w, max_w, ef, unit.top_insulation_overlap_width))
+        append!(dr_segments, create_geometric_mesh(start_w, max_w, ef, unit.top_insulation_overlap_width))
     end
 
     # --- Region 4: R_overlap .. R_dom ---
     used_r = sum(dr_segments)
     remaining_r = max(R_dom - used_r, 0.0)
     if remaining_r > unit.epsilon_geometry
-        start_w = max(last(dr_segments), min_w)
+        if unit.has_top_insulation_overlap
+            start_w = last(dr_segments)
+        else
+            start_w = max(last(dr_segments), min_w)
+        end
         append!(dr_segments, create_geometric_mesh(start_w, max_w, ef, remaining_r))
     end
 
