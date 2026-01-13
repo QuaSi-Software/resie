@@ -348,7 +348,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # calculate the normalized dz with respect to to the volume of each section
     unit.dz_normalized = unit.dz .* sqrt.((unit.volume_segments .* unit.number_of_layer_total) ./ unit.volume)
 
-    # calculate coefficient for losses to ambient						  
+    # calculate coefficient for losses to ambient
     unit.sigma_bottom_only = unit.surface_area_bottom * unit.thermal_transmission_bottom /
                              (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])  # [1/h] losses to ambient through bottom
     unit.sigma_lid_only = unit.surface_area_lid * unit.thermal_transmission_lid /
@@ -2188,7 +2188,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 if h <= unit.number_of_STES_layer_below_ground
                     # map soil row h (depth from surface) to buried STES layer k (bottom→top)
                     z_storage = unit.h_stes_buried - unit.soil_z_centers[h]
-                    k = searchsortedfirst(cum_dz_below, z_storage + eps(Float64))
+                    k = searchsortedfirst(cum_dz_below, z_storage)
                     k = clamp(k, 1, unit.number_of_STES_layer_below_ground)
 
                     # local wall face area represented by this cell
@@ -2329,43 +2329,76 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
     nz = length(unit.soil_z_centers)
     nr = length(unit.soil_r_centers)
 
-    cum_dz_below = unit.number_of_STES_layer_below_ground > 0 ?
-                   cumsum(unit.dz[1:unit.number_of_STES_layer_below_ground]) : Float64[]
+    nbur = unit.number_of_STES_layer_below_ground
+    cum_dz_below = nbur > 0 ? cumsum(unit.dz[1:nbur]) : Float64[]
 
-    # --- side below ground: compute Teff so that STES loss term uses the SAME flux as the FEM Robin ---
-    for k in 1:unit.number_of_STES_layer_below_ground
-        # map STES layer k (bottom→top) to soil row h
-        z_k = cum_dz_below[k] - unit.dz[k] / 2                 # depth from tank bottom
-        z_soil = unit.h_stes_buried - z_k                      # depth from ground surface
-        h = searchsortedfirst(unit.soil_z_centers, z_soil + eps(Float64))
-        h = clamp(h, 1, nz)
+    # ---------- 1) compute FEM wall heat flow per buried STES layer ----------
+    Q_side = zeros(Float64, nbur)  # [W], positive = heat leaving tank into soil
+
+    for h in 1:nz
+        # only rows within buried section participate in wall exchange
+        if unit.soil_z_centers[h] > unit.h_stes_buried + unit.epsilon_geometry
+            continue
+        end
+        if nbur == 0
+            continue
+        end
+
+        # map soil row h to buried STES layer k (bottom→top)
+        z_storage = unit.h_stes_buried - unit.soil_z_centers[h]   # depth measured from tank bottom
+        k = searchsortedfirst(cum_dz_below, z_storage + eps(Float64))
+        k = clamp(k, 1, nbur)
 
         r_wall = unit.radius_at_row[h]
-        idx = findfirst(j -> unit.cells_active[h, j] && (unit.soil_r_centers[j] >= r_wall - 1e-12), 1:nr)
+        if r_wall <= unit.epsilon_geometry
+            continue
+        end
 
-        Tc = (idx === nothing) ? unit.ground_temperature : unit.soil_t1[h, idx]
-        d_soil = (idx === nothing) ? (unit.soil_dr[1] / 2) :
-                 max(unit.soil_r_centers[idx] - r_wall, unit.soil_dr[idx] / 2)
-        Ueff = effective_U_to_cellcenter(unit.thermal_transmission_barrels[k], unit.row_k[h], d_soil)
+        # first active (soil) cell outside the tank at this depth
+        idx = findfirst(j -> unit.cells_active[h, j], 1:nr)
+        if idx === nothing
+            continue
+        end
 
-        unit.effective_ambient_temperature_barrels[k] = teff_from_cellcenter(unit.temperature_segments[k], Tc,
-                                                                             unit.thermal_transmission_barrels[k], Ueff)
+        T_cell = unit.soil_t1[h, idx]
+
+        # distance from wall to that cell center (for Ueff)
+        d_soil = max(unit.soil_r_centers[idx] - r_wall, unit.soil_dr[idx] / 2)
+
+        U = unit.thermal_transmission_barrels[k]
+        Ueff = effective_U_to_cellcenter(U, unit.row_k[h], d_soil)
+
+        # wall area represented by this row (must match the FEM assembly)
+        A_face = 2pi * r_wall * unit.soil_dz[h] * unit.sidewall_increase_factor
+
+        Q_side[k] += Ueff * A_face * (unit.temperature_segments[k] - T_cell)
     end
 
-    # --- side above ground: ambient temperature ---
-    for k in (unit.number_of_STES_layer_below_ground + 1):unit.number_of_layer_total
+    # ---------- 2) convert that heat flow into Teff consistent with STES sigma_barrel ----------
+    for k in 1:nbur
+        U = unit.thermal_transmission_barrels[k]
+        A_stes = unit.surface_area_barrel_segments[k]  # area used in sigma_barrel
+
+        if U > 0.0 && A_stes > 0.0
+            unit.effective_ambient_temperature_barrels[k] = unit.temperature_segments[k] - Q_side[k] / (U * A_stes)
+        else
+            unit.effective_ambient_temperature_barrels[k] = unit.temperature_segments[k]
+        end
+    end
+
+    # above ground remains ambient
+    for k in (nbur + 1):(unit.number_of_layer_total)
         unit.effective_ambient_temperature_barrels[k] = unit.ambient_temperature
     end
 
-    # --- lid faces ambient ---
+    # lid faces ambient
     unit.effective_ambient_temperature_top = unit.ambient_temperature
 
-    # --- bottom: use the same idea with the area-weighted soil cell-center average T_base ---
-    hbot = clamp(unit.number_of_STES_layer_below_ground + 1, 1, nz)
-    Ueff = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[hbot], unit.soil_dz[hbot] / 2)
-
+    # bottom: use the area-weighted soil cell-center average T_base ---
+    hbot = clamp(nbur + 1, 1, nz)
+    Ueff_b = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[hbot], unit.soil_dz[hbot] / 2)
     unit.effective_ambient_temperature_bottom = teff_from_cellcenter(unit.temperature_segments[1], T_base,
-                                                                     unit.thermal_transmission_bottom, Ueff)
+                                                                     unit.thermal_transmission_bottom, Ueff_b)
 end
 
 # Build a view field where tank interior has the current layer temps
