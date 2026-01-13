@@ -2118,9 +2118,9 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
         end
 
         # capacity
-        Vcell = 2pi * rc[i] * dr[i] * dz[h]
-        C = unit.row_rho[h] * unit.row_cp[h] * Vcell
-        aP = C / sim_params["time_step_seconds"]
+        Vcell = 2pi * rc[i] * dr[i] * dz[h] # m^3
+        C = unit.row_rho[h] * unit.row_cp[h] * Vcell  # [Wh/K]
+        aP = C / (sim_params["time_step_seconds"] / 60 / 60)  # [W/K]
         rhs = aP * Told[h, i]
 
         # EAST (i+1)
