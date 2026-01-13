@@ -1378,7 +1378,7 @@ function update_STES(unit::SeasonalThermalStorage,
         # mass flow and temperatures for charging
         mass_in_temp, mass_in_vec = calculate_mass_temperature_charging(unit, t_old,
                                                                         mass_in ./ number_of_internal_timesteps,
-                                                                        lower_node, sim_params)
+                                                                        temperatures_input, lower_node, sim_params)
         # mass flow and corresponding temperatures into each layer during discharging
         mass_out_temp, mass_out_vec = calculate_mass_temperature_discharging(unit, t_old,
                                                                              mass_out ./
@@ -1449,7 +1449,7 @@ end
 
 """
 calculate_mass_temperature_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-   mass_in::Vector{Float64}, lower_node::Int, sim_params::Dict{String,Any})
+   mass_in::Vector{Float64}, temperatures_input::Vector{Temperature}, lower_node::Int, sim_params::Dict{String,Any})
 
 Calculate the mass flow and its temperature into each single layer of a Seasonal Thermal Energy Storage (STES) during charging.
 It handles cases where the mass flow into a layer is greater than the volume of the layer as well as multiple inputs
@@ -1460,6 +1460,7 @@ lowest layer that is below the temperature of the input (e.g. lance)
 - `unit::SeasonalThermalStorage`: The seasonal thermal storage unit.
 - `t_old::Vector{Temperature}`: Vector of temperatures in each layer before charging.
 - `mass_in::Vector{Float64}`: Vector of mass inputs for each input source.
+- `temperatures_input::Vector{Temperature}`: Vector of input temperatures of mass_in
 - `lower_node::Int`: The index of the lowest layer to consider for charging.
 - `sim_params::Dict{String,Any}`: Dictionary of simulation parameters.
 
@@ -1468,7 +1469,8 @@ lowest layer that is below the temperature of the input (e.g. lance)
 - `mass_in_vec::Vector{Float64}`: Vector of mass flow into each layer.
 """
 function calculate_mass_temperature_charging(unit::SeasonalThermalStorage, t_old::Vector{Temperature},
-                                             mass_in::Vector{Float64}, lower_node::Int,
+                                             mass_in::Vector{Float64}, temperatures_input::Vector{Temperature},
+                                             lower_node::Int,
                                              sim_params::Dict{String,Any})::Tuple{Vector{Float64},Vector{Float64}}
     number_of_inputs = length(unit.current_energy_input)
     mass_in_temp = zeros(unit.number_of_layer_total)
@@ -1481,10 +1483,10 @@ function calculate_mass_temperature_charging(unit::SeasonalThermalStorage, t_old
     # This represents a ideal charging system (lance e.g.)
     for input in 1:number_of_inputs
         for layer in (unit.number_of_layer_total):-1:1
-            if t_old[layer] < unit.current_temperature_input[input]
+            if t_old[layer] < temperatures_input[input]
                 push!(upper_node_charging, layer)
                 mass_input[layer, input] = mass_in[input]
-                temperature_input[layer, input] = unit.current_temperature_input[input]
+                temperature_input[layer, input] = temperatures_input[input]
                 break
             end
         end
