@@ -2236,12 +2236,14 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 if unit.has_top_insulation_overlap &&
                    (rc[i] >= unit.radius_at_row[h] - eps(Float64)) &&
                    (rc[i] <= unit.radius_at_row[h] + unit.top_insulation_overlap_width + eps(Float64))
-                    htop = unit.thermal_transmission_overlap
+                    U_surf = unit.thermal_transmission_overlap
                 else
-                    htop = unit.soil_surface_hconv
+                    U_surf = unit.soil_surface_hconv
                 end
-                aP += htop * A_n
-                rhs += htop * A_n * unit.ambient_temperature
+                Ueff = effective_U_to_cellcenter(U_surf, unit.row_k[h], dz[h] / 2)
+
+                aP += Ueff * A_n
+                rhs += Ueff * A_n * unit.ambient_temperature
             end
         else
             if unit.cells_active[h - 1, i]
