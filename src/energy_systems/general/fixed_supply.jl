@@ -1,3 +1,89 @@
+#! format: off
+const FIXED_SUPPLY_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the supply (e.g. electricity, heat, gas, etc.)",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a temperature profile file",
+        display_name="Temperature profile file",
+        required=false,
+        conditionals=[
+            ("temperature_from_global_file", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_from_global_file" => (
+        default=false,
+        description="If true, take the temperature profile from the global weather data file",
+        display_name="Temperature from global file",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "constant_temperature" => (
+        default=nothing,
+        description="Constant temperature value",
+        display_name="Constant temperature",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "energy_profile_file_path" => (
+        default=nothing,
+        description="Path to a profile file with energy values",
+        display_name="Energy profile file",
+        required=false,
+        conditionals=[
+            ("constant_supply", "mutex"),
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_supply" => (
+        default=nothing,
+        description="Constant supply (power, not work)",
+        display_name="Constant supply",
+        required=false,
+        conditionals=[
+            ("energy_profile_file_path", "mutex"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "scale" => (
+        default=1.0,
+        description="Scaling factor for the energy profile",
+        display_name="Energy scale",
+        required=false,
+        conditionals=[("energy_profile_file_path", "is_not_nothing")],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+)
+#! format: on
+
 """
 Implementation of a component modeling an abstract fixed supply of some medium.
 
@@ -28,10 +114,51 @@ mutable struct FixedSupply <: Component
     constant_temperature::Temperature
 
     function FixedSupply(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        energy_profile = "energy_profile_file_path" in keys(config) ?
-                         Profile(config["energy_profile_file_path"], sim_params) :
-                         nothing
+        constructor_errored = false
 
+        # extract all parameters using the parameter dictionary as the source of truth
+        extracted_params = Dict{String,Any}()
+        for (param_name, param_def) in FIXED_SUPPLY_PARAMETERS
+            try
+                extracted_params[param_name] = extract_parameter(FixedSupply, config, param_name,
+                                                                 param_def, sim_params, uac)
+            catch e
+                @error "$(sprint(showerror, e))"
+                constructor_errored = true
+            end
+        end
+
+        try
+            # extract control_parameters, which is essentially a subconfig
+            extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+            # validate configuration, e.g. for interdependencies and allowed values
+            validate_config(FixedSupply, config, extracted_params, uac, sim_params)
+        catch e
+            @error "$(sprint(showerror, e))"
+            constructor_errored = true
+        end
+
+        # we delayed throwing the errors upwards so that many errors are caught at once
+        if constructor_errored
+            throw(InputError("Can't construct component $uac because of errors parsing " *
+                             "the parameter config. Check the error log for more " *
+                             "information on each error."))
+        end
+
+        # initialize and construct the object
+        init_values = init_from_params(FixedSupply, uac, extracted_params, config, sim_params)
+        return new(init_values...)
+    end
+end
+
+function component_parameters(x::Type{FixedSupply})::Dict{String,NamedTuple}
+    return deepcopy(FIXED_SUPPLY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    if param_name == "constant_temperature" || param_name == "temperature_profile_file_path"
         constant_temperature,
         temperature_profile = get_parameter_profile_from_config(config,
                                                                 sim_params,
@@ -40,24 +167,40 @@ mutable struct FixedSupply <: Component
                                                                 "temperature_from_global_file",
                                                                 "constant_temperature",
                                                                 uac)
-
-        medium = Symbol(config["medium"])
-        register_media([medium])
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_fixed_source,                 # sys_function
-                   medium,                          # medium
-                   InterfaceMap(medium => nothing), # input_interfaces
-                   InterfaceMap(medium => nothing), # output_interfaces
-                   energy_profile,                  # energy_profile
-                   temperature_profile,             # temperature_profile
-                   default(config, "scale", 1.0),   # scaling_factor
-                   0.0,                             # supply
-                   nothing,                         # temperature
-                   default(config, "constant_supply", nothing),      # constant_supply (power, not work!)
-                   constant_temperature)            # constant_temperature
+        return param_name == "constant_temperature" ? constant_temperature : temperature_profile
     end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params)
+end
+
+function validate_config(x::Type{FixedSupply}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(FixedSupply))
+end
+
+function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+    register_media([medium])
+
+    energy_profile = params["energy_profile_file_path"] !== nothing ?
+                     Profile(params["energy_profile_file_path"], sim_params) :
+                     nothing
+
+    # return tuple in the order expected by new()
+    return (uac,                                     # uac
+            Controller(params["control_parameters"]),
+            sf_fixed_source,                         # sys_function
+            medium,                                  # medium
+            InterfaceMap(medium => nothing),         # input_interfaces
+            InterfaceMap(medium => nothing),         # output_interfaces
+            energy_profile,                          # energy_profile
+            params["temperature_profile_file_path"], # temperature_profile, might be from global weather data
+            params["scale"],                         # scaling_factor
+            0.0,                                     # supply
+            nothing,                                 # temperature
+            params["constant_supply"],               # constant_supply (power, not work!)
+            params["constant_temperature"])          # constant_temperature
 end
 
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})

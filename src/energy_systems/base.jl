@@ -2266,7 +2266,7 @@ Returns a dictionary, with type names as keys, of the parameters of all componen
 - `Dict{String,Any}`: The parameter definition for all components, indexed by type names.
 """
 function all_component_parameters()::Dict{String,Any}
-    types = [Bus, GridInput, GridOutput, HeatPump]
+    types = [Bus, FixedSink, FixedSupply, FlexibleSink, FlexibleSupply, GridInput, GridOutput, HeatPump]
 
     all_parameters = Dict{String,Any}()
     for cmp_type in types
