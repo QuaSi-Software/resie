@@ -355,40 +355,7 @@ mutable struct HeatPump <: Component
     time_active::Float64
 
     function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        constructor_errored = false
-
-        # extract all parameters using the parameter dictionary as the source of truth
-        extracted_params = Dict{String,Any}()
-        for (param_name, param_def) in HEAT_PUMP_PARAMETERS
-            try
-                extracted_params[param_name] = extract_parameter(HeatPump, config, param_name, param_def, sim_params)
-            catch e
-                @error "$(sprint(showerror, e))"
-                constructor_errored = true
-            end
-        end
-
-        try
-            # extract control_parameters, which is essentially a subconfig
-            extracted_params["control_parameters"] = extract_control_parameters(Component, config)
-
-            # validate configuration, e.g. for interdependencies and allowed values
-            validate_config(HeatPump, config, extracted_params, uac, sim_params)
-        catch e
-            @error "$(sprint(showerror, e))"
-            constructor_errored = true
-        end
-
-        # we delayed throwing the errors upwards so that many errors are caught at once
-        if constructor_errored
-            throw(InputError("Can't construct component $uac because of errors parsing " *
-                             "the parameter config. Check the error log for more " *
-                             "information on each error."))
-        end
-
-        # initialize and construct the object
-        init_values = init_from_params(HeatPump, uac, extracted_params, config)
-        return new(init_values...)
+        return new(SSOT_parameter_constructor(HeatPump, uac, config, sim_params)...)
     end
 end
 
@@ -397,7 +364,7 @@ function component_parameters(x::Type{HeatPump})::Dict{String,NamedTuple}
 end
 
 function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_name::String,
-                           param_def::NamedTuple, sim_params::Dict{String,Any})
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if param_name == "icing_coefficients"
         value = default(config, param_name, param_def.default)
         return parse.(Float64, split(value, ","))
@@ -408,7 +375,7 @@ function extract_parameter(x::Type{HeatPump}, config::Dict{String,Any}, param_na
         return sim_params["watt_to_wh"](value)
     end
 
-    return extract_parameter(Component, config, param_name, param_def, sim_params)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted::Dict{String,Any},
@@ -435,7 +402,8 @@ function validate_config(x::Type{HeatPump}, config::Dict{String,Any}, extracted:
     end
 end
 
-function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,Any}, raw_params::Dict{String,Any})::Tuple
+function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     # turn media names into Symbol and register them
     m_el_in = Symbol(params["m_el_in"])
     m_heat_out = Symbol(params["m_heat_out"])

@@ -114,41 +114,7 @@ mutable struct FixedSink <: Component
     constant_temperature::Temperature
 
     function FixedSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        constructor_errored = false
-
-        # extract all parameters using the parameter dictionary as the source of truth
-        extracted_params = Dict{String,Any}()
-        for (param_name, param_def) in FIXED_SINK_PARAMETERS
-            try
-                extracted_params[param_name] = extract_parameter(FixedSink, config, param_name,
-                                                                 param_def, sim_params, uac)
-            catch e
-                @error "$(sprint(showerror, e))"
-                constructor_errored = true
-            end
-        end
-
-        try
-            # extract control_parameters, which is essentially a subconfig
-            extracted_params["control_parameters"] = extract_control_parameters(Component, config)
-
-            # validate configuration, e.g. for interdependencies and allowed values
-            validate_config(FixedSink, config, extracted_params, uac, sim_params)
-        catch e
-            @error "$(sprint(showerror, e))"
-            constructor_errored = true
-        end
-
-        # we delayed throwing the errors upwards so that many errors are caught at once
-        if constructor_errored
-            throw(InputError("Can't construct component $uac because of errors parsing " *
-                             "the parameter config. Check the error log for more " *
-                             "information on each error."))
-        end
-
-        # initialize and construct the object
-        init_values = init_from_params(FixedSink, uac, extracted_params, config, sim_params)
-        return new(init_values...)
+        return new(SSOT_parameter_constructor(FixedSink, uac, config, sim_params)...)
     end
 end
 
@@ -182,7 +148,7 @@ function extract_parameter(x::Type{FixedSink}, config::Dict{String,Any}, param_n
         return param_name == "constant_temperature" ? constant_temperature : temperature_profile
     end
 
-    return extract_parameter(Component, config, param_name, param_def, sim_params)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{FixedSink}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,

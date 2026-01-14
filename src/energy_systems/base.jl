@@ -1589,9 +1589,10 @@ Handles special processing like function parsing where needed.
     in this function.
 - `param_def::NamedTuple`: The parameter definition with its metadata
 - `sim_params::Dict{String,Any}`: Simulation parameters
+- `uac::String`: UAC of the component, typically used for error messages
 """
 function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_name::String,
-                           param_def::NamedTuple, sim_params::Dict{String,Any})
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
     if isdefined(param_def, :default)
         value = default(config, param_name, param_def.default)
     elseif param_name in keys(config)
@@ -1709,12 +1710,74 @@ Constructs the initial values for the component's fields.
 -`uac::String`: The UAC of the component
 -`params::Dict{String,Any}`: The extracted and validated parameters
 -`raw_params::Dict{String,Any}`: The original component config before extraction
+-`sim_params::Dict{String,Any}`: Simulation parameters
 # Returns
 -`Tuple`: A tuple matching the order expected by the `new()` constructor of the component
 """
 function init_from_params(x::Type{Component}, uac::String, params::Dict{String,Any},
-                          raw_params::Dict{String,Any})::Tuple
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
     return Tuple()
+end
+
+"""
+    SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,Any},
+                               sim_params::Dict{String,Any})::Tuple
+
+Base implementation of a Component-Subtype constructor using the single-source-of-truth
+functionality for parameter parsing and validation.
+
+This is used by being called inside a constructor function and will return a tuple ready to
+be unrolled into the default constructor method and/or `new`. E.g.:
+```
+function HeatPump(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+    return new(SSOT_parameter_constructor(HeatPump, uac, config, sim_params)...)
+end
+```
+
+# Args
+- `T::Type`: The type on which the constructor is called. This is used to call the subtype-
+    specific parameter functions, e.g. `extract_parameter`
+- `uac::String`: The UAC of the component
+- `config::Dict{String,Any}`: The config dict with the parameter values
+- `sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+- `Tuple`: The extracted and validated parameter values ready to be unrolled into `new`
+"""
+function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,Any},
+                                    sim_params::Dict{String,Any})::Tuple
+    constructor_errored = false
+
+    # extract all parameters using the parameter dictionary as the source of truth
+    extracted_params = Dict{String,Any}()
+    for (param_name, param_def) in component_parameters(T)
+        try
+            extracted_params[param_name] = extract_parameter(T, config, param_name, param_def, sim_params, uac)
+        catch e
+            @error "$(sprint(showerror, e))"
+            constructor_errored = true
+        end
+    end
+
+    try
+        # extract control_parameters, which is essentially a subconfig
+        extracted_params["control_parameters"] = extract_control_parameters(Component, config)
+
+        # validate configuration, e.g. for interdependencies and allowed values
+        validate_config(T, config, extracted_params, uac, sim_params)
+    catch e
+        @error "$(sprint(showerror, e))"
+        constructor_errored = true
+    end
+
+    # we delayed throwing the errors upwards so that many errors are caught at once
+    if constructor_errored
+        throw(InputError("Can't construct component $uac because of errors parsing " *
+                         "the parameter config. Check the error log for more " *
+                         "information on each error."))
+    end
+
+    # initialize the parameters ready for feeding into new()
+    return init_from_params(T, uac, extracted_params, config, sim_params)
 end
 
 """

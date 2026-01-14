@@ -125,7 +125,7 @@ function GridConnection{IsSource}(uac::String, config::Dict{String,Any}, sim_par
     end
 
     # initialize and construct the object
-    init_values = init_from_params(GridConnection, uac, extracted_params, config)
+    init_values = init_from_params(GridConnection{IsSource}, uac, extracted_params, config, sim_params)
     return GridConnection{IsSource}(init_values...)
 end
 
@@ -178,7 +178,7 @@ function extract_parameter(x::Type{GridConnection{IsSource}}, config::Dict{Strin
         return param_name == "constant_temperature" ? constant_temperature : temperature_profile
     end
 
-    return extract_parameter(Component, config, param_name, param_def, sim_params)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,Any}, extracted::Dict{String,Any},
@@ -186,8 +186,8 @@ function validate_config(x::Type{GridConnection{IsSource}}, config::Dict{String,
     validate_config(Component, extracted, uac, sim_params, component_parameters(GridConnection{IsSource}))
 end
 
-function init_from_params(x::Type{GridConnection}, uac::String, params::Dict{String,Any},
-                          raw_params::Dict{String,Any})::Tuple
+function init_from_params(x::Type{GridConnection{IsSource}}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple where {IsSource}
     medium = Symbol(params["medium"])
     register_media([medium])
 

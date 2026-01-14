@@ -174,6 +174,10 @@ end
 
 Config-constructor for a Bus.
 
+This could ideally be rolled into an inner constructor, however having it external to the
+struct has the advantage that additional constructors can make use of the default internal
+constructor without keyword arguments.
+
 # Arguments
 `uac::String`: The UAC of the new bus
 `config::Dict{String,Any}`: The config from the project file
@@ -183,40 +187,7 @@ Config-constructor for a Bus.
 `Bus`: The constructed bus
 """
 function Bus(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})::Bus
-    constructor_errored = false
-
-    # extract all parameters using the parameter dictionary as the source of truth
-    extracted_params = Dict{String,Any}()
-    for (param_name, param_def) in BUS_PARAMETERS
-        try
-            extracted_params[param_name] = extract_parameter(Bus, config, param_name, param_def, sim_params, uac)
-        catch e
-            @error "$(sprint(showerror, e))"
-            constructor_errored = true
-        end
-    end
-
-    try
-        # extract control_parameters, which is essentially a subconfig
-        extracted_params["control_parameters"] = extract_control_parameters(Component, config)
-
-        # validate configuration, e.g. for interdependencies and allowed values
-        validate_config(Bus, config, extracted_params, uac, sim_params)
-    catch e
-        @error "$(sprint(showerror, e))"
-        constructor_errored = true
-    end
-
-    # we delayed throwing the errors upwards so that many errors are caught at once
-    if constructor_errored
-        throw(InputError("Can't construct component $uac because of errors parsing " *
-                         "the parameter config. Check the error log for more " *
-                         "information on each error."))
-    end
-
-    # initialize and construct the object
-    init_values = init_from_params(Bus, uac, extracted_params, config, sim_params)
-    return Bus(init_values...)
+    return Bus(SSOT_parameter_constructor(Bus, uac, config, sim_params)...)
 end
 
 """
@@ -261,7 +232,7 @@ end
 
 function extract_parameter(x::Type{Bus}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
                            sim_params::Dict{String,Any}, uac::String)
-    return extract_parameter(Component, config, param_name, param_def, sim_params)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
 end
 
 function validate_config(x::Type{Bus}, config::Dict{String,Any}, extracted::Dict{String,Any},
