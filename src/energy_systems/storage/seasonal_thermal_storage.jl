@@ -352,7 +352,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
 
     # calculate coefficient for losses to ambient
     unit.sigma_bottom_only = unit.surface_area_bottom * unit.thermal_transmission_bottom /
-                             (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])  # [1/h] losses to ambient through bottom
+                             (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[1])   # [1/h] losses to ambient through bottom
     unit.sigma_lid_only = unit.surface_area_lid * unit.thermal_transmission_lid /
                           (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments[end])    # [1/h] losses to ambient through lid
 
@@ -364,9 +364,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     # But may this is useful in the future...
     # unit.lambda = 1 ./ (unit.rho_medium * convert_J_in_Wh(unit.cp_medium) * unit.volume_segments)          # [K/Wh] 
 
-    # coefficient for input/output mass flow, assuming water as fluid
-    cp_water = 4180                                                                      # [J/kgK]
-    unit.phi = cp_water ./ (unit.cp_medium * unit.rho_medium * unit.volume_segments)     # [1/kg]
+    # coefficient for input/output mass flow
+    unit.phi = 1 ./ (unit.rho_medium * unit.volume_segments)     # [1/kg]
 
     # coefficient for buoyancy effects
     unit.theta = [unit.volume_segments[n - 1] / (unit.volume_segments[n] + unit.volume_segments[n - 1])
