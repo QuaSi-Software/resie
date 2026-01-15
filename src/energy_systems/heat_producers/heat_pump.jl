@@ -133,6 +133,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Design thermal power",
         display_name="Thermal power",
         required=true,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         unit="W"
@@ -142,6 +145,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="COP in bypass operation (when input >= output temperature)",
         display_name="Bypass COP",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -151,6 +157,10 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Minimum part-load ratio to operate",
         display_name="Min. usage fraction",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -187,6 +197,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Maximum iterations for PLR optimisation",
         display_name="Nr. optimisation passes",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
         type=UInt,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -197,6 +210,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Weight for heat demand matching in optimization",
         display_name="Eval. factor heat",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -207,6 +223,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Weight for time usage in optimisation",
         display_name="Eval. factor time",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -217,6 +236,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Weight for electricity minimization in optimisation",
         display_name="Eval. factor electricity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -227,6 +249,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Overestimation factor for available heat output in optimisation",
         display_name="Fudge factor",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -237,6 +262,10 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Absolute tolerance for PLR optimization",
         display_name="Abs. tolerance PLR",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -247,6 +276,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Objective function tolerance for PLR optimization",
         display_name="Abs. tolerance obj. function",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         conditionals=[("model_type", "is_one_of", ("inverter", "on-off"))],
@@ -257,6 +289,10 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Fraction of input power used (losses: 1 - factor)",
         display_name="Power losses factor",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -266,6 +302,10 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Fraction of input heat used (losses: 1 - factor)",
         display_name="Heat losses factor",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+            ("self", "value_lte_num", 1.0)
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -275,6 +315,9 @@ const HEAT_PUMP_PARAMETERS = Dict(
         description="Constant power loss, e.g. standby power",
         display_name="Constant power loss",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
         type=Float64,
         json_type="number",
         unit="W"
