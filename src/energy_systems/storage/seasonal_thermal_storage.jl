@@ -144,6 +144,8 @@ mutable struct SeasonalThermalStorage <: Component
 
     epsilon_geometry::Float64
 
+    reproduce_IEA_ES_Task39::String
+
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
@@ -294,7 +296,8 @@ mutable struct SeasonalThermalStorage <: Component
                    Array{Float64}(undef, 0, 0, 0),                 # soil_temperature_field_output  (time × nz × nr)
                    0.0,                                            # mass_in_sum [kg]
                    0.0,                                            # mass_out_sum [kg]
-                   1e-9)                                           # epsilon_geometry
+                   1e-9,                                           # epsilon_geometry
+                   default(config, "reproduce_IEA_ES_Task39", "")) # reproduce_IEA_ES_Task39: enables additional outputs and set constant temperature of 30°C for input flow during discharge. Can be one of "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG"
     end
 end
 
@@ -1338,7 +1341,12 @@ function update_STES(unit::SeasonalThermalStorage,
     lower_node = 1
 
     # define input temperature for discharging
-    return_temperature_input = unit.low_temperature
+    if unit.reproduce_IEA_ES_Task39 == ""
+        return_temperature_input = unit.low_temperature
+    else
+        # set constant input temperature during discharging for IEA-ES Task 39 validation only!
+        return_temperature_input = 30.0
+    end
 
     # sort input by temperature, starting with the lowest, to avoid that energy can not be used for charging
     energy_input = energy_input[sortperm(temperatures_input)]
@@ -1735,25 +1743,172 @@ function reset(unit::SeasonalThermalStorage)
     unit.losses = 0.0
 end
 
+# This function is used to output soil temperatures at given coordinates for IEA-ES Task 39 validation only 
+"""
+    get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real;
+                         include_tank::Bool=true) -> Float64
+
+Return temperature [°C] at a point in the unified axisymmetric (r-z) field.
+
+Arguments
+- r_m: horizontal (radial) distance from the center [m]
+- z_m: vertical distance from the ground surface downward [m]
+
+Behavior
+- Uses bilinear interpolation on the *cell-center* grids `unit.soil_r_centers` and `unit.soil_z_centers`.
+- If `include_tank=true` (default), masked (tank interior) cells are filled using `vis_field_with_tank(unit)`
+  so points inside the tank return the tank temperature at that depth.
+- If `include_tank=false`, uses `unit.soil_t1` directly (tank interior may be meaningless/stale there).
+"""
+function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real;
+                              include_tank::Bool=false)::Float64
+
+    # For pyramid, adjust the radius to the equivalent round radius
+    if unit.shape == "quadratic"
+        r_m *= unit.equivalent_radius_bottom / unit.radius_small
+    end
+
+    @assert unit.ground_model == "FEM" "get_soil_temperature is only valid for ground_model == \"FEM\"."
+
+    rc = unit.soil_r_centers              # [m]
+    zc = unit.soil_z_centers              # [m], depth from ground surface downward
+    nr = length(rc)
+    nz = length(zc)
+    @assert nr >= 1 && nz >= 1
+
+    r = Float64(r_m)
+    z = Float64(z_m)
+
+    # clamp query point into domain spanned by cell centers
+    r = clamp(r, rc[1], rc[end])
+    z = clamp(z, zc[1], zc[end])
+
+    # --- bracket in r (i1, i2) and interpolation weight α ---
+    i2 = searchsortedfirst(rc, r)
+    if i2 <= 1
+        i1 = 1
+        i2 = 1
+        alpha = 0.0
+    elseif i2 > nr
+        i1 = nr
+        i2 = nr
+        alpha = 0.0
+    else
+        i1 = i2 - 1
+        denom = rc[i2] - rc[i1]
+        alpha = denom > 0 ? (r - rc[i1]) / denom : 0.0
+    end
+
+    # --- bracket in z (h1, h2) and interpolation weight β ---
+    h2 = searchsortedfirst(zc, z)
+    if h2 <= 1
+        h1 = 1
+        h2 = 1
+        β = 0.0
+    elseif h2 > nz
+        h1 = nz
+        h2 = nz
+        β = 0.0
+    else
+        h1 = h2 - 1
+        denom = zc[h2] - zc[h1]
+        β = denom > 0 ? (z - zc[h1]) / denom : 0.0
+    end
+
+    Tfield = include_tank ? vis_field_with_tank(unit) : unit.soil_t1  # (nz × nr)
+
+    # bilinear interpolation (degenerates to linear/point if i1==i2 or h1==h2)
+    T11 = Tfield[h1, i1]
+    T12 = Tfield[h1, i2]
+    T21 = Tfield[h2, i1]
+    T22 = Tfield[h2, i2]
+
+    Tr1 = (1 - alpha) * T11 + alpha * T12
+    Tr2 = (1 - alpha) * T21 + alpha * T22
+    return (1 - β) * Tr1 + β * Tr2
+end
+
 function output_values(unit::SeasonalThermalStorage)::Vector{String}
-    return [string(unit.m_heat_in) * ":IN",
-            string(unit.m_heat_out) * ":OUT",
-            "Load",
-            "Load%",
-            "Capacity",
-            "LossesGains",
-            "LossesGains_top",
-            "LossesGains_sidewalls",
-            "LossesGains_bottom",
-            "CurrentMaxOutTemp",
-            "GroundTemperature",
-            "MassInput",
-            "MassOutput",
-            "Temperature_upper",
-            "Temperature_three_quarter",
-            "Temperature_middle",
-            "Temperature_one_quarter",
-            "Temperature_lower"]
+    output_vals = [string(unit.m_heat_in) * ":IN",
+                   string(unit.m_heat_out) * ":OUT",
+                   "Load",
+                   "Load%",
+                   "Capacity",
+                   "LossesGains",
+                   "LossesGains_top",
+                   "LossesGains_sidewalls",
+                   "LossesGains_bottom",
+                   "CurrentMaxOutTemp",
+                   "GroundTemperature",
+                   "MassInput",
+                   "MassOutput",
+                   "Temperature_upper",
+                   "Temperature_three_quarter",
+                   "Temperature_middle",
+                   "Temperature_one_quarter",
+                   "Temperature_lower"]
+
+    if unit.reproduce_IEA_ES_Task39 !== ""
+        # for IEA-ES Task 39 validation only
+        # add specified STES layer outputs
+        append!(output_vals,
+                ["T_v0.95",
+                 "T_v0.85",
+                 "T_v0.75",
+                 "T_v0.65",
+                 "T_v0.55",
+                 "T_v0.45",
+                 "T_v0.35",
+                 "T_v0.25",
+                 "T_v0.15",
+                 "T_v0.05"])
+        # add soil output
+        if unit.reproduce_IEA_ES_Task39 == "PTES-1-C"
+            append!(output_vals,
+                    ["T_57.5_2",
+                     "T_60.5_2",
+                     "T_80_2",
+                     "T_45.5_8",
+                     "T_48.5_8",
+                     "T_60.5_8",
+                     "T_80_8",
+                     "T_0_18",
+                     "T_27.5_18",
+                     "T_48.5_18",
+                     "T_60.5_18",
+                     "T_80_18"])
+        elseif unit.reproduce_IEA_ES_Task39 == "PTES-1-P"
+            append!(output_vals,
+                    ["T_52.5_2",
+                     "T_55.5_2",
+                     "T_75_2",
+                     "T_40.5_8",
+                     "T_43.5_8",
+                     "T_55.5_8",
+                     "T_75_8",
+                     "T_0_18",
+                     "T_22.5_18",
+                     "T_43.5_18",
+                     "T_55.5_18",
+                     "T_75_18"])
+        elseif unit.reproduce_IEA_ES_Task39 == "TTES-1-UG"
+            append!(output_vals,
+                    ["T_36.5_2",
+                     "T_39.5_2",
+                     "T_54.5_2",
+                     "T_36.5_13.5",
+                     "T_39.5_13.5",
+                     "T_54.5_13.5",
+                     "T_0_29",
+                     "T_17_29",
+                     "T_36.5_29",
+                     "T_39.5_29",
+                     "T_54.5_29"])
+        elseif unit.reproduce_IEA_ES_Task39 == "TTES-1-AG"
+            # do not output soil here
+        end
+    end
+    return output_vals
 end
 
 function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
@@ -1793,6 +1948,104 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
         return unit.temperature_segments[Int(round(0.75 * unit.number_of_layer_total))]
     elseif key.value_key == "Temperature_upper"
         return unit.temperature_segments[end]
+
+        # for IEA-ES Task 39 validation only
+    elseif key.value_key == "T_v0.95"
+        return unit.temperature_segments[Int(round(0.951 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.85"
+        return unit.temperature_segments[Int(round(0.851 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.75"
+        return unit.temperature_segments[Int(round(0.751 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.65"
+        return unit.temperature_segments[Int(round(0.651 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.55"
+        return unit.temperature_segments[Int(round(0.551 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.45"
+        return unit.temperature_segments[Int(round(0.451 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.35"
+        return unit.temperature_segments[Int(round(0.351 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.25"
+        return unit.temperature_segments[Int(round(0.251 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.15"
+        return unit.temperature_segments[Int(round(0.151 * unit.number_of_layer_total))]
+    elseif key.value_key == "T_v0.05"
+        return unit.temperature_segments[Int(round(0.051 * unit.number_of_layer_total))]
+
+        # FOR IEA-ES Task 39 TTES-1-UG
+    elseif key.value_key == "T_36.5_2"
+        return get_soil_temperature(unit, 36.5, 2.0)
+    elseif key.value_key == "T_39.5_2"
+        return get_soil_temperature(unit, 39.5, 2.0)
+    elseif key.value_key == "T_54.5_2"
+        return get_soil_temperature(unit, 54.5, 2.0)
+    elseif key.value_key == "T_36.5_13.5"
+        return get_soil_temperature(unit, 36.5, 13.5)
+    elseif key.value_key == "T_39.5_13.5"
+        return get_soil_temperature(unit, 39.5, 13.5)
+    elseif key.value_key == "T_54.5_13.5"
+        return get_soil_temperature(unit, 54.5, 13.5)
+    elseif key.value_key == "T_0_29"
+        return get_soil_temperature(unit, 0.0, 29.0)
+    elseif key.value_key == "T_17_29"
+        return get_soil_temperature(unit, 17.0, 29.0)
+    elseif key.value_key == "T_36.5_29"
+        return get_soil_temperature(unit, 36.5, 29.0)
+    elseif key.value_key == "T_39.5_29"
+        return get_soil_temperature(unit, 39.5, 29.0)
+    elseif key.value_key == "T_54.5_29"
+        return get_soil_temperature(unit, 54.5, 29.0)
+
+        # FOR IEA-ES Task 39 PTES-1-C
+    elseif key.value_key == "T_57.5_2"
+        return get_soil_temperature(unit, 57.5, 2.0)
+    elseif key.value_key == "T_60.5_2"
+        return get_soil_temperature(unit, 60.5, 2.0)
+    elseif key.value_key == "T_80_2"
+        return get_soil_temperature(unit, 80.0, 2.0)
+    elseif key.value_key == "T_45.5_8"
+        return get_soil_temperature(unit, 45.5, 8.0)
+    elseif key.value_key == "T_48.5_8"
+        return get_soil_temperature(unit, 48.5, 8.0)
+    elseif key.value_key == "T_60.5_8"
+        return get_soil_temperature(unit, 60.5, 8.0)
+    elseif key.value_key == "T_80_8"
+        return get_soil_temperature(unit, 80.0, 8.0)
+    elseif key.value_key == "T_0_18"
+        return get_soil_temperature(unit, 0.0, 18.0)
+    elseif key.value_key == "T_27.5_18"
+        return get_soil_temperature(unit, 27.5, 18.0)
+    elseif key.value_key == "T_48.5_18"
+        return get_soil_temperature(unit, 48.5, 18.0)
+    elseif key.value_key == "T_60.5_18"
+        return get_soil_temperature(unit, 60.5, 18.0)
+    elseif key.value_key == "T_80_18"
+        return get_soil_temperature(unit, 80.0, 18.0)
+
+        # FOR IEA-ES Task 39 PTES-1-P
+    elseif key.value_key == "T_52.5_2"
+        return get_soil_temperature(unit, 52.5, 2.0)
+    elseif key.value_key == "T_55.5_2"
+        return get_soil_temperature(unit, 55.5, 2.0)
+    elseif key.value_key == "T_75_2"
+        return get_soil_temperature(unit, 75.0, 2.0)
+    elseif key.value_key == "T_40.5_8"
+        return get_soil_temperature(unit, 40.5, 8.0)
+    elseif key.value_key == "T_43.5_8"
+        return get_soil_temperature(unit, 43.5, 8.0)
+    elseif key.value_key == "T_55.5_8"
+        return get_soil_temperature(unit, 55.5, 8.0)
+    elseif key.value_key == "T_75_8"
+        return get_soil_temperature(unit, 75.0, 8.0)
+    elseif key.value_key == "T_0_18"
+        return get_soil_temperature(unit, 0.0, 18.0)
+    elseif key.value_key == "T_22.5_18"
+        return get_soil_temperature(unit, 22.5, 18.0)
+    elseif key.value_key == "T_43.5_18"
+        return get_soil_temperature(unit, 43.5, 18.0)
+    elseif key.value_key == "T_55.5_18"
+        return get_soil_temperature(unit, 55.5, 18.0)
+    elseif key.value_key == "T_75_18"
+        return get_soil_temperature(unit, 75.0, 18.0)
     end
     throw(KeyError(key.value_key))
 end
@@ -1989,6 +2242,7 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
                                unit.ground_accuracy_mode == "normal" ? (mindz / 3, 4.0, 1, 2.0) :
                                unit.ground_accuracy_mode == "high" ? (mindz / 4, 2.0, 2, 2.0) :
                                unit.ground_accuracy_mode == "very_high" ? (mindz / 8, 1.0, 3, 2.0) :
+                               unit.ground_accuracy_mode == "IEA_ES_39" ? (mindz / 2.74, 16, 1, 2.0) :  # IEA-ES Task 39 mesh definition
                                error("In STES $(unit.uac), ground_accuracy_mode must be one of: " *
                                      "very_rough, rough, normal, high, very_high.")
 
