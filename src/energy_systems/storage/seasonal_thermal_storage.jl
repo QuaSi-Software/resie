@@ -111,6 +111,7 @@ mutable struct SeasonalThermalStorage <: Component
     radius_at_row::Array{Float64}
     equivalent_radius_bottom::Float64
     sidewall_increase_factor::Float64
+    first_soil_row_below_STES::Int
 
     # state variables
     current_max_output_temperature::Float64
@@ -176,6 +177,7 @@ mutable struct SeasonalThermalStorage <: Component
                    InterfaceMap(m_heat_out => nothing),            # output_interfaces
                    m_heat_in,                                      # medium in the STES   
                    m_heat_out,                                     # medium out of the STES
+
                    # geometry and physical properties
                    0.0,                                            # capacity of the STES [Wh]
                    default(config, "volume", nothing),             # volume of the STES [m^3]
@@ -207,6 +209,7 @@ mutable struct SeasonalThermalStorage <: Component
                    Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
                    Float64[],                                      # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
                    Float64[],                                      # layer_masses, mass of the medium in each layer [kg]
+
                    # loading and unloading
                    default(config, "high_temperature", 90.0),          # upper temperature of the STES [°C]
                    default(config, "low_temperature", 15.0),           # lower temperature of the STES [°C]
@@ -216,6 +219,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "max_unload_rate_mass", nothing),   # maximum unload rate given in 1/h, mass flow in total related to the total volume of the STES
                    nothing,                                            # max_input_energy, maximum input energy per time step [Wh]
                    nothing,                                            # max_output_energy, maximum output energy per time step [Wh]
+
                    # Losses
                    default(config, "thermal_transmission_lid", 0.25),                  # [W/(m^2K)]
                    default(config, "thermal_transmission_barrel_above_ground", 0.375), # [W/(m^2K)]
@@ -229,17 +233,15 @@ mutable struct SeasonalThermalStorage <: Component
                    Temperature[],                                         # effective_ambient_temperature_barrels corresponding to each layer [°C]          
                    0.0,                                                   # effective_ambient_temperature_top 
                    0.0,                                                   # effective_ambient_temperature_bottom
+
                    # ground coupling FEM (unified)
-                   default(config, "ground_domain_radius_factor", 1.5),          # [m] ground_domain_radius_factor: Factor for the ground domain width, is multiplied with the radius of the storage at the ground surface.
-                   default(config, "ground_domain_depth_factor", 2.0),           # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the total height of the storage.
-                   default(config, "ground_domain_radius", nothing),             # [m] soil domain radius. If none given, it will be derived from the STES geometry.
-                   default(config, "ground_domain_depth", nothing),              # [m] soil depth from surface. If none given, it will be derived from the STES geometry.
-                   default(config, "ground_accuracy_mode", "normal"),            # mesh preset: very_rough|rough|normal|high|very_high
-                   default(config, "ground_layers_depths", [nothing]),           # [m] Monotonically increasing depths from surface (0.0) downward.
-                   # Defines piecewise-constant soil layers by intervals [d[i], d[i+1]).
-                   # Last value should be ≥ ground_domain_depth; if shorter, code extends.
-                   default(config, "ground_layers_k", Float64[1.5]),            # [W/(m·K)] Thermal conductivity per layer. Length may be
-                   # ≤ (length(depths)-1); last value is repeated if shorter.
+                   default(config, "ground_domain_radius_factor", 1.5),         # [m] ground_domain_radius_factor: Factor for the ground domain width, is multiplied with the radius of the storage at the ground surface.
+                   default(config, "ground_domain_depth_factor", 2.0),          # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the total height of the storage.
+                   default(config, "ground_domain_radius", nothing),            # [m] soil domain radius. If none given, it will be derived from the STES geometry.
+                   default(config, "ground_domain_depth", nothing),             # [m] soil depth from surface. If none given, it will be derived from the STES geometry.
+                   default(config, "ground_accuracy_mode", "normal"),           # mesh preset: very_rough|rough|normal|high|very_high
+                   default(config, "ground_layers_depths", [nothing]),          # [m] defines piecewise-constant soil layers by intervals [d[i], d[i+1]) in depths from surface (0.0) downward. If last value is < ground_domain_depth, it will be set to ground_domain_depth.
+                   default(config, "ground_layers_k", Float64[1.5]),            # [W/(m·K)] Thermal conductivity per layer. Length may be ≤ (length(depths)-1); last value is repeated if shorter.
                    default(config, "ground_layers_rho", Float64[2000.0]),       # [kg/m³] Mass density per layer. Same broadcasting rule as above.
                    default(config, "ground_layers_cp", Float64[1000.0]),        # [J/(kg·K)] Specific heat capacity per layer 
                    Float64[],                                                   # row_k: Thermal conductivity per row
@@ -249,8 +251,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "has_top_insulation_overlap", false),        # [Bool] has_top_insulation_overlap
                    default(config, "top_insulation_overlap_width", 5.0),        # [m] top_insulation_overlap_width
                    default(config, "thermal_transmission_overlap", 0.25),       # [W/(m²·K)] thermal_transmission_overlap
-                   default(config, "bottom_soil_boundary", "Neumann"),          # bottom_soil_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition 
-                   # with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
+                   default(config, "bottom_soil_boundary", "Neumann"),          # bottom_soil_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
 
                    # FEM state (unified axisymmetric r-z soil domain)
                    Float64[],                                  # soil_dr
@@ -265,6 +266,7 @@ mutable struct SeasonalThermalStorage <: Component
                    Float64[],                                  # radius_at_row
                    0.0,                                        # equivalent_radius_bottom
                    0.0,                                        # sidewall_increase_factor
+                   0,                                          # first_soil_row_below_STES
 
                    # state variables
                    0.0,                                            # current_max_output_temperature
@@ -476,6 +478,11 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         for h in 1:nz
             unit.radius_at_row[h] = radius_at_row(unit, h)
         end
+
+        # determine first soil row center that is strictly below the STES base (depth > h_stes_buried)
+        unit.first_soil_row_below_STES = Int(clamp(searchsortedfirst(unit.soil_z_centers,
+                                                                     unit.h_stes_buried + unit.epsilon_geometry), 1,
+                                                   length(unit.soil_z_centers)))
 
         # get mask for storage area
         # true → this cell is *soil* and part of the PDE
@@ -1909,6 +1916,10 @@ function create_geometric_mesh_two_sided(min_mesh_width::Float64,
     return dx
 end
 
+function row_within_buried(unit::SeasonalThermalStorage, h::Int)::Bool
+    return unit.soil_z_centers[h] <= unit.h_stes_buried + unit.epsilon_geometry
+end
+
 # map depth z [m] (measured from ground surface downward) to soil layer properties
 # Note that currently the soil properties are considered at a single depth without taking overlaps into account!
 function soil_props_at_depth(unit::SeasonalThermalStorage, z::Float64)
@@ -2185,7 +2196,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 push!(V, -aW)
             else
                 # masked neighbor → wall Robin (below ground only)
-                if h <= unit.number_of_STES_layer_below_ground
+                if row_within_buried(unit, h) && unit.number_of_STES_layer_below_ground > 0
                     # map soil row h (depth from surface) to buried STES layer k (bottom→top)
                     z_storage = unit.h_stes_buried - unit.soil_z_centers[h]
                     k = searchsortedfirst(cum_dz_below, z_storage)
@@ -2257,8 +2268,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
                 push!(V, -aN)
             else
                 # masked neighbor → base Robin within equivalent bottom radius
-                if (rc[i] <= unit.equivalent_radius_bottom + 1e-12) &&
-                   (h == unit.number_of_STES_layer_below_ground + 1)
+                if (rc[i] <= unit.equivalent_radius_bottom + 1e-12) && (h == unit.first_soil_row_below_STES)
                     A_n = 2pi * rc[i] * dr[i]
                     Ueff = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[h], dz[h] / 2)
 
@@ -2286,13 +2296,12 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
     unit.soil_t2 .= Tnew
     unit.soil_t1 .= unit.soil_t2
 
-    hbot = unit.number_of_STES_layer_below_ground + 1
     num = 0.0
     den = 0.0
     for i in 1:length(unit.soil_r_centers)
         if unit.soil_r_centers[i] <= unit.equivalent_radius_bottom + 1e-12
             w = 2pi * unit.soil_r_centers[i] * unit.soil_dr[i]
-            num += unit.soil_t2[hbot, i] * w
+            num += unit.soil_t2[unit.first_soil_row_below_STES, i] * w
             den += w
         else
             break
@@ -2395,8 +2404,9 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
     unit.effective_ambient_temperature_top = unit.ambient_temperature
 
     # bottom: use the area-weighted soil cell-center average T_base ---
-    hbot = clamp(nbur + 1, 1, nz)
-    Ueff_b = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[hbot], unit.soil_dz[hbot] / 2)
+
+    Ueff_b = effective_U_to_cellcenter(unit.thermal_transmission_bottom, unit.row_k[unit.first_soil_row_below_STES],
+                                       unit.soil_dz[unit.first_soil_row_below_STES] / 2)
     unit.effective_ambient_temperature_bottom = teff_from_cellcenter(unit.temperature_segments[1], T_base,
                                                                      unit.thermal_transmission_bottom, Ueff_b)
 end
