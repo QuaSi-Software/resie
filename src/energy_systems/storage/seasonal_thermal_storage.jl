@@ -1,8 +1,9 @@
 """
-Implementation of a seasonal thermal storage component.
+Implementation of a ground-coupled stratified thermal storage component.
 
-This is a simplified model, which mostly deals with amounts of energy and considers
-temperatures only for the available temperature as the tank is depleted.
+This can be a detailed model when FEM is enabled to simulate the ground-coupling of the 
+stratified storage. It has been validated against IEA ES Task 39 results for the following
+test cases: "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG".
 """
 
 using Plots: Plots
