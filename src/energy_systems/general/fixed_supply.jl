@@ -27,6 +27,10 @@ mutable struct FixedSupply <: Component
     constant_supply::Union{Nothing,Float64}
     constant_temperature::Temperature
 
+    treat_profile_as_volume_flow_in_qm_per_hour::Bool
+    medium_roh::Floathing
+    medium_cp::Floathing
+
     function FixedSupply(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
                          Profile(config["energy_profile_file_path"], sim_params) :
@@ -56,13 +60,25 @@ mutable struct FixedSupply <: Component
                    0.0,                             # supply
                    nothing,                         # temperature
                    default(config, "constant_supply", nothing),      # constant_supply (power, not work!)
-                   constant_temperature)            # constant_temperature
+                   constant_temperature,            # constant_temperature
+                   default(config, "treat_profile_as_volume_flow_in_qm_per_hour", false),
+                   default(config, "medium_roh", nothing),  # [kg/m^3]
+                   default(config, "medium_cp", nothing))   # [J/kgK]
     end
 end
 
 function initialise!(unit::FixedSupply, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.output_interfaces[unit.medium],
                           load_storages(unit.controller, unit.medium))
+
+    if unit.treat_profile_as_volume_flow_in_qm_per_hour
+        if unit.medium_roh === nothing
+            @error "In fixed supply $(unit.uac), the profile should be treated as volume flow. Please provide the medium density medium_roh."
+        end
+        if unit.medium_cp === nothing
+            @error "In fixed supply $(unit.uac), the profile should be treated as volume flow. Please provide the medium thermal capacity medium_cp."
+        end
+    end
 end
 
 function control(unit::FixedSupply,
@@ -70,19 +86,28 @@ function control(unit::FixedSupply,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    if unit.constant_supply !== nothing
-        unit.supply = sim_params["watt_to_wh"](unit.constant_supply)
-    elseif unit.energy_profile !== nothing
-        unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
-    else
-        unit.supply = 0.0
-    end
-
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
+    if unit.constant_supply !== nothing
+        unit.supply = sim_params["watt_to_wh"](unit.constant_supply)
+    elseif unit.energy_profile !== nothing
+        if unit.treat_profile_as_volume_flow_in_qm_per_hour &&
+           isa(unit.output_interfaces[unit.medium].target, LimitCoolingInputTemperatureTarget)
+            t_low = unit.output_interfaces[unit.medium].target.current_energy_input_return_temperature # [°C]
+            t_high = unit.temperature # [°C]
+            volume_flow = unit.scaling_factor * Profiles.power_at_time(unit.energy_profile, sim_params) # [m^3/h]
+            power = unit.medium_roh * volume_flow * unit.medium_cp / 3600 * (t_high - t_low) # [W]
+            unit.supply = sim_params["watt_to_wh"](power)
+        else
+            unit.supply = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
+        end
+    else
+        unit.supply = 0.0
+    end
+
     set_max_energy!(unit.output_interfaces[unit.medium], unit.supply, nothing, unit.temperature)
 end
 
