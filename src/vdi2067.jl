@@ -74,8 +74,8 @@ VDI_SCENARIO_NONE = VDIParams(
     0.000,    # no revenues
     0.000,    # no miscellaneous (Excel)
     120.0,     # grid price addon €/MWh
-    79.90,     # AW_PV €/MWh
-    7.35*1.42 # AW_Wind €/MWh
+    106.8,     # AW_PV €/MWh
+    58.8*1.42 # AW_Wind €/MWh
     )
 
 # Scenario 2 — moderate escalation
@@ -91,8 +91,8 @@ VDI_SCENARIO_MOD = VDIParams(
     #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
-    79.90,    # AW_PV €/MWh
-    7.35*1.42 # AW_Wind €/MWh
+    106.8,    # AW_PV €/MWh
+    58.8*1.42 # AW_Wind €/MWh
     )
 
 # Scenario 3 — progressive escalation
@@ -108,8 +108,8 @@ VDI_SCENARIO_PRO = VDIParams(
     #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
-    79.90,     # AW_PV €/MWh
-    7.35*1.42 # AW_Wind €/MWh
+    106.8,     # AW_PV €/MWh
+    58.8*1.42 # AW_Wind €/MWh
     )
 
 
@@ -388,6 +388,16 @@ function revenue_feedin(sim::Dict, p::VDIParams)
     return A_E2 * a * b
 end
 
+function co2_yearly(sim::Dict)
+    IN = sim["Grid_IN"] + sim["Control_Reserve"] .* 1e-3        # convert Wh time series in kWh
+    co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh 
+
+    # what about PV and Wind?
+
+    co2_y1 = sum(IN .* co2_intensity)  
+
+    
+end
 
 ############################################################
 #  MAIN FUNCTION — TOTAL ANNUITY AND HEAT PRICE
@@ -405,6 +415,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     sim_new["Grid_price"] = sim["Stock_Price"]
     sim_new["Market_Value_PV"] = sim["Market_Price_PV"]
     sim_new["Market_Value_Wind"] = sim["Market_Price_Wind"]
+    sim_new["CO2_Grid"] = sim["CO2_Grid"]
 
     sim = OrderedDict()
 
@@ -421,6 +432,8 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
               
     A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
                         (A_rev_control + A_rev_feed)
+    
+    CO2_yearly = co2_yearly(sim_new)
 
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
@@ -437,7 +450,8 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_rev_control" => A_rev_control,
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
-        "A_total_incentive" => A_total_incentive
+        "A_total_incentive" => A_total_incentive,
+        "CO2_yearly" => CO2_yearly
         # "heat_price_eur_per_kwh" => heat_price
     )
 end

@@ -18,49 +18,49 @@
              "1": {
                 "key": {"m_power": ["Grid_IN->HeatPump"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "2": {
                 "key": {"m_power": ["Grid_IN->Boiler"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "3": {
                 "key": {"m_power": ["Grid_IN->Demand_Power"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "4": {
                 "key": {"m_power": ["Grid_IN->Battery"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "6": {
                 "key": {"m_power": ["Photovoltaic->Grid_OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "7": {
                 "key": {"m_power": ["WindFarm->Grid_OUT"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "8": {
                 "key": {"Demand_Power": ["Demand"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "9": {
                 "key": {"Demand_Heat": ["Demand"]},
                 "axis": "left",
-                "unit": "kW",
+                "unit": "kWh",
                 "scale_factor": 0.001
             },
             "10": {
@@ -74,17 +74,29 @@
                 "axis": "left",
                 "unit": "%",
                 "scale_factor": 1
+            },
+            "12": {
+				"key":{"Grid_IN":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001	
+            },
+            "13": {
+				"key":{"ControlReserve":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
             }
         }
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.12.2024 23:45",
+        "end": "31.01.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",
         "epsilon": 1e-7,
-        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"  
 
     },
     "components": {
@@ -241,110 +253,110 @@
             },
             "control_modules": [
                             {
-                    "name": "EMS", 
-                    "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
-                                            "./profiles/MA/boersenpreis_EUR_kWh.prf"],
-                    "limit_prices": [100, 0, 1000],
-                    "new_connections_below_limits": {
-                        "BUS_Power":[
-                            {
-                            "input_order": [
-                                "ControlReserve",
-                                "Photovoltaic",
-                                "WindFarm",
-                                "Grid_IN",
-                                "Battery"
-                            ],
-                            "output_order": [
-                                "Demand_Power",
-                                "HeatPump",
-                                "Boiler",
-                                "Battery",
-                                "Grid_OUT"
-                            ],
-                            "energy_flow": [
-                                [0, 0, 0, 0, 0],
-                                [1, 1, 1, 1, 1],
-                                [1, 1, 1, 1, 1],
-                                [1, 1, 1, 0, 0],
-                                [1, 0, 0, 0, 0]
-                            ]
-                            },
-                            {
-                            "input_order": [
-                                "ControlReserve",
-                                "Photovoltaic",
-                                "WindFarm",
-                                "Grid_IN",
-                                "Battery"
-                            ],
-                            "output_order": [
-                                "Demand_Power",
-                                "HeatPump",
-                                "Boiler",
-                                "Battery",
-                                "Grid_OUT"
-                            ],
-                            "energy_flow": [
-                                [0, 1, 1, 1, 0],
-                                [1, 1, 1, 1, 1],
-                                [1, 1, 1, 1, 1],
-                                [1, 1, 1, 1, 1],
-                                [1, 0, 0, 0, 0]
-                            ]
-                            }
+                "name": "EMS", 
+                "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
+                                        "./profiles/MA/boersenpreis_EUR_kWh.prf"],
+                "limit_prices": [20, 0, 50],
+                "new_connections_below_limits": {
+                    "BUS_Power":[
+                        {
+                        "input_order": [
+                            "ControlReserve",
+                            "Photovoltaic",
+                            "WindFarm",
+                            "Grid_IN",
+                            "Battery"
                         ],
-                        "BUS_Heat": [
-                            {
-                            "input_order": [
-                                "HeatPump",
-                                "Boiler",
-                                "BufferTank",
-                                "HeatPump#secondary",
-                                "Boiler#secondary"
-                            ],
-                            "output_order": [
-                                "Demand_Heat",
-                                "BufferTank"
-                            ],
-                            "energy_flow": [
-                                [1, 1],
-                                [1, 1],
-                                [1, 0],
-                                [1, 0],
-                                [1, 0]
-                            ]
-                            },
-                            {
-                            "input_order": [
-                                "HeatPump",
-                                "Boiler",
-                                "HeatPump#secondary",
-                                "Boiler#secondary",
-                                "BufferTank"
-                            ],
-                            "output_order": [
-                                "Demand_Heat",
-                                "BufferTank"
-                            ],
-                            "energy_flow": [
-                                [1, 1],
-                                [1, 1],
-                                [1, 1],
-                                [1, 1],
-                                [1, 0]
-                            ]
-                            }
+                        "output_order": [
+                            "Demand_Power",
+                            "HeatPump",
+                            "Boiler",
+                            "Battery",
+                            "Grid_OUT"
+                        ],
+                        "energy_flow": [
+                            [0, 0, 0, 0, 0],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 0, 0],
+                            [1, 0, 0, 0, 0]
                         ]
-                    },
-                    "bus_uacs": ["BUS_Power", "BUS_Heat"],
-                    "storage_uac": "BufferTank",
-                    "hp_uac": "HeatPump",
-                    "boiler_uac": "Boiler",
-                    "reserve_uac": "ControlReserve",
-                    "grid_out_uac": "Grid_OUT"
-                    }
-                ]          
+                        },
+                        {
+                        "input_order": [
+                            "ControlReserve",
+                            "Photovoltaic",
+                            "WindFarm",
+                            "Grid_IN",
+                            "Battery"
+                        ],
+                        "output_order": [
+                            "Demand_Power",
+                            "HeatPump",
+                            "Boiler",
+                            "Battery",
+                            "Grid_OUT"
+                        ],
+                        "energy_flow": [
+                            [0, 1, 1, 1, 0],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 0],
+                            [1, 0, 0, 0, 0]
+                        ]
+                        }
+                    ],
+                    "BUS_Heat": [
+                        {
+                        "input_order": [
+                            "HeatPump",
+                            "Boiler",
+                            "BufferTank",
+                            "HeatPump#secondary",
+                            "Boiler#secondary"
+                        ],
+                        "output_order": [
+                            "Demand_Heat",
+                            "BufferTank"
+                        ],
+                        "energy_flow": [
+                            [1, 1],
+                            [1, 1],
+                            [1, 0],
+                            [1, 0],
+                            [1, 0]
+                        ]
+                        },
+                        {
+                        "input_order": [
+                            "HeatPump",
+                            "Boiler",
+                            "HeatPump#secondary",
+                            "Boiler#secondary",
+                            "BufferTank"
+                        ],
+                        "output_order": [
+                            "Demand_Heat",
+                            "BufferTank"
+                        ],
+                        "energy_flow": [
+                            [1, 1],
+                            [1, 1],
+                            [1, 1],
+                            [1, 1],
+                            [1, 0]
+                        ]
+                        }
+                    ]
+                },
+                "bus_uacs": ["BUS_Power", "BUS_Heat"],
+                "storage_uac": "BufferTank",
+                "hp_uac": "HeatPump",
+                "boiler_uac": "Boiler",
+                "reserve_uac": "ControlReserve",
+                "grid_out_uac": "Grid_OUT"
+                }
+            ]           
         },
         "BUS_Heat": {
             "type": "Bus",

@@ -1,7 +1,6 @@
 using Dates
 using ..Resie
 using OrderedCollections: OrderedDict
-using Statistics
 """
 Control module for setting limits to the PLR of a component according to a price_profile and 
 available storage capacity or demand.
