@@ -22,7 +22,7 @@ import .VDI2067
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems.json"
 
 
 ############################################################
@@ -56,18 +56,18 @@ BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an arr
 # limit for energy stock prices for economic_control.jl (EUR/MWh)
 # if no grid price limit is to be considered, limit is set "towards infinity"
 # TODO adjust limits
-p_stock_lo   = 100        # lower limit
-p_stock_hi   = 200        # upper limit
-p_stock_step = 50         # step size
+p_stock_lo   = 0        # lower limit
+p_stock_hi   = 0        # upper limit
+p_stock_step = 0         # step size
 p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
 
 # benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
 # of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
 # if control energy is not to be considerd, benchmark is set "towards infinity"
 # TODO adjust limits
-p_res_lo   = 400            # lower limit
-p_res_hi   = 1200           # upper limit
-p_res_step = 400            # step size
+p_res_lo   = 0            # lower limit
+p_res_hi   = 0           # upper limit
+p_res_step = 0            # step size
 p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -125,7 +125,7 @@ state_earn_power =Dict{String,Any}(
                 [0, 1, 1, 1, 0],
                 [1, 1, 1, 1, 1],
                 [1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1],
+                [1, 1, 1, 1, 0],
                 [1, 0, 0, 0, 0]
             ])
 
@@ -282,6 +282,7 @@ function run_resie_variant(
     price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
+    co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"
 
     # create correct profiles from price_profile_paths and add the to sim_output
     run_ID = UUID(runidx)
@@ -291,12 +292,14 @@ function run_resie_variant(
     price_profile_reserve_energy = Profile(price_profile_path_reserve_energy, sim_params)
     price_profile_market_value_pv = Profile(price_profile_path_market_value_pv, sim_params)
     price_profile_market_value_wind = Profile(price_profile_path_market_value_wind, sim_params)
+    co2_profile_grid = Profile(co2_profile_path_grid, sim_params)
 
     stock_values = []
     reserve_power_values = []
     reserve_energy_values = []
     market_value_pv_values = []
     market_value_wind_values = []
+    co2_value_grid = []
     date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
 
     for dt in date_range
@@ -305,6 +308,7 @@ function run_resie_variant(
         push!(reserve_energy_values, price_profile_reserve_energy.data[dt] .* reserve_energy_mult .+ reserve_energy_addon)
         push!(market_value_pv_values, price_profile_market_value_pv.data[dt] .* market_value_pv_mult .+ market_value_pv_addon)
         push!(market_value_wind_values, price_profile_market_value_wind.data[dt] .* market_value_wind_mult .+ market_value_wind_addon)
+        push!(co2_value_grid, co2_profile_grid.data[dt])
     end 
 
     #calculate reserve_bench_profile from other profiles
@@ -382,6 +386,7 @@ function run_resie_variant(
     sim_output["Market_Price_PV"] = market_value_pv_values
     sim_output["Market_Price_Wind"] = market_value_wind_values
     sim_output["Reserve_Bench_Price"] = reserve_bench_values
+    sim_output["CO2_Grid"] = co2_value_grid
 
     return sim_output
 end
@@ -415,7 +420,7 @@ function main(base_input_path, write_output)
                    "annuity_mod A_rev_control / €", "annuity_mod A_rev_feed / €", "annuity_mod A_total / €",
                    "annuity_pro A_cap / €", "annuity_pro A_misc / €", "annuity_pro A_op / €", "annuity_pro A_energy / €", 
                    "annuity_pro A_rev_control / €", "annuity_pro A_rev_feed / €", "annuity_pro A_total / €",
-                   "balance_power", "balance_heat"], ';') * "\n"
+                   "balance_power", "balance_heat", "CO2_yearly"], ';') * "\n"
     open(out_file_path, "a") do file_handle
         write(file_handle, header)
     end
