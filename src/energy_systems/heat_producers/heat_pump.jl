@@ -799,6 +799,15 @@ function calculate_slices(unit::HeatPump,
             continue
         end
 
+        # check if heat is available for specific src_idx and snk_idx
+        if energies.available_heat_in[src_idx] == 0
+            src_idx += 1
+            continue
+        elseif energies.available_heat_out[snk_idx] == 0
+            snk_idx += 1
+            continue
+        end
+
         # check and determine input temperature of layer, also skip if it's not in the list
         # of indices to be used (this is used by the mechanism for transformer chains and
         # is controlled by arguments fixed_heat_in and fixed_heat_out)
