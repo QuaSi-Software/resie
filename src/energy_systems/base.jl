@@ -1655,6 +1655,66 @@ function extract_control_parameters(x::Type{Component}, config::Dict{String,Any}
 end
 
 """
+    check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
+
+Checks the given parameter for the given validation. Throws InputError if the validation
+fails or is misconfigured.
+
+# Args
+- `validation::Tuple`: The validation to check, from the parameter SSOT definition
+- `name::String`: The name of the parameter to validate
+- `value::Any`: The value of the parameter to validate
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `uac::String`: The UAC of the component, mostly used in error messages
+"""
+function check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
+    # currently only one primary operand is implemented
+    if validation[1] != "self"
+        throw(InputError("Unknown validation operand $(validation[1]) for component $uac"))
+    end
+
+    if validation[2] == "value_lt_num"
+        if !(value < validation[3])
+            throw(InputError("Value of $name must be less than $(validation[3])"))
+        end
+    elseif validation[2] == "value_lte_num"
+        if !(value <= validation[3])
+            throw(InputError("Value of $name must be less than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_gt_num"
+        if !(value > validation[3])
+            throw(InputError("Value of $name must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_gte_num"
+        if !(value >= validation[3])
+            throw(InputError("Value of $name must be greater than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_lt_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value < other_value)
+            throw(InputError("Value of $name must be less than value of parameter $(validation[3])"))
+        end
+    elseif validation[2] == "value_lte_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value <= other_value)
+            throw(InputError("Value of $name must be less than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_gt_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value > other_value)
+            throw(InputError("Value of $name must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_gte_rel"
+        other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
+        if !(value >= other_value)
+            throw(InputError("Value of $name must be greater than or equal to $(validation[3])"))
+        end
+    else
+        throw(InputError("Unknown validation operand $(validation[2]) for component $uac"))
+    end
+end
+
+"""
     validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
 
 Validates the given configuration for interdependencies and consistency.
@@ -1694,6 +1754,13 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
                         throw(InputError("Parameters $name and $other_name of component $uac are mutually exclusive."))
                     end
                 end
+            end
+        end
+
+        # check for other field-specific validations
+        if name in keys(type_def) && isdefined(type_def[name], :validations)
+            for validation in type_def[name].validations
+                check_validation(validation, name, value, extracted, uac)
             end
         end
     end
