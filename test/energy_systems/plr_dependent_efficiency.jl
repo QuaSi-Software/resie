@@ -349,9 +349,7 @@ function test_gas_boiler_supply_driven_plrd()
             "type" => "FixedSupply",
             "medium" => "m_c_g_natgas",
             "output_refs" => ["TST_GB_01"],
-            "is_source" => true,
             "energy_profile_file_path" => "./profiles/tests/demand_heating_energy.prf",
-            "supply" => 0,
             "scale" => 1.0,
         ),
         "TST_GB_01" => Dict{String,Any}(

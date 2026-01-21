@@ -33,7 +33,6 @@ function energy_system()::Dict{String,Any}
             "type" => "Demand",
             "medium" => "m_e_ac_230v",
             "output_refs" => [],
-            "energy_profile_file_path" => "./profiles/tests/demand_electricity.prf",
             "scale" => 1,
             "constant_demand" => 1000,
         ),
