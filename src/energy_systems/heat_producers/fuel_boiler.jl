@@ -1,3 +1,101 @@
+#! format: off
+const FUEL_BOILER_PARAMETERS = Dict(
+    "m_fuel_in" => (
+        description="Fuel input medium",
+        display_name="Medium fuel_in",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "linear_interface" => (
+        default="heat_out",
+        description="Which interface is considered linear relative to the part-load-ratio",
+        display_name="Linear interface",
+        options=["fuel_in", "heat_out"],
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "efficiency_fuel_in" => (
+        default="const:1.1",
+        description="Efficiency function for the fuel input",
+        display_name="Efficiency fuel_in",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "efficiency_heat_out" => (
+        default="const:1.0",
+        description="Efficiency function for the heat output",
+        display_name="Efficiency heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        function_type="1dim",
+        unit="-"
+    ),
+    "power_th" => (
+        default=nothing,
+        description="Design thermal power",
+        display_name="Thermal power",
+        required=true,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "min_power_fraction" => (
+        default=0.1,
+        description="Minimum part-load ratio to operate",
+        display_name="Min. power fraction",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
+        required=false,
+        type=Floathing,
+        json_type="number",
+        unit="°C"
+    ),
+    "nr_discretization_steps" => (
+        default=30,
+        description="Number of intervals for interpolated efficiency functions",
+        display_name="Nr. discretization steps",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=UInt,
+        json_type="number",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a boiler producing heat (as hot water) from the chemical energy in a fuel.
 
@@ -38,39 +136,55 @@ mutable struct FuelBoiler <: Component
     losses::Float64
 
     function FuelBoiler(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_fuel_in = Symbol(config["m_fuel_in"])
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        register_media([m_fuel_in, m_heat_out])
-        interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
-
-        linear_interface = Symbol(replace(default(config, "linear_interface", "heat_out"), "m_" => ""))
-        if !(linear_interface in interface_list)
-            @error "Given unknown interface name $linear_interface designated as linear " *
-                   "for component $uac"
-        end
-
-        efficiencies = Dict{Symbol,Function}(
-            Symbol("fuel_in") => parse_efficiency_function(default(config, "efficiency_fuel_in", "const:1.1")),
-            Symbol("heat_out") => parse_efficiency_function(default(config, "efficiency_heat_out", "const:1.0")),
-        )
-
-        return new(uac,
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,
-                   InterfaceMap(m_fuel_in => nothing),
-                   InterfaceMap(m_heat_out => nothing),
-                   m_fuel_in,
-                   m_heat_out,
-                   config["power_th"] / efficiencies[Symbol("heat_out")](1.0),
-                   linear_interface,
-                   default(config, "min_power_fraction", 0.1),
-                   efficiencies,
-                   interface_list,
-                   Dict{Symbol,Vector{Tuple{Float64,Float64}}}(),        # energy_to_plr
-                   1.0 / default(config, "nr_discretization_steps", 30), # discretization_step
-                   default(config, "output_temperature", nothing),
-                   0.0)  # losses
+        return new(SSOT_parameter_constructor(FuelBoiler, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{FuelBoiler})::Dict{String,NamedTuple}
+    return deepcopy(FUEL_BOILER_PARAMETERS) # Return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{FuelBoiler}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{FuelBoiler}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(FuelBoiler))
+end
+
+function init_from_params(x::Type{FuelBoiler}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    m_fuel_in = Symbol(params["m_fuel_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    register_media([m_fuel_in, m_heat_out])
+    interface_list = (Symbol("fuel_in"), Symbol("heat_out"))
+    linear_interface = Symbol(params["linear_interface"])
+
+    efficiencies = Dict{Symbol,Function}(
+        Symbol("fuel_in") => params["efficiency_fuel_in"],
+        Symbol("heat_out") => params["efficiency_heat_out"],
+    )
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_fuel_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_fuel_in,
+            m_heat_out,
+            params["power_th"] / efficiencies[Symbol("heat_out")](1.0),
+            linear_interface,
+            params["min_power_fraction"],
+            efficiencies,
+            interface_list,
+            Dict{Symbol,Vector{Tuple{Float64,Float64}}}(), # energy_to_plr
+            1.0 / params["nr_discretization_steps"], # discretization_step
+            params["output_temperature"],
+            0.0) # losses
 end
 
 function initialise!(unit::FuelBoiler, sim_params::Dict{String,Any})
