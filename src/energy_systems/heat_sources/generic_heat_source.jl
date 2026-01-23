@@ -1,3 +1,129 @@
+#! format: off
+const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
+    "medium" => (
+        description="Medium of the heat source",
+        display_name="Medium",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a temperature profile file",
+        display_name="Temperature profile file",
+        required=false,
+        conditionals=[
+            ("temperature_from_global_file", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "temperature_from_global_file" => (
+        default=false,
+        description="If true, take the temperature profile from the global weather data file",
+        display_name="Temperature from global file",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("constant_temperature", "mutex")
+        ],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "constant_temperature" => (
+        default=nothing,
+        description="Constant temperature value",
+        display_name="Constant temperature",
+        required=false,
+        conditionals=[
+            ("temperature_profile_file_path", "mutex"),
+            ("temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "max_power_profile_file_path" => (
+        default=nothing,
+        description="Path to a profile file with maximum power values",
+        display_name="Max. power profile file",
+        required=false,
+        conditionals=[
+            ("constant_power", "mutex"),
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_power" => (
+        default=nothing,
+        description="Constant maximum power to supply",
+        display_name="Constant max. power",
+        required=false,
+        conditionals=[
+            ("max_power_profile_file_path", "mutex"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "scale" => (
+        default=1.0,
+        description="Scaling factor for the max. power profile",
+        display_name="Max. power scale",
+        required=false,
+        conditionals=[("max_power_profile_file_path", "is_not_nothing")],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "temperature_reduction_model" => (
+        default="none",
+        description="The temperature reduction model to use",
+        display_name="Temp. reduction model",
+        required=false,
+        options=["none", "constant", "lmtd"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "min_source_in_temperature" => (
+        default=nothing,
+        description="Minimum source input temperature",
+        display_name="Min. source temp.",
+        required=false,
+        conditionals=[("temperature_reduction_model", "has_value", "lmtd")],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "max_source_in_temperature" => (
+        default=nothing,
+        description="Maximum source input temperature",
+        display_name="Max. source temp.",
+        required=false,
+        conditionals=[("temperature_reduction_model", "has_value", "lmtd")],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "minimal_reduction" => (
+        default=2.0,
+        description="Minimal (or constant) reduction of temperature",
+        display_name="Min. reduction",
+        required=false,
+        conditionals=[("temperature_reduction_model", "is_one_of", ("lmtd", "constant"))],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+)
+#! format: on
+
 """
 A generic heat source that models a number of different technologies used to supply heat.
 
@@ -31,13 +157,18 @@ mutable struct GenericHeatSource <: Component
     temperature_src_in::Temperature
     temperature_snk_out::Temperature
 
-    function GenericHeatSource(uac::String,
-                               config::Dict{String,Any},
-                               sim_params::Dict{String,Any})
-        max_power_profile = "max_power_profile_file_path" in keys(config) ?
-                            Profile(config["max_power_profile_file_path"], sim_params) :
-                            nothing
+    function GenericHeatSource(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
+        return new(SSOT_parameter_constructor(GenericHeatSource, uac, config, sim_params)...)
+    end
+end
 
+function component_parameters(x::Type{GenericHeatSource})::Dict{String,NamedTuple}
+    return deepcopy(GENERIC_HEAT_SOURCE_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{GenericHeatSource}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name == "constant_temperature" || param_name == "temperature_profile_file_path"
         constant_temperature,
         temperature_profile = get_parameter_profile_from_config(config,
                                                                 sim_params,
@@ -46,30 +177,46 @@ mutable struct GenericHeatSource <: Component
                                                                 "temperature_from_global_file",
                                                                 "constant_temperature",
                                                                 uac)
-
-        medium = Symbol(config["medium"])
-        register_media([medium])
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_flexible_source,              # sys_function
-                   medium,                          # medium
-                   InterfaceMap(medium => nothing), # input_interfaces
-                   InterfaceMap(medium => nothing), # output_interfaces
-                   max_power_profile,
-                   temperature_profile,
-                   default(config, "scale", 1.0),   # scaling_factor
-                   default(config, "constant_power", nothing),
-                   constant_temperature,
-                   default(config, "temperature_reduction_model", "none"),
-                   default(config, "min_source_in_temperature", nothing),
-                   default(config, "max_source_in_temperature", nothing),
-                   nothing,                                   # avg_source_in_temperature
-                   default(config, "minimal_reduction", 2.0), # lmtd_min
-                   0.0,     # max_energy
-                   nothing, # temperature_src_in
-                   nothing) # temperature_snk_out
+        return param_name == "constant_temperature" ? constant_temperature : temperature_profile
     end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{GenericHeatSource}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(GenericHeatSource))
+end
+
+function init_from_params(x::Type{GenericHeatSource}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+    register_media([medium])
+
+    max_power_profile = params["max_power_profile_file_path"] !== nothing ?
+                        Profile(params["max_power_profile_file_path"], sim_params) :
+                        nothing
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_flexible_source,
+            medium,
+            InterfaceMap(medium => nothing),
+            InterfaceMap(medium => nothing),
+            max_power_profile,
+            params["temperature_profile_file_path"], # temperature_profile, might be from global weather data
+            params["scale"],
+            params["constant_power"],
+            params["constant_temperature"],
+            params["temperature_reduction_model"],
+            params["min_source_in_temperature"],
+            params["max_source_in_temperature"],
+            nothing,                     # avg_source_in_temperature
+            params["minimal_reduction"], # lmtd_min
+            0.0,                         # max_energy
+            nothing,                     # temperature_src_in
+            nothing)                     # temperature_snk_out
 end
 
 function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})

@@ -1,3 +1,275 @@
+#! format: off
+const BUFFER_TANK_PARAMETERS = Dict(
+    "medium" => (
+        default="m_h_w_ht1",
+        description="Heat medium of the buffer tank",
+        display_name="Medium",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "model_type" => (
+        default="ideally_stratified",
+        description="Operation model: 'ideally_stratified', 'balanced', or 'ideally_mixed'",
+        display_name="Model type",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["ideally_stratified", "balanced", "ideally_mixed"],
+        unit="-"
+    ),
+    "consider_losses" => (
+        default=false,
+        description="Toggle to en-/disable the calculation of losses to the ambient",
+        display_name="Consider losses to the ambient?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "ambient_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a temperature profile file",
+        display_name="Ambient temp. profile",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+            ("ambient_temperature_from_global_file", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "ambient_temperature_from_global_file" => (
+        default=false,
+        description="If true, take the ambient temperature profile from the global weather data file",
+        display_name="Ambient temp. from global file",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "constant_ambient_temperature" => (
+        default=nothing,
+        description="Constant ambient temperature value",
+        display_name="Constant ambient temp.",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("ambient_temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "capacity" => (
+        default=nothing,
+        description="Capacity of the tank as energy value",
+        display_name="Capacity (energy)",
+        required=false,
+        conditionals=[
+            ("volume", "mutex"),
+        ],
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="Wh"
+    ),
+    "volume" => (
+        default=nothing,
+        description="Capacity of the tank as volume",
+        display_name="Capacity (volume)",
+        required=false,
+        conditionals=[
+            ("volume", "mutex"),
+        ],
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m^3"
+    ),
+    "initial_load" => (
+        default=0.0,
+        description="Initial load as relative value",
+        display_name="Initial load (relative)",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "rho_medium" => (
+        default=1000.0,
+        description="Density of the fluid",
+        display_name="Density fluid",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "cp_medium" => (
+        default=4.18,
+        description="Specific heat capacity of the fluid",
+        display_name="Spec. heat capacity fluid",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="kJ/kg*K"
+    ),
+    "high_temperature" => (
+        default=75.0,
+        description="Upper temperature of the buffer tank to the supply line",
+        display_name="Upper temperature",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "low_temperature" => (
+        default=20.0,
+        description="Lower temperature of the buffer tank from the return line",
+        display_name="Lower temperature",
+        required=false,
+        validations=[
+            ("self", "value_lt_rel", "high_temperature"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "max_load_rate" => (
+        default=nothing,
+        description="Maximum load rate of the tank relative to the capacity",
+        display_name="Max. load rate",
+        required=false,
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+        ],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "max_unload_rate" => (
+        default=nothing,
+        description="Maximum unload rate of the tank relative to the capacity",
+        display_name="Max. unload rate",
+        required=false,
+        validations=[
+            ("self", "value_gt_num_or_nothing", 0.0),
+        ],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "h_to_r" => (
+        default=2.0,
+        description="Ratio of height to radius of the cylinder",
+        display_name="Height-radius ratio",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "thermal_transmission_lid" => (
+        default=1.2,
+        description="Thermal transmission rate of the lid",
+        display_name="Thermal transmission lid",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+        ],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "thermal_transmission_barrel" => (
+        default=1.2,
+        description="Thermal transmission rate of the barrel",
+        display_name="Thermal transmission barrel",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+        ],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "thermal_transmission_bottom" => (
+        default=1.2,
+        description="Thermal transmission rate of the bottom",
+        display_name="Thermal transmission bottom",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+        ],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "ground_temperature" => (
+        default=12.0,
+        description="Constant temperature of the ground",
+        display_name="Ground temperature",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "switch_point" => (
+        default=0.15,
+        description="Switch point for the balanced model as relative load",
+        display_name="Switch point",
+        required=false,
+        conditionals=[
+            ("model_type", "has_value", "balanced"),
+        ],
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lt_num", 1.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a buffer tank holding hot water for heating or DHW purposes.
 
@@ -38,13 +310,17 @@ mutable struct BufferTank <: Component
     low_temperature::Float64
     max_load_rate::Floathing
     max_unload_rate::Floathing
+    # maximum input energy per time step [Wh]
     max_input_energy::Floathing
+    # maximum output energy per time step [Wh]
     max_output_energy::Floathing
     consider_losses::Bool
 
-    # for losses
+    ## for losses
     h_to_r::Float64
+    # surface of the lid and the bottom of the cylinder [m^2]
     surface_lid_bottom::Float64
+    # surface of the barrel of the cylinder [m^2]
     surface_barrel::Float64
     thermal_transmission_lid::Float64
     thermal_transmission_barrel::Float64
@@ -56,84 +332,91 @@ mutable struct BufferTank <: Component
     # for model type "balanced"
     switch_point::Float64
 
+    # current_max_output_temperature at the beginning of the time step
     current_max_output_temperature::Float64
     initial_load::Float64
+    # current load, set to inital_load at the beginning [Wh]
     load::Float64
+    # stores the load of the previous time step without losses
     load_end_of_last_timestep::Float64
+    # losses in current time step [Wh]
     losses::Float64
+    # bool indicating if the process step has already been performed in the current time step
     process_done::Bool
+    # bool indicating if the load step has already been performed in the current time step
     load_done::Bool
 
     function BufferTank(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        medium = Symbol(default(config, "medium", "m_h_w_ht1"))
-        register_media([medium])
-
-        input_model_type = default(config, "model_type", "ideally_stratified")
-        if input_model_type == "ideally_stratified"
-            model_type = :ideally_stratified
-        elseif input_model_type == "balanced"
-            model_type = :balanced
-        elseif input_model_type == "ideally_mixed"
-            model_type = :ideally_mixed
-        else
-            @error "For the buffer tank $uac, the model_type could not be detected. Is has to be one of: " *
-                   "'ideally_stratified', 'balanced', 'ideally_mixed'."
-            throw(InputError())
-        end
-
-        consider_losses = default(config, "consider_losses", false)
-        if consider_losses
-            constant_ambient_temperature,
-            ambient_temperature_profile = get_parameter_profile_from_config(config,
-                                                                            sim_params,
-                                                                            "ambient_temperature",
-                                                                            "ambient_temperature_profile_file_path",
-                                                                            "ambient_temperature_from_global_file",
-                                                                            "constant_ambient_temperature",
-                                                                            uac;
-                                                                            required=true)
-
-        else
-            constant_ambient_temperature = nothing
-            ambient_temperature_profile = nothing
-        end
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage,                                 # sys_function
-                   InterfaceMap(medium => nothing),            # input_interfaces
-                   InterfaceMap(medium => nothing),            # output_interfaces
-                   medium,                                     # medium in the buffer tank
-                   model_type,                                 # can be one of :ideally_stratified, :balanced, :ideally_mixed
-                   default(config, "capacity", nothing),       # capacity of the buffer tank [Wh] (either capacity or volume has to be given)
-                   default(config, "volume", nothing),         # volume of the buffer tank [m^3] (either capacity or volume has to be given)
-                   default(config, "rho_medium", 1000.0),      # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.18),         # specific thermal capacity of medium [kJ/kgK]
-                   default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [°C]
-                   default(config, "low_temperature", 20),     # lower temperature of the buffer tank [°C]
-                   default(config, "max_load_rate", nothing),  # maximum load rate given in 1/h
-                   default(config, "max_unload_rate", nothing),# maximum unload rate given in 1/h
-                   nothing,                                    # maximum input energy per time step [Wh]
-                   nothing,                                    # maximum output energy per time step [Wh]
-                   consider_losses,                            # consider_losses [Bool]
-                   default(config, "h_to_r", 2.0),             # ratio of height to radius of the cylinder [-]
-                   0.0,                                        # surface_lid_bottom, surface of the lid and the bottom of the cylinder [m^2]
-                   0.0,                                        # surface_barrel, surface of the barrel of the cylinder [m^2]
-                   default(config, "thermal_transmission_lid", 1.2),     # [W/(m^2K)]
-                   default(config, "thermal_transmission_barrel", 1.2),  # [W/(m^2K)]
-                   default(config, "thermal_transmission_bottom", 1.2),  # [W/(m^2K)]
-                   ambient_temperature_profile,                          # [°C]
-                   constant_ambient_temperature,                         # ambient_temperature [°C]
-                   default(config, "ground_temperature", 12),            # [°C]
-                   default(config, "switch_point", 0.15),                # [%/100] load where to change from stratified to mixed mode, only for model_type :balanced
-                   0.0,                                        # current_max_output_temperature at the beginning of the time step
-                   default(config, "initial_load", 0.0),       # initial_load [%/100]
-                   0.0,                                        # load, set to inital_load at the beginning [Wh]
-                   0.0,                                        # load_end_of_last_timestep, stores the load of the previous time step without losses
-                   0.0,                                        # losses in current time step [Wh]
-                   false,                                      # process_done, bool indicating if the process step has already been performed in the current time step
-                   false)                                      # load_done, bool indicating if the load step has already been performed in the current time step
+        new(SSOT_parameter_constructor(BufferTank, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{BufferTank})::Dict{String,NamedTuple}
+    return deepcopy(BUFFER_TANK_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    if param_name == "constant_ambient_temperature" || param_name == "ambient_temperature_profile_file_path"
+        constant_temperature,
+        temperature_profile = get_parameter_profile_from_config(config,
+                                                                sim_params,
+                                                                "ambient_emperature",
+                                                                "ambient_emperature_profile_file_path",
+                                                                "ambient_emperature_from_global_file",
+                                                                "constant_ambient_temperature",
+                                                                uac)
+        return param_name == "constant_ambient_temperature" ? constant_temperature : temperature_profile
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{BufferTank}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(BufferTank))
+end
+
+function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    medium = Symbol(params["medium"])
+    register_media([medium])
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_storage,
+            InterfaceMap(medium => nothing),
+            InterfaceMap(medium => nothing),
+            medium,
+            Symbol(params["model_type"]),
+            params["capacity"],
+            params["volume"],
+            params["rho_medium"],
+            params["cp_medium"],
+            params["high_temperature"],
+            params["low_temperature"],
+            params["max_load_rate"],
+            params["max_unload_rate"],
+            nothing, # max_input_energy
+            nothing, # max_output_energy
+            params["consider_losses"],
+            params["h_to_r"],
+            0.0,     # surface_lid_bottom
+            0.0,     # surface_barrel
+            params["thermal_transmission_lid"],
+            params["thermal_transmission_barrel"],
+            params["thermal_transmission_bottom"],
+            params["consider_losses"] ? params["ambient_temperature_profile"] : nothing,
+            params["consider_losses"] ? params["constant_ambient_temperature"] : nothing,
+            params["ground_temperature"],
+            params["switch_point"],
+            0.0,     # current_max_output_temperature
+            params["initial_load"],
+            0.0,     # load
+            0.0,     # load_end_of_last_timestep,
+            0.0,     # losses
+            false,   # process_done
+            false)   # load_done
 end
 
 function initialise!(unit::BufferTank, sim_params::Dict{String,Any})

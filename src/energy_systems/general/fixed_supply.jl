@@ -79,7 +79,7 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         conditionals=[("energy_profile_file_path", "is_not_nothing")],
         type=Float64,
         json_type="number",
-        unit="W"
+        unit="-"
     ),
 )
 #! format: on
