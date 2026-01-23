@@ -1673,6 +1673,11 @@ function check_validation(validation::Tuple, name::String, value::Any, extracted
         throw(InputError("Unknown validation operand $(validation[1]) for component $uac"))
     end
 
+    # most current operators expect a not-nothing value, so we can catch it here
+    if !occursin("or_nothing", validation[2]) && value === nothing
+        throw(InputError("Value of $name was `nothing` but must be numeric"))
+    end
+
     if validation[2] == "value_lt_num"
         if !(value < validation[3])
             throw(InputError("Value of $name must be less than $(validation[3])"))
@@ -1688,6 +1693,10 @@ function check_validation(validation::Tuple, name::String, value::Any, extracted
     elseif validation[2] == "value_gte_num"
         if !(value >= validation[3])
             throw(InputError("Value of $name must be greater than or equal to $(validation[3])"))
+        end
+    elseif validation[2] == "value_gt_num_or_nothing"
+        if !(value === nothing || value > validation[3])
+            throw(InputError("Value of $name must be greater than $(validation[3])"))
         end
     elseif validation[2] == "value_lt_rel"
         other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
