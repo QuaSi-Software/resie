@@ -169,7 +169,8 @@
                     "low_threshold": 0.2,
                     "high_threshold": 0.95,
                     "min_run_time": 0,
-                    "storage_uac": "BufferTank"
+                    "storage_uac": "BufferTank",
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_kWh.prf"
                 }
             ],
             "output_refs": {
@@ -206,7 +207,8 @@
                     "low_threshold": 0.2,
                     "high_threshold": 0.95,
                     "min_run_time": 0,
-                    "storage_uac": "BufferTank"
+                    "storage_uac": "BufferTank",
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_kWh.prf"
                 }
             ],
             "output_refs": {
