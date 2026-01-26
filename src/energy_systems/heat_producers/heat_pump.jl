@@ -780,6 +780,11 @@ function calculate_slices(unit::HeatPump,
     available_time = sim_params["time_step_seconds"]
     EPS = sim_params["epsilon"]
 
+    # if we have COP == 1.0, we must limit electricity input as the heat input is not
+    # available as limit factor and leads to infinite loops in some cases. as the limit we
+    # use the heat pump's design heat output energy assuming no losses
+    energies.available_el_in = min(sim_params["watt_to_wh"](unit.design_power_th), energies.available_el_in)
+
     # keep running until we ran out of either sources or sinks to check
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
         # we can skip calculation if there is no energy left to be distributed. this can
@@ -800,7 +805,7 @@ function calculate_slices(unit::HeatPump,
         end
 
         # check if heat is available for specific src_idx and snk_idx
-        if energies.available_heat_in[src_idx] == 0
+        if energies.available_heat_in[src_idx] == 0 && unit.cop != 1.0
             src_idx += 1
             continue
         elseif energies.available_heat_out[snk_idx] == 0
