@@ -143,14 +143,13 @@
             "m_el_out": "m_power"
         },
         "Heat_Source_HP": {
-            "type": "GenericHeatSource",
+            "type": "GridConnection",
             "output_refs": [
                 "HeatPump"
             ],
             "medium": "m_heat_source",
-            "constant_power": 9999999999,
             "temperature_from_global_file": "temp_ambient_air",
-            "scale": 1
+            "is_source": true
         },
         "Heat_Source_FB": {
             "type": "GenericHeatSource",
@@ -158,13 +157,18 @@
                 "Boiler"
             ],
             "medium": "m_heat_source",
-            "constant_power": 9999999999,
-            "temperature_from_global_file": "temp_ambient_air",
-            "scale": 1
+            "constant_temperature": 0,
+            "is_source": true
         },
         "HeatPump": {
             "type": "HeatPump",
-            "model_type": "simplified",
+            "model_type": "inverter",
+            "control_modules": [
+                {
+                    "name": "profile_limited",
+                    "profile_path": "./profiles/MA/ones.prf"
+                }
+            ],
             "output_refs": {
                 "m_heat_out": "BUS_Heat",
                 "m_heat_out_secondary": "BUS_Heat"
@@ -179,23 +183,26 @@
             "m_heat_out": "m_heat",
             "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
-            "cop_function": "const:3.5",
+            "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 35, 4.10, 3.92, 3.22",
             "bypass_cop": 15.0,
             "min_power_function": "const:0.0",
-            "max_power_function": "const:1.0",
+            "max_power_function": "poly-2: 0.001119613, -0.06349226, 0.03004031, -0.000400244, 0.002087081, -0.000351640, -0.000003101, -0.0000000655, -0.000013215, 0.000001353",
             "__OPTIONAL_LOSSES__": "",
             "heat_losses_factor": 0.95,
             "power_losses_factor": 0.97,
             "__OPTIONAL_ICING__": "",
-            "consider_icing": false,
-            "icing_coefficients": "3,-0.42,15,2,30",
-            "__OPTIONAL_OPTIMISATION_FOR_INVERTER_HP__": "",
-            "optimise_slice_dispatch": false,
-            "optimal_plr": 0.5,
-            "nr_optimisation_passes": 10
+            "consider_icing": true,
+            "icing_coefficients": "3,-0.42,15,2,30"
         },
         "Boiler": {
             "type": "HeatPump",
+            "model_type": "simplified",
+            "control_modules": [
+                {
+                    "name": "profile_limited",
+                    "profile_path": "./profiles/MA/ones.prf"
+                }
+            ],
             "output_refs": {
                 "m_heat_out": "BUS_Heat",
                 "m_heat_out_secondary": "BUS_Heat"
@@ -216,14 +223,7 @@
             "max_power_function": "const:1.0",
             "__OPTIONAL_LOSSES__": "",
             "heat_losses_factor": 1.0,
-            "power_losses_factor": 1.0,
-            "__OPTIONAL_ICING__": "",
-            "consider_icing": false,
-            "icing_coefficients": "3,-0.42,15,2,30",
-            "__OPTIONAL_OPTIMISATION_FOR_INVERTER_HP__": "",
-            "optimise_slice_dispatch": false,
-            "optimal_plr": 0.5,
-            "nr_optimisation_passes": 10
+            "power_losses_factor": 1.0
         },
         "BUS_Power": {
             "type": "Bus",
@@ -255,8 +255,9 @@
                             {
                 "name": "EMS", 
                 "price_profile_paths": ["./profiles/MA/boersenpreis_EUR_kWh.prf", 
+                                        "./profiles/MA/boersenpreis_EUR_kWh.prf",
                                         "./profiles/MA/boersenpreis_EUR_kWh.prf"],
-                "limit_prices": [20, 0, 50],
+                "limit_prices": [100, 0, 1000, 1000],
                 "new_connections_below_limits": {
                     "BUS_Power":[
                         {
