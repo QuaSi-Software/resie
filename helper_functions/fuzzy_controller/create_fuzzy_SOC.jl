@@ -1,22 +1,22 @@
 using FuzzyLogic
 
-fis = @mamfis function fuzzy_control(p_now, p_future, p_stability, SOC_now)::SOC_target
+fis = @mamfis function fuzzy_control(p_now, p_trend, p_volatility, SOC_now)::SOC_target
     p_now := begin
         domain = -50:950 # TODO change to min max 
-        cheap = TriangularMF(-100, -50, 450)
-        average = TriangularMF(-50, 450, 950)
+        cheap = TrapezoidalMF(-100, -50, 0, 450)
+        average = TrapezoidalMF(-50, 300, 450, 950)
         expensive = TriangularMF(450, 950, 1500)
         trapezoidalMF
     end
 
-    p_future := begin
+    p_trend := begin
         domain = -50:950 # TODO change to min max 
         cheap = TriangularMF(-100, -50, 450)
         average = TriangularMF(-50, 450, 950)
         expensive = TriangularMF(450, 950, 1500)
     end
 
-    p_stability := begin
+    p_volatility := begin
         domain = 0:10 # TODO change to min max 
         low = TriangularMF(-5, 0, 5)
         average = TriangularMF(0, 5, 10)
@@ -37,9 +37,9 @@ fis = @mamfis function fuzzy_control(p_now, p_future, p_stability, SOC_now)::SOC
         high = TriangularMF(0.5, 1.0, 2.0)
     end
 
-    p_now == cheap || p_future == high --> SOC_target == low
-    p_now == expensive || p_stability == high --> SOC_target == high
-    p_future == low || p_stability == low --> SOC_target == middle
+    p_now == cheap || p_trend == expensive --> SOC_target == low
+    p_now == expensive || p_volatility == high --> SOC_target == high
+    p_trend == cheap || p_volatility == low --> SOC_target == middle
 end
 
 # output of compilefis should be used in the controller because it's a lot faster and 
