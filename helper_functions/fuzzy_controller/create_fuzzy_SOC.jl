@@ -6,6 +6,7 @@ fis = @mamfis function fuzzy_control(p_now, p_future, p_stability, SOC_now)::SOC
         cheap = TriangularMF(-100, -50, 450)
         average = TriangularMF(-50, 450, 950)
         expensive = TriangularMF(450, 950, 1500)
+        trapezoidalMF
     end
 
     p_future := begin

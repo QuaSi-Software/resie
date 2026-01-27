@@ -233,8 +233,8 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    IN = sim["Grid_IN"] + sim["Control_Reserve"] .* 1e-6        # convert Wh time series in MWh
-    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
+    IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
+    base_price = 214.0        # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
     
 
@@ -389,14 +389,13 @@ function revenue_feedin(sim::Dict, p::VDIParams)
 end
 
 function co2_yearly(sim::Dict)
-    IN = sim["Grid_IN"] + sim["Control_Reserve"] .* 1e-3        # convert Wh time series in kWh
+    IN = sim["Grid_IN"] + sim["Control_energy"] .* 1e-3        # convert Wh time series in kWh
     co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh 
 
     # what about PV and Wind?
 
-    co2_y1 = sum(IN .* co2_intensity)  
+    return sum(IN .* co2_intensity)  
 
-    
 end
 
 ############################################################

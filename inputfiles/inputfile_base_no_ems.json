@@ -169,7 +169,7 @@
             ],
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
-            "scale": 1e6
+            "scale": 0.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
@@ -343,7 +343,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "volume": 800,
+            "capacity": 65.0e6,
             "rho_medium": 1000,
             "cp_medium": 4.18,
             "high_temperature": 90.0,
