@@ -55,7 +55,7 @@ BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an arr
 
 # limit for energy stock prices for economic_control.jl (EUR/MWh)
 # if no grid price limit is to be considered, limit is set "towards infinity"
-# TODO adjust limits
+# TODO delete?
 p_stock_lo   = 0        # lower limit
 p_stock_hi   = 0        # upper limit
 p_stock_step = 0.5         # step size
@@ -64,7 +64,7 @@ p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array o
 # benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
 # of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
 # if control energy is not to be considerd, benchmark is set "towards infinity"
-# TODO adjust limits
+# TODO delete?
 p_res_lo   = 0            # lower limit
 p_res_hi   = 0           # upper limit
 p_res_step = 0.5            # step size
@@ -225,8 +225,8 @@ function run_resie_variant(
         Pth_Boiler::Number,
         Cap_Wh::Number,
         BattCap_Wh::Number,
-        p_stock::Number,
-        p_reserve::Number,
+        p_stock::Number, #TODO delete?
+        p_reserve::Number, #TODO delete?
         states_power_bus::Array{Dict{String,Any}},
         states_heat_bus::Array{Dict{String,Any}},
         profile_addons,
@@ -238,7 +238,7 @@ function run_resie_variant(
     # adjust price limits to account for fixed added costs and cost mulitplications
     stock_addon, reserve_power_addon, reserve_energy_addon, market_value_pv_addon, market_value_wind_addon = profile_addons
     stock_mult, reserve_power_mult, reserve_energy_mult, market_value_pv_mult, market_value_wind_mult = profile_multipliers
-    p_stock = p_stock / stock_mult - stock_addon
+    p_stock = p_stock / stock_mult - stock_addon #TODO delete?
 
     cfg = deepcopy(base_input)
 
@@ -258,9 +258,7 @@ function run_resie_variant(
         csv_name = "out_HP$(safe(display_MW(Pth_HP)))MW_" *
                    "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
                    "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-                   "BAT$(safe(display_kWh(BattCap_Wh)))kWh_" *
-                   "P$(safe(p_stock))EUR_" * 
-                   "R$(safe(p_reserve))EUR.csv"
+                   "BAT$(safe(display_kWh(BattCap_Wh)))kWh.csv"
 
         aux_name = replace(csv_name, ".csv" => ".md")
 
@@ -282,7 +280,8 @@ function run_resie_variant(
     price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
-    co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"
+    co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf" #TODO co2 profile is incomplete?
+    # TODO set price profile paths for positive and negatice control energy (CBMP) and for pos and neg control power 
 
     # create correct profiles from price_profile_paths and add the to sim_output
     run_ID = UUID(runidx)
@@ -311,7 +310,7 @@ function run_resie_variant(
         push!(co2_value_grid, co2_profile_grid.data[dt])
     end 
 
-    #calculate reserve_bench_profile from other profiles
+    #calculate reserve_bench_profile from other profiles    #TODO not needed anymore - delete?
     reserve_bench_values = zeros(size(stock_values, 1))
     timestamps = zeros(Int, size(stock_values, 1))
     for (idx, dt) in enumerate(date_range)
@@ -323,7 +322,7 @@ function run_resie_variant(
         end
     end
 
-    # reserve_bench profile will be overwritten for every run to make sure the 
+    # reserve_bench profile will be overwritten for every run to make sure the      #TODO not needed anymore - delete?
     # profile_multipliers and profile_addons calculated correctly.
     # If multiple threads are used each thread gets their own profile.
     if Threads.nthreads() > 1
@@ -340,7 +339,7 @@ function run_resie_variant(
     save_to_prf(timestamps, stock_values, price_profile_path_stock_new)
 
     ########################################################
-    # Set limits / benchmark for economic_control.jl
+    # Set limits / benchmark for economic_control.jl             #TODO not needed anymore - delete?
     ########################################################
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
@@ -361,9 +360,7 @@ function run_resie_variant(
         "input_HP$(safe(display_MW(Pth_HP)))MW_" *
         "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
         "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-        "BAT$(safe(display_kWh(BattCap_Wh)))kWh_" *
-        "P$(safe(p_stock))€MWh_" *
-        "R$(safe(p_reserve))€MW4h.json"
+        "BAT$(safe(display_kWh(BattCap_Wh)))kWh.json"
     )
 
     open(fname, "w") do io
@@ -380,12 +377,12 @@ function run_resie_variant(
     Resie.close_run(run_ID)
 
     # add the profiles to the sim_output to be used in vdi2067 calculation
-    sim_output["Stock_Price"] = stock_values
+    sim_output["Stock_Price"] = stock_values    #TODO is this with or without grid add ons?
     sim_output["Reserve_Power_Price"] = reserve_power_values
     sim_output["Reserve_Energy_Price"] = reserve_energy_values
     sim_output["Market_Price_PV"] = market_value_pv_values
     sim_output["Market_Price_Wind"] = market_value_wind_values
-    sim_output["Reserve_Bench_Price"] = reserve_bench_values
+    sim_output["Reserve_Bench_Price"] = reserve_bench_values    #TODO not needed anymore - delete?
     sim_output["CO2_Grid"] = co2_value_grid
 
     return sim_output
@@ -404,23 +401,38 @@ function main(base_input_path, write_output)
         length(Pth_HP_vals) *
         length(Pth_Boiler_vals) *
         length(Cap_vals_Wh) *
-        length(BattCap_vals_Wh) *
-        length(p_stock_vals) *
-        length(p_reserve_vals)
+        length(BattCap_vals_Wh)
 
     println("Parameterstudy starts: $total_runs runs on $(Threads.nthreads()) parallel Threads")
 
     out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
     touch(out_file_path)
-    header = join(["Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", 
-                   "Battery_Capacity / Wh", "Stock_Price / €/MWh", "Reserve_Price / €/4h", 
-                   "annuity_no A_cap / €", "annuity_no A_misc / €", "annuity_no A_op / €", "annuity_no A_energy / €", 
-                   "annuity_no A_rev_control / €", "annuity_no A_rev_feed / €", "annuity_no A_total / €",
-                   "annuity_mod A_cap / €", "annuity_mod A_misc / €", "annuity_mod A_op / €", "annuity_mod A_energy / €", 
-                   "annuity_mod A_rev_control / €", "annuity_mod A_rev_feed / €", "annuity_mod A_total / €",
-                   "annuity_pro A_cap / €", "annuity_pro A_misc / €", "annuity_pro A_op / €", "annuity_pro A_energy / €", 
-                   "annuity_pro A_rev_control / €", "annuity_pro A_rev_feed / €", "annuity_pro A_total / €",
-                   "balance_power", "balance_heat", "CO2_yearly"], ';') * "\n"
+    header = join([
+                #component parameters
+                "Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", "Battery_Capacity / Wh", #compontet parameters
+                
+                # price parameters #TODO delete?
+                "Stock_Price / €/MWh", "Reserve_Price / €/4h", 
+                
+                # no cost escalation
+                "annuity_no A_cap / €", "annuity_no A_cap_incentive / €", "annuity_no A_misc / €", "annuity_no A_op / €", "annuity_no A_energy / €", 
+                "annuity_no A_rev_control / €", "annuity_no A_rev_feed / €", "annuity_no A_total / €", "annuity_no A_total_incentive / €",
+
+                # moderate cost escalation
+                "annuity_mod A_cap / €", "annuity_mod A_cap_incentive / €", "annuity_mod A_misc / €", "annuity_mod A_op / €", "annuity_mod A_energy / €", 
+                "annuity_mod A_rev_control / €", "annuity_mod A_rev_feed / €", "annuity_mod A_total / €", "annuity_mod A_total_incentive / €",
+
+                # progressive cost escalation
+                "annuity_pro A_cap / €", "annuity_pro A_cap_incentive / €", "annuity_pro A_misc / €", "annuity_pro A_op / €", "annuity_pro A_energy / €", 
+                "annuity_pro A_rev_control / €", "annuity_pro A_rev_feed / €", "annuity_pro A_total / €", "annuity_pro A_total_incentive / €",
+
+                # balance warnings
+                "balance_power", "balance_heat", 
+
+                # yearly CO2-emissions
+                # "CO2_yearly"
+                ], ';') * "\n"
+
     open(out_file_path, "a") do file_handle
         write(file_handle, header)
     end
@@ -435,9 +447,9 @@ function main(base_input_path, write_output)
                           Logging.Warn, nothing)
     Logging.global_logger(logger)
 
-    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve) in
+    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve) in #TODO delete p_stock and p_reserve
         collect(Iterators.product(Pth_HP_vals, Pth_Boiler_vals, Cap_vals_Wh,
-                                  BattCap_vals_Wh, p_stock_vals, p_reserve_vals))
+                                  BattCap_vals_Wh, p_stock_vals, p_reserve_vals)) #TODO delete p_stock and p_reserve
         
         runidx = Threads.atomic_add!(runidx_global, 1)
         sim_output = OrderedDict()
@@ -448,7 +460,7 @@ function main(base_input_path, write_output)
         raw_sim = run_resie_variant(
             outdir, base_input,
             Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
-            p_stock, p_reserve,
+            p_stock, p_reserve, #TODO delete p_stock and p_reserve
             states_power_bus, states_heat_bus,
             profile_addons, profile_multipliers,
             runidx, total_runs;
@@ -493,6 +505,7 @@ function main(base_input_path, write_output)
         annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
         annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
+        # co2_yearly = collect(values(sim)) #TODO
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
         row = replace(row, '.' => ',')
         # Lock the file writing

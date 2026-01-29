@@ -432,7 +432,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
                         (A_rev_control + A_rev_feed)
     
-    CO2_yearly = co2_yearly(sim_new)
+    # CO2_yearly = co2_yearly(sim_new)
 
 
     # calculating a heat price out of the total annual costs and the produced heat does not make sense
@@ -450,7 +450,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
         "A_total_incentive" => A_total_incentive,
-        "CO2_yearly" => CO2_yearly
+        # "CO2_yearly" => CO2_yearly
         # "heat_price_eur_per_kwh" => heat_price
     )
 end

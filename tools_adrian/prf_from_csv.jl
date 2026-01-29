@@ -9,17 +9,16 @@ df = CSV.read(filepath, DataFrame, delim=";", decimal=',')
 # df[:, end-3:end] .= ifelse.(df[!, end-3:end] .< 0, missing, df[!, end-3:end])
 # df = df[:, 1:end-2]
 # df = Impute.interpolate(df)
+df[end:end+20, :] = df[1:20, :]
 timestep_size = df[5, timestep_col_name] - df[6, timestep_col_name]
 for col_name in names(df)
     if col_name != timestep_col_name 
     
         target_path = raw"c:\Users\jenter\Documents\resie\profiles\MA\\" * col_name * ".prf" # TODO change
 
-        header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
-                            "# profile_start_date_format:", "# timestamp_format:", "# interpolation_type:", 
-                            "# time_shift_seconds:"]
+        header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:", "# time_zone"]
         if occursin("irr", col_name) # search in column name for certain word to filter
-            header_values = ["intensive", "startdate_timestamp", profile_start_date, 
+            header_values = ["intensive", "datestamp", profile_start_date, 
                             "dd.mm.yyyy HH:MM", "seconds", "linear_solar_radiation", 0] # TODO change
         else
             header_values = ["intensive", "startdate_timestamp", profile_start_date, 
