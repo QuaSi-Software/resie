@@ -145,7 +145,7 @@
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.01.2024 23:45",
+        "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",

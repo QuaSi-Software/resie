@@ -44,19 +44,19 @@ end
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
 heatpump_component(A0::Real) =
-    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.4, Inf)
+    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.4, 0.0)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.4, Inf)
+    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.4, 0.0)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.4, Inf)
+    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.4, 0.0)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real) =
-    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0, 0.0, Inf)
+    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0, 0.0, 0.0)
 
 
 ############################################################
@@ -352,7 +352,7 @@ function revenue_feedin(sim::Dict, p::VDIParams)
     A_E_PV = 0.0
 
     if haskey(sim, "Grid_Out_PV")
-        E_PV = sim["Grid_Out_PV"]                                  
+        E_PV = sim["Grid_Out_PV"] .* 1e-6                                  
         market_value_PV = vecize_price(sim["Market_Value_PV"], length(E_PV))
 
         # Effective remuneration per timestep: max(MW, AW)
@@ -360,14 +360,14 @@ function revenue_feedin(sim::Dict, p::VDIParams)
         price_eff_PV = max.(market_value_PV, p.AW_PV)
 
         # Wh * €/MWh → EUR
-        A_E_PV = sum(E_PV .* price_eff_PV) * 1e-6
+        A_E_PV = sum(E_PV .* price_eff_PV)
     end
 
     # 2) WIND
     A_E_Wind = 0.0
 
     if haskey(sim, "Grid_Out_Wind_Wh")
-        E_Wind = sim["Grid_Out_Wind_Wh"]
+        E_Wind = sim["Grid_Out_Wind_Wh"] .* 1e-6
         market_value_Wind = vecize_price(sim["Market_Value_Wind"], length(E_Wind))
 
         # Effective remuneration per timestep: max(MW, AW)
@@ -375,7 +375,7 @@ function revenue_feedin(sim::Dict, p::VDIParams)
         price_eff_Wind = max.(market_value_Wind, p.AW_Wind)
 
         # Wh * €/MWh → EUR
-        A_E_Wind = sum(E_Wind .* price_eff_Wind) * 1e-6
+        A_E_Wind = sum(E_Wind .* price_eff_Wind)
     end
 
     # 3) TOTAL FIRST-YEAR FEED-IN REVENUE

@@ -38,36 +38,36 @@ Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
 # Boiler power (W)
 Pth_Boiler_lo   = 3.1e6     # lower limit
 Pth_Boiler_hi   = 3.9e6     # upper limit
-Pth_Boiler_step = 0.5e6     # step size
+Pth_Boiler_step = 0.2e6     # step size
 Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
 Cap_lo_Wh   = 61.0e6        # lower limit
 Cap_hi_Wh   = 69.0e6        # upper limit
-Cap_step_Wh = 2.0e6        # step size
+Cap_step_Wh = 2.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 0e3      # lower limit
-Batt_hi_Wh   = 300e3       # upper limit
-Batt_step_Wh = 100e3        # step size
+Batt_lo_Wh   = 0e3          # lower limit
+Batt_hi_Wh   = 450e3        # upper limit
+Batt_step_Wh = 150e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # limit for energy stock prices for economic_control.jl (EUR/MWh)
 # if no grid price limit is to be considered, limit is set "towards infinity"
 # TODO delete?
-p_stock_lo   = 0        # lower limit
-p_stock_hi   = 0        # upper limit
-p_stock_step = 0.5         # step size
+p_stock_lo   = 0            # lower limit
+p_stock_hi   = 0            # upper limit
+p_stock_step = 0.5          # step size
 p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
 
 # benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
 # of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
 # if control energy is not to be considerd, benchmark is set "towards infinity"
 # TODO delete?
-p_res_lo   = 0            # lower limit
-p_res_hi   = 0           # upper limit
-p_res_step = 0.5            # step size
+p_res_lo   = 0             # lower limit
+p_res_hi   = 0             # upper limit
+p_res_step = 0.5           # step size
 p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -505,7 +505,7 @@ function main(base_input_path, write_output)
         annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
         annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
-        # co2_yearly = collect(values(sim)) #TODO
+        # co2 = collect(values(sim_output[runidx])) #TODO
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
         row = replace(row, '.' => ',')
         # Lock the file writing
