@@ -44,15 +44,15 @@ end
 
 "Heat pump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
 heatpump_component(A0::Real) =
-    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.4, 0.0)
+    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.2, 0.0)
 
 "Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
 boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.4, 0.0)
+    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.2, 0.0)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.4, 0.0)
+    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.2, 0.0)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
 battery_component(A0::Real) =
@@ -73,9 +73,9 @@ VDI_SCENARIO_NONE = VDIParams(
     0.000,    # no repair cost (Excel)
     0.000,    # no revenues
     0.000,    # no miscellaneous (Excel)
-    120.0,     # grid price addon €/MWh
-    106.8,     # AW_PV €/MWh
-    58.8*1.42 # AW_Wind €/MWh
+    120.0,    # grid price addon €/MWh
+    106.8,    # AW_PV €/MWh
+    83.496    # AW_Wind €/MWh, 58.8*1.42
     )
 
 # Scenario 2 — moderate escalation
@@ -92,7 +92,7 @@ VDI_SCENARIO_MOD = VDIParams(
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     106.8,    # AW_PV €/MWh
-    58.8*1.42 # AW_Wind €/MWh
+    83.496    # AW_Wind €/MWh, 58.8*1.42
     )
 
 # Scenario 3 — progressive escalation
@@ -109,7 +109,7 @@ VDI_SCENARIO_PRO = VDIParams(
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     106.8,     # AW_PV €/MWh
-    58.8*1.42 # AW_Wind €/MWh
+    83.496    # AW_Wind €/MWh, 58.8*1.42
     )
 
 
@@ -236,8 +236,6 @@ function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
     base_price = 214.0        # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
 
-    
-
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
     A1 = sum(IN .* base_price)  
@@ -352,29 +350,29 @@ function revenue_feedin(sim::Dict, p::VDIParams)
     A_E_PV = 0.0
 
     if haskey(sim, "Grid_Out_PV")
-        E_PV = sim["Grid_Out_PV"] .* 1e-6                                  
+        E_PV = sim["Grid_Out_PV"] .* 1e-6      # Wh -> MWh                                  
         market_value_PV = vecize_price(sim["Market_Value_PV"], length(E_PV))
 
         # Effective remuneration per timestep: max(MW, AW)
         # the bigger number (market value or AW) per timestep is used
         price_eff_PV = max.(market_value_PV, p.AW_PV)
 
-        # Wh * €/MWh → EUR
+        # MWh * €/MWh → EUR
         A_E_PV = sum(E_PV .* price_eff_PV)
     end
 
     # 2) WIND
     A_E_Wind = 0.0
 
-    if haskey(sim, "Grid_Out_Wind_Wh")
-        E_Wind = sim["Grid_Out_Wind_Wh"] .* 1e-6
+    if haskey(sim, "Grid_Out_Wind")
+        E_Wind = sim["Grid_Out_Wind"] .* 1e-6     # Wh -> MWh  
         market_value_Wind = vecize_price(sim["Market_Value_Wind"], length(E_Wind))
 
         # Effective remuneration per timestep: max(MW, AW)
         # the bigger number (market value or AW) per timestep is used
         price_eff_Wind = max.(market_value_Wind, p.AW_Wind)
 
-        # Wh * €/MWh → EUR
+        # MWh * €/MWh → EUR
         A_E_Wind = sum(E_Wind .* price_eff_Wind)
     end
 

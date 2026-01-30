@@ -348,7 +348,7 @@
             "cp_medium": 4.18,
             "high_temperature": 90.0,
             "low_temperature": 50.0,
-            "initial_load": 0.1,
+            "initial_load": 0.5,
             "max_load_rate": 0.25,
             "max_unload_rate": 0.2,
             "___BALANCED MODEL ONLY___": "",
@@ -369,7 +369,7 @@
             ],
             "medium": "m_power",
             "capacity": 200e3,
-            "load": 175e3
+            "load": 100e3
         },
         "Demand_Heat": {
             "type": "Demand",

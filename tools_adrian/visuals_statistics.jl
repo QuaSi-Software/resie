@@ -25,7 +25,7 @@ using Plots
 # ----------------------------
 # User-Einstellungen
 # ----------------------------
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_240runs_260127_113848.csv"   # <- anpassen
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_600runs_260129_180625.csv"   # <- anpassen
 const OUTDIR   = "C:/Users/jenter/Documents/resie/output/parameterstudy/plots"                               # Ordner für PNGs
 
 # Fixpunkt (Baseline), an dem "die anderen Parameter" festgehalten werden
