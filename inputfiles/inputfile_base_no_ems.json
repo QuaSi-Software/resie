@@ -369,7 +369,7 @@
             ],
             "medium": "m_power",
             "capacity": 200e3,
-            "load": 100e3
+            "load": 0.5
         },
         "Demand_Heat": {
             "type": "Demand",

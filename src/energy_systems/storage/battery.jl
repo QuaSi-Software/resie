@@ -36,7 +36,7 @@ Base.@kwdef mutable struct Battery <: Component
                    InterfaceMap(medium => nothing), # output_interfaces
                    medium,
                    config["capacity"], # capacity
-                   config["load"],     # load
+                   config["capacity"] * config["load"],     # load
                    0.0, # load_end_of_last_timestep
                    0.0, # losses
                    0.0, # max_charge
