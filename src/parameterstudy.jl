@@ -17,7 +17,7 @@ using Statistics: mean
 
 include("vdi2067.jl")
 import .VDI2067
-
+using Infiltrator
 ############################################################
 # Load base input
 ############################################################
@@ -53,29 +53,13 @@ Batt_hi_Wh   = 450e3        # upper limit
 Batt_step_Wh = 150e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
-# limit for energy stock prices for economic_control.jl (EUR/MWh)
-# if no grid price limit is to be considered, limit is set "towards infinity"
-# TODO delete?
-p_stock_lo   = 0            # lower limit
-p_stock_hi   = 0            # upper limit
-p_stock_step = 0.5          # step size
-p_stock_vals = collect(p_stock_lo:p_stock_step:p_stock_hi)  # creates an array of values
-
-# benchmark (smallest accepted value) for control reserve revenue per 4 hour time slot per MW 
-# of offered Reserve Control power for economic_control.jl (EUR/MW/4h-slot)
-# if control energy is not to be considerd, benchmark is set "towards infinity"
-# TODO delete?
-p_res_lo   = 0             # lower limit
-p_res_hi   = 0             # upper limit
-p_res_step = 0.5           # step size
-p_reserve_vals = collect(p_res_lo:p_res_step:p_res_hi)  # creates an array of values
-
 # define adjustments to the different price profiles in the order of
-# [stock_price, reserve_power_price, reserve_energy_price, market_value_pv, market_value_wind]
+# [stock_price, reserve_power_neg_price, reserve_energy_neg_price, reserve_power_pos_price, 
+#  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
 # TODO adjust values
 # Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
-profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0]
-profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0]
+profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
 # define states in control module
@@ -213,6 +197,23 @@ function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepat
     println("Profile file at $filepath created.")
 end
 
+function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
+    header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:", 
+                        "# time_zone:", "# interpolation_type:"]
+    header_values = ["intensive", "datestamp", "dd.mm.yyyy HH:MM", 
+                     "Europe/Berlin", "stepwise"]
+    open(filepath, "w") do file_handle
+        for (var, val) in zip(header_variables, header_values)
+            write(file_handle, var * "\t" * val * "\n")
+        end
+        for (ts, val) in zip(dates, values)
+            write(file_handle, string(ts) * ";" * string(val) * "\n")
+        end      
+    end
+
+    println("Profile file at $filepath created.")
+end
+
 
 ############################################################
 # Simulation of a single run
@@ -225,8 +226,6 @@ function run_resie_variant(
         Pth_Boiler::Number,
         Cap_Wh::Number,
         BattCap_Wh::Number,
-        p_stock::Number, #TODO delete?
-        p_reserve::Number, #TODO delete?
         states_power_bus::Array{Dict{String,Any}},
         states_heat_bus::Array{Dict{String,Any}},
         profile_addons,
@@ -235,11 +234,6 @@ function run_resie_variant(
         total_runs::Int;
         write_output::Bool=true
         )
-    # adjust price limits to account for fixed added costs and cost mulitplications
-    stock_addon, reserve_power_addon, reserve_energy_addon, market_value_pv_addon, market_value_wind_addon = profile_addons
-    stock_mult, reserve_power_mult, reserve_energy_mult, market_value_pv_mult, market_value_wind_mult = profile_multipliers
-    p_stock = p_stock / stock_mult - stock_addon #TODO delete?
-
     cfg = deepcopy(base_input)
 
     ########################################################
@@ -276,76 +270,119 @@ function run_resie_variant(
 
     # set price profiles paths
     price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_MWh.prf"
-    price_profile_path_reserve_power = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
+    price_profile_path_reserve_power_neg = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
+    price_profile_path_reserve_energy_neg = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
+    price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
+    price_profile_path_reserve_energy_pos = "./profiles/MA/aFRR_pos_energy_EUR_MWh.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
     co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf" #TODO co2 profile is incomplete?
-    # TODO set price profile paths for positive and negatice control energy (CBMP) and for pos and neg control power 
 
-    # create correct profiles from price_profile_paths and add the to sim_output
+    profile_paths = [price_profile_path_stock, price_profile_path_reserve_power_neg, price_profile_path_reserve_energy_neg,
+                     price_profile_path_reserve_power_pos, price_profile_path_reserve_energy_pos,
+                     price_profile_path_market_value_pv, price_profile_path_market_value_wind,
+                     co2_profile_path_grid]
+
+    # create correct profiles from price_profile_paths and add the to sim_output.
+    # profiles will be overwritten for every run to make sure the profile_multipliers and 
+    # profile_addons calculated correctly.
+    # If multiple threads are used each thread gets their own profile.
     run_ID = UUID(runidx)
     sim_params, _, _ = Resie.prepare_inputs(cfg, run_ID)
-    price_profile_stock = Profile(price_profile_path_stock, sim_params)
-    price_profile_reserve_power = Profile(price_profile_path_reserve_power, sim_params)
-    price_profile_reserve_energy = Profile(price_profile_path_reserve_energy, sim_params)
-    price_profile_market_value_pv = Profile(price_profile_path_market_value_pv, sim_params)
-    price_profile_market_value_wind = Profile(price_profile_path_market_value_wind, sim_params)
-    co2_profile_grid = Profile(co2_profile_path_grid, sim_params)
+    
+    profile_dir = "./profiles/MA/profiles_parameterstudy"
+    mkpath(profile_dir)
 
-    stock_values = Float64[]
-    reserve_power_values = []
-    reserve_energy_values = []
-    market_value_pv_values = []
-    market_value_wind_values = []
-    co2_value_grid = []
+    profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
     date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+    new_paths = Array{String}(undef, length(profile_paths)) 
+    profile_values = Array{Float64}(undef, length(profile_paths), length(date_range)) 
 
-    for dt in date_range
-        push!(stock_values, price_profile_stock.data[dt] .* stock_mult .+ stock_addon)
-        push!(reserve_power_values, price_profile_reserve_power.data[dt] .* reserve_power_mult .+ reserve_power_addon)
-        push!(reserve_energy_values, price_profile_reserve_energy.data[dt] .* reserve_energy_mult .+ reserve_energy_addon)
-        push!(market_value_pv_values, price_profile_market_value_pv.data[dt] .* market_value_pv_mult .+ market_value_pv_addon)
-        push!(market_value_wind_values, price_profile_market_value_wind.data[dt] .* market_value_wind_mult .+ market_value_wind_addon)
-        push!(co2_value_grid, co2_profile_grid.data[dt])
-    end 
-
-    #calculate reserve_bench_profile from other profiles    #TODO not needed anymore - delete?
-    reserve_bench_values = zeros(size(stock_values, 1))
-    timestamps = zeros(Int, size(stock_values, 1))
-    for (idx, dt) in enumerate(date_range)
-        timestamps[idx] = Int((idx - 1) * sim_params["time_step_seconds"])
-        if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
-            idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
-            reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1
-                                                 reserve_power_values[idx] * 4
+    for (p_idx, path) in enumerate(profile_paths)
+        if profile_multipliers[p_idx] != 0 && profile_addons[p_idx] != 0 && profile_id == 0
+            new_paths[p_idx] = path
+        else
+            profile = Profile(path, sim_params)
+            values = [profile.data[dt] .* profile_multipliers[p_idx] .+ profile_addons[p_idx] for dt in date_range]
+            new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
+            save_to_prf(collect(date_range), values, new_path)
+            new_paths[p_idx] = path
+            profile_values[p_idx, :] = values
         end
     end
 
-    # reserve_bench profile will be overwritten for every run to make sure the      #TODO not needed anymore - delete?
+    # # adjust price limits to account for fixed added costs and cost mulitplications
+    # stock_addon, reserve_power_neg_addon, reserve_energy_neg_addon, reserve_power_pos_addon, reserve_energy_pos_addon, market_value_pv_addon, market_value_wind_addon = profile_addons
+    # stock_mult, reserve_power_neg_mult, reserve_energy_neg_mult, reserve_power_pos_mult, reserve_energy_pos_mult, market_value_pv_mult, market_value_wind_mult = profile_multipliers
+
+    # # create correct profiles from price_profile_paths and add the to sim_output
+    # price_profile_stock = Profile(price_profile_path_stock, sim_params)
+    # price_profile_reserve_power_neg = Profile(price_profile_path_reserve_power_neg, sim_params)
+    # price_profile_reserve_energy_neg = Profile(price_profile_path_reserve_energy_neg, sim_params)
+    # price_profile_reserve_power_pos = Profile(price_profile_path_reserve_power_pos, sim_params)
+    # price_profile_reserve_energy_pos = Profile(price_profile_path_reserve_energy_pos, sim_params)
+    # price_profile_market_value_pv = Profile(price_profile_path_market_value_pv, sim_params)
+    # price_profile_market_value_wind = Profile(price_profile_path_market_value_wind, sim_params)
+    # co2_profile_grid = Profile(co2_profile_path_grid, sim_params)
+
+    # stock_values = Float64[]
+    # reserve_power_neg_values = []
+    # reserve_energy_neg_values = []
+    # reserve_power_pos_values = []
+    # reserve_energy_pos_values = []
+    # market_value_pv_values = []
+    # market_value_wind_values = []
+    # co2_value_grid = []
+    # date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+
+    # for dt in date_range
+    #     push!(stock_values, price_profile_stock.data[dt] .* stock_mult .+ stock_addon)
+    #     push!(reserve_power_neg_values, price_profile_reserve_power_neg.data[dt] .* reserve_power_neg_mult .+ reserve_power_neg_addon)
+    #     push!(reserve_energy_neg_values, price_profile_reserve_energy_neg.data[dt] .* reserve_energy_neg_mult .+ reserve_energy_neg_addon)
+    #     push!(reserve_power_pos_values, price_profile_reserve_power_pos.data[dt] .* reserve_power_pos_mult .+ reserve_power_pos_addon)
+    #     push!(reserve_energy_pos_values, price_profile_reserve_energy_pos.data[dt] .* reserve_energy_pos_mult .+ reserve_energy_pos_addon)
+    #     push!(market_value_pv_values, price_profile_market_value_pv.data[dt] .* market_value_pv_mult .+ market_value_pv_addon)
+    #     push!(market_value_wind_values, price_profile_market_value_wind.data[dt] .* market_value_wind_mult .+ market_value_wind_addon)
+    #     push!(co2_value_grid, co2_profile_grid.data[dt] .* co2_grid_mult .+ co2_grid_addon)
+    # end 
+
+    #calculate reserve_bench_profile from other profiles    #TODO not needed anymore - delete?
+    # reserve_bench_values = zeros(size(stock_values, 1))
+    # timestamps = zeros(Int, size(stock_values, 1))
+    # for (idx, dt) in enumerate(date_range)
+    #     timestamps[idx] = Int((idx - 1) * sim_params["time_step_seconds"])
+    #     if Hour(dt).value % 4 == 0 && Minute(dt).value == 0
+    #         idx_end = Int(idx + 4 * 3600 / sim_params["time_step_seconds"]) - 1
+    #         reserve_bench_values[idx:idx_end] .= (mean(abs.(reserve_energy_values[idx:idx_end])) - mean(stock_values[idx:idx_end])) + # * 1
+    #                                              reserve_power_values[idx] * 4
+    #     end
+    # end
+
+    # reserve power and energy profiles will be overwritten for every run to make sure the
     # profile_multipliers and profile_addons calculated correctly.
     # If multiple threads are used each thread gets their own profile.
-    if Threads.nthreads() > 1
-        mkpath("./profiles/MA/reserve_bench_price_profiles")
-        price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_profiles/reserve_bench_price_EUR_MW_$(Threads.threadid()).prf" 
-        mkpath("./profiles/MA/stock_price_profiles")
-        price_profile_path_stock_new = "./profiles/MA/stock_price_profiles/stock_price_EUR_MWh_$(Threads.threadid()).prf" 
-    else
-        price_profile_path_reserve_bench = "./profiles/MA/reserve_bench_price_EUR_MW.prf" 
-        price_profile_path_stock_new = "./profiles/MA/stock_price_EUR_MWh.prf" 
-        # reserve_bench profile will be only created when it's not there
-    end
-    save_to_prf(timestamps, reserve_bench_values, price_profile_path_reserve_bench)
-    save_to_prf(timestamps, stock_values, price_profile_path_stock_new)
+    # profile_dir = "./profiles/MA/price_profiles_parameterstudy"
+    # mkpath(profile_dir)
+    # profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
+
+    # price_profile_path_reserve_power_neg = profile_dir * "/reserve_power_neg_EUR_MW_$(profile_id).prf" 
+    # price_profile_path_reserve_energy_neg = profile_dir * "/reserve_energy_neg_EUR_MWh_$(profile_id).prf" 
+    # price_profile_path_reserve_power_pos = profile_dir * "/reserve_power_pos_EUR_MW_$(profile_id).prf" 
+    # price_profile_path_reserve_energy_pos = profile_dir * "/reserve_energy_pos_EUR_MWh_$(profile_id).prf" 
+    # price_profile_path_stock = profile_dir * "/stock_price_EUR_MWh_$(profile_id).prf" 
+    # save_to_prf(collect(date_range), reserve_bench_values, price_profile_path_reserve_power_neg)
+    # save_to_prf(collect(date_range), stock_values, price_profile_path_reserve_energy_neg)
+    # save_to_prf(collect(date_range), reserve_bench_values, price_profile_path_reserve_power_pos)
+    # save_to_prf(collect(date_range), stock_values, price_profile_path_reserve_energy_pos)
+    # save_to_prf(collect(date_range), stock_values, price_profile_path_stock)
 
     ########################################################
-    # Set limits / benchmark for economic_control.jl             #TODO not needed anymore - delete?
+    # Set limits / benchmark for economic_control.jl
     ########################################################
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
         cm = cfg["components"]["BUS_Power"]["control_modules"][1]
-        cm["price_profile_paths"] = [price_profile_path_stock_new, price_profile_path_reserve_bench]
-        cm["limit_prices"] = [p_stock, 0, p_reserve]
+        cm["price_profile_paths"] = new_paths[1:5]
         cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
         cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 
                                                   "BUS_Heat" => states_heat_bus)
@@ -376,14 +413,23 @@ function run_resie_variant(
     success, sim_output = Resie.load_and_run(fname, run_ID)
     Resie.close_run(run_ID)
 
+    #TODO abziehen von addon für alle preise die addon dabei haben, Reihenfolge ist egal, aber Energiegewichtet vom Preis abziehen
+    # 
+    # @infiltrate
+    # energy_with_addon = max.(sim_output["Grid_IN m_power OUT"] .- sim_output["PosControlReserve m_power IN"], 0)
+    # energy_without_addon = min.(sim_output["Grid_IN m_power OUT"], sim_output["PosControlReserve m_power IN"])
+    # stock_values .-=  stock_addon * sim_output["PosControlReserve m_power IN"]/sim_output["Grid_IN m_power OUT"]
+
+
     # add the profiles to the sim_output to be used in vdi2067 calculation
-    sim_output["Stock_Price"] = stock_values    #TODO is this with or without grid add ons?
-    sim_output["Reserve_Power_Price"] = reserve_power_values
-    sim_output["Reserve_Energy_Price"] = reserve_energy_values
-    sim_output["Market_Price_PV"] = market_value_pv_values
-    sim_output["Market_Price_Wind"] = market_value_wind_values
-    sim_output["Reserve_Bench_Price"] = reserve_bench_values    #TODO not needed anymore - delete?
-    sim_output["CO2_Grid"] = co2_value_grid
+    sim_output["Stock_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
+    sim_output["Reserve_Power_Price_Neg"] = profile_values[2, :]
+    sim_output["Reserve_Energy_Price_Neg"] = profile_values[3, :]
+    sim_output["Reserve_Power_Price_Pos"] = profile_values[4, :]
+    sim_output["Reserve_Energy_Price_Pos"] = profile_values[5, :]
+    sim_output["Market_Price_PV"] = profile_values[6, :]
+    sim_output["Market_Price_Wind"] = profile_values[7, :]
+    sim_output["CO2_Grid"] = profile_values[8, :]
 
     return sim_output
 end
@@ -447,9 +493,9 @@ function main(base_input_path, write_output)
                           Logging.Warn, nothing)
     Logging.global_logger(logger)
 
-    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve) in #TODO delete p_stock and p_reserve
+    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh) in
         collect(Iterators.product(Pth_HP_vals, Pth_Boiler_vals, Cap_vals_Wh,
-                                  BattCap_vals_Wh, p_stock_vals, p_reserve_vals)) #TODO delete p_stock and p_reserve
+                                  BattCap_vals_Wh))
         
         runidx = Threads.atomic_add!(runidx_global, 1)
         sim_output = OrderedDict()
@@ -460,7 +506,6 @@ function main(base_input_path, write_output)
         raw_sim = run_resie_variant(
             outdir, base_input,
             Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
-            p_stock, p_reserve, #TODO delete p_stock and p_reserve
             states_power_bus, states_heat_bus,
             profile_addons, profile_multipliers,
             runidx, total_runs;
@@ -500,7 +545,7 @@ function main(base_input_path, write_output)
             VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
 
         # write important results to seperate file
-        parameters = [Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh, p_stock, p_reserve]
+        parameters = [Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh]
         annuities_no = collect(values(sim_output[runidx]["VDI_NO"]))
         annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
         annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
