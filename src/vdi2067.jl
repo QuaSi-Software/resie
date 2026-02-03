@@ -404,6 +404,13 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     sim_new = Dict()
     sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->Boiler"] .+
                          sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+ sim["m_power EnergyFlow Grid_IN->Battery"]
+    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->Boiler"] .+
+                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->Boiler"] .+
+                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->Boiler"]
+    sim_new["Power_Demand_Demand"] = sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+
+                                     sim["m_power EnergyFlow Photovoltaic->Demand_Power"].+
+                                     sim["m_power EnergyFlow WindFarm->Demand_Power"] .+
+                                     sim["m_power EnergyFlow Battery->Demand_Power"]
     sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
     sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
     sim_new["Control_energy"] = sim["ControlReserve m_power OUT"]

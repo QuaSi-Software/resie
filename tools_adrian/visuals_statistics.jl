@@ -1,13 +1,3 @@
-############################################################
-# Parameterstudie-Auswertung (CSV) – NUR Szenario "no"
-# ---------------------------------------------------
-# Fixes gegenüber deiner letzten Version:
-# 1) Balance-Warnings: ALLE Runs mit |balance| > 1 werden gefiltert (Betrag!)
-# 2) Spearman: Statistics.cor unterstützt kein keyword "method"
-#    → Spearman wird berechnet als Pearson-Korrelation der Ränge (inkl. Tie-Handling)
-# 3) World-Age-Warnung (Julia 1.12 + Revise): main wird über invokelatest gestartet
-############################################################
-
 using CSV                                                # CSV-Dateien einlesen
 using DataFrames                                         # Tabellenverarbeitung
 using Statistics                                         # mean/std/cor
@@ -17,7 +7,7 @@ using Plots                                              # Plots
 ############################################################
 # Konfiguration (hier anpassen)
 ############################################################
-const CSV_PATH = "c:/Users/jenter/Documents/resie/output/parameterstudy/results_1050runs_260130_090710.csv"             # <- Pfad zur CSV anpassen
+const CSV_PATH = "c:/Users/jenter/Documents/resie/output/parameterstudy/results_396runs_260202_120434.csv"             # <- Pfad zur CSV anpassen
 const OUTDIR   = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"                                 # Plot-Ausgabeordner
 
 ############################################################
@@ -38,10 +28,10 @@ const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 w
 # Fixpunkt (für 1D-Slices)
 ############################################################
 const FIX = Dict(                                        # Fixwerte für 1D-Plots
-    "Hp_Power / W"             => 6.5e6,                  # W
-    "Boiler_Power / W"         => 3.6e6,                  # W
-    "BufferTank_Capacity / Wh" => 6.5e7,                  # Wh
-    "Battery_Capacity / Wh"    => 350e3,                  # Wh
+    "Hp_Power / W"             => 6.0e6,                  # W
+    "Boiler_Power / W"         => 3.0e6,                  # W
+    "BufferTank_Capacity / Wh" => 6.0e7,                  # Wh
+    "Battery_Capacity / Wh"    => 0.0,                  # Wh
 )
 
 ############################################################
@@ -109,6 +99,18 @@ function row_matches_fix(row, fix::Dict{String,Float64}, varying_col::String)  #
 end
 
 ############################################################
+# Fixpunktfilter (OHNE Balance), damit du "grundsätzlich" siehst,
+# wie viele Runs es am Fixpunkt gibt.
+############################################################
+function filter_fix_only(df::DataFrame, varying_col::String, fix::Dict{String,Float64})
+    keep = Vector{Bool}(undef, nrow(df))                    # Bool-Vektor anlegen
+    for i in 1:nrow(df)                                     # über alle Zeilen iterieren
+        keep[i] = row_matches_fix(df[i, :], fix, varying_col) # Fixpunkt prüfen
+    end
+    return df[keep, :]                                      # gefilterten DataFrame zurückgeben
+end
+
+############################################################
 # Filter: Balance-Warnings entfernen (Betrag!)
 # Regel: alles mit |balance| > threshold wird verworfen
 ############################################################
@@ -126,7 +128,10 @@ function filter_balance(df::DataFrame, bal_cols::Vector{String}, threshold::Floa
 end
 
 ############################################################
-# Subset für 1D-Plot: Balance-Filter + Fixpunktfilter + Diagnose
+# Subset für 1D-Plot:
+# - erst Fixpunktfilter (ohne Balance)
+# - dann Balancefilter
+# + Diagnoseausgabe für beide Schritte
 ############################################################
 function subset_for_single_param(df::DataFrame, varying_col::String;
                                  fix::Dict{String,Float64},
@@ -134,25 +139,20 @@ function subset_for_single_param(df::DataFrame, varying_col::String;
                                  bal_threshold::Float64)
 
     n_start = nrow(df)                                     # Startzeilen
-    df2 = filter_balance(df, bal_cols, bal_threshold)       # Balance-Warnings filtern
-    n_after_balance = nrow(df2)                             # Zeilen nach Balance-Filter
 
-    keep = Vector{Bool}(undef, nrow(df2))                   # Bool-Vektor für Fixpunktfilter
-    for i in 1:nrow(df2)                                    # über alle Zeilen iterieren
-        keep[i] = row_matches_fix(df2[i, :], fix, varying_col)  # Fixpunkt prüfen
-    end
-    df3 = df2[keep, :]                                      # Fixpunktsubset bilden
-    n_after_fix = nrow(df3)                                 # Zeilen nach Fixpunktfilter
+    df_fix = filter_fix_only(df, varying_col, fix)          # Fixpunktfilter zuerst
+    n_after_fix = nrow(df_fix)                              # Anzahl am Fixpunkt (ohne Balance)
+
+    df_fix_bal = filter_balance(df_fix, bal_cols, bal_threshold) # dann Balancefilter
+    n_after_balance = nrow(df_fix_bal)                      # Anzahl am Fixpunkt (mit Balance)
 
     println("--------------------------------------------------")  # Trennlinie
     println("Parameter: ", varying_col)                       # aktueller Parameter
-    @printf("Start:                 %5d Zeilen\n", n_start)    # Startausgabe
-    @printf("nach Balance-Filter:   %5d (-%d)\n",              # Balanceausgabe
-            n_after_balance, n_start - n_after_balance)       # Differenz
-    @printf("nach Fixpunkt-Filter:  %5d (-%d)\n",              # Fixpunktausgabe
-            n_after_fix, n_after_balance - n_after_fix)       # Differenz
+    @printf("Start:                      %5d Zeilen\n", n_start)           # Startausgabe
+    @printf("nach Fixpunkt-Filter:       %5d (-%d)\n", n_after_fix, n_start - n_after_fix)  # Fix-Ausgabe
+    @printf("nach Balance-Filter (auf Fix): %5d (-%d)\n", n_after_balance, n_after_fix - n_after_balance) # Balance-Ausgabe
 
-    return df3                                               # Subset zurückgeben
+    return df_fix_bal                                        # Subset für Plot zurückgeben
 end
 
 ############################################################
@@ -192,7 +192,7 @@ function plot_single_param(df::DataFrame, varying_col::String, ycol::String; out
         markersize = 4,                                      # Markergröße
         xlabel = varying_col,                                # x-Label
         ylabel = ycol,                                       # y-Label
-        title  = "Gesamtannuität (no) vs. $(varying_col)\n(Fixpunkt, |Balance| ≤ $(BAL_THRESHOLD))",  # Titel
+        title  = "Gesamtannuität (no) vs. $(varying_col)\n(Fixpunkt zuerst, dann |Balance| ≤ $(BAL_THRESHOLD))", # Titel
         legend = false,                                      # keine Legende
     )
 
@@ -205,52 +205,159 @@ function plot_single_param(df::DataFrame, varying_col::String, ycol::String; out
     return p                                                 # Plot zurückgeben
 end
 
+
 ############################################################
-# Globales Optimum: Minimum der Annuität über alle Runs
+# Top-N Globaloptima (nur Szenario "no")
+# - Filtert technisch gültige Runs (|balance| ≤ threshold)
+# - Sortiert nach annuity_no A_total
+# - Gibt Parameter + ALLE no-Annuitäten aus
 ############################################################
-function global_optimum(df::DataFrame, ycol::String)
-    dfv = df                                                 # Arbeitskopie
-    dfv = dfv[.!ismissing.(dfv[!, ycol]), :]                  # gültige y-Werte behalten
-    ymin, idx = findmin(dfv[!, ycol])                         # Minimum + Index
-    best = dfv[idx, :]                                        # Optimumzeile
+function topN_optima(df::DataFrame,
+                     xcols::Vector{String},
+                     ycol::String;
+                     bal_cols::Vector{String}=BAL_COLS,
+                     bal_threshold::Float64=BAL_THRESHOLD,
+                     N::Int=10)
 
-    println("\n================ GLOBALOPTIMUM ================") # Überschrift
-    @printf("Minimalwert %s: %.3e €\n\n", ycol, ymin)          # Minimalwert ausgeben
+    # -------- technisch gültige Runs --------
+    dfv = filter_balance(df, bal_cols, bal_threshold)
 
-    for c in names(best)                                      # alle Spalten ausgeben
-        println(rpad(c, 35), " = ", best[c])                  # Name + Wert
-    end
+    # -------- nur gültige Annuitäten --------
+    dfv = dfv[.!ismissing.(dfv[!, ycol]), :]
 
-    return best                                               # Optimum zurückgeben
+    # -------- nach Gesamtannuität sortieren --------
+    sort!(dfv, ycol)
+
+    # -------- Top-N auswählen --------
+    nshow = min(N, nrow(dfv))
+    bestN = dfv[1:nshow, :]
+
+    # -------- Spaltenauswahl --------
+    annuity_cols_no = [
+        "annuity_no A_cap / €",
+        "annuity_no A_misc / €",
+        "annuity_no A_op / €",
+        "annuity_no A_energy / €",
+        "annuity_no A_rev_control / €",
+        "annuity_no A_rev_feed / €",
+        "annuity_no A_total / €",
+    ]
+
+    keep_cols = vcat(xcols, annuity_cols_no)
+    bestN_small = bestN[:, keep_cols]
+
+    # -------- Ausgabe --------
+    println("\n================ TOP-$(nshow) GLOBALOPTIMA (no) ================")
+    println("Hinweis: gefiltert auf |Balance| ≤ $(bal_threshold)\n")
+
+    show(stdout, MIME"text/plain"(), bestN_small; allrows=true, allcols=true)
+    println()
+
+    return bestN_small
 end
 
+
 ############################################################
-# Sensitivität 1: standardisierte lineare Sensitivität (β)
+# Plot: Top-10 Annuitäts-Zerlegung (gestapelte Balken) – GR-sicher
+# - Kosten positiv (oben)
+# - Erlöse negativ (unten)
+# - A_total als Punkt
 ############################################################
-function linear_sensitivity(df::DataFrame, xcols::Vector{String}, ycol::String)
+function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
 
-    dfv = df[.!ismissing.(df[!, ycol]), :]                    # nur gültige y-Werte
+    # ----------------------------
+    # Spalten (No-Szenario)
+    # ----------------------------
+    col_cap    = "annuity_no A_cap / €"            # CAPEX-Anteil
+    col_misc   = "annuity_no A_misc / €"           # Sonstige Kosten
+    col_op     = "annuity_no A_op / €"             # Betriebskosten
+    col_energy = "annuity_no A_energy / €"         # Energiekosten
+    col_rev_c  = "annuity_no A_rev_control / €"    # Erlöse Regelenergie (wird abgezogen)
+    col_rev_f  = "annuity_no A_rev_feed / €"       # Erlöse Einspeisung (wird abgezogen)
+    col_total  = "annuity_no A_total / €"          # Gesamtannuität
 
-    X = reduce(hcat, [dfv[!, c] for c in xcols])              # Matrix X (n x 4)
-    y = dfv[!, ycol]                                          # Zielvariable y (n)
+    # ----------------------------
+    # x-Achse
+    # ----------------------------
+    n = nrow(best10)                               # Anzahl Runs
+    x = collect(1:n)                               # 1..n
 
-    Xs = (X .- mean(X, dims=1)) ./ std(X, dims=1)             # X standardisieren
-    ys = (y .- mean(y)) ./ std(y)                             # y standardisieren
+    # ----------------------------
+    # Daten (robust nach Float)
+    # ----------------------------
+    cap    = to_float.(best10[!, col_cap])         # A_cap
+    misc   = to_float.(best10[!, col_misc])        # A_misc
+    op     = to_float.(best10[!, col_op])          # A_op
+    energy = to_float.(best10[!, col_energy])      # A_energy
+    rev_c  = to_float.(best10[!, col_rev_c])       # A_rev_control (positiv in CSV)
+    rev_f  = to_float.(best10[!, col_rev_f])       # A_rev_feed (positiv in CSV)
+    total  = to_float.(best10[!, col_total])       # A_total
 
-    β = Xs \ ys                                               # Least-Squares β
-
-    println("\n=========== LINEARE SENSITIVITÄT (β) ===========")# Überschrift
-    for (c, b) in zip(xcols, β)                               # Parameter + β
-        @printf("%-30s β = %+6.3f\n", c, b)                   # Ausgabe
+    # ----------------------------
+    # Missing-Check (sonst Plot-Fehler)
+    # ----------------------------
+    for (name, v) in [("cap",cap), ("misc",misc), ("op",op), ("energy",energy), ("rev_c",rev_c), ("rev_f",rev_f), ("total",total)]
+        @assert all(.!ismissing.(v)) "Missing in $(name) – prüfe CSV/Parsing"
     end
 
-    return β                                                  # β zurückgeben
+    # ----------------------------
+    # Positive Stacks: Kosten nach oben
+    # Wir bauen den "Bottom" kumulativ selbst
+    # ----------------------------
+    bottom_pos = zeros(Float64, n)                 # Start bei 0
+    p = plot(                                      # leeren Plot initialisieren
+        xlabel = "Top-Run (1 = bestes A_total)",
+        ylabel = "Annuitäten / €",
+        title  = "Top-$n: Zerlegung der Annuitäten (no)\nKosten oben, Erlöse unten",
+        legend = :topright
+    )
+
+    # Hilfsfunktion: eine Stack-Schicht als Balken zeichnen
+    function stack_layer!(p, x, bottom, height; label::String)
+        top = bottom .+ height                     # obere Kante
+        bar!(p, x, top;                            # Balken bis "top"
+            fillrange = bottom,                    # Start bei "bottom" (macht stacking!)
+            label = label)
+        return bottom .+ height                    # neuen Bottom zurückgeben
+    end
+
+    # Kosten stapeln
+    bottom_pos = stack_layer!(p, x, bottom_pos, cap;    label="A_cap")
+    bottom_pos = stack_layer!(p, x, bottom_pos, misc;   label="A_misc")
+    bottom_pos = stack_layer!(p, x, bottom_pos, op;     label="A_op")
+    bottom_pos = stack_layer!(p, x, bottom_pos, energy; label="A_energy")
+
+    # ----------------------------
+    # Negative Stacks: Erlöse nach unten
+    # (wir stapeln negative Höhen)
+    # ----------------------------
+    bottom_neg = zeros(Float64, n)                 # Start bei 0
+    bottom_neg = stack_layer!(p, x, bottom_neg, -rev_c; label="-A_rev_control")
+    bottom_neg = stack_layer!(p, x, bottom_neg, -rev_f; label="-A_rev_feed")
+
+    # ----------------------------
+    # A_total als Marker
+    # ----------------------------
+    scatter!(p, x, total; label="A_total", markersize=5)
+
+    # ----------------------------
+    # Achsenticks
+    # ----------------------------
+    xticks!(p, x, string.(x))
+
+    # ----------------------------
+    # Speichern
+    # ----------------------------
+    isdir(outdir) || mkpath(outdir)
+    savefig(p, joinpath(outdir, "top10_annuity_breakdown_no.png"))
+
+    return p
 end
+
+
 
 ############################################################
 # Ranking-Funktion (für Spearman), mit Tie-Handling
-# - gleiche Werte erhalten den Mittelwert ihrer Rangpositionen
-# - Ränge starten bei 1
 ############################################################
 function rank_average_ties(v::Vector{Float64})                # Input: Float64-Vektor
     n = length(v)                                             # Länge
@@ -281,7 +388,7 @@ function spearman_corr(x::Vector{Float64}, y::Vector{Float64})
 end
 
 ############################################################
-# Sensitivität 2: Spearman-Rangkorrelation (ρ)
+# Sensitivität: Spearman (ρ)
 ############################################################
 function spearman_sensitivity(df::DataFrame, xcols::Vector{String}, ycol::String)
 
@@ -295,27 +402,13 @@ function spearman_sensitivity(df::DataFrame, xcols::Vector{String}, ycol::String
         ]
         x = Vector{Float64}(sub[!, c])                        # x als Float64-Vektor
         y = Vector{Float64}(sub[!, ycol])                     # y als Float64-Vektor
+        if length(unique(x)) < 2                               # keine Variation?
+            @printf("%-30s ρ =   NaN  (keine Variation)\n", c) # Hinweis ausgeben
+            continue                                           # weiter
+        end
         ρ = spearman_corr(x, y)                               # Spearman berechnen
         @printf("%-30s ρ = %+6.3f\n", c, ρ)                   # Ausgabe
     end
-end
-
-############################################################
-# Optional: Werte-Check (zeigt, ob Fixwerte im Grid vorkommen)
-############################################################
-function nearest_value_report(df::DataFrame, col::String, target::Float64; max_show::Int=12)
-    vals = unique(skipmissing(df[!, col]))                    # eindeutige Werte
-    vals = sort(collect(vals))                                # sortieren
-    if isempty(vals)                                          # falls leer
-        println("[$col] keine Werte (alles missing?)")        # Hinweis
-        return                                                # abbrechen
-    end
-    idx = findmin(abs.(vals .- target))[2]                    # Index nächster Wert
-    nearest = vals[idx]                                       # nächster Wert
-    println("[$col] target = $(target), nearest = $(nearest), diff = $(nearest - target)") # Report
-    println("    Beispiel-Werte: ",                           # Beispielwerte
-            join(vals[1:min(end, max_show)], ", "),           # join
-            length(vals) > max_show ? ", ..." : "")           # ggf. mehr anzeigen
 end
 
 ############################################################
@@ -326,19 +419,22 @@ function main()
     df = CSV.read(CSV_PATH, DataFrame)                        # CSV einlesen
     println("Gesamtanzahl Zeilen CSV: ", nrow(df))            # Zeilenanzahl ausgeben
 
-    numeric_cols = vcat(XCOLS, [YCOL_NO], BAL_COLS)           # benötigte numerische Spalten
+    annuity_cols_no = [
+    "annuity_no A_cap / €",
+    "annuity_no A_cap_incentive / €",
+    "annuity_no A_misc / €",
+    "annuity_no A_op / €",
+    "annuity_no A_energy / €",
+    "annuity_no A_rev_control / €",
+    "annuity_no A_rev_feed / €",
+    "annuity_no A_total / €",
+    "annuity_no A_total_incentive / €",
+    ]
+    numeric_cols = vcat(XCOLS, annuity_cols_no, BAL_COLS)      # benötigte numerische Spalten
     coerce_columns!(df, numeric_cols)                         # Konvertierung anwenden
 
-    println("\n--- Werte-Check: Fixpunkt vs. vorhandene Grid-Werte ---")  # Überschrift
-    for (col, target) in FIX                                  # über Fixwerte iterieren
-        nearest_value_report(df, col, target)                 # report ausgeben
-    end
-
-    df_valid = filter_balance(df, BAL_COLS, BAL_THRESHOLD)    # technisch gültige Runs (|Balance| ≤ 1)
-    println("\nTechnisch gültige Runs (|Balance| ≤ 1): ", nrow(df_valid)) # Count ausgeben
-
     ########################################################
-    # 1) 1D-Plots am Fixpunkt (Basisfall, no)
+    # 1) 1D-Plots: Diagnose Fixpunkt zuerst, dann Balance
     ########################################################
     for varying in XCOLS                                      # jeden Parameter separat
         sub = subset_for_single_param(                        # Subset inkl. Diagnose
@@ -352,19 +448,18 @@ function main()
     end
 
     ########################################################
-    # 2) Globales Optimum (Basisfall no)
+    # 2) Top-10 Globaloptima (nur Parameter + annuity_no total)
     ########################################################
-    best_no = global_optimum(df_valid, YCOL_NO)                # Optimum aus gültigen Runs
+    best10 = Base.invokelatest(topN_optima, df, XCOLS, YCOL_NO; N=10)
+    Base.invokelatest(plot_top10_annuity_breakdown, best10; outdir=OUTDIR)
 
     ########################################################
-    # 3) Sensitivitäten (Basisfall no)
+    # 3) Sensitivität (Spearman) auf technisch gültigen Runs
     ########################################################
-    β_no = linear_sensitivity(df_valid, XCOLS, YCOL_NO)        # lineare Sensitivität
-    spearman_sensitivity(df_valid, XCOLS, YCOL_NO)             # Spearman-Sensitivität
+    df_valid = filter_balance(df, BAL_COLS, BAL_THRESHOLD)     # technisch gültige Runs
+    spearman_sensitivity(df_valid, XCOLS, YCOL_NO)             # Spearman auf gültigen Runs
 
     println("\nFertig. Plots liegen in: $(OUTDIR)/")           # Abschlussmeldung
 end
 
 Base.invokelatest(main)                                       # Start (robust gegen World-Age/Revise)
-
-

@@ -18,7 +18,7 @@ julia
 ]
 activate .
 include("src/run_resie.jl")
-run_repl(raw"c:\Users\jenter\Documents\resie\inputfiles\inputfile_base_ems.json)
+run_repl(raw"C:\Users\jenter\Documents\resie\inputfiles\inputfile_base_fuzzy.json")
 
 
  julia --project=. --threads auto "src/parameterstudy.jl"

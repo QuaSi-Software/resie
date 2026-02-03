@@ -116,7 +116,7 @@
             ],
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
-            "scale": 1e6
+            "scale": 0.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
@@ -170,7 +170,7 @@
                     "high_threshold": 0.95,
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
-                    "price_profile_path": "profiles/MA/boersenpreis_EUR_kWh.prf"
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
                 }
             ],
             "output_refs": {
@@ -208,7 +208,7 @@
                     "high_threshold": 0.95,
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
-                    "price_profile_path": "profiles/MA/boersenpreis_EUR_kWh.prf"
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
                 }
             ],
             "output_refs": {

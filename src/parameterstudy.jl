@@ -276,7 +276,7 @@ function run_resie_variant(
     price_profile_path_reserve_energy_pos = "./profiles/MA/aFRR_pos_energy_EUR_MWh.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
-    co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf" #TODO co2 profile is incomplete?
+    co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"
 
     profile_paths = [price_profile_path_stock, price_profile_path_reserve_power_neg, price_profile_path_reserve_energy_neg,
                      price_profile_path_reserve_power_pos, price_profile_path_reserve_energy_pos,
@@ -525,7 +525,7 @@ function main(base_input_path, write_output)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
         A0_HP     = 700 * (Pth_HP / 1e3)        #   
         A0_Boiler = 285  * (Pth_Boiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen
-        A0_Buffer = 25  * (Cap_Wh / 1e3)        # estimate from FACT document: 2.06 Mio € for 80 MWh
+        A0_Buffer = 39  * (Cap_Wh / 1e3)        # from FACT document
         A0_Batt   = 375 * (BattCap_Wh / 1e3)    # TODO Jule fragen
        
         components = VDI2067.VDIComponent[
