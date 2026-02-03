@@ -91,7 +91,7 @@
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.01.2024 23:45",
+        "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",
@@ -101,13 +101,12 @@
     },
     "components": {
         "Grid_IN": {
-            "type": "FlexibleSupply",
+            "type": "GridConnection",
             "output_refs": [
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "is_source": true,
-            "constant_power": 15.0e6
+            "is_source": true
         },
         "ControlReserve": {
             "type": "FlexibleSupply",
@@ -170,7 +169,9 @@
                     "high_threshold": 0.95,
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
-                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                    "price_trend_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                    "price_volatility_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
                 }
             ],
             "output_refs": {
@@ -208,7 +209,9 @@
                     "high_threshold": 0.95,
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
-                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
+                    "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                    "price_trend_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                    "price_volatility_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
                 }
             ],
             "output_refs": {
@@ -292,24 +295,24 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 65e6,
+            "capacity": 65.0e6,
             "rho_medium": 1000,
             "cp_medium": 4.18,
             "high_temperature": 90.0,
-            "low_temperature": 20.0,
+            "low_temperature": 50.0,
             "initial_load": 0.5,
             "max_load_rate": 0.25,
             "max_unload_rate": 0.2,
             "___BALANCED MODEL ONLY___": "",
-            "switch_point": 0.25,
+            "switch_point": 0.1,
             "___LOSSES___": "",
             "consider_losses": true,
-            "h_to_r": 2,
-            "constant_ambient_temperature": 18,
+            "h_to_r": 13.33,
+            "ambient_temperature_from_global_file": "temp_ambient_air",
             "ground_temperature": 12,
-            "thermal_transmission_lid": 1.0,
-            "thermal_transmission_barrel": 1.0,
-            "thermal_transmission_bottom": 1.0
+            "thermal_transmission_lid": 1.2,
+            "thermal_transmission_barrel": 1.2,
+            "thermal_transmission_bottom": 1.2
         },
         "Battery": {
             "type": "Battery",
