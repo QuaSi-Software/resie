@@ -211,6 +211,7 @@
             ],
             "medium": "m_heat_source",
             "constant_temperature": 0,
+            "constant_power": 1e7,
             "is_source": true
         },
         "HeatPump": {

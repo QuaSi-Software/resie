@@ -157,6 +157,7 @@
             ],
             "medium": "m_heat_source",
             "constant_temperature": 0,
+            "constant_power": 1e7,
             "is_source": true
         },
         "HeatPump": {
@@ -228,7 +229,7 @@
             "m_heat_out": "m_heat",
             "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
-            "cop_function": "const:1.0",
+            "cop_function": "const:1.01",
             "bypass_cop": 15.0,
             "min_power_function": "const:0.0",
             "max_power_function": "const:1.0",

@@ -56,7 +56,7 @@ end
 
 function upper_plr_limit(mod::CM_StorageDrivenFuzzy, sim_params::Dict{String,Any})::Float64
     run_fuzzy!(mod.parameters, sim_params)
-    return mod.parameters["plr_limit"]
+    return 1
 end
 
 function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})    
@@ -69,7 +69,6 @@ function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})
     # Fuzzy logic returns change in plr and SOC target value
     plr_diff, SOC_target = fuzzy_control(p_now, p_trend, p_volatility, SOC_now)
     if isnan(plr_diff) || isnan(SOC_target)
-        @infiltrate
         @error "Fuzzy Controller $(mod_params.name) couldn't be calculated. " *
                "Check if the parameters are inside their bounds."
         throw(InputError)

@@ -28,7 +28,7 @@ const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 w
 # Fixpunkt (für 1D-Slices)
 ############################################################
 const FIX = Dict(                                        # Fixwerte für 1D-Plots
-    "Hp_Power / W"             => 6.0e6,                  # W
+    "Hp_Power / W"             => 4.0e6,                  # W
     "Boiler_Power / W"         => 3.0e6,                  # W
     "BufferTank_Capacity / Wh" => 6.0e7,                  # Wh
     "Battery_Capacity / Wh"    => 0.0,                  # Wh
