@@ -170,8 +170,8 @@
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
                     "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
-                    "price_trend_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
-                    "price_volatility_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
+                    "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
+                    "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf"
                 }
             ],
             "output_refs": {
@@ -210,8 +210,8 @@
                     "min_run_time": 0,
                     "storage_uac": "BufferTank",
                     "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
-                    "price_trend_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
-                    "price_volatility_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf"
+                    "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
+                    "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf"
                 }
             ],
             "output_refs": {
