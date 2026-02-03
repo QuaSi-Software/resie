@@ -9,6 +9,370 @@ using Plots: plot, scatter, savefig
 using Plots: Plots
 using Roots
 
+#! format: off
+const GEOTHERMAL_PROBES_PARAMETERS = Dict(
+    "m_heat_in" => (
+        default="m_h_w_ht1",
+        description="Heat input medium (for regeneration/loading)",
+        display_name="Medium heat_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_lt1",
+        description="Heat output medium (for extraction/unloading)",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "model_type" => (
+        default="simplified",
+        description="Operation model: 'simplified' or 'detailed'.",
+        display_name="Model type",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["simplified", "detailed"],
+        unit="-"
+    ),
+    "probe_field_geometry" => (
+        default="rectangle",
+        description="Geometry of probe field (rectangle, open_rectangle, zoned_rectangle, " *
+                    "U_configurations, lopsided_U_configuration, C_configuration, L_configuration)",
+        display_name="Probe field geometry",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["rectangle","open_rectangle","zoned_rectangle","U_configurations",
+                 "lopsided_U_configuration","C_configuration","L_configuration"],
+        unit="-"
+    ),
+    "number_of_probes_x" => (
+        default=1,
+        description="Number of probes in x direction; corresponds to value M of g-function library",
+        display_name="Number probes x",
+        required=false,
+        validations=[
+            ("self", "value_lte_rel", "number_of_probes_y")
+        ],
+        type=Int,
+        json_type="integer",
+        unit="-"
+    ),
+    "number_of_probes_y" => (
+        default=1,
+        description="Number of probes in y direction; corresponds to value N of g-function library",
+        display_name="Number probes y",
+        required=false,
+        type=Int,
+        json_type="integer",
+        unit="-"
+    ),
+    "probe_field_key_2" => (
+        default="",
+        description="Secondary key for g-function library (if required). The value " *
+                    "depends on the chosen geometry type.",
+        display_name="Probe field key 2",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "probe_depth" => (
+        default=150.0,
+        description="Depth (length) of a single geothermal probe",
+        display_name="Probe depth",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 24),
+            ("self", "value_lte_num", 384),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "borehole_spacing" => (
+        default=5.0,
+        description="Average distance between boreholes",
+        display_name="Borehole spacing",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "probe_type" => (
+        default="double U-pipe",
+        description="Probe type: single or double U-pipe",
+        display_name="Probe type",
+        required=false,
+        options=["single U-pipe", "double U-pipe"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "pipe_diameter_outer" => (
+        default=0.032,
+        description="Outer diameter of pipe",
+        display_name="Outer pipe diameter",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "pipe_diameter_inner" => (
+        default=0.026,
+        description="Inner diameter of pipe",
+        display_name="Inner pipe diameter",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "fluid_specific_heat_capacity" => (
+        default=3800.0,
+        description="Specific heat capacity of the heat transfer fluid. Default value is " *
+                    "calculated for brine at 0 °C (25 % glycol 75 % water).",
+        display_name="Fluid specific heat capacity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "fluid_density" => (
+        default=1045.0,
+        description="Density of the heat transfer fluid. Default value is calculated for " *
+                    "brine at 0 °C (25 % glycol 75 % water).",
+        display_name="Fluid density",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "fluid_kinematic_viscosity" => (
+        default=3.9e-6,
+        description="Kinematic viscosity of the fluid. Default value is calculated for " *
+                    "brine at 0 °C (25 % glycol 75 % water).",
+        display_name="Fluid kinematic viscosity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m^2/s"
+    ),
+    "fluid_heat_conductivity" => (
+        default=0.5,
+        description="Heat conductivity of the fluid. Default value is calculated for brine " *
+                    "at 0 °C (25 % glycol 75 % water).",
+        display_name="Fluid heat conductivity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "fluid_prandtl_number" => (
+        default=30.0,
+        description="Prandtl number of the fluid. Default value is calculated for brine " *
+                    "at 0 °C (25 % glycol 75 % water).",
+        display_name="Fluid Prandtl number",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "grout_heat_conductivity" => (
+        default=2.0,
+        description="Heat conductivity of grout/filling material",
+        display_name="Grout heat conductivity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "pipe_heat_conductivity" => (
+        default=0.42,
+        description="Heat conductivity of pipe material",
+        display_name="Pipe heat conductivity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "borehole_diameter" => (
+        default=0.15,
+        description="Borehole diameter",
+        display_name="Borehole diameter",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "shank_spacing" => (
+        default=0.1,
+        description="Shank spacing (distance between inner pipes). Required for " *
+                    "calculation of thermal borehole resistance.",
+        display_name="Shank spacing",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "regeneration" => (
+        default=true,
+        description="Flag whether regeneration (use of input interface) is active",
+        display_name="Regeneration",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "max_probe_temperature_loading" => (
+        default=nothing,
+        description="Maximum allowed probe temperature during loading",
+        display_name="Max probe temp (loading)",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "min_probe_temperature_unloading" => (
+        default=nothing,
+        description="Minimum allowed probe temperature during unloading",
+        display_name="Min probe temp (unloading)",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "unloading_temperature_spread" => (
+        default=3,
+        description="Temperature spread between forward and return flow during " *
+                    "unloading within one probe",
+        display_name="Unloading temp spread",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "loading_temperature" => (
+        default=nothing,
+        description="Nominal high temperature for loading geothermal probe storage",
+        display_name="Loading temperature",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "loading_temperature_spread" => (
+        default=3,
+        description="Temperature spread between forward and return flow during loading " *
+                    "within one probe",
+        display_name="Loading temp spread",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "max_output_power" => (
+        default=50.0,
+        description="Maximum output power per meter of probe",
+        display_name="Max output power",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m"
+    ),
+    "max_input_power" => (
+        default=50.0,
+        description="Maximum input power per meter of probe",
+        display_name="Max input power",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m"
+    ),
+    "g_function_file_path" => (
+        default=nothing,
+        description="Path to a custom g-function file",
+        display_name="g-function file path",
+        required=false,
+        type=Stringing,
+        json_type="string",
+        unit="-"
+    ),
+    "boreholewall_start_temperature" => (
+        default=4.0,
+        description="Starting borehole wall temperature",
+        display_name="Borehole wall start temp",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "soil_undisturbed_ground_temperature" => (
+        default=11.0,
+        description="Undisturbed ground temperature",
+        display_name="Soil undisturbed ground temp",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "soil_heat_conductivity" => (
+        default=1.5,
+        description="Heat conductivity of surrounding soil, homogenous and constant",
+        display_name="Soil heat conductivity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "soil_density" => (
+        default=2000.0,
+        description="Soil density",
+        display_name="Soil density",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "soil_specific_heat_capacity" => (
+        default=2400.0,
+        description="Soil specific heat capacity",
+        display_name="Soil specific heat capacity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "borehole_thermal_resistance" => (
+        default=0.1,
+        description="Thermal resistance of borehole",
+        display_name="Borehole thermal resistance",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m*K/W"
+    ),
+    "limit_max_output_energy_to_avoid_pulsing" => (
+        default=false,
+        description="Limit max output energy to avoid pulsing. If a control module is " *
+                    "given, this parameter might be overwritten by the module. If set " *
+                    "to false, the temperature acts as a simple turn-on-temperature, " *
+                    "representing an on-off fluid pump. If set to true, the maximum " *
+                    "energy is calculated to provide the current temperature also in the " *
+                    "next timestep to prevent pulsing, representing a variable speed pump.",
+        display_name="Limit max output energy",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    )
+)
+#! format: on
+
 mutable struct GeothermalProbes <: Component
     uac::String
     controller::Controller
@@ -28,23 +392,32 @@ mutable struct GeothermalProbes <: Component
     max_output_power::Float64
     max_input_power::Float64
     regeneration::Bool
+    # max output energy in every time step, calculated in control()
     max_output_energy::Float64
     current_max_input_energy::Float64
+    # max input energy in every time step, calculated in control()
     max_input_energy::Float64
+    # output temperature in current time step, calculated in control()
     current_max_output_temperature::Temperature
+    # input temperature in current time step, calculated in control()
     current_min_input_temperature::Temperature
     soil_undisturbed_ground_temperature::Temperature
     soil_heat_conductivity::Float64
     soil_density::Float64
     soil_specific_heat_capacity::Float64
     borehole_thermal_resistance::Float64
+    # pre-calculated multiscale g-function. Calculated in pre-processing.
     g_function::Vector{Float64}
+    # index of current time step to get access on time dependent g-function values
     time_index::Int
+    # average fluid temperature
     fluid_temperature::Temperature
     borehole_current_wall_temperature::Temperature
     output_temperatures_last_timestep::Vector{Temperature}
 
+    # vector to hold specific energy sum (in and out) per probe meter in each time step
     energy_in_out_per_probe_meter::Vector{Float64}
+    # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
     power_in_out_difference_per_probe_meter::Vector{Float64}
 
     g_function_file_path::Stringing
@@ -53,15 +426,20 @@ mutable struct GeothermalProbes <: Component
     number_of_probes_y::Int
     probe_field_key_2::String
     probe_depth::Float64
+    # number of geothermal probes in the borefield, determined in initialize from borehole configuration
     number_of_probes::Int
     borehole_spacing::Float64
     probe_type::Int
 
     pipe_diameter_outer::Float64
     pipe_diameter_inner::Float64
+    # will be calculated in initialization
     radius_pipe_inner::Float64
+    # will be calculated in initialization
     radius_pipe_outer::Float64
+    # will be calculated in initialization
     radius_borehole::Float64
+    # will be calculated in initialization
     distance_pipe_center::Float64
 
     fluid_specific_heat_capacity::Float64
@@ -78,113 +456,103 @@ mutable struct GeothermalProbes <: Component
 
     limit_max_output_energy_to_avoid_pulsing::Bool
 
+    # Reynold's number. To be calculated in function later.
     fluid_reynolds_number::Float64
 
+    # probe coordinates to save them for plotting
     probe_coordinates::Union{Nothing,Vector{Vector{Float64}}}
+    # flag indicating if the process step has already been performed in the current time step
     process_done::Bool
+    # flag indicating if the load step has already been performed in the current time step
     load_done::Bool
 
     function GeothermalProbes(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
-        register_media([m_heat_in, m_heat_out])
-
-        # get model type from input file
-        model_type = default(config, "model_type", "simplified")
-        model_type_allowed_values = ["simplified", "detailed"]
-        if !(model_type in model_type_allowed_values)
-            @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
-            throw(InputError())
-        end
-
-        # get probe field geometry from input file
-        probe_field_geometry = default(config, "probe_field_geometry", "rectangle")
-        probe_field_geometry_allowed_values = ["rectangle",
-                                               "open_rectangle",
-                                               "zoned_rectangle",
-                                               "U_configurations",
-                                               "lopsided_U_configuration",
-                                               "C_configuration",
-                                               "L_configuration"]
-        if !(probe_field_geometry in probe_field_geometry_allowed_values)
-            @error "Undefined probe field configuration \"$(probe_field_geometry)\" of unit \"$(uac)\". Has to be one of: $(probe_field_geometry_allowed_values)."
-            throw(InputError())
-        end
-
-        return new(uac,                                 # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage,                          # sys_function
-                   InterfaceMap(m_heat_in => nothing),  # input_interfaces
-                   InterfaceMap(m_heat_out => nothing), # output_interfaces
-                   m_heat_in,      # medium name of input interface
-                   m_heat_out,     # medium name of output interface
-                   model_type,     # model type. currently "simplified" with constant thermal borehole resistance and 
-                   #                 "detailed" with calculated thermal borehole resistance in every time step are available.
-
-                   default(config, "max_probe_temperature_loading", nothing),     # upper temperature limit in the probe for loading
-                   default(config, "min_probe_temperature_unloading", nothing),   # lower temperature limit in the probe for unloading
-                   default(config, "unloading_temperature_spread", 3),   # temperature spread between forward and return flow during unloading, within one probe!
-                   default(config, "loading_temperature", nothing),      # nominal high temperature for loading geothermal probe storage, can also be set from other end of interface
-                   default(config, "loading_temperature_spread", 3),     # temperature spread between forward and return flow during loading, within one probe!
-                   default(config, "max_output_power", 50),              # maximum output power in W/m probe
-                   default(config, "max_input_power", 50),               # maximum input power in W/m probe
-                   default(config, "regeneration", true),                # flag if regeneration should be taken into account
-                   0.0,                                                  # max_output_energy in every time step, calculated in control()
-                   0.0,                                                  # current_max_input_energy
-                   0.0,                                                  # max_input_energy in every time step, calculated in control()
-                   0.0,                                                  # output temperature in current time step, calculated in control()
-                   0.0,                                                  # input temperature in current time step, calculated in control()
-                   default(config, "soil_undisturbed_ground_temperature", 11.0),    # Considered as constant
-                   default(config, "soil_heat_conductivity", 1.5),                  # Heat conductivity of surrounding soil, homogenous and constant, in [W/(m K)]
-                   default(config, "soil_density", 2000.0),                         # soil density in [kg/m^3]
-                   default(config, "soil_specific_heat_capacity", 2400.0),          # soil specific heat capacity in [J/(kg K)]
-                   default(config, "borehole_thermal_resistance", 0.1),             # thermal resistance in [(m K)/W]. If set, borehole_thermal_resistance is constant! (default: 0.1 (m K)/W)
-                   [],                                                   # pre-calculated multiscale g-function. Calculated in pre-processing.
-                   0,                                                    # index of current time step to get access on time dependent g-function values
-                   0.0,                                                  # average fluid temperature
-                   default(config, "boreholewall_start_temperature", 4.0),          # boreholewall starting temperature
-                   [],                                                   # output_temperatures_last_timestep
-                   #
-                   [],                                                   # vector to hold specific energy sum (in and out) per probe meter in each time step
-                   [],                                                   # vector to hold specific energy per probe meter as difference for each step, used for g-function approach 
-                   #
-                   default(config, "g_function_file_path", nothing),     # path to a file with a custom g-function
-                   probe_field_geometry,                                 # type of probe field geometry, can be one of: rectangle, open_rectangle, zoned_rectangle, U_configurations, lopsided_U_configuration, C_configuration, L_configuration
-                   default(config, "number_of_probes_x", 1),             # number of probes in x direction, corresponds so m value of g-function library. Note that number_of_probes_x <= number_of_probes_y!
-                   default(config, "number_of_probes_y", 1),             # number of probes in x direction, corresponds so m value of g-function library. Note that number_of_probes_x <= number_of_probes_y!
-                   default(config, "probe_field_key_2", ""),             # key2 of g-function library. Can also be "" if non is needed. The value depends on the chosen library type.
-                   default(config, "probe_depth", 150.0),                # depth (or length) of a single geothermal probe. Has to be between 24 m and 384 m.
-                   0,                                                    # number of geothermal probes in the borefield, determined in initialize from borehole configuration
-                   default(config, "borehole_spacing", 5),               # [m] distance between boreholes in the field, assumed to be constant. Set average spacing. 
-                   default(config, "probe_type", 2),                     # probe type: 1: single U-pipe in one probe, 2: double U-pipe in one probe
-                   #
-                   default(config, "pipe_diameter_outer", 0.032),        # outer pipe diameter
-                   default(config, "pipe_diameter_inner", 0.026),        # inner pipe diameter
-                   0.0,                                                  # radius_pipe_inner, will be calculated in initialization
-                   0.0,                                                  # radius_pipe_outer, will be calculated in initialization
-                   0.0,                                                  # radius_borehole, will be calculated in initialization
-                   0.0,                                                  # distance_pipe_center, will be calculated in initialization
-                   #
-                   default(config, "fluid_specific_heat_capacity", 3800.0), # specific heat capacity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-                   default(config, "fluid_density", 1045.0),                # density brine at 0 °C (25 % glycol 75 % water (interpolated))
-                   default(config, "fluid_kinematic_viscosity", 3.9e-6),    # viscosity brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-                   default(config, "fluid_heat_conductivity", 0.5),         # heat conductivity brine at 0 °C (25 % glycol 75 % water (interpolated))
-                   default(config, "fluid_prandtl_number", 30.0),           # prandtl-number brine at 0 °C (25 % glycol 75 % water (interpolated)) 
-                   #
-                   default(config, "grout_heat_conductivity", 2.0),         # lambda grout / filling material in W/(mK)   
-                   default(config, "pipe_heat_conductivity", 0.42),         # lambda of inner pipes
-                   #
-                   default(config, "borehole_diameter", 0.15),              # borehole diameter in m.
-                   default(config, "shank_spacing", 0.1),                   # shank-spacing = distance between inner pipes in borehole, diagonal through borehole center. required for calculation of thermal borehole resistance.
-                   #
-                   default(config, "limit_max_output_energy_to_avoid_pulsing", false),  # limit_max_output_energy_to_avoid_pulsing. If a control module is given, this parameter will be overwritten by the control module!
-                   # If set to false, the temperature acts as a stupid turn-on-temperature, representing an on-off fluid pump
-                   # If set to true, the maximum energy is calculated to provide the current temperature also in the next timestep to prevent pulsing, representing a variable speed pump
-                   0.0,                                                     # Reynoldsnumber. To be calculated in function later.
-                   nothing,                                                 # probe_coordinates to save them for plotting
-                   false,                                                   # process_done, bool indicating if the process step has already been performed in the current time step
-                   false)                                                   # load_done, bool indicating if the load step has already been performed in the current time step
+        new(SSOT_parameter_constructor(GeothermalProbes, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{GeothermalProbes})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_PROBES_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{GeothermalProbes}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{GeothermalProbes}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalProbes))
+end
+
+function init_from_params(x::Type{GeothermalProbes}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    m_heat_in = Symbol(params["m_heat_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    register_media([m_heat_in, m_heat_out])
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_storage,
+            InterfaceMap(m_heat_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_heat_in,
+            m_heat_out,
+            params["model_type"],
+            params["max_probe_temperature_loading"],
+            params["min_probe_temperature_unloading"],
+            params["unloading_temperature_spread"],
+            params["loading_temperature"],
+            params["loading_temperature_spread"],
+            params["max_output_power"],
+            params["max_input_power"],
+            params["regeneration"],
+            0.0, # max_output_energy
+            0.0, # current_max_input_energy
+            0.0, # max_input_energy
+            0.0, # current_max_output_temperature
+            0.0, # current_max_input_temperature
+            params["soil_undisturbed_ground_temperature"],
+            params["soil_heat_conductivity"],
+            params["soil_density"],
+            params["soil_specific_heat_capacity"],
+            params["borehole_thermal_resistance"],
+            [],  # g_function
+            0,   # time_index
+            0.0, # fluid_temperature
+            params["boreholewall_start_temperature"],
+            [],  # output_temperatures_last_timestep
+            [],  # energy_in_out_per_probe_meter
+            [],  # power_in_out_difference_per_probe_meter
+            params["g_function_file_path"],
+            params["probe_field_geometry"],
+            params["number_of_probes_x"],
+            params["number_of_probes_y"],
+            params["probe_field_key_2"],
+            params["probe_depth"],
+            0, # number_of_probes
+            params["borehole_spacing"],
+            params["probe_type"] == "double U-pipe" ? 2 : 1,
+            params["pipe_diameter_outer"],
+            params["pipe_diameter_inner"],
+            0.0, # radius_pipe_inner
+            0.0, # radius_pipe_outer
+            0.0, # radius_borehole
+            0.0, # distance_pipe_center
+            params["fluid_specific_heat_capacity"],
+            params["fluid_density"],
+            params["fluid_kinematic_viscosity"],
+            params["fluid_heat_conductivity"],
+            params["fluid_prandtl_number"],
+            params["grout_heat_conductivity"],
+            params["pipe_heat_conductivity"],
+            params["borehole_diameter"],
+            params["shank_spacing"],
+            params["limit_max_output_energy_to_avoid_pulsing"],
+            0.0,     # fluid_reynolds_number
+            nothing, # probe_coordinates
+            false,   # process_done
+            false)   # load_done
 end
 
 function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
