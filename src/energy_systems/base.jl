@@ -2324,6 +2324,73 @@ function get_parameter_profile_from_config(config::Dict{String,Any},
 end
 
 """
+    load_profile_from_global_weather_file(config::Dict{String,Any}, from_global_file_key::String,
+                                          sim_params::Dict{String,Any}, uac::String)
+
+Reads a profile file path from the given config and then loads and returns the profile from
+the global weather file.
+
+# Args
+-`config::Dict{String,Any}`: The config from which to read the file path
+-`from_global_file_key::String`: The key for the config containing the name of the profile
+    in the global weather file
+-`sim_params::Dict{String,Any}`: Simulation parameters
+-`uac::String`: The UAC of the component, used for error messages
+# Returns
+-`Union{Nothing,Profile}`: The requested profile or nothing if the config does not contain
+    the given key
+"""
+function load_profile_from_global_weather_file(config::Dict{String,Any},
+                                               from_global_file_key::String,
+                                               sim_params::Dict{String,Any},
+                                               uac::String)
+    if !haskey(config, from_global_file_key)
+        return nothing
+    end
+
+    if !haskey(sim_params, "weather_data")
+        throw(InputError("For component $uac a global weather file key was given, but " *
+                         "no global weather file is set (or it failed to load)."))
+    end
+
+    wd = sim_params["weather_data"]
+    field_name_str = config[from_global_file_key]
+    field_symbols = fieldnames(typeof(wd))
+    if any(occursin(field_name_str, string(sym)) for sym in field_symbols)
+        return getfield(wd, Symbol(field_name_str))
+    else
+        throw(InputError("For component $uac the global weather file key, given as " *
+                         "'$field_name_str', must be one of: " *
+                         "$(join(string.(field_symbols), ", "))."))
+    end
+end
+
+"""
+    load_optional_profile(config::Dict{String,Any}, parameter_name::String,
+                          sim_params::Dict{String,Any})
+
+Reads the given config for the given key and then loads the profile or returns nothing if
+the key does not occur in the config.
+
+# Args
+-`config::Dict{String,Any}`: The config that maybe contains the key
+-`parameter_name::String`: The key for the config with the profile file path
+-`sim_params::Dict{String,Any}`: Simulation parameters
+# Returns
+-`Union{Nothing,Profile}`: The requested profile or nothing if the config does not contain
+    the given key
+"""
+function load_optional_profile(config::Dict{String,Any}, parameter_name::String,
+                               sim_params::Dict{String,Any})
+    if haskey(config, parameter_name)
+        path = config[parameter_name]
+        return Profile(path, sim_params)
+    end
+
+    return nothing
+end
+
+"""
 get_diff_solar_radiation_profile_from_config(config, simulation_parameter, uac)
 
 Function to determine the source of the solar diffuse radiation profile.

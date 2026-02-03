@@ -43,17 +43,18 @@ const BUFFER_TANK_PARAMETERS = Dict(
         unit="-"
     ),
     "ambient_temperature_from_global_file" => (
-        default=false,
-        description="If true, take the ambient temperature profile from the global weather data file",
-        display_name="Ambient temp. from global file",
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "ambient temperature profile to be used",
+        display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
             ("consider_losses", "is_true"),
             ("ambient_temperature_profile_file_path", "mutex"),
             ("constant_ambient_temperature", "mutex")
         ],
-        type=Bool,
-        json_type="boolean",
+        type=String,
+        json_type="string",
         unit="-"
     ),
     "constant_ambient_temperature" => (
@@ -91,7 +92,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         display_name="Capacity (volume)",
         required=false,
         conditionals=[
-            ("volume", "mutex"),
+            ("capacity", "mutex"),
         ],
         validations=[
             ("self", "value_gt_num_or_nothing", 0.0),
@@ -357,16 +358,12 @@ end
 
 function extract_parameter(x::Type{BufferTank}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
                            sim_params::Dict{String,Any}, uac::String)
-    if param_name == "constant_ambient_temperature" || param_name == "ambient_temperature_profile_file_path"
-        constant_temperature,
-        temperature_profile = get_parameter_profile_from_config(config,
-                                                                sim_params,
-                                                                "ambient_emperature",
-                                                                "ambient_emperature_profile_file_path",
-                                                                "ambient_emperature_from_global_file",
-                                                                "constant_ambient_temperature",
-                                                                uac)
-        return param_name == "constant_ambient_temperature" ? constant_temperature : temperature_profile
+    if param_name == "ambient_temperature_from_global_file"
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name == "ambient_temperature_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "constant_ambient_temperature"
+        return convert(Temperature, default(config, param_name, nothing))
     end
 
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
@@ -406,7 +403,9 @@ function init_from_params(x::Type{BufferTank}, uac::String, params::Dict{String,
             params["thermal_transmission_lid"],
             params["thermal_transmission_barrel"],
             params["thermal_transmission_bottom"],
-            params["consider_losses"] ? params["ambient_temperature_profile"] : nothing,
+            params["consider_losses"] ?
+            some_or_none(params["ambient_temperature_profile_file_path"],
+                         params["ambient_temperature_from_global_file"]) : nothing,
             params["consider_losses"] ? params["constant_ambient_temperature"] : nothing,
             params["ground_temperature"],
             params["switch_point"],

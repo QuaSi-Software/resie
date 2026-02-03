@@ -22,16 +22,17 @@ const FIXED_SUPPLY_PARAMETERS = Dict(
         unit="-"
     ),
     "temperature_from_global_file" => (
-        default=false,
-        description="If true, take the temperature profile from the global weather data file",
-        display_name="Temperature from global file",
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "temperature profile to be used",
+        display_name="Global file temp. key",
         required=false,
         conditionals=[
             ("temperature_profile_file_path", "mutex"),
             ("constant_temperature", "mutex")
         ],
-        type=Bool,
-        json_type="boolean",
+        type=String,
+        json_type="string",
         unit="-"
     ),
     "constant_temperature" => (
@@ -124,16 +125,12 @@ end
 
 function extract_parameter(x::Type{FixedSupply}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
                            sim_params::Dict{String,Any}, uac::String)
-    if param_name == "constant_temperature" || param_name == "temperature_profile_file_path"
-        constant_temperature,
-        temperature_profile = get_parameter_profile_from_config(config,
-                                                                sim_params,
-                                                                "temperature",
-                                                                "temperature_profile_file_path",
-                                                                "temperature_from_global_file",
-                                                                "constant_temperature",
-                                                                uac)
-        return param_name == "constant_temperature" ? constant_temperature : temperature_profile
+    if param_name == "temperature_from_global_file"
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name == "temperature_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "constant_temperature"
+        return convert(Temperature, default(config, param_name, nothing))
     end
 
     return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
@@ -161,7 +158,7 @@ function init_from_params(x::Type{FixedSupply}, uac::String, params::Dict{String
             InterfaceMap(medium => nothing),         # input_interfaces
             InterfaceMap(medium => nothing),         # output_interfaces
             energy_profile,                          # energy_profile
-            params["temperature_profile_file_path"], # temperature_profile, might be from global weather data
+            some_or_none(params["temperature_profile_file_path"], params["temperature_from_global_file"]),
             params["scale"],                         # scaling_factor
             0.0,                                     # supply
             nothing,                                 # temperature

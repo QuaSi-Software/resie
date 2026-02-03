@@ -11,7 +11,7 @@ function test_mutex_parameters()
             "type" => "GridInput",
             "output_refs" => ["TST_DEM_01"],
             "medium" => "m_h_w_lt1",
-            "temperature_from_global_file" => true,
+            "temperature_from_global_file" => "temp key",
             "constant_temperature" => 50.0,
         ),
         "TST_DEM_01" => Dict{String,Any}(
