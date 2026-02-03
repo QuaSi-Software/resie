@@ -5,6 +5,607 @@ using Plots: Plots
 using SparseArrays
 using LinearAlgebra
 
+#! format: off
+const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
+    "m_heat_in" => (
+        default="m_h_w_ht1",
+        description="Heat input medium (for regeneration/loading)",
+        display_name="Medium heat_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_lt1",
+        description="Heat output medium (for extraction/unloading)",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "model_type" => (
+        default="simplified",
+        description="Operation model: currently 'simplified', with constant fluid-to-soil " *
+                    "resistance, and 'detailed' with calculated fluid-to-soil resistance " *
+                    "in every time step, are available.",
+        display_name="Model type",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["simplified", "detailed"],
+        unit="-"
+    ),
+    "accuracy_mode" => (
+        default="normal",
+        description="Simulation accuracy mode",
+        display_name="Accuracy mode",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["very_rough", "rough", "normal", "high", "very_high"],
+        unit="-"
+    ),
+    "ambient_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to ambient temperature profile file",
+        display_name="Ambient temp. profile",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_from_global_file", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "ambient_temperature_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "ambient temperature profile to be used",
+        display_name="Global file amb. temp. key",
+        required=false,
+        conditionals=[
+            ("consider_losses", "is_true"),
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_ambient_temperature" => (
+        default=nothing,
+        description="Constant ambient temperature value",
+        display_name="Constant ambient temp.",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("ambient_temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "global_solar_radiation_profile_file_path" => (
+        default=nothing,
+        description="Path to global solar radiation profile file",
+        display_name="Global solar radiation profile",
+        required=false,
+        conditionals=[
+            ("global_solar_radiation_from_global_file", "mutex"),
+            ("constant_global_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "global_solar_radiation_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "global solar radiation profile to be used",
+        display_name="Global file glob. rad. key",
+        required=false,
+        conditionals=[
+            ("global_solar_radiation_profile_file_path", "mutex"),
+            ("constant_global_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_global_solar_radiation" => (
+        default=nothing,
+        description="Constant global solar radiation value",
+        display_name="Constant global solar radiation",
+        required=false,
+        conditionals=[
+            ("global_solar_radiation_profile_file_path", "mutex"),
+            ("global_solar_radiation_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="Wh/m^2"
+    ),
+    "infrared_sky_radiation_profile_file_path" => (
+        default=nothing,
+        description="Path to infrared sky radiation profile file",
+        display_name="Infrared radiation profile",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_from_global_file", "mutex"),
+            ("constant_infrared_sky_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "infrared_sky_radiation_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with the " *
+                    "infrared sky radiation profile to be used",
+        display_name="Global file infr. sky rad. key",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_profile_file_path", "mutex"),
+            ("constant_infrared_sky_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_infrared_sky_radiation" => (
+        default=nothing,
+        description="Constant infrared sky radiation value",
+        display_name="Constant infrared radiation",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_profile_file_path", "mutex"),
+            ("infrared_sky_radiation_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="Wh/m^2"
+    ),
+    "pipe_radius_outer" => (
+        default=0.016,
+        description="Outer radius of the collector pipe",
+        display_name="Pipe outer radius",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "pipe_thickness" => (
+        default=0.003,
+        description="Thickness of the collector pipe",
+        display_name="Pipe thickness",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "pipe_heat_conductivity" => (
+        default=0.4,
+        description="Heat conductivity of pipe material",
+        display_name="Pipe heat conductivity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "pipe_laying_depth" => (
+        default=1.5,
+        description="Depth of pipe system below ground surface",
+        display_name="Pipe laying depth",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "pipe_length" => (
+        default=100,
+        description="Length of one collector pipe",
+        display_name="Pipe length",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "number_of_pipes" => (
+        default=1,
+        description="Number of parallel pipes, each with a length of 'pipe_length'",
+        display_name="Number of pipes",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "pipe_spacing" => (
+        default=0.5,
+        description="Distance between pipes",
+        display_name="Pipe spacing",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "pipe_soil_thermal_resistance" => (
+        default=0.1,
+        description="Thermal resistance between pipe and soil",
+        display_name="Pipe-soil thermal resistance",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m*K/W"
+    ),
+    "considered_soil_depth" => (
+        default=10.0,
+        description="Depth of soil considered in simulation",
+        display_name="Considered soil depth",
+        required=false,
+        validations=[
+            ("self", "value_gt_rel", "pipe_laying_depth")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "soil_density" => (
+        default=2000,
+        description="Density of unfrozen soil",
+        display_name="Soil density",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "soil_specific_heat_capacity" => (
+        default=1000,
+        description="Specific heat capacity of unfrozen soil",
+        display_name="Soil specific heat capacity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "soil_specific_heat_capacity_frozen" => (
+        default=900,
+        description="Specific heat capacity of frozen soil",
+        display_name="Soil specific heat capacity (frozen)",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "soil_heat_conductivity" => (
+        default=1.5,
+        description="Heat conductivity of unfrozen soil (lambda)",
+        display_name="Soil heat conductivity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "soil_heat_conductivity_frozen" => (
+        default=2.0,
+        description="Heat conductivity of frozen soil (lambda)",
+        display_name="Soil heat conductivity (frozen)",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "soil_specific_enthalpy_of_fusion" => (
+        default=90000,
+        description="Specific enthalpy of fusion of soil",
+        display_name="Soil enthalpy of fusion",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="J/kg"
+    ),
+    "phase_change_upper_boundary_temperature" => (
+        default=-0.25,
+        description="Upper boundary temperature for phase change",
+        display_name="Phase change upper boundary",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "phase_change_lower_boundary_temperature" => (
+        default=-1,
+        description="Lower boundary temperature for phase change",
+        display_name="Phase change lower boundary",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "surface_convective_heat_transfer_coefficient" => (
+        default=14.7,
+        description="Convective heat transfer coefficient at surface",
+        display_name="Surface convective heat transfer",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "surface_reflection_factor" => (
+        default=0.25,
+        description="Surface reflection factor (albedo)",
+        display_name="Surface reflection factor",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "surface_emissivity" => (
+        default=0.9,
+        description="Surface emissivity on ground surface",
+        display_name="Surface emissivity",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "fluid_specific_heat_capacity" => (
+        default=3800,
+        description="Specific heat capacity of heat transfer fluid",
+        display_name="Fluid specific heat capacity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "fluid_density" => (
+        default=1045,
+        description="Density of heat transfer fluid; default for 30 % glycol at 0 °C",
+        display_name="Fluid density",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "fluid_prandtl_number" => (
+        default=30,
+        description="Prandtl number of heat transfer fluid; default for 30 % glycol at 0 °C",
+        display_name="Fluid Prandtl number",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "fluid_kinematic_viscosity" => (
+        default=3.9e-6,
+        description="Kinematic viscosity of heat transfer fluid; default for 30 % glycol at 0 °C",
+        display_name="Fluid kinematic viscosity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m^2/s"
+    ),
+    "fluid_heat_conductivity" => (
+        default=0.5,
+        description="Heat conductivity of heat transfer fluid; default for 30 % glycol at 0 °C",
+        display_name="Fluid heat conductivity",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m*K"
+    ),
+    "use_dynamic_fluid_properties" => (
+        default=false,
+        description="Use temperature-dependent fluid properties; false for constant, true " *
+                    "for temperature-dependent fluid properties accoring to TRNSYS Type 710",
+        display_name="Use dynamic fluid properties",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "nusselt_approach" => (
+        default="Stephan",
+        description="Approach for Nusselt number calculation",
+        display_name="Nusselt approach",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["Stephan", "Ramming"],
+        unit="-"
+    ),
+    "start_temperature_fluid_and_pipe" => (
+        default=15.5,
+        description="Starting temperature of fluid and soil near pipe during initialisation",
+        display_name="Start temperature",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "undisturbed_ground_temperature" => (
+        default=9.0,
+        description="Undisturbed ground temperature at lower simulation boundary",
+        display_name="Undisturbed ground temperature",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "max_output_power" => (
+        default=20,
+        description="Maximum output power per unit area. Depends on ground and climate " *
+                    "localization. See VDI 4640-2.",
+        display_name="Maximum output power",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2"
+    ),
+    "max_input_power" => (
+        default=20,
+        description="Maximum input power per unit area. Depends on ground and climate " *
+                    "localization. See VDI 4640-2",
+        display_name="Maximum input power",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2"
+    ),
+    "unloading_temperature_spread" => (
+        default=3.0,
+        description="Temperature spread between forward and return during unloading",
+        display_name="Unloading temperature spread",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "loading_temperature_spread" => (
+        default=3.0,
+        description="Temperature spread between forward and return during loading",
+        display_name="Loading temperature spread",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "fluid_min_output_temperature" => (
+        default=nothing,
+        description="Minimum output temperature of fluid during unloading",
+        display_name="Min output temperature",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "fluid_max_input_temperature" => (
+        default=nothing,
+        description="Maximum input temperature of fluid during loading",
+        display_name="Max input temperature",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "regeneration" => (
+        default=true,
+        description="Enable regeneration (loading) of the collector",
+        display_name="Regeneration enabled",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "max_picard_iter" => (
+        default=3,
+        description="Maximum number of iterations for implicit solving (update of k(T))",
+        display_name="Max Picard iterations",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0)
+        ],
+        type=Int,
+        json_type="integer",
+        unit="-"
+    ),
+    "picard_tol" => (
+        default=1e-3,
+        description="Absolute tolerance for Picard iteration",
+        display_name="Picard tolerance",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+)
+#! format: on
+
 """
 Implementation of a geothermal heat collector.
 This implementation acts as storage as is can produce and load energy.
@@ -15,7 +616,6 @@ Possible improvements in the future:
 - Adaptation of the model to be able to simulate a single pipe (requires adaptation of the
   boundary conditions)
 """
-
 mutable struct GeothermalHeatCollector <: Component
     uac::String
     controller::Controller
@@ -36,7 +636,9 @@ mutable struct GeothermalHeatCollector <: Component
     fluid_max_input_temperature::Temperature
     loading_temperature_spread::Temperature
 
+    # depends on ground and climate localization. [VDI 4640-2.]
     max_output_power::Union{Nothing,Float64}
+    # depends on ground and climate localization. [VDI 4640-2.]
     max_input_power::Union{Nothing,Float64}
     regeneration::Bool
     max_output_energy::Float64
@@ -62,16 +664,24 @@ mutable struct GeothermalHeatCollector <: Component
     surface_convective_heat_transfer_coefficient::Float64
     surface_reflection_factor::Float64
 
+    # holds the temperature of the last timestep
     t1::Array{Float64}
+    # holds the temperature of the current timestep
     t2::Array{Float64}
+    # holds the specific heat capacity for each node
     cp::Array{Float64}
+    # precalculated density * volume of the soil around each node
     soil_weight::Array{Float64}
+    # identifies the fluid node index in y direction
     fluid_node_y_idx::Int
+    # identifies nodes surrounding the fluid-node: pipe-surrounding: true; else: false
     is_pipe_surrounding::Array{Bool}
 
     pipe_radius_outer::Float64
     pipe_thickness::Float64
+    # pipe inner diameter
     pipe_d_i::Float64
+    # pipe outer diameter
     pipe_d_o::Float64
     pipe_laying_depth::Float64
     pipe_length::Float64
@@ -82,18 +692,27 @@ mutable struct GeothermalHeatCollector <: Component
     model_type::String
     pipe_soil_thermal_resistance::Floathing
 
+    # solar global radiation on horizontal surface, to be read from weather-profile
     global_radiation_power::Float64
+    # boltzmann_constant [W/(m^2 K^4)]: Stefan-Boltzmann-Constant
     boltzmann_constant::Float64
     surface_emissivity::Float64
 
+    # horizontal dimension parallel to ground surface and orthogonal to pipe
     dx::Vector{Float64}
+    # vertical dimension orthogonal to ground surface and orthogonal to pipe
     dy::Vector{Float64}
+    # this is dx between the nodes (while dx is the x-width assigned to each node)
     dx_mesh::Vector{Float64}
+    # this is dy between the nodes (while dy is the y-width assigned to each node)
     dy_mesh::Vector{Float64}
+    # horizontal dimension parallel to ground surface and parallel to pipe (equals the length of one pipe, constant)
     dz::Float64
 
+    # is set to fluid_start_temperature at the beginning
     fluid_temperature::Temperature
 
+    # total heat flux in or out of collector
     collector_total_heat_energy_in_out::Float64
 
     pipe_heat_conductivity::Float64
@@ -105,157 +724,163 @@ mutable struct GeothermalHeatCollector <: Component
     use_dynamic_fluid_properties::Bool
     nusselt_approach::String
 
+    # to be calculated by a function
     fluid_reynolds_number::Float64
+    # convective heat transfer coefficient between fluid and pipe
     alpha_fluid_pipe::Float64
     average_temperature_adjacent_to_pipe::Float64
     undisturbed_ground_temperature::Float64
 
+    # holds temperature field of nodes for output plot
     temp_field_output::Array{Float64}
+    # precalculated parameter for freezing function
     sigma_lat::Float64
+    # precalculated parameter for freezing function
     t_lat::Float64
+    # precalculated parameter for freezing function
     delta_t_lat::Float64
+    # precalculated parameter
     volume_adjacent_to_pipe::Float64
 
+    # indicating if the process step has already been performed in the current time step
     process_done::Bool
+    # indicating if the load step has already been performed in the current time step
     load_done::Bool
 
     max_picard_iter::Int
     picard_tol::Float64
 
     function GeothermalHeatCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
-        register_media([m_heat_in, m_heat_out])
-
-        constant_ambient_temperature,
-        ambient_temperature_profile = get_parameter_profile_from_config(config,
-                                                                        sim_params,
-                                                                        "ambient_temperature",
-                                                                        "ambient_temperature_profile_file_path",
-                                                                        "ambient_temperature_from_global_file",
-                                                                        "constant_ambient_temperature",
-                                                                        uac;
-                                                                        required=true)
-
-        constant_global_radiation,
-        global_radiation_profile = get_parameter_profile_from_config(config,
-                                                                     sim_params,
-                                                                     "global_solar_radiation",
-                                                                     "global_solar_radiation_profile_file_path",
-                                                                     "global_solar_radiation_from_global_file",
-                                                                     "constant_global_solar_radiation",
-                                                                     uac;
-                                                                     required=true) # Wh/m^2
-
-        constant_infrared_sky_radiation,
-        infrared_sky_radiation_profile = get_parameter_profile_from_config(config,
-                                                                           sim_params,
-                                                                           "infrared_sky_radiation",
-                                                                           "infrared_sky_radiation_profile_file_path",
-                                                                           "infrared_sky_radiation_from_global_file",
-                                                                           "constant_infrared_sky_radiation",
-                                                                           uac;
-                                                                           required=true)  # Wh/m^2
-
-        # get model type from input file
-        model_type = default(config, "model_type", "simplified")
-        model_type_allowed_values = ["simplified", "detailed"]
-        if !(model_type in model_type_allowed_values)
-            @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
-            throw(InputError())
-        end
-
-        return new(uac,                                                  # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage,                                           # sys_function
-                   InterfaceMap(m_heat_in => nothing),                   # input_interfaces
-                   InterfaceMap(m_heat_out => nothing),                  # output_interfaces
-                   m_heat_in,                                            # medium name of input interface
-                   m_heat_out,                                           # medium name of output interface
-                   ambient_temperature_profile,                          # [°C] ambient temperature profile
-                   constant_ambient_temperature,                         # [°C] constant ambient temperature
-                   global_radiation_profile,                             # [Wh/m^2]
-                   constant_global_radiation,                            # [Wh/m^2]
-                   infrared_sky_radiation_profile,                       # [Wh/m^2]
-                   constant_infrared_sky_radiation,                      # [Wh/m^2]
-                   default(config, "unloading_temperature_spread", 3.0), # [K] temperature spread between forward and return flow during unloading            
-                   default(config, "fluid_min_output_temperature", nothing),   # [°C] minimum output temperature of the fluid for unloading
-                   default(config, "fluid_max_input_temperature", nothing),    # [°C] maximum input temperature of the fluid for loading
-                   default(config, "loading_temperature_spread", 3.0),   # [K] temperature spread between forward and return flow during loading         
-                   default(config, "max_output_power", 20),              # maximum output power in W/m^2, set by user. depends on ground and climate localization. [VDI 4640-2.]
-                   default(config, "max_input_power", 20),               # maximum input power in W/m^2, set by user. depends on ground and climate localization. [VDI 4640-2.]
-                   default(config, "regeneration", true),                # flag if regeneration should be taken into account
-                   0.0,                                                  # max_output_energy [Wh] accoring to max_output_power, calculated in initialize()
-                   0.0,                                                  # current_max_output_energy [Wh] in every time step, calculated in control()
-                   0.0,                                                  # max_input_energy [Wh] according to max_input_power, calculated in initialize()
-                   0.0,                                                  # current_max_input_energy [Wh] in every time step, calculated in initialize()
-                   0.0,                                                  # current_output_temperature [°C] in current time step, calculated in control()
-                   0.0,                                                  # current_input_temperature [°C] in current time step, calculated in control()
-                   0.0,                                                  # ambient_temperature [°C] in current time step, calculated in control()
-                   default(config, "soil_specific_heat_capacity", 1000), # specific heat capacity of unfrozen soil [J/(kgK)]
-                   default(config, "soil_specific_heat_capacity_frozen", 900), # specific heat capacity of soil in fully frozen condition [J/(kgK)]
-                   default(config, "soil_density", 2000),                # density of soil [kg/m^3]
-                   default(config, "soil_heat_conductivity", 1.5),       # heat conductivity of unfrozen soil (lambda) [W/(mK)]
-                   default(config, "soil_heat_conductivity_frozen", 2.0),# heat conductivity of frozen soil (lambda) [W/(mK)]
-                   Array{Float64}(undef, 0),                             # soil_density_vector: vector to set soil density.
-                   default(config, "soil_specific_enthalpy_of_fusion", 90000),            # specific enthalpy of fusion of soil [J/kg]
-                   default(config, "phase_change_upper_boundary_temperature", -0.25),     # phase_change_upper_boundary_temperature [°C]
-                   default(config, "phase_change_lower_boundary_temperature", -1),        # phase_change_lower_boundary_temperature [°C]
-                   default(config, "surface_convective_heat_transfer_coefficient", 14.7), # convective heat transfer on surface [W/(m^2 K)]
-                   default(config, "surface_reflection_factor", 0.25),   # reflection factor / albedo value of surface [-]
-                   Array{Float64}(undef, 0, 0),                          # t1 [°C] holds the temperature of the last timestep
-                   Array{Float64}(undef, 0, 0),                          # t2 [°C] holds the temperature of the current timestep
-                   Array{Float64}(undef, 0, 0),                          # cp [J/(kg K)], holds the specific heat capacity for each node
-                   Array{Float64}(undef, 0, 0),                          # soil_weight [kg], precalculated density * volume of the soil around each node
-                   0,                                                    # fluid_node_y_idx, identifies the fluid node index in y direction
-                   Array{Bool}(undef, 0, 0),                             # is_pipe_surrounding, identifies nodes surrounding the fluid-node: pipe-surrounding: true; else: false
-                   default(config, "pipe_radius_outer", 0.016),          # pipe outer radius [m]
-                   default(config, "pipe_thickness", 0.003),             # thickness of pipe [m]
-                   0.0,                                                  # pipe_d_i: pipe inner diameter [m], calculated in initialize() 
-                   0.0,                                                  # pipe_d_o: pipe outer diameter [m], calculated in initialize() 
-                   default(config, "pipe_laying_depth", 1.5),            # depth of pipe system below the ground surface [m]
-                   default(config, "pipe_length", 100),                  # pipe length of one collector pipe [m]
-                   default(config, "number_of_pipes", 1),                # number of parallel pipes, each with a length of "pipe_length"
-                   default(config, "pipe_spacing", 0.5),                 # distance between pipes of collector [m]
-                   default(config, "considered_soil_depth", 10.0),       # depth of the soil considered in the simulation [m]
-                   default(config, "accuracy_mode", "normal"),           # accuracy_mode. Has to be one of "very_rough", "rough", "normal", "high", "very_high"
-                   model_type,                                           # model_type. currently "simplified", with constant fluid-to-soil resistance, and 
-                   #                                                       "detailed", with calculated fluid-to-soil resistance in every time step, are available.
-                   default(config, "pipe_soil_thermal_resistance", 0.1), # thermal resistance in [(m K)/W], only for model_type = simplified
-                   0.0,                                                  # global_radiation_power [W/m^2]: solar global radiation on horizontal surface, to be read from weather-profile
-                   5.6697e-8,                                            # boltzmann_constant [W/(m^2 K^4)]: Stefan-Boltzmann-Constant
-                   default(config, "surface_emissivity", 0.9),           # surface_emissivity [-]: emissivity on ground surface
-                   Array{Float64}(undef, 0),                             # dx [m] horizontal dimension parallel to ground surface and orthogonal to pipe
-                   Array{Float64}(undef, 0),                             # dy [m] vertical dimension orthogonal to ground surface and orthogonal to pipe
-                   Array{Float64}(undef, 0),                             # dx_mesh [m] this is dx between the nodes (while dx is the x-width assigned to each node)
-                   Array{Float64}(undef, 0),                             # dy_mesh [m] this is dy between the nodes (while dy is the y-width assigned to each node)
-                   0.0,                                                  # dz [m] horizontal dimension parallel to ground surface and parallel to pipe (equals the length of one pipe, constant)
-                   0.0,                                                  # fluid_temperature [°C], is set to fluid_start_temperature at the beginning               
-                   0.0,                                                  # collector_total_heat_energy_in_out, total heat flux in or out of collector
-                   default(config, "pipe_heat_conductivity", 0.4),       # pipe_heat_conductivity [W/(mK)] 
-                   default(config, "fluid_specific_heat_capacity", 3800),# fluid_specific_heat_capacity [J/(kg K)]
-                   default(config, "fluid_prandtl_number", 30),          # prandtl number [-], preset for 30 % glycol at 0 °C 
-                   default(config, "fluid_density", 1045),               # fluid density [kg/m^3], preset for 30 % glycol at 0 °C
-                   default(config, "fluid_kinematic_viscosity", 3.9e-6), # fluid_kinematic_viscosity [m^2/s], preset for 30 % glycol at 0 °C
-                   default(config, "fluid_heat_conductivity", 0.5),      # fluid_heat_conductivity [W/(mK)], preset for 30 % glycol at 0 °C
-                   default(config, "use_dynamic_fluid_properties", false), # use_dynamic_fluid_properties, false for constant, true for temperature-dependent fluid properties accoring to TRNSYS Type 710                   
-                   default(config, "nusselt_approach", "Stephan"),       # approach used for the calculation of the Nußelt number, can be one of: Stephan, Ramming
-                   0.0,                                                  # fluid_reynolds_number, to be calculated by a function
-                   0.0,                                                  # alpha_fluid_pipe: convective heat transfer coefficient between fluid and pipe
-                   default(config, "start_temperature_fluid_and_pipe", 15.5), # average_temperature_adjacent_to_pipe [°C], used as starting temperature of fluid and soil near pipe during initialisation
-                   default(config, "undisturbed_ground_temperature", 9.0),    # undisturbed ground temperature at the bottom of the simulation boundary [°C]
-                   Array{Float64}(undef, 0, 0, 0),                       # temp_field_output [°C], holds temperature field of nodes for output plot
-                   0.0,                                                  # sigma_lat; precalculated parameter for freezing function
-                   0.0,                                                  # t_lat; precalculated parameter for freezing function
-                   0.0,                                                  # delta_t_lat; precalculated parameter for freezing function
-                   0.0,                                                  # volume_adjacent_to_pipe; precalculated parameter
-                   false,                                                # process_done, bool indicating if the process step has already been performed in the current time step
-                   false,                                                # load_done, bool indicating if the load step has already been performed in the current time step
-                   default(config, "max_picard_iter", 3),                # max_picard_iter: Maximum number of iterations during implicit solving (update k(T))
-                   default(config, "picard_tol", 1e-3))                  # picard_tol: Tolerance for picard iteration: absolute temperature difference
+        new(SSOT_parameter_constructor(GeothermalHeatCollector, uac, config, sim_params)...)
     end
 end
 
+function component_parameters(x::Type{GeothermalHeatCollector})::Dict{String,NamedTuple}
+    return deepcopy(GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name in ("ambient_temperature_from_global_file", "global_solar_radiation_from_global_file",
+                      "infrared_sky_radiation_from_global_file")
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name in ("ambient_temperature_profile_file_path", "global_solar_radiation_profile_file_path",
+                          "infrared_sky_radiation_profile_file_path")
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name in ("constant_ambient_temperature", "constant_global_solar_radiation",
+                          "constant_infrared_sky_radiation")
+        if occursin("temperature", param_name)
+            return convert(Temperature, default(config, param_name, nothing))
+        else
+            return convert(Floathing, default(config, param_name, nothing))
+        end
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{GeothermalHeatCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(GeothermalHeatCollector))
+end
+
+function init_from_params(x::Type{GeothermalHeatCollector}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    m_heat_in = Symbol(params["m_heat_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    register_media([m_heat_in, m_heat_out])
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_storage,
+            InterfaceMap(m_heat_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_heat_in,
+            m_heat_out,
+            some_or_none(params["ambient_temperature_profile_file_path"],
+                         params["ambient_temperature_from_global_file"]),
+            params["constant_ambient_temperature"],
+            some_or_none(params["global_solar_radiation_profile_file_path"],
+                         params["global_solar_radiation_from_global_file"]),
+            params["constant_global_solar_radiation"],
+            some_or_none(params["infrared_sky_radiation_profile_file_path"],
+                         params["infrared_sky_radiation_from_global_file"]),
+            params["constant_infrared_sky_radiation"],
+            params["unloading_temperature_spread"],
+            params["fluid_min_output_temperature"],
+            params["fluid_max_input_temperature"],
+            params["loading_temperature_spread"],
+            params["max_output_power"],
+            params["max_input_power"],
+            params["regeneration"],
+            0.0, # max_output_energy
+            0.0, # current_max_output_energy
+            0.0, # max_input_energy
+            0.0, # current_max_input_energy
+            0.0, # current_output_temperature
+            0.0, # current_input_temperature
+            0.0, # ambient_temperature
+            params["soil_specific_heat_capacity"],
+            params["soil_specific_heat_capacity_frozen"],
+            params["soil_density"],
+            params["soil_heat_conductivity"],
+            params["soil_heat_conductivity_frozen"],
+            Array{Float64}(undef, 0), # soil_density_vector
+            params["soil_specific_enthalpy_of_fusion"],
+            params["phase_change_upper_boundary_temperature"],
+            params["phase_change_lower_boundary_temperature"],
+            params["surface_convective_heat_transfer_coefficient"],
+            params["surface_reflection_factor"],
+            Array{Float64}(undef, 0, 0), # t1
+            Array{Float64}(undef, 0, 0), # t2
+            Array{Float64}(undef, 0, 0), # cp
+            Array{Float64}(undef, 0, 0), # soil_weight
+            0,                           # fluid_node_y_idx
+            Array{Bool}(undef, 0, 0),    # is_pipe_surrounding
+            params["pipe_radius_outer"],
+            params["pipe_thickness"],
+            0.0,                         # pipe_d_i
+            0.0,                         # pipe_d_o
+            params["pipe_laying_depth"],
+            params["pipe_length"],
+            params["number_of_pipes"],
+            params["pipe_spacing"],
+            params["considered_soil_depth"],
+            params["accuracy_mode"],
+            params["model_type"],
+            params["pipe_soil_thermal_resistance"],
+            0.0,                      # global_radiation_power
+            5.6697e-8,                # boltzmann_constant
+            params["surface_emissivity"],
+            Array{Float64}(undef, 0), # dx
+            Array{Float64}(undef, 0), # dy
+            Array{Float64}(undef, 0), # dx_mesh
+            Array{Float64}(undef, 0), # dy_mesh
+            0.0,                      # dz
+            0.0,                      # fluid_temperature 
+            0.0,                      # collector_total_heat_energy_in_out
+            params["pipe_heat_conductivity"],
+            params["fluid_specific_heat_capacity"],
+            params["fluid_prandtl_number"],
+            params["fluid_density"],
+            params["fluid_kinematic_viscosity"],
+            params["fluid_heat_conductivity"],
+            params["use_dynamic_fluid_properties"],
+            params["nusselt_approach"],
+            0.0,                            # fluid_reynolds_number
+            0.0,                            # alpha_fluid_pipe
+            params["start_temperature_fluid_and_pipe"],
+            params["undisturbed_ground_temperature"],
+            Array{Float64}(undef, 0, 0, 0), # temp_field_output
+            0.0,                            # sigma_lat
+            0.0,                            # t_lat
+            0.0,                            # delta_t_lat
+            0.0,                            # volume_adjacent_to_pipe
+            false,                          # process_done,
+            false,                          # load_done
+            params["max_picard_iter"],
+            params["picard_tol"])
+end
 function initialise!(unit::GeothermalHeatCollector, sim_params::Dict{String,Any})
     if unit.regeneration
         set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
