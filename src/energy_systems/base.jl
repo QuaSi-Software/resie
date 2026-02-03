@@ -44,6 +44,17 @@ default(config::AbstractDict{String,Any}, name::String, default_val::Any)::Any =
                                                                                         default_val
 
 """
+Convenience function that returns the first argument that is not nothing.
+
+This is similar to something, however it will return nothing if all arguments are nothing
+instead of throwing an error.
+"""
+some_or_none() = nothing
+some_or_none(x::Nothing, y...) = some_or_none(y...)
+some_or_none(x::Some, y...) = x.value
+some_or_none(x::Any, y...) = x
+
+"""
 Categories that each represent a physical medium in conjunction with additional attributes,
 such as temperature or voltage. These attributes are not necessarily unchanging, but are
 considered the nominal range. For example, a heating component might circulate water anywhere
