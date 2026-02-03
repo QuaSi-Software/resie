@@ -57,7 +57,8 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         display_name="Number probes x",
         required=false,
         validations=[
-            ("self", "value_lte_rel", "number_of_probes_y")
+            ("self", "value_lte_rel", "number_of_probes_y"),
+            ("self", "value_gte_num", 1.0),
         ],
         type=Int,
         json_type="integer",
@@ -68,6 +69,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Number of probes in y direction; corresponds to value N of g-function library",
         display_name="Number probes y",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0),
+        ],
         type=Int,
         json_type="integer",
         unit="-"
@@ -100,6 +104,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Average distance between boreholes",
         display_name="Borehole spacing",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -119,6 +126,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Outer diameter of pipe",
         display_name="Outer pipe diameter",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -128,6 +138,10 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Inner diameter of pipe",
         display_name="Inner pipe diameter",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lt_rel", "pipe_diameter_outer"),
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -138,6 +152,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "calculated for brine at 0 °C (25 % glycol 75 % water).",
         display_name="Fluid specific heat capacity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="J/kg*K"
@@ -148,6 +165,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "brine at 0 °C (25 % glycol 75 % water).",
         display_name="Fluid density",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="kg/m^3"
@@ -158,6 +178,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "brine at 0 °C (25 % glycol 75 % water).",
         display_name="Fluid kinematic viscosity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="m^2/s"
@@ -168,6 +191,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "at 0 °C (25 % glycol 75 % water).",
         display_name="Fluid heat conductivity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m*K"
@@ -178,6 +204,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "at 0 °C (25 % glycol 75 % water).",
         display_name="Fluid Prandtl number",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -187,6 +216,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Heat conductivity of grout/filling material",
         display_name="Grout heat conductivity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m*K"
@@ -196,6 +228,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Heat conductivity of pipe material",
         display_name="Pipe heat conductivity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m*K"
@@ -205,6 +240,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Borehole diameter",
         display_name="Borehole diameter",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -215,6 +253,10 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "calculation of thermal borehole resistance.",
         display_name="Shank spacing",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lt_rel", "borehole_diameter"),
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -252,6 +294,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "unloading within one probe",
         display_name="Unloading temp spread",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="K"
@@ -271,6 +316,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
                     "within one probe",
         display_name="Loading temp spread",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="K"
@@ -280,6 +328,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Maximum output power per meter of probe",
         display_name="Max output power",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m"
@@ -289,6 +340,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Maximum input power per meter of probe",
         display_name="Max input power",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m"
@@ -325,6 +379,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Heat conductivity of surrounding soil, homogenous and constant",
         display_name="Soil heat conductivity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="W/m*K"
@@ -334,6 +391,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Soil density",
         display_name="Soil density",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="kg/m^3"
@@ -343,6 +403,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Soil specific heat capacity",
         display_name="Soil specific heat capacity",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="J/kg*K"
@@ -352,6 +415,9 @@ const GEOTHERMAL_PROBES_PARAMETERS = Dict(
         description="Thermal resistance of borehole",
         display_name="Borehole thermal resistance",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="m*K/W"
