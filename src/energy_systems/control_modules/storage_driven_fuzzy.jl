@@ -34,7 +34,7 @@ mutable struct CM_StorageDrivenFuzzy <: ControlModule
 
         params["plr_limit"] = 1.0
 
-        params["unit"] = components[params["unit_uac"]]
+        params["unit"] = components[unit_uac]
 
         return new("storage_driven_fuzzy", params)
     end
