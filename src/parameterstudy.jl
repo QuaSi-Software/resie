@@ -271,9 +271,9 @@ function run_resie_variant(
     # set price profiles paths
     price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_MWh.prf"
     price_profile_path_reserve_power_neg = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy_neg = "./profiles/MA/aFRR_neg_energy_EUR_MWh.prf"
+    price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_mean_15min.prf"
     price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy_pos = "./profiles/MA/aFRR_pos_energy_EUR_MWh.prf"
+    price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_mean_15min.prf"
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
     co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"

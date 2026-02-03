@@ -56,7 +56,7 @@ end
 
 function upper_plr_limit(mod::CM_StorageDrivenFuzzy, sim_params::Dict{String,Any})::Float64
     run_fuzzy!(mod.parameters, sim_params)
-    return 1
+    return mod.parameters["plr_limit"]
 end
 
 function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})    
