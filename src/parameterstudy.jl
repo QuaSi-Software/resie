@@ -299,7 +299,7 @@ function run_resie_variant(
     profile_values = Array{Float64}(undef, length(profile_paths), length(date_range)) 
 
     for (p_idx, path) in enumerate(profile_paths)
-        if profile_multipliers[p_idx] != 0 && profile_addons[p_idx] != 0 && profile_id == 0
+        if profile_multipliers[p_idx] != 1 && profile_addons[p_idx] != 0 && profile_id == 0
             new_paths[p_idx] = path
         else
             profile = Profile(path, sim_params)
@@ -456,10 +456,7 @@ function main(base_input_path, write_output)
     header = join([
                 #component parameters
                 "Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", "Battery_Capacity / Wh", #compontet parameters
-                
-                # price parameters #TODO delete?
-                "Stock_Price / €/MWh", "Reserve_Price / €/4h", 
-                
+
                 # no cost escalation
                 "annuity_no A_cap / €", "annuity_no A_cap_incentive / €", "annuity_no A_misc / €", "annuity_no A_op / €", "annuity_no A_energy / €", 
                 "annuity_no A_rev_control / €", "annuity_no A_rev_feed / €", "annuity_no A_total / €", "annuity_no A_total_incentive / €",
