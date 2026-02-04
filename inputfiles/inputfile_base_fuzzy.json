@@ -7,12 +7,16 @@
         "csv_time_unit": "date",
         "return_output_keys":  {
 	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
-			            "Photovoltaic->Grid_OUT", "WindFarm->Grid_OUT"],
-	        "ControlReserve": ["m_power:OUT"],
+			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->Boiler", "Photovoltaic->Demand_Power",
+                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->Boiler", "WindFarm->Demand_Power", 
+                        "Battery->Demand_Power"],
+	        "NegControlReserve": ["m_power:OUT"],
+            "PosControlReserve": ["m_power:IN"],
             "Demand_Heat":  ["Demand"],
             "Demand_Power": ["Demand"],
             "BUS_Power": ["Balance"], 
-            "BUS_Heat": ["Balance"]
+            "BUS_Heat": ["Balance"],
+            "Grid_IN": ["m_power:OUT"]
         },
         "output_plot": {
              "1": {
@@ -65,13 +69,13 @@
             },
             "10": {
                 "key": {"BufferTank": ["Load%"]},
-                "axis": "left",
+                "axis": "right",
                 "unit": "%",
                 "scale_factor": 1
             },
             "11": {
                 "key": {"Battery": ["Load%"]},
-                "axis": "left",
+                "axis": "right",
                 "unit": "%",
                 "scale_factor": 1
             },
@@ -82,10 +86,64 @@
 				"scale_factor": 0.001	
             },
             "13": {
-				"key":{"ControlReserve":["m_power:OUT"]},
+				"key":{"NegControlReserve":["m_power:OUT"]},
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001
+            },
+            "14": {
+                "key":{"HeatPump": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "15": {
+                "key":{"Boiler": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "24": {
+                "key":{"HeatPump": ["secondary_m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "25": {
+                "key":{"Boiler": ["secondary_m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "16": {
+                "key": {"m_heat": ["Boiler->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "17": {
+                "key": {"m_heat": ["HeatPump->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "18": {
+                "key": {"m_heat": ["Boiler->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "19": {
+                "key": {"m_heat": ["HeatPump->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "20": {
+                "key": {"m_heat": ["BufferTank->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
             }
         }
     },
@@ -108,11 +166,17 @@
             "medium": "m_power",
             "is_source": true
         },
-        "ControlReserve": {
+        "NegControlReserve": {
             "type": "FlexibleSupply",
             "output_refs": [
                 "BUS_Power"
             ],
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 0.0
+        },
+        "PosControlReserve": {
+            "type": "FlexibleSink",
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
             "scale": 0.0
@@ -142,12 +206,13 @@
             "m_el_out": "m_power"
         },
         "Heat_Source_HP": {
-            "type": "GridConnection",
+            "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
             ],
             "medium": "m_heat_source",
             "temperature_from_global_file": "temp_ambient_air",
+            "constant_power": 1e7,
             "is_source": true
         },
         "Heat_Source_FB": {
@@ -180,7 +245,7 @@
                 "m_heat_out_secondary": "BUS_Heat"
             },
             "has_secondary_interface": true,
-            "primary_el_sources": ["ControlReserve", "Photovoltaic", "WindFarm"],
+            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
             "power_th": 6.1e6,
             "__OPTIONAL_MEDIA__": "",
@@ -220,7 +285,7 @@
                 "m_heat_out_secondary": "BUS_Heat"
             },
             "has_secondary_interface": true,
-            "primary_el_sources": ["ControlReserve", "Photovoltaic", "WindFarm"],
+            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
             "power_th": 3.5e6,
             "__OPTIONAL_MEDIA__": "",
@@ -229,7 +294,7 @@
             "m_heat_out": "m_heat",
             "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
-            "cop_function": "const:1.01",
+            "cop_function": "const:1.0",
             "bypass_cop": 15.0,
             "min_power_function": "const:0.0",
             "max_power_function": "const:1.0",
@@ -242,13 +307,14 @@
             "medium": "m_power",
             "connections": {
                 "input_order": [
-                    "ControlReserve",
+                    "NegControlReserve",
                     "Photovoltaic",
                     "WindFarm",
                     "Grid_IN",
                     "Battery"
                 ],
                 "output_order": [
+                    "PosControlReserve",
                     "Demand_Power",
                     "HeatPump",
                     "Boiler",
@@ -256,11 +322,11 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
-                    [0, 0, 0, 0, 0],
-                    [1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1],
-                    [1, 1, 1, 0, 0],
-					[1, 0, 0, 0, 0]
+                    [0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 0, 0],
+					[1, 1, 0, 0, 0, 0]
                 ]
             }           
         },
