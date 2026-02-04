@@ -1,7 +1,7 @@
 """
 Implementation of a ground-coupled stratified thermal storage component.
 
-This can be a detailed model when FEM is enabled to simulate the ground-coupling of the 
+This can be a detailed model when FVM is enabled to simulate the ground-coupling of the 
 stratified storage. It has been validated against IEA ES Task 39 results for the following
 test cases: "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG".
 """
@@ -80,7 +80,7 @@ mutable struct SeasonalThermalStorage <: Component
     effective_ambient_temperature_top::Temperature
     effective_ambient_temperature_bottom::Temperature
 
-    # ground coupling FEM (optional)
+    # ground coupling FVM (optional)
     ground_domain_radius_factor::Float64
     ground_domain_depth_factor::Float64
     ground_domain_radius::Floathing
@@ -99,7 +99,7 @@ mutable struct SeasonalThermalStorage <: Component
     thermal_transmission_overlap::Float64
     bottom_soil_boundary::String
 
-    # FEM state (unified axisymmetric r-z soil domain)
+    # FVM state (unified axisymmetric r-z soil domain)
     soil_dr::Vector{Float64}
     soil_dz::Vector{Float64}
     soil_dr_mesh::Vector{Float64}
@@ -187,7 +187,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
                    default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
                    default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
-                   default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FEM"
+                   default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FVM"
                    default(config, "rho_medium", 1000.0),          # [kg/m^3] density of the medium 
                    default(config, "cp_medium", 4186),             # [J/kgK] specific thermal capacity of medium 
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
@@ -237,7 +237,7 @@ mutable struct SeasonalThermalStorage <: Component
                    0.0,                                                   # effective_ambient_temperature_top 
                    0.0,                                                   # effective_ambient_temperature_bottom
 
-                   # ground coupling FEM (unified)
+                   # ground coupling FVM (unified)
                    default(config, "ground_domain_radius_factor", 1.5),         # [m] ground_domain_radius_factor: Factor for the ground domain width, is multiplied with the radius of the storage at the ground surface.
                    default(config, "ground_domain_depth_factor", 2.0),          # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the total height of the storage.
                    default(config, "ground_domain_radius", nothing),            # [m] soil domain radius. If none given, it will be derived from the STES geometry.
@@ -256,7 +256,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "thermal_transmission_overlap", 0.25),       # [W/(m²·K)] thermal_transmission_overlap
                    default(config, "bottom_soil_boundary", "Neumann"),          # bottom_soil_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
 
-                   # FEM state (unified axisymmetric r-z soil domain)
+                   # FVM state (unified axisymmetric r-z soil domain)
                    Float64[],                                  # soil_dr
                    Float64[],                                  # soil_dz
                    Float64[],                                  # soil_dr_mesh
@@ -416,7 +416,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     unit.effective_ambient_temperature_top = unit.ambient_temperature
     unit.effective_ambient_temperature_bottom = unit.ground_temperature
 
-    if unit.ground_model == "FEM"
+    if unit.ground_model == "FVM"
         # get equivalent radii of bottom and lid of STES
         unit.equivalent_radius_bottom, equivalent_radius_top = equiv_radii_for_ground(unit)
 
@@ -436,18 +436,21 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         elseif unit.ground_domain_radius <= storage_radius_surface
             @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of the " *
                    "STES at the surface which is $(storage_radius_surface) m for the current configuration."
+            throw(InputError)
         end
         if unit.ground_domain_depth === nothing
             unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.height
         elseif unit.ground_domain_depth <= unit.h_stes_buried
             @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
                    "depth of the STES which is $(unit.h_stes_buried) m for the current configuration."
+            throw(InputError)
         end
         if unit.has_top_insulation_overlap &&
            (storage_radius_surface + unit.top_insulation_overlap_width) > unit.ground_domain_radius
             @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of " *
                    "the insulation overlap of the STES! Increase the `ground_domain_radius_factor` or decrease " *
                    "the `top_insulation_overlap_width`."
+            throw(InputError)
         end
 
         if unit.ground_layers_depths == [nothing]
@@ -460,8 +463,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
                   "to cover the whole ground depth. The corresponding ground properties were copied from the last given depth."
         end
 
-        # Prepare unified (r,z) soil FEM and allocate its output field
-        prepare_ground_fem_unified!(unit)
+        # Prepare unified (r,z) soil FVM and allocate its output field
+        prepare_ground_fvm_unified!(unit)
         nz = length(unit.soil_dz)
         nr = length(unit.soil_dr)
         unit.soil_temperature_field_output = zeros(Float64,
@@ -498,7 +501,8 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         # do nothing here
     else
         @error "In STES $(unit.uac), the given ground_model has to be either `simple` to use a constant surrounding " *
-               "ground temperature or `FEM` to use the FEM-model to model the surrounding soil."
+               "ground temperature or `FVM` to use the FVM-model to model the surrounding soil."
+        throw(InputError)
     end
 end
 
@@ -906,7 +910,7 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
     fig_name = "temperature_difference_surrounding_STES_$(unit.uac).html"
     PlotlyJS.savefig(p, output_path * "/" * fig_name)
 
-    if unit.ground_model == "FEM"
+    if unit.ground_model == "FVM"
         # ====================================
         # plot soil + storage temperatures
         # ====================================
@@ -1008,11 +1012,11 @@ function control(unit::SeasonalThermalStorage,
         unit.ground_temperature = Profiles.value_at_time(unit.ground_temperature_profile, sim_params)
     end
 
-    if unit.ground_model == "FEM"
-        # calculate effective ambient temperature for each layer (unified FEM)
-        update_ground_fem_unified_and_set_Teff!(unit, sim_params)
+    if unit.ground_model == "FVM"
+        # calculate effective ambient temperature for each layer (unified FVM)
+        update_ground_fvm_unified_and_set_Teff!(unit, sim_params)
 
-        # save unified FEM soil field for output
+        # save unified FVM soil field for output
         if sim_params["current_date"] >= sim_params["start_date_output"]
             sidx = Int(sim_params["time_since_output"] / sim_params["time_step_seconds"]) + 1
             if size(unit.soil_temperature_field_output, 1) >= sidx
@@ -1769,7 +1773,7 @@ function get_soil_temperature(unit::SeasonalThermalStorage, r_m::Real, z_m::Real
         r_m *= unit.equivalent_radius_bottom / unit.radius_small
     end
 
-    @assert unit.ground_model == "FEM" "get_soil_temperature is only valid for ground_model == \"FEM\"."
+    @assert unit.ground_model == "FVM" "get_soil_temperature is only valid for ground_model == \"FVM\"."
 
     rc = unit.soil_r_centers              # [m]
     zc = unit.soil_z_centers              # [m], depth from ground surface downward
@@ -2051,7 +2055,7 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-# === Ground coupling FEM for STES (unified axisymmetric r–z domain) ===
+# === Ground coupling FVM for STES (unified axisymmetric r–z domain) ===
 
 """
     create_geometric_mesh(min_mesh_width::Float64,
@@ -2205,7 +2209,7 @@ function equiv_radii_for_ground(unit::SeasonalThermalStorage)
     end
 end
 
-function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
+function prepare_ground_fvm_unified!(unit::SeasonalThermalStorage)
     # ----------------------------
     # 1) Basic geometry
     # ----------------------------
@@ -2244,8 +2248,9 @@ function prepare_ground_fem_unified!(unit::SeasonalThermalStorage)
                                unit.ground_accuracy_mode == "high" ? (mindz / 4, 2.0, 2, 2.0) :
                                unit.ground_accuracy_mode == "very_high" ? (mindz / 8, 1.0, 3, 2.0) :
                                unit.ground_accuracy_mode == "IEA_ES_39" ? (mindz / 2.74, 16, 1, 2.0) :  # IEA-ES Task 39 mesh definition
-                               error("In STES $(unit.uac), ground_accuracy_mode must be one of: " *
-                                     "very_rough, rough, normal, high, very_high.")
+                               @error("In STES $(unit.uac), ground_accuracy_mode must be one of: " *
+                                      "very_rough, rough, normal, high, very_high.") &
+                               throw(InputError)
 
     min_w = max(min_w, 1e-4)
     max_w = max(max_w, min_w)
@@ -2586,7 +2591,7 @@ function teff_from_cellcenter(T_tank::Float64, T_cell::Float64, U::Float64, Ueff
     return T_tank - (Ueff / U) * (T_tank - T_cell)
 end
 
-function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
+function update_ground_fvm_unified_and_set_Teff!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     T_base = solve_soil_unified!(unit, sim_params)
 
     nz = length(unit.soil_z_centers)
@@ -2595,7 +2600,7 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
     nbur = unit.number_of_STES_layer_below_ground
     cum_dz_below = nbur > 0 ? cumsum(unit.dz[1:nbur]) : Float64[]
 
-    # ---------- 1) compute FEM wall heat flow per buried STES layer ----------
+    # ---------- 1) compute FVM wall heat flow per buried STES layer ----------
     Q_side = zeros(Float64, nbur)  # [W], positive = heat leaving tank into soil
 
     for h in 1:nz
@@ -2631,7 +2636,7 @@ function update_ground_fem_unified_and_set_Teff!(unit::SeasonalThermalStorage, s
         U = unit.thermal_transmission_barrels[k]
         Ueff = effective_U_to_cellcenter(U, unit.row_k[h], d_soil)
 
-        # wall area represented by this row (must match the FEM assembly)
+        # wall area represented by this row (must match the FVM assembly)
         A_face = 2pi * r_wall * unit.soil_dz[h] * unit.sidewall_increase_factor
 
         Q_side[k] += Ueff * A_face * (unit.temperature_segments[k] - T_cell)
