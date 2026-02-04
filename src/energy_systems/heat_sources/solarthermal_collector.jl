@@ -8,168 +8,549 @@ Works for flat plate collectors, vacuum tube collectors and PVT modules.
 The calculation is based on EN ISO 9806:2017 for quasi-dynamic models.
 """
 
+#! format: off
+const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "ambient_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to ambient temperature profile file",
+        display_name="Ambient temp. profile",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_from_global_file", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "ambient_temperature_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with the ambient temperature profile",
+        display_name="Global file amb. temp. key",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_ambient_temperature" => (
+        default=nothing,
+        description="Constant ambient temperature value",
+        display_name="Constant ambient temp.",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("ambient_temperature_from_global_file", "mutex")
+        ],
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "beam_solar_radiation_profile_file_path" => (
+        default=nothing,
+        description="Path to beam solar radiation profile file",
+        display_name="Beam solar rad. profile",
+        required=false,
+        conditionals=[
+            ("beam_solar_radiation_from_global_file", "mutex"),
+            ("constant_beam_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "beam_solar_radiation_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with beam solar radiation",
+        display_name="Global file beam rad. key",
+        required=false,
+        conditionals=[
+            ("beam_solar_radiation_profile_file_path", "mutex"),
+            ("constant_beam_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_beam_solar_radiation" => (
+        default=nothing,
+        description="Constant beam solar radiation value",
+        display_name="Constant beam solar rad.",
+        required=false,
+        conditionals=[
+            ("beam_solar_radiation_profile_file_path", "mutex"),
+            ("beam_solar_radiation_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2"
+    ),
+    "diffuse_solar_radiation_profile_file_path" => (
+        default=nothing,
+        description="Path to diffuse solar radiation profile file",
+        display_name="Diffuse solar rad. profile",
+        required=false,
+        conditionals=[
+            ("diffuse_solar_radiation_from_global_file", "mutex"),
+            ("constant_diffuse_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "diffuse_solar_radiation_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with diffuse solar radiation",
+        display_name="Global file diffuse rad. key",
+        required=false,
+        conditionals=[
+            ("diffuse_solar_radiation_profile_file_path", "mutex"),
+            ("constant_diffuse_solar_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_diffuse_solar_radiation" => (
+        default=nothing,
+        description="Constant diffuse solar radiation value",
+        display_name="Constant diffuse solar rad.",
+        required=false,
+        conditionals=[
+            ("diffuse_solar_radiation_profile_file_path", "mutex"),
+            ("diffuse_solar_radiation_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2"
+    ),
+    "infrared_sky_radiation_profile_file_path" => (
+        default=nothing,
+        description="Path to long wave infrared sky radiation profile file",
+        display_name="Infrared sky rad. profile",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_from_global_file", "mutex"),
+            ("constant_infrared_sky_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "infrared_sky_radiation_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with infrared sky radiation",
+        display_name="Global file infrared rad. key",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_profile_file_path", "mutex"),
+            ("constant_infrared_sky_radiation", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_infrared_sky_radiation" => (
+        default=nothing,
+        description="Constant long wave infrared sky radiation value",
+        display_name="Constant infrared sky rad.",
+        required=false,
+        conditionals=[
+            ("infrared_sky_radiation_profile_file_path", "mutex"),
+            ("infrared_sky_radiation_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m²"
+    ),
+    "wind_speed_profile_file_path" => (
+        default=nothing,
+        description="Path to wind speed profile file",
+        display_name="Wind speed profile",
+        required=false,
+        conditionals=[
+            ("wind_speed_from_global_file", "mutex"),
+            ("constant_wind_speed", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "wind_speed_from_global_file" => (
+        default=nothing,
+        description="If given points to a key in the global weather data file with wind speed",
+        display_name="Global file wind speed key",
+        required=false,
+        conditionals=[
+            ("wind_speed_profile_file_path", "mutex"),
+            ("constant_wind_speed", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_wind_speed" => (
+        default=nothing,
+        description="Constant wind speed value",
+        display_name="Constant wind speed",
+        required=false,
+        conditionals=[
+            ("wind_speed_profile_file_path", "mutex"),
+            ("wind_speed_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m/s"
+    ),
+    "collector_gross_area" => (
+        default=nothing,
+        description="Gross area of the solarthermal collector",
+        display_name="Collector gross area",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="m^2"
+    ),
+    "tilt_angle" => (
+        default=nothing,
+        description="Tilt angle of the collector between 0° (horizontal) and 90° (vertical)",
+        display_name="Tilt angle",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="°"
+    ),
+    "azimuth_angle" => (
+        default=nothing,
+        description="Azimuth angle (orientation) of the collector between -180° and 180° " *
+                    "with 0°=south, -90°=east, 90°=west",
+        display_name="Azimuth angle",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="°"
+    ),
+    "ground_reflectance" => (
+        default=0.2,
+        description="Reflectance (albedo) of the ground around the collector",
+        display_name="Ground reflectance",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "eta_0_b" => (
+        default=nothing,
+        description="Zero-loss efficiency eta_0_b at (mean_temp - ambient_temp)=0 K based " *
+                    "on beam solar irradiance. From Solar Keymark database.",
+        display_name="Zero-loss eff. eta_0_b",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "K_b_t_array" => (
+        default=nothing,
+        description="Array with transversal incidence angle modifier values from 10° to " *
+                    "90°. Use null for interpolation.",
+        display_name="K_b transversal array",
+        required=true,
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "K_b_l_array" => (
+        default=nothing,
+        description="Array with longitudinal incidence angle modifier values from 10° to " *
+                    "90°. Use null for interpolation.",
+        display_name="K_b longitudinal array",
+        required=true,
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "K_d" => (
+        default=nothing,
+        description="Incidence angle modifier for diffuse irradiance. From Solar Keymark database.",
+        display_name="Diffuse incidence angle modifier K_d",
+        required=true,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "a_params" => (
+        default=nothing,
+        description="Parameters a1-a8 defining the collector according to EN ISO " *
+                    "9806:2017. From Solar Keymark database.",
+        display_name="ISO 9806:2017 a-parameters",
+        required=true,
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "vol_heat_capacity" => (
+        default=4.2e6,
+        description="Volumetric heat capacity of the heat transfer fluid in the collector",
+        display_name="Volumetric heat capacity",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="J/m^3*K"
+    ),
+    "wind_speed_reduction" => (
+        default=1.0,
+        description="Factor to adjust wind speed to account for different wind conditions vs. 10 m height reference",
+        display_name="Wind speed reduction factor",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "delta_T" => (
+        default=nothing,
+        description="Constant temperature difference between collector input and output. " *
+                    "Either delta_T or spec_flow_rate must be defined.",
+        display_name="Temperature difference",
+        required=false,
+        conditionals=[("spec_flow_rate", "mutex")],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "spec_flow_rate" => (
+        default=nothing,
+        description="Constant specific flow rate per m² collector area. Either " *
+                    "spec_flow_rate or delta_T must be defined.",
+        display_name="Specific flow rate",
+        required=false,
+        conditionals=[("delta_T", "mutex")],
+        type=Float64,
+        json_type="number",
+        unit="m^3/s*m^2"
+    ),
+    "spec_flow_rate_min" => (
+        default=0.000002,
+        description="Minimal spec_flow_rate to start producing energy; used together with delta_T",
+        display_name="Min. specific flow rate",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="m^3/s*m^2"
+    ),
+    "delta_T_min" => (
+        default=2.0,
+        description="Minimal delta_T to start producing energy; used together with spec_flow_rate",
+        display_name="Min. temperature difference",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="K"
+    )
+)
+#! format: on
+
 mutable struct SolarthermalCollector <: Component
-    # general
+    ## general
     uac::String
     controller::Controller
     sys_function::SystemFunction
-
     input_interfaces::InterfaceMap
     output_interfaces::InterfaceMap
     m_heat_out::Symbol
-    # collector installation
+
+    ## collector installation
     collector_gross_area::Float64
     tilt_angle::Float64
     azimuth_angle::Float64
     ground_reflectance::Float64
-    # collector parameters
+
+    ## collector parameters
     eta_0_b::Float64
+    # row1: angle 0° to 90°/vertical/west
+    # row2: transversal/tilt
+    # row3: longitudinal/azimuth/orientation
     K_b_array::Array{Union{Missing,Float64},2}
+    # interpolation functions
     K_b_itp::Tuple{AbstractArray,AbstractArray}
+    # calculated from K_b_array in control()
     K_b::Float64
     K_d::Float64
     a_params::Array{Float64,1}
+    # equals Boltzmann-constant
     sigma::Float64
     vol_heat_cap::Float64
-    # weather profiles
+
+    ## weather profiles
     ambient_temperature_profile::Union{Profile,Nothing}
     beam_solar_hor_irradiance_profile::Union{Profile,Nothing}
     diffuse_solar_hor_irradiance_profile::Union{Profile,Nothing}
     long_wave_irradiance_profile::Union{Profile,Nothing}
     wind_speed_profile::Union{Profile,Nothing}
-    # weather parameters
+
+    ## weather parameters
     wind_speed_reduction::Float64
     ambient_temperature::Temperature
+    # diffuse_solar_irradiance_in_plane in [W/m²]
     beam_solar_irradiance_in_plane::Float64
+    # diffuse_solar_irradiance_in_plane [W/m²]
     diffuse_solar_irradiance_in_plane::Float64
     reduced_wind_speed::Floathing
     beam_solar_hor_irradiance::Floathing
     diffuse_solar_hor_irradiance::Floathing
     long_wave_irradiance::Floathing
+    # direct_normal_irradiance calculated from sun position [W/m²]
     direct_normal_irradiance::Float64
-    # operation parameters
+
+    ## operation parameters
     delta_T::Union{Float64,Nothing}
     spec_flow_rate::Floathing
     delta_T_min::Union{Float64,Nothing}
     spec_flow_rate_min::Floathing
-    # results
+
+    ## results
+    # energy that was removed from the system in current time step
     used_energy::Array{Floathing}
+    # output temperature in current time step, calculated in control()
     output_temperature::Temperature
+    # average temperature in current time step, calculated in control()
     average_temperature::Temperature
+    # average temperature from last time step, calculated in control()
     last_average_temperature::Temperature
+    # actual flow rate resulting from simulation and used energy
     spec_flow_rate_actual::Floathing
+    # actual delta_T resulting from simulation and written to output
     delta_T_actual::Float64
-    # internal parameters for temperature layers
+
+    ## internal parameters for temperature layers
+    # list of available_energies in for each component connected to the collector
     available_energies::Array{Floathing}
+    # list of average_temperatures in for each component connected to the collector
     average_temperatures::Array{Floathing}
+    # list of output_temperatures in for each component connected to the collector
     output_temperatures::Array{Floathing}
+    # list of runtimes at different temperature levels for each component connected to the collector
     runtimes::Array{Floathing}
+    # list of all calculated output temperature and output energy pairs
     temperature_energy_pairs::Dict{Temperature,Tuple}
+    # uacs for which energy was calculated
     calc_uacs::Array{Stringing}
     mean_ambient_temperature::Float64
 
     function SolarthermalCollector(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        const_ambient_temperature,
-        ambient_temperature_profile = get_parameter_profile_from_config(config, sim_params, "ambient_temperature",
-                                                                        "ambient_temperature_profile_file_path",
-                                                                        "ambient_temperature_from_global_file",
-                                                                        "constant_ambient_temperature", uac;
-                                                                        required=true) # °C
-        const_beam_solar_hor_irradiance,
-        beam_solar_hor_irradiance_profile = get_parameter_profile_from_config(config, sim_params,
-                                                                              "beam_solar_radiation",
-                                                                              "beam_solar_radiation_profile_file_path",
-                                                                              "beam_solar_radiation_from_global_file",
-                                                                              "constant_beam_solar_radiation", uac;
-                                                                              required=true) # Wh/m²
-        const_long_wave_irradiance,
-        long_wave_irradiance_profile = get_parameter_profile_from_config(config, sim_params,
-                                                                         "infrared_sky_radiation",
-                                                                         "infrared_sky_radiation_profile_file_path",
-                                                                         "infrared_sky_radiation_from_global_file",
-                                                                         "constant_infrared_sky_radiation", uac;
-                                                                         required=true) # Wh/m²
-        const_diffuse_hor_irradiance,
-        diffuse_solar_hor_irradiance_profile = get_parameter_profile_from_config(config, sim_params,
-                                                                                 "diffuse_solar_radiation",
-                                                                                 "diffuse_solar_radiation_profile_file_path",
-                                                                                 "diffuse_solar_radiation_from_global_file",
-                                                                                 "constant_diffuse_solar_radiation",
-                                                                                 uac; required=true) # Wh/m²
-        const_wind_speed,
-        wind_speed_profile = get_parameter_profile_from_config(config, sim_params, "wind_speed",
-                                                               "wind_speed_profile_file_path",
-                                                               "wind_speed_from_global_file",
-                                                               "constant_wind_speed", uac; required=true) # m/s
-        if const_wind_speed === nothing
-            const_wind_speed = 0
-        else
-            const_wind_speed = max(const_wind_speed * default(config, "wind_speed_reduction", 1.0) - 3, 0)
-        end
-
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        register_media([m_heat_out])
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_flexible_source, # sys_function
-                   InterfaceMap(), # input_interfaces
-                   InterfaceMap(m_heat_out => nothing), # output_interfaces
-                   m_heat_out, # medium name of output interface
-                   # collector installation
-                   config["collector_gross_area"], # gross area of collector
-                   config["tilt_angle"], # tilt angle
-                   config["azimuth_angle"], # azimuth angle or orientation angle
-                   default(config, "ground_reflectance", 0.2), # reflectance of the ground around the collector
-                   # collector parameters
-                   config["eta_0_b"],
-                   vcat([10, 20, 30, 40, 50, 60, 70, 80, 90]', config["K_b_t_array"]', config["K_b_l_array"]'),
-                   # row1: angle 0° to 90°/vertical/west, 
-                   # row2: transversal/tilt, 
-                   # row3: longitudinal/azimuth/orientation
-                   ([], []), # initialise Interpolation functions for K_b
-                   1, # Calculate K_b from K_b_array in control()
-                   config["K_d"], # collector parameter for diffuse irradiance 
-                   config["a_params"], # collector sim_params a1 to a8 corresponding to EN ISO 9806:2017
-                   5.670374419 * 10^-8, # Stefan Boltzmann Constant
-                   default(config, "vol_heat_capacity", 4.2e6), # volumetric heat capacity of the fluid in the collector in [J/(m³*K)]
-                   # weather profiles
-                   ambient_temperature_profile,
-                   beam_solar_hor_irradiance_profile,
-                   diffuse_solar_hor_irradiance_profile,
-                   long_wave_irradiance_profile,
-                   wind_speed_profile,
-                   # weather parameters
-                   default(config, "wind_speed_reduction", 1.0), # adjust the wind speed by this factor to account for different wind conditions compared to measured wind speed at 10m height
-                   const_ambient_temperature, # ambient temperature [°C]
-                   0.0, # beam_solar_irradiance in collector plane [W/m²]
-                   0.0, # diffuse_solar_irradiance_in_plane [W/m²]
-                   const_wind_speed, # wind_speed multiplied with wind speed reduction [m/s]
-                   const_beam_solar_hor_irradiance, # beam horizontal irradiance [W/m²]
-                   const_diffuse_hor_irradiance, # diffuse horizontal irradiance [W/m²]
-                   const_long_wave_irradiance, # long wave irradiance [W/m²]
-                   0.0, # direct_normal_irradiance calculated from sun position [W/m²]
-                   # operation parameters
-                   default(config, "delta_T", nothing), # delta_T between input and output temperature in [K]
-                   default(config, "spec_flow_rate", nothing), # nominal specific volume flow of the thermal collector in [m³/(m²*s)]
-                   default(config, "delta_T_min", 2), # minimal delta_T between input and output temperature for the collector to start producing energy in K; used together with spec_flow_rate
-                   default(config, "spec_flow_rate_min", 0.000002), # minimal specific volume flow of the thermal collector to start producing energy in m³/(m²*s); used together with delta_T
-                   # results
-                   [], # energy that was removed from the system in current time step
-                   0.0, # output temperature in current time step, calculated in control()
-                   0.0, # average temperature in current time step, calculated in control()
-                   0.0, # average temperature from last time step, calculated in control()
-                   0.0, # actual flow rate resulting from simulation and used energy
-                   0.0, # actual delta_T resulting from simulation and written to output
-                   # internal parameters for temperature layers
-                   [], # list of available_energies in for each component connected to the collector
-                   [], # list of average_temperatures in for each component connected to the collector
-                   [], # list of output_temperatures in for each component connected to the collector
-                   [], # list of runtimes at different temperature levels for each component connected to the collector
-                   Dict{Temperature,Tuple}(), # list of all calculated output temperature and output energy pairs
-                   [], # uacs for which energy was calculated
-                   10.0)
+        new(SSOT_parameter_constructor(SolarthermalCollector, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{SolarthermalCollector})::Dict{String,NamedTuple}
+    return deepcopy(SOLARTHERMAL_COLLECTOR_PARAMETERS)
+end
+
+function extract_parameter(x::Type{SolarthermalCollector}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name in ("ambient_temperature_from_global_file", "beam_solar_radiation_from_global_file",
+                      "infrared_sky_radiation_from_global_file", "diffuse_solar_radiation_from_global_file",
+                      "wind_speed_from_global_file")
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name in ("ambient_temperature_profile_file_path", "beam_solar_radiation_profile_file_path",
+                          "infrared_sky_radiation_profile_file_path", "diffuse_solar_radiation_profile_file_path",
+                          "wind_speed_profile_file_path")
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name in ("constant_ambient_temperature", "constant_beam_solar_radiation",
+                          "constant_infrared_sky_radiation", "constant_diffuse_solar_radiation", "constant_wind_speed")
+        if occursin("temperature", param_name)
+            return convert(Temperature, default(config, param_name, nothing))
+        else
+            return convert(Floathing, default(config, param_name, nothing))
+        end
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{SolarthermalCollector}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(SolarthermalCollector))
+end
+
+function init_from_params(x::Type{SolarthermalCollector}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    m_heat_out = Symbol(params["m_heat_out"])
+    register_media([m_heat_out])
+
+    const_wind_speed = params["constant_wind_speed"]
+    if const_wind_speed === nothing
+        const_wind_speed = 0.0
+    else
+        const_wind_speed = max(0.0, const_wind_speed * params["wind_speed_reduction"] - 3.0)
+    end
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_flexible_source,
+            InterfaceMap(),
+            InterfaceMap(m_heat_out => nothing),
+            m_heat_out,
+            params["collector_gross_area"],
+            params["tilt_angle"],
+            params["azimuth_angle"],
+            params["ground_reflectance"],
+            params["eta_0_b"],
+            # K_b_array
+            vcat([10, 20, 30, 40, 50, 60, 70, 80, 90]', params["K_b_t_array"]', params["K_b_l_array"]'),
+            ([], []), # K_b_itp
+            1,        # K_b
+            params["K_d"],
+            params["a_params"],
+            5.670374419 * 10^-8, # sigma
+            params["vol_heat_capacity"],
+            some_or_none(params["ambient_temperature_profile_file_path"],
+                         params["ambient_temperature_from_global_file"]),
+            some_or_none(params["beam_solar_radiation_profile_file_path"],
+                         params["beam_solar_radiation_from_global_file"]),
+            some_or_none(params["diffuse_solar_radiation_profile_file_path"],
+                         params["diffuse_solar_radiation_from_global_file"]),
+            some_or_none(params["infrared_sky_radiation_profile_file_path"],
+                         params["infrared_sky_radiation_from_global_file"]),
+            some_or_none(params["wind_speed_profile_file_path"],
+                         params["wind_speed_from_global_file"]),
+            params["wind_speed_reduction"],
+            params["constant_ambient_temperature"],
+            0.0, # beam_solar_irradiance_in_plane
+            0.0, # diffuse_solar_irradiance_in_plane
+            const_wind_speed,
+            params["constant_beam_solar_radiation"],
+            params["constant_diffuse_solar_radiation"],
+            params["constant_infrared_sky_radiation"],
+            0.0, # direct_normal_irradiance
+            params["delta_T"],
+            params["spec_flow_rate"],
+            params["delta_T_min"],
+            params["spec_flow_rate_min"],
+            [],   # used_energy
+            0.0,  # output_temperature
+            0.0,  # average_temperature
+            0.0,  # last_average_temperature
+            0.0,  # spec_flow_rate_actual
+            0.0,  # delta_T_actual
+            [],   # available_energies
+            [],   # average_temperatures
+            [],   # output_temperatures
+            [],   # runtimes
+            Dict{Temperature,Tuple}(), # temperature_energy_pairs
+            [],   # calc_uacs
+            10.0) # mean_ambient_temperature
 end
 
 function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
