@@ -30,7 +30,7 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems
 ############################################################
 
 # HeatPump power (W)
-Pth_HP_lo   = 1.0e6         # lower limit
+Pth_HP_lo   = 0.0e6         # lower limit
 Pth_HP_hi   = 10.0e6         # upper limit
 Pth_HP_step = 1.0e6         # step size
 Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
