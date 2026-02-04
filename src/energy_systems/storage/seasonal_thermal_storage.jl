@@ -97,7 +97,7 @@ mutable struct SeasonalThermalStorage <: Component
     has_top_insulation_overlap::Bool
     top_insulation_overlap_width::Float64
     thermal_transmission_overlap::Float64
-    bottom_soil_boundary::String
+    ground_bottom_boundary::String
 
     # FVM state (unified axisymmetric r-z soil domain)
     soil_dr::Vector{Float64}
@@ -254,7 +254,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "has_top_insulation_overlap", false),        # [Bool] has_top_insulation_overlap
                    default(config, "top_insulation_overlap_width", 5.0),        # [m] top_insulation_overlap_width
                    default(config, "thermal_transmission_overlap", 0.25),       # [W/(m²·K)] thermal_transmission_overlap
-                   default(config, "bottom_soil_boundary", "Neumann"),          # bottom_soil_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
+                   default(config, "ground_bottom_boundary", "Neumann"),        # ground_bottom_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
 
                    # FVM state (unified axisymmetric r-z soil domain)
                    Float64[],                                  # soil_dr
@@ -2414,7 +2414,7 @@ function solve_soil_unified!(unit::SeasonalThermalStorage, sim_params::Dict{Stri
         end
 
         # Deep boundary: Dirichlet to ground temp. If Neumann, do nothing here.
-        if h == nz && unit.bottom_soil_boundary == "Dirichlet" # bottom boundary to constant ground_temperature
+        if h == nz && unit.ground_bottom_boundary == "Dirichlet" # bottom boundary to constant ground_temperature
             push!(I, p)
             push!(J, p)
             push!(V, 1.0)
