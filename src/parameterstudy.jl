@@ -30,27 +30,27 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems
 ############################################################
 
 # HeatPump power (W)
-Pth_HP_lo   = 5.5e6         # lower limit
-Pth_HP_hi   = 6.5e6         # upper limit
-Pth_HP_step = 0.2e6         # step size
+Pth_HP_lo   = 1.0e6         # lower limit
+Pth_HP_hi   = 10.0e6         # upper limit
+Pth_HP_step = 1.0e6         # step size
 Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
 
 # Boiler power (W)
-Pth_Boiler_lo   = 3.1e6     # lower limit
-Pth_Boiler_hi   = 3.9e6     # upper limit
-Pth_Boiler_step = 0.2e6     # step size
+Pth_Boiler_lo   = 0.0e6     # lower limit
+Pth_Boiler_hi   = 5.0e6     # upper limit
+Pth_Boiler_step = 0.5e6     # step size
 Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 61.0e6        # lower limit
-Cap_hi_Wh   = 69.0e6        # upper limit
-Cap_step_Wh = 2.0e6         # step size
+Cap_lo_Wh   = 20.0e6        # lower limit
+Cap_hi_Wh   = 80.0e6        # upper limit
+Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
 Batt_lo_Wh   = 0e3          # lower limit
-Batt_hi_Wh   = 450e3        # upper limit
-Batt_step_Wh = 150e3        # step size
+Batt_hi_Wh   = 0e3        # upper limit
+Batt_step_Wh = 0.5e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of
