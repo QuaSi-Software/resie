@@ -1986,7 +1986,7 @@ function find_parallels(components)
                  && has_grid_input(unit, outface.target.uac)
                  && !(old_uac !== "" && !has_grid_output(unit, old_uac)))
                 || (old_uac !== "" && !connection_allowed(unit, old_uac, outface.target.uac))
-                || (outface.target === EnergySystems.sf_transformer && !(outface.target in components)))
+                || (outface.target.sys_function === EnergySystems.sf_transformer && !(outface.target in components)))
                 continue
             end
             new_path = copy(path)

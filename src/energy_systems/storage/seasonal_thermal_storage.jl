@@ -605,7 +605,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
                    "For a given h/r ratio of $(hr), the slope angle must be greater than $(round(alpha_min; digits=2))° and " *
                    "less than $(round(alpha_max; digits=2))°. For a given slope angle of $(alpha)°, the h/r ratio must be " *
                    "less than $(round(hr_max; digits=2))."
-            throw(InputError)
+            throw(InputError())
         end
 
         height = hr * (radius_large + radius_small) / 2
@@ -673,7 +673,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
     else
         @error "Invalid shape type of seasonal thermal storage $(uac). Shape has to be 'round' or 'quadratic'!"
-        throw(InputError)
+        throw(InputError())
     end
 end
 

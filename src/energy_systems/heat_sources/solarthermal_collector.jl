@@ -179,7 +179,7 @@ function initialise!(unit::SolarthermalCollector, sim_params::Dict{String,Any})
     if sim_params["longitude"] === nothing || sim_params["latitude"] === nothing
         @error "Longitude and latitude must be provided through a weather file or in the 
         simulation parameters to calculate the sun position."
-        throw(InputError)
+        throw(InputError())
     end
 
     unit.output_temperature = Profiles.value_at_time(unit.ambient_temperature_profile, sim_params)
@@ -466,7 +466,7 @@ function get_output_temperature_bounds(unit::SolarthermalCollector,
 
     else
         @error "Error in config file: Exclusively delta_T OR spec_flow_rate must have a value"
-        throw(InputError)
+        throw(InputError())
     end
 
     unit.temperature_energy_pairs[current_max_temperature] = (energy_at_max_temp,
@@ -538,7 +538,7 @@ function calculate_output_energy_from_output_temperature(unit::SolarthermalColle
 
     else
         @error "Error in config file: Exclusively delta_T OR spec_flow_rate must have a value"
-        throw(InputError)
+        throw(InputError())
     end
 
     unit.temperature_energy_pairs[minimum_output_temperature] = (p_spec_th, t_avg, t_target)
