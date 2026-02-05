@@ -1,0 +1,255 @@
+{
+    "io_settings": {
+        "sankey_plot": "default",
+        "csv_time_unit": "date",
+        "csv_output_keys": "all_incl_flows",
+        "output_plot": "all_incl_flows"
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "07.01.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds"
+    },
+    "components": {
+        "TST_DEM_01": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_e_ac_230v",
+            "energy_profile_file_path": "./profiles/district/demand_electricity_85Living_15Business.prf",
+            "scale": 1000.0,
+            "import_data": {
+                "node_position": {
+                    "x": -72,
+                    "y": -34
+                },
+                "node_type": "Demand",
+                "connection_handles": []
+            }
+        },
+        "TST_DEM_02": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_h_w_ht1",
+            "constant_temperature": 58.0,
+            "energy_profile_file_path": "./profiles/district/demand_heating_and_Water_85Living.prf",
+            "scale": 1000.0,
+            "import_data": {
+                "node_position": {
+                    "x": -66,
+                    "y": 42
+                },
+                "node_type": "Demand",
+                "connection_handles": []
+            }
+        },
+        "TST_HP_01": {
+            "type": "HeatPump",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "power_th": 4000,
+            "m_heat_in": "m_h_w_lt1",
+            "m_el_in": "m_e_ac_230v",
+            "m_heat_out": "m_h_w_ht1",
+            "model_type": "simplified",
+            "cop_function": "carnot:0.4",
+            "bypass_cop": 10,
+            "min_power_function": "const:0.0",
+            "max_power_function": "const:1.0",
+            "heat_losses_factor": 0.95,
+            "power_losses_factor": 0.97,
+            "min_usage_fraction": 0.1,
+            "consider_icing": true,
+            "import_data": {
+                "node_position": {
+                    "x": -329,
+                    "y": 44.5
+                },
+                "node_type": "HeatPump",
+                "connection_handles": [
+                    [
+                        0,
+                        0
+                    ]
+                ]
+            }
+        },
+        "TST_BFT_01": {
+            "type": "Buffertank",
+            "output_refs": [
+                "TST_BUS_01"
+            ],
+            "medium": "m_h_w_ht1",
+            "capacity": 20000,
+            "model_type": "ideally_stratified",
+            "high_temperature": 63.0,
+            "low_temperature": 25.0,
+            "initial_load": 0.5,
+            "max_load_rate": 1,
+            "max_unload_rate": 1.5,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 4,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 0.4,
+            "thermal_transmission_barrel": 0.3,
+            "thermal_transmission_bottom": 1.0,
+            "import_data": {
+                "node_position": {
+                    "x": -188.5,
+                    "y": 106.5
+                },
+                "node_type": "Buffertank",
+                "connection_handles": [
+                    [
+                        0,
+                        0
+                    ]
+                ]
+            }
+        },
+        "TST_BUS_01": {
+            "type": "Bus",
+            "medium": "FILL_IN",
+            "connections": {
+                "input_order": [
+                    "TST_BFT_01",
+                    "TST_HP_01"
+                ],
+                "output_order": [
+                    "TST_BFT_01",
+                    "TST_DEM_02"
+                ],
+                "energy_flow": [
+                    [1,1],
+                    [1,1]
+                ]
+            },
+            "import_data": {
+                "node_position": {
+                    "x": -188,
+                    "y": 36.5
+                },
+                "node_type": "Bus"
+            }
+        },
+        "TST_BUS_02": {
+            "type": "Bus",
+            "medium": "FILL_IN",
+            "connections": {
+                "input_order": [
+                    "TST_GRI_01",
+                    "TST_PV_01",
+                    "TST_BAT_01"
+                ],
+                "output_order": [
+                    "TST_DEM_01",
+                    "TST_HP_01",
+                    "TST_BAT_01"
+                ],
+                "energy_flow": [
+                    [1,1,0],
+                    [1,1,1],
+                    [1,1,0]
+                ]
+            },
+            "import_data": {
+                "node_position": {
+                    "x": -432,
+                    "y": -34
+                },
+                "node_type": "Bus"
+            }
+        },
+        "TST_SRC_01": {
+            "type": "BoundedSupply",
+            "output_refs": [
+                "TST_HP_01"
+            ],
+            "medium": "m_h_w_lt1",
+            "constant_power": 100000,
+            "temperature_profile_file_path": "./profiles/district/ambient_temperature_TRY2015_Stuttgart.prf",
+            "import_data": {
+                "node_position": {
+                    "x": -463.5,
+                    "y": 51.5
+                },
+                "node_type": "BoundedSupply",
+                "connection_handles": [
+                    [
+                        0,
+                        1
+                    ]
+                ]
+            }
+        },
+        "TST_GRI_01": {
+            "type": "GridConnection",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "medium": "m_e_ac_230v",
+            "is_source": true,
+            "import_data": {
+                "node_position": {
+                    "x": -586.5,
+                    "y": -41
+                },
+                "node_type": "GridInput",
+                "connection_handles": [
+                    [
+                        0,
+                        0
+                    ]
+                ]
+            }
+        },
+        "TST_PV_01": {
+            "type": "Pvplant",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "energy_profile_file_path": "./profiles/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 4000,
+            "m_el_out": "m_e_ac_230v",
+            "import_data": {
+                "node_position": {
+                    "x": -585,
+                    "y": -120.5
+                },
+                "node_type": "Pvplant",
+                "connection_handles": [
+                    [
+                        0,
+                        0
+                    ]
+                ]
+            }
+        },
+        "TST_BAT_01": {
+            "type": "Battery",
+            "output_refs": [
+                "TST_BUS_02"
+            ],
+            "medium": "m_e_ac_230v",
+            "capacity": 10000,
+            "initial_charge": 5000,
+            "import_data": {
+                "node_position": {
+                    "x": -431,
+                    "y": -106.5
+                },
+                "node_type": "Battery",
+                "connection_handles": [
+                    [
+                        0,
+                        0
+                    ]
+                ]
+            }
+        }
+    }
+}
