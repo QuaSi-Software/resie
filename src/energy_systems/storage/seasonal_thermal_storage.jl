@@ -189,7 +189,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
                    default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FVM"
                    default(config, "rho_medium", 1000.0),          # [kg/m^3] density of the medium 
-                   default(config, "cp_medium", 4186),             # [J/kgK] specific thermal capacity of medium 
+                   default(config, "cp_medium", 4180),             # [J/kgK] specific thermal capacity of medium 
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
                    0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
                    0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
