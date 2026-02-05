@@ -7,10 +7,11 @@ export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
+Custom error type for exception `InputError` as alias to `ArgumentError`.
+Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-struct InputError <: Exception end
+const InputError = ArgumentError
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.
@@ -136,14 +137,14 @@ mutable struct Profile
                         else
                             @error "The profile at $(file_path) has some corrupt data in line $(line_idx). Please check!"
                             close(file_handle)
-                            throw(InputError)
+                            throw(InputError())
                         end
                     end
                 end
             catch e
                 @error "While reading the data from the profile at $(file_path) in line $(current_line) the following error occured: $e\n" *
                        "Check if the file exists at the specified path!"
-                throw(InputError)
+                throw(InputError())
             finally
                 if file_handle !== nothing
                     close(file_handle)
@@ -156,14 +157,14 @@ mutable struct Profile
                     @error "For the profile at $(file_path) a time definition via startdate_timestepsize is chosen. " *
                            "Specify 'profile_start_date', 'profile_start_date_format' and 'profile_time_step_seconds' " *
                            "in the profile header!"
-                    throw(InputError)
+                    throw(InputError())
                 else
                     # create time step from startdate and timestep
                     if length(profile_timestamps) > 0
                         @error "For the profile at $(file_path) a time stamp is given, but 'startdate_timestepsize' " *
                                "is chosen as 'time_definition'. This expects to not have a time stamp! Chose another " *
                                "'time_definition'."
-                        throw(InputError)
+                        throw(InputError())
                     end
                     start_date = parse_datestamp(profile_start_date,
                                                  convert_String_to_DateFormat(profile_start_date_format, file_path),
@@ -182,7 +183,7 @@ mutable struct Profile
                     @error "For the profile at $(file_path) a time definition via startdate_timestamp is chosen. " *
                            "Specify 'profile_start_date', 'profile_start_date_format' and 'timestamp_format' in the " *
                            "profile header!"
-                    throw(InputError)
+                    throw(InputError())
                 else
 
                     # calculate time step from startdate and continuos timestamp
@@ -207,7 +208,7 @@ mutable struct Profile
                     else
                         @error "For the profile at $(file_path) the 'timestamp_format' has to be one of 'seconds', " *
                                "'minutes' or 'hours'!"
-                        throw(InputError)
+                        throw(InputError())
                     end
                     if time_shift_seconds !== nothing
                         shift = Second(time_shift_seconds)
@@ -217,7 +218,7 @@ mutable struct Profile
                 if isnothing(timestamp_format)
                     @error "For the profile at $(file_path) a time definition via datestamp is chosen. " *
                            "Specify 'timestamp_format' in the profile header!"
-                    throw(InputError)
+                    throw(InputError())
                 else
                     # get time step from datestamp
                     df = convert_String_to_DateFormat(timestamp_format, file_path)
@@ -234,7 +235,7 @@ mutable struct Profile
             else
                 @error "For the profile at $(file_path) no 'time_definition' is chosen. " *
                        "It has to be one of 'startdate_timestepsize', 'startdate_timestamp' or 'datestamp'."
-                throw(InputError)
+                throw(InputError())
             end
 
             if isnothing(profile_time_step) && length(profile_timestamps_date) > 1
@@ -242,7 +243,7 @@ mutable struct Profile
             elseif isnothing(profile_time_step)
                 @error "For the profile at $(file_path) no profile time step could be determined. " *
                        "Please specify one with the parameter 'profile_time_step_seconds'."
-                throw(InputError)
+                throw(InputError())
             end
         else # data was read in from somewhere else and is provided as vector
             profile_values = given_profile_values
@@ -258,7 +259,7 @@ mutable struct Profile
             @error "The interpolation type of the profile at $(file_path) has to be one of " *
                    "'stepwise', 'linear_classic', 'linear_time_preserving' or 'linear_solar_radiation'! " *
                    "The given interpolation type is '$interpolation_type'."
-            throw(InputError)
+            throw(InputError())
         end
 
         # remove leap days and daylight savings from profile
@@ -273,7 +274,7 @@ mutable struct Profile
                        "simulation start date!\n " *
                        "Simulation start: $(Dates.format(sim_params["start_date"], "yyyy-mm-dd HH:MM:SS"))\n" *
                        "Profile start: $(Dates.format(profile_timestamps_date[1], "yyyy-mm-dd HH:MM:SS"))\n" *
-                       throw(InputError)
+                       throw(InputError())
             else
                 nr_to_repeat = Int(ceil((sim_params["end_date"] - profile_timestamps_date[end]) /
                                         (profile_timestamps_date[end] - profile_timestamps_date[1])))
@@ -344,16 +345,16 @@ mutable struct Profile
                              "datestamp of the profile contains daylight savings."
             end
             @error error_msg
-            throw(InputError)
+            throw(InputError())
         elseif length(profile_timestamps_date) !== length(unique(profile_timestamps_date))
             @error "The timestamp of the profile at $(file_path) has duplicates!"
-            throw(InputError)
+            throw(InputError())
         elseif length(profile_timestamps_date) > 1 &&
                length(unique(diff_ignore_leap_days(profile_timestamps_date))) !== 1
             @error "The timestamp of the profile at $(file_path) has an inconsistent time step width! " *
                    "If the profile is defined by a datestamp and has daylight savings, please specify a 'time_zone'! " *
                    "If the profile has no daylight savings, a 'time_zone' must not be given!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check time step compatibility
@@ -362,7 +363,7 @@ mutable struct Profile
             @error ("The timestep of the profile at $(file_path), which is $(string(profile_time_step)),\n" *
                     "is not a multiple or a divisor of the requested simulation timestep of " *
                     "$(string(sim_params["time_step_seconds"]))!")
-            throw(InputError)
+            throw(InputError())
         end
 
         # check coverage of simulation time
@@ -381,7 +382,7 @@ mutable struct Profile
                              "of all profiles."
             end
             @error error_msg
-            throw(InputError)
+            throw(InputError())
         end
 
         if data_type == "intensive"         # e.g., temperature, power
@@ -391,7 +392,7 @@ mutable struct Profile
         else
             @error "For the profile at $(file_path) no valid 'data_type' is given! " *
                    "Has to be either 'intensive' or 'extensive'."
-            throw(InputError)
+            throw(InputError())
         end
 
         values_converted,
@@ -431,7 +432,7 @@ function convert_String_to_DateFormat(datetime_str::String, file_path::String)::
         @error "Time given date specifier '$(datetime_str)' of profile at $(file_path) could not be converted " *
                "to a DateFormat. Make sure it matches the format specification of the Julia Dates package. " *
                "The following error occured: $e"
-        throw(InputError)
+        throw(InputError())
     end
 end
 
@@ -458,7 +459,7 @@ function parse_datestamp(datetime_str::String,
                "'$(time_format_variable_name)' has to match the dataformat, e.g. 'dd-mm-yyyy HH:MM:SS'. " *
                "'$(time_format_variable_name)' is `$(time_format)` which does not fit to the " *
                "timestamp given `$(datetime_str)`.\n The following error occured: $e"
-        throw(InputError)
+        throw(InputError())
     end
 end
 
@@ -606,14 +607,14 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
         catch e
             @error "In the profile at $file_path, the given time zone $(time_zone) could not be detected. " *
                    "It has to be an IANA (also known as TZ or TZDB) time zone identifier."
-            throw(InputError)
+            throw(InputError())
         end
         if tz isa FixedTimeZone
             @error "The time zone $(tz) of the profile at $(file_path) is a FixedTimeZone. " *
                    "This is not supported! Please use a VariableTimeZone given as IANA (also known as TZ or TZDB) time " *
                    "zone identifier, or remove the time_zone parameter if you use local standard time. If you want to " *
                    "shift the whole time series, use the parameter time_shift_seconds."
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if the current time zone includes any DST within the simulation time
@@ -623,7 +624,7 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
         catch e
             @error "In the profile at $file_path, the first datestamp $tz is probably invalid for the specified time " *
                    "zone $time_zone. The following error occurred: $e"
-            throw(InputError)
+            throw(InputError())
         end
         has_dst = false
         next_transition = next_transition_instant(fist_time_step)
@@ -650,7 +651,7 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
                        "- create a destination folder for the recompilation, if it doesn't exist:" *
                        "'user_home_directory'/.julia/scratchspaces/$(timezones_uuid)/build/compiled/tzjf/v1/2024a \n" *
                        "- re-run the compilation by running ReSiE or with TimeZones.TZData.compile(max_year=2200) in Julia."
-                throw(InputError)
+                throw(InputError())
             end
             # re-creation of the TimeZone is required to apply the recompilation
             tz = TimeZone(time_zone)
@@ -680,7 +681,7 @@ function remove_day_light_saving(timestamp::Vector{DateTime}, time_zone::Union{N
             catch e
                 @error "In the profile at $file_path, the datestamp $ts is probably invalid for the specified time " *
                        "zone $time_zone. The following error occured: $e"
-                throw(InputError)
+                throw(InputError())
             end
 
             if zoned_time.zone.offset.dst !== Second(0) && !has_corrected
@@ -856,13 +857,13 @@ function convert_profile(values::Vector{Float64},
             if original_time_step !== Millisecond(1000 * 60 * 60)
                 @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
                        "1 hour (3600 seconds) to use the linear_solar_radiation method for interpolation!"
-                throw(InputError)
+                throw(InputError())
             end
 
             if !time_is_aligned
                 @error "For the profile at $(file_path) with solar radiation data, the original time step has to be " *
                        "aligned to the simulation start time to use the linear_solar_radiation method for interpolation!"
-                throw(InputError)
+                throw(InputError())
             end
 
             if length(sunrise_sunset) == 0

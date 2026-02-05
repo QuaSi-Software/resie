@@ -376,7 +376,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
                    "For a given h/r ratio of $(hr), the slope angle must be greater than $(round(alpha_min; digits=2))° and " *
                    "less than $(round(alpha_max; digits=2))°. For a given slope angle of $(alpha)°, the h/r ratio must be " *
                    "less than $(round(hr_max; digits=2))."
-            throw(InputError)
+            throw(InputError())
         end
 
         height = hr * (radius_large + radius_small) / 2
@@ -444,7 +444,7 @@ function calc_STES_geometry(uac::String, volume::Float64, alpha::Float64, hr::Fl
         return a_top, a_lat, a_bottom, v_section, height, base_side / 2, top_side / 2
     else
         @error "Invalid shape type of seasonal thermal storage $(uac). Shape has to be 'round' or 'quadratic'!"
-        throw(InputError)
+        throw(InputError())
     end
 end
 
@@ -455,7 +455,7 @@ function plot_optional_figures_begin(unit::SeasonalThermalStorage, output_path::
     Plots.plot!(p, [-unit.radius_small, unit.radius_small], [0, 0]; color=:blue, lw=6, label="")  # Bottom
     Plots.plot!(p, [unit.radius_small, unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
     Plots.plot!(p, [-unit.radius_small, -unit.radius_large], [0, unit.height]; color=:blue, lw=6, label="")  # Side wall
-    Plots.plot!(p, ; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
+    Plots.plot!(p,; title="Cross section of the STES $(unit.uac) (cross-section: $(unit.shape))",
                 xlabel="x-coordinate [m]",
                 ylabel="height [m]",
                 legend=false,
