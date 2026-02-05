@@ -436,21 +436,21 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         elseif unit.ground_domain_radius <= storage_radius_surface
             @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of the " *
                    "STES at the surface which is $(storage_radius_surface) m for the current configuration."
-            throw(InputError)
+            throw(InputError())
         end
         if unit.ground_domain_depth === nothing
             unit.ground_domain_depth = unit.ground_domain_depth_factor * unit.height
         elseif unit.ground_domain_depth <= unit.h_stes_buried
             @error "In STES $(unit.uac), the given ground_domain_depth has to be greater than the height of buried " *
                    "depth of the STES which is $(unit.h_stes_buried) m for the current configuration."
-            throw(InputError)
+            throw(InputError())
         end
         if unit.has_top_insulation_overlap &&
            (storage_radius_surface + unit.top_insulation_overlap_width) > unit.ground_domain_radius
             @error "In STES $(unit.uac), the given ground_domain_radius has to be greater than the radius of " *
                    "the insulation overlap of the STES! Increase the `ground_domain_radius_factor` or decrease " *
                    "the `top_insulation_overlap_width`."
-            throw(InputError)
+            throw(InputError())
         end
 
         if unit.ground_layers_depths == [nothing]
@@ -502,7 +502,7 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
     else
         @error "In STES $(unit.uac), the given ground_model has to be either `simple` to use a constant surrounding " *
                "ground temperature or `FVM` to use the FVM-model to model the surrounding soil."
-        throw(InputError)
+        throw(InputError())
     end
 end
 
@@ -2250,7 +2250,7 @@ function prepare_ground_fvm_unified!(unit::SeasonalThermalStorage)
                                unit.ground_accuracy_mode == "IEA_ES_39" ? (mindz / 2.74, 16, 1, 2.0) :  # IEA-ES Task 39 mesh definition
                                @error("In STES $(unit.uac), ground_accuracy_mode must be one of: " *
                                       "very_rough, rough, normal, high, very_high.") &
-                               throw(InputError)
+                               throw(InputError())
 
     min_w = max(min_w, 1e-4)
     max_w = max(max_w, min_w)
