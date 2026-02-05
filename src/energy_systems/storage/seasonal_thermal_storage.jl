@@ -187,7 +187,7 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
                    default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
                    default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
-                   default(config, "ground_model", "simple"),      # ground_model. Can be one of "simple" or "FVM"
+                   default(config, "ground_model", "simplified"),  # ground_model. Can be one of "simplified" or "FVM"
                    default(config, "rho_medium", 1000.0),          # [kg/m^3] density of the medium 
                    default(config, "cp_medium", 4180),             # [J/kgK] specific thermal capacity of medium 
                    default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
@@ -497,10 +497,10 @@ function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})
         for h in 1:nz, i in 1:nr
             unit.cells_active[h, i] = cell_active(unit, h, i)
         end
-    elseif unit.ground_model == "simple"
+    elseif unit.ground_model == "simplified"
         # do nothing here
     else
-        @error "In STES $(unit.uac), the given ground_model has to be either `simple` to use a constant surrounding " *
+        @error "In STES $(unit.uac), the given ground_model has to be either `simplified` to use a constant surrounding " *
                "ground temperature or `FVM` to use the FVM-model to model the surrounding soil."
         throw(InputError())
     end
@@ -1023,7 +1023,7 @@ function control(unit::SeasonalThermalStorage,
                 unit.soil_temperature_field_output[sidx, :, :] = vis_field_with_tank(unit)
             end
         end
-    elseif unit.ground_model == "simple"
+    elseif unit.ground_model == "simplified"
         # update surrounding effective_ambient_temperature
         unit.effective_ambient_temperature_barrels = [i <= unit.number_of_STES_layer_below_ground ?
                                                       unit.ground_temperature : unit.ambient_temperature
