@@ -205,11 +205,11 @@ mutable struct SeasonalThermalStorage <: Component
                    default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
                    Float64[],                                      # dz, thickness of the layers of the STES [m]
                    Float64[],                                      # dz_normalized, normalized dz with respect to to the volume of each section
-                   0.0,                                            # [1/h] sigma factor for losses to ambient through bottom: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
-                   0.0,                                            # [1/h] sigma factor for losses to ambient through top: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
-                   Float64[],                                      # [1/h] sigma factor for losses to ambient through barrels: area_of_losses * U[kJ/m^2K] / (roh * cp * volume_segment)
-                   Float64[],                                      # [K/kJ] factor for input/output energy:  1 / (roh * cp * volume_segment ) 
-                   Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (roh  * volume_segment )
+                   0.0,                                            # [1/h] sigma factor for losses to ambient through bottom: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
+                   0.0,                                            # [1/h] sigma factor for losses to ambient through top: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
+                   Float64[],                                      # [1/h] sigma factor for losses to ambient through barrels: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
+                   Float64[],                                      # [K/kJ] factor for input/output energy:  1 / (rho * cp * volume_segment ) 
+                   Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (rho  * volume_segment )
                    Float64[],                                      # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
                    Float64[],                                      # layer_masses, mass of the medium in each layer [kg]
 
@@ -1250,7 +1250,7 @@ function convert_J_in_Wh(energy::Float64)::Float64
 end
 
 """
-convert_energy_in_mass(energy, temp_low, temp_high, cp, roh)
+convert_energy_in_mass(energy, temp_low, temp_high, cp)
 
  calculates mass [kg] from energy [Wh] 
 
@@ -1270,7 +1270,7 @@ function convert_energy_in_mass(energy::Float64, temp_low::Temperature, temp_hig
 end
 
 """
-convert_mass_in_energy(mass, temp_low, temp_high, cp, roh)
+convert_mass_in_energy(mass, temp_low, temp_high, cp)
 
  calculates energy [Wh] from mass [kg] 
 
