@@ -385,7 +385,7 @@
             "hr_ratio": 2,
             "sidewall_angle": 90,
             "rho_medium": 1000,
-            "cp_medium": 4.18,
+            "cp_medium": 4180,
             "diffussion_coefficient": 0.000000143,
             "number_of_layer_total": 25,
             "number_of_layer_above_ground": 1,
