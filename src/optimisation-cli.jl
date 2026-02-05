@@ -9,10 +9,10 @@ const BOUNDS = Dict{String,Tuple}(
     "TST_BAT_01" => ("capacity", 0, 30000),
     "TST_BFT_01" => ("capacity", 0, 60000),
 )
-const NR_TRIES = 1000
+const NR_TRIES = 100
 const OPEX_YEARS = 20
 const HEAT_DEMAND = 12000000
-const POWER_DEMAND = 3000000
+const POWER_DEMAND = 5000000
 
 function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
     open(filepath, "r") do file_handle
@@ -21,10 +21,7 @@ function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
     end
 end
 
-function run_simulation(inputs::OrderedDict{AbstractString,Any})::Dict{String,Float64}
-    # artifical delay, useful for debugging
-    # sleep(0.05)
-
+function run_simulation(inputs::OrderedDict{AbstractString,Any})::NamedTuple
     # naive capex, opex and emissions calculations depending purely on parameters as we
     # don't perform a simulation
     capex = inputs["components"]["TST_HP_01"]["power_th"] * 0.001 * 1500.0 +
@@ -44,25 +41,27 @@ function run_simulation(inputs::OrderedDict{AbstractString,Any})::Dict{String,Fl
     opex = grid_power_demand * 0.001 * price
     opex = max(opex, 0.0)
 
-    results = Dict{String,Float64}(
-        "capex" => capex,
-        "opex" => opex,
-        "emissions" => (0.35 - 0.1 * (inputs["components"]["TST_BAT_01"]["capacity"] /
-                                      BOUNDS["TST_BAT_01"][3])) * grid_power_demand * 0.001,
-    )
-    return results
+    return (capex=capex,
+            opex=opex,
+            emissions=(0.35 - 0.1 * (inputs["components"]["TST_BAT_01"]["capacity"] /
+                                     BOUNDS["TST_BAT_01"][3])) * grid_power_demand * 0.001)
 end
 
-function objective_function(results::Dict{String,Float64})::Tuple{Float64,Float64}
-    return results["capex"] + OPEX_YEARS * results["opex"], results["emissions"]
+function objective_function(results::NamedTuple)::NamedTuple
+    return (lcc=(results.capex + OPEX_YEARS * results.opex), emissions=results.emissions)
 end
 
 function main()
     inputs = read_JSON("./examples/optimisation_example.json")
 
-    # simple monte carlo
+    print("Starting N=$NR_TRIES simulation runs: ")
+
     all_results = []
-    for _ in range(0, NR_TRIES)
+    min_lcc = Inf
+    min_emissions = Inf
+
+    # simple monte carlo
+    for idx in range(0, NR_TRIES)
         # set parameters to equally distributed random values
         hp_power = rand(BOUNDS["TST_HP_01"][2]:BOUNDS["TST_HP_01"][3])
         pv_power = rand(BOUNDS["TST_PV_01"][2]:BOUNDS["TST_PV_01"][3])
@@ -76,28 +75,38 @@ function main()
         # run sim and record results
         run_results = run_simulation(inputs)
         obj_results = objective_function(run_results)
-        push!(all_results, (obj_results[1], obj_results[2], hp_power, pv_power, bat_cap, bt_cap))
+        push!(all_results, [0.0, obj_results.lcc, obj_results.emissions, hp_power, pv_power, bat_cap, bt_cap])
+        min_lcc = obj_results.lcc < min_lcc ? obj_results.lcc : min_lcc
+        min_emissions = obj_results.emissions < min_emissions ? obj_results.emissions : min_emissions
 
-        # debug output
-        # print("run with HP $(hp_power) PV $(pv_power) BAT $(bat_cap) BFT $(bt_cap) ")
-        # print("results in $(run_results["capex"]) $(run_results["opex"]) $(run_results["emissions"])\n")
+        if idx % Int(NR_TRIES / 20) == 0
+            print("$idx ")
+        end
     end
+    print("\nFinished simulation, now plotting\n")
+
+    # calculate global measure and sort by it
+    for res in all_results
+        res[1] = sqrt(((res[2]) / min_lcc - 1.0)^2 + (res[3] / min_emissions - 1.0)^2)
+    end
+    sort!(all_results; by=x->x[1])
 
     # create scatter plot with objective function values
-    x_values = [result[1] for result in all_results]
-    y_values = [result[2] for result in all_results]
+    x_values = [result[2] for result in all_results]
+    y_values = [result[3] for result in all_results]
 
-    scatter(x_values, y_values; xlabel="Cost (capex + 20*opex)", ylabel="Emissions",
-            title="Pareto Front", legend=false)
+    scatter(x_values, y_values; xlabel="Life-cycle cost (capex + $OPEX_YEARS*opex) [€]",
+            ylabel="Operational emissions [kg/a]", title="Pareto Front", legend=false)
     savefig("./output/pareto_front.html")
 
+    println("Plotting finished, now finding Pareto-optimal points")
     # find and print Pareto optimal points
     pareto_points = []
     for (i, result_i) in enumerate(all_results)
         is_dominated = false
         for (j, result_j) in enumerate(all_results)
-            if i != j && result_j[1] <= result_i[1] && result_j[2] <= result_i[2]
-                if result_j[1] < result_i[1] || result_j[2] < result_i[2]
+            if i != j && result_j[2] <= result_i[2] && result_j[3] <= result_i[3]
+                if result_j[2] < result_i[2] || result_j[3] < result_i[3]
                     is_dominated = true
                     break
                 end
@@ -108,10 +117,17 @@ function main()
         end
     end
 
-    println("\nPareto Front Points:")
+    println("Pareto Front Points:")
     for point in pareto_points
-        cost, emissions, hp_power, pv_power, bat_cap, bt_cap = point
+        _, cost, emissions, hp_power, pv_power, bat_cap, bt_cap = point
         println("Cost: $(cost), Emissions: $(emissions)")
+        println("  HP power: $(hp_power), PV scale: $(pv_power), BAT capacity: $(bat_cap), BFT capacity: $(bt_cap)")
+    end
+
+    println("Top 10 Global Measure Points:")
+    for point in all_results[1:10]
+        gb, cost, emissions, hp_power, pv_power, bat_cap, bt_cap = point
+        println("Global Measure: $gb, Cost: $(cost), Emissions: $(emissions)")
         println("  HP power: $(hp_power), PV scale: $(pv_power), BAT capacity: $(bat_cap), BFT capacity: $(bt_cap)")
     end
 end
