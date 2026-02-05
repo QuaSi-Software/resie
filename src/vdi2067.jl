@@ -200,10 +200,10 @@ end
 function op_annuity(components::Vector{VDIComponent}, p::VDIParams)     # operation cost-related annuity
 
     # first year operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
-    A_B1  = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0)  # only use f_bedien if component is actually used -> p_th > 0
+    sum((c.f_bedien * 30.0) for c in components if c.A0 > 0, init=0.0)  # only use f_bedien if component is actually used -> p_th > 0
 
     # First-year inspection, maintenance, repair and reinstatement cost
-    A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components)
+    A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components if c.A0 > 0, init=0.0)
 
     a   = annuity_factor(p.i_cap, p.T)
     b_B  = price_change_factor(p.r_op,   p.i_cap, p.T)
@@ -218,7 +218,7 @@ end
 ############################################################
 
 function misc_annuity(components::Vector{VDIComponent}, p::VDIParams)
-    total_cap = sum(c.A0 for c in components)
+    total_cap = sum(c.A0 for c in components if c.A0 > 0, init=0.0)
     A1 = 0.02 * total_cap        # rule-of-thumb: 2% of investment
 
     a = annuity_factor(p.i_cap, p.T)
