@@ -313,7 +313,8 @@
             "thermal_transmission_barrel": 0.375,
             "thermal_transmission_bottom": 0.375,
             "constant_ground_temperature": 9.0,
-            "initial_load": 0.1
+            "initial_load": 0.1,
+            "ground_model": "simplified"
         },
         "TST_01_HZG_01_GRI": {
             "type": "GridConnection",
