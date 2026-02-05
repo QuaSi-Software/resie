@@ -1,6 +1,6 @@
 using Optim: optimize, minimizer, Options, NelderMead
 using ..Resie: get_run
-
+using Infiltrator
 """
 Implementation of a heat pump component, elevating heat to a higher temperature using
 electricity.
@@ -779,7 +779,7 @@ function calculate_slices(unit::HeatPump,
     snk_idx::Int = 1
     available_time = sim_params["time_step_seconds"]
     EPS = sim_params["epsilon"]
-
+    if plrs == [1.0, 1.0] && sim_params["time"] >= 134100 @infiltrate end
     # if we have COP == 1.0, we must limit electricity input as the heat input is not
     # available as limit factor and leads to infinite loops in some cases. as the limit we
     # use the heat pump's design heat output energy assuming no losses
@@ -793,7 +793,8 @@ function calculate_slices(unit::HeatPump,
         # to account for COP == 1.0.
         if energies.available_el_in < EPS ||
            ((unit.cop == 0.0 || unit.cop > 1.0) && sum(energies.available_heat_in; init=0.0) < EPS) ||
-           sum(energies.available_heat_out; init=0.0) < EPS
+           sum(energies.available_heat_out; init=0.0) < EPS ||
+           available_time <= EPS
             # end of condition
             break
         end
@@ -975,6 +976,7 @@ function find_best_slicing(unit::HeatPump,
                                x_abstol=unit.x_abstol,
                                f_abstol=unit.f_abstol))
     optimal_plrs = minimizer(results)
+    if sim_params["time"] >= 134100 @infiltrate end
     energies = calculate_slices(unit, sim_params, energies, optimal_plrs, true, fixed_heat_in, fixed_heat_out)
 
     return energies
@@ -1136,6 +1138,7 @@ end
 
 function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
+    if sim_params["time"] >= 134100 @infiltrate end
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
         set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
