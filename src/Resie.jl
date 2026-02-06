@@ -53,10 +53,11 @@ function close_run(id::UUID)
 end
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
+Custom error type for exception `InputError` as alias to `ArgumentError`.
+Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-struct InputError <: Exception end
+const InputError = ArgumentError
 
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
@@ -225,7 +226,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     csv_time_unit = default(project_config["io_settings"], "csv_time_unit", "seconds")
     if !(csv_time_unit in ["seconds", "minutes", "hours", "date"])
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
-        throw(InputError)
+        throw(InputError())
     end
     do_return_data = output_keys_return !== nothing 
 

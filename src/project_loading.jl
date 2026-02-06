@@ -111,7 +111,7 @@ function load_components(config_ordered::AbstractDict{String,Any}, sim_params::D
                         push!(media_sym, getproperty(components[unit_key], Symbol(medium)))
                     else
                         @error "For component $unit_key, the given key `$medium` in the `output_refs` is not a valid key!"
-                        throw(InputError)
+                        throw(InputError())
                     end
                 end
                 link_output_with(components[unit_key], target_components; given_media=media_sym)
@@ -248,11 +248,11 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
                "'start_end_unit' is `$(simulation_parameters["start_end_unit"])` which does not fit to the start" *
                "and end time given: `$(simulation_parameters["start"])` and `$(simulation_parameters["end"])`.\n" *
                "The following error occurred: $e")
-        throw(InputError)
+        throw(InputError())
     end
     if start_date_output < start_date
         @error "The start date of the output can not be prior to the start date of the simulation!"
-        throw(InputError)
+        throw(InputError())
     end
     if simulation_parameters["time_step_unit"] == "seconds"
         time_step = simulation_parameters["time_step"]
@@ -278,7 +278,7 @@ function get_timesteps(simulation_parameters::AbstractDict{String,Any})
        (month(end_date) == 2 && day(end_date) == 29) ||
        (month(start_date_output) == 2 && day(start_date_output) == 29)
         @error "The simulation start and end date and the start date of the output can not be at a leap day!"
-        throw(InputError)
+        throw(InputError())
     end
     return UInt(time_step), start_date, start_date_output, end_date, nr_of_steps, nr_of_steps_output
 end

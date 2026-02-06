@@ -509,7 +509,7 @@ function get_layer_temperature(unit::HeatPump,
             @error "Error: The $(term) temperature for $(unit.uac) could not be detected. " *
                    "Please specify one with the parameter '$(term)_temperature' or check " *
                    "the connected components."
-            throw(InputError)
+            throw(InputError())
         end
         return false, layer_temp
     end
@@ -671,7 +671,7 @@ function handle_slice(unit::HeatPump,
         if cop === nothing
             @error ("Input and/or output temperature for heatpump $(unit.uac) is not " *
                     "given. Provide temperatures or fixed cop.")
-            throw(InputError)
+            throw(InputError())
         end
         cop *= unit.plf_function(plr)
         if unit.consider_icing
@@ -787,14 +787,14 @@ function calculate_slices(unit::HeatPump,
 
     # keep running until we ran out of either sources or sinks to check
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
-        # we can skip calculation if there is no energy left to be distributed. this can
-        # happen for example during potential calculations when another transformer has
-        # already used up all available energies. Do not consider heat_in in process 
-        # to account for COP == 1.0.
+        # we can skip calculation if there is no energy left to be distributed or we ran out
+        # of available time. this can happen for example during potential calculations when
+        # another transformer has already used up all available energies. Do not consider
+        # heat_in in process to account for COP == 1.0.
         if energies.available_el_in < EPS ||
            ((unit.cop == 0.0 || unit.cop > 1.0) && sum(energies.available_heat_in; init=0.0) < EPS) ||
            sum(energies.available_heat_out; init=0.0) < EPS ||
-           available_time <= EPS
+           available_time < EPS
             # end of condition
             break
         end
