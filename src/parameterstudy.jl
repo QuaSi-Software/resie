@@ -221,7 +221,7 @@ end
 # Simulation of a single run
 ############################################################
 
-function run_resie_variant(
+function create_variant(
         outdir::String,
         base_input::OrderedDict,
         Pth_HP::Number,
@@ -232,8 +232,7 @@ function run_resie_variant(
         states_heat_bus::Array{Dict{String,Any}},
         profile_addons,
         profile_multipliers,
-        runidx::Int,
-        total_runs::Int;
+        run_ID::UUID;
         write_output::Bool=true
         )
     cfg = deepcopy(base_input)
@@ -289,7 +288,6 @@ function run_resie_variant(
     # profiles will be overwritten for every run to make sure the profile_multipliers and 
     # profile_addons calculated correctly.
     # If multiple threads are used each thread gets their own profile.
-    run_ID = UUID(runidx)
     sim_params, _, _ = Resie.prepare_inputs(cfg, run_ID)
     
     profile_dir = "./profiles/MA/profiles_parameterstudy"
@@ -331,6 +329,7 @@ function run_resie_variant(
 
     fname = joinpath(
         outdir,
+        "inputfiles",
         "input_HP$(safe(display_MW(Pth_HP)))MW_" *
         "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
         "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
@@ -341,20 +340,21 @@ function run_resie_variant(
         JSON.print(io, cfg)
     end
 
+    return fname, profile_values, Int(sim_params["time_step_seconds"])
+end
+
+function run_resie_variant(input_file::String, run_ID::UUID, profile_values, profile_addons)
+
     ########################################################
     # run simulation
     ########################################################
-
-    println("[$runidx/$total_runs] → start simulation: $(basename(fname))")
-
-    success, sim_output = Resie.load_and_run(fname, run_ID)
+    success, sim_output = Resie.load_and_run(input_file, run_ID)
     Resie.close_run(run_ID)
 
     # remove addon for used grid electricity to went into PosControlReserve
     energy_with_addon = max.(sim_output["Grid_IN m_power OUT"] .- sim_output["PosControlReserve m_power IN"], 0)
     energy_without_addon = min.(sim_output["Grid_IN m_power OUT"], sim_output["PosControlReserve m_power IN"])
     profile_values[1, :] .-= profile_addons[1] .* energy_without_addon ./ (energy_with_addon .+ energy_without_addon)
-
 
     # add the profiles to the sim_output to be used in vdi2067 calculation
     sim_output["Stock_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
@@ -373,10 +373,11 @@ end
 # Main Loop
 ############################################################
 
-function main(base_input_path, write_output)
+function main(base_input_path::String, write_output::Bool=false, save_input_files::Bool=true)
     base_input = Resie.read_JSON(base_input_path)
     outdir = "./output/parameterstudy"
     mkpath(outdir)
+    mkpath(joinpath(outdir, "inputfiles"))
 
     total_runs =
         length(Pth_HP_vals) *
@@ -388,28 +389,33 @@ function main(base_input_path, write_output)
 
     out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
     touch(out_file_path)
-    header = join([
-                #component parameters
-                "Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", "Battery_Capacity / Wh", #compontet parameters
-
-                # no cost escalation
-                "annuity_no A_cap / €", "annuity_no A_cap_incentive / €", "annuity_no A_misc / €", "annuity_no A_op / €", "annuity_no A_energy / €", 
-                "annuity_no A_rev_control / €", "annuity_no A_rev_feed / €", "annuity_no A_total / €", "annuity_no A_total_incentive / €",
-
-                # moderate cost escalation
-                "annuity_mod A_cap / €", "annuity_mod A_cap_incentive / €", "annuity_mod A_misc / €", "annuity_mod A_op / €", "annuity_mod A_energy / €", 
-                "annuity_mod A_rev_control / €", "annuity_mod A_rev_feed / €", "annuity_mod A_total / €", "annuity_mod A_total_incentive / €",
-
-                # progressive cost escalation
-                "annuity_pro A_cap / €", "annuity_pro A_cap_incentive / €", "annuity_pro A_misc / €", "annuity_pro A_op / €", "annuity_pro A_energy / €", 
-                "annuity_pro A_rev_control / €", "annuity_pro A_rev_feed / €", "annuity_pro A_total / €", "annuity_pro A_total_incentive / €",
-
-                # balance warnings
-                "balance_power", "balance_heat", 
-
-                # yearly CO2-emissions
-                # "CO2_yearly"
-                ], ';') * "\n"
+    #component parameters
+    header_parameters = ["Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", 
+                         "Battery_Capacity / Wh"]
+    # no cost escalation
+    header_annuity_no = ["annuity_no A_cap / €", "annuity_no A_cap_incentive / €", 
+                         "annuity_no A_misc / €", "annuity_no A_op / €", 
+                         "annuity_no A_energy / €", "annuity_no A_rev_control / €", 
+                         "annuity_no A_rev_feed / €", "annuity_no A_total / €", 
+                         "annuity_no A_total_incentive / €"]
+    # moderate cost escalation
+    header_annuity_mod = ["annuity_mod A_cap / €", "annuity_mod A_cap_incentive / €", 
+                          "annuity_mod A_misc / €", "annuity_mod A_op / €", 
+                          "annuity_mod A_energy / €", "annuity_mod A_rev_control / €", 
+                          "annuity_mod A_rev_feed / €", "annuity_mod A_total / €", 
+                          "annuity_mod A_total_incentive / €"]
+    # progressive cost escalation
+    header_annuity_pro = ["annuity_pro A_cap / €", "annuity_pro A_cap_incentive / €", 
+                          "annuity_pro A_misc / €", "annuity_pro A_op / €", 
+                          "annuity_pro A_energy / €", "annuity_pro A_rev_control / €", 
+                          "annuity_pro A_rev_feed / €", "annuity_pro A_total / €", 
+                          "annuity_pro A_total_incentive / €"]
+    # balance warnings
+    header_balances = ["balance_power", "balance_heat", "Errors"]
+    # yearly_CO2-emissions
+    header_co2 = ["CO2_yearly"]
+    header = join(vcat(header_parameters, header_annuity_no, header_annuity_mod, 
+                       header_annuity_pro, header_balances), ';') * "\n"
 
     open(out_file_path, "a") do file_handle
         write(file_handle, header)
@@ -420,6 +426,7 @@ function main(base_input_path, write_output)
     output_lock = ReentrantLock()
 
     runidx_global = Threads.Atomic{Int}(1)
+    erridx_global = Threads.Atomic{Int}(0)
 
     logger = start_logger(true, false, nothing, nothing,
                           Logging.Warn, nothing)
@@ -430,25 +437,53 @@ function main(base_input_path, write_output)
                                   BattCap_vals_Wh))
         
         runidx = Threads.atomic_add!(runidx_global, 1)
+        run_ID = UUID(runidx)
         sim_output = OrderedDict()
         start_time = now()
         ####################################################
         # Simulation
         ####################################################
-        raw_sim = run_resie_variant(
-            outdir, base_input,
-            Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
-            states_power_bus, states_heat_bus,
-            profile_addons, profile_multipliers,
-            runidx, total_runs;
-            write_output=write_output
-        )
+        input_file, 
+        profile_values, 
+        timestep = create_variant(outdir, base_input, 
+                                  Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
+                                  states_power_bus, states_heat_bus, 
+                                  profile_addons, profile_multipliers,
+                                  run_ID; 
+                                  write_output=write_output)
 
-        # SimOutput in old format again
-        sim_output[runidx] = Dict{String, Any}("sim" => raw_sim)
-        sim_output[runidx]["Balance_heat"] = sum(raw_sim["BUS_Heat Balance"])
-        sim_output[runidx]["Balance_power"] = sum(raw_sim["BUS_Power Balance"])
+        println("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
 
+        raw_sim = nothing
+        try
+            raw_sim = run_resie_variant(input_file, run_ID, profile_values, profile_addons)
+
+            sim_output[runidx] = Dict{String, Any}("sim" => raw_sim)
+            sim_output[runidx]["Balance_heat"] = sum(raw_sim["BUS_Heat Balance"])
+            sim_output[runidx]["Balance_power"] = sum(raw_sim["BUS_Power Balance"])
+            sim_output[runidx]["time_step_seconds"] = timestep
+            sim_output[runidx]["Errors"] = ""
+        catch e
+            sim_output[runidx] = Dict{String, Any}("sim" => missing)
+            sim_output[runidx]["Balance_heat"] = missing
+            sim_output[runidx]["Balance_power"] = missing
+            sim_output[runidx]["time_step_seconds"] = missing
+
+            # save excact error message to output file
+            error_message = sprint(showerror, e)
+            full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
+            println(full_error_message)
+            sim_output[runidx]["Errors"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+            Threads.atomic_add!(erridx_global, 1)
+
+            # save input file that threw error seperately
+            error_path = joinpath(outdir, "error_inputfiles")
+            mkpath(error_path)
+            cp(input_file, joinpath(error_path, splitpath(input_file)[end]), force=true)
+        end
+        if !save_input_files 
+            rm(input_file) 
+        end
 
         ####################################################
         # Econcomy based on VDI 2067 principles
@@ -467,21 +502,28 @@ function main(base_input_path, write_output)
             VDI2067.battery_component(A0_Batt)
         ]
 
-        sim_output[runidx]["VDI_NO"] = 
-            VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_NONE)
+        if !isnothing(raw_sim)
+            sim_output[runidx]["VDI_NO"] = 
+                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_NONE)
 
-        sim_output[runidx]["VDI_MOD"] = 
-            VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
+            sim_output[runidx]["VDI_MOD"] = 
+                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
 
-        sim_output[runidx]["VDI_PRO"] = 
-            VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
+            sim_output[runidx]["VDI_PRO"] = 
+                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
 
+            # get values for writing into output file
+            annuities_no = collect(values(sim_output[runidx]["VDI_NO"]))
+            annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
+            annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
+        else
+            annuities_no = fill(missing, length(header_annuity_no))
+            annuities_mod = fill(missing, length(header_annuity_mod))
+            annuities_pro = fill(missing, length(header_annuity_pro))
+        end
         # write important results to seperate file
         parameters = [Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh]
-        annuities_no = collect(values(sim_output[runidx]["VDI_NO"]))
-        annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
-        annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
-        balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power")))
+        balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power", "Errors")))
         # co2 = collect(values(sim_output[runidx])) #TODO
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
         row = replace(row, '.' => ',')
@@ -501,7 +543,7 @@ function main(base_input_path, write_output)
     end
 
     close_logger(logger)
-    println("✔ Parameterstudy completed.")
+    println("✔ Parameterstudy completed with $(erridx_global[]) Errors.")
 end
 
-main(base_input_path, false)
+main(base_input_path, false, true)
