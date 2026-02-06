@@ -53,11 +53,14 @@ function close_run(id::UUID)
 end
 
 """
-Custom error type for exception `InputError` as alias to `ArgumentError`.
-Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Custom exception `InputError` used to signify that an input was not correctly set up,
+outside the allowed range, etc.
 Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-const InputError = ArgumentError
+struct InputError <: Exception
+    msg::Union{AbstractString,Nothing}
+end
+InputError() = InputError(nothing)
 
 # note: includes that contain their own module, which have to be submodules of the Resie
 # module, are included first, then can be accessed with the "using" keyword. files that
