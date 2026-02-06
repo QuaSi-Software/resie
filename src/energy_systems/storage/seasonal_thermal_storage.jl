@@ -1448,9 +1448,9 @@ function update_STES(unit::SeasonalThermalStorage,
     else
         load_new = (weighted_mean(t_new, unit.volume_segments, sim_params) - unit.low_temperature) /
                    (unit.high_temperature - unit.low_temperature) * unit.capacity
-        losses = unit.load + sum(energy_input) - energy_output - load_new # + sum(Q_in_out)  # losses are positive here
+        losses = unit.load + sum(energy_input) - energy_output - load_new # + sum(Q_in_out)  # losses to the ambient are positive here
 
-        # calculate separate losses 
+        # calculate separate losses: losses to the ambient are positive here
         unit.losses_top = (sim_params["time_step_seconds"] / 60 / 60) *
                           unit.surface_area_lid * unit.thermal_transmission_lid *
                           (unit.temperature_segments[end] - unit.effective_ambient_temperature_top)
@@ -1930,11 +1930,11 @@ function output_value(unit::SeasonalThermalStorage, key::OutputKey)::Float64
     elseif key.value_key == "LossesGains"
         return -unit.losses
     elseif key.value_key == "LossesGains_top"
-        return unit.losses_top
+        return -unit.losses_top
     elseif key.value_key == "LossesGains_sidewalls"
-        return unit.losses_sidewalls
+        return -unit.losses_sidewalls
     elseif key.value_key == "LossesGains_bottom"
-        return unit.losses_bottom
+        return -unit.losses_bottom
     elseif key.value_key == "CurrentMaxOutTemp"
         return unit.current_max_output_temperature
     elseif key.value_key == "GroundTemperature"
