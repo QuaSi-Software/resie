@@ -914,9 +914,9 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
             sim_params = get_run(unit.run_id).parameters
             @error "A negative energy $(available_energy)/$(target_energy) from $(input_row.source.uac) to " *
                    "$(output_row.target.uac) has been detected during distributing energy in bus $(unit.uac) at time " *
-                   "$(sim_params["time"])/$(sim_params["current_date"]). This can have multiple reasons, e.g. a bug " *
-                   "in one of the components or a wrong order of operation. Double check the results and contact " *
-                   "the developers."
+                   "$(sim_params["time"])/$(sim_params["current_date"]). This can have multiple reasons, e.g. " *
+                   "negative values in provided profiles, a bug in one of the components or a wrong order of " *
+                   "operation. Double check the results and contact the developers."
             break
         end
 

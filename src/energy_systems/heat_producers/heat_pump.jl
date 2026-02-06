@@ -1220,10 +1220,13 @@ function calculate_slices(unit::HeatPump,
         # layers have energy left, this was caused by the PLR of the slice being too low or
         # the heat pump being undersized. in either case we need to advance both indices so
         # we don't recalculate the same slice twice
-        if (energies.available_heat_in[src_idx] >= EPS && cop !== 1.0) &&
+        if energies.available_heat_in[src_idx] >= EPS &&
            energies.available_heat_out[snk_idx] >= EPS
             # end of condition
-            src_idx += 1
+            if cop !== 1.0
+                # do not go into next heat_in layer if we have cop = 1 as we do not need heat input
+                src_idx += 1
+            end
             snk_idx += 1
         else
             if energies.available_heat_in[src_idx] < EPS && cop !== 1.0
