@@ -4,6 +4,15 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.5
+* Add new FVM-based ground-model for STES to better represent losses into the ground. The model is validated against all relevant IEA ES Task 39 testcases.
+* Update unit for cp from [kJ/kgK] to [J/kgK] for all components for consistency. This is especially relevant for the buffer tank!
+* Add the possibility to treat profiles as volume flow for FixedSink and FixedSource in combination with STES
+* Add new FVM ground model of STES to scenario "interconnected_STES"
+* Update scenario "multisector_district" due to former changes in v0.12.5 and change color of Sankey to be aligned with DrawIO sketch
+* Fix bug in bus to handle energy_flows between -epsilon and zero
+* Fix calling InputError with empty constructor not working correctly
+
 ### Version 0.13.4
 * Fix HeatPump producing negative energies in rare cases
 * Fix an erroneous error message in Bus to cause the entire energy system being printed on console
