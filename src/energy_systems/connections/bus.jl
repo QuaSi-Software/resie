@@ -898,6 +898,8 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         else
             energy_flow = min(target_energy, available_energy)
         end
+        # trim energy_flows between -epsilon and zero to zero.
+        energy_flow = max(0.0, energy_flow)
 
         unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
         # if both min and max temperature are given and differ (which currently only happens

@@ -7,11 +7,14 @@ export Profile, power_at_time, work_at_time, value_at_time, remove_leap_days,
        add_ignoring_leap_days, sub_ignoring_leap_days
 
 """
-Custom error type for exception `InputError` as alias to `ArgumentError`.
-Used to signify that an input was not correctly set up, outside the allowed range, etc.
+Custom exception `InputError` used to signify that an input was not correctly set up,
+outside the allowed range, etc.
 Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-const InputError = ArgumentError
+struct InputError <: Exception
+    msg::Union{AbstractString,Nothing}
+end
+InputError() = InputError(nothing)
 
 """
 Holds values from a file so they can be retrieved later and indexed by time.

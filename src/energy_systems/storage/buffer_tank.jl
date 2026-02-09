@@ -108,7 +108,7 @@ mutable struct BufferTank <: Component
                    default(config, "capacity", nothing),       # capacity of the buffer tank [Wh] (either capacity or volume has to be given)
                    default(config, "volume", nothing),         # volume of the buffer tank [m^3] (either capacity or volume has to be given)
                    default(config, "rho_medium", 1000.0),      # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.18),         # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "cp_medium", 4180),         # specific thermal capacity of medium [J/kgK]
                    default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [°C]
                    default(config, "low_temperature", 20),     # lower temperature of the buffer tank [°C]
                    default(config, "max_load_rate", nothing),  # maximum load rate given in 1/h
@@ -147,12 +147,12 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but none of them is given."
         throw(InputError())
     elseif unit.capacity === nothing && unit.volume !== nothing
-        unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
+        unit.capacity = unit.volume * unit.rho_medium * unit.cp_medium / 3600 *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
         if unit.consider_losses
             unit.volume = unit.capacity /
-                          (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+                          (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
         end
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
