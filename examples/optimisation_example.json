@@ -49,6 +49,8 @@
             "output_refs": [
                 "TST_BUS_01"
             ],
+            "capex_per_kW": 1500.0,
+            "base_cop": 2.0,
             "power_th": 4000,
             "m_heat_in": "m_h_w_lt1",
             "m_el_in": "m_e_ac_230v",
@@ -81,6 +83,7 @@
             "output_refs": [
                 "TST_BUS_01"
             ],
+            "capex_per_kWh": 150.0,
             "medium": "m_h_w_ht1",
             "capacity": 20000,
             "model_type": "ideally_stratified",
@@ -212,6 +215,7 @@
             "output_refs": [
                 "TST_BUS_02"
             ],
+            "capex_per_kW": 1000.0,
             "energy_profile_file_path": "./profiles/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
             "scale": 4000,
             "m_el_out": "m_e_ac_230v",
@@ -234,6 +238,8 @@
             "output_refs": [
                 "TST_BUS_02"
             ],
+            "capex_per_kWh": 350.0,
+            "base_grid_price": 0.3,
             "medium": "m_e_ac_230v",
             "capacity": 10000,
             "initial_charge": 5000,

@@ -14,6 +14,7 @@ const NR_TRIES = 200
 const OPEX_YEARS = 20
 const HEAT_DEMAND = 12000000
 const POWER_DEMAND = 5000000
+const SUNSHINE_HOURS = 2000
 
 function read_JSON(filepath::String)::OrderedDict{AbstractString,Any}
     open(filepath, "r") do file_handle
@@ -25,20 +26,26 @@ end
 function run_simulation(inputs::OrderedDict{AbstractString,Any})::NamedTuple
     # naive capex, opex and emissions calculations depending purely on parameters as we
     # don't perform a simulation
-    capex = inputs["components"]["TST_HP_01"]["power_th"] * 0.001 * 1500.0 +
-            inputs["components"]["TST_BAT_01"]["capacity"] * 0.001 * 350.0 +
-            inputs["components"]["TST_BFT_01"]["capacity"] * 0.001 * 150.0 +
-            inputs["components"]["TST_PV_01"]["scale"] * 0.001 * 1000.0 +
+    capex = inputs["components"]["TST_HP_01"]["power_th"] * 0.001 *
+            inputs["components"]["TST_HP_01"]["capex_per_kW"] +
+            inputs["components"]["TST_BAT_01"]["capacity"] * 0.001 *
+            inputs["components"]["TST_BAT_01"]["capex_per_kWh"] +
+            inputs["components"]["TST_BFT_01"]["capacity"] * 0.001 *
+            inputs["components"]["TST_BFT_01"]["capex_per_kWh"] +
+            inputs["components"]["TST_PV_01"]["scale"] * 0.001 *
+            inputs["components"]["TST_PV_01"]["capex_per_kW"] +
             10000.0
 
-    avg_cop = 2.0 + (inputs["components"]["TST_BFT_01"]["capacity"] / BOUNDS["TST_BFT_01"][3])
+    avg_cop = inputs["components"]["TST_HP_01"]["base_cop"] +
+              (inputs["components"]["TST_BFT_01"]["capacity"] / BOUNDS["TST_BFT_01"][3])
     hp_load_hours = HEAT_DEMAND / inputs["components"]["TST_HP_01"]["power_th"]
     power_demand = POWER_DEMAND + (inputs["components"]["TST_HP_01"]["power_th"] / avg_cop) * hp_load_hours
     grid_power_demand = power_demand -
-                        (inputs["components"]["TST_PV_01"]["scale"] * 2000) *
+                        (inputs["components"]["TST_PV_01"]["scale"] * SUNSHINE_HOURS) *
                         (inputs["components"]["TST_BAT_01"]["capacity"] / BOUNDS["TST_BAT_01"][3])
     grid_power_demand = max(grid_power_demand, 0.0)
-    price = 0.3 - 0.1 * (inputs["components"]["TST_BAT_01"]["capacity"] / BOUNDS["TST_BAT_01"][3])
+    price = inputs["components"]["TST_BAT_01"]["base_grid_price"] -
+            0.1 * (inputs["components"]["TST_BAT_01"]["capacity"] / BOUNDS["TST_BAT_01"][3])
     opex = grid_power_demand * 0.001 * price
     opex = max(opex, 0.0)
 
@@ -89,19 +96,19 @@ function main()
             sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
 
             range = NBH_SCALE * temperature * (BOUNDS["TST_HP_01"][3] - BOUNDS["TST_HP_01"][2])
-            hp_power = sample[4] + rand((-0.5 * range):(0.5 * range))
+            hp_power = sample["hp_power"] + rand((-0.5 * range):(0.5 * range))
             hp_power = max(BOUNDS["TST_HP_01"][2], min(BOUNDS["TST_HP_01"][3], hp_power))
 
             range = NBH_SCALE * temperature * (BOUNDS["TST_PV_01"][3] - BOUNDS["TST_PV_01"][2])
-            pv_power = sample[5] + rand((-0.5 * range):(0.5 * range))
+            pv_power = sample["pv_power"] + rand((-0.5 * range):(0.5 * range))
             pv_power = max(BOUNDS["TST_PV_01"][2], min(BOUNDS["TST_PV_01"][3], pv_power))
 
             range = NBH_SCALE * temperature * (BOUNDS["TST_BAT_01"][3] - BOUNDS["TST_BAT_01"][2])
-            bat_cap = sample[6] + rand((-0.5 * range):(0.5 * range))
+            bat_cap = sample["bat_cap"] + rand((-0.5 * range):(0.5 * range))
             bat_cap = max(BOUNDS["TST_BAT_01"][2], min(BOUNDS["TST_BAT_01"][3], bat_cap))
 
             range = NBH_SCALE * temperature * (BOUNDS["TST_BFT_01"][3] - BOUNDS["TST_BFT_01"][2])
-            bt_cap = sample[7] + rand((-0.5 * range):(0.5 * range))
+            bt_cap = sample["bt_cap"] + rand((-0.5 * range):(0.5 * range))
             bt_cap = max(BOUNDS["TST_BFT_01"][2], min(BOUNDS["TST_BFT_01"][3], bt_cap))
 
             inputs["components"]["TST_HP_01"]["power_th"] = hp_power
@@ -113,15 +120,30 @@ function main()
         # run sim and record results
         run_results = run_simulation(inputs)
         obj_results = objective_function(run_results)
-        push!(all_results, [0.0, obj_results.lcc, obj_results.emissions, hp_power, pv_power, bat_cap, bt_cap])
+        result = Dict(
+            "gm" => 0.0,
+            "cost" => obj_results.lcc,
+            "emissions" => obj_results.emissions,
+            "hp_power" => hp_power,
+            "hp_capex_per_kw" => inputs["components"]["TST_HP_01"]["capex_per_kW"],
+            "pv_power" => pv_power,
+            "pv_capex_per_kw" => inputs["components"]["TST_PV_01"]["capex_per_kW"],
+            "bat_cap" => bat_cap,
+            "bat_capex_per_kwh" => inputs["components"]["TST_BAT_01"]["capex_per_kWh"],
+            "bt_cap" => bt_cap,
+            "bt_capex_per_kwh" => inputs["components"]["TST_BFT_01"]["capex_per_kWh"],
+            "base_cop" => inputs["components"]["TST_HP_01"]["base_cop"],
+            "base_grid_price" => inputs["components"]["TST_BAT_01"]["base_grid_price"],
+        )
+        push!(all_results, result)
         min_lcc = obj_results.lcc < min_lcc ? obj_results.lcc : min_lcc
         min_emissions = obj_results.emissions < min_emissions ? obj_results.emissions : min_emissions
 
         # calculate global measure and sort by it
         for res in all_results
-            res[1] = sqrt(((res[2]) / min_lcc - 1.0)^2 + (res[3] / min_emissions - 1.0)^2)
+            res["gm"] = sqrt(((res["cost"]) / min_lcc - 1.0)^2 + (res["emissions"] / min_emissions - 1.0)^2)
         end
-        sort!(all_results; by=x -> x[1])
+        sort!(all_results; by=x -> x["gm"])
 
         if idx % 5 == 0
             print("| ")
@@ -130,8 +152,8 @@ function main()
     print("\nFinished simulation, now plotting\n")
 
     # create scatter plot with objective function values
-    x_values = [result[2] for result in all_results]
-    y_values = [result[3] for result in all_results]
+    x_values = [result["cost"] for result in all_results]
+    y_values = [result["emissions"] for result in all_results]
 
     scatter(x_values, y_values; xlabel="Life-cycle cost (capex + $OPEX_YEARS*opex) [€]",
             ylabel="Operational emissions [kg/a]", title="Pareto Front", legend=false,
@@ -144,8 +166,8 @@ function main()
     for (i, result_i) in enumerate(all_results)
         is_dominated = false
         for (j, result_j) in enumerate(all_results)
-            if i != j && result_j[2] <= result_i[2] && result_j[3] <= result_i[3]
-                if result_j[2] < result_i[2] || result_j[3] < result_i[3]
+            if i != j && result_j["cost"] <= result_i["cost"] && result_j["emissions"] <= result_i["emissions"]
+                if result_j["cost"] < result_i["cost"] || result_j["emissions"] < result_i["emissions"]
                     is_dominated = true
                     break
                 end
@@ -158,16 +180,16 @@ function main()
 
     println("Pareto Front Points:")
     for point in pareto_points
-        _, cost, emissions, hp_power, pv_power, bat_cap, bt_cap = point
-        println("Cost: $(cost), Emissions: $(emissions)")
-        println("  HP power: $(hp_power), PV scale: $(pv_power), BAT capacity: $(bat_cap), BFT capacity: $(bt_cap)")
+        println("Cost: $(point["cost"]), Emissions: $(point["emissions"])")
+        println("  HP power: $(point["hp_power"]), PV scale: $(point["pv_power"]), " *
+                "BAT capacity: $(point["bat_cap"]), BFT capacity: $(point["bt_cap"])")
     end
 
     println("Top 10 Global Measure Points:")
     for point in all_results[1:10]
-        gb, cost, emissions, hp_power, pv_power, bat_cap, bt_cap = point
-        println("Global Measure: $gb, Cost: $(cost), Emissions: $(emissions)")
-        println("  HP power: $(hp_power), PV scale: $(pv_power), BAT capacity: $(bat_cap), BFT capacity: $(bt_cap)")
+        println("Global Measure: $(point["gm"]), Cost: $(point["cost"]), Emissions: $(point["emissions"])")
+        println("  HP power: $(point["hp_power"]), PV scale: $(point["pv_power"]), " *
+                "BAT capacity: $(point["bat_cap"]), BFT capacity: $(point["bt_cap"])")
     end
 end
 
