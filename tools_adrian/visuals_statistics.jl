@@ -7,7 +7,7 @@ using Plots                                              # Plots
 ############################################################
 # Konfiguration (hier anpassen)
 ############################################################
-const CSV_PATH = "c:/Users/jenter/Documents/resie/output/parameterstudy/results_396runs_260202_120434.csv"             # <- Pfad zur CSV anpassen
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_2975runs_260209_184340.csv"             # <- Pfad zur CSV anpassen
 const OUTDIR   = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"                                 # Plot-Ausgabeordner
 
 ############################################################
@@ -28,8 +28,8 @@ const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 w
 # Fixpunkt (für 1D-Slices)
 ############################################################
 const FIX = Dict(                                        # Fixwerte für 1D-Plots
-    "Hp_Power / W"             => 4.0e6,                  # W
-    "Boiler_Power / W"         => 3.0e6,                  # W
+    "Hp_Power / W"             => 7.0e6,                  # W
+    "Boiler_Power / W"         => 1.0e6,                  # W
     "BufferTank_Capacity / Wh" => 6.0e7,                  # Wh
     "Battery_Capacity / Wh"    => 0.0,                  # Wh
 )

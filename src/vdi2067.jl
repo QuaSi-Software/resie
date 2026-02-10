@@ -71,8 +71,8 @@ VDI_SCENARIO_NONE = VDIParams(
     0.000,    # no energy cost (Excel)
     0.000,    # no maintenance cost (Excel)
     0.000,    # no repair cost (Excel)
-    0.000,    # no revenues
     0.000,    # no miscellaneous (Excel)
+    0.000,    # no revenues
     120.0,    # grid price addon €/MWh
     106.8,    # AW_PV €/MWh
     83.496    # AW_Wind €/MWh, 58.8*1.42
@@ -86,8 +86,8 @@ VDI_SCENARIO_MOD = VDIParams(
     0.010,    # energy cost +1.0% (Excel)
     0.010,    # maintenance cost +0.5% (Excel)
     0.010,    # repair cost +0.5% (Excel)
-    -0.01,    # revenues -10%
     0.010,    # miscellaneous +0.5% (Excel)
+    -0.01,    # revenues -10%
     #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
@@ -103,8 +103,8 @@ VDI_SCENARIO_PRO = VDIParams(
     0.020,    # energy cost +2.0% (Excel)
     0.020,    # maintenance +1.0% (Excel)
     0.020,    # repair +1.0% (Excel)
-    -0.02,    # revenues -2.0%
     0.020,    # miscellaneous +1.0% (Excel)
+    -0.02,    # revenues -2.0%
     #TODO grid fees based on historical average data
     120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
@@ -200,7 +200,7 @@ end
 function op_annuity(components::Vector{VDIComponent}, p::VDIParams)     # operation cost-related annuity
 
     # first year operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
-    sum((c.f_bedien * 30.0) for c in components if c.A0 > 0, init=0.0)  # only use f_bedien if component is actually used -> p_th > 0
+    A_B1 = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0, init=0.0)  # only use f_bedien if component is actually used -> p_th > 0
 
     # First-year inspection, maintenance, repair and reinstatement cost
     A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components if c.A0 > 0, init=0.0)
@@ -234,7 +234,7 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
-    base_price = 214.0        # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)
+    base_price = 214.0        # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
