@@ -18,5 +18,5 @@ examples/*.json
 profiles/examples/district/230413_profiles_management.xlsx
 
 !/**/.gitkeep
-profiles/weather/TRY2015_Konstanz_Jahr.epw
+profiles/*
 src/energy_systems/heat_sources/solarthermal_collector_validation.jl
