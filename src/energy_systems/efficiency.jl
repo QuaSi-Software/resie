@@ -683,7 +683,7 @@ Checks the available energy on the input heat interface.
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+function check_heat_in_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
@@ -892,7 +892,7 @@ Therefore, it returns not only the energies but also the corresponding target_ua
     infinite value.
 - `Vector{Stringing}`: The UACs of the targets on the interface corresponding to the energies.
 """
-function check_heat_out_layered(unit::Electrolyser,
+function check_heat_out_layered(unit::Union{Electrolyser,ThermalBooster},
                                 interface_name::String,
                                 medium::Symbol,
                                 output_temperature::Floathing,
