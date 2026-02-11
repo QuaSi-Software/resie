@@ -193,7 +193,7 @@
             "scale": 1,
             "m_el_out": "m_power"
         },
-        "Heat_Source_HP": {
+        "Heat_Source_HeatPump": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
@@ -203,7 +203,7 @@
             "constant_power": 1e7,
             "is_source": true
         },
-        "Heat_Source_FB": {
+        "Heat_Source_ElectrodeBoiler": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "ElectrodeBoiler"

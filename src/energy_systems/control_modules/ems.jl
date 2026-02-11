@@ -23,7 +23,7 @@ mutable struct CM_EMS <: ControlModule
             "new_connections_below_limits" => Dict{String,Any}(), # (Normalbetrieb), Sparbetrieb, Einnahmenbetrieb
             "bus_uacs" => [],
             "storage_uac" => nothing,
-            "hp_uac" => nothing,
+            "HeatPump_uac" => nothing,
             "ElectrodeBoiler_uac" => nothing,
             "reserve_uac" => nothing,
             "grid_out_uac" => nothing
@@ -122,7 +122,7 @@ mutable struct CM_EMS <: ControlModule
             # end 
             # append!(time_array_1, t1*10^6)
 
-            hp_uac = mod_params["hp_uac"]
+            HeatPump_uac = mod_params["HeatPump_uac"]
             ElectrodeBoiler_uac = mod_params["ElectrodeBoiler_uac"]
             storage_uac = mod_params["storage_uac"]
             grid_out_uac = mod_params["grid_out_uac"]
@@ -134,7 +134,7 @@ mutable struct CM_EMS <: ControlModule
             # define relevant output_keys to be able to gather data after future simulation
             output_keys_dict = OrderedDict{String, Any}(
                 storage_uac => ["Load", "Capacity"],
-                hp_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT", 
+                HeatPump_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT", 
                            "MixingTemperature_Input", "MixingTemperature_Output"],
                 ElectrodeBoiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT"],
                 grid_out_uac => ["m_power:IN"]
@@ -177,22 +177,22 @@ mutable struct CM_EMS <: ControlModule
 
             #TODO caluclate on timestep basis and find min between storage_power and th_power on timestep basis
             # calculate available power from heat pump
-            hp = comps[hp_uac]
-            used_th_power_hp = sim_params["wh_to_watts"].(output_data[hp_uac * "m_heat" * "OUT"]) .+ 
-                               sim_params["wh_to_watts"].(output_data[hp_uac * "secondary_m_heat" * "OUT"])
-            available_th_power_hp = zeros(length(used_th_power_hp))
-            available_el_power_hp = []
-            for (idx, th_power) in enumerate(used_th_power_hp)
+            HeatPump = comps[HeatPump_uac]
+            used_th_power_HeatPump = sim_params["wh_to_watts"].(output_data[HeatPump_uac * "m_heat" * "OUT"]) .+ 
+                               sim_params["wh_to_watts"].(output_data[HeatPump_uac * "secondary_m_heat" * "OUT"])
+            available_th_power_HeatPump = zeros(length(used_th_power_HeatPump))
+            available_el_power_HeatPump = []
+            for (idx, th_power) in enumerate(used_th_power_HeatPump)
                 if th_power == 0
-                    src_temp = hp.input_interfaces[hp.m_heat_in].source.temperature_src_in
+                    src_temp = HeatPump.input_interfaces[HeatPump.m_heat_in].source.temperature_src_in
                     snk_temp = comps[storage_uac].high_temperature
-                    available_th_power_hp[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
-                    available_th_power_hp[idx] = min(available_storage_power[idx], available_th_power_hp[idx])
-                    push!(available_el_power_hp, available_th_power_hp[idx] / hp.dynamic_cop(src_temp, snk_temp))
+                    available_th_power_HeatPump[idx] = HeatPump.max_power_function(src_temp, snk_temp) * HeatPump.design_power_th
+                    available_th_power_HeatPump[idx] = min(available_storage_power[idx], available_th_power_HeatPump[idx])
+                    push!(available_el_power_HeatPump, available_th_power_HeatPump[idx] / HeatPump.dynamic_cop(src_temp, snk_temp))
                 else
-                    available_th_power_hp[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx] - th_power
-                    available_th_power_hp[idx] = min(available_storage_power[idx], available_th_power_hp[idx])
-                    push!(available_el_power_hp, available_th_power_hp[idx] / output_data[hp_uac * "COP"][idx])
+                    available_th_power_HeatPump[idx] = th_power / output_data[HeatPump_uac * "Avg_PLR"][idx] - th_power
+                    available_th_power_HeatPump[idx] = min(available_storage_power[idx], available_th_power_HeatPump[idx])
+                    push!(available_el_power_HeatPump, available_th_power_HeatPump[idx] / output_data[HeatPump_uac * "COP"][idx])
                 end
             end
 
@@ -207,13 +207,13 @@ mutable struct CM_EMS <: ControlModule
                     push!(available_th_power_ElectrodeBoiler, th_power / output_data[ElectrodeBoiler_uac * "Avg_PLR"][idx] - th_power)
                 end
             end
-            available_el_power_ElectrodeBoiler = min.(available_storage_power .- available_th_power_hp, available_th_power_ElectrodeBoiler)
+            available_el_power_ElectrodeBoiler = min.(available_storage_power .- available_th_power_HeatPump, available_th_power_ElectrodeBoiler)
 
             # add the feed-in power from renewables to the reserve control power since it 
             # can be marketed additionally
             feed_in_el_power = output_data[grid_out_uac * "m_power" * "IN"]
-            available_el_power = minimum(available_el_power_hp .+ available_el_power_ElectrodeBoiler .+ feed_in_el_power)
-            # available_el_power = available_el_power_hp[min_idx] + available_el_power_ElectrodeBoiler[min_idx] + feed_in_el_power[min_idx]
+            available_el_power = minimum(available_el_power_HeatPump .+ available_el_power_ElectrodeBoiler .+ feed_in_el_power)
+            # available_el_power = available_el_power_HeatPump[min_idx] + available_el_power_ElectrodeBoiler[min_idx] + feed_in_el_power[min_idx]
 
             # check if minimum el power of 1 MW can be provided
             if available_el_power >= 10^6
@@ -271,18 +271,18 @@ mutable struct CM_EMS <: ControlModule
             # of 1h continous reserve demand
             available_storage_power = min(available_storage_capacity, storage.max_load_rate * storage.capacity)
             
-            hp = components[mod_params["hp_uac"]]
+            HeatPump = components[mod_params["HeatPump_uac"]]
             ElectrodeBoiler = components[mod_params["ElectrodeBoiler_uac"]]
-            available_th_power = hp.design_power_th + ElectrodeBoiler.design_power_th - max_power_demand
+            available_th_power = HeatPump.design_power_th + ElectrodeBoiler.design_power_th - max_power_demand
             available_th_power = min(available_th_power, available_storage_power)
             # check if heat pump has capacity for providing control reserve
-            if max_power_demand >= hp.design_power_th # only ElectrodeBoiler used for control reserve
+            if max_power_demand >= HeatPump.design_power_th # only ElectrodeBoiler used for control reserve
                 available_el_power = available_th_power
             elseif available_th_power > 0 # ElectrodeBoiler and heat pump used for control reserve
-                available_power_hp = hp.design_power_th - max_power_demand
-                cop = hp.dynamic_cop(30, demand.temperature) * hp.plf_function(1.0) #TODO variable input_temp for cop calculation
-                available_el_power_hp = available_power_hp / cop
-                available_el_power = available_el_power_hp + ElectrodeBoiler.design_power_th
+                available_power_HeatPump = HeatPump.design_power_th - max_power_demand
+                cop = HeatPump.dynamic_cop(30, demand.temperature) * HeatPump.plf_function(1.0) #TODO variable input_temp for cop calculation
+                available_el_power_HeatPump = available_power_HeatPump / cop
+                available_el_power = available_el_power_HeatPump + ElectrodeBoiler.design_power_th
             else
                 available_el_power = 0.0
             end

@@ -15,7 +15,7 @@ const OUTDIR   = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/" 
 # Spaltennamen (wie in deiner CSV)
 ############################################################
 const XCOLS = [                                          # Einflussgrößen (Anlagenparameter)
-    "Hp_Power/W",                                       # Wärmepumpenleistung
+    "HeatPump_Power/W",                                       # Wärmepumpenleistung
     "ElectrodeBoiler_Power/W",                                   # ElectrodeBoiler/Heizstab-Leistung
     "BufferTank_Capacity/Wh",                           # Wärmespeichergröße
     "Battery_Capacity/Wh",                              # Batteriegröße
@@ -29,7 +29,7 @@ const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 w
 # Fixpunkt (für 1D-Slices)
 ############################################################
 const FIX = Dict(                                        # Fixwerte für 1D-Plots
-    "Hp_Power/W"             => 6.0e6,                  # W
+    "HeatPump_Power/W"             => 6.0e6,                  # W
     "ElectrodeBoiler_Power/W"         => 2.0e6,                  # W
     "BufferTank_Capacity/Wh" => 3.0e7,                  # Wh
     "Battery_Capacity/Wh"    => 0.0,                  # Wh
@@ -448,7 +448,7 @@ end
 
 
 ############################################################
-# 3D-Plot: HP_Power vs. ElectrodeBoiler_Power vs. BufferTank_Capacity
+# 3D-Plot: HeatPump_Power vs. ElectrodeBoiler_Power vs. BufferTank_Capacity
 # mit farblicher Codierung der Annuität (grün=niedrig, rot=hoch)
 ############################################################
 function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
@@ -456,7 +456,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     # ----------------------------
     # Spaltennamen
     # ----------------------------
-    col_hp     = "Hp_Power/W"
+    col_HeatPump     = "HeatPump_Power/W"
     col_ElectrodeBoiler = "ElectrodeBoiler_Power/W"
     col_buffer = "BufferTank_Capacity/Wh"
     col_annuity = "annuity_no A_total/€"
@@ -473,7 +473,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     # Nur gültige Zeilen selektieren
     # ----------------------------
     dfv = dfv[
-        .!ismissing.(dfv[!, col_hp]) .&&
+        .!ismissing.(dfv[!, col_HeatPump]) .&&
         .!ismissing.(dfv[!, col_ElectrodeBoiler]) .&&
         .!ismissing.(dfv[!, col_buffer]) .&&
         .!ismissing.(dfv[!, col_annuity]),
@@ -491,7 +491,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     # ----------------------------
     # Daten extrahieren und konvertieren
     # ----------------------------
-    hp      = Vector{Float64}(dfv[!, col_hp]) ./ 1e6        # in MW konvertieren
+    HeatPump      = Vector{Float64}(dfv[!, col_HeatPump]) ./ 1e6        # in MW konvertieren
     ElectrodeBoiler  = Vector{Float64}(dfv[!, col_ElectrodeBoiler]) ./ 1e6    # in MW konvertieren
     buffer  = Vector{Float64}(dfv[!, col_buffer]) ./ 1e6    # in MWh konvertieren
     annuity = Vector{Float64}(dfv[!, col_annuity]) ./ 1e6    # in Mio. € konvertieren
@@ -499,7 +499,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     # ----------------------------
     # Labelnamen konvertieren
     # ----------------------------
-    col_hp_label     = convert_param_label(col_hp)
+    col_HeatPump_label     = convert_param_label(col_HeatPump)
     col_ElectrodeBoiler_label = convert_param_label(col_ElectrodeBoiler)
     col_buffer_label = convert_param_label(col_buffer)
     col_annuity_label = convert_annuity_label(col_annuity)
@@ -518,7 +518,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     # Interaktiver 3D-Scatterplot (PlotlyJS)
     # ----------------------------
     trace = PlotlyJS.scatter3d(
-        x = hp,
+        x = HeatPump,
         y = ElectrodeBoiler,
         z = buffer,
         mode = "markers",
@@ -535,7 +535,7 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     layout = PlotlyJS.Layout(
         title = "3D-Parameterraum: Parameter vs. Gesamtannuität",
         scene = PlotlyJS.attr(
-            xaxis = PlotlyJS.attr(title = col_hp_label),
+            xaxis = PlotlyJS.attr(title = col_HeatPump_label),
             yaxis = PlotlyJS.attr(title = col_ElectrodeBoiler_label),
             zaxis = PlotlyJS.attr(title = col_buffer_label)
         ),
@@ -666,7 +666,7 @@ function main()
     end
 
     ########################################################
-    # 2) 3D-Plot: HP_Power vs. ElectrodeBoiler_Power vs. BufferTank
+    # 2) 3D-Plot: HeatPump_Power vs. ElectrodeBoiler_Power vs. BufferTank
     #    mit Farbcodierung der Annuität
     ########################################################
     Base.invokelatest(getfield(@__MODULE__, :plot_3d_parameter_space), df; outdir=OUTDIR)
