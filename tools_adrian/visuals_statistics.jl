@@ -3,24 +3,25 @@ using DataFrames                                         # Tabellenverarbeitung
 using Statistics                                         # mean/std/cor
 using Printf                                             # formatierte Ausgaben
 using Plots                                              # Plots
+import PlotlyJS
 
 ############################################################
 # Konfiguration (hier anpassen)
 ############################################################
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_2975runs_260209_184340.csv"             # <- Pfad zur CSV anpassen
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_2640runs_260210_181232.csv"             # <- Pfad zur CSV anpassen
 const OUTDIR   = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"                                 # Plot-Ausgabeordner
 
 ############################################################
 # Spaltennamen (wie in deiner CSV)
 ############################################################
 const XCOLS = [                                          # Einflussgrößen (Anlagenparameter)
-    "Hp_Power / W",                                       # Wärmepumpenleistung
-    "Boiler_Power / W",                                   # Boiler/Heizstab-Leistung
-    "BufferTank_Capacity / Wh",                           # Wärmespeichergröße
-    "Battery_Capacity / Wh",                              # Batteriegröße
+    "Hp_Power/W",                                       # Wärmepumpenleistung
+    "ElectrodeBoiler_Power/W",                                   # ElectrodeBoiler/Heizstab-Leistung
+    "BufferTank_Capacity/Wh",                           # Wärmespeichergröße
+    "Battery_Capacity/Wh",                              # Batteriegröße
 ]
 
-const YCOL_NO  = "annuity_no A_total / €"                # Zielgröße (Basisfall "no")
+const YCOL_NO  = "annuity_no A_total/€"                # Zielgröße (Basisfall "no")
 const BAL_COLS = ["balance_power", "balance_heat"]       # Balance-Warning-Spalten
 const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 werden verworfen
 
@@ -28,10 +29,10 @@ const BAL_THRESHOLD = 1.0                                 # alle |balance| > 1 w
 # Fixpunkt (für 1D-Slices)
 ############################################################
 const FIX = Dict(                                        # Fixwerte für 1D-Plots
-    "Hp_Power / W"             => 7.0e6,                  # W
-    "Boiler_Power / W"         => 1.0e6,                  # W
-    "BufferTank_Capacity / Wh" => 6.0e7,                  # Wh
-    "Battery_Capacity / Wh"    => 0.0,                  # Wh
+    "Hp_Power/W"             => 6.0e6,                  # W
+    "ElectrodeBoiler_Power/W"         => 2.0e6,                  # W
+    "BufferTank_Capacity/Wh" => 3.0e7,                  # Wh
+    "Battery_Capacity/Wh"    => 0.0,                  # Wh
 )
 
 ############################################################
@@ -76,6 +77,51 @@ end
 ############################################################
 function isapprox_num(a::Real, b::Real)                    # zwei Real-Zahlen vergleichen
     return isapprox(a, b; rtol=REL_TOL, atol=ABS_TOL)       # mit Toleranzen
+end
+
+############################################################
+# Hilfsfunktion: Parameter-Label konvertieren (W/Wh → MW/MWh)
+############################################################
+function convert_param_label(col::String)                  # Spaltennamen konvertieren
+    if contains(col, "/ W")                                # Watt-Einheit?
+        return replace(col, "/ W" => "/ MW")               # in MW umwandeln
+    elseif contains(col, "/ Wh")                           # Wh-Einheit?
+        return replace(col, "/ Wh" => "/ MWh")             # in MWh umwandeln
+    else
+        return col                                         # sonst unverändert
+    end
+end
+
+############################################################
+# Hilfsfunktion: Annuitäts-Label konvertieren (€ → Mio. €)
+############################################################
+function convert_annuity_label(col::String)                # Spaltennamen für Annuitäten
+    if contains(col, "/€")                               # Euro-Einheit?
+        return replace(col, "/€" => "/Mio. €")         # in Mio. € umwandeln
+    else
+        return col                                         # sonst unverändert
+    end
+end
+
+############################################################
+# Hilfsfunktion: Wert-Konvertierung (W/Wh → MW/MWh, € → Mio. €)
+############################################################
+function convert_param_value(col::String, value::Real)     # Spaltennamen + Wert
+    if contains(col, "/W") || contains(col, "/Wh")       # Watt oder Wh?
+        return value / 1e6                                 # durch 1e6 teilen
+    elseif contains(col, "/€")                           # Euro?
+        return value / 1e6                                 # durch 1e6 teilen
+    else
+        return value                                       # sonst unverändert
+    end
+end
+
+############################################################
+# Hilfsfunktion: Wert formatieren (1 Nachkommastelle)
+############################################################
+function format_param_value(value::Real; decimals::Int=1)  # Wert mit Dezimalstellen
+    rounded = round(value; digits=decimals)                # runden
+    return string(rounded)                                 # als String zurückgeben
 end
 
 ############################################################
@@ -146,8 +192,10 @@ function subset_for_single_param(df::DataFrame, varying_col::String;
     df_fix_bal = filter_balance(df_fix, bal_cols, bal_threshold) # dann Balancefilter
     n_after_balance = nrow(df_fix_bal)                      # Anzahl am Fixpunkt (mit Balance)
 
+    varying_col_label = convert_param_label(varying_col)    # Label konvertieren
+
     println("--------------------------------------------------")  # Trennlinie
-    println("Parameter: ", varying_col)                       # aktueller Parameter
+    println("Parameter: ", varying_col_label)                # aktueller Parameter (konvertiert)
     @printf("Start:                      %5d Zeilen\n", n_start)           # Startausgabe
     @printf("nach Fixpunkt-Filter:       %5d (-%d)\n", n_after_fix, n_start - n_after_fix)  # Fix-Ausgabe
     @printf("nach Balance-Filter (auf Fix): %5d (-%d)\n", n_after_balance, n_after_fix - n_after_balance) # Balance-Ausgabe
@@ -180,27 +228,43 @@ function plot_single_param(df::DataFrame, varying_col::String, ycol::String; out
     ymin, iy = findmin(dfp[!, ycol])                         # Minimum von y finden
     xmin = dfp[iy, varying_col]                              # zugehöriges x
 
-    @printf("Minimum: %.3e € bei %s = %.3e\n",                # Minimum ausgeben
-            ymin, varying_col, xmin)                         # Format
+    xmin_conv = convert_param_value(varying_col, xmin)       # x-Wert konvertieren
+    xmin_str = format_param_value(xmin_conv)                 # formatieren
+    xlabel_conv = convert_param_label(varying_col)           # Label konvertieren
+    ylabel_conv = convert_annuity_label(ycol)                # Annuitäts-Label konvertieren
+    ymin_conv = convert_param_value(ycol, ymin)              # y-Minimum konvertieren
+    ymin_str = format_param_value(ymin_conv)                 # formatieren
 
-    p = plot(                                                # Plotobjekt erstellen
-        dfp[!, varying_col],                                 # x-Daten
-        dfp[!, ycol],                                        # y-Daten
+    @printf("Minimum: %s Mio. € bei %s = %s\n",              # Minimum ausgeben
+            ymin_str, xlabel_conv, xmin_str)                 # Format
+
+    # Konvertiere x-Daten (alle x-Werte)
+    x_data = Vector{Float64}(dfp[!, varying_col])
+    if contains(varying_col, "/ W") || contains(varying_col, "/ Wh")
+        x_data = x_data ./ 1e6                               # In MW/MWh umwandeln
+    end
+
+    # Konvertiere y-Daten (Annuität in Mio. €)
+    y_data = Vector{Float64}(dfp[!, ycol]) ./ 1e6            # In Mio. € umwandeln
+
+    p = Plots.plot(                                          # Plotobjekt erstellen
+        x_data,                                              # x-Daten konvertiert
+        y_data,                                              # y-Daten konvertiert
         seriestype = :line,                                  # Linienplot
         marker = :circle,                                    # Marker
         linewidth = 2,                                       # Linienbreite
         markersize = 4,                                      # Markergröße
-        xlabel = varying_col,                                # x-Label
-        ylabel = ycol,                                       # y-Label
-        title  = "Gesamtannuität (no) vs. $(varying_col)\n(Fixpunkt zuerst, dann |Balance| ≤ $(BAL_THRESHOLD))", # Titel
+        xlabel = xlabel_conv,                                # x-Label konvertiert
+        ylabel = ylabel_conv,                                # y-Label konvertiert
+        title  = "Gesamtannuität (no) vs. $(xlabel_conv)\n(Fixpunkt zuerst, dann |Balance| ≤ $(BAL_THRESHOLD))", # Titel
         legend = false,                                      # keine Legende
     )
 
-    scatter!(p, [xmin], [ymin], marker=:star5, markersize=9, label=false)  # Minimum markieren
+    Plots.scatter!(p, [xmin_conv], [ymin_conv], marker=:star5, markersize=9, label=false)  # Minimum markieren (konvertiert!)
 
     isdir(outdir) || mkpath(outdir)                          # Ordner anlegen falls nötig
     fname = replace(varying_col, r"[^\w]+" => "_")           # Dateiname säubern
-    savefig(p, joinpath(outdir, "annuity_no_vs_$(fname).png"))# Plot speichern
+    Plots.savefig(p, joinpath(outdir, "annuity_no_vs_$(fname).png"))# Plot speichern
 
     return p                                                 # Plot zurückgeben
 end
@@ -234,26 +298,52 @@ function topN_optima(df::DataFrame,
 
     # -------- Spaltenauswahl --------
     annuity_cols_no = [
-        "annuity_no A_cap / €",
-        "annuity_no A_misc / €",
-        "annuity_no A_op / €",
-        "annuity_no A_energy / €",
-        "annuity_no A_rev_control / €",
-        "annuity_no A_rev_feed / €",
-        "annuity_no A_total / €",
+        "annuity_no A_cap/€",
+        "annuity_no A_misc/€",
+        "annuity_no A_op/€",
+        "annuity_no A_energy/€",
+        "annuity_no A_rev_control/€",
+        "annuity_no A_rev_feed/€",
+        "annuity_no A_total/€",
     ]
 
+    # -------- Konvertiere Leistungs-/Kapazitätswerte in bestN (für plot_top10_annuity_breakdown) --------
+    for col in xcols
+        if contains(col, "/ W") || contains(col, "/ Wh")
+            bestN[!, col] = bestN[!, col] ./ 1e6  # In MW/MWh umwandeln
+        end
+    end
+
+    # -------- Konvertiere Annuitätswerte in bestN (für plot_top10_annuity_breakdown) --------
+    for col in annuity_cols_no
+        bestN[!, col] = bestN[!, col] ./ 1e6     # In Mio. € umwandeln
+    end
+
+    # -------- Spaltenauswahl für Anzeige --------
     keep_cols = vcat(xcols, annuity_cols_no)
     bestN_small = bestN[:, keep_cols]
 
+    # -------- Konvertiere Spaltenüberschriften für Anzeige --------
+    rename_pairs = Pair{String, String}[]
+    for col in names(bestN_small)
+        if contains(col, "/W") || contains(col, "/Wh")
+            push!(rename_pairs, col => convert_param_label(col))
+        elseif contains(col, "/€")
+            push!(rename_pairs, col => convert_annuity_label(col))
+        end
+    end
+    if !isempty(rename_pairs)
+        rename!(bestN_small, rename_pairs)
+    end
+
     # -------- Ausgabe --------
     println("\n================ TOP-$(nshow) GLOBALOPTIMA (no) ================")
-    println("Hinweis: gefiltert auf |Balance| ≤ $(bal_threshold)\n")
+    println("Hinweis: gefiltert auf |Balance| ≤ $(bal_threshold), Leistungen in MW, Kapazitäten in MWh, Annuitäten in Mio. €\n")
 
     show(stdout, MIME"text/plain"(), bestN_small; allrows=true, allcols=true)
     println()
 
-    return bestN_small
+    return bestN  # Rückgabe der kompletten DataFrame mit konvertierten Werten aber Original-Labels
 end
 
 
@@ -268,13 +358,13 @@ function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
     # ----------------------------
     # Spalten (No-Szenario)
     # ----------------------------
-    col_cap    = "annuity_no A_cap / €"            # CAPEX-Anteil
-    col_misc   = "annuity_no A_misc / €"           # Sonstige Kosten
-    col_op     = "annuity_no A_op / €"             # Betriebskosten
-    col_energy = "annuity_no A_energy / €"         # Energiekosten
-    col_rev_c  = "annuity_no A_rev_control / €"    # Erlöse Regelenergie (wird abgezogen)
-    col_rev_f  = "annuity_no A_rev_feed / €"       # Erlöse Einspeisung (wird abgezogen)
-    col_total  = "annuity_no A_total / €"          # Gesamtannuität
+    col_cap    = "annuity_no A_cap/€"            # CAPEX-Anteil
+    col_misc   = "annuity_no A_misc/€"           # Sonstige Kosten
+    col_op     = "annuity_no A_op/€"             # Betriebskosten
+    col_energy = "annuity_no A_energy/€"         # Energiekosten
+    col_rev_c  = "annuity_no A_rev_control/€"    # Erlöse Regelenergie (wird abgezogen)
+    col_rev_f  = "annuity_no A_rev_feed/€"       # Erlöse Einspeisung (wird abgezogen)
+    col_total  = "annuity_no A_total/€"          # Gesamtannuität
 
     # ----------------------------
     # x-Achse
@@ -284,14 +374,15 @@ function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
 
     # ----------------------------
     # Daten (robust nach Float)
+    # Werte sind bereits in Mio. € konvertiert von topN_optima()
     # ----------------------------
-    cap    = to_float.(best10[!, col_cap])         # A_cap
-    misc   = to_float.(best10[!, col_misc])        # A_misc
-    op     = to_float.(best10[!, col_op])          # A_op
-    energy = to_float.(best10[!, col_energy])      # A_energy
-    rev_c  = to_float.(best10[!, col_rev_c])       # A_rev_control (positiv in CSV)
-    rev_f  = to_float.(best10[!, col_rev_f])       # A_rev_feed (positiv in CSV)
-    total  = to_float.(best10[!, col_total])       # A_total
+    cap    = to_float.(best10[!, col_cap])         # A_cap (bereits in Mio. €)
+    misc   = to_float.(best10[!, col_misc])        # A_misc (bereits in Mio. €)
+    op     = to_float.(best10[!, col_op])          # A_op (bereits in Mio. €)
+    energy = to_float.(best10[!, col_energy])      # A_energy (bereits in Mio. €)
+    rev_c  = to_float.(best10[!, col_rev_c])       # A_rev_control (bereits in Mio. €)
+    rev_f  = to_float.(best10[!, col_rev_f])       # A_rev_feed (bereits in Mio. €)
+    total  = to_float.(best10[!, col_total])       # A_total (bereits in Mio. €)
 
     # ----------------------------
     # Missing-Check (sonst Plot-Fehler)
@@ -305,9 +396,9 @@ function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
     # Wir bauen den "Bottom" kumulativ selbst
     # ----------------------------
     bottom_pos = zeros(Float64, n)                 # Start bei 0
-    p = plot(                                      # leeren Plot initialisieren
+    p = Plots.plot(                                # leeren Plot initialisieren
         xlabel = "Top-Run (1 = bestes A_total)",
-        ylabel = "Annuitäten / €",
+        ylabel = "Annuitäten/Mio. €",
         title  = "Top-$n: Zerlegung der Annuitäten (no)\nKosten oben, Erlöse unten",
         legend = :topright
     )
@@ -315,7 +406,7 @@ function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
     # Hilfsfunktion: eine Stack-Schicht als Balken zeichnen
     function stack_layer!(p, x, bottom, height; label::String)
         top = bottom .+ height                     # obere Kante
-        bar!(p, x, top;                            # Balken bis "top"
+        Plots.bar!(p, x, top;                      # Balken bis "top"
             fillrange = bottom,                    # Start bei "bottom" (macht stacking!)
             label = label)
         return bottom .+ height                    # neuen Bottom zurückgeben
@@ -338,18 +429,18 @@ function plot_top10_annuity_breakdown(best10::DataFrame; outdir::String=OUTDIR)
     # ----------------------------
     # A_total als Marker
     # ----------------------------
-    scatter!(p, x, total; label="A_total", markersize=5)
+    Plots.scatter!(p, x, total; label="A_total", markersize=5)
 
     # ----------------------------
     # Achsenticks
     # ----------------------------
-    xticks!(p, x, string.(x))
+    Plots.xticks!(p, x, string.(x))
 
     # ----------------------------
     # Speichern
     # ----------------------------
     isdir(outdir) || mkpath(outdir)
-    savefig(p, joinpath(outdir, "top10_annuity_breakdown_no.png"))
+    Plots.savefig(p, joinpath(outdir, "top10_annuity_breakdown_no.png"))
 
     return p
 end
@@ -357,59 +448,182 @@ end
 
 
 ############################################################
-# Ranking-Funktion (für Spearman), mit Tie-Handling
+# 3D-Plot: HP_Power vs. ElectrodeBoiler_Power vs. BufferTank_Capacity
+# mit farblicher Codierung der Annuität (grün=niedrig, rot=hoch)
 ############################################################
-function rank_average_ties(v::Vector{Float64})                # Input: Float64-Vektor
-    n = length(v)                                             # Länge
-    order = sortperm(v)                                       # Index-Reihenfolge sortierter Werte
-    r = similar(v)                                            # Rang-Vektor anlegen
-    i = 1                                                     # Startindex im sortierten Array
-    while i <= n                                              # über alle sortierten Werte laufen
-        j = i                                                 # j startet bei i
-        while j < n && v[order[j]] == v[order[j + 1]]         # solange Gleichheit (Tie)
-            j += 1                                            # Tie-Block erweitern
-        end
-        avg_rank = (i + j) / 2                                # mittlerer Rang für Tie-Block
-        for k in i:j                                          # jedem Element im Tie-Block Rang zuweisen
-            r[order[k]] = avg_rank                            # Rang zurück auf Originalindex
-        end
-        i = j + 1                                             # zum nächsten Block springen
+function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
+
+    # ----------------------------
+    # Spaltennamen
+    # ----------------------------
+    col_hp     = "Hp_Power/W"
+    col_ElectrodeBoiler = "ElectrodeBoiler_Power/W"
+    col_buffer = "BufferTank_Capacity/Wh"
+    col_annuity = "annuity_no A_total/€"
+
+    # ----------------------------
+    # Balance-Filter anwenden
+    # ----------------------------
+    dfv = filter_balance(df, BAL_COLS, BAL_THRESHOLD)
+    println("\n---------- 3D-Parameter-Space ----------")
+    println("Gesamtanzahl Runs: $(nrow(df))")
+    println("Nach Balance-Filter: $(nrow(dfv))")
+
+    # ----------------------------
+    # Nur gültige Zeilen selektieren
+    # ----------------------------
+    dfv = dfv[
+        .!ismissing.(dfv[!, col_hp]) .&&
+        .!ismissing.(dfv[!, col_ElectrodeBoiler]) .&&
+        .!ismissing.(dfv[!, col_buffer]) .&&
+        .!ismissing.(dfv[!, col_annuity]),
+        :
+    ]
+
+    n = nrow(dfv)
+    if n == 0
+        @warn "Keine gültigen Datenpunkte für 3D-Plot"
+        return nothing
     end
-    return r                                                  # Ränge zurückgeben
+
+    println("Mit allen 4 Parametern gültig: $n")
+
+    # ----------------------------
+    # Daten extrahieren und konvertieren
+    # ----------------------------
+    hp      = Vector{Float64}(dfv[!, col_hp]) ./ 1e6        # in MW konvertieren
+    ElectrodeBoiler  = Vector{Float64}(dfv[!, col_ElectrodeBoiler]) ./ 1e6    # in MW konvertieren
+    buffer  = Vector{Float64}(dfv[!, col_buffer]) ./ 1e6    # in MWh konvertieren
+    annuity = Vector{Float64}(dfv[!, col_annuity]) ./ 1e6    # in Mio. € konvertieren
+
+    # ----------------------------
+    # Labelnamen konvertieren
+    # ----------------------------
+    col_hp_label     = convert_param_label(col_hp)
+    col_ElectrodeBoiler_label = convert_param_label(col_ElectrodeBoiler)
+    col_buffer_label = convert_param_label(col_buffer)
+    col_annuity_label = convert_annuity_label(col_annuity)
+
+    # ----------------------------
+    # Annuität-Statistik
+    # ----------------------------
+    annuity_min = minimum(annuity)
+    annuity_max = maximum(annuity)
+    annuity_mean = mean(annuity)
+    @printf("Annuität min: %.2f Mio. €\n", annuity_min)
+    @printf("Annuität max: %.2f Mio. €\n", annuity_max)
+    @printf("Annuität mean: %.2f Mio. €\n", annuity_mean)
+
+     # ----------------------------
+    # Interaktiver 3D-Scatterplot (PlotlyJS)
+    # ----------------------------
+    trace = PlotlyJS.scatter3d(
+        x = hp,
+        y = ElectrodeBoiler,
+        z = buffer,
+        mode = "markers",
+        marker = PlotlyJS.attr(
+            size = 4,
+            color = annuity,                        # Farbcodierung nach Annuität
+            colorscale = "Viridis",
+            opacity = 0.9,
+            colorbar = PlotlyJS.attr(title = "Gesamtannuität [Mio. €]")
+        ),
+        name = col_annuity_label
+    )
+
+    layout = PlotlyJS.Layout(
+        title = "3D-Parameterraum: Parameter vs. Gesamtannuität",
+        scene = PlotlyJS.attr(
+            xaxis = PlotlyJS.attr(title = col_hp_label),
+            yaxis = PlotlyJS.attr(title = col_ElectrodeBoiler_label),
+            zaxis = PlotlyJS.attr(title = col_buffer_label)
+        ),
+        margin = PlotlyJS.attr(l = 0, r = 0, b = 0, t = 60)
+    )
+
+    p = PlotlyJS.Plot(trace, layout)
+
+    # ----------------------------
+    # Speichern als interaktive HTML-Datei
+    # ----------------------------
+    isdir(outdir) || mkpath(outdir)
+    html_path = joinpath(outdir, "3d_parameter_space_interactive.html")
+    PlotlyJS.savefig(p, html_path)
+    println("Interaktiver Plot gespeichert: $html_path")
+
+    return p
 end
 
 ############################################################
-# Spearman-Korrelation = Pearson-Korrelation der Ränge
+# Factor-Screening Sensitivität (SRC = standardisierte Regression)
+# - z-standardisiert x und y
+# - lineares Modell: y = b0 + sum(bi * xi)
+# - |bi| zeigt relativen Einfluss
 ############################################################
-function spearman_corr(x::Vector{Float64}, y::Vector{Float64})
-    rx = rank_average_ties(x)                                 # Ränge von x
-    ry = rank_average_ties(y)                                 # Ränge von y
-    return cor(rx, ry)                                        # Pearson-Korrelation der Ränge
-end
+function factor_screening_sensitivity(df::DataFrame, xcols::Vector{String}, ycol::String)
 
-############################################################
-# Sensitivität: Spearman (ρ)
-############################################################
-function spearman_sensitivity(df::DataFrame, xcols::Vector{String}, ycol::String)
+    println("\n=========== FACTOR SCREENING (SRC) ===========")
 
-    println("\n=========== SPEARMAN-SENSITIVITÄT (ρ) ===========")# Überschrift
-
-    for c in xcols                                            # über Parameter iterieren
-        sub = df[
-            .!ismissing.(df[!, c]) .&&                        # x gültig
-            .!ismissing.(df[!, ycol]),                        # y gültig
-            :
-        ]
-        x = Vector{Float64}(sub[!, c])                        # x als Float64-Vektor
-        y = Vector{Float64}(sub[!, ycol])                     # y als Float64-Vektor
-        if length(unique(x)) < 2                               # keine Variation?
-            @printf("%-30s ρ =   NaN  (keine Variation)\n", c) # Hinweis ausgeben
-            continue                                           # weiter
-        end
-        ρ = spearman_corr(x, y)                               # Spearman berechnen
-        @printf("%-30s ρ = %+6.3f\n", c, ρ)                   # Ausgabe
+    # Nur vollständige Zeilen
+    mask = trues(nrow(df))
+    for c in xcols
+        mask .&= .!ismissing.(df[!, c])
     end
+    mask .&= .!ismissing.(df[!, ycol])
+    sub = df[mask, :]
+
+    n = nrow(sub)
+    p = length(xcols)
+    if n == 0
+        @warn "Keine gültigen Zeilen für Factor Screening"
+        return nothing
+    end
+
+    # Designmatrix und Ziel
+    X = Matrix{Float64}(undef, n, p)
+    for (j, c) in enumerate(xcols)
+        X[:, j] = Vector{Float64}(sub[!, c])
+    end
+    y = Vector{Float64}(sub[!, ycol])
+
+    # Standardisieren (z-Score)
+    Xz = similar(X)
+    valid_cols = trues(p)
+    for j in 1:p
+        xj = X[:, j]
+        sj = std(xj)
+        if sj == 0.0
+            valid_cols[j] = false
+            Xz[:, j] .= 0.0
+        else
+            Xz[:, j] = (xj .- mean(xj)) ./ sj
+        end
+    end
+    sy = std(y)
+    if sy == 0.0
+        @warn "Zielvariable hat keine Variation"
+        return nothing
+    end
+    yz = (y .- mean(y)) ./ sy
+
+    # Lineare Regression mit Achsenabschnitt
+    Xreg = hcat(ones(n), Xz)
+    beta = Xreg \ yz
+    coeffs = beta[2:end]
+
+    # Ausgabe
+    for (j, c) in enumerate(xcols)
+        c_label = convert_param_label(c)
+        if !valid_cols[j]
+            @printf("%-30s SRC =   NaN  (keine Variation)\n", c_label)
+        else
+            @printf("%-30s SRC = %+6.3f\n", c_label, coeffs[j])
+        end
+    end
+    return coeffs
 end
+
 
 ############################################################
 # MAIN
@@ -420,15 +634,15 @@ function main()
     println("Gesamtanzahl Zeilen CSV: ", nrow(df))            # Zeilenanzahl ausgeben
 
     annuity_cols_no = [
-    "annuity_no A_cap / €",
-    "annuity_no A_cap_incentive / €",
-    "annuity_no A_misc / €",
-    "annuity_no A_op / €",
-    "annuity_no A_energy / €",
-    "annuity_no A_rev_control / €",
-    "annuity_no A_rev_feed / €",
-    "annuity_no A_total / €",
-    "annuity_no A_total_incentive / €",
+    "annuity_no A_cap/€",
+    "annuity_no A_cap_incentive/€",
+    "annuity_no A_misc/€",
+    "annuity_no A_op/€",
+    "annuity_no A_energy/€",
+    "annuity_no A_rev_control/€",
+    "annuity_no A_rev_feed/€",
+    "annuity_no A_total/€",
+    "annuity_no A_total_incentive/€",
     ]
     numeric_cols = vcat(XCOLS, annuity_cols_no, BAL_COLS)      # benötigte numerische Spalten
     coerce_columns!(df, numeric_cols)                         # Konvertierung anwenden
@@ -437,29 +651,38 @@ function main()
     # 1) 1D-Plots: Diagnose Fixpunkt zuerst, dann Balance
     ########################################################
     for varying in XCOLS                                      # jeden Parameter separat
-        sub = subset_for_single_param(                        # Subset inkl. Diagnose
+        sub = Base.invokelatest(                              # Subset inkl. Diagnose
+            getfield(@__MODULE__, :subset_for_single_param),
             df,                                                # Originaldaten
             varying;                                           # variierende Spalte
             fix=FIX,                                           # Fixpunkt
             bal_cols=BAL_COLS,                                 # Balance-Spalten
             bal_threshold=BAL_THRESHOLD                        # Schwelle (Betrag)
         )
-        plot_single_param(sub, varying, YCOL_NO; outdir=OUTDIR)# Plot speichern
+        Base.invokelatest(
+            getfield(@__MODULE__, :plot_single_param),
+            sub, varying, YCOL_NO; outdir=OUTDIR
+        )                                                      # Plot speichern
     end
 
     ########################################################
-    # 2) Top-10 Globaloptima (nur Parameter + annuity_no total)
+    # 2) 3D-Plot: HP_Power vs. ElectrodeBoiler_Power vs. BufferTank
+    #    mit Farbcodierung der Annuität
     ########################################################
-    best10 = Base.invokelatest(topN_optima, df, XCOLS, YCOL_NO; N=10)
-    Base.invokelatest(plot_top10_annuity_breakdown, best10; outdir=OUTDIR)
+    Base.invokelatest(getfield(@__MODULE__, :plot_3d_parameter_space), df; outdir=OUTDIR)
 
     ########################################################
-    # 3) Sensitivität (Spearman) auf technisch gültigen Runs
+    # 3) Top-10 Globaloptima (nur Parameter + annuity_no total)
     ########################################################
-    df_valid = filter_balance(df, BAL_COLS, BAL_THRESHOLD)     # technisch gültige Runs
-    spearman_sensitivity(df_valid, XCOLS, YCOL_NO)             # Spearman auf gültigen Runs
+    best10 = Base.invokelatest(getfield(@__MODULE__, :topN_optima), df, XCOLS, YCOL_NO; N=10)
+    Base.invokelatest(getfield(@__MODULE__, :plot_top10_annuity_breakdown), best10; outdir=OUTDIR)
+
+    # 4) Sensitivität (Factor Screening) auf technisch gültigen Runs
+    ########################################################
+    df_valid = Base.invokelatest(getfield(@__MODULE__, :filter_balance), df, BAL_COLS, BAL_THRESHOLD)
+    Base.invokelatest(getfield(@__MODULE__, :factor_screening_sensitivity), df_valid, XCOLS, YCOL_NO)
 
     println("\nFertig. Plots liegen in: $(OUTDIR)/")           # Abschlussmeldung
 end
 
-Base.invokelatest(main)                                       # Start (robust gegen World-Age/Revise)
+Base.invokelatest(getfield(@__MODULE__, :main))              # Start (robust gegen World-Age/Revise)

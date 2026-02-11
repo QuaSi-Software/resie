@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems.json"
 
 
 ############################################################
@@ -30,20 +30,20 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy.
 ############################################################
 
 # HeatPump power (W)
-Pth_HP_lo   = 3.0e6         # lower limit
-Pth_HP_hi   = 9.0e6         # upper limit
-Pth_HP_step = 1.0e6         # step size
-Pth_HP_vals = collect(Pth_HP_lo:Pth_HP_step:Pth_HP_hi)  # array of values
+Pth_HeatPump_lo   = 2.0e6         # lower limit
+Pth_HeatPump_hi   = 10.0e6         # upper limit
+Pth_HeatPump_step = 1.0e6         # step size
+Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
-# Boiler power (W)
-Pth_Boiler_lo   = 0.0e6     # lower limit
-Pth_Boiler_hi   = 6.0e6     # upper limit
-Pth_Boiler_step = 1.0e6     # step size
-Pth_Boiler_vals = collect(Pth_Boiler_lo:Pth_Boiler_step:Pth_Boiler_hi)  # creates an array of values
+# ElectrodeBoiler power (W)
+Pth_ElectrodeBoiler_lo   = 0.0e6     # lower limit
+Pth_ElectrodeBoiler_hi   = 7.0e6     # upper limit
+Pth_ElectrodeBoiler_step = 1.0e6     # step size
+Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 20.0e6        # lower limit
-Cap_hi_Wh   = 80.0e6        # upper limit
+Cap_lo_Wh   = 10.0e6        # lower limit
+Cap_hi_Wh   = 100.0e6        # upper limit
 Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
@@ -58,7 +58,7 @@ BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an arr
 #  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
 # TODO adjust values
 # Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
-profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]         #TODO costs for power provider (105+31)?
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
@@ -78,7 +78,7 @@ state_save_power = Dict{String,Any}(
                  "PosControlReserve",
                  "Demand_Power",
                  "HeatPump",
-                 "Boiler",
+                 "ElectrodeBoiler",
                  "Battery",
                  "Grid_OUT"
              ],
@@ -103,7 +103,7 @@ state_earn_power =Dict{String,Any}(
                 "PosControlReserve",
                 "Demand_Power",
                 "HeatPump",
-                "Boiler",
+                "ElectrodeBoiler",
                 "Battery",
                 "Grid_OUT"
             ],
@@ -119,10 +119,10 @@ state_earn_power =Dict{String,Any}(
 state_save_heat = Dict{String,Any}(
              "input_order"=> [
                 "HeatPump",
-                "Boiler",
+                "ElectrodeBoiler",
                 "BufferTank",
                 "HeatPump#secondary",
-                "Boiler#secondary"
+                "ElectrodeBoiler#secondary"
             ],
             "output_order"=> [
                 "Demand_Heat",
@@ -140,9 +140,9 @@ state_save_heat = Dict{String,Any}(
 state_earn_heat =Dict{String,Any}(
             "input_order"=> [
                 "HeatPump",
-                "Boiler",
+                "ElectrodeBoiler",
                 "HeatPump#secondary",
-                "Boiler#secondary",
+                "ElectrodeBoiler#secondary",
                 "BufferTank"
             ],
             "output_order"=> [
@@ -224,9 +224,9 @@ end
 function create_variant(
         outdir::String,
         base_input::OrderedDict,
-        Pth_HP::Number,
-        Pth_Boiler::Number,
-        Cap_Wh::Number,
+        Pth_HeatPump::Number,
+        Pth_ElectrodeBoiler::Number,
+        BuffCap_Wh::Number,
         BattCap_Wh::Number,
         states_power_bus::Array{Dict{String,Any}},
         states_heat_bus::Array{Dict{String,Any}},
@@ -240,9 +240,9 @@ function create_variant(
     ########################################################
     # Set components
     ########################################################
-    cfg["components"]["HeatPump"]["power_th"] = Pth_HP
-    cfg["components"]["Boiler"]["power_th"] = Pth_Boiler
-    cfg["components"]["BufferTank"]["capacity"] = Cap_Wh
+    cfg["components"]["HeatPump"]["power_th"] = Pth_HeatPump
+    cfg["components"]["ElectrodeBoiler"]["power_th"] = Pth_ElectrodeBoiler
+    cfg["components"]["BufferTank"]["capacity"] = BuffCap_Wh
     cfg["components"]["Battery"]["capacity"] = BattCap_Wh
     
     ########################################################
@@ -250,9 +250,9 @@ function create_variant(
     ########################################################
 
     if write_output
-        csv_name = "out_HP$(safe(display_MW(Pth_HP)))MW_" *
-                   "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
-                   "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
+        csv_name = "out_HP$(safe(display_MW(Pth_HeatPump)))MW_" *
+                   "EB$(safe(display_MW(Pth_ElectrodeBoiler)))MW_" *
+                   "BUF$(safe(display_MWh(BuffCap_Wh)))MWh_" *
                    "BAT$(safe(display_kWh(BattCap_Wh)))kWh.csv"
 
         aux_name = replace(csv_name, ".csv" => ".md")
@@ -330,9 +330,9 @@ function create_variant(
     fname = joinpath(
         outdir,
         "inputfiles",
-        "input_HP$(safe(display_MW(Pth_HP)))MW_" *
-        "BOI$(safe(display_MW(Pth_Boiler)))MW_" *
-        "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
+        "input_HP$(safe(display_MW(Pth_HeatPump)))MW_" *
+        "EB$(safe(display_MW(Pth_ElectrodeBoiler)))MW_" *
+        "BUF$(safe(display_MWh(BuffCap_Wh)))MWh_" *
         "BAT$(safe(display_kWh(BattCap_Wh)))kWh.json"
     )
 
@@ -380,8 +380,8 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     mkpath(joinpath(outdir, "inputfiles"))
 
     total_runs =
-        length(Pth_HP_vals) *
-        length(Pth_Boiler_vals) *
+        length(Pth_HeatPump_vals) *
+        length(Pth_ElectrodeBoiler_vals) *
         length(Cap_vals_Wh) *
         length(BattCap_vals_Wh)
 
@@ -390,26 +390,26 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
     touch(out_file_path)
     #component parameters
-    header_parameters = ["Hp_Power / W", "Boiler_Power / W", "BufferTank_Capacity / Wh", 
-                         "Battery_Capacity / Wh"]
+    header_parameters = ["HeatPump_Power/W", "ElectrodeBoiler_Power/W", "BufferTank_Capacity/Wh", 
+                         "Battery_Capacity/Wh"]
     # no cost escalation
-    header_annuity_no = ["annuity_no A_cap / €", "annuity_no A_cap_incentive / €", 
-                         "annuity_no A_misc / €", "annuity_no A_op / €", 
-                         "annuity_no A_energy / €", "annuity_no A_rev_control / €", 
-                         "annuity_no A_rev_feed / €", "annuity_no A_total / €", 
-                         "annuity_no A_total_incentive / €"]
+    header_annuity_no = ["annuity_no A_cap/€", "annuity_no A_cap_incentive/€", 
+                         "annuity_no A_misc/€", "annuity_no A_op/€", 
+                         "annuity_no A_energy/€", "annuity_no A_rev_control/€", 
+                         "annuity_no A_rev_feed/€", "annuity_no A_total/€", 
+                         "annuity_no A_total_incentive/€"]
     # moderate cost escalation
-    header_annuity_mod = ["annuity_mod A_cap / €", "annuity_mod A_cap_incentive / €", 
-                          "annuity_mod A_misc / €", "annuity_mod A_op / €", 
-                          "annuity_mod A_energy / €", "annuity_mod A_rev_control / €", 
-                          "annuity_mod A_rev_feed / €", "annuity_mod A_total / €", 
-                          "annuity_mod A_total_incentive / €"]
+    header_annuity_mod = ["annuity_mod A_cap/€", "annuity_mod A_cap_incentive/€", 
+                          "annuity_mod A_misc/€", "annuity_mod A_op/€", 
+                          "annuity_mod A_energy/€", "annuity_mod A_rev_control/€", 
+                          "annuity_mod A_rev_feed/€", "annuity_mod A_total/€", 
+                          "annuity_mod A_total_incentive/€"]
     # progressive cost escalation
-    header_annuity_pro = ["annuity_pro A_cap / €", "annuity_pro A_cap_incentive / €", 
-                          "annuity_pro A_misc / €", "annuity_pro A_op / €", 
-                          "annuity_pro A_energy / €", "annuity_pro A_rev_control / €", 
-                          "annuity_pro A_rev_feed / €", "annuity_pro A_total / €", 
-                          "annuity_pro A_total_incentive / €"]
+    header_annuity_pro = ["annuity_pro A_cap/€", "annuity_pro A_cap_incentive/€", 
+                          "annuity_pro A_misc/€", "annuity_pro A_op/€", 
+                          "annuity_pro A_energy/€", "annuity_pro A_rev_control/€", 
+                          "annuity_pro A_rev_feed/€", "annuity_pro A_total/€", 
+                          "annuity_pro A_total_incentive/€"]
     # balance warnings
     header_balances = ["balance_power", "balance_heat", "Errors"]
     # yearly_CO2-emissions
@@ -432,8 +432,8 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
                           Logging.Warn, nothing)
     Logging.global_logger(logger)
 
-    Threads.@threads for (Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh) in
-        collect(Iterators.product(Pth_HP_vals, Pth_Boiler_vals, Cap_vals_Wh,
+    Threads.@threads for (Pth_HeatPump, Pth_ElectrodeBoiler, BuffCap_Wh, BattCap_Wh) in
+        collect(Iterators.product(Pth_HeatPump_vals, Pth_ElectrodeBoiler_vals, Cap_vals_Wh,
                                   BattCap_vals_Wh))
         
         runidx = Threads.atomic_add!(runidx_global, 1)
@@ -446,7 +446,7 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         input_file, 
         profile_values, 
         timestep = create_variant(outdir, base_input, 
-                                  Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh,
+                                  Pth_HeatPump, Pth_ElectrodeBoiler, BuffCap_Wh, BattCap_Wh,
                                   states_power_bus, states_heat_bus, 
                                   profile_addons, profile_multipliers,
                                   run_ID; 
@@ -490,14 +490,14 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
-        A0_HP     = 700 * (Pth_HP / 1e3)        #   alter Wert 700
-        A0_Boiler = 285  * (Pth_Boiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen  # alter Wert: 285
-        A0_Buffer = 39  * (Cap_Wh / 1e3)        # from FACT document
+        A0_HeatPump     = 700 * (Pth_HeatPump / 1e3)        #   alter Wert 700
+        A0_ElectrodeBoiler = 285  * (Pth_ElectrodeBoiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen  # alter Wert: 285
+        A0_Buffer = 39  * (BuffCap_Wh / 1e3)        # from FACT document
         A0_Batt   = 375 * (BattCap_Wh / 1e3)    # TODO Jule fragen
        
         components = VDI2067.VDIComponent[
-            VDI2067.heatpump_component(A0_HP),
-            VDI2067.boiler_component(A0_Boiler),
+            VDI2067.heatpump_component(A0_HeatPump),
+            VDI2067.ElectrodeBoiler_component(A0_ElectrodeBoiler),
             VDI2067.buffertank_component(A0_Buffer),
             VDI2067.battery_component(A0_Batt)
         ]
@@ -522,7 +522,7 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
             annuities_pro = fill(missing, length(header_annuity_pro))
         end
         # write important results to seperate file
-        parameters = [Pth_HP, Pth_Boiler, Cap_Wh, BattCap_Wh]
+        parameters = [Pth_HeatPump, Pth_ElectrodeBoiler, BuffCap_Wh, BattCap_Wh]
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power", "Errors")))
         # co2 = collect(values(sim_output[runidx])) #TODO
         row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"

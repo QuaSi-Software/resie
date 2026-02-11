@@ -24,7 +24,7 @@ mutable struct CM_EMS <: ControlModule
             "bus_uacs" => [],
             "storage_uac" => nothing,
             "hp_uac" => nothing,
-            "boiler_uac" => nothing,
+            "ElectrodeBoiler_uac" => nothing,
             "reserve_uac" => nothing,
             "grid_out_uac" => nothing
         )
@@ -123,7 +123,7 @@ mutable struct CM_EMS <: ControlModule
             # append!(time_array_1, t1*10^6)
 
             hp_uac = mod_params["hp_uac"]
-            boiler_uac = mod_params["boiler_uac"]
+            ElectrodeBoiler_uac = mod_params["ElectrodeBoiler_uac"]
             storage_uac = mod_params["storage_uac"]
             grid_out_uac = mod_params["grid_out_uac"]
 
@@ -136,7 +136,7 @@ mutable struct CM_EMS <: ControlModule
                 storage_uac => ["Load", "Capacity"],
                 hp_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT", 
                            "MixingTemperature_Input", "MixingTemperature_Output"],
-                boiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT"],
+                ElectrodeBoiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT"],
                 grid_out_uac => ["m_power:IN"]
             )
             output_data_keys = Resie.output_keys(comps, output_keys_dict)
@@ -196,24 +196,24 @@ mutable struct CM_EMS <: ControlModule
                 end
             end
 
-            # calculate available power from boiler 
-            used_th_power_boiler = sim_params["wh_to_watts"].(output_data[boiler_uac * "m_heat" * "OUT"]) .+ 
-                                   sim_params["wh_to_watts"].(output_data[boiler_uac * "secondary_m_heat" * "OUT"])
-            available_th_power_boiler = []
-            for (idx, th_power) in enumerate(used_th_power_boiler)
+            # calculate available power from ElectrodeBoiler 
+            used_th_power_ElectrodeBoiler = sim_params["wh_to_watts"].(output_data[ElectrodeBoiler_uac * "m_heat" * "OUT"]) .+ 
+                                   sim_params["wh_to_watts"].(output_data[ElectrodeBoiler_uac * "secondary_m_heat" * "OUT"])
+            available_th_power_ElectrodeBoiler = []
+            for (idx, th_power) in enumerate(used_th_power_ElectrodeBoiler)
                 if th_power == 0
-                    push!(available_th_power_boiler, comps[boiler_uac].design_power_th)
+                    push!(available_th_power_ElectrodeBoiler, comps[ElectrodeBoiler_uac].design_power_th)
                 else
-                    push!(available_th_power_boiler, th_power / output_data[boiler_uac * "Avg_PLR"][idx] - th_power)
+                    push!(available_th_power_ElectrodeBoiler, th_power / output_data[ElectrodeBoiler_uac * "Avg_PLR"][idx] - th_power)
                 end
             end
-            available_el_power_boiler = min.(available_storage_power .- available_th_power_hp, available_th_power_boiler)
+            available_el_power_ElectrodeBoiler = min.(available_storage_power .- available_th_power_hp, available_th_power_ElectrodeBoiler)
 
             # add the feed-in power from renewables to the reserve control power since it 
             # can be marketed additionally
             feed_in_el_power = output_data[grid_out_uac * "m_power" * "IN"]
-            available_el_power = minimum(available_el_power_hp .+ available_el_power_boiler .+ feed_in_el_power)
-            # available_el_power = available_el_power_hp[min_idx] + available_el_power_boiler[min_idx] + feed_in_el_power[min_idx]
+            available_el_power = minimum(available_el_power_hp .+ available_el_power_ElectrodeBoiler .+ feed_in_el_power)
+            # available_el_power = available_el_power_hp[min_idx] + available_el_power_ElectrodeBoiler[min_idx] + feed_in_el_power[min_idx]
 
             # check if minimum el power of 1 MW can be provided
             if available_el_power >= 10^6
@@ -272,17 +272,17 @@ mutable struct CM_EMS <: ControlModule
             available_storage_power = min(available_storage_capacity, storage.max_load_rate * storage.capacity)
             
             hp = components[mod_params["hp_uac"]]
-            boiler = components[mod_params["boiler_uac"]]
-            available_th_power = hp.design_power_th + boiler.design_power_th - max_power_demand
+            ElectrodeBoiler = components[mod_params["ElectrodeBoiler_uac"]]
+            available_th_power = hp.design_power_th + ElectrodeBoiler.design_power_th - max_power_demand
             available_th_power = min(available_th_power, available_storage_power)
             # check if heat pump has capacity for providing control reserve
-            if max_power_demand >= hp.design_power_th # only boiler used for control reserve
+            if max_power_demand >= hp.design_power_th # only ElectrodeBoiler used for control reserve
                 available_el_power = available_th_power
-            elseif available_th_power > 0 # boiler and heat pump used for control reserve
+            elseif available_th_power > 0 # ElectrodeBoiler and heat pump used for control reserve
                 available_power_hp = hp.design_power_th - max_power_demand
                 cop = hp.dynamic_cop(30, demand.temperature) * hp.plf_function(1.0) #TODO variable input_temp for cop calculation
                 available_el_power_hp = available_power_hp / cop
-                available_el_power = available_el_power_hp + boiler.design_power_th
+                available_el_power = available_el_power_hp + ElectrodeBoiler.design_power_th
             else
                 available_el_power = 0.0
             end

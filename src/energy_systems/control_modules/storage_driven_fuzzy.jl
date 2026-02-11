@@ -1,9 +1,10 @@
-"""
-Control module for running a component depending on the state of a linked storage component.
-In particular it switches to a state of allowing operation of the component when the load
-of the linked storage falls below the lower threshold. The module stays in this state until
-the load has reached the upper threshold and the minimum run time has passed.
-"""
+
+
+#Control module for running a component depending on the state of a linked storage component.
+#In particular it switches to a state of allowing operation of the component when the load
+#of the linked storage falls below the lower threshold. The module stays in this state until
+#the load has reached the upper threshold and the minimum run time has passed.
+
 
 mutable struct CM_StorageDrivenFuzzy <: ControlModule
     name::String
@@ -19,10 +20,10 @@ mutable struct CM_StorageDrivenFuzzy <: ControlModule
             "high_threshold" => 0.95,
             "min_run_time" => 1800,
             "storage_uac" => nothing,
+            "demand_uac" => nothing,
             "price_profile_path" => nothing,
             "price_trend_profile_path" => nothing,
-            "price_volatility_profile_path" => nothing,
-            "demand_heat_profile_path" => nothing
+            "price_volatility_profile_path" => nothing
 
         )
         params = Base.merge(default_parameters, parameters)
@@ -40,7 +41,7 @@ mutable struct CM_StorageDrivenFuzzy <: ControlModule
         params["price_volatility_profile"] = Profile(params["price_volatility_profile_path"], sim_params)
         params["plr_limit"] = 1.0
         params["unit"] = components[unit_uac]
-        params["demand_heat"] = Profile(params["demand_heat_profile_path"], sim_params)
+        params["demand"] = components[params["demand_uac"]]
 
         return new("storage_driven_fuzzy", params)
     end
@@ -68,21 +69,18 @@ function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})
     p_trend = value_at_time(mod_params["price_trend_profile"], sim_params)
     p_volatility = value_at_time(mod_params["price_volatility_profile"], sim_params)
     SOC_now = mod_params["storage"].load_end_of_last_timestep / mod_params["storage"].capacity
-    demand_now = mod_params["demand_heat"].value_at_time(sim_params)
+    demand_now = mod_params["demand"].demand
 
     # Fuzzy logic returns change in plr and SOC target value
     plr_diff, SOC_target = fuzzy_control(p_now, p_trend, p_volatility, SOC_now)
     if isnan(plr_diff) || isnan(SOC_target)
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
-               "Check if the parameters are inside their bounds."
-        throw(InputError)
+               "Check if the parameters are inside their bounds.  * p_now=$p_now, p_trend=$p_trend, p_volatility=$p_volatility, SOC_now=$SOC_now"
+               throw(InputError)
     end
     plr = mod_params["unit"].avg_plr
 
-    # Check if demand is higher than what unit and storage can provide
-    # TODO das nimmt an, dass WP und Boiler jeweils alleine (mit Speicher) Bedarf decken müssen?
-    demand_coverable = plr * mod_params["unit"].design_heat_th + SOC_now * mod_params["storage"].capacity * sim_params["wh_to_watts"]
-    
+        
     if SOC_target <= SOC_now
         # change low_threshold of storage_driven_fuzzy controller
         mod_params["low_threshold"] = SOC_target
@@ -96,9 +94,16 @@ function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})
         mod_params["plr_limit"] = clamp(missing_power / mod_params["unit"].design_power_th, 0.0, 1.0)
     end
     
+    # Check if demand is higher than what unit and storage can provide
+    # TODO das nimmt an, dass WP und ElectrodeBoiler jeweils alleine (mit Speicher) Bedarf decken müssen?
+    demand_coverable = mod_params["plr_limit"] * mod_params["unit"].design_power_th + SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
+    
     # Ensure plr_limit is never reduced if doing so would leave demand uncovered
-    if demand_now > demand_coverable
-        mod_params["plr_limit"] = max(mod_params["plr_limit"], plr)
+    if demand_now > demand_coverable && mod_params["plr_limit"] < 1.0
+        mod_params["low_threshold"] = SOC_target
+        mod_params["high_threshold"] = SOC_now
+        mod_params["plr_limit"] = 1.0
+        println("Fuzzy Controller set plr too small")
     end
 end 
 

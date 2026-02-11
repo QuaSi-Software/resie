@@ -25,8 +25,8 @@ mutable struct CM_EconomicControl3States <: ControlModule
             "bus_uac" => unit_uac,
             "storage_uac" => nothing,
             "demand_uac" => nothing,
-            "hp_uac" => nothing,
-            "boiler_uac" => nothing,
+            "HeatPump_uac" => nothing,
+            "ElectrodeBoiler_uac" => nothing,
             "reserve_uac" => nothing 
         )
         params = Base.merge(default_parameters, parameters)
@@ -136,7 +136,7 @@ mutable struct CM_EconomicControl3States <: ControlModule
             output_keys_dict = OrderedDict{String, Any}(
                 mod_params["demand_uac"] => ["Demand"],
                 mod_params["storage_uac"] => ["Load", "Capacity"],
-                mod_params["hp_uac"] =>  ["m_power:IN", "m_heat:OUT"]
+                mod_params["HeatPump_uac"] =>  ["m_power:IN", "m_heat:OUT"]
             )
             output_data_keys = Resie.output_keys(comps, output_keys_dict)
             output_data = zeros(Float64, length(sim_range), 1 + length(output_data_keys))
@@ -160,14 +160,14 @@ mutable struct CM_EconomicControl3States <: ControlModule
             output_data = OrderedDict(zip(output_data_keys_string, eachcol(output_data)))
             # logic to evaluate if reserve control energy can be used
             storage = comps[mod_params["storage_uac"]]
-            hp = comps[mod_params["storage_uac"]]
+            HeatPump = comps[mod_params["storage_uac"]]
             available_storage_capacity = minimum(output_data[storage.uac * "Capacity"]) -
                                          maximum(output_data[storage.uac * "Load"]) 
             max_storage_charge = storage.max_load_rate * minimum(output_data[storage.uac * "Capacity"])
             #TODO caluclate on timestep basis and find min between storage_power and th_power on timestep basis
             available_storage_power = min(available_storage_capacity, max_storage_charge)
-            available_th_power = maximum(hp.plr)hp.uac * "Effective_COP", hp.uac * "Avg_PLR", hp.uac * "Time_active"
-            available_el_power = hp.uac * "Effective_COP"
+            available_th_power = maximum(HeatPump.plr)HeatPump.uac * "Effective_COP", HeatPump.uac * "Avg_PLR", HeatPump.uac * "Time_active"
+            available_el_power = HeatPump.uac * "Effective_COP"
             energy_indicator = true
 
             # cleanup sim relevant variables to save memory; TODO might not be significant
@@ -204,18 +204,18 @@ mutable struct CM_EconomicControl3States <: ControlModule
             # of 1h continous reserve demand
             available_storage_power = min(available_storage_capacity, storage.max_load_rate * storage.capacity)
             
-            hp = components[mod_params["hp_uac"]]
-            boiler = components[mod_params["boiler_uac"]]
-            available_th_power = hp.design_power_th + boiler.design_power_th - max_power_demand
+            HeatPump = components[mod_params["HeatPump_uac"]]
+            ElectrodeBoiler = components[mod_params["ElectrodeBoiler_uac"]]
+            available_th_power = HeatPump.design_power_th + ElectrodeBoiler.design_power_th - max_power_demand
             available_th_power = min(available_th_power, available_storage_power)
             # check if heat pump has capacity for providing control reserve
-            if max_power_demand >= hp.design_power_th # only boiler used for control reserve
+            if max_power_demand >= HeatPump.design_power_th # only ElectrodeBoiler used for control reserve
                 available_el_power = available_th_power
-            elseif available_th_power > 0 # boiler and heat pump used for control reserve
-                available_power_hp = hp.design_power_th - max_power_demand
-                cop = hp.dynamic_cop(30, demand.temperature) * hp.plf_function(1.0) #TODO variable input_temp for cop calculation
-                available_el_power_hp = available_power_hp / cop
-                available_el_power = available_el_power_hp + boiler.design_power_th
+            elseif available_th_power > 0 # ElectrodeBoiler and heat pump used for control reserve
+                available_power_HeatPump = HeatPump.design_power_th - max_power_demand
+                cop = HeatPump.dynamic_cop(30, demand.temperature) * HeatPump.plf_function(1.0) #TODO variable input_temp for cop calculation
+                available_el_power_HeatPump = available_power_HeatPump / cop
+                available_el_power = available_el_power_HeatPump + ElectrodeBoiler.design_power_th
             else
                 available_el_power = 0.0
             end
