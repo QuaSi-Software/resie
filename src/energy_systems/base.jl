@@ -1612,6 +1612,7 @@ include("electric_producers/utir.jl")
 include("others/electrolyser.jl")
 include("heat_producers/fuel_boiler.jl")
 include("heat_producers/heat_pump.jl")
+include("heat_producers/thermal_booster.jl")
 include("electric_producers/pv_plant.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the
