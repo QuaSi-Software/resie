@@ -6,9 +6,9 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "return_output_keys":  {
-	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
-			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->Boiler", "Photovoltaic->Demand_Power",
-                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->Boiler", "WindFarm->Demand_Power", 
+	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->ElectrodeBoiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
+			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",
+                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->ElectrodeBoiler", "WindFarm->Demand_Power", 
                         "Battery->Demand_Power"],
 	        "NegControlReserve": ["m_power:OUT"],
             "PosControlReserve": ["m_power:IN"],
@@ -26,7 +26,7 @@
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"m_power": ["Grid_IN->Boiler"]},
+                "key": {"m_power": ["Grid_IN->ElectrodeBoiler"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -98,13 +98,13 @@
                 "scale_factor": 0.001
             },
             "15": {
-                "key":{"Boiler": ["m_heat:OUT"]},
+                "key":{"ElectrodeBoiler": ["m_heat:OUT"]},
                 "axis":"left",
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
             "16": {
-                "key": {"m_heat": ["Boiler->BufferTank"]},
+                "key": {"m_heat": ["ElectrodeBoiler->BufferTank"]},
                 "axis":"left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -116,7 +116,7 @@
                 "scale_factor": 0.001
             },
             "18": {
-                "key": {"m_heat": ["Boiler->Demand_Heat"]},
+                "key": {"m_heat": ["ElectrodeBoiler->Demand_Heat"]},
                 "axis":"left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -193,7 +193,7 @@
             "scale": 1,
             "m_el_out": "m_power"
         },
-        "Heat_Source_HP": {
+        "Heat_Source_HeatPump": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
@@ -203,10 +203,10 @@
             "constant_power": 1e7,
             "is_source": true
         },
-        "Heat_Source_FB": {
+        "Heat_Source_ElectrodeBoiler": {
             "type": "GenericHeatSource",
             "output_refs": [
-                "Boiler"
+                "ElectrodeBoiler"
             ],
             "medium": "m_heat_source",
             "constant_temperature": 0,
@@ -246,7 +246,7 @@
             "consider_icing": true,
             "icing_coefficients": "3,-0.42,15,2,30"
         },
-        "Boiler": {
+        "ElectrodeBoiler": {
             "type": "HeatPump",
             "model_type": "simplified",
             "control_modules": [
@@ -291,7 +291,7 @@
                     "PosControlReserve",
                     "Demand_Power",
                     "HeatPump",
-                    "Boiler",
+                    "ElectrodeBoiler",
                     "Battery",
                     "Grid_OUT"
                 ],
@@ -310,7 +310,7 @@
             "connections": {
                 "input_order": [
                     "HeatPump",
-                    "Boiler",
+                    "ElectrodeBoiler",
                     "BufferTank"
                 ],
                 "output_order": [
