@@ -83,7 +83,7 @@ mutable struct TBEnergies
     slices_temp_heat_out::Vector{Floathing}
     slices_temp_heat_out_temperature::Vector{Temperature}
     slices_temp_heat_out_uac::Vector{Stringing}
-    slices_temp_times::Vector{Floathing}
+
     slices_el_in::Vector{Floathing}
     slices_heat_in::Vector{Floathing}
     slices_heat_in_temperature::Vector{Temperature}
@@ -118,7 +118,6 @@ mutable struct TBEnergies
                    Vector{Floathing}(),
                    Vector{Temperature}(),
                    Vector{Stringing}(),
-                   Vector{Floathing}(),
                    Vector{Floathing}(),
                    Vector{Floathing}(),
                    Vector{Temperature}(),
@@ -183,14 +182,7 @@ function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any}):
     energies.potential_el_in = sum(energies.potential_el_in_layered)
     energies.potential_el_in = min(unit.power_el, energies.potential_el_in)
 
-    # shortcut if we're limited by zero input electricity
-    if energies.potential_el_in <= 0.0
-        do_calculation = false
-    else
-        do_calculation = true
-    end
-
-    if do_calculation
+    if energies.potential_el_in > 0.0     # shortcut if we're limited by zero input electricity
         # get vectored values for the input and output heat potentials
         energies.potentials_heat_in,
         energies.in_temps_min,
@@ -243,13 +235,18 @@ function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any}):
         if energies.heat_in_has_inf_energy
             for heat_in_idx in eachindex(energies.potentials_heat_in)
                 energies = calculate_booster(unit, sim_params, energies; fixed_heat_in=heat_in_idx)
+                energies = add_heat_in_temp_to_slices(energies)
+                energies = copy_heat_out_temp_to_slices(energies)
             end
         elseif energies.heat_out_has_inf_energy
             for heat_out_idx in eachindex(energies.potentials_heat_out)
                 energies = calculate_booster(unit, sim_params, energies; fixed_heat_out=heat_out_idx)
+                energies = add_heat_out_temp_to_slices(energies)
+                energies = copy_heat_in_temp_to_slices(energies)
             end
         else
             energies = calculate_booster(unit, sim_params, energies)
+            energies = copy_temp_to_slices!(energies)
         end
     end
 
@@ -301,12 +298,112 @@ function filter_by_transformer(energies::TBEnergies,
     return filtered
 end
 
+"""
+Reset the temporary slices of an energies container.
+"""
+function reset_temp_slices!(energies::TBEnergies)::TBEnergies
+    energies.slices_temp_el_in = Vector{Floathing}()
+    energies.slices_temp_heat_in = Vector{Floathing}()
+    energies.slices_temp_heat_in_temperature = Vector{Temperature}()
+    energies.slices_temp_heat_in_uac = Vector{Stringing}()
+    energies.slices_temp_heat_out = Vector{Floathing}()
+    energies.slices_temp_heat_out_temperature = Vector{Temperature}()
+    energies.slices_temp_heat_out_uac = Vector{Stringing}()
+    return energies
+end
+
+"""
+Adds the heat_in temp slices to the existing slices output fields.
+"""
+function add_heat_in_temp_to_slices(energies::TBEnergies)::TBEnergies
+    append!(energies.slices_heat_in, energies.slices_temp_heat_in)
+    append!(energies.slices_heat_in_temperature, energies.slices_temp_heat_in_temperature)
+    append!(energies.slices_heat_in_uac, energies.slices_temp_heat_in_uac)
+    return energies
+end
+
+"""
+Adds the heat_out temp slices to the existing slices output fields.
+"""
+function add_heat_out_temp_to_slices(energies::TBEnergies)::TBEnergies
+    append!(energies.slices_heat_out, energies.slices_temp_heat_out)
+    append!(energies.slices_heat_out_temperature, energies.slices_temp_heat_out_temperature)
+    append!(energies.slices_heat_out_uac, energies.slices_temp_heat_out_uac)
+    return energies
+end
+
+"""
+Copies the electricity and heat_in temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
+function copy_heat_in_temp_to_slices(energies::TBEnergies)::TBEnergies
+    if length(energies.slices_heat_in) == 0
+        energies.slices_el_in = copy(energies.slices_temp_el_in)
+        energies.slices_heat_in = copy(energies.slices_temp_heat_in)
+        energies.slices_heat_in_temperature = copy(energies.slices_temp_heat_in_temperature)
+        energies.slices_heat_in_uac = copy(energies.slices_temp_heat_in_uac)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_temp_el_in))
+            energies.slices_el_in = energies.slices_temp_el_in
+        end
+        if _isless(_sum(energies.slices_heat_in), _sum(energies.slices_temp_heat_in))
+            energies.slices_heat_in = energies.slices_temp_heat_in
+            energies.slices_heat_in_temperature = energies.slices_temp_heat_in_temperature
+            energies.slices_heat_in_uac = energies.slices_temp_heat_in_uac
+        end
+    end
+    return energies
+end
+
+"""
+Copies the electricity and heat_out temp slices to the slices output fields and overwrites
+existing values based on whether the sums over the temp slices are smaller than the existing
+values.
+"""
+function copy_heat_out_temp_to_slices(energies::TBEnergies)::TBEnergies
+    if length(energies.slices_heat_out) == 0
+        energies.slices_el_in = copy(energies.slices_temp_el_in)
+        energies.slices_heat_out = copy(energies.slices_temp_heat_out)
+        energies.slices_heat_out_temperature = copy(energies.slices_temp_heat_out_temperature)
+        energies.slices_heat_out_uac = copy(energies.slices_temp_heat_out_uac)
+    else
+        if _isless(_sum(energies.slices_el_in), _sum(energies.slices_temp_el_in))
+            energies.slices_el_in = energies.slices_temp_el_in
+        end
+        if _isless(_sum(energies.slices_heat_out), _sum(energies.slices_temp_heat_out))
+            energies.slices_heat_out = energies.slices_temp_heat_out
+            energies.slices_heat_out_temperature = energies.slices_temp_heat_out_temperature
+            energies.slices_heat_out_uac = energies.slices_temp_heat_out_uac
+        end
+    end
+    return energies
+end
+
+"""
+Copies the temporary slices of the given energy container to the actual slices.
+
+This overwrites any existing actual slices.
+"""
+function copy_temp_to_slices!(energies::TBEnergies)::TBEnergies
+    energies.slices_el_in = copy(energies.slices_temp_el_in)
+    energies.slices_heat_in = copy(energies.slices_temp_heat_in)
+    energies.slices_heat_in_temperature = copy(energies.slices_temp_heat_in_temperature)
+    energies.slices_heat_in_uac = copy(energies.slices_temp_heat_in_uac)
+    energies.slices_heat_out = copy(energies.slices_temp_heat_out)
+    energies.slices_heat_out_temperature = copy(energies.slices_temp_heat_out_temperature)
+    energies.slices_heat_out_uac = copy(energies.slices_temp_heat_out_uac)
+    return energies
+end
+
 function calculate_booster(unit::ThermalBooster,
                            sim_params::Dict{String,Any},
                            energies::TBEnergies;
                            fixed_heat_in::Union{Nothing,Integer}=nothing,
                            fixed_heat_out::Union{Nothing,Integer}=nothing)::TBEnergies
     energies = reset_available!(energies; fixed_heat_in, fixed_heat_out)
+    energies = reset_temp_slices!(energies)
+
     src_idx::Int = 1
     snk_idx::Int = 1
     EPS = sim_params["epsilon"]
@@ -347,7 +444,6 @@ function calculate_booster(unit::ThermalBooster,
 
         # reduce source temperature by terminal_dT
         src_temperature_reduced = src_temperature - unit.terminal_dT
-        # TODO check for negative src_temperature_reduced
 
         # calculate required mass in output for current slice
         mass_out_current_layer = energies.available_heat_out[snk_idx] / (convert_J_in_Wh(unit.cp_medium_out) *
@@ -396,14 +492,14 @@ function calculate_booster(unit::ThermalBooster,
         energies.available_heat_in[src_idx] -= required_low_temp_heat
         energies.available_heat_out[snk_idx] -= out_energy
 
-        # map to slices
-        push!(energies.slices_el_in, required_boost_heat)
-        push!(energies.slices_heat_in, required_low_temp_heat)
-        push!(energies.slices_heat_in_temperature, src_temperature)
-        push!(energies.slices_heat_in_uac, energies.in_uacs_heat[src_idx])
-        push!(energies.slices_heat_out, out_energy)
-        push!(energies.slices_heat_out_temperature, snk_temperature)
-        push!(energies.slices_heat_out_uac, energies.out_uacs[snk_idx])
+        # map to temp slices
+        push!(energies.slices_temp_el_in, required_boost_heat)
+        push!(energies.slices_temp_heat_in, required_low_temp_heat)
+        push!(energies.slices_temp_heat_in_temperature, src_temperature)
+        push!(energies.slices_temp_heat_in_uac, energies.in_uacs_heat[src_idx])
+        push!(energies.slices_temp_heat_out, out_energy)
+        push!(energies.slices_temp_heat_out_temperature, snk_temperature)
+        push!(energies.slices_temp_heat_out_uac, energies.out_uacs[snk_idx])
 
         # go to next layer(s)
         if energies.available_heat_in[src_idx] < EPS
@@ -417,6 +513,22 @@ function calculate_booster(unit::ThermalBooster,
     return energies
 end
 
+"""
+Determines the temperature of the input/output layer and if it should be skipped.
+
+Layers are skipped if they have a temperature that are out of the temperature band
+defined by the thermal booster input/output temperatures (if any).
+
+# Arguments
+- `unit::ThermalBooster`: The thermal booster.
+- `current_idx::Integer`: The index of the layer.
+- `temps_min::Vector{<:Temperature}`: The minimum temperatures of all layers.
+- `temps_max::Vector{<:Temperature}`: The maximum temperatures of all layers.
+- `input::Bool`: If the layer is an input or not. Defaults to true.
+# Returns
+- `Bool`: If the layer should be skipped.
+- `Temperature`: The layer temperature.
+"""
 function get_layer_temperature(unit::ThermalBooster,
                                current_idx::Integer,
                                temps_min::Vector{<:Temperature},
