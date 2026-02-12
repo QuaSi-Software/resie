@@ -1,0 +1,386 @@
+{
+    "io_settings": {
+        "csv_output_file": "./output/out.csv",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./output/auxiliary_info.md",
+        "sankey_plot": "default",
+        "csv_time_unit": "date",
+        "return_output_keys":  {
+	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
+			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->Boiler", "Photovoltaic->Demand_Power",
+                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->Boiler", "WindFarm->Demand_Power", 
+                        "Battery->Demand_Power"],
+	        "NegControlReserve": ["m_power:OUT"],
+            "PosControlReserve": ["m_power:IN"],
+            "Demand_Heat":  ["Demand"],
+            "Demand_Power": ["Demand"],
+            "BUS_Power": ["Balance"], 
+            "BUS_Heat": ["Balance"],
+            "Grid_IN": ["m_power:OUT"]
+        },
+        "output_plot": {
+             "1": {
+                "key": {"m_power": ["Grid_IN->HeatPump"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "2": {
+                "key": {"m_power": ["Grid_IN->Boiler"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "3": {
+                "key": {"m_power": ["Grid_IN->Demand_Power"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "4": {
+                "key": {"m_power": ["Grid_IN->Battery"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "6": {
+                "key": {"m_power": ["Photovoltaic->Grid_OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "7": {
+                "key": {"m_power": ["WindFarm->Grid_OUT"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "8": {
+                "key": {"Demand_Power": ["Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "9": {
+                "key": {"Demand_Heat": ["Demand"]},
+                "axis": "left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "10": {
+                "key": {"BufferTank": ["Load%"]},
+                "axis": "right",
+                "unit": "%",
+                "scale_factor": 1
+            },
+            "11": {
+                "key": {"Battery": ["Load%"]},
+                "axis": "right",
+                "unit": "%",
+                "scale_factor": 1
+            },
+            "12": {
+				"key":{"Grid_IN":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001	
+            },
+            "13": {
+				"key":{"NegControlReserve":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
+            "14": {
+                "key":{"HeatPump": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "15": {
+                "key":{"Boiler": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "21": {
+                "key": {"m_heat": ["Boiler->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "17": {
+                "key": {"m_heat": ["HeatPump->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "18": {
+                "key": {"m_heat": ["Boiler->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "19": {
+                "key": {"m_heat": ["HeatPump->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "20": {
+                "key": {"m_heat": ["BufferTank->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            }
+        }
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds",
+        "epsilon": 1e-7,
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"  
+
+    },
+    "components": {
+        "Grid_IN": {
+            "type": "GridConnection",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "medium": "m_power",
+            "is_source": true
+        },
+        "NegControlReserve": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 0.0
+        },
+        "PosControlReserve": {
+            "type": "FlexibleSink",
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 0.0
+        },
+        "Grid_OUT": {
+            "type": "GridConnection",
+            "output_refs": [],
+            "medium": "m_power",
+            "is_source": false
+        },
+        "Photovoltaic": {
+            "type": "PVPlant",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
+            "scale": 1,
+            "m_el_out": "m_power"
+        },
+        "WindFarm": {
+            "type": "PVPlant",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
+            "scale": 1,
+            "m_el_out": "m_power"
+        },
+        "Heat_Source_HP": {
+            "type": "GenericHeatSource",
+            "output_refs": [
+                "HeatPump"
+            ],
+            "medium": "m_heat_source",
+            "temperature_from_global_file": "temp_ambient_air",
+            "constant_power": 1e7,
+            "is_source": true
+        },
+        "Heat_Source_FB": {
+            "type": "GenericHeatSource",
+            "output_refs": [
+                "Boiler"
+            ],
+            "medium": "m_heat_source",
+            "constant_temperature": 0,
+            "constant_power": 1e7,
+            "is_source": true
+        },
+        "HeatPump": {
+            "type": "HeatPump",
+            "model_type": "inverter",
+            "control_modules": [
+                {
+                    "name": "profile_limited",
+                    "profile_path": "./profiles/MA/ones.prf"
+                }
+            ],
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "has_secondary_interface": false,
+            "power_th": 6.1e6,
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_heat_source",
+            "m_el_in": "m_power",
+            "m_heat_out": "m_heat",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 35, 4.10, 3.92, 3.22",
+            "bypass_cop": 15.0,
+            "min_power_function": "const:0.0",
+            "max_power_function": "poly-2: 0.001119613, -0.06349226, 0.03004031, -0.000400244, 0.002087081, -0.000351640, -0.000003101, -0.0000000655, -0.000013215, 0.000001353",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 0.95,
+            "power_losses_factor": 0.97,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": true,
+            "icing_coefficients": "3,-0.42,15,2,30"
+        },
+        "Boiler": {
+            "type": "HeatPump",
+            "model_type": "simplified",
+            "control_modules": [
+                {
+                    "name": "profile_limited",
+                    "profile_path": "./profiles/MA/ones.prf"
+                }
+            ],
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "has_secondary_interface": false,
+            "power_th": 3.5e6,
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_heat_source",
+            "m_el_in": "m_power",
+            "m_heat_out": "m_heat",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "const:1.0",
+            "bypass_cop": 15.0,
+            "min_power_function": "const:0.0",
+            "max_power_function": "const:1.0",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 1.0,
+            "power_losses_factor": 1.0
+        },
+        "BUS_Power": {
+            "type": "Bus",
+            "medium": "m_power",
+            "connections": {
+                "input_order": [
+                    "NegControlReserve",
+                    "Photovoltaic",
+                    "WindFarm",
+                    "Grid_IN",
+                    "Battery"
+                ],
+                "output_order": [
+                    "PosControlReserve",
+                    "Demand_Power",
+                    "HeatPump",
+                    "Boiler",
+                    "Battery",
+                    "Grid_OUT"
+                ],
+                "energy_flow": [
+                    [0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 0, 0],
+					[1, 1, 0, 0, 0, 0]
+                ]
+            }           
+        },
+        "BUS_Heat": {
+            "type": "Bus",
+            "medium": "m_heat",
+            "control_modules":[ 
+                {
+                "name": "ems_fuzzy",
+                "primary_source_uac": "HeatPump",
+                "secondary_source_uac": "Boiler",
+                "storage_uac": "BufferTank",
+                "demand_uac": "Demand_Heat",
+                "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
+                "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf"
+                }
+            ],
+            "connections": {
+                "input_order": [
+                    "HeatPump",
+                    "Boiler",
+                    "BufferTank"
+                ],
+                "output_order": [
+                    "Demand_Heat",
+					"BufferTank"
+                ],
+                "energy_flow": [
+                    [1, 1],
+                    [1, 1],
+					[1, 0]
+                ]
+            }
+        },
+        "BufferTank": {
+            "type": "BufferTank",
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "medium": "m_heat",
+            "___GENERAL PARAMETER___": "",
+            "model_type": "ideally_stratified",
+            "capacity": 65.0e6,
+            "rho_medium": 1000,
+            "cp_medium": 4180.0,
+            "high_temperature": 90.0,
+            "low_temperature": 50.0,
+            "initial_load": 0.9,
+            "max_load_rate": 0.25,
+            "max_unload_rate": 0.2,
+            "___BALANCED MODEL ONLY___": "",
+            "switch_point": 0.1,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 13.33,
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 1.2,
+            "thermal_transmission_barrel": 1.2,
+            "thermal_transmission_bottom": 1.2
+        },
+        "Battery": {
+            "type": "Battery",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "medium": "m_power",
+            "capacity": 200e3,
+            "load": 0.9
+        },
+        "Demand_Heat": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_heat",
+            "energy_profile_file_path": "./profiles/MA/germersheim_heat.prf",
+            "constant_temperature": 90,
+            "scale": 1
+        },
+        "Demand_Power": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_power",
+            "energy_profile_file_path": "./profiles/MA/germersheim_power.prf",
+            "scale": 1
+        }
+        
+    }
+}

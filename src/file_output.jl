@@ -551,7 +551,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
                         # this is very specific for the current implementation of this exact
                         # control module. @TODO make this more generalized once more control
                         # modules also modify the order of operations
-                        if control_module.name in ["economic_control", "economic_control_3_states", "EMS", "EMS_Fuzzy"]
+                        if control_module.name in ["economic_control", "economic_control_3_states", "EMS"]
                             for (state_id, order) in pairs(control_module.ooo_by_state)
                                 write(file_handle, "\n# Order of operations $(component.uac) state #$(state_id)\n")
                                 write(file_handle, listify_operations(order))

@@ -1,43 +1,44 @@
+using Infiltrator
 """
 Control module for running a component depending on the state of a linked storage component.
 In particular it switches to a state of allowing operation of the component when the load
 of the linked storage falls below the lower threshold. The module stays in this state until
 the load has reached the upper threshold and the minimum run time has passed.
 """
-mutable struct CM_StorageDrivenFuzzy <: ControlModule
+mutable struct CM_EMSFuzzy <: ControlModule
     name::String
     parameters::Dict{String,Any}
 
-    function CM_StorageDrivenFuzzy(parameters::Dict{String,Any},
+    function CM_EMSFuzzy(parameters::Dict{String,Any},
                                    components::Grouping,
                                    sim_params::Dict{String,Any},
                                    unit_uac::String)
         default_parameters = Dict{String,Any}(
-            "name" => "storage_driven_fuzzy",
-            "low_threshold" => 0.2,
-            "high_threshold" => 0.95,
-            "min_run_time" => 1800,
+            "name" => "ems_fuzzy",
+            "primary_source_uac" => nothing,
+            "secondary_source_uac" => nothing,
             "storage_uac" => nothing,
             "demand_uac" => nothing,
             "price_profile_path" => nothing,
             "price_trend_profile_path" => nothing,
-            "price_volatility_profile_path" => nothing
+            "price_volatility_profile_path" => nothing,
+
         )
         params = Base.merge(default_parameters, parameters)
 
         if !(params["storage_uac"] !== nothing
              && params["storage_uac"] in keys(components)
              && components[params["storage_uac"]] isa StorageComponent)
-            @error "Required storage component for control module storage_driven_fuzzy not given"
+            @error "Required storage component for control module ems_fuzzy not given"
             throw(InputError)
         end
         params["storage"] = components[params["storage_uac"]]
-
         params["price_profile"] = Profile(params["price_profile_path"], sim_params)
         params["price_trend_profile"] = Profile(params["price_trend_profile_path"], sim_params)
         params["price_volatility_profile"] = Profile(params["price_volatility_profile_path"], sim_params)
         params["plr_limit"] = 1.0
-        params["unit"] = components[unit_uac]
+        params["primary_source"] = components[params["primary_source_uac"]]
+        params["secondary_source"] = components[params["secondary_source_uac"]]
         params["demand"] = components[params["demand_uac"]]
 
         return new(params["name"], params)
@@ -45,22 +46,36 @@ mutable struct CM_StorageDrivenFuzzy <: ControlModule
 end
 
 # method for control module name on type-level
-control_module_name(::Type{CM_StorageDrivenFuzzy})::String = "storage_driven_fuzzy"
+control_module_name(::Type{CM_EMSFuzzy})::String = "ems_fuzzy"
 
-function has_method_for(mod::CM_StorageDrivenFuzzy, func::ControlModuleFunction)::Bool
-    return func == cmf_upper_plr_limit
+function has_method_for(mod::CM_EMSFuzzy, func::ControlModuleFunction)::Bool
+    return func == cmf_change_bus_priorities
 end
 
-function update(mod::CM_StorageDrivenFuzzy)
-    # do nothing
+function update(mod::CM_EMSFuzzy)
+    # ordinarily we would update the state machine in the control modules's update step,
+    # however this control module is special in that it's callbacks are used outside the
+    # normal order of operations, so the update is performed by the callbacks instead
 end
 
-function upper_plr_limit(mod::CM_StorageDrivenFuzzy, sim_params::Dict{String,Any})::Float64
-    run_fuzzy!(mod.parameters, sim_params)
-    return mod.parameters["plr_limit"]
+function change_bus_priorities!(mod::CM_EMSFuzzy,
+                                components::Grouping,
+                                sim_params::Dict{String,Any})
+    # perform update outside of normal order of operations
+    run_fuzzy_ems!(mod.parameters, sim_params)
+    # set limits by using the profile limited control module thats attached to each source
+    mod.parameters["primary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_primary"]
+    mod.parameters["secondary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_secondary"]
 end
 
-function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})    
+function reorder_operations(mod::CM_EMSFuzzy,
+                            order_of_operations::OrderOfOperations,
+                            sim_params::Dict{String,Any})::OrderOfOperations
+    # ooo doesn't get changed in this control module, so just return the original ooo
+    return order_of_operations
+end
+
+function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})    
     # get input values for Fuzzy control
     p_now = value_at_time(mod_params["price_profile"], sim_params)
     p_trend = value_at_time(mod_params["price_trend_profile"], sim_params)
@@ -69,40 +84,49 @@ function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})
     demand_now = mod_params["demand"].demand
 
     # Fuzzy logic returns change in plr and SOC target value
-    plr_diff, SOC_target = fuzzy_control(p_now, p_trend, p_volatility, SOC_now)
+    plr_diff, SOC_target = fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
     if isnan(plr_diff) || isnan(SOC_target)
+        @infiltrate
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
                "Check if the parameters are inside their bounds. " *
                "p_now=$p_now, p_trend=$p_trend, p_volatility=$p_volatility, SOC_now=$SOC_now"
         throw(InputError)
     end
-    plr = mod_params["unit"].avg_plr
+
+    plr_primary = mod_params["primary_source"].avg_plr
+    plr_secondary = mod_params["secondary_source"].avg_plr
+    rel_primary = mod_params["secondary_source"].design_power_th / mod_params["primary_source"].design_power_th
     
+    # control charging and discharging in the same way
+    # plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
+
     if SOC_target <= SOC_now
-        # change low_threshold of storage_driven_fuzzy controller
-        mod_params["low_threshold"] = SOC_target
-        mod_params["high_threshold"] = SOC_now
-        mod_params["plr_limit"] = clamp(plr + plr_diff, 0.0, 1.0)
+        # reduce output power to empty the storage
+        plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
     else
-        # change high_threshold of storage_driven_fuzzy controller
-        mod_params["low_threshold"] = SOC_now
-        mod_params["high_threshold"] = SOC_target
+        # increase output power to fill the storage
         missing_power = sim_params["wh_to_watts"]((SOC_target - SOC_now) * mod_params["storage"].capacity)
-        mod_params["plr_limit"] = clamp(missing_power / mod_params["unit"].design_power_th, 0.0, 1.0)
+        plr_target_prim = missing_power / mod_params["primary_source"].design_power_th
     end
 
-    # Check if demand is higher than what unit and storage can provide
-    # TODO das nimmt an, dass WP und Boiler jeweils alleine (mit Speicher) Bedarf decken müssen?
-    demand_coverable = mod_params["plr_limit"] * mod_params["unit"].design_power_th + SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
+    # calculate the plrs of the sources with respect to their maximum power and priorities
+    mod_params["plr_limit_primary"] = clamp(plr_target_prim, 0.0, 1.0)
+    mod_params["plr_limit_secondary"] = clamp(plr_target_prim / rel_primary - mod_params["plr_limit_primary"] / rel_primary, 0.0, 1.0)
+
+    # Check how much heat both heat sources and storage can provide
+    maximum_heat = mod_params["plr_limit_primary"] * mod_params["primary_source"].design_power_th +
+                   mod_params["plr_limit_secondary"] * mod_params["secondary_source"].design_power_th +
+                   SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
    
-    # Ensure plr_limit is never reduced if doing so would leave demand uncovered
-    if demand_now > demand_coverable && mod_params["plr_limit"] < 1.0
-        mod_params["plr_limit"] = 1.0
+    # Fallback: Ensure plr_limit is never reduced if doing so would leave demand uncovered
+    if demand_now > maximum_heat && mod_params["plr_limit_primary"] < 1.0 && mod_params["plr_limit_secondary"] < 1.0
+        mod_params["plr_limit_primary"] = 1.0
+        mod_params["plr_limit_secondary"] = 1.0
         println("Fuzzy Controller set plr too small")
     end
 end 
 
-function fuzzy_control(p_now, p_trend, p_volatility, SOC_now)
+function fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
       cheap = max(min((p_now - -137) / 1, 1, (80 - p_now) / 25), 0)
       average = max(min((p_now - 55) / 25, (100 - p_now) / 20), 0)
       expensive = max(min((p_now - 80) / 20, 1, (1001 - p_now) / 1), 0)
