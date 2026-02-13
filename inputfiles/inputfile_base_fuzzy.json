@@ -359,7 +359,7 @@
             "low_temperature": 50.0,
             "initial_load": 0.9,
             "max_load_rate": 0.25,
-            "max_unload_rate": 0.2,
+            "max_unload_rate": 0.25,
             "___BALANCED MODEL ONLY___": "",
             "switch_point": 0.1,
             "___LOSSES___": "",

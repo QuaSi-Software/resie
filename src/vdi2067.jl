@@ -2,7 +2,7 @@ module VDI2067
 using OrderedCollections: OrderedDict
 export VDIParams, VDIComponent, vdi2067_annuity,
        VDI_SCENARIO_NONE, VDI_SCENARIO_MOD, VDI_SCENARIO_PRO,
-       heatpump_component, boiler_component, buffertank_component, battery_component
+       heatpump_component, ElectrodeBoiler_component, buffertank_component, battery_component
 
 ############################################################
 #  PARAMETER STRUCTURE – VDI 2067 COMPATIBLE
@@ -46,9 +46,9 @@ end
 heatpump_component(A0::Real) =
     VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.2, 0.0)
 
-"Boiler / electric heater: maintenance 2.0 %, repair 1.0 %."
-boiler_component(A0::Real) =
-    VDIComponent("Boiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.2, 0.0)
+"ElectrodeBoiler / electric heater: maintenance 2.0 %, repair 1.0 %."
+ElectrodeBoiler_component(A0::Real) =
+    VDIComponent("ElectrodeBoiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.2, 0.0)
 
 "Buffer tank: maintenance 0.5 %, repair 0.5 %."
 buffertank_component(A0::Real) =
@@ -234,7 +234,7 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
-    base_price = 214.0        # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
@@ -402,11 +402,11 @@ end
 
 function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
     sim_new = Dict()
-    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->Boiler"] .+
+    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
                          sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+ sim["m_power EnergyFlow Grid_IN->Battery"]
-    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->Boiler"] .+
-                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->Boiler"] .+
-                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->Boiler"]
+    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
     sim_new["Power_Demand_Demand"] = sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+
                                      sim["m_power EnergyFlow Photovoltaic->Demand_Power"].+
                                      sim["m_power EnergyFlow WindFarm->Demand_Power"] .+

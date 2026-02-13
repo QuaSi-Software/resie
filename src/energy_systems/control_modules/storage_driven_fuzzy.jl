@@ -92,9 +92,9 @@ function run_fuzzy!(mod_params::Dict{String,Any}, sim_params::Dict{String,Any})
     end
 
     # Check if demand is higher than what unit and storage can provide
-    # TODO das nimmt an, dass WP und Boiler jeweils alleine (mit Speicher) Bedarf decken müssen?
-    demand_coverable = mod_params["plr_limit"] * mod_params["unit"].design_power_th + SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
-   
+    # TODO das nimmt an, dass WP und ElectrodeBoiler jeweils alleine (mit Speicher) Bedarf decken müssen?
+    demand_coverable = mod_params["plr_limit"] * mod_params["unit"].design_power_th + SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity) 
+    
     # Ensure plr_limit is never reduced if doing so would leave demand uncovered
     if demand_now > demand_coverable && mod_params["plr_limit"] < 1.0
         mod_params["plr_limit"] = 1.0

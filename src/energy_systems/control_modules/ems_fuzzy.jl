@@ -86,7 +86,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     # Fuzzy logic returns change in plr and SOC target value
     plr_diff, SOC_target = fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
     if isnan(plr_diff) || isnan(SOC_target)
-        @infiltrate
+        
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
                "Check if the parameters are inside their bounds. " *
                "p_now=$p_now, p_trend=$p_trend, p_volatility=$p_volatility, SOC_now=$SOC_now"
@@ -95,48 +95,65 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     plr_primary = mod_params["primary_source"].avg_plr
     plr_secondary = mod_params["secondary_source"].avg_plr
-    rel_primary = mod_params["secondary_source"].design_power_th / mod_params["primary_source"].design_power_th
+    primary_power = mod_params["primary_source"].design_power_th
+    secondary_power = mod_params["secondary_source"].design_power_th
+    total_power = primary_power + secondary_power
+
+    if total_power <= 0
+        mod_params["plr_limit_primary"] = 0.0
+        mod_params["plr_limit_secondary"] = 0.0
+        return
+    end
     
     # control charging and discharging in the same way
     # plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
 
     if SOC_target <= SOC_now
         # reduce output power to empty the storage
-        plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
+        current_power = plr_primary * primary_power + plr_secondary * secondary_power
+        target_power = clamp(current_power + plr_diff * total_power, 0.0, total_power)
     else
         # increase output power to fill the storage
         missing_power = sim_params["wh_to_watts"]((SOC_target - SOC_now) * mod_params["storage"].capacity)
-        plr_target_prim = missing_power / mod_params["primary_source"].design_power_th
+        target_power = clamp(missing_power, 0.0, total_power)
     end
 
     # calculate the plrs of the sources with respect to their maximum power and priorities
-    mod_params["plr_limit_primary"] = clamp(plr_target_prim, 0.0, 1.0)
-    mod_params["plr_limit_secondary"] = clamp(plr_target_prim / rel_primary - mod_params["plr_limit_primary"] / rel_primary, 0.0, 1.0)
+    mod_params["plr_limit_primary"] = primary_power > 0 ? clamp(target_power / primary_power, 0.0, 1.0) : 0.0
+    remaining_power = max(target_power - mod_params["plr_limit_primary"] * primary_power, 0.0)
+    mod_params["plr_limit_secondary"] = secondary_power > 0 ? clamp(remaining_power / secondary_power, 0.0, 1.0) : 0.0
 
     # Check how much heat both heat sources and storage can provide
+    storage_power_by_soc = SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
+    storage_power_limit = hasproperty(mod_params["storage"], :max_output_energy) ?
+                          sim_params["wh_to_watts"](mod_params["storage"].max_output_energy) :
+                          storage_power_by_soc
+    storage_available_power = min(storage_power_by_soc, storage_power_limit)
     maximum_heat = mod_params["plr_limit_primary"] * mod_params["primary_source"].design_power_th +
                    mod_params["plr_limit_secondary"] * mod_params["secondary_source"].design_power_th +
-                   SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
+                   storage_available_power
    
     # Fallback: Ensure plr_limit is never reduced if doing so would leave demand uncovered
-    if demand_now > maximum_heat && mod_params["plr_limit_primary"] < 1.0 && mod_params["plr_limit_secondary"] < 1.0
-        mod_params["plr_limit_primary"] = 1.0
-        mod_params["plr_limit_secondary"] = 1.0
+    can_raise_primary = primary_power > 0 && mod_params["plr_limit_primary"] < 1.0
+    can_raise_secondary = secondary_power > 0 && mod_params["plr_limit_secondary"] < 1.0
+    if demand_now > maximum_heat && (can_raise_primary || can_raise_secondary)
+        mod_params["plr_limit_primary"] = primary_power > 0 ? 1.0 : 0.0
+        mod_params["plr_limit_secondary"] = secondary_power > 0 ? 1.0 : 0.0
         println("Fuzzy Controller set plr too small")
     end
 end 
 
 function fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
-      cheap = max(min((p_now - -137) / 1, 1, (80 - p_now) / 25), 0)
-      average = max(min((p_now - 55) / 25, (100 - p_now) / 20), 0)
-      expensive = max(min((p_now - 80) / 20, 1, (1001 - p_now) / 1), 0)
-      falling = max(min((p_trend - -258) / 1, 1, (6 - p_trend) / 13), 0)
-      rising = max(min((p_trend - -7) / 13, 1, (247 - p_trend) / 1), 0)
-      stable = max(min((p_volatility - -1) / 1, 1, (15 - p_volatility) / 11), 0)  
-      volatile = max(min((p_volatility - 4) / 11, 1, (266 - p_volatility) / 1), 0)
-      empty = max(min((SOC_now - -0.5) / 0.5, (0.5 - SOC_now) / 0.5), 0)
-      middle = max(min((SOC_now - 0.0) / 0.5, (1.0 - SOC_now) / 0.5), 0)
-      full = max(min((SOC_now - 0.5) / 0.5, (1.5 - SOC_now) / 0.5), 0)
+      cheap = max(min((p_now - -137) / 1, 1, (75 - p_now) / 65), 0)
+      average = max(min((p_now - 55) / 25, (105 - p_now) / 25), 0)
+      expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)
+      falling = max(min((p_trend - -258) / 1, 1, (1 - p_trend) / 8), 0)
+      rising = max(min((p_trend - -1) / 7, 1, (247 - p_trend) / 1), 0)
+      stable = max(min((p_volatility - -1) / 1, (10 - p_volatility) / 10), 0)
+      volatile = max(min((p_volatility - 8) / 7, 1, (266 - p_volatility) / 1), 0)        
+      empty = max(min((SOC_now - -0.5) / 0.5, 1, (0.3 - SOC_now) / 0.15), 0)
+      middle = max(min((SOC_now - 0.2) / 0.3, (0.8 - SOC_now) / 0.30000000000000004), 0) 
+      full = max(min((SOC_now - 0.7) / 0.15000000000000002, 1, (1.5 - SOC_now) / 0.5), 0)
       ant1 = min(cheap, min(falling, min(stable, empty)))
       ant2 = min(cheap, min(falling, min(stable, middle)))
       ant3 = min(cheap, min(falling, min(stable, full)))
@@ -175,21 +192,19 @@ function fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
       ant36 = min(expensive, min(rising, min(volatile, full)))
       P2H_agg = collect(LinRange{Float64}(-2.0, 2.0, 101))
       @inbounds for (i, x) = enumerate(P2H_agg)
-              lower = max(min((x - -2.0) / 1.0, (0.0 - x) / 1.0), 0)
-              keep = max(min((x - -1.0) / 1.0, (1.0 - x) / 1.0), 0)
-              rise = max(min((x - 0.0) / 1.0, (2.0 - x) / 1.0), 0)
-              P2H_agg[i] = max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(min(ant1, rise), min(ant2, keep)), min(ant3, keep)), min(ant4, rise)), min(ant5, rise)), min(ant6, rise)), min(ant7, rise)), min(ant8, rise)), min(ant9, rise)), min(ant10, rise)), min(ant11, rise)), min(ant12, rise)), min(ant13, 
-rise)), min(ant14, lower)), min(ant15, lower)), min(ant16, rise)), min(ant17, keep)), min(ant18, keep)), min(ant19, rise)), min(ant20, rise)), min(ant21, rise)), min(ant22, rise)), min(ant23, rise)), min(ant24, rise)), min(ant25, rise)), min(ant26, lower)), min(ant27, lower)), min(ant28, keep)), min(ant29, keep)), min(ant30, keep)), min(ant31, rise)), min(ant32, rise)), min(ant33, keep)), min(ant34, rise)), min(ant35, keep)), min(ant36, keep))
+              lower = max(min((x - -2.0) / 1.0, (-0.2 - x) / 0.8), 0)
+              keep = max(min((x - -0.3) / 0.3, (0.3 - x) / 0.3), 0)
+              rise = max(min((x - 0.2) / 0.8, (2.0 - x) / 1.0), 0)
+              P2H_agg[i] = max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(min(ant1, rise), min(ant2, keep)), min(ant3, keep)), min(ant4, rise)), min(ant5, rise)), min(ant6, rise)), min(ant7, rise)), min(ant8, rise)), min(ant9, rise)), min(ant10, rise)), min(ant11, rise)), min(ant12, rise)), min(ant13, rise)), min(ant14, lower)), min(ant15, lower)), min(ant16, rise)), min(ant17, keep)), min(ant18, keep)), min(ant19, rise)), min(ant20, rise)), min(ant21, rise)), min(ant22, rise)), min(ant23, rise)), min(ant24, rise)), min(ant25, rise)), min(ant26, lower)), min(ant27, lower)), min(ant28, keep)), min(ant29, keep)), min(ant30, keep)), min(ant31, rise)), min(ant32, rise)), min(ant33, keep)), min(ant34, rise)), min(ant35, keep)), min(ant36, keep))
           end
       P2H = ((2 * sum((mfi * xi for (mfi, xi) = zip(P2H_agg, LinRange{Float64}(-2.0, 2.0, 101)))) - first(P2H_agg) * -2.0) - last(P2H_agg) * 2.0) / ((2 * sum(P2H_agg) - first(P2H_agg)) - last(P2H_agg))
-      SOC_target_agg = collect(LinRange{Float64}(0.0, 1.0, 101))
+      SOC_target_agg = collect(LinRange{Float64}(-2.0, 2.0, 101))
       @inbounds for (i, x) = enumerate(SOC_target_agg)
-              low = max(min((x - -0.5) / 0.5, (0.5 - x) / 0.5), 0)
+              low = max(min((x - -1.0) / 0.5, (0.5 - x) / 1.0), 0)
               med = max(min((x - 0.0) / 0.5, (1.0 - x) / 0.5), 0)
               high = max(min((x - 0.5) / 0.5, (1.5 - x) / 0.5), 0)
               SOC_target_agg[i] = max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(max(min(ant1, med), min(ant2, med)), min(ant3, high)), min(ant4, high)), min(ant5, high)), min(ant6, high)), min(ant7, high)), min(ant8, high)), min(ant9, high)), min(ant10, high)), min(ant11, high)), min(ant12, high)), min(ant13, med)), min(ant14, low)), min(ant15, low)), min(ant16, med)), min(ant17, med)), min(ant18, high)), min(ant19, med)), min(ant20, high)), min(ant21, high)), min(ant22, med)), min(ant23, high)), min(ant24, high)), min(ant25, med)), min(ant26, low)), min(ant27, low)), min(ant28, med)), min(ant29, low)), min(ant30, low)), min(ant31, med)), min(ant32, med)), min(ant33, high)), min(ant34, high)), min(ant35, med)), min(ant36, med))
           end
-      SOC_target = ((2 * sum((mfi * xi for (mfi, xi) = zip(SOC_target_agg, LinRange{Float64}(0.0, 1.0, 101)))) - first(SOC_target_agg) * 0) - last(SOC_target_agg) * 1) / ((2 * sum(SOC_target_agg) - 
-first(SOC_target_agg)) - last(SOC_target_agg))
+      SOC_target = ((2 * sum((mfi * xi for (mfi, xi) = zip(SOC_target_agg, LinRange{Float64}(-2.0, 2.0, 101)))) - first(SOC_target_agg) * -2.0) - last(SOC_target_agg) * 2.0) / ((2 * sum(SOC_target_agg) - first(SOC_target_agg)) - last(SOC_target_agg))
       return P2H, SOC_target
   end

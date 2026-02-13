@@ -193,7 +193,7 @@
             "scale": 1,
             "m_el_out": "m_power"
         },
-        "Heat_Source_HP": {
+        "Heat_Source_HeatPump": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
@@ -203,7 +203,7 @@
             "constant_power": 1e7,
             "is_source": true
         },
-        "Heat_Source_FB": {
+        "Heat_Source_ElectrodeBoiler": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "ElectrodeBoiler"
@@ -226,7 +226,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 6.1e6,
+            "power_th": 8.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -256,7 +256,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 3.5e6,
+            "power_th": 1.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -338,7 +338,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 65.0e6,
+            "capacity": 40.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,
