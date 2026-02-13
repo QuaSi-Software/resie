@@ -432,15 +432,175 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     end
 
     @info "-- Now preparing inputs"
+    if !isnothing(project_config["optimizer"])
+        create_output_file()
+        if project_config["optimizer"] == "parameterstudy"
+            opt_params = project_config["optimizer"]["optim_params"]
+
+            output_lock = ReentrantLock()
+            runidx_global = Threads.Atomic{Int}(1)
+            erridx_global = Threads.Atomic{Int}(0)
+
+            Threads.@threads for sample_params in collect(Iterators.product(opt_params))
+                run_sample(outdir, project_config, sample_params)
+            end
+        elseif project_config["optimizer"] == "monte_carlo_anealing"
+            objective_function = # ???
+            optimize(run_single_sim)
+        end
+
+    else
+        run_single_sim(project_config_run, run_ID)
+    end
+    return true
+end
+
+function run_single_sim(project_config, run_ID)
     sim_params, components, operations = prepare_inputs(project_config, run_ID)
     current_runs[run_ID] = SimulationRun(sim_params, components, operations)
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
-    run_simulation_loop(project_config, sim_params, components, operations)
+    sim_output = run_simulation_loop(project_config, sim_params, components, operations)
+    
+    if !isnothing(project_config["economy"]) || !isnothing(project_config["emissions"])
+        years_sim = sim_params["number_of_time_steps_output"] * sim_params["time_step_seconds"] / 3600*8760
+        years_economy_data = length(price_profile) / sim_params["time_step_seconds"]
+        if years < 1
+            # repeat whole sim_output until 1 year full
+            sim_output
+        elseif  years > 1
+            # repeat last year until project_config["economy"]["economy_parms"]["eval_time_a"]
+            sim_output
+        end
+        if !isnothing(project_config["economy"])
+            annuities, total_costs = calc_economy(sim_output) # annuity for each value for each component
+        end
+        if !isnothing(project_config["emissions"])
+            # analog zu economy
+        end
+    end
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
-    return true
+    return sim_output, annuities, total_costs, emissions
+end
+
+function monte_carlo_anealing()
+    # combined monte carlo and simulated annealing
+    # the temperature determines if a completely random or existing sample is used as starting
+    # point, determines the size of the neighborhood and the number of results (sorted by)
+    # global measure, from which a new sample is drawn
+    for idx in range(1, NR_TRIES)
+        # temperature schedule is simple inverse logistic curve
+        temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / NR_TRIES - 0.5)))
+
+        if length(all_results) == 0 || rand() < temperature
+            # set parameters to equally distributed random values across whole parameter space
+            hp_power = rand(BOUNDS["TST_HP_01"][2]:BOUNDS["TST_HP_01"][3])
+            pv_power = rand(BOUNDS["TST_PV_01"][2]:BOUNDS["TST_PV_01"][3])
+            bat_cap = rand(BOUNDS["TST_BAT_01"][2]:BOUNDS["TST_BAT_01"][3])
+            bt_cap = rand(BOUNDS["TST_BFT_01"][2]:BOUNDS["TST_BFT_01"][3])
+            sample_params =
+
+            print(". ")
+        else
+            # set parameters to neighborhood of existing result, drawn from the top results
+            # by global measure, where temperature determines the results pool and size of
+            # neighborhood
+            sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
+            print("$sample_idx ")
+            sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
+
+            range = NBH_SCALE * temperature * (BOUNDS["TST_HP_01"][3] - BOUNDS["TST_HP_01"][2])
+            hp_power = sample["hp_power"] + rand((-0.5 * range):(0.5 * range))
+            hp_power = max(BOUNDS["TST_HP_01"][2], min(BOUNDS["TST_HP_01"][3], hp_power))
+
+            range = NBH_SCALE * temperature * (BOUNDS["TST_PV_01"][3] - BOUNDS["TST_PV_01"][2])
+            pv_power = sample["pv_power"] + rand((-0.5 * range):(0.5 * range))
+            pv_power = max(BOUNDS["TST_PV_01"][2], min(BOUNDS["TST_PV_01"][3], pv_power))
+
+            range = NBH_SCALE * temperature * (BOUNDS["TST_BAT_01"][3] - BOUNDS["TST_BAT_01"][2])
+            bat_cap = sample["bat_cap"] + rand((-0.5 * range):(0.5 * range))
+            bat_cap = max(BOUNDS["TST_BAT_01"][2], min(BOUNDS["TST_BAT_01"][3], bat_cap))
+
+            range = NBH_SCALE * temperature * (BOUNDS["TST_BFT_01"][3] - BOUNDS["TST_BFT_01"][2])
+            bt_cap = sample["bt_cap"] + rand((-0.5 * range):(0.5 * range))
+            bt_cap = max(BOUNDS["TST_BFT_01"][2], min(BOUNDS["TST_BFT_01"][3], bt_cap))
+
+            sample_params = 
+        end
+
+        # run sim and record results
+        run_results = run_sample(outdir, project_config, sample_params)
+        obj_results = objective_function(run_results)
+        result = Dict(
+            "gm" => 0.0,
+            "cost" => obj_results.lcc,
+            "emissions" => obj_results.emissions,
+            "hp_power" => hp_power,
+            "hp_capex_per_kw" => inputs["components"]["TST_HP_01"]["capex_per_kW"],
+            "pv_power" => pv_power,
+            "pv_capex_per_kw" => inputs["components"]["TST_PV_01"]["capex_per_kW"],
+            "bat_cap" => bat_cap,
+            "bat_capex_per_kwh" => inputs["components"]["TST_BAT_01"]["capex_per_kWh"],
+            "bt_cap" => bt_cap,
+            "bt_capex_per_kwh" => inputs["components"]["TST_BFT_01"]["capex_per_kWh"],
+            "base_cop" => inputs["components"]["TST_HP_01"]["base_cop"],
+            "base_grid_price" => inputs["components"]["TST_BAT_01"]["base_grid_price"],
+        )
+        push!(all_results, result)
+        min_lcc = obj_results.lcc < min_lcc ? obj_results.lcc : min_lcc
+        min_emissions = obj_results.emissions < min_emissions ? obj_results.emissions : min_emissions
+
+        # calculate global measure and sort by it
+        for res in all_results
+            res["gm"] = sqrt(((res["cost"]) / min_lcc - 1.0)^2 + (res["emissions"] / min_emissions - 1.0)^2)
+        end
+        sort!(all_results; by=x -> x["gm"])
+
+        if idx % 5 == 0
+            print("| ")
+        end
+    end
+end
+
+function run_sample(outdir, project_config, sample_params)
+    runidx = Threads.atomic_add!(runidx_global, 1)
+    run_ID = uuid4()
+    combined_output = OrderedDict()
+    start_time = now()
+    ####################################################
+    # Simulation
+    ####################################################
+    # TODO input_file wird nicht neu geschrieben, sondern nur profile
+    project_config_run = create_variant(outdir, project_config, sample_params,
+                                        run_ID; 
+                                        write_output=write_output)
+
+
+    @info("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
+
+    raw_sim = nothing
+    try
+        raw_sim, annuities, total_costs, emissions = run_single_sim(project_config_run, run_ID)
+
+    catch e
+        # save excact error message to output file
+        error_message = sprint(showerror, e)
+        full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
+        @info full_error_message
+        combined_output[runidx]["Errors"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+        Threads.atomic_add!(erridx_global, 1)
+
+        # save input file that threw error seperately
+        error_path = joinpath(outdir, "error_inputfiles")
+        mkpath(error_path)
+        cp(input_file, joinpath(error_path, splitpath(input_file)[end]), force=true)
+    end
+    if !save_input_files 
+        rm(input_file) 
+    end
+    return raw_sim, annuities, total_costs, emissions
 end
 
 end # module

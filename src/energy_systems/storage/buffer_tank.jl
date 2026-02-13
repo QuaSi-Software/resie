@@ -405,4 +405,10 @@ function output_value(unit::BufferTank, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
+function return_values(unit::BufferTank)::Vector{String}
+        return [string(unit.medium) * ":IN",
+            string(unit.medium) * ":OUT",
+            "Capacity"]
+end
+
 export BufferTank
