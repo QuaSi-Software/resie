@@ -3,6 +3,7 @@ module Resie
 using Printf
 using Dates: now, seconds
 using UUIDs
+using .Threads
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -251,6 +252,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                    weather_CSV_keys,
                    csv_time_unit)
     end
+    
     # create keys consistent with csv_output for return data for return Dict
     if do_return_data
         output_return_header = ["timestep"]
@@ -455,16 +457,21 @@ function load_and_run(filepath::String, run_ID::UUID)::Tuple{Bool, Union{Ordered
         @error "Could not find or parse project config file at $(abspath(filepath))"
         return false, nothing
     end
-
+    run_lock = ReentrantLock()
     @info "-- Now preparing inputs"
     sim_params, components, operations = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+    Threads.lock(run_lock) do 
+        current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+    end
     @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
     start = now()
     @info "---- Simulation loop ----"
     output_return_data = run_simulation_loop(project_config, sim_params, components, operations)
     @info "-- Simulation loop complete in $(seconds(now() - start)) s"
+    Threads.lock(run_lock) do 
+        close_run(run_ID)
+    end
     return true, output_return_data
 end
 

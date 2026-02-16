@@ -370,7 +370,6 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     # run simulation
     ########################################################
     success, sim_output = Resie.load_and_run(input_file, run_ID)
-    Resie.close_run(run_ID)
 
     # remove addon for used grid electricity to went into PosControlReserve
     energy_with_addon = max.(sim_output["Grid_IN m_power OUT"] .- sim_output["PosControlReserve m_power IN"], 0)
