@@ -6,9 +6,9 @@
         "sankey_plot": "default",
         "csv_time_unit": "date",
         "return_output_keys":  {
-	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->Boiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
-			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->Boiler", "Photovoltaic->Demand_Power",
-                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->Boiler", "WindFarm->Demand_Power", 
+	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->ElectrodeBoiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
+			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",
+                        "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->ElectrodeBoiler", "WindFarm->Demand_Power", 
                         "Battery->Demand_Power"],
 	        "NegControlReserve": ["m_power:OUT"],
             "PosControlReserve": ["m_power:IN"],
@@ -26,7 +26,7 @@
                 "scale_factor": 0.001
             },
             "2": {
-                "key": {"m_power": ["Grid_IN->Boiler"]},
+                "key": {"m_power": ["Grid_IN->ElectrodeBoiler"]},
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
@@ -69,13 +69,13 @@
             },
             "10": {
                 "key": {"BufferTank": ["Load%"]},
-                "axis": "left",
+                "axis": "right",
                 "unit": "%",
                 "scale_factor": 1
             },
             "11": {
                 "key": {"Battery": ["Load%"]},
-                "axis": "left",
+                "axis": "right",
                 "unit": "%",
                 "scale_factor": 1
             },
@@ -90,6 +90,48 @@
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001
+            },
+            "14": {
+                "key":{"HeatPump": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "15": {
+                "key":{"ElectrodeBoiler": ["m_heat:OUT"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "21": {
+                "key": {"m_heat": ["ElectrodeBoiler->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "17": {
+                "key": {"m_heat": ["HeatPump->BufferTank"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "18": {
+                "key": {"m_heat": ["ElectrodeBoiler->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "19": {
+                "key": {"m_heat": ["HeatPump->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
+            "20": {
+                "key": {"m_heat": ["BufferTank->Demand_Heat"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
             }
         }
     },
@@ -118,14 +160,14 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
-            "scale": 1e6
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 0.0
         },
         "PosControlReserve": {
             "type": "FlexibleSink",
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
-            "scale": 1e6
+            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "scale": 0.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
@@ -151,7 +193,7 @@
             "scale": 1,
             "m_el_out": "m_power"
         },
-        "Heat_Source_HP": {
+        "Heat_Source_HeatPump": {
             "type": "GenericHeatSource",
             "output_refs": [
                 "HeatPump"
@@ -161,10 +203,10 @@
             "constant_power": 1e7,
             "is_source": true
         },
-        "Heat_Source_FB": {
+        "Heat_Source_ElectrodeBoiler": {
             "type": "GenericHeatSource",
             "output_refs": [
-                "Boiler"
+                "ElectrodeBoiler"
             ],
             "medium": "m_heat_source",
             "constant_temperature": 0,
@@ -180,19 +222,15 @@
                     "profile_path": "./profiles/MA/ones.prf"
                 }
             ],
-            "output_refs": {
-                "m_heat_out": "BUS_Heat",
-                "m_heat_out_secondary": "BUS_Heat"
-            },
-            "has_secondary_interface": true,
-            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
-            "secondary_el_sources": ["Grid_IN"],
-            "power_th": 6.1e6,
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "has_secondary_interface": false,
+            "power_th": 8.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
             "m_heat_out": "m_heat",
-            "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
             "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 35, 4.10, 3.92, 3.22",
             "bypass_cop": 15.0,
@@ -205,7 +243,7 @@
             "consider_icing": true,
             "icing_coefficients": "3,-0.42,15,2,30"
         },
-        "Boiler": {
+        "ElectrodeBoiler": {
             "type": "HeatPump",
             "model_type": "simplified",
             "control_modules": [
@@ -214,19 +252,15 @@
                     "profile_path": "./profiles/MA/ones.prf"
                 }
             ],
-            "output_refs": {
-                "m_heat_out": "BUS_Heat",
-                "m_heat_out_secondary": "BUS_Heat"
-            },
-            "has_secondary_interface": true,
-            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
-            "secondary_el_sources": ["Grid_IN"],
-            "power_th": 3.5e6,
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "has_secondary_interface": false,
+            "power_th": 1.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
             "m_heat_out": "m_heat",
-            "m_heat_out_secondary": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
             "cop_function": "const:1.0",
             "bypass_cop": 15.0,
@@ -251,7 +285,7 @@
                     "PosControlReserve",
                     "Demand_Power",
                     "HeatPump",
-                    "Boiler",
+                    "ElectrodeBoiler",
                     "Battery",
                     "Grid_OUT"
                 ],
@@ -259,8 +293,8 @@
                     [0, 0, 0, 0, 0, 0],
                     [1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 0, 0, 1],
-					[1, 0, 0, 0, 0, 1]
+                    [1, 1, 1, 1, 0, 0],
+					[1, 1, 0, 0, 0, 0]
                 ]
             },
             "control_modules": [
@@ -286,7 +320,7 @@
                             "PosControlReserve",
                             "Demand_Power",
                             "HeatPump",
-                            "Boiler",
+                            "ElectrodeBoiler",
                             "Battery",
                             "Grid_OUT"
                         ],
@@ -310,7 +344,7 @@
                             "PosControlReserve",
                             "Demand_Power",
                             "HeatPump",
-                            "Boiler",
+                            "ElectrodeBoiler",
                             "Battery",
                             "Grid_OUT"
                         ],
@@ -327,10 +361,8 @@
                         {
                         "input_order": [
                             "HeatPump",
-                            "Boiler",
-                            "BufferTank",
-                            "HeatPump#secondary",
-                            "Boiler#secondary"
+                            "ElectrodeBoiler",
+                            "BufferTank"
                         ],
                         "output_order": [
                             "Demand_Heat",
@@ -339,17 +371,13 @@
                         "energy_flow": [
                             [1, 1],
                             [1, 1],
-                            [1, 0],
-                            [1, 0],
                             [1, 0]
                         ]
                         },
                         {
                         "input_order": [
                             "HeatPump",
-                            "Boiler",
-                            "HeatPump#secondary",
-                            "Boiler#secondary",
+                            "ElectrodeBoiler",
                             "BufferTank"
                         ],
                         "output_order": [
@@ -357,8 +385,6 @@
                             "BufferTank"
                         ],
                         "energy_flow": [
-                            [1, 1],
-                            [1, 1],
                             [1, 1],
                             [1, 1],
                             [1, 0]
@@ -369,7 +395,7 @@
                 "bus_uacs": ["BUS_Power", "BUS_Heat"],
                 "storage_uac": "BufferTank",
                 "hp_uac": "HeatPump",
-                "boiler_uac": "Boiler",
+                "boiler_uac": "ElectrodeBoiler",
                 "neg_reserve_uac": "NegControlReserve",
                 "pos_reserve_uac": "PosControlReserve",
                 "grid_out_uac": "Grid_OUT"
@@ -382,10 +408,8 @@
             "connections": {
                 "input_order": [
                     "HeatPump",
-                    "Boiler",
-                    "BufferTank",
-                    "HeatPump#secondary",
-                    "Boiler#secondary"
+                    "ElectrodeBoiler",
+                    "BufferTank"
                 ],
                 "output_order": [
                     "Demand_Heat",
@@ -394,8 +418,6 @@
                 "energy_flow": [
                     [1, 1],
                     [1, 1],
-					[1, 0],
-					[1, 0],
 					[1, 0]
                 ]
             }
@@ -408,12 +430,12 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 65.0e6,
+            "capacity": 40.0e6,
             "rho_medium": 1000,
-            "cp_medium": 4.18,
+            "cp_medium": 4180.0,
             "high_temperature": 90.0,
             "low_temperature": 50.0,
-            "initial_load": 0.5,
+            "initial_load": 0.9,
             "max_load_rate": 0.25,
             "max_unload_rate": 0.2,
             "___BALANCED MODEL ONLY___": "",
@@ -434,7 +456,7 @@
             ],
             "medium": "m_power",
             "capacity": 200e3,
-            "load": 0.5
+            "load": 0.9
         },
         "Demand_Heat": {
             "type": "Demand",
