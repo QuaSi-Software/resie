@@ -11,9 +11,11 @@ they should be created:
         - all possible keys (in-/excluding flows) if this is requested in the input file or
         - only the requested keys as requested in the input file
 """
-function get_output_keys(io_settings::AbstractDict{String,Any},
+function get_output_keys(project_config::AbstractDict{AbstractString,Any},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
+                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
+    io_settings = project_config["io_settings"]
     # determine if lineplot and csv should be created
     do_plot_all_outputs_excl_flows = false
     do_plot_all_outputs_incl_flows = false
@@ -49,8 +51,29 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         end
     end
 
-    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || do_write_all_CSV_outputs_excl_flows
-    plot_all_including_flows = do_write_all_CSV_outputs_incl_flows || do_plot_all_outputs_incl_flows
+
+    do_return_all_outputs_excl_flows = false
+    do_return_all_outputs_incl_flows = false
+    do_return_data = false
+    if haskey(project_config, "emissions") || haskey(project_config, "economy") || haskey(project_config, "optimizer") 
+        #TODO get_output_keys for return_data in a smart way if optimize, economy or emissions
+        # is set in input file or just get all excl flows
+        do_return_data = true
+        if haskey(project_config, "emissions")
+            do_return_all_outputs_excl_flows = true
+        elseif haskey(project_config, "economy")
+            do_return_all_outputs_excl_flows = true
+        elseif haskey(project_config, "optimizer")
+            do_return_all_outputs_excl_flows = true
+        end
+    end
+
+    plot_all_excluding_flows = do_plot_all_outputs_excl_flows || 
+                               do_write_all_CSV_outputs_excl_flows || 
+                               do_return_all_outputs_excl_flows
+    plot_all_including_flows = do_plot_all_outputs_incl_flows || 
+                               do_write_all_CSV_outputs_incl_flows || 
+                               do_return_all_outputs_incl_flows
 
     # collect all possible outputs of all units if needed
     if plot_all_excluding_flows || plot_all_including_flows
@@ -156,7 +179,19 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         output_keys_to_csv = nothing
     end
 
-    return output_keys_lineplot, output_keys_to_csv
+    if do_return_data  # return data from funtion
+        if do_return_all_outputs_incl_flows
+            output_keys_return = all_output_keys_incl_flows
+        elseif do_return_all_outputs_excl_flows
+            output_keys_return = all_output_keys_excl_flows
+        else  # get only requested output keys from input file for CSV-export
+            output_keys_return = output_keys(components, io_settings["return_output_keys"])
+        end
+    else
+        output_keys_return = nothing
+    end
+
+    return output_keys_lineplot, output_keys_to_csv, output_keys_return
 end
 
 """

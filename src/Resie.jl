@@ -3,6 +3,8 @@ module Resie
 using Printf
 using Dates: now, seconds
 using UUIDs
+using LinearAlgebra
+using .Threads
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -195,7 +197,12 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
         operations = calculate_order_of_operations(components)
     end
 
-    return sim_params, components, operations
+    #TODO create functions to parse new parameters from input file
+    economy_params = get_economy_params(project_config["economy"])
+
+    emission_params = get_emission_params(project_config["emission"])
+
+    return sim_params, components, operations, economy_params, emission_params
 end
 
 """
@@ -214,7 +221,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
+    output_keys_lineplot, 
+    output_keys_to_CSV,
+    output_keys_return = get_output_keys(project_config, components)
+
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing &&
@@ -231,6 +241,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError())
     end
+    do_return_data = output_keys_return !== nothing 
 
     # Initialize the array for output plots
     output_data_lineplot = do_create_plot_data ?
@@ -239,6 +250,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
+    output_return_data = do_return_data ?
+                        zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_return)) :
+                        nothing
 
     # reset CSV file
     if do_write_CSV
@@ -246,6 +260,23 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                    output_keys_to_CSV,
                    weather_CSV_keys,
                    csv_time_unit)
+    end
+
+    # create keys consistent with csv_output for return data for return Dict
+    if do_return_data
+        output_return_header = ["timestep"]
+        for outkey in output_keys_return
+            if outkey.medium === nothing
+                header = "$(outkey.unit.uac) $(outkey.value_key)"
+            else
+                if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                    header = "$(outkey.medium) $(outkey.value_key)"
+                else
+                    header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+                end
+            end
+            push!(output_return_header, header)
+        end
     end
 
     # check if sankey should be plotted
@@ -318,6 +349,10 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
+            if do_return_data
+                output_return_data[output_steps, :] = gather_output_data(output_keys_return,
+                                                                         sim_params["time_since_output"])
+            end
 
             # simulation update
             sim_params["time_since_output"] += Int(sim_params["time_step_seconds"])
@@ -389,6 +424,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                   "$(join(component_list, ", "))"
         end
     end
+    return do_return_data ? OrderedDict{String, AbstractArray}(zip(output_return_header, eachcol(output_return_data))) : nothing
 end
 
 """
@@ -432,175 +468,180 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     end
 
     @info "-- Now preparing inputs"
+
+    run_lock = ReentrantLock()
+    output_lock = ReentrantLock()
+    results_lock = ReentrantLock()
+
+    proccesed_results_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
+    touch(proccesed_results_file_path)
+
     if !isnothing(project_config["optimizer"])
-        create_output_file()
-        if project_config["optimizer"] == "parameterstudy"
-            opt_params = project_config["optimizer"]["optim_params"]
+        #TODO implement function load_optimizer to process parameter ranges or objective functions
+        optimizer = load_optimizer(project_config["optimizer"])
 
-            output_lock = ReentrantLock()
-            runidx_global = Threads.Atomic{Int}(1)
-            erridx_global = Threads.Atomic{Int}(0)
+        runidx_global = Atomic{Int}(1)
+        all_results = OrderedDict()
+        if haskey(optimizer, "objective")
+            obj = zeros(length(keys(optimizer["objective"])))
+            obj_lock = ReentrantLock()
+        end
 
-            Threads.@threads for sample_params in collect(Iterators.product(opt_params))
-                run_sample(outdir, project_config, sample_params)
+        @threads for sample_params in optimizer["iterator"]
+            runidx = atomic_add!(runidx_global, 1)
+            run_ID = uuid4()
+            start_time = now()
+            #TODO create new Logging level for Info thats overarching mulitple simulations
+            @info("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
+
+            # decide which algorithm to run based on type of optimizer
+            if optimizer["type"] == "parameterstudy"
+                _ = run_sample(outdir, proccesed_results_file_path, project_config, 
+                               sample_params, run_ID, run_lock, output_lock)
+
+            elseif optimizer["type"] == "monte_carlo_annealing"
+                monte_carlo_annealing!(all_results, obj, obj_lock, 
+                                       outdir, proccesed_results_file_path, project_config, 
+                                       run_ID, run_lock, output_lock, results_lock)
+
             end
-        elseif project_config["optimizer"] == "monte_carlo_anealing"
-            objective_function = # ???
-            optimize(run_single_sim)
+
+            runtime = round(Int, Dates.seconds(now() - start_time))
+            eta = round(Int, (total_runs - runidx) * runtime / Threads.nthreads() / 60)
+            @info "[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min"
         end
 
     else
-        run_single_sim(project_config_run, run_ID)
+        run_ID = uuid4()
+        _ = run_sample(outdir, proccesed_results_file_path, project_config, 
+                       nothing, run_ID, run_lock, output_lock)
     end
+
     return true
 end
 
-function run_single_sim(project_config, run_ID)
-    sim_params, components, operations = prepare_inputs(project_config, run_ID)
-    current_runs[run_ID] = SimulationRun(sim_params, components, operations)
-    @info "-- Simulation setup complete in $(seconds(now() - start)) s"
+function monte_carlo_annealing!(all_results, obj, obj_lock, outdir, proccesed_results_file_path, project_config, run_ID, run_lock, output_lock, results_lock)
+    # temperature schedule is simple inverse logistic curve
+    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["nr_tries"] - 0.5)))
 
-    start = now()
-    @info "---- Simulation loop ----"
-    sim_output = run_simulation_loop(project_config, sim_params, components, operations)
-    
-    if !isnothing(project_config["economy"]) || !isnothing(project_config["emissions"])
-        years_sim = sim_params["number_of_time_steps_output"] * sim_params["time_step_seconds"] / 3600*8760
-        years_economy_data = length(price_profile) / sim_params["time_step_seconds"]
-        if years < 1
-            # repeat whole sim_output until 1 year full
-            sim_output
-        elseif  years > 1
-            # repeat last year until project_config["economy"]["economy_parms"]["eval_time_a"]
-            sim_output
+    if length(all_results) == 0 || rand() < temperature
+        # set parameters to equally distributed random values across whole parameter space
+        sample_params = Dict()
+        for (key, param) in pairs(optimizer["opt_params"])
+            sample_params[key] = rand(param["min"]:param["max"])
         end
-        if !isnothing(project_config["economy"])
-            annuities, total_costs = calc_economy(sim_output) # annuity for each value for each component
-        end
-        if !isnothing(project_config["emissions"])
-            # analog zu economy
+    else
+        # set parameters to neighborhood of existing result, drawn from the top results
+        # by global measure, where temperature determines the results pool and size of
+        # neighborhood
+        sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
+        sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
+        
+        sample_params = Dict()
+        for (key, param) in pairs(optimizer["opt_params"])
+            range = nbh_scale * temperature * (param["max"] - param["min"])
+            value = sample[key] + rand((-0.5 * range):(0.5 * range))
+            sample_params[key] = clamp(value, param["min"], param["max"])
         end
     end
-    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
-    return sim_output, annuities, total_costs, emissions
-end
 
-function monte_carlo_anealing()
-    # combined monte carlo and simulated annealing
-    # the temperature determines if a completely random or existing sample is used as starting
-    # point, determines the size of the neighborhood and the number of results (sorted by)
-    # global measure, from which a new sample is drawn
-    for idx in range(1, NR_TRIES)
-        # temperature schedule is simple inverse logistic curve
-        temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / NR_TRIES - 0.5)))
+    # run sim and calculate objective results
+    results = run_sample(outdir, proccesed_results_file_path, project_config, sample_params, run_ID, run_lock, output_lock)
+    obj_results = objective_function(results)
 
-        if length(all_results) == 0 || rand() < temperature
-            # set parameters to equally distributed random values across whole parameter space
-            hp_power = rand(BOUNDS["TST_HP_01"][2]:BOUNDS["TST_HP_01"][3])
-            pv_power = rand(BOUNDS["TST_PV_01"][2]:BOUNDS["TST_PV_01"][3])
-            bat_cap = rand(BOUNDS["TST_BAT_01"][2]:BOUNDS["TST_BAT_01"][3])
-            bt_cap = rand(BOUNDS["TST_BFT_01"][2]:BOUNDS["TST_BFT_01"][3])
-            sample_params =
+    # calculate minimum of results
+    @lock obj_lock obj .= min.(min_obj, obj_results) 
 
-            print(". ")
-        else
-            # set parameters to neighborhood of existing result, drawn from the top results
-            # by global measure, where temperature determines the results pool and size of
-            # neighborhood
-            sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
-            print("$sample_idx ")
-            sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
-
-            range = NBH_SCALE * temperature * (BOUNDS["TST_HP_01"][3] - BOUNDS["TST_HP_01"][2])
-            hp_power = sample["hp_power"] + rand((-0.5 * range):(0.5 * range))
-            hp_power = max(BOUNDS["TST_HP_01"][2], min(BOUNDS["TST_HP_01"][3], hp_power))
-
-            range = NBH_SCALE * temperature * (BOUNDS["TST_PV_01"][3] - BOUNDS["TST_PV_01"][2])
-            pv_power = sample["pv_power"] + rand((-0.5 * range):(0.5 * range))
-            pv_power = max(BOUNDS["TST_PV_01"][2], min(BOUNDS["TST_PV_01"][3], pv_power))
-
-            range = NBH_SCALE * temperature * (BOUNDS["TST_BAT_01"][3] - BOUNDS["TST_BAT_01"][2])
-            bat_cap = sample["bat_cap"] + rand((-0.5 * range):(0.5 * range))
-            bat_cap = max(BOUNDS["TST_BAT_01"][2], min(BOUNDS["TST_BAT_01"][3], bat_cap))
-
-            range = NBH_SCALE * temperature * (BOUNDS["TST_BFT_01"][3] - BOUNDS["TST_BFT_01"][2])
-            bt_cap = sample["bt_cap"] + rand((-0.5 * range):(0.5 * range))
-            bt_cap = max(BOUNDS["TST_BFT_01"][2], min(BOUNDS["TST_BFT_01"][3], bt_cap))
-
-            sample_params = 
-        end
-
-        # run sim and record results
-        run_results = run_sample(outdir, project_config, sample_params)
-        obj_results = objective_function(run_results)
-        result = Dict(
-            "gm" => 0.0,
-            "cost" => obj_results.lcc,
-            "emissions" => obj_results.emissions,
-            "hp_power" => hp_power,
-            "hp_capex_per_kw" => inputs["components"]["TST_HP_01"]["capex_per_kW"],
-            "pv_power" => pv_power,
-            "pv_capex_per_kw" => inputs["components"]["TST_PV_01"]["capex_per_kW"],
-            "bat_cap" => bat_cap,
-            "bat_capex_per_kwh" => inputs["components"]["TST_BAT_01"]["capex_per_kWh"],
-            "bt_cap" => bt_cap,
-            "bt_capex_per_kwh" => inputs["components"]["TST_BFT_01"]["capex_per_kWh"],
-            "base_cop" => inputs["components"]["TST_HP_01"]["base_cop"],
-            "base_grid_price" => inputs["components"]["TST_BAT_01"]["base_grid_price"],
-        )
-        push!(all_results, result)
-        min_lcc = obj_results.lcc < min_lcc ? obj_results.lcc : min_lcc
-        min_emissions = obj_results.emissions < min_emissions ? obj_results.emissions : min_emissions
+    # write output to all_results
+    lock(results_lock) do 
+        all_results[run_ID] = results
 
         # calculate global measure and sort by it
         for res in all_results
-            res["gm"] = sqrt(((res["cost"]) / min_lcc - 1.0)^2 + (res["emissions"] / min_emissions - 1.0)^2)
+            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(keys(optimizer["objective"]), min_obj))
         end
         sort!(all_results; by=x -> x["gm"])
-
-        if idx % 5 == 0
-            print("| ")
-        end
     end
 end
 
-function run_sample(outdir, project_config, sample_params)
-    runidx = Threads.atomic_add!(runidx_global, 1)
-    run_ID = uuid4()
-    combined_output = OrderedDict()
-    start_time = now()
+function run_sample(outdir, proccesed_results_file_path, project_config, sample_params, run_ID, run_lock, output_lock)
     ####################################################
     # Simulation
     ####################################################
-    # TODO input_file wird nicht neu geschrieben, sondern nur profile
-    project_config_run = create_variant(outdir, project_config, sample_params,
-                                        run_ID; 
-                                        write_output=write_output)
+    # TODO implement create_variant but without rewriting and saving input_file but only profiles
+    if sample_params !== nothing
+        project_config = create_variant(outdir, project_config, sample_params, run_ID)
+    end
 
+    sim_params, components, operations, 
+    economy_params, emission_params = prepare_inputs(project_config, run_ID)
+    @info "-- Simulation setup complete in $(seconds(now() - start)) s"
 
-    @info("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
+    lock(run_lock) do 
+        current_runs[run_ID] = SimulationRun(sim_params, components, operations)
+    end
 
-    raw_sim = nothing
+    start = now()
+    @info "---- Simulation loop ----"
+    results = OrderedDict()
     try
-        raw_sim, annuities, total_costs, emissions = run_single_sim(project_config_run, run_ID)
+        sim_output = run_simulation_loop(project_config, sim_params, components, operations)
 
+        results["error"] = ""
+        #TODO get necessary values from project_config or economy_params, emission_params and optimizer
+        if !isnothing(economy_params) || !isnothing(emission_params)
+            years_sim = sim_params["number_of_time_steps_output"] * sim_params["time_step_seconds"] / 3600*8760
+            #TODO do prepare_inputs for new groups or include handling in existing 
+            # prepare_inputs with additional output
+            # years_economy_data = length(price_profile) / sim_params["time_step_seconds"]
+            # years_emission_data = length(emission_profile) / sim_params["time_step_seconds"]
+            if years_sim < 1
+                #TODO repeat whole sim_output until 1 year full
+                sim_output
+            elseif  years > 1
+                #TODO repeat last year until economy_params["eval_time"]
+                sim_output
+            end
+            if !isnothing(economy_params)
+                #TODO annuity and total_costs for each value for each component
+                # add values to flat dictionary to avoid unnecessary nesting
+                results = calc_economy(sim_output, results) 
+            end
+            if !isnothing(emission_params)
+                #TODO analog zu economy
+                # add values to flat dictionary to avoid unnecessary nesting
+                results = calc_emission(sim_output, results)
+            end
+            #TODO make smart sums of needed values of sim_output
+            for val_name in sum_output_values
+                results[val_name] = sum(sim_output[val_name])
+            end
+        end
     catch e
+        sim_output = nothing
         # save excact error message to output file
         error_message = sprint(showerror, e)
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
         @info full_error_message
-        combined_output[runidx]["Errors"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
-        Threads.atomic_add!(erridx_global, 1)
+        results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
+    end
 
-        # save input file that threw error seperately
-        error_path = joinpath(outdir, "error_inputfiles")
-        mkpath(error_path)
-        cp(input_file, joinpath(error_path, splitpath(input_file)[end]), force=true)
+    # Write results to seperate file after all simulations are finished.
+    row = join(collect(results.values), ';') * "\n"
+    row = replace(row, '.' => ',')
+    # Lock the file writing
+    lock(output_lock) do 
+        open(proccesed_results_file_path, "a") do file_handle
+            write(file_handle, row)
+        end
     end
-    if !save_input_files 
-        rm(input_file) 
+        
+    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
+    lock(run_lock) do 
+        close_run(run_ID)
     end
-    return raw_sim, annuities, total_costs, emissions
+
+    return results
 end
 
 end # module
