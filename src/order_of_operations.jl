@@ -105,6 +105,7 @@ function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
     reorder_storage_loading(simulation_order, components, components_by_function)
+    reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
 
     fn_first = function (entry)
         return entry[1]
@@ -2802,6 +2803,59 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
 
         # same as above, but for inputs and the process step
         # this is done in reorder_for_input_priorities()
+    end
+end
+
+"""
+    reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
+
+Handle process/load steps of flexible sinks, sources and storages that are directly connected to a transformer and
+may be between the potential and produce of the connected transformer:
+- Ensure that flexible sources and storages have their process-step after the process step of a directly 
+connected transformers. 
+- Ensure that flexible sinks and storages have their load/process-step after the process step of a directly 
+connected transformers.
+
+# Arguments
+-`simulation_order`: A global parameter holding the simulation order
+-`components`: All components of the current energy system
+-`components_by_function`: The mapping of component functions
+"""
+function reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
+    # flexible source, storages
+    sources_to_consider = vcat((values(components_by_function[i]) for i in (6, 5))...)
+    # flexible sink, storages
+    sinks_to_consider = vcat((values(components_by_function[i]) for i in (7, 5))...)
+
+    # For every flexible source/storage directly connected to a transformer...
+    for source in sources_to_consider
+        source_medium = hasproperty(source, :m_heat_out) ? source.m_heat_out : source.medium
+        target = source.output_interfaces[source_medium].target
+        if target.sf_function === EnergySystems.sf_transformer
+            # make sure the process of the source/storage comes after the process of the connected transformer.
+            place_one_lower!(simulation_order,
+                             (target.uac, EnergySystems.s_process),
+                             (source.uac, EnergySystems.s_process);
+                             force=false)
+        end
+    end
+
+    # For every flexible sink/storage directly connected to a transformer...
+    for sink in sinks_to_consider
+        if hasproperty(sink, :regeneration) && !sink.regeneration
+            # skip components with deactivated input interfaces (geothermal heat collector, geothermal probes)
+            continue
+        end
+        sink_medium = hasproperty(sink, :m_heat_in) ? sink.m_heat_in : sink.medium
+        sink_step = sink.sys_function === EnergySystems.sf_storage ? EnergySystems.s_load : EnergySystems.s_process
+        source = sink.input_interfaces[sink_medium].source
+        if source.sf_function === EnergySystems.sf_transformer
+            # make sure the process/load of the sink/storage comes after the process of the connected transformer
+            place_one_lower!(simulation_order,
+                             (source.uac, EnergySystems.s_process),
+                             (sink.uac, sink_step);
+                             force=false)
+        end
     end
 end
 
