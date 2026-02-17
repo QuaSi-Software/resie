@@ -514,7 +514,8 @@ function set_max_energy!(interface::SystemInterface,
                          temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
                          purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing,
                          has_calculated_all_maxima::Bool=false,
-                         recalculate_max_energy::Bool=false)
+                         recalculate_max_energy::Bool=false;
+                         is_transformer_potential::Bool=false)
     # add nothing elements to temperature if there is only a single one
     energy = convert_to_vector(energy, Vector{Floathing})
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
@@ -564,7 +565,15 @@ function set_max_energy!(interface::SystemInterface,
             temp_max = temperature_max
             uac = purpose_uac
         else
-            # limit max_energy to existing max_energy and get temperatures
+            # limit max_energy to existing max_energy and get 
+            if is_transformer_potential  # --> caller is transformer and is calling from potential step.
+                # if other side is not also a transformer --> do not update MaxEnergy!
+                if !(interface.source.sys_function === EnergySystems.sf_transformer &&
+                     interface.target.sys_function === EnergySystems.sf_transformer)
+                    return
+                end
+            end
+
             energy_new = Vector{Floathing}()
             temp_min = Vector{Temperature}()
             temp_max = Vector{Temperature}()

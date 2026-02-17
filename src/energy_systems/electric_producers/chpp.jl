@@ -103,10 +103,12 @@ function control(unit::CHPP,
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], nothing, nothing, unit.output_temperature)
 end
 
-function set_max_energies!(unit::CHPP, fuel_in::Float64, el_out::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
+function set_max_energies!(unit::CHPP, is_transformer_potential::Bool, fuel_in::Float64, el_out::Float64,
+                           heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_el_out], el_out; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature;
+                    is_transformer_potential=is_transformer_potential)
 end
 
 function calculate_energies(unit::CHPP, sim_params::Dict{String,Any})::Tuple{Bool,Vector{Floathing}}
@@ -123,9 +125,9 @@ function potential(unit::CHPP, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3])
+        set_max_energies!(unit, true, energies[1], energies[2], energies[3])
     end
 end
 
@@ -134,7 +136,7 @@ function process(unit::CHPP, sim_params::Dict{String,Any})
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         unit.losses = 0.0
-        set_max_energies!(unit, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0, 0.0)
         return
     end
 
