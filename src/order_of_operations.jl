@@ -2830,11 +2830,12 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
     # For every flexible source/storage directly connected to a transformer...
     for source in sources_to_consider
         source_medium = hasproperty(source, :m_heat_out) ? source.m_heat_out : source.medium
-        target = source.output_interfaces[source_medium].target
-        if target.sf_function === EnergySystems.sf_transformer
+        connected_target_transformer = get_directly_connected_transformer(source.output_interfaces[source_medium],
+                                                                          "output")
+        for connected_transformer in connected_target_transformer
             # make sure the process of the source/storage comes after the process of the connected transformer.
             place_one_lower!(simulation_order,
-                             (target.uac, EnergySystems.s_process),
+                             (connected_transformer.uac, EnergySystems.s_process),
                              (source.uac, EnergySystems.s_process);
                              force=false)
         end
@@ -2848,11 +2849,11 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
         end
         sink_medium = hasproperty(sink, :m_heat_in) ? sink.m_heat_in : sink.medium
         sink_step = sink.sys_function === EnergySystems.sf_storage ? EnergySystems.s_load : EnergySystems.s_process
-        source = sink.input_interfaces[sink_medium].source
-        if source.sf_function === EnergySystems.sf_transformer
+        connected_source_transformer = get_directly_connected_transformer(sink.input_interfaces[sink_medium], "input")
+        for connected_transformer in connected_source_transformer
             # make sure the process/load of the sink/storage comes after the process of the connected transformer
             place_one_lower!(simulation_order,
-                             (source.uac, EnergySystems.s_process),
+                             (connected_transformer.uac, EnergySystems.s_process),
                              (sink.uac, sink_step);
                              force=false)
         end
@@ -3029,6 +3030,86 @@ function check_interface_for_transformer(interface, type)
     else
         @error "The function check_interface_for_transformer() was not able to detect if it is an output or an input interface. Check the function call."
         exit()
+    end
+end
+
+"""
+    get_directly_connected_transformer(interface::SystemInterface, type::String)
+
+Checks a given interface if there is one or more transformer in the following or previous chain.
+The function search only across busses but not through other components!
+
+# Arguments
+-`interface::SystemInterface`: The interface that should be checked
+-`type::String`: Can be either "input" or "output". Defines if the "interface" should 
+                 be handled as an input or an output interface.
+
+# Returns
+Returns a list of the directly connected transformer.
+"""
+function get_directly_connected_transformer(interface, type)
+    if type == "input"
+        input_transformer = []
+        add_transformer_in_input! = function (current_node, last_node_uac, checked_interfaces)
+            if current_node.sys_function === EnergySystems.sf_transformer
+                push!(input_transformer, current_node)
+            else
+                for inface in values(current_node.input_interfaces)
+                    if inface !== nothing
+                        inface.is_secondary_interface && continue
+                        if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
+                            continue
+                        elseif inface in checked_interfaces || inface.source == current_node
+                            continue
+                        elseif !connection_allowed(current_node, inface.source.uac, last_node_uac)
+                            continue
+                        elseif inface.source.sys_function === EnergySystems.sf_transformer
+                            push!(input_transformer, inface.source)
+                        elseif !(inface.source.sys_function === EnergySystems.sf_bus)
+                            continue
+                        else
+                            push!(checked_interfaces, inface)
+                            add_transformer_in_input!(inface.source, current_node.uac, checked_interfaces)
+                        end
+                    end
+                end
+            end
+        end
+
+        add_transformer_in_input!(interface.source, interface.target.uac, [])
+        return input_transformer
+
+    elseif type == "output"
+        output_transformer = []
+        add_transformer_in_output! = function (current_node, last_node_uac, checked_interfaces)
+            if current_node.sys_function === EnergySystems.sf_transformer
+                push!(output_transformer, current_node)
+            else
+                for outface in values(current_node.output_interfaces)
+                    if outface !== nothing
+                        outface.is_secondary_interface && continue
+                        if outface.target.sys_function === EnergySystems.sf_bus &&
+                           startswith(outface.target.uac, "Proxy")
+                            continue
+                        elseif outface in checked_interfaces || outface.target == current_node
+                            continue
+                        elseif !connection_allowed(current_node, last_node_uac, outface.target.uac)
+                            continue
+                        elseif outface.target.sys_function === EnergySystems.sf_transformer
+                            push!(output_transformer, outface.target)
+                        elseif !(outface.target.sys_function === EnergySystems.sf_bus)
+                            continue
+                        else
+                            push!(checked_interfaces, outface)
+                            add_transformer_in_output!(outface.target, current_node.uac, checked_interfaces)
+                        end
+                    end
+                end
+            end
+        end
+
+        add_transformer_in_output!(interface.target, interface.source.uac, [])
+        return output_transformer
     end
 end
 
