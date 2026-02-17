@@ -3,6 +3,9 @@ using ..Resie: get_run
 """
 Thermal Booster
 
+Takes thermal energy of low temperature to preheats a demand and adds additional energy to
+reach the desired output temperature of the demand.
+
 """
 mutable struct ThermalBooster <: Component
     uac::String
@@ -157,6 +160,7 @@ function control(unit::ThermalBooster, components::Grouping, sim_params::Dict{St
 end
 
 function set_max_energies!(unit::ThermalBooster,
+                           is_transformer_potential::Bool,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
@@ -166,105 +170,13 @@ function set_max_energies!(unit::ThermalBooster,
                            purpose_uac_heat_out::Union{Stringing,Vector{Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
-    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in; is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, slices_heat_in_temperature, nothing,
-                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in;
+                    is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
-                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
-end
-
-function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any})::TBEnergies
-    energies = TBEnergies()
-
-    # get electricity potential and reduce it by constant power draw (or however much
-    # is available)
-    energies.potential_el_in_layered, energies.in_uacs_el = check_el_in_layered(unit, sim_params)
-    energies.potential_el_in = sum(energies.potential_el_in_layered)
-    energies.potential_el_in = min(unit.power_el, energies.potential_el_in)
-
-    if energies.potential_el_in > 0.0     # shortcut if we're limited by zero input electricity
-        # get vectored values for the input and output heat potentials
-        energies.potentials_heat_in,
-        energies.in_temps_min,
-        energies.in_temps_max,
-        energies.in_uacs_heat = check_heat_in_layered(unit, sim_params)
-
-        energies.potentials_heat_out,
-        energies.out_temps_min,
-        energies.out_temps_max,
-        energies.out_uacs = check_heat_out_layered(unit, sim_params)
-
-        # in the following we want to work with positive values as it is easier
-        energies.potentials_heat_in = abs.(energies.potentials_heat_in)
-        energies.potentials_heat_out = abs.(energies.potentials_heat_out)
-
-        # reduce available input energies by the power/heat losses that would occur if the
-        # sources would be fully utilised. since the actual usage is equal or less than that,
-        # it works out even if the PLR for that source is not 1.0
-        energies.potentials_heat_in .*= unit.heat_losses_factor
-        energies.potential_el_in *= unit.power_losses_factor
-
-        # reorder inputs and outputs according to control modules
-        index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
-        energies.in_temps_min = energies.in_temps_min[index]
-        energies.in_temps_max = energies.in_temps_max[index]
-        energies.in_uacs_heat = energies.in_uacs_heat[index]
-        energies.potentials_heat_in = energies.potentials_heat_in[index]
-
-        index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
-        energies.out_temps_min = energies.out_temps_min[index]
-        energies.out_temps_max = energies.out_temps_max[index]
-        energies.out_uacs = energies.out_uacs[index]
-        energies.potentials_heat_out = energies.potentials_heat_out[index]
-
-        # there are three different cases of how to handle the layered approach of operating the
-        # thermal booster, depending on wether or not any input heat or output heat transformer has a
-        # value of infinite as the potential. if this is the case for both the input and output,
-        # the calculation cannot be resolved.
-        energies.heat_in_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=true))
-        energies.heat_out_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=false))
-
-        if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
-            @warn "The thermal booster $(unit.uac) has unknown energies in both its inputs and " *
-                  "outputs. This cannot be resolved. Please check the order of operation and " *
-                  "make sure that either the inputs or the outputs have been fully calculated " *
-                  "before the thermal booster $(unit.uac) has its potential step."
-            return energies
-        end
-
-        if energies.heat_in_has_inf_energy
-            for heat_in_idx in eachindex(energies.potentials_heat_in)
-                energies = calculate_booster(unit, sim_params, energies; fixed_heat_in=heat_in_idx)
-                energies = add_heat_in_temp_to_slices(energies)
-                energies = copy_heat_out_temp_to_slices(energies)
-            end
-        elseif energies.heat_out_has_inf_energy
-            for heat_out_idx in eachindex(energies.potentials_heat_out)
-                energies = calculate_booster(unit, sim_params, energies; fixed_heat_out=heat_out_idx)
-                energies = add_heat_out_temp_to_slices(energies)
-                energies = copy_heat_in_temp_to_slices(energies)
-            end
-        else
-            energies = calculate_booster(unit, sim_params, energies)
-            energies = copy_temp_to_slices!(energies)
-        end
-    end
-
-    # now set losses of the thermal booster and add the losses to the actually consumed
-    # power / heat for the slices
-    el_in = sum(energies.slices_el_in; init=0.0)
-    heat_in = sum(energies.slices_heat_in; init=0.0)
-    unit.losses_power = -1.0 * el_in
-    unit.losses_heat = -1.0 * heat_in
-    energies.slices_el_in ./= unit.power_losses_factor
-    energies.slices_heat_in ./= unit.heat_losses_factor
-
-    el_in = sum(energies.slices_el_in; init=0.0)
-    heat_in = sum(energies.slices_heat_in; init=0.0)
-    unit.losses_power += el_in
-    unit.losses_heat += heat_in
-
-    return energies
+                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out;
+                    is_transformer_potential=is_transformer_potential)
 end
 
 """
@@ -396,123 +308,6 @@ function copy_temp_to_slices!(energies::TBEnergies)::TBEnergies
     return energies
 end
 
-function calculate_booster(unit::ThermalBooster,
-                           sim_params::Dict{String,Any},
-                           energies::TBEnergies;
-                           fixed_heat_in::Union{Nothing,Integer}=nothing,
-                           fixed_heat_out::Union{Nothing,Integer}=nothing)::TBEnergies
-    energies = reset_available!(energies; fixed_heat_in, fixed_heat_out)
-    energies = reset_temp_slices!(energies)
-
-    src_idx::Int = 1
-    snk_idx::Int = 1
-    EPS = sim_params["epsilon"]
-
-    # loop over input and output layer
-    while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
-        if energies.available_el_in < EPS || sum(energies.available_heat_in; init=0.0) < EPS ||
-           sum(energies.available_heat_out; init=0.0) < EPS
-            # end of condition
-            break
-        end
-
-        # apply restrictions of control modules for a slice
-        if !check_src_to_snk(unit.controller, energies.in_uacs_heat[src_idx], energies.out_uacs[snk_idx])
-            snk_idx += 1
-            continue
-        end
-
-        # check temperatures
-        skip_slice, src_temperature = get_layer_temperature(unit, src_idx,
-                                                            energies.in_temps_min,
-                                                            energies.in_temps_max;
-                                                            input=true)
-        if skip_slice || !(src_idx in energies.in_indices)
-            src_idx += 1
-            continue
-        end
-
-        # same for output
-        skip_slice, snk_temperature = get_layer_temperature(unit, snk_idx,
-                                                            energies.out_temps_min,
-                                                            energies.out_temps_max;
-                                                            input=false)
-        if skip_slice || !(snk_idx in energies.out_indices)
-            snk_idx += 1
-            continue
-        end
-
-        # reduce source temperature by terminal_dT
-        src_temperature_reduced = src_temperature - unit.terminal_dT
-
-        # calculate required mass in output for current slice
-        mass_out_current_layer = energies.available_heat_out[snk_idx] / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                                         (snk_temperature - unit.demand_input_temperature))
-
-        # calculate required energy from thermal input for current slice
-        required_low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                                 (src_temperature_reduced - unit.demand_input_temperature)
-        # limit to maximum available energy
-        required_low_temp_heat = min(required_low_temp_heat, energies.available_heat_in[src_idx])
-        if unit.allow_boost_only
-            # calculate intermediate temperature to start from boosting while keeping the mass_out_current_layer
-            src_temperature_reduced = required_low_temp_heat /
-                                      (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out)) +
-                                      unit.demand_input_temperature
-        else
-            # recalculate output layer mass that can be heated
-            mass_out_current_layer = required_low_temp_heat / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                               (src_temperature_reduced - unit.demand_input_temperature))
-        end
-
-        # calculate the remaining energy to boost the input temperature to the output temperature in current slice
-        # handle cases where output is fully provided by power with toggle!
-        required_boost_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                              (snk_temperature - src_temperature_reduced)
-        # limit to maximum available boost energy
-        if energies.available_el_in < required_boost_heat
-            # limit
-            required_boost_heat = min(required_boost_heat, energies.available_el_in)
-            # recalculate mass than can be heated
-            mass_out_current_layer = required_boost_heat /
-                                     (convert_J_in_Wh(unit.cp_medium_out) * (snk_temperature - src_temperature_reduced))
-            # update also low temp heat
-        end
-
-        # calculate output energy
-        out_energy = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                     (snk_temperature - unit.demand_input_temperature)
-        if (required_low_temp_heat + required_boost_heat) - out_energy > EPS
-            @error "something went wrong in the thermal booster... \nrequired_low_temp_heat: $(required_low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
-            # TODO remove later...
-        end
-
-        # update available energies
-        energies.available_el_in -= required_boost_heat
-        energies.available_heat_in[src_idx] -= required_low_temp_heat
-        energies.available_heat_out[snk_idx] -= out_energy
-
-        # map to temp slices
-        push!(energies.slices_temp_el_in, required_boost_heat)
-        push!(energies.slices_temp_heat_in, required_low_temp_heat)
-        push!(energies.slices_temp_heat_in_temperature, src_temperature)
-        push!(energies.slices_temp_heat_in_uac, energies.in_uacs_heat[src_idx])
-        push!(energies.slices_temp_heat_out, out_energy)
-        push!(energies.slices_temp_heat_out_temperature, snk_temperature)
-        push!(energies.slices_temp_heat_out_uac, energies.out_uacs[snk_idx])
-
-        # go to next layer(s)
-        if energies.available_heat_in[src_idx] < EPS
-            src_idx += 1
-        end
-        if energies.available_heat_out[snk_idx] < EPS
-            snk_idx += 1
-        end
-    end
-
-    return energies
-end
-
 """
 Determines the temperature of the input/output layer and if it should be skipped.
 
@@ -591,15 +386,231 @@ function reset_available!(energies::TBEnergies;
     return energies
 end
 
+# Calculate inner physics of Thermal Booster
+function calculate_booster(unit::ThermalBooster,
+                           sim_params::Dict{String,Any},
+                           energies::TBEnergies;
+                           fixed_heat_in::Union{Nothing,Integer}=nothing,
+                           fixed_heat_out::Union{Nothing,Integer}=nothing)::TBEnergies
+    energies = reset_available!(energies; fixed_heat_in, fixed_heat_out)
+    energies = reset_temp_slices!(energies)
+
+    src_idx::Int = 1
+    snk_idx::Int = 1
+    EPS = sim_params["epsilon"]
+
+    # loop over input and output layer
+    while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
+        if energies.available_el_in < EPS || sum(energies.available_heat_in; init=0.0) < EPS ||
+           sum(energies.available_heat_out; init=0.0) < EPS
+            # end of condition
+            break
+        end
+
+        # apply restrictions of control modules for a slice
+        if !check_src_to_snk(unit.controller, energies.in_uacs_heat[src_idx], energies.out_uacs[snk_idx])
+            snk_idx += 1
+            continue
+        end
+
+        # check temperatures
+        skip_slice, src_temperature = get_layer_temperature(unit, src_idx,
+                                                            energies.in_temps_min,
+                                                            energies.in_temps_max;
+                                                            input=true)
+        if skip_slice || !(src_idx in energies.in_indices)
+            src_idx += 1
+            continue
+        end
+
+        # same for output
+        skip_slice, snk_temperature = get_layer_temperature(unit, snk_idx,
+                                                            energies.out_temps_min,
+                                                            energies.out_temps_max;
+                                                            input=false)
+        if skip_slice || !(snk_idx in energies.out_indices)
+            snk_idx += 1
+            continue
+        end
+
+        ### Calculate Thermal Booster ###
+        # reduce source temperature by terminal_dT
+        src_temperature_reduced = src_temperature - unit.terminal_dT
+
+        # calculate required mass in output for current slice
+        mass_out_current_layer = energies.available_heat_out[snk_idx] / (convert_J_in_Wh(unit.cp_medium_out) *
+                                                                         (snk_temperature - unit.demand_input_temperature))
+
+        # calculate required energy from thermal input for current slice
+        required_low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
+                                 (src_temperature_reduced - unit.demand_input_temperature)
+        # limit to maximum available energy
+        required_low_temp_heat = min(required_low_temp_heat, energies.available_heat_in[src_idx])
+        if unit.allow_boost_only
+            # calculate intermediate temperature to start from boosting while keeping the mass_out_current_layer
+            src_temperature_reduced = required_low_temp_heat /
+                                      (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out)) +
+                                      unit.demand_input_temperature
+        else
+            # recalculate output layer mass that can be heated
+            mass_out_current_layer = required_low_temp_heat / (convert_J_in_Wh(unit.cp_medium_out) *
+                                                               (src_temperature_reduced - unit.demand_input_temperature))
+        end
+
+        # calculate the remaining energy to boost the input temperature to the output temperature in current slice
+        # handle cases where output is fully provided by power with toggle!
+        required_boost_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
+                              (snk_temperature - src_temperature_reduced)
+        # limit to maximum available boost energy
+        if energies.available_el_in < required_boost_heat
+            # limit
+            required_boost_heat = min(required_boost_heat, energies.available_el_in)
+            # recalculate mass than can be heated
+            mass_out_current_layer = required_boost_heat /
+                                     (convert_J_in_Wh(unit.cp_medium_out) * (snk_temperature - src_temperature_reduced))
+            # update also low temp heat
+        end
+
+        # calculate output energy
+        out_energy = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
+                     (snk_temperature - unit.demand_input_temperature)
+
+        if (required_low_temp_heat + required_boost_heat) - out_energy > EPS
+            @error "something went wrong in the thermal booster... \nrequired_low_temp_heat: $(required_low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
+            # TODO remove later...
+        end
+
+        # update available energies
+        energies.available_el_in -= required_boost_heat
+        energies.available_heat_in[src_idx] -= required_low_temp_heat
+        energies.available_heat_out[snk_idx] -= out_energy
+
+        # map to temp slices
+        push!(energies.slices_temp_el_in, required_boost_heat)
+        push!(energies.slices_temp_heat_in, required_low_temp_heat)
+        push!(energies.slices_temp_heat_in_temperature, src_temperature)
+        push!(energies.slices_temp_heat_in_uac, energies.in_uacs_heat[src_idx])
+        push!(energies.slices_temp_heat_out, out_energy)
+        push!(energies.slices_temp_heat_out_temperature, snk_temperature)
+        push!(energies.slices_temp_heat_out_uac, energies.out_uacs[snk_idx])
+
+        # go to next layer(s)
+        if energies.available_heat_in[src_idx] < EPS
+            src_idx += 1
+        end
+        if energies.available_heat_out[snk_idx] < EPS
+            snk_idx += 1
+        end
+    end
+
+    return energies
+end
+
+# Calculate Energies
+function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any})::TBEnergies
+    energies = TBEnergies()
+
+    # get electricity potential and reduce it by constant power draw (or however much
+    # is available)
+    energies.potential_el_in_layered, energies.in_uacs_el = check_el_in_layered(unit, sim_params)
+    energies.potential_el_in = sum(energies.potential_el_in_layered)
+    energies.potential_el_in = min(unit.power_el, energies.potential_el_in)
+
+    if energies.potential_el_in > 0.0     # shortcut if we're limited by zero input electricity
+        # get vectored values for the input and output heat potentials
+        energies.potentials_heat_in,
+        energies.in_temps_min,
+        energies.in_temps_max,
+        energies.in_uacs_heat = check_heat_in_layered(unit, sim_params)
+
+        energies.potentials_heat_out,
+        energies.out_temps_min,
+        energies.out_temps_max,
+        energies.out_uacs = check_heat_out_layered(unit, sim_params)
+
+        # in the following we want to work with positive values as it is easier
+        energies.potentials_heat_in = abs.(energies.potentials_heat_in)
+        energies.potentials_heat_out = abs.(energies.potentials_heat_out)
+
+        # reduce available input energies by the power/heat losses that would occur if the
+        # sources would be fully utilised. since the actual usage is equal or less than that,
+        # it works out even if the PLR for that source is not 1.0
+        energies.potentials_heat_in .*= unit.heat_losses_factor
+        energies.potential_el_in *= unit.power_losses_factor
+
+        # reorder inputs and outputs according to control modules
+        index = reorder_inputs(unit.controller, energies.in_temps_min, energies.in_temps_max)
+        energies.in_temps_min = energies.in_temps_min[index]
+        energies.in_temps_max = energies.in_temps_max[index]
+        energies.in_uacs_heat = energies.in_uacs_heat[index]
+        energies.potentials_heat_in = energies.potentials_heat_in[index]
+
+        index = reorder_outputs(unit.controller, energies.out_temps_min, energies.out_temps_max)
+        energies.out_temps_min = energies.out_temps_min[index]
+        energies.out_temps_max = energies.out_temps_max[index]
+        energies.out_uacs = energies.out_uacs[index]
+        energies.potentials_heat_out = energies.potentials_heat_out[index]
+
+        # there are three different cases of how to handle the layered approach of operating the
+        # thermal booster, depending on wether or not any input heat or output heat transformer has a
+        # value of infinite as the potential. if this is the case for both the input and output,
+        # the calculation cannot be resolved.
+        energies.heat_in_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=true))
+        energies.heat_out_has_inf_energy = any(isinf, filter_by_transformer(energies, sim_params; heat_in=false))
+
+        if energies.heat_in_has_inf_energy && energies.heat_out_has_inf_energy
+            @warn "The thermal booster $(unit.uac) has unknown energies in both its inputs and " *
+                  "outputs. This cannot be resolved. Please check the order of operation and " *
+                  "make sure that either the inputs or the outputs have been fully calculated " *
+                  "before the thermal booster $(unit.uac) has its potential step."
+            return energies
+        end
+
+        if energies.heat_in_has_inf_energy
+            for heat_in_idx in eachindex(energies.potentials_heat_in)
+                energies = calculate_booster(unit, sim_params, energies; fixed_heat_in=heat_in_idx)
+                energies = add_heat_in_temp_to_slices(energies)
+                energies = copy_heat_out_temp_to_slices(energies)
+            end
+        elseif energies.heat_out_has_inf_energy
+            for heat_out_idx in eachindex(energies.potentials_heat_out)
+                energies = calculate_booster(unit, sim_params, energies; fixed_heat_out=heat_out_idx)
+                energies = add_heat_out_temp_to_slices(energies)
+                energies = copy_heat_in_temp_to_slices(energies)
+            end
+        else
+            energies = calculate_booster(unit, sim_params, energies)
+            energies = copy_temp_to_slices!(energies)
+        end
+    end
+
+    # now set losses of the thermal booster and add the losses to the actually consumed
+    # power / heat for the slices
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    unit.losses_power = -1.0 * el_in
+    unit.losses_heat = -1.0 * heat_in
+    energies.slices_el_in ./= unit.power_losses_factor
+    energies.slices_heat_in ./= unit.heat_losses_factor
+
+    el_in = sum(energies.slices_el_in; init=0.0)
+    heat_in = sum(energies.slices_heat_in; init=0.0)
+    unit.losses_power += el_in
+    unit.losses_heat += heat_in
+
+    return energies
+end
+
 function potential(unit::ThermalBooster, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0)
+        set_max_energies!(unit, true, sum(energies.slices_el_in; init=0.0), 0.0, 0.0)
         return
     end
 
     set_max_energies!(unit,
+                      true,
                       energies.slices_el_in,
                       energies.slices_heat_in,
                       energies.slices_heat_out,
@@ -618,7 +629,7 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     heat_out = sum(energies.slices_heat_out; init=0.0)
 
     if heat_out < sim_params["epsilon"]
-        set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
@@ -637,13 +648,15 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     unit.losses = unit.losses_power + unit.losses_heat
 end
 
-# has its own reset function as here more parameters are present that need to be reset in
-# every timestep
+# ThermalBooster its own reset function as here more parameters are present 
+# that need to be reset in every timestep
 function reset(unit::ThermalBooster)
     invoke(reset, Tuple{Component}, unit)
 
     # reset other parameter
     unit.losses = 0.0
+    unit.losses_heat = 0.0
+    unit.losses_power = 0.0
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}
