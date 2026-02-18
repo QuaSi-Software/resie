@@ -435,18 +435,28 @@ function calculate_booster(unit::ThermalBooster,
             continue
         end
 
-        # calculate required mass output for current slice
-        mass_out_current_layer = energies.available_heat_out[snk_idx] / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                                         (demand_temperature - unit.demand_input_temperature))
+        demand_delta_temperature = demand_temperature - unit.demand_input_temperature
+        if demand_delta_temperature < EPS
+            snk_idx += 1
+            continue
+        end
 
-        boost_only = sum(energies.available_heat_in; init=0.0) < EPS && unit.allow_boost_solely
+        # defaults for this slice
+        out_energy = 0.0
+        low_temp_heat = 0.0
+        required_boost_heat = 0.0
+        intermediate_temperature = unit.demand_input_temperature
+        source_temperature = nothing
+
+        # no heat_in available at all -> solely boost (if allowed)
+        boost_only = unit.allow_boost_solely && sum(energies.available_heat_in; init=0.0) < EPS
         if boost_only
-            # set input temperature to demand_input_temperature as no heat in is available and all will be done with energy
+            out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
+            required_boost_heat = out_energy
+            low_temp_heat = 0.0
             intermediate_temperature = unit.demand_input_temperature
-            low_temp_heat = 0
-            source_temperature = nothing
-        else # heat_in has at least in one slice energy available
-            # check input
+        else
+            # check input slice temperature
             skip_slice, source_temperature = get_layer_temperature(unit, src_idx,
                                                                    energies.in_temps_min,
                                                                    energies.in_temps_max;
@@ -456,63 +466,88 @@ function calculate_booster(unit::ThermalBooster,
                 continue
             end
 
-            # reduce source temperature by terminal_dT
-            intermediate_temperature = min(source_temperature - unit.terminal_dT, demand_temperature)
+            # cap intermediate temperature by source and terminal_dT
+            intermediate_temperature_cap = min(demand_temperature, source_temperature - unit.terminal_dT)
 
-            # calculate required energy from thermal input for current slice
-            if intermediate_temperature < unit.demand_input_temperature
-                # no heat_in can be used
-                low_temp_heat = 0
+            # if the source is too cold to contribute (after terminal_dT)
+            if intermediate_temperature_cap <= unit.demand_input_temperature + EPS
+                if unit.allow_boost_solely
+                    out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
+                    required_boost_heat = out_energy
+                    low_temp_heat = 0.0
+                    intermediate_temperature = unit.demand_input_temperature
+                end
             else
-                required_low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                                         (intermediate_temperature - unit.demand_input_temperature)
-                # limit to maximum available energy
-                low_temp_heat = min(required_low_temp_heat, energies.available_heat_in[src_idx])
-            end
+                # max thermal fraction (at intermediate_temperature_cap)
+                low_temp_fraction_max = (intermediate_temperature_cap - unit.demand_input_temperature) /
+                                        demand_delta_temperature
+                low_temp_fraction_max = clamp(low_temp_fraction_max, 0.0, 1.0)
+                boost_fraction_min = 1.0 - low_temp_fraction_max
 
-            if low_temp_heat < EPS && unit.allow_boost_solely
-                intermediate_temperature = unit.demand_input_temperature
-            elseif low_temp_heat < EPS
-                # no energy deliver
-                mass_out_current_layer = 0.0
-            elseif unit.allow_boost_additional # && low_temp_heat > EPS (always true)
-                # calculate intermediate temperature to start from boosting while keeping the mass_out_current_layer
-                intermediate_temperature = low_temp_heat /
-                                           (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out)) +
-                                           unit.demand_input_temperature
-            else # low_temp_heat > EPS && !unit.allow_boost_additional
-                # recalculate output layer mass that can be heated without additional boost
-                mass_out_current_layer = low_temp_heat / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                          (intermediate_temperature - unit.demand_input_temperature))
+                if unit.allow_boost_additional
+                    # variable split: Qlow <= low_temp_fraction_max * Qout, Qel = Qout - Qlow
+                    electric_limited_out_energy = energies.available_heat_out[snk_idx]
+                    if boost_fraction_min > EPS
+                        electric_limited_out_energy = energies.available_el_in / boost_fraction_min
+                    end
+
+                    out_energy = min(energies.available_heat_out[snk_idx],
+                                     energies.available_heat_in[src_idx] + energies.available_el_in,
+                                     electric_limited_out_energy)
+
+                    low_temp_heat = min(energies.available_heat_in[src_idx], low_temp_fraction_max * out_energy)
+                    required_boost_heat = out_energy - low_temp_heat
+                else
+                    # fixed split at intermediate_temperature_cap (if any low heat is used)
+                    if energies.available_heat_in[src_idx] < EPS
+                        if unit.allow_boost_solely
+                            out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
+                            required_boost_heat = out_energy
+                            low_temp_heat = 0.0
+                            intermediate_temperature = unit.demand_input_temperature
+                        end
+                    else
+                        thermal_limited_out_energy = energies.available_heat_in[src_idx] / low_temp_fraction_max
+
+                        electric_limited_out_energy = energies.available_heat_out[snk_idx]
+                        if boost_fraction_min > EPS
+                            electric_limited_out_energy = energies.available_el_in / boost_fraction_min
+                        end
+
+                        out_energy = min(energies.available_heat_out[snk_idx],
+                                         thermal_limited_out_energy,
+                                         electric_limited_out_energy)
+
+                        low_temp_heat = low_temp_fraction_max * out_energy
+                        required_boost_heat = out_energy - low_temp_heat
+                    end
+                end
             end
         end
 
-        # calculate the remaining energy to boost the input temperature to the output temperature in current slice
-        # handle cases where output is fully provided by power with toggle!
-        required_boost_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                              (demand_temperature - intermediate_temperature)
-        # limit to maximum available boost energy
-        if energies.available_el_in < required_boost_heat
-            # limit
-            required_boost_heat = min(required_boost_heat, energies.available_el_in)
-            # case 1: enough heat in --> intermediate temperature is already at maximum --> decrease low_temp_heat
-            # case 2: not enough heat in & unit.allow_boost_additional --> intermediate temperature is lower than source_temperature --> iteration would be required!
-            # case 3: not enough heat in & !unit.allow_boost_additional --> intermediate temperature is maxed out, no further effect --> decrease low_temp_heat
-            # if source_temperature !== nothing && intermediate_temperature < min(source_temperature - unit.terminal_dT, demand_temperature)
-            # TODO
-            # else # case 1 & 3
-            # recalculate mass that can be heated
-            mass_out_current_layer = required_boost_heat / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                            (demand_temperature - intermediate_temperature))
-            low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                            (intermediate_temperature - unit.demand_input_temperature)
-            # end                
+        # if nothing can be delivered for this pairing, move on (avoid stalling)
+        if out_energy < EPS
+            if source_temperature !== nothing &&
+               (source_temperature - unit.terminal_dT) <= unit.demand_input_temperature + EPS &&
+               !unit.allow_boost_solely
+                src_idx += 1
+            else
+                snk_idx += 1
+            end
+            continue
         end
 
-        # calculate output energy
-        out_energy = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                     (demand_temperature - unit.demand_input_temperature)
+        # compute mass and intermediate temperature from chosen split
+        mass_out_current_layer = out_energy / (convert_J_in_Wh(unit.cp_medium_out) * demand_delta_temperature)
 
+        if low_temp_heat > EPS
+            intermediate_temperature = unit.demand_input_temperature +
+                                       low_temp_heat / (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out))
+        else
+            intermediate_temperature = unit.demand_input_temperature
+        end
+
+        # energy consistency (should be ~0)
         if (low_temp_heat + required_boost_heat) - out_energy > EPS
             @error "something went wrong in the thermal booster... \nlow_temp_heat: $(low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
             # TODO remove later...
