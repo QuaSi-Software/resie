@@ -416,7 +416,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     sim_new["Control_energy"] = sim["NegControlReserve m_power OUT"]
     sim_new["Control_power_price"] = sim["Reserve_Power_Price_Neg"]
     sim_new["Control_energy_price"] = sim["Reserve_Energy_Price_Neg"]
-    sim_new["Grid_price"] = sim["Stock_Price"]
+    sim_new["Grid_price"] = sim["Grid_Price"]
     sim_new["Market_Value_PV"] = sim["Market_Price_PV"]
     sim_new["Market_Value_Wind"] = sim["Market_Price_Wind"]
     sim_new["CO2_Grid"] = sim["CO2_Grid"]

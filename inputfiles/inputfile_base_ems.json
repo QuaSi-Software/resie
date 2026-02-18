@@ -314,7 +314,7 @@
                 "reserve_power_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
                 "reserve_energy_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
                 "reserve_call_pos_path": "./profiles/MA/ones.prf",
-                "min_reserve_power": 0.5,
+                "min_reserve_power": 0.5e6,
                 "offer_only_freebids": false,
                 "storage_uac": "BufferTank",
                 "hp_uac": "HeatPump",

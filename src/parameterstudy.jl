@@ -54,10 +54,10 @@ Batt_step_Wh = 0.5e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of
-# [stock_price, reserve_power_neg_price, reserve_energy_neg_price, reserve_power_pos_price, 
+# [grid_price, reserve_power_neg_price, reserve_energy_neg_price, reserve_power_pos_price, 
 #  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
 # TODO adjust values
-# Stock Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
+# Grid Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
 profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
@@ -291,18 +291,24 @@ function create_variant(
     end
 
     # set price profiles paths
-    price_profile_path_stock = "./profiles/MA/boersenpreis_EUR_MWh.prf"
+    price_profile_path_grid = "./profiles/MA/boersenpreis_EUR_MWh.prf"
     price_profile_path_reserve_power_neg = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_mean_15min.prf"
+    profile_path_reserve_call_neg = "./profiles/MA/ones.prf" #TODO Abrufprofil negativ hinterlegen
     price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_mean_15min.prf"
+    profile_path_reserve_call_pos = "./profiles/MA/ones.prf" #TODO Abrufprofil positiv hinterlegen
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
     co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"
 
-    profile_paths = [price_profile_path_stock, price_profile_path_reserve_power_neg, price_profile_path_reserve_energy_neg,
-                     price_profile_path_reserve_power_pos, price_profile_path_reserve_energy_pos,
-                     price_profile_path_market_value_pv, price_profile_path_market_value_wind,
+    profile_paths = [price_profile_path_grid, 
+                     price_profile_path_reserve_power_neg, 
+                     price_profile_path_reserve_energy_neg, profile_path_reserve_call_neg,
+                     price_profile_path_reserve_power_pos, 
+                     price_profile_path_reserve_energy_pos, profile_path_reserve_call_pos,
+                     price_profile_path_market_value_pv, 
+                     price_profile_path_market_value_wind,
                      co2_profile_path_grid]
 
     # create correct profiles from price_profile_paths and add the to sim_output.
@@ -333,16 +339,25 @@ function create_variant(
     end
 
     ########################################################
-    # Set limits / benchmark for economic_control.jl
+    # Set limits / benchmark for ems.jl
     ########################################################
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
         cm = cfg["components"]["BUS_Power"]["control_modules"][1]
-        cm["price_profile_paths"] = new_paths[1:5]
-        cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
-        cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 
-                                                  "BUS_Heat" => states_heat_bus)
+        cm["grid_price_path"]: new_paths[1], 
+        cm["reserve_power_price_neg_path"]: new_paths[2],   
+        cm["reserve_energy_price_neg_path"]: new_paths[3],   
+        cm["reserve_call_neg_path"]: new_paths[4],   
+        cm["reserve_power_price_pos_path"]: new_paths[5],   
+        cm["reserve_energy_price_pos_path"]: new_paths[6],   
+        cm["reserve_call_pos_path"]: new_paths[7]    
+        # cm["price_profile_paths"] = new_paths[1:5]
+        # cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
+        # cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 
+        #                                           "BUS_Heat" => states_heat_bus)
     end
+
+    
 
     ########################################################
     # safe run specific inputfile_"xxx".json
@@ -382,14 +397,16 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     profile_values[1, :] .-= profile_addons[1] .* addon_share
 
     # add the profiles to the sim_output to be used in vdi2067 calculation
-    sim_output["Stock_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
+    sim_output["Grid_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
     sim_output["Reserve_Power_Price_Neg"] = profile_values[2, :]
     sim_output["Reserve_Energy_Price_Neg"] = profile_values[3, :]
-    sim_output["Reserve_Power_Price_Pos"] = profile_values[4, :]
-    sim_output["Reserve_Energy_Price_Pos"] = profile_values[5, :]
-    sim_output["Market_Price_PV"] = profile_values[6, :]
-    sim_output["Market_Price_Wind"] = profile_values[7, :]
-    sim_output["CO2_Grid"] = profile_values[8, :]
+    sim_output["Reserve_Call_Neg"] = profile_values[4, :]
+    sim_output["Reserve_Power_Price_Pos"] = profile_values[5, :]
+    sim_output["Reserve_Energy_Price_Pos"] = profile_values[6, :]
+    sim_output["Reserve_Call_Pos"] = profile_values[7, :]
+    sim_output["Market_Price_PV"] = profile_values[8, :]
+    sim_output["Market_Price_Wind"] = profile_values[9, :]
+    sim_output["CO2_Grid"] = profile_values[10, :]
 
     return sim_output
 end
