@@ -29,7 +29,11 @@ mutable struct ThermalBooster <: Component
     cp_medium_out::Float64
     terminal_dT::Float64
     demand_input_temperature::Float64
-    allow_boost_only::Bool
+    allow_boost_solely::Bool
+    allow_boost_additional::Bool
+    intermediate_temperature::Float64
+    intermediate_temperatures::Vector{Float64}
+    intermediate_temperature_energies::Vector{Float64}
 
     losses::Float64
     losses_power::Float64
@@ -58,7 +62,14 @@ mutable struct ThermalBooster <: Component
                    default(config, "cp_medium_out", 4180.0),          # [J/(kgK)]
                    default(config, "terminal_dT", 2.0),               # [K]
                    default(config, "demand_input_temperature", 12.0), # [°C] TODO Could also be a profile
-                   default(config, "allow_boost_only", false))
+                   default(config, "allow_boost_solely", true),       # allow_boost_solely: allow use of energy if no heat_in is available at all
+                   default(config, "allow_boost_additional", true),   # allow_boost_additional: allow use of energy to increase mass flow if heat_in is not sufficient --> allow intermediate temperature to be lower than heat_in temperature
+                   0.0,
+                   [],
+                   [],
+                   0.0,
+                   0.0,
+                   0.0)
     end
 end
 
@@ -399,10 +410,11 @@ function calculate_booster(unit::ThermalBooster,
     snk_idx::Int = 1
     EPS = sim_params["epsilon"]
 
+    ### Calculate Thermal Booster ###
     # loop over input and output layer
     while (src_idx <= length(energies.available_heat_in) && snk_idx <= length(energies.available_heat_out))
-        if energies.available_el_in < EPS || sum(energies.available_heat_in; init=0.0) < EPS ||
-           sum(energies.available_heat_out; init=0.0) < EPS
+        if sum(energies.available_heat_out; init=0.0) < EPS ||
+           (sum(energies.available_heat_in; init=0.0) < EPS && !unit.allow_boost_solely)
             # end of condition
             break
         end
@@ -413,89 +425,118 @@ function calculate_booster(unit::ThermalBooster,
             continue
         end
 
-        # check temperatures
-        skip_slice, src_temperature = get_layer_temperature(unit, src_idx,
-                                                            energies.in_temps_min,
-                                                            energies.in_temps_max;
-                                                            input=true)
-        if skip_slice || !(src_idx in energies.in_indices)
-            src_idx += 1
-            continue
-        end
-
-        # same for output
-        skip_slice, snk_temperature = get_layer_temperature(unit, snk_idx,
-                                                            energies.out_temps_min,
-                                                            energies.out_temps_max;
-                                                            input=false)
+        # check temperatures of output
+        skip_slice, demand_temperature = get_layer_temperature(unit, snk_idx,
+                                                               energies.out_temps_min,
+                                                               energies.out_temps_max;
+                                                               input=false)
         if skip_slice || !(snk_idx in energies.out_indices)
             snk_idx += 1
             continue
         end
 
-        ### Calculate Thermal Booster ###
-        # reduce source temperature by terminal_dT
-        src_temperature_reduced = src_temperature - unit.terminal_dT
-
-        # calculate required mass in output for current slice
+        # calculate required mass output for current slice
         mass_out_current_layer = energies.available_heat_out[snk_idx] / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                                         (snk_temperature - unit.demand_input_temperature))
+                                                                         (demand_temperature - unit.demand_input_temperature))
 
-        # calculate required energy from thermal input for current slice
-        required_low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                                 (src_temperature_reduced - unit.demand_input_temperature)
-        # limit to maximum available energy
-        required_low_temp_heat = min(required_low_temp_heat, energies.available_heat_in[src_idx])
-        if unit.allow_boost_only
-            # calculate intermediate temperature to start from boosting while keeping the mass_out_current_layer
-            src_temperature_reduced = required_low_temp_heat /
-                                      (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out)) +
-                                      unit.demand_input_temperature
-        else
-            # recalculate output layer mass that can be heated
-            mass_out_current_layer = required_low_temp_heat / (convert_J_in_Wh(unit.cp_medium_out) *
-                                                               (src_temperature_reduced - unit.demand_input_temperature))
+        boost_only = sum(energies.available_heat_in; init=0.0) < EPS && unit.allow_boost_solely
+        if boost_only
+            # set input temperature to demand_input_temperature as no heat in is available and all will be done with energy
+            intermediate_temperature = unit.demand_input_temperature
+            low_temp_heat = 0
+            source_temperature = nothing
+        else # heat_in has at least in one slice energy available
+            # check input
+            skip_slice, source_temperature = get_layer_temperature(unit, src_idx,
+                                                                   energies.in_temps_min,
+                                                                   energies.in_temps_max;
+                                                                   input=true)
+            if skip_slice || !(src_idx in energies.in_indices)
+                src_idx += 1
+                continue
+            end
+
+            # reduce source temperature by terminal_dT
+            intermediate_temperature = min(source_temperature - unit.terminal_dT, demand_temperature)
+
+            # calculate required energy from thermal input for current slice
+            if intermediate_temperature < unit.demand_input_temperature
+                # no heat_in can be used
+                low_temp_heat = 0
+            else
+                required_low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
+                                         (intermediate_temperature - unit.demand_input_temperature)
+                # limit to maximum available energy
+                low_temp_heat = min(required_low_temp_heat, energies.available_heat_in[src_idx])
+            end
+
+            if low_temp_heat < EPS && unit.allow_boost_solely
+                intermediate_temperature = unit.demand_input_temperature
+            elseif low_temp_heat < EPS
+                # no energy deliver
+                mass_out_current_layer = 0.0
+            elseif unit.allow_boost_additional # && low_temp_heat > EPS (always true)
+                # calculate intermediate temperature to start from boosting while keeping the mass_out_current_layer
+                intermediate_temperature = low_temp_heat /
+                                           (mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out)) +
+                                           unit.demand_input_temperature
+            else # low_temp_heat > EPS && !unit.allow_boost_additional
+                # recalculate output layer mass that can be heated without additional boost
+                mass_out_current_layer = low_temp_heat / (convert_J_in_Wh(unit.cp_medium_out) *
+                                                          (intermediate_temperature - unit.demand_input_temperature))
+            end
         end
 
         # calculate the remaining energy to boost the input temperature to the output temperature in current slice
         # handle cases where output is fully provided by power with toggle!
         required_boost_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                              (snk_temperature - src_temperature_reduced)
+                              (demand_temperature - intermediate_temperature)
         # limit to maximum available boost energy
         if energies.available_el_in < required_boost_heat
             # limit
             required_boost_heat = min(required_boost_heat, energies.available_el_in)
-            # recalculate mass than can be heated
-            mass_out_current_layer = required_boost_heat /
-                                     (convert_J_in_Wh(unit.cp_medium_out) * (snk_temperature - src_temperature_reduced))
-            # update also low temp heat
+            # case 1: enough heat in --> intermediate temperature is already at maximum --> decrease low_temp_heat
+            # case 2: not enough heat in & unit.allow_boost_additional --> intermediate temperature is lower than source_temperature --> iteration would be required!
+            # case 3: not enough heat in & !unit.allow_boost_additional --> intermediate temperature is maxed out, no further effect --> decrease low_temp_heat
+            # if source_temperature !== nothing && intermediate_temperature < min(source_temperature - unit.terminal_dT, demand_temperature)
+            # TODO
+            # else # case 1 & 3
+            # recalculate mass that can be heated
+            mass_out_current_layer = required_boost_heat / (convert_J_in_Wh(unit.cp_medium_out) *
+                                                            (demand_temperature - intermediate_temperature))
+            low_temp_heat = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
+                            (intermediate_temperature - unit.demand_input_temperature)
+            # end                
         end
 
         # calculate output energy
         out_energy = mass_out_current_layer * convert_J_in_Wh(unit.cp_medium_out) *
-                     (snk_temperature - unit.demand_input_temperature)
+                     (demand_temperature - unit.demand_input_temperature)
 
-        if (required_low_temp_heat + required_boost_heat) - out_energy > EPS
-            @error "something went wrong in the thermal booster... \nrequired_low_temp_heat: $(required_low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
+        if (low_temp_heat + required_boost_heat) - out_energy > EPS
+            @error "something went wrong in the thermal booster... \nlow_temp_heat: $(low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
             # TODO remove later...
         end
 
         # update available energies
         energies.available_el_in -= required_boost_heat
-        energies.available_heat_in[src_idx] -= required_low_temp_heat
+        energies.available_heat_in[src_idx] -= low_temp_heat
         energies.available_heat_out[snk_idx] -= out_energy
 
         # map to temp slices
         push!(energies.slices_temp_el_in, required_boost_heat)
-        push!(energies.slices_temp_heat_in, required_low_temp_heat)
-        push!(energies.slices_temp_heat_in_temperature, src_temperature)
+        push!(energies.slices_temp_heat_in, low_temp_heat)
+        push!(energies.slices_temp_heat_in_temperature, source_temperature)
         push!(energies.slices_temp_heat_in_uac, energies.in_uacs_heat[src_idx])
         push!(energies.slices_temp_heat_out, out_energy)
-        push!(energies.slices_temp_heat_out_temperature, snk_temperature)
+        push!(energies.slices_temp_heat_out_temperature, demand_temperature)
         push!(energies.slices_temp_heat_out_uac, energies.out_uacs[snk_idx])
 
+        push!(unit.intermediate_temperatures, intermediate_temperature)
+        push!(unit.intermediate_temperature_energies, out_energy)
+
         # go to next layer(s)
-        if energies.available_heat_in[src_idx] < EPS
+        if !boost_only && energies.available_heat_in[src_idx] < EPS
             src_idx += 1
         end
         if energies.available_heat_out[snk_idx] < EPS
@@ -646,6 +687,10 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     end
     # calculate total losses
     unit.losses = unit.losses_power + unit.losses_heat
+
+    # calculate mean intermediate temperature
+    unit.intermediate_temperature = sum(unit.intermediate_temperatures .* unit.intermediate_temperature_energies) /
+                                    sum(unit.intermediate_temperature_energies)
 end
 
 # ThermalBooster its own reset function as here more parameters are present 
@@ -657,6 +702,8 @@ function reset(unit::ThermalBooster)
     unit.losses = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
+    unit.intermediate_temperatures = []
+    unit.intermediate_temperature_energies = []
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}
@@ -665,7 +712,8 @@ function output_values(unit::ThermalBooster)::Vector{String}
                    string(unit.m_heat_out) * ":OUT"]
     append!(output_vals, ["LossesGains",
                           "Losses_power",
-                          "Losses_heat"])
+                          "Losses_heat",
+                          "intermediate_temperature"])
     return output_vals
 end
 
@@ -680,6 +728,8 @@ function output_value(unit::ThermalBooster, key::OutputKey)::Float64
         return -unit.losses_heat
     elseif key.value_key == "LossesGains"
         return -unit.losses
+    elseif key.value_key == "intermediate_temperature"
+        return unit.intermediate_temperature
     end
     throw(KeyError(key.value_key))
 end
