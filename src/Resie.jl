@@ -512,7 +512,6 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         end
 
     else
-        run_ID = uuid4()
         _ = run_sample(outdir, proccesed_results_file_path, project_config, 
                        nothing, run_ID, run_lock, output_lock)
     end
