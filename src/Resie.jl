@@ -224,6 +224,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                            default(project_config["io_settings"], "csv_output_weather", false)
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
+    do_write_CSV_continously = default(project_config["io_settings"], "write_csv_continously", false)
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
@@ -233,20 +234,24 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         throw(InputError())
     end
 
-    # Initialize the array for output plots
+    # Initialize the arrays for output
     output_data_lineplot = do_create_plot_data ?
                            zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_lineplot)) :
                            nothing
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
+    output_csv = do_write_CSV && !do_write_CSV_continously ?
+                 Matrix{String}(undef, sim_params["number_of_time_steps_output"],
+                                1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
+                 nothing
 
-    # reset CSV file
+    # write CSV file headers
     if do_write_CSV
-        reset_file(sim_params["run_path"](csv_output_file_path),
-                   output_keys_to_CSV,
-                   weather_CSV_keys,
-                   csv_time_unit)
+        write_CSV_headers(sim_params["run_path"](csv_output_file_path),
+                          output_keys_to_CSV,
+                          weather_CSV_keys,
+                          csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -295,15 +300,21 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                 end
             end
 
-            # write requested output data of the components to CSV-file
-            # This is currently done in every time step to keep data even if 
-            # an error occurs.
-            if do_write_CSV
-                write_to_file(sim_params["run_path"](csv_output_file_path),
-                              output_keys_to_CSV,
-                              weather_CSV_keys,
-                              sim_params,
-                              csv_time_unit)
+            # write requested output data to the CSV file if configured, or to output
+            # storage if not
+            if do_write_CSV && do_write_CSV_continously
+                write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
+                                  output_keys_to_CSV,
+                                  weather_CSV_keys,
+                                  sim_params,
+                                  csv_time_unit)
+            elseif do_write_CSV
+                output_csv[output_steps, :] = write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
+                                                                output_keys_to_CSV,
+                                                                weather_CSV_keys,
+                                                                sim_params,
+                                                                csv_time_unit;
+                                                                do_return=true)
             end
 
             # get the energy transported through each interface in every timestep for Sankey
@@ -341,6 +352,17 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         end
     end
     @info "-- Finished time step loop"
+
+    # write output to CSV if not done continously
+    if do_write_CSV && !do_write_CSV_continously
+        write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
+                          output_keys_to_CSV,
+                          weather_CSV_keys,
+                          sim_params,
+                          csv_time_unit;
+                          do_return=false,
+                          output_rows=output_csv)
+    end
 
     # create profile line plot
     if do_create_plot_data || do_create_plot_weather
