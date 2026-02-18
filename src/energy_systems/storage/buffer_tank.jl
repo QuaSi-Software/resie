@@ -191,9 +191,19 @@ function control(unit::BufferTank,
 
     unit.current_max_output_temperature = temperature_at_load(unit)
 
-    set_max_energy!(unit.input_interfaces[unit.medium], min(unit.capacity - unit.load, unit.max_input_energy),
+    if discharge_is_allowed(unit.controller, sim_params)
+        max_discharge =  min(unit.capacity - unit.load, unit.max_input_energy)
+    else
+        max_discharge = 0.0
+    end
+    set_max_energy!(unit.input_interfaces[unit.medium], max_discharge,
                     unit.high_temperature, nothing)
-    set_max_energy!(unit.output_interfaces[unit.medium], min(unit.load, unit.max_output_energy), nothing,
+    if charge_is_allowed(unit.controller, sim_params)
+        max_charge = min(unit.load, unit.max_output_energy)
+    else
+        max_charge = 0.0
+    end
+    set_max_energy!(unit.output_interfaces[unit.medium], max_charge, nothing,
                     unit.current_max_output_temperature)
 
     if unit.ambient_temperature_profile !== nothing && unit.consider_losses

@@ -1,8 +1,7 @@
 using Dates
 using ..Resie
 using OrderedCollections: OrderedDict
-using Infiltrator
-# using Statistics
+
 """
 Control module for setting limits to the PLR of a component according to a price_profiles and 
 available storage capacity or demand.
@@ -29,6 +28,7 @@ mutable struct CM_EMS <: ControlModule
             "reserve_call_pos_path" => nothing,         # pos_Abrufdauer   
             "min_reserve_power" => 0.0,
             "offer_only_freebids" => false,
+            "min_storage_load" => 0.0,
             "new_connections_below_limits" => Dict{String,Any}(), # (Normalbetrieb), Sparbetrieb, Einnahmenbetrieb
             "bus_uacs" => [],
             "storage_uac" => nothing,
@@ -305,6 +305,9 @@ function future_sim(sim_length::TimePeriod,
     # define how long the future simulation will be
     end_date = sim_params["current_date"] + sim_length - Second(sim_params["time_step_seconds"])
     sim_range = sp["current_date"]:Second(sp["time_step_seconds"]):end_date
+
+    # disallow charging of storage for baseline simulation
+    comps[hp_uac].controller.modules[1].parameters["charge_is_allowed"] = false
     
     # define relevant output_keys to be able to gather data after future simulation
     if comps[hp_uac].has_secondary_interface
@@ -420,7 +423,8 @@ function future_sim(sim_length::TimePeriod,
     # ----------------------------------------------------------------
 
     # calculate available storage power to be discharged
-    available_storage_load = sim_params["wh_to_watts"].(output_data[storage_uac * "Load"])
+    available_storage_load = sim_params["wh_to_watts"].(output_data[storage_uac * "Load"] .- 
+                             mod_params["min_storage_load"] .* output_data[storage_uac * "Capacity"])
     max_storage_discharge = comps[storage_uac].max_unload_rate .* output_data[storage_uac * "Capacity"]
     available_storage_power_pos = min.(available_storage_load[1] / length(available_storage_load), max_storage_discharge)
     
@@ -448,7 +452,6 @@ function future_sim(sim_length::TimePeriod,
     # available_el_power_pos = min(available_storage_load[1] / length(available_storage_load), 
     #                                 available_el_power_pos)
 
-    if sim_length < Hour(4) || sim_params["time"] >= 174600 @infiltrate end
     # calculate used and maximum el power for hp and boiler for calculation of 
     # max_plr for positve control reserve
     used_el_power_boiler = used_th_power_boiler
@@ -500,7 +503,6 @@ function change_bus_priorities!(mod::CM_EMS,
     end
 
     if mod.state_machine.state == 2
-        @infiltrate
         calc_reserve_power(Second(sim_params["time_step_seconds"]), mod.parameters, 
                            mod.ooo_by_state, components, sim_params)
     end
