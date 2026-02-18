@@ -304,18 +304,95 @@
                                         "./profiles/MA/boersenpreis_EUR_MWh.prf",
                                         "./profiles/MA/boersenpreis_EUR_MWh.prf",
                                         "./profiles/MA/boersenpreis_EUR_MWh.prf",
-                                        "./profiles/MA/boersenpreis_EUR_MWh.prf",
-                                        "./profiles/MA/ones.prf",
-                                        "./profiles/MA/ones.prf"],
-                "grid_price_path": "./profiles/MA/boersenpreis_EUR_MWh.prf", 
-                "reserve_power_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                "reserve_energy_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                "reserve_call_neg_path": "./profiles/MA/ones.prf",   
-                "reserve_power_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                "reserve_energy_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                "reserve_call_pos_path": "./profiles/MA/ones.prf",
-                "min_reserve_power": 0.5,
-                "offer_only_freebids": false,
+                                        "./profiles/MA/boersenpreis_EUR_MWh.prf"],
+                "limit_prices": [100, 0, 1000, 1000],
+                "new_connections_below_limits": {
+                    "BUS_Power":[
+                        {
+                        "input_order": [
+                            "NegControlReserve",
+                            "Photovoltaic",
+                            "WindFarm",
+                            "Grid_IN",
+                            "Battery"
+                        ],
+                        "output_order": [
+                            "PosControlReserve",
+                            "Demand_Power",
+                            "HeatPump",
+                            "ElectrodeBoiler",
+                            "Battery",
+                            "Grid_OUT"
+                        ],
+                        "energy_flow": [
+                            [0, 0, 0, 0, 0, 0],
+                            [1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 0, 0, 1],
+                            [1, 0, 0, 0, 0, 1]
+                        ]
+                        },
+                        {
+                        "input_order": [
+                            "NegControlReserve",
+                            "Photovoltaic",
+                            "WindFarm",
+                            "Grid_IN",
+                            "Battery"
+                        ],
+                        "output_order": [
+                            "PosControlReserve",
+                            "Demand_Power",
+                            "HeatPump",
+                            "ElectrodeBoiler",
+                            "Battery",
+                            "Grid_OUT"
+                        ],
+                        "energy_flow": [
+                            [0, 0, 0, 0, 0, 0],
+                            [1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 1, 1, 1],
+                            [1, 1, 1, 0, 0, 1],
+                            [1, 0, 0, 0, 0, 1]
+                        ]
+                        }
+                    ],
+                    "BUS_Heat": [
+                        {
+                        "input_order": [
+                            "HeatPump",
+                            "ElectrodeBoiler",
+                            "BufferTank"
+                        ],
+                        "output_order": [
+                            "Demand_Heat",
+                            "BufferTank"
+                        ],
+                        "energy_flow": [
+                            [1, 1],
+                            [1, 1],
+                            [1, 0]
+                        ]
+                        },
+                        {
+                        "input_order": [
+                            "HeatPump",
+                            "ElectrodeBoiler",
+                            "BufferTank"
+                        ],
+                        "output_order": [
+                            "Demand_Heat",
+                            "BufferTank"
+                        ],
+                        "energy_flow": [
+                            [1, 1],
+                            [1, 1],
+                            [1, 0]
+                        ]
+                        }
+                    ]
+                },
+                "bus_uacs": ["BUS_Power", "BUS_Heat"],
                 "storage_uac": "BufferTank",
                 "hp_uac": "HeatPump",
                 "boiler_uac": "ElectrodeBoiler",
