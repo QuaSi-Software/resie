@@ -28,11 +28,12 @@ mutable struct ThermalBooster <: Component
     power_el::Float64
     cp_medium_out::Float64
     terminal_dT::Float64
-    demand_input_temperature::Float64
+    demand_input_temperature_profile::Union{Profile,Nothing}
+    demand_input_temperature::Temperature
     allow_boost_solely::Bool
     allow_boost_additional::Bool
-    intermediate_temperature::Float64
-    intermediate_temperatures::Vector{Float64}
+    mean_intermediate_temperature::Temperature
+    intermediate_temperatures::Vector{Temperature}
     intermediate_temperature_energies::Vector{Float64}
 
     losses::Float64
@@ -44,6 +45,16 @@ mutable struct ThermalBooster <: Component
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
         m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
         register_media([m_el_in, m_heat_out, m_heat_in])
+
+        constant_demand_input_temperature,
+        demand_input_temperature_profile = get_parameter_profile_from_config(config,
+                                                                             sim_params,
+                                                                             "demand_input_temperature",
+                                                                             "demand_input_temperature_profile_file_path",
+                                                                             "",
+                                                                             "constant_demand_input_temperature",
+                                                                             uac;
+                                                                             required=true)
 
         return new(uac,
                    Controller(default(config, "control_parameters", nothing)),
@@ -61,15 +72,16 @@ mutable struct ThermalBooster <: Component
                    config["power_el"],                                # [W]
                    default(config, "cp_medium_out", 4180.0),          # [J/(kgK)]
                    default(config, "terminal_dT", 2.0),               # [K]
-                   default(config, "demand_input_temperature", 12.0), # [°C] TODO Could also be a profile
+                   demand_input_temperature_profile,                  # [°C] demand_input_temperature_profile
+                   constant_demand_input_temperature,                 # [°C] demand_input_temperature
                    default(config, "allow_boost_solely", true),       # allow_boost_solely: allow use of energy if no heat_in is available at all
                    default(config, "allow_boost_additional", true),   # allow_boost_additional: allow use of energy to increase mass flow if heat_in is not sufficient --> allow intermediate temperature to be lower than heat_in temperature
-                   0.0,
-                   [],
-                   [],
-                   0.0,
-                   0.0,
-                   0.0)
+                   0.0,                                               # mean_intermediate_temperature
+                   Temperature[],                                     # intermediate_temperatures
+                   Float64[],                                         # intermediate_temperature_energies
+                   0.0,                                               # losses
+                   0.0,                                               # losses_power
+                   0.0)                                               # losses_heat
     end
 end
 
@@ -155,6 +167,11 @@ end
 
 function control(unit::ThermalBooster, components::Grouping, sim_params::Dict{String,Any})
     update(unit.controller)
+
+    # update current demand input temperature
+    if unit.demand_input_temperature_profile !== nothing
+        unit.demand_input_temperature = Profiles.value_at_time(unit.demand_input_temperature_profile, sim_params)
+    end
 
     if unit.output_temperature !== nothing
         set_max_energy!(unit.output_interfaces[unit.m_heat_out],
@@ -547,12 +564,6 @@ function calculate_booster(unit::ThermalBooster,
             intermediate_temperature = unit.demand_input_temperature
         end
 
-        # energy consistency (should be ~0)
-        if (low_temp_heat + required_boost_heat) - out_energy > EPS
-            @error "something went wrong in the thermal booster... \nlow_temp_heat: $(low_temp_heat) \nrequired_boost_heat: $(required_boost_heat) \nout_energy: $(out_energy)"
-            # TODO remove later...
-        end
-
         # update available energies
         energies.available_el_in -= required_boost_heat
         energies.available_heat_in[src_idx] -= low_temp_heat
@@ -724,11 +735,11 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     unit.losses = unit.losses_power + unit.losses_heat
 
     # calculate mean intermediate temperature
-    unit.intermediate_temperature = sum(unit.intermediate_temperatures .* unit.intermediate_temperature_energies) /
-                                    sum(unit.intermediate_temperature_energies)
+    unit.mean_intermediate_temperature = sum(unit.intermediate_temperatures .* unit.intermediate_temperature_energies) /
+                                         sum(unit.intermediate_temperature_energies)
 end
 
-# ThermalBooster its own reset function as here more parameters are present 
+# ThermalBooster has its own reset function as here more parameters are present 
 # that need to be reset in every timestep
 function reset(unit::ThermalBooster)
     invoke(reset, Tuple{Component}, unit)
@@ -737,8 +748,8 @@ function reset(unit::ThermalBooster)
     unit.losses = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
-    unit.intermediate_temperatures = []
-    unit.intermediate_temperature_energies = []
+    unit.intermediate_temperatures = Temperature[]
+    unit.intermediate_temperature_energies = Float64[]
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}
@@ -748,7 +759,7 @@ function output_values(unit::ThermalBooster)::Vector{String}
     append!(output_vals, ["LossesGains",
                           "Losses_power",
                           "Losses_heat",
-                          "intermediate_temperature"])
+                          "mean_intermediate_temperature"])
     return output_vals
 end
 
@@ -763,8 +774,8 @@ function output_value(unit::ThermalBooster, key::OutputKey)::Float64
         return -unit.losses_heat
     elseif key.value_key == "LossesGains"
         return -unit.losses
-    elseif key.value_key == "intermediate_temperature"
-        return unit.intermediate_temperature
+    elseif key.value_key == "mean_intermediate_temperature"
+        return unit.mean_intermediate_temperature
     end
     throw(KeyError(key.value_key))
 end
