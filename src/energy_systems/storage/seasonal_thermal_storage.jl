@@ -11,7 +11,7 @@ using Dates
 using PlotlyJS: PlotlyJS
 using SparseArrays
 using LinearAlgebra
-using GLMakie
+# using GLMakie
 
 mutable struct SeasonalThermalStorage <: Component
     # general
@@ -951,36 +951,36 @@ function plot_optional_figures_end(unit::SeasonalThermalStorage, sim_params::Dic
             mirror_domain ? hcat(reverse(A; dims=2), A) : A
         end
 
-        # ================= GLMakie live viewer =================
-        try
-            GLMakie.activate!()
+        # # ================= GLMakie live viewer =================
+        # try
+        #     GLMakie.activate!()
 
-            time_idx = Observable(1)
-            surf_obs = @lift(temp_slice($time_idx))
+        #     time_idx = Observable(1)
+        #     surf_obs = @lift(temp_slice($time_idx))
 
-            f_gl = Figure(; size=(1000, 800))
-            ax_gl = Axis3(f_gl[1, 1];
-                          xlabel="Depth z [m]",
-                          ylabel="Radius r [m]",
-                          zlabel="Temperature [°C]")
+        #     f_gl = Figure(; size=(1000, 800))
+        #     ax_gl = Axis3(f_gl[1, 1];
+        #                   xlabel="Depth z [m]",
+        #                   ylabel="Radius r [m]",
+        #                   zlabel="Temperature [°C]")
 
-            ax_gl.limits = ((zmin, zmax), (rmin, rmax), (Tmin, Tmax))
-            ax_gl.aspect = (aspect_x, aspect_y, aspect_z)
+        #     ax_gl.limits = ((zmin, zmax), (rmin, rmax), (Tmin, Tmax))
+        #     ax_gl.aspect = (aspect_x, aspect_y, aspect_z)
 
-            # surface!(ax_gl, z_abs, r_abs, surf_obs)
-            scatter!(ax_gl, z_abs, r_abs, surf_obs; markersize=3.5)
+        #     # surface!(ax_gl, z_abs, r_abs, surf_obs)
+        #     scatter!(ax_gl, z_abs, r_abs, surf_obs; markersize=3.5)
 
-            # Simple slider instead of SliderGrid (more robust across Makie versions)
-            slider_gl = GLMakie.Slider(f_gl[2, 1]; range=1:nt, startvalue=1, horizontal=true)
+        #     # Simple slider instead of SliderGrid (more robust across Makie versions)
+        #     slider_gl = GLMakie.Slider(f_gl[2, 1]; range=1:nt, startvalue=1, horizontal=true)
 
-            on(slider_gl.value) do v
-                time_idx[] = v
-            end
+        #     on(slider_gl.value) do v
+        #         time_idx[] = v
+        #     end
 
-            display(f_gl)
-        catch e
-            @warn "Error while building GLMakie soil/STES figure for $(unit.uac): $(e)"
-        end
+        #     display(f_gl)
+        # catch e
+        #     @warn "Error while building GLMakie soil/STES figure for $(unit.uac): $(e)"
+        # end
     end
 
     return true
