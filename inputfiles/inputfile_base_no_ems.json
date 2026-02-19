@@ -262,7 +262,9 @@
             "output_refs": [
                 "BUS_Heat"
             ],
-            "has_secondary_interface": false,
+            "has_secondary_interface": true,
+            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
+            "secondary_el_sources": ["Grid_IN"],
             "power_th": 6.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
@@ -347,7 +349,8 @@
                 "input_order": [
                     "HeatPump",
                     "ElectrodeBoiler",
-                    "BufferTank"
+                    "BufferTank",
+                    "HeatPump#secondary"
                 ],
                 "output_order": [
                     "Demand_Heat",
@@ -356,7 +359,8 @@
                 "energy_flow": [
                     [1, 1],
 					[1, 1],
-					[1, 0]
+					[1, 0],
+                    [1, 0]
                 ]
             }
         },

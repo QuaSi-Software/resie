@@ -378,7 +378,7 @@ function future_sim(sim_length::TimePeriod,
     cops_hp = zeros(length(used_th_power_hp))
     for (idx, th_power) in enumerate(used_th_power_hp)
         if th_power == 0
-            src_temp = comps[hp.input_interfaces[hp.m_heat_in].source.uac].temperature_src_in
+            src_temp = comps[hp.input_interfaces[hp.m_heat_in].source.uac].temperature_snk_out
             snk_temp = comps[storage_uac].high_temperature
             available_th_power_hp_neg[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
             available_th_power_hp_neg[idx] = min(available_storage_power_neg[idx], 

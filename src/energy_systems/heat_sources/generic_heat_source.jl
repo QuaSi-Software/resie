@@ -85,6 +85,13 @@ function initialise!(unit::GenericHeatSource, sim_params::Dict{String,Any})
         end
         unit.avg_source_in_temperature = 0.5 * (unit.min_source_in_temperature + unit.max_source_in_temperature)
     end
+
+    if unit.constant_temperature !== nothing
+        unit.temperature_src_in = unit.constant_temperature
+    elseif unit.temperature_profile !== nothing
+        unit.temperature_src_in = Profiles.value_at_time(unit.temperature_profile, sim_params)
+    end
+    unit.temperature_snk_out = unit.temperature_src_in
 end
 
 function control(unit::GenericHeatSource,
