@@ -244,27 +244,41 @@ function calc_reserve_power(sim_length::TimePeriod,
             power_pos_bool = !power_pos_bool
         end
 
-        power_value = power_neg * power_neg_bool - power_pos * power_pos_bool
-        energy_values = Array{Float64}(undef, length(date_range))
+        # control reserve realted values are always positive for ease of use and handle pos
+        # and neg differntiation with power_neg_bool and power_pos_bool
+        power_value = power_neg * power_neg_bool + power_pos * power_pos_bool
+        energy_weighted_values = Array{Float64}(undef, length(date_range))
         for (idx, dt) in enumerate(date_range)
-            if power_value >= 0
-                energy_values[idx] = power_value * price_profiles[4].data[dt]
-            else
-                energy_values[idx] = -power_value * price_profiles[7].data[dt]
+            if power_neg_bool
+                energy_weighted_values[idx] = power_value * price_profiles[4].data[dt]
+            elseif power_pos_bool
+                energy_weighted_values[idx] = power_value * price_profiles[7].data[dt]
             end
         end
 
-        if power_value > 0
+        # negative control reserve
+        if power_neg_bool
             components[mod_params["neg_reserve_uac"]].scaling_factor = floor(power_value, digits=-6)
             components[mod_params["pos_reserve_uac"]].scaling_factor = 0.0
-        
-        elseif power_value < 0
+            
+            #set plr_limit to baseline + offered negative control reserve
+            el_power_hp = max.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
+            left_energy_weighted_values = energy_weighted_values .- (el_power_hp .- baseline_el_hp)
+            el_power_boiler = max.(baseline_el_boiler .+ left_energy_weighted_values, max_el_boiler)
+
+            for (idx, dt) in enumerate(date_range)
+                components[mod_params["boiler_uac"]].controller.modules[1].profile.data[dt] = el_power_boiler[idx] / max_el_boiler[idx]
+                components[mod_params["hp_uac"]].controller.modules[1].profile.data[dt] = el_power_hp[idx] / max_el_hp[idx]
+            end
+        # positive control reserve
+        elseif power_pos_bool
             components[mod_params["pos_reserve_uac"]].scaling_factor = ceil(power_value, digits=-6)
             components[mod_params["neg_reserve_uac"]].scaling_factor = 0.0       
-
-            el_power_boiler = max.(baseline_el_boiler .- energy_values, 0)
-            left_energy_values = max.(energy_values .- baseline_el_boiler, 0)
-            el_power_hp = max.(baseline_el_hp .- left_energy_values, 0)
+            
+            #set plr_limit to baseline - offered positive control reserve
+            el_power_boiler = max.(baseline_el_boiler .- energy_weighted_values, 0)
+            left_energy_weighted_values = max.(energy_weighted_values .- baseline_el_boiler, 0)
+            el_power_hp = max.(baseline_el_hp .- left_energy_weighted_values, 0)
 
             for (idx, dt) in enumerate(date_range)
                 components[mod_params["boiler_uac"]].controller.modules[1].profile.data[dt] = el_power_boiler[idx] / max_el_boiler[idx]
@@ -273,17 +287,7 @@ function calc_reserve_power(sim_length::TimePeriod,
         end
     end
 
-    #TODO 
-    # alle 4h wird technische Machbarkeit geprüft
-    #   ergibt maximale Leistung pos und neg über ganzen Zeitraum
-    #   minimum 0.5 MW
-    #   Wenn nur eine Richtung möglich dann wird angeboten in die Richtung
-    #   Wenn beide Richtungen dann wird Preisvergleich mit Erlösprofilen * maximale Leistung
-    #       Erlösprofil = (Leistungspreis + Arbeitspreis * Abrufdauer) * time_step_seconds/3600
-    #       Auf 4h Aufsummieren für Gesamterlös über 4h
-    #   Wenn keine der Richtungen möglich, dann wird in jedem Zeitschritt nach freebids gearbeitet
-    #       pos und neg vergleichen: Arbeitspreis * Abrufdauer für jeden Zeitschritt
-    # Parameter in Inputfile ob nur freebids oder beides
+
     return power_pos_bool || power_neg_bool
 end 
 
@@ -307,7 +311,7 @@ function future_sim(sim_length::TimePeriod,
     sim_range = sp["current_date"]:Second(sp["time_step_seconds"]):end_date
 
     # disallow charging of storage for baseline simulation
-    comps[hp_uac].controller.modules[1].parameters["charge_is_allowed"] = false
+    comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
     
     # define relevant output_keys to be able to gather data after future simulation
     if comps[hp_uac].has_secondary_interface
