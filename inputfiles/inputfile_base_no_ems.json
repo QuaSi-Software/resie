@@ -250,21 +250,10 @@
         "HeatPump": {
             "type": "HeatPump",
             "model_type": "inverter",
-            "control_modules": [
-                {
-                    "name": "storage_driven",
-                    "low_threshold": 0.95,
-                    "high_threshold": 1.0,
-                    "min_run_time": 0,
-                    "storage_uac": "BufferTank"
-                }
-            ],
             "output_refs": [
                 "BUS_Heat"
             ],
-            "has_secondary_interface": true,
-            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
-            "secondary_el_sources": ["Grid_IN"],
+            "has_secondary_interface": false,
             "power_th": 6.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
@@ -286,15 +275,6 @@
         "ElectrodeBoiler": {
             "type": "HeatPump",
             "model_type": "simplified",
-            "control_modules": [
-                {
-                    "name": "storage_driven",
-                    "low_threshold": 0.7,
-                    "high_threshold": 0.7,
-                    "min_run_time": 0,
-                    "storage_uac": "BufferTank"
-                }
-            ],
             "output_refs": [
                 "BUS_Heat"
             ],
@@ -349,8 +329,7 @@
                 "input_order": [
                     "HeatPump",
                     "ElectrodeBoiler",
-                    "BufferTank",
-                    "HeatPump#secondary"
+                    "BufferTank"
                 ],
                 "output_order": [
                     "Demand_Heat",
@@ -359,13 +338,20 @@
                 "energy_flow": [
                     [1, 1],
 					[1, 1],
-					[1, 0],
-                    [1, 0]
+					[1, 0]
                 ]
             }
         },
         "BufferTank": {
             "type": "BufferTank",
+            "control_modules": [
+                {
+                    "name": "storage_driven_storage",
+                    "low_threshold": 0.95,
+                    "high_threshold": 1.00,
+                    "min_run_time": 0
+                }
+            ],
             "output_refs": [
                 "BUS_Heat"
             ],
