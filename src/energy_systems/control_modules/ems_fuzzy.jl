@@ -24,7 +24,8 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "price_profile_path" => nothing,
             "price_trend_profile_path" => nothing,
             "price_volatility_profile_path" => nothing,
-            "min_storage_load" => 0.0
+            "min_storage_load" => 0.0,
+            "rolling_horizion_hours": 8760.0
 
         )
         params = Base.merge(default_parameters, parameters)
@@ -110,6 +111,16 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     p_volatility = value_at_time(mod_params["price_volatility_profile"], sim_params)
     SOC_now = mod_params["storage"].load_end_of_last_timestep / mod_params["storage"].capacity
 
+    # calculate price bounds for fuzzy control with rolling horizon
+    end_date = sim_params["current_date"] + mod_params["rolling_horizion_hours"]
+    rolling_range = sim_params["current_date"]:sim_params["time_step_seconds"]:end_date
+    p_range = Array{Float64}(undef, length(rolling_range))
+    for (idx, dt) in enumerate(rolling_range)
+        p_range[idx] = mod_params["price_profile"].data[dt]
+    end
+    p_min_temp = minimum(p_range)
+    p_max_temp = maximum(p_range)
+
     plr_primary = mod_params["primary_source"].avg_plr
     plr_secondary = mod_params["secondary_source"].avg_plr
     primary_power = mod_params["primary_source"].design_power_th
@@ -123,7 +134,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     end
 
     # Fuzzy logic returns absolute plr and chargemode
-    plr, chargemode = fuzzy_control_chargemode(p_now, p_trend)
+    plr, chargemode = fuzzy_control_chargemode(p_now, p_trend, p_min_temp, p_max_temp)
     if isnan(plr) || isnan(chargemode)
         
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
@@ -217,7 +228,12 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     # end
 end 
 
-function fuzzy_control_chargemode(p_now, p_trend)
+# a:"left foot"
+# b:"left shoulder" 
+# c:"right shoulder"
+# d:"right foot"
+# TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
+function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
       cheap = max(min((p_now - -137) / 1, 1, (75 - p_now) / 65), 0)
       average = max(min((p_now - 55) / 25, (105 - p_now) / 25), 0)
       expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)

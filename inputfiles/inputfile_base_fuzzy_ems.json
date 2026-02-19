@@ -365,7 +365,8 @@
                 "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
                 "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
                 "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf",
-                "min_storage_load": 0.1
+                "min_storage_load": 0.1,
+                "rolling_horizion_hours": 168
                 }
             ],
             "connections": {
