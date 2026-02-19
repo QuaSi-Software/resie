@@ -224,7 +224,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                            default(project_config["io_settings"], "csv_output_weather", false)
     weather_CSV_keys = do_write_CSV_weather ? weather_data_keys : nothing
     do_write_CSV = output_keys_to_CSV !== nothing || do_write_CSV_weather
-    do_write_CSV_continously = default(project_config["io_settings"], "write_csv_continously", false)
+    do_write_CSV_continuously = default(project_config["io_settings"], "write_csv_continuously", false)
     csv_output_file_path = default(project_config["io_settings"],
                                    "csv_output_file",
                                    "./output/out.csv")
@@ -241,7 +241,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     output_weather_lineplot = do_create_plot_weather ?
                               zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(weather_data_keys)) :
                               nothing
-    output_csv = do_write_CSV && !do_write_CSV_continously ?
+    output_csv = do_write_CSV && !do_write_CSV_continuously ?
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
                                 1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
@@ -302,7 +302,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
             # write requested output data to the CSV file if configured, or to output
             # storage if not
-            if do_write_CSV && do_write_CSV_continously
+            if do_write_CSV && do_write_CSV_continuously
                 write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
                                   output_keys_to_CSV,
                                   weather_CSV_keys,
@@ -353,8 +353,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     end
     @info "-- Finished time step loop"
 
-    # write output to CSV if not done continously
-    if do_write_CSV && !do_write_CSV_continously
+    # write output to CSV if not done continuously
+    if do_write_CSV && !do_write_CSV_continuously
         write_to_CSV_file(sim_params["run_path"](csv_output_file_path),
                           output_keys_to_CSV,
                           weather_CSV_keys,
