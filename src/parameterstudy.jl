@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems.json"
 
 
 ############################################################
@@ -30,27 +30,27 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 1.0e6         # lower limit
+Pth_HeatPump_lo   = 0.0e6         # lower limit
 Pth_HeatPump_hi   = 10.0e6         # upper limit
-Pth_HeatPump_step = 0.5e6         # step size
+Pth_HeatPump_step = 1.0e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
 Pth_ElectrodeBoiler_lo   = 0.0e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 5.0e6     # upper limit
-Pth_ElectrodeBoiler_step = 0.5e6     # step size
+Pth_ElectrodeBoiler_hi   = 10.0e6     # upper limit
+Pth_ElectrodeBoiler_step = 1.0e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 10.0e6        # lower limit
-Cap_hi_Wh   = 100.0e6        # upper limit
+Cap_lo_Wh   = 0.0e6        # lower limit
+Cap_hi_Wh   = 80.0e6        # upper limit
 Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
 Batt_lo_Wh   = 0e3          # lower limit
-Batt_hi_Wh   = 0e3        # upper limit
-Batt_step_Wh = 0.5e3        # step size
+Batt_hi_Wh   = 10000e3        # upper limit
+Batt_step_Wh = 2000e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of

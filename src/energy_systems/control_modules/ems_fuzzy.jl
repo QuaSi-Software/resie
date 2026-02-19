@@ -84,8 +84,8 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     demand_now = mod_params["demand"].demand
 
     # Fuzzy logic returns change in plr and SOC target value
-    plr_diff, SOC_target = fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
-    if isnan(plr_diff) || isnan(SOC_target)
+    plr_factor, SOC_target = fuzzy_control_ems(p_now, p_trend, p_volatility, SOC_now)
+    if isnan(plr_factor) || isnan(SOC_target)
         
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
                "Check if the parameters are inside their bounds. " *
@@ -106,12 +106,12 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     end
     
     # control charging and discharging in the same way
-    # plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_diff * (1+rel_primary), 0.0, (1+rel_primary))
+    # plr_target_prim = clamp(plr_primary + rel_primary * plr_secondary + plr_factor * (1+rel_primary), 0.0, (1+rel_primary))
 
     if SOC_target <= SOC_now
         # reduce output power to empty the storage
         current_power = plr_primary * primary_power + plr_secondary * secondary_power
-        target_power = clamp(current_power + plr_diff * total_power, 0.0, total_power)
+        target_power = clamp(current_power * plr_factor, 0.0, total_power)
     else
         # increase output power to fill the storage
         missing_power = sim_params["wh_to_watts"]((SOC_target - SOC_now) * mod_params["storage"].capacity)
