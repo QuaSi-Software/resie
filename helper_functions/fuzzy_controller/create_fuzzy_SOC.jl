@@ -1,6 +1,6 @@
 using FuzzyLogic
 
-fis = @mamfis function fuzzy_control_ems(p_now, p_trend)::{plr_factor, chargemode}
+fis = @mamfis function fuzzy_control_ems(p_now, p_trend)::{plr_max, chargemode}
     p_now := begin
         domain = -150:1100 
         cheap = TrapezoidalMF(-137, -136, 10, 75)
@@ -16,11 +16,11 @@ fis = @mamfis function fuzzy_control_ems(p_now, p_trend)::{plr_factor, chargemod
         rising = TrapezoidalMF(-1, 6, 246, 247)
     end
 
-    plr_factor := begin
-        domain = -2.0:2.0
-        lower = TriangularMF(-2.0, -1.0, -0.2)
-        keep = TriangularMF(-0.3, 0.0, 0.3)
-        rise = TriangularMF(0.2, 1.0, 2.0)
+    plr_max := begin
+        domain = -1.0:2.0
+        low = TriangularMF(-1.0, 0.0, 0.5)
+        mid = TriangularMF(0.0, 0.5, 1.0)
+        high = TriangularMF(0.5, 1.0, 2.0)
     end
 
     chargemode := begin
@@ -44,15 +44,16 @@ fis = @mamfis function fuzzy_control_ems(p_now, p_trend)::{plr_factor, chargemod
     #end
 
 
-p_now	==	cheap	    &&	p_trend	==	falling	-->	(	plr_factor	==	keep	,	chargemode	==	on	)
-p_now	==	cheap	    &&	p_trend	==	stable	-->	(	plr_factor	==	rise	,	chargemode	==	on	)
-p_now	==	cheap	    &&	p_trend	==	rising	-->	(	plr_factor	==	rise	,	chargemode	==	on	)
-p_now	==	average	    &&	p_trend	==	falling	-->	(	plr_factor	==	keep	,	chargemode	==	off	)
-p_now	==	average	    &&	p_trend	==	stable	-->	(	plr_factor	==	keep	,	chargemode	==	on	)
-p_now	==	average	    &&	p_trend	==	rising	-->	(	plr_factor	==	rise	,	chargemode	==	on	)
-p_now	==	expensive	&&	p_trend	==	falling	-->	(	plr_factor	==	lower	,	chargemode	==	off	)
-p_now	==	expensive	&&	p_trend	==	stable	-->	(	plr_factor	==	lower	,	chargemode	==	off	)
-p_now	==	expensive	&&	p_trend	==	rising	-->	(	plr_factor	==	keep	,	chargemode	==	off	)
+p_now	==	cheap	    &&	p_trend	==	falling	-->	(	plr_max	==	high	,	chargemode	==	off	)
+p_now	==	cheap	    &&	p_trend	==	stable	-->	(	plr_max	==	high	,	chargemode	==	on	)
+p_now	==	cheap	    &&	p_trend	==	rising	-->	(	plr_max	==	high	,	chargemode	==	on	)
+p_now	==	average	    &&	p_trend	==	falling	-->	(	plr_max	==	mid	    ,	chargemode	==	off	)
+p_now	==	average	    &&	p_trend	==	stable	-->	(	plr_max	==	mid	    ,	chargemode	==	on	)
+p_now	==	average	    &&	p_trend	==	rising	-->	(	plr_max	==	mid	    ,	chargemode	==	on	)
+p_now	==	expensive	&&	p_trend	==	falling	-->	(	plr_max	==	low	    ,	chargemode	==	off	)
+p_now	==	expensive	&&	p_trend	==	stable	-->	(	plr_max	==	low	    ,	chargemode	==	off	)
+p_now	==	expensive	&&	p_trend	==	rising	-->	(	plr_max	==	low	    ,	chargemode	==	on	)
+
 
 
 end

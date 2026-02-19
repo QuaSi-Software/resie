@@ -250,6 +250,15 @@
         "HeatPump": {
             "type": "HeatPump",
             "model_type": "inverter",
+            "control_modules": [
+                {
+                    "name": "storage_driven",
+                    "low_threshold": 0.95,
+                    "high_threshold": 1.0,
+                    "min_run_time": 0,
+                    "storage_uac": "BufferTank"
+                }
+            ],
             "output_refs": [
                 "BUS_Heat"
             ],
