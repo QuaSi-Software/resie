@@ -598,6 +598,8 @@ end
 # Calculate Energies
 function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any})::TBEnergies
     energies = TBEnergies()
+    unit.intermediate_temperatures = Temperature[]
+    unit.intermediate_temperature_energies = Float64[]
 
     # get electricity potential and reduce it by constant power draw (or however much
     # is available)
@@ -750,8 +752,6 @@ function reset(unit::ThermalBooster)
     unit.losses = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
-    unit.intermediate_temperatures = Temperature[]
-    unit.intermediate_temperature_energies = Float64[]
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}
