@@ -5,7 +5,7 @@ using Dates
 using Proj
 using Resie.SolarIrradiance
 
-export WeatherData, gather_weather_data, get_weather_data_keys
+export WeatherData, gather_weather_data, get_weather_data_keys, WeatherFileType, guess_file_format
 
 """
 Custom exception `InputError` used to signify that an input was not correctly set up,
@@ -18,6 +18,49 @@ end
 InputError() = InputError(nothing)
 
 """
+Types of weather files that are implemented.
+"""
+@enum WeatherFileType wft_dat wft_epw wft_unknown
+
+"""
+    guess_file_format(weather_file_path::String)
+
+Guess the file format of the given weather file.
+
+# Arguments
+- `weather_file_path::String`: The path of the weather file
+# Returns
+- `WeatherFileType`: The weather file type, might be wft_unknown
+"""
+function guess_file_format(weather_file_path::String)
+    # if there's a file ending, use that
+    if endswith(lowercase(weather_file_path), ".dat")
+        return wft_dat
+    elseif endswith(lowercase(weather_file_path), ".epw")
+        return wft_epw
+    end
+
+    # read first line and guess from how it begins
+    line = readline(weather_file_path)
+    if startswith(line, "LOCATION")
+        return wft_epw
+    elseif startswith(line, "Koordinatensystem")
+        return wft_dat
+    end
+
+    # unknown file format or format has changed
+    return wft_unknown
+end
+
+"""
+Struct for holding the data of a weather file. The data can either be a .dat file from the
+DWD (German weather service) or an .epw file (EnergyPlusWeather).
+
+**Definition of time:**
+The weather data in this struct after loading corresponds to the timestep following the time
+indicated. While the ambient temperature is an instantaneous value from half the timestep
+ahead of the current timestamp, the solar radiation data is the mean/sum of the timestep
+ahead of the current timestamp. Data from EWP and DWD-dat files are converted accordingly.
 """
 mutable struct WeatherData
     """Ambient air temperature, in °C."""
@@ -44,28 +87,18 @@ mutable struct WeatherData
     """sunset, in decimal hours."""
     sunset::Profile
 
-    """
-    get_weather_data(weather_file_path, sim_params)
-    
-    Function to read in a weather file and hold the data. The data can either be
-    a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
-    
-    The returned values are of type WeaterData containing profiles of type Profile.
-
-    **Definition of time:**
-    The weather data returned from this function corresponds to the timestep following
-    the time indicated. While the ambient temperature is an instantaneous value from half the 
-    timestep ahead of the current timestamp, the solar radiation data is the mean/sum of the 
-    timestep ahead of the current timestamp. Data from EWP and DWD-dat files are converted
-    accordingly.
-
-    """
     function WeatherData(weather_file_path::String,
                          sim_params::Dict{String,Any},
+                         file_format::WeatherFileType,
                          weather_interpolation_type_solar::String,
                          weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
-            @error "The weather file could not be found in: \n $(sim_params["run_path"](weather_file_path))"
+            @error "The weather file could not be found in $(weather_file_path)"
+            throw(InputError())
+        end
+
+        if file_format == wft_unknown
+            @error "Unknown file type for weather file $(weather_file_path)"
             throw(InputError())
         end
 
@@ -77,7 +110,7 @@ mutable struct WeatherData
                                                     step=time_step)))
         nr_of_years = end_year - start_year + 1
 
-        if endswith(lowercase(weather_file_path), ".dat")
+        if file_format == wft_dat
             weatherdata_dict, headerdata = read_dat_file(weather_file_path, sim_params)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
@@ -162,7 +195,7 @@ mutable struct WeatherData
             globHorIrr = deepcopy(beamHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
-        elseif endswith(lowercase(weather_file_path), ".epw")
+        elseif file_format == wft_epw
             weatherdata_dict, headerdata = read_epw_file(weather_file_path, sim_params)
 
             latitude = headerdata["latitude"]
