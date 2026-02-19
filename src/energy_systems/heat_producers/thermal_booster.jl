@@ -467,6 +467,8 @@ function calculate_booster(unit::ThermalBooster,
 
         # no heat_in available at all -> solely boost (if allowed)
         boost_only = unit.allow_boost_solely && sum(energies.available_heat_in; init=0.0) < EPS
+        no_heat_in_in_next_slices = src_idx == length(energies.available_heat_in) ||
+                                    sum(energies.available_heat_in[(src_idx + 1):end]; init=0.0) < EPS
         if boost_only
             out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
             required_boost_heat = out_energy
@@ -488,7 +490,7 @@ function calculate_booster(unit::ThermalBooster,
 
             # if the source is too cold to contribute (after terminal_dT)
             if intermediate_temperature_cap <= unit.demand_input_temperature + EPS
-                if unit.allow_boost_solely
+                if unit.allow_boost_solely && no_heat_in_in_next_slices
                     out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
                     required_boost_heat = out_energy
                     low_temp_heat = 0.0
@@ -501,7 +503,7 @@ function calculate_booster(unit::ThermalBooster,
                 low_temp_fraction_max = clamp(low_temp_fraction_max, 0.0, 1.0)
                 boost_fraction_min = 1.0 - low_temp_fraction_max
 
-                if unit.allow_boost_additional
+                if unit.allow_boost_additional && no_heat_in_in_next_slices
                     # variable split: Qlow <= low_temp_fraction_max * Qout, Qel = Qout - Qlow
                     electric_limited_out_energy = energies.available_heat_out[snk_idx]
                     if boost_fraction_min > EPS
@@ -517,7 +519,7 @@ function calculate_booster(unit::ThermalBooster,
                 else
                     # fixed split at intermediate_temperature_cap (if any low heat is used)
                     if energies.available_heat_in[src_idx] < EPS
-                        if unit.allow_boost_solely
+                        if unit.allow_boost_solely && no_heat_in_in_next_slices
                             out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
                             required_boost_heat = out_energy
                             low_temp_heat = 0.0
