@@ -348,8 +348,7 @@
                 {
                     "name": "storage_driven_storage",
                     "low_threshold": 0.95,
-                    "high_threshold": 1.00,
-                    "min_run_time": 0
+                    "high_threshold": 0.995
                 }
             ],
             "output_refs": [

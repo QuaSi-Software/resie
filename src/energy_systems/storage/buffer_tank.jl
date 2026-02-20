@@ -61,6 +61,10 @@ mutable struct BufferTank <: Component
     load::Float64
     load_end_of_last_timestep::Float64
     losses::Float64
+
+    max_charge::Float64
+    max_discharge::Float64
+
     process_done::Bool
     load_done::Bool
 
@@ -131,6 +135,8 @@ mutable struct BufferTank <: Component
                    0.0,                                        # load, set to inital_load at the beginning [Wh]
                    0.0,                                        # load_end_of_last_timestep, stores the load of the previous time step without losses
                    0.0,                                        # losses in current time step [Wh]
+                   0.0,                                        # max_charge
+                   0.0,                                        # max_discharge 
                    false,                                      # process_done, bool indicating if the process step has already been performed in the current time step
                    false)                                      # load_done, bool indicating if the load step has already been performed in the current time step
     end
@@ -184,6 +190,13 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     unit.load_end_of_last_timestep = copy(unit.load)
 end
 
+function reset(unit::BufferTank)
+    invoke(reset, Tuple{Component}, unit)
+
+    unit.max_charge = 0.0
+    unit.max_discharge = 0.0
+end
+
 function control(unit::BufferTank,
                  components::Grouping,
                  sim_params::Dict{String,Any})
@@ -192,18 +205,19 @@ function control(unit::BufferTank,
     unit.current_max_output_temperature = temperature_at_load(unit)
 
     if discharge_is_allowed(unit.controller, sim_params)
-        max_discharge =  min(unit.capacity - unit.load, unit.max_input_energy)
+        unit.max_discharge = min(unit.load, unit.max_output_energy)
     else
-        max_discharge = 0.0
+        unit.max_discharge = 0.0
     end
-    set_max_energy!(unit.input_interfaces[unit.medium], max_discharge,
+    set_max_energy!(unit.output_interfaces[unit.medium], unit.max_discharge,
                     unit.high_temperature, nothing)
+
     if charge_is_allowed(unit.controller, sim_params)
-        max_charge = min(unit.load, unit.max_output_energy)
+        unit.max_charge = min(unit.capacity - unit.load, unit.max_input_energy)
     else
-        max_charge = 0.0
+        unit.max_charge = 0.0
     end
-    set_max_energy!(unit.output_interfaces[unit.medium], max_charge, nothing,
+    set_max_energy!(unit.input_interfaces[unit.medium], unit.max_charge, nothing,
                     unit.current_max_output_temperature)
 
     if unit.ambient_temperature_profile !== nothing && unit.consider_losses
@@ -291,7 +305,7 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
     energy_demanded = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy demanded
-    if energy_demanded >= -sim_params["epsilon"]
+    if energy_demanded >= -sim_params["epsilon"] || unit.max_discharge <= sim_params["epsilon"]
         set_max_energy!(unit.output_interfaces[unit.medium], 0.0)
         handle_component_update!(unit, "process", sim_params)
         return
@@ -349,7 +363,7 @@ function load(unit::BufferTank, sim_params::Dict{String,Any})
     energy_available = balance(exchanges) + energy_potential(exchanges)
 
     # shortcut if there is no energy to be used
-    if energy_available <= sim_params["epsilon"]
+    if energy_available <= sim_params["epsilon"] || unit.max_charge <= sim_params["epsilon"]
         handle_component_update!(unit, "load", sim_params)
         set_max_energy!(unit.input_interfaces[unit.medium], 0.0)
         return
