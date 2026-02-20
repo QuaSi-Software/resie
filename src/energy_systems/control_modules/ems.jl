@@ -216,8 +216,13 @@ function calc_reserve_power(sim_length::TimePeriod,
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
     power_pos_bool = power_pos > mod_params["min_reserve_power"]        
     if power_neg_bool || power_pos_bool
-        end_date = sim_params["current_date"] + sim_length - Second(sim_params["time_step_seconds"])  
-        date_range = sim_params["current_date"]:Second(sim_params["time_step_seconds"]):end_date
+        end_date = min(add_ignoring_leap_days(sim_params["current_date"], 
+                                              Second(sim_length) - Second(sim_params["time_step_seconds"])),
+                       sim_params["end_date"])
+        date_range = remove_leap_days(collect(range(sim_params["current_date"]; 
+                                                    stop=end_date, 
+                                                    step=Second(sim_params["time_step_seconds"])
+                                                    )))
         price_profiles = mod_params["price_profiles"]
 
         if power_neg_bool && power_pos_bool
@@ -307,8 +312,9 @@ function future_sim(sim_length::TimePeriod,
     storage_uac = mod_params["storage_uac"]
 
     # define how long the future simulation will be
-    end_date = sim_params["current_date"] + sim_length - Second(sim_params["time_step_seconds"])
-    sim_range = sp["current_date"]:Second(sp["time_step_seconds"]):end_date
+    end_date = min(add_ignoring_leap_days(sp["current_date"], Second(sim_length) - Second(sp["time_step_seconds"])),
+                   sim_params["end_date"])
+    sim_range = remove_leap_days(collect(range(sp["current_date"]; stop=end_date, step=Second(sp["time_step_seconds"]))))
 
     # disallow charging of storage for baseline simulation
     comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
