@@ -228,18 +228,45 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     # end
 end 
 
+
+# TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
 # a:"left foot"
 # b:"left shoulder" 
 # c:"right shoulder"
 # d:"right foot"
-# TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
+# TriangularMF max(min((x - a) / (b - a), (c - x) / (c - b)), 0)
+    # a:"left foot"
+    # b:"peak" 
+    # c:"right foot"
 function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
-      cheap = max(min((p_now - -137) / 1, 1, (75 - p_now) / 65), 0)
-      average = max(min((p_now - 55) / 25, (105 - p_now) / 25), 0)
-      expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)
+   
+    # definition of membership functions for price with rolling horizon bounds
+        # helpers for p_now rolling horizon inputs
+        #TODO is simple linear membership enough?
+      a1 = temp_min -1
+      b1 = temp_min
+      c1 = (temp_max + temp_min) /2
+      a2 = temp_min
+      b2 = (temp_max + temp_min) /2
+      c2 = temp_max
+      a3 = (temp_max + temp_min) /2
+      b3 = temp_max
+      c3 = temp_max + 1
+      
+      cheap = max(min((p_now-a1) / (b1-a1), (c1-p_now) / (c1-b1)), 0)
+      average = max(min((p_now-a2) / (b2-a2), (c2-p_now) / (c2-b2)), 0)
+      expensive = max(min((p_now-a3) / (b3-a3), (c3-p_now) / (c3-b3)), 0) 
+    
+    # old version with fixed price bounds
+        # cheap = max(min((p_now - -137) / 1, 1, (75 - p_now) / 65), 0)
+        # average = max(min((p_now - 55) / 25, (105 - p_now) / 25), 0)
+        # expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)
+    
+    # definition of membership functions for price trend
       falling = max(min((p_trend - -258) / 1, 1, (1 - p_trend) / 8), 0)
       stable = max(min((p_trend - -7) / 7, (6 - p_trend) / 6), 0)
       rising = max(min((p_trend - -1) / 7, 1, (247 - p_trend) / 1), 0)
+
       ant1 = min(cheap, falling)
       ant2 = min(cheap, stable)
       ant3 = min(cheap, rising)
