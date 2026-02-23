@@ -1,3 +1,4 @@
+using Dates
 using Infiltrator
 """
 Control module for running a component depending on the state of a linked storage component.
@@ -25,10 +26,13 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "price_trend_profile_path" => nothing,
             "price_volatility_profile_path" => nothing,
             "min_storage_load" => 0.0,
-            "rolling_horizion_hours": 8760.0
+            "rolling_horizon_hours" => 8760.0
 
         )
         params = Base.merge(default_parameters, parameters)
+        if haskey(parameters, "rolling_horizion_hours") && !haskey(parameters, "rolling_horizon_hours")
+            params["rolling_horizon_hours"] = parameters["rolling_horizion_hours"]
+        end
 
         if !(params["storage_uac"] !== nothing
              && params["storage_uac"] in keys(components)
@@ -108,12 +112,36 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     # get input values for Fuzzy control
     p_now = value_at_time(mod_params["price_profile"], sim_params)
     p_trend = value_at_time(mod_params["price_trend_profile"], sim_params)
-    p_volatility = value_at_time(mod_params["price_volatility_profile"], sim_params)
-    SOC_now = mod_params["storage"].load_end_of_last_timestep / mod_params["storage"].capacity
+    # p_volatility = value_at_time(mod_params["price_volatility_profile"], sim_params)
+    # SOC_now = mod_params["storage"].load_end_of_last_timestep / mod_params["storage"].capacity
 
-    # calculate price bounds for fuzzy control with rolling horizon
-    end_date = sim_params["current_date"] + mod_params["rolling_horizion_hours"]
-    rolling_range = sim_params["current_date"]:sim_params["time_step_seconds"]:end_date
+    # calculate price bounds for fuzzy control with rolling horizon.
+    # Keep horizon length stable even when Feb 29 timestamps are skipped.
+    horizon_hours = round(Int, mod_params["rolling_horizon_hours"])
+    step = Dates.Second(round(Int, sim_params["time_step_seconds"]))
+    desired_len = round(Int, horizon_hours * 3600 / sim_params["time_step_seconds"]) + 1
+    rolling_range = DateTime[]
+    dt = sim_params["current_date"]
+    max_iterations = max(desired_len * 3, 1)
+    iterations = 0
+
+    while length(rolling_range) < desired_len && iterations < max_iterations
+        if !(Dates.month(dt) == 2 && Dates.day(dt) == 29)
+            push!(rolling_range, dt)
+        end
+
+        dt += step
+        if dt > sim_params["end_date"]
+            dt = sim_params["start_date"]
+        end
+        iterations += 1
+    end
+
+    if isempty(rolling_range)
+        @error "Fuzzy Controller $(mod_params["name"]) rolling horizon has no valid timestamps."
+        throw(InputError)
+    end
+
     p_range = Array{Float64}(undef, length(rolling_range))
     for (idx, dt) in enumerate(rolling_range)
         p_range[idx] = mod_params["price_profile"].data[dt]
@@ -135,6 +163,9 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     # Fuzzy logic returns absolute plr and chargemode
     plr, chargemode = fuzzy_control_chargemode(p_now, p_trend, p_min_temp, p_max_temp)
+    if p_now < 80
+        chargemode = 100.0
+    end
     if isnan(plr) || isnan(chargemode)
         
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
@@ -166,7 +197,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     if th_power_demand > (available_th_power_storage + target_power)
         # add security factor to account for calculation inaccuracies
-        target_power = th_power_demand * 1.1 
+        target_power = (th_power_demand * 1.1) - available_th_power_storage 
     else
         min_plr = renewable_el_energy / total_el_power_timestep
         target_power = max(plr, min_plr) * total_th_power_timestep
@@ -241,17 +272,28 @@ end
 function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
    
     # definition of membership functions for price with rolling horizon bounds
-        # helpers for p_now rolling horizon inputs
-        #TODO is simple linear membership enough?
-      a1 = temp_min -1
-      b1 = temp_min
-      c1 = (temp_max + temp_min) /2
-      a2 = temp_min
-      b2 = (temp_max + temp_min) /2
-      c2 = temp_max
-      a3 = (temp_max + temp_min) /2
-      b3 = temp_max
-      c3 = temp_max + 1
+      # helpers for p_now rolling horizon inputs
+      # avoid degenerate membership functions when temp_min == temp_max
+      min_temp = float(temp_min)
+      max_temp = float(temp_max)
+      if !isfinite(min_temp) || !isfinite(max_temp)
+          return NaN, NaN
+      end
+      if max_temp <= min_temp
+          delta = max(abs(min_temp) * 1e-6, 1e-6)
+          min_temp -= delta
+          max_temp += delta
+      end
+
+      a1 = min_temp - 1
+      b1 = min_temp
+      c1 = (max_temp + min_temp) / 2
+      a2 = min_temp
+      b2 = (max_temp + min_temp) / 2
+      c2 = max_temp
+      a3 = (max_temp + min_temp) / 2
+      b3 = max_temp
+      c3 = max_temp + 1
       
       cheap = max(min((p_now-a1) / (b1-a1), (c1-p_now) / (c1-b1)), 0)
       average = max(min((p_now-a2) / (b2-a2), (c2-p_now) / (c2-b2)), 0)
@@ -283,14 +325,17 @@ function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
               high = max(min((x - 0.5) / 0.5, (2.0 - x) / 1.0), 0)
               plr_max_agg[i] = max(max(max(max(max(max(max(max(min(ant1, high), min(ant2, high)), min(ant3, high)), min(ant4, mid)), min(ant5, mid)), min(ant6, mid)), min(ant7, low)), min(ant8, low)), min(ant9, low))
           end
-      plr_max = ((2 * sum((mfi * xi for (mfi, xi) = zip(plr_max_agg, LinRange{Float64}(-1.0, 2.0, 101)))) - first(plr_max_agg) * -1.0) - last(plr_max_agg) * 2.0) / ((2 * sum(plr_max_agg) - first(plr_max_agg)) - last(plr_max_agg))
+      plr_num = (2 * sum((mfi * xi for (mfi, xi) = zip(plr_max_agg, LinRange{Float64}(-1.0, 2.0, 101)))) - first(plr_max_agg) * -1.0) - last(plr_max_agg) * 2.0
+      plr_den = (2 * sum(plr_max_agg) - first(plr_max_agg)) - last(plr_max_agg)
+      plr_max = plr_den == 0 ? NaN : plr_num / plr_den
       chargemode_agg = collect(LinRange{Float64}(-1.0, 101.0, 101))
       @inbounds for (i, x) = enumerate(chargemode_agg)
               off = max(min((x - -1.0) / 1.0, (51.0 - x) / 51.0), 0)
               on = max(min((x - 49.0) / 51.0, (101.0 - x) / 1.0), 0)
               chargemode_agg[i] = max(max(max(max(max(max(max(max(min(ant1, off), min(ant2, on)), min(ant3, on)), min(ant4, off)), min(ant5, on)), min(ant6, on)), min(ant7, off)), min(ant8, off)), min(ant9, on))
           end
-      chargemode = ((2 * sum((mfi * xi for (mfi, xi) = zip(chargemode_agg, LinRange{Float64}(-1.0, 101.0, 101)))) - first(chargemode_agg) * -1.0) - last(chargemode_agg) * 101.0) / ((2 * 
-sum(chargemode_agg) - first(chargemode_agg)) - last(chargemode_agg))
+      charge_num = (2 * sum((mfi * xi for (mfi, xi) = zip(chargemode_agg, LinRange{Float64}(-1.0, 101.0, 101)))) - first(chargemode_agg) * -1.0) - last(chargemode_agg) * 101.0
+      charge_den = (2 * sum(chargemode_agg) - first(chargemode_agg)) - last(chargemode_agg)
+      chargemode = charge_den == 0 ? NaN : charge_num / charge_den
       return plr_max, chargemode
   end

@@ -236,7 +236,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
@@ -274,7 +274,7 @@
             "has_secondary_interface": true,
             "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
-            "power_th": 8.0e6,
+            "power_th": 7.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -308,7 +308,7 @@
             "has_secondary_interface": true,
             "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
-            "power_th": 1.0e6,
+            "power_th": 3.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -366,7 +366,7 @@
                 "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
                 "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf",
                 "min_storage_load": 0.1,
-                "rolling_horizion_hours": 168
+                "rolling_horizon_hours": 12
                 }
             ],
             "connections": {
@@ -398,13 +398,13 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 40.0e6,
+            "capacity": 60.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,
             "low_temperature": 50.0,
             "initial_load": 0.9,
-            "max_load_rate": 0.25,
+            "max_load_rate": 0.2,
             "max_unload_rate": 0.2,
             "___BALANCED MODEL ONLY___": "",
             "switch_point": 0.1,
@@ -423,7 +423,7 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "capacity": 200e3,
+            "capacity": 1000e3,
             "load": 0.9
         },
         "Demand_Heat": {

@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
 
 
 ############################################################
@@ -43,14 +43,14 @@ Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_st
 
 # BufferTank capacity (Wh)
 Cap_lo_Wh   = 0.0e6        # lower limit
-Cap_hi_Wh   = 80.0e6        # upper limit
+Cap_hi_Wh   = 100.0e6        # upper limit
 Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 0e3          # lower limit
-Batt_hi_Wh   = 10000e3        # upper limit
-Batt_step_Wh = 2000e3        # step size
+Batt_lo_Wh   = 1000e3          # lower limit
+Batt_hi_Wh   = 1000e3        # upper limit
+Batt_step_Wh = 0.5e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -177,30 +177,6 @@ function display_MWh(Wh)
     round(Wh / 1e6; digits=3)       # displays MWh
 end
 
-function display_kWh(Wh)    
-    round(Wh / 1e3; digits=3)       # displays kWh
-end
-
-function detect_vdi2067_grid_price_mode(vdi_file::String=joinpath(@__DIR__, "vdi2067.jl"))
-    for line in eachline(vdi_file)
-        if occursin("sim_new[\"Grid_price\"]", line) && occursin("=", line)
-            rhs = strip(split(line, "="; limit=2)[2])
-            rhs = strip(split(rhs, "#"; limit=2)[1])
-            rhs_clean = strip(replace(rhs, ";" => ""))
-            fixed_price = tryparse(Float64, rhs_clean)
-
-            if !isnothing(fixed_price)
-                return "fixed price ($(fixed_price) EUR/MWh)"
-            elseif occursin("Stock_Price", rhs)
-                return "price profile (Stock_Price)"
-            else
-                return "custom: " * rhs
-            end
-        end
-    end
-
-    return "unknown (Grid_price assignment not found)"
-end
 
 function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
@@ -274,7 +250,7 @@ function create_variant(
         csv_name = "out_HP$(safe(display_MW(Pth_HeatPump)))MW_" *
                    "EB$(safe(display_MW(Pth_ElectrodeBoiler)))MW_" *
                    "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-                   "BAT$(safe(display_kWh(BattCap_Wh)))kWh.csv"
+                   "BAT$(safe(display_MWh(BattCap_Wh)))MWh.csv"
 
         aux_name = replace(csv_name, ".csv" => ".md")
 
@@ -294,10 +270,10 @@ function create_variant(
     price_profile_path_grid = "./profiles/MA/boersenpreis_EUR_MWh.prf"
     price_profile_path_reserve_power_neg = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_mean_15min.prf"
-    profile_path_reserve_call_neg = "./profiles/MA/ones.prf" #TODO Abrufprofil negativ hinterlegen
+    profile_path_reserve_call_neg = "./profiles/MA/reserve_call_neg.prf" #TODO Abrufprofil negativ hinterlegen
     price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
     price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_mean_15min.prf"
-    profile_path_reserve_call_pos = "./profiles/MA/ones.prf" #TODO Abrufprofil positiv hinterlegen
+    profile_path_reserve_call_pos = "./profiles/MA/reserve_call_pos.prf" #TODO Abrufprofil positiv hinterlegen
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
     co2_profile_path_grid = "./profiles/MA/CO2_life_g_kWh.prf"
@@ -369,7 +345,7 @@ function create_variant(
         "input_HP$(safe(display_MW(Pth_HeatPump)))MW_" *
         "EB$(safe(display_MW(Pth_ElectrodeBoiler)))MW_" *
         "BUF$(safe(display_MWh(Cap_Wh)))MWh_" *
-        "BAT$(safe(display_kWh(BattCap_Wh)))kWh.json"
+        "BAT$(safe(display_MWh(BattCap_Wh)))MWh.json"
     )
 
     open(fname, "w") do io
@@ -432,7 +408,7 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     end
     skipped_runs = length(all_combinations) - length(valid_combinations)
     total_runs = length(valid_combinations)
-    vdi_grid_price_mode = detect_vdi2067_grid_price_mode()
+    
 
     println("Parameterstudy starts: $total_runs runs on $(Threads.nthreads()) parallel Threads")
     println("Skipped $skipped_runs invalid runs (HeatPump + ElectrodeBoiler <= 5 MW).")
@@ -462,12 +438,16 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
                           "annuity_pro A_energy / €", "annuity_pro A_rev_control / €", 
                           "annuity_pro A_rev_feed / €", "annuity_pro A_total / €", 
                           "annuity_pro A_total_incentive / €"]
+    vdi_annuity_keys = [
+        "A_cap", "A_cap_incentive", "A_misc", "A_op", "A_energy",
+        "A_rev_control", "A_rev_feed", "A_total", "A_total_incentive"
+    ]
     # balance warnings
     header_balances = ["balance_power", "balance_heat", "Errors"]
     # yearly_CO2-emissions
     header_co2 = ["CO2_yearly"]
     header = join(vcat(header_parameters, header_annuity_no, header_annuity_mod, 
-                       header_annuity_pro, header_balances), ';') * "\n"
+                       header_annuity_pro, header_co2, header_balances), ';') * "\n"
 
     open(out_file_path, "a") do file_handle
         write(file_handle, header)
@@ -563,19 +543,20 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
                 VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
 
             # get values for writing into output file
-            annuities_no = collect(values(sim_output[runidx]["VDI_NO"]))
-            annuities_mod = collect(values(sim_output[runidx]["VDI_MOD"]))
-            annuities_pro = collect(values(sim_output[runidx]["VDI_PRO"]))
+            annuities_no = [sim_output[runidx]["VDI_NO"][k] for k in vdi_annuity_keys]
+            annuities_mod = [sim_output[runidx]["VDI_MOD"][k] for k in vdi_annuity_keys]
+            annuities_pro = [sim_output[runidx]["VDI_PRO"][k] for k in vdi_annuity_keys]
+            co2_yearly = sim_output[runidx]["VDI_NO"]["CO2_yearly"]
         else
             annuities_no = fill(missing, length(header_annuity_no))
             annuities_mod = fill(missing, length(header_annuity_mod))
             annuities_pro = fill(missing, length(header_annuity_pro))
+            co2_yearly = missing
         end
         # write important results to seperate file
         parameters = [Pth_HeatPump, Pth_ElectrodeBoiler, Cap_Wh, BattCap_Wh]
-        balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_heat", "Balance_power", "Errors")))
-        # co2 = collect(values(sim_output[runidx])) #TODO
-        row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, balances), ';') * "\n"
+        balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_power", "Balance_heat", "Errors")))
+        row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, co2_yearly, balances), ';') * "\n"
         row = replace(row, '.' => ',')
         # Lock the file writing
         Threads.lock(output_lock)

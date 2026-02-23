@@ -91,6 +91,12 @@
 				"unit": "kWh",
 				"scale_factor": 0.001
             },
+            "21": {
+				"key":{"PosControlReserve":["m_power:IN"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
             "14": {
                 "key":{"HeatPump": ["m_heat:OUT"]},
                 "axis":"left",
@@ -103,7 +109,7 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "21": {
+            "22": {
                 "key": {"m_heat": ["ElectrodeBoiler->BufferTank"]},
                 "axis":"left",
                 "unit": "kWh",
@@ -304,10 +310,10 @@
                     "grid_price_path": "./profiles/MA/stock_price_EUR_MWh.prf",
                     "reserve_power_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
                     "reserve_energy_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                    "reserve_call_neg_path": "./profiles/MA/ones.prf",   
+                    "reserve_call_neg_path": "./profiles/MA/reserve_call_neg.prf",   
                     "reserve_power_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
                     "reserve_energy_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                    "reserve_call_pos_path": "./profiles/MA/ones.prf",
+                    "reserve_call_pos_path": "./profiles/MA/reserve_call_pos.prf",
                     "min_reserve_power": 0.5e6,
                     "offer_only_freebids": false,
                     "min_storage_load": 0.2,

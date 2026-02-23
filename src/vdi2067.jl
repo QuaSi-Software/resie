@@ -234,7 +234,7 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
-    base_price = 214.0      # vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
@@ -250,29 +250,7 @@ end
 ############################################################
 #  REVENUE — CONTROL ENERGY + CONTROL CAPACITY
 ############################################################
-"""
-    revenue_control(sim::Dict, p::VDIParams)
 
-Calculates annualized revenues from control reserve provision according to VDI 2067.
-
-Assumptions (model-consistent):
-- Time resolution is fixed to 15 minutes (Δt = 0.25 h)
-- All price profiles are provided at 15-minute resolution
-- Control energy prices are given in EUR/MWh
-- Control capacity prices are given in EUR/MW
-- Offered control capacity is implicitly derived from the simulated
-  reserve energy (Grid input for control reserve)
-- Capacity prices remain constant over 4-hour blocks, but are provided
-  as 15-minute profiles (already expanded)
-
-Required entries in `sim`:
-- "Control_energy"                :: Vector{Float64}  (Wh per timestep)
-- "Control_energy_price"      :: Vector{Float64}  (EUR/MWh)
-- "Control_power_price"      :: Vector{Float64}  (EUR/MW)
-
-Returns:
-- Annualized control reserve revenue [EUR/a]
-"""
 function revenue_control(sim::Dict, p::VDIParams)
 
     # Fixed model time step
@@ -318,32 +296,6 @@ end
 #  REVENUES — FEED-IN
 ############################################################
 
-"""
-    revenue_feedin(sim::Dict, p::VDIParams)
-
-Calculates annualized feed-in revenues for PV and wind plantsaccording to EEG.
-
-Assumptions:
-- Time resolution: 15 minutes (900 s)
-- Feed-in is remunerated via market value + market premium
-- Market premium is defined as: max(0, AW - market price)
-- PV and wind are treated separately with individual market values
-  and "anzulegender Wert" (AW)
-
-Required entries in `sim`:
-- "Grid_Out_PV"                :: Vector{Float64}
-- "Grid_Out_Wind"              :: Vector{Float64}
-- "Market_Value_PV"            :: Vector{Float64}
-- "Market_Value_Wind"          :: Vector{Float64}
-
-Required entries in `p`:
-- p.AW_PV     :: €/MWh
-- p.AW_Wind   :: €/MWh
-
-Returns:
-- Annualized feed-in revenue [EUR/a]
-"""
-
 function revenue_feedin(sim::Dict, p::VDIParams)
 
     # 1) PHOTOVOLTAIC
@@ -387,12 +339,13 @@ function revenue_feedin(sim::Dict, p::VDIParams)
 end
 
 function co2_yearly(sim::Dict)
-    IN = sim["Grid_IN"] + sim["Control_energy"] .* 1e-3        # convert Wh time series in kWh
-    co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh 
+    IN = sim["Grid_IN"] .* 1e-3        # convert Wh time series in kWh
+    co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh  #TODO fixed value if no dynamic prices
+    yearly_co2 = sum(IN .* co2_intensity) .* 1e-6   # t CO2 per year, convert g to t
+    
+    #TODO what about PV and Wind?
 
-    # what about PV and Wind?
-
-    return sum(IN .* co2_intensity)  
+    return yearly_co2 
 
 end
 
@@ -437,13 +390,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
                         (A_rev_control + A_rev_feed)
     
-    # CO2_yearly = co2_yearly(sim_new)
-
-
-    # calculating a heat price out of the total annual costs and the produced heat does not make sense
-        # Q_heat_kWh = sum(sim_new["Heat"]) / 1000.0
-        # heat_price = round(A_total / Q_heat_kWh, digits=2)   # EUR/kWh
-
+    CO2_yearly = co2_yearly(sim_new)
 
     return OrderedDict(
         "A_cap" => A_cap,
@@ -455,8 +402,7 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
         "A_total_incentive" => A_total_incentive,
-        # "CO2_yearly" => CO2_yearly
-        # "heat_price_eur_per_kwh" => heat_price
+        "CO2_yearly" => CO2_yearly
     )
 end
 
