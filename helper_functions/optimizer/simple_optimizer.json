@@ -1,0 +1,259 @@
+{
+    "io_settings": {
+        "csv_output_file": "nothing",
+        "auxiliary_info": false,
+        "sankey_plot": "nothing",
+        "output_plot": "nothing",
+        "return_output_keys":  {
+            "Demand_Heat":  ["Demand"],
+            "Demand_Power": ["Demand"],
+            "BUS_Power": ["Balance"], 
+            "BUS_Heat": ["Balance"],
+            "Grid_IN": ["m_power:OUT"]
+        },
+        "csv_output_keys": {
+			"economy":  ["annuity_total", "annuity_revenue"],
+            "optimizer": ["objective"]
+        }
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:45",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 900,
+        "time_step_unit": "seconds",
+        "epsilon": 1e-7,
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw"  
+    },
+    "components": {
+        "Grid_IN": {
+            "type": "GridConnection",
+            "output_refs": [
+                "BUS_Power"
+            ],
+            "medium": "m_power",
+            "is_source": true
+        },
+        "Heat_Source_HP": {
+            "type": "GenericHeatSource",
+            "output_refs": [
+                "HeatPump"
+            ],
+            "medium": "m_heat_source",
+            "temperature_from_global_file": "temp_ambient_air",
+            "constant_power": 1e7,
+            "is_source": true
+        },
+        "HeatPump": {
+            "type": "HeatPump",
+            "model_type": "inverter",
+            "control_modules": [
+                {
+                    "name": "storage_driven",
+                    "low_threshold": 0.2,
+                    "high_threshold": 0.95,
+                    "min_run_time": 0,
+                    "storage_uac": "BufferTank"
+                }
+            ],
+            "output_refs": {
+                "m_heat_out": "BUS_Heat"
+            },
+            "power_th": 8.5e6,
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "m_heat_source",
+            "m_el_in": "m_power",
+            "m_heat_out": "m_heat",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 35, 4.10, 3.92, 3.22",
+            "bypass_cop": 15.0,
+            "min_power_function": "const:0.0",
+            "max_power_function": "poly-2: 0.001119613, -0.06349226, 0.03004031, -0.000400244, 0.002087081, -0.000351640, -0.000003101, -0.0000000655, -0.000013215, 0.000001353",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 0.95,
+            "power_losses_factor": 0.97,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": true,
+            "icing_coefficients": "3,-0.42,15,2,30"
+        },
+        "BUS_Power": {
+            "type": "Bus",
+            "medium": "m_power",
+            "connections": {
+                "input_order": [
+                    "Grid_IN"
+                ],
+                "output_order": [
+                    "Demand_Power",
+                    "HeatPump"
+                ],
+                "energy_flow": [
+                    [1, 1]
+                ]
+            }           
+        },
+        "BUS_Heat": {
+            "type": "Bus",
+            "medium": "m_heat",
+            "connections": {
+                "input_order": [
+                    "HeatPump",
+                    "BufferTank"
+                ],
+                "output_order": [
+                    "Demand_Heat",
+					"BufferTank"
+                ],
+                "energy_flow": [
+					[1, 1],
+					[1, 0]
+                ]
+            }
+        },
+        "BufferTank": {
+            "type": "BufferTank",
+            "output_refs": [
+                "BUS_Heat"
+            ],
+            "medium": "m_heat",
+            "___GENERAL PARAMETER___": "",
+            "model_type": "ideally_stratified",
+            "capacity": 65.0e6,
+            "rho_medium": 1000,
+            "cp_medium": 4.18,
+            "high_temperature": 90.0,
+            "low_temperature": 50.0,
+            "initial_load": 0.5,
+            "max_load_rate": 0.25,
+            "max_unload_rate": 0.2,
+            "___BALANCED MODEL ONLY___": "",
+            "switch_point": 0.1,
+            "___LOSSES___": "",
+            "consider_losses": true,
+            "h_to_r": 13.33,
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 1.2,
+            "thermal_transmission_barrel": 1.2,
+            "thermal_transmission_bottom": 1.2
+        },
+        "Demand_Heat": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_heat",
+            "energy_profile_file_path": "th_demand",
+            "constant_temperature": 90,
+            "scale": 1
+        },
+        "Demand_Power": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "m_power",
+            "energy_profile_file_path": "el_demand",
+            "scale": 1
+        }
+    },
+    "economy": {
+        "economy_params": {
+            "__scenario_defines_defaults__": "",
+            "scenario": "progressive",
+            "__specific_parameters_can_be_adjusted__": "",
+            "eval_time_a": 20,
+            "interest_rate": 0.03,
+            "__PRICE_DEVELOPMENT_FACTORS__": "",
+            "r_cap": 0.012,
+            "r_energy": 0.01,
+            "r_op": 0.005,
+            "r_repair": 0.005,
+            "r_misc": 0.005,
+            "r_rev": -0.01
+        },
+        "HeatPump": {
+            "__spezific_investment_cost_per_thpower_W__": "",
+            "c_cap_spez": 0.7,
+            "lifetime_a": 20,
+            "__percentages_of_investment_for_operation__": "",
+            "f_maint": 0.015,
+            "f_repair":0.01,
+            "__amount_of_manhours/a_for_operation__": "",
+            "f_op_h": 5.0,
+            "__incetive_structure_with_percentage_of_investment_and_possible_maximum__": "",
+            "f_incentive": 0.2,
+            "max_incentive": 0.0
+        },
+        "BufferTank": {
+            "__spezific_investment_cost_per_capacity_Wh__": "",
+            "c_cap_spez": 0.039,
+            "lifetime_a": 15,
+            "__percentages_of_investment_for_operation__": "",
+            "f_maint": 0.005,
+            "f_repair":0.005,
+            "__amount_of_manhours/a_for_operation__": "",
+            "f_op_h": 0.0,
+            "__incetive_structure_with_percentage_of_investment_and_possible_maximum__": "",
+            "f_incentive": 0.2,
+            "max_incentive": 0.0
+        }
+    },
+    "emissions": {
+        "HeatPump": {
+            "__spezific_emissions_per_thpower_W__": "",
+            "grey_emissions_spez": 0.7,
+            "lifetime_a": 20
+        }
+    },
+    "profiles": {
+        "stock_price": {"path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                        "scale": 0.0,
+                        "addon": 0.0},
+        "el_demand": {"path": "./profiles/MA/germersheim_power.prf",
+                      "scale": 0.0,
+                      "addon": 0.0},
+        "th_demand": {"path": "./profiles/MA/germersheim_heat.prf",
+                      "scale": 0.0,
+                      "addon": 0.0}
+    },
+    "optimizer": {
+        "type": "parametervariation",
+        "objective": ["total_annuity", "max"],
+        "penalty_balance": 1e9,
+        "__alternativ_objective_function__": "",
+        "objective_function": ["poly:1.0,1.0e9", ["total_annuity", "balance"]],
+        "_objective_function": "min(annuity + balance*1000)",
+
+        "__choose_one_function_to_generate_the_iterator_only_parametervariation__": "",
+        "combination_func": "product",
+        "_combination_func": "zip",
+        "__combination_func": "random_30",
+
+        "optim_params": {
+            "__min, max, start__": "",
+            "__min, max, n__": "",
+            "__values: [wert1, wert2, wert3]__": "",
+            "components": {
+                "HeatPump": {"power_th": {"min": 0,
+                                          "max": 10e6,
+                                          "n": 10
+                             }
+                },
+                "Boiler": {"power_th": {"values": [0, 1, 2, 3]
+                           }
+                },
+                "BufferTank": {"capacity": [20e6, 80e6, 50e6]
+                }
+            },
+            "__some_way_to_access_economy_parameters_too__": "",
+            "economy": {
+                "HeatPump": {"c_cap_spez": {"min": 0.3,
+                                            "max": 1.0,
+                                            "n": 7
+                             }
+                }
+            },
+            "profiles": {"stock_price": {"scale": [0.0, 1.5, 1.0],
+                                         "addon": [0.0, 100.0, 20.0]
+                         }
+            }
+        }
+    }
+}
