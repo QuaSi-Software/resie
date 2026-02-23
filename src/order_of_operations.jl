@@ -1503,6 +1503,9 @@ function merge_parallel_branches(branches, is_input, is_connecting_branch, paral
     parallel_branch_idx = fill(0, length(is_input))
     for (idx_branch, branch) in enumerate(branches)
         for component in branch
+            if component.sys_function !== EnergySystems.sf_transformer
+                continue
+            end
             for (idx_parallel_branch, parallel_branch) in enumerate(parallel_branches)
                 for branch in parallel_branch[2]
                     if component in branch
@@ -2021,14 +2024,16 @@ function find_parallels(components)
             end_unit = path[end]
             # filter paths for...
             if (
-                # starting with either a bus or transformer
+                # starting with a bus
                 start_unit.sys_function in [EnergySystems.sf_bus]
-                # ending with either a bus or transformer
+                # ending with a bus
                 && end_unit.sys_function in [EnergySystems.sf_bus]
                 # has a length > 2
                 && length(path) > 2
                 # has not the same start and end bus
-                && start_unit.uac != end_unit.uac
+                &&
+                ((start_unit.proxy !== nothing ? start_unit.proxy.uac : start_unit.uac) !=
+                 (end_unit.proxy !== nothing ? end_unit.proxy.uac : end_unit.uac))
                 # path contains at least one transformer in between
                 && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:(end - 1)]])
                 # remove all non-transformers and non-busses from path
@@ -2280,9 +2285,22 @@ function add_non_recursive_indirect_outputs!(node_set,
                     && (last_unit_uac == "" ? false : has_grid_output(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
+                if outface.target.sys_function === EnergySystems.sf_bus && outface.target.proxy !== nothing
+                    target = outface.target.proxy
+                    proxy_interface = []
+                    for proxy_inface in target.input_interfaces
+                        if proxy_inface.source.uac == unit.uac
+                            proxy_interface = proxy_inface
+                            break
+                        end
+                    end
+                    push!(checked_interfaces, proxy_interface)
+                else
+                    target = outface.target
+                end
                 push!(checked_interfaces, outface)
                 add_non_recursive_indirect_outputs!(node_set,
-                                                    outface.target,
+                                                    target,
                                                     checked_interfaces,
                                                     sys_function,
                                                     unit.uac,
@@ -2352,9 +2370,22 @@ function add_non_recursive_indirect_inputs!(node_set,
                     && (last_unit_uac == "" ? false : has_grid_input(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
+                if inface.source.sys_function === EnergySystems.sf_bus && inface.source.proxy !== nothing
+                    source = inface.source.proxy
+                    proxy_interface = []
+                    for proxy_outface in source.output_interfaces
+                        if proxy_outface.target.uac == unit.uac
+                            proxy_interface = proxy_outface
+                            break
+                        end
+                    end
+                    push!(checked_interfaces, proxy_interface)
+                else
+                    source = inface.source
+                end
                 push!(checked_interfaces, inface)
                 add_non_recursive_indirect_inputs!(node_set,
-                                                   inface.source,
+                                                   source,
                                                    checked_interfaces,
                                                    sys_function,
                                                    unit.uac,
