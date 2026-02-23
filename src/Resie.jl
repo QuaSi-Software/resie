@@ -412,6 +412,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     # plot additional figures potentially available from components after simulation
     if default(project_config["io_settings"], "auxiliary_plots", false)
         component_list = []
+        #TODO does run_path has to be used here?
         output_path = default(project_config["io_settings"], "auxiliary_plots_path", "./output/")
         for component in components
             if plot_optional_figures_end(component[2], sim_params, output_path)
@@ -473,11 +474,19 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     output_lock = ReentrantLock()
     results_lock = ReentrantLock()
 
-    proccesed_results_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
-    touch(proccesed_results_file_path)
+    #TODO ther maybe better way to do this; maybe take some general parts of prepare_inputs 
+    # and put them here
+    sim_params = get_simulation_params(project_config)
+    
+    proccesed_results_path = default(project_config["io_settings"], 
+                                     "processed_results", 
+                                     "./output/results_$(total_runs)runs_" * 
+                                     Dates.format(now(), "yymmdd_HHMMSS") * ".csv")
+    proccesed_results_path = sim_params["run_path"](proccesed_results_path)
+    touch(proccesed_results_path)
 
     if !isnothing(project_config["optimizer"])
-        #TODO implement function load_optimizer to process parameter ranges or objective functions
+        #TODO implement function load_optimizer to process parameter ranges or objective functions (project_loading.jl?)
         optimizer = load_optimizer(project_config["optimizer"])
 
         runidx_global = Atomic{Int}(1)
@@ -489,20 +498,20 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 
         @threads for sample_params in optimizer["iterator"]
             runidx = atomic_add!(runidx_global, 1)
-            run_ID = uuid4()
+            sample_ID = uuid4()
             start_time = now()
             #TODO create new Logging level for Info thats overarching mulitple simulations
             @info("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
 
             # decide which algorithm to run based on type of optimizer
             if optimizer["type"] == "parameterstudy"
-                _ = run_sample(outdir, proccesed_results_file_path, project_config, 
-                               sample_params, run_ID, run_lock, output_lock)
+                _ = run_sample(sim_params, proccesed_results_path, project_config, 
+                               sample_params, sample_ID, run_lock, output_lock)
 
             elseif optimizer["type"] == "monte_carlo_annealing"
                 monte_carlo_annealing!(all_results, obj, obj_lock, 
-                                       outdir, proccesed_results_file_path, project_config, 
-                                       run_ID, run_lock, output_lock, results_lock)
+                                       sim_params, proccesed_results_path, project_config, 
+                                       sample_ID, run_lock, output_lock, results_lock)
 
             end
 
@@ -512,14 +521,16 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         end
 
     else
-        _ = run_sample(outdir, proccesed_results_file_path, project_config, 
+        _ = run_sample(sim_params, proccesed_results_path, project_config, 
                        nothing, run_ID, run_lock, output_lock)
     end
 
     return true
 end
 
-function monte_carlo_annealing!(all_results, obj, obj_lock, outdir, proccesed_results_file_path, project_config, run_ID, run_lock, output_lock, results_lock)
+function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
+                                proccesed_results_path, project_config, run_ID, 
+                                run_lock, output_lock, results_lock)
     # temperature schedule is simple inverse logistic curve
     temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["nr_tries"] - 0.5)))
 
@@ -545,7 +556,8 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, outdir, proccesed_re
     end
 
     # run sim and calculate objective results
-    results = run_sample(outdir, proccesed_results_file_path, project_config, sample_params, run_ID, run_lock, output_lock)
+    results = run_sample(sim_params, proccesed_results_path, project_config, 
+                         sample_params, run_ID, run_lock, output_lock)
     obj_results = objective_function(results)
 
     # calculate minimum of results
@@ -563,13 +575,12 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, outdir, proccesed_re
     end
 end
 
-function run_sample(outdir, proccesed_results_file_path, project_config, sample_params, run_ID, run_lock, output_lock)
+function run_sample(sim_params, proccesed_results_path, project_config, sample_params, run_ID, run_lock, output_lock)
     ####################################################
     # Simulation
     ####################################################
-    # TODO implement create_variant but without rewriting and saving input_file but only profiles
     if sample_params !== nothing
-        project_config = create_variant(outdir, project_config, sample_params, run_ID)
+        project_config = create_variant(sim_params, project_config, sample_params, run_ID)
     end
 
     sim_params, components, operations, 
@@ -630,7 +641,7 @@ function run_sample(outdir, proccesed_results_file_path, project_config, sample_
     row = replace(row, '.' => ',')
     # Lock the file writing
     lock(output_lock) do 
-        open(proccesed_results_file_path, "a") do file_handle
+        open(proccesed_results_path, "a") do file_handle
             write(file_handle, row)
         end
     end
@@ -641,6 +652,103 @@ function run_sample(outdir, proccesed_results_file_path, project_config, sample_
     end
 
     return results
+end
+
+function create_variant(sim_params::Dict{String, Any}, project_config::AbstractDict{AbstractString,Any}, sample_params::Dict{String,Any}, run_ID::UUID)
+    cfg = deepcopy(project_config)
+
+    if cfg["io_settings"]["csv_output_keys"] != "nothing" 
+        cfg["io_settings"]["csv_output_file"] = default(project_config["io_settings"],
+                                                        "csv_output_file",
+                                                        "./output/out.csv")
+    end
+    if cfg["io_settings"]["output_plot"] != "nothing" 
+        cfg["io_settings"]["output_plot_file"] = default(project_config["io_settings"],
+                                                        "csv_output_file",
+                                                        "./output/out.csv")
+    end
+    if cfg["io_settings"]["sankey_plot"] != "nothing" 
+        cfg["io_settings"]["sankey_plot_file"] = default(project_config["io_settings"],
+                                                        "csv_output_file",
+                                                        "./output/out.csv")
+    end
+
+    # set up the parameters for this simulation variant
+    for (category, uacs) in pairs(sample_params)
+        for (uac, params) in pairs(uacs)
+            for (key_param, value) in pairs(params)
+                cfg[category][uac][key_param] = value
+                # rename outputs to clarify parameter values if outputfiles for each simulation 
+                # should be generated
+                if cfg["io_settings"]["csv_output_keys"] != "nothing"
+                    name, ext = split(cfg["io_settings"]["csv_output_file"], '.')
+                    cfg["io_settings"]["csv_output_file"] *= name * "_" * uac * "_" * 
+                                                            key_param * "_" * value * "." * ext
+                end
+                if cfg["io_settings"]["output_plot"] != "nothing"
+                    name, ext = split(cfg["io_settings"]["output_plot_file"], '.')
+                    cfg["io_settings"]["output_plot_file"] *= name * "_" * uac * "_" * 
+                                                            key_param * "_" * value * "." * ext
+                end
+                if cfg["io_settings"]["sankey_plot"] != "nothing"
+                    name, ext = split(cfg["io_settings"]["sankey_plot_file"], '.')
+                    cfg["io_settings"]["sankey_plot_file"] *= name * "_" * uac * "_" * 
+                                                            key_param * "_" * value * "." * ext
+                end
+            end
+        end
+    end
+
+    #TODO maybe this should be moved to profile processing to allow the profiles to be 
+    # defined with "profiles" group, scale and addon without optimizer
+    profile_paths = Dict{String,String}()
+    profile_scales = Dict{String,Float64}()
+    profile_addons = Dict{String,Float64}()
+    for (name, profile) in pairs(cfg["profiles"])
+        profile_paths[name] = profile["path"]
+        profile_scales[name] = profile["scale"]
+        profile_addons[name] = profile["addon"]
+    end
+   
+    # create correct profiles from price_profile_paths and add the to sim_output.
+    # profiles will be overwritten for every run to make sure the profile_scales and 
+    # profile_addons calculated correctly.
+    # If multiple threads are used each thread gets their own profile.
+    
+    profile_dir = sim_params["run_path"]("./profiles")
+    mkpath(profile_dir)
+
+    profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
+    date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+    new_paths = Array{String}(undef, length(profile_paths)) 
+
+    for (name, path) in pairs(profile_paths)
+        if profile_scales[name] != 1 && profile_addons[name] != 0 && profile_id == 0
+            new_paths[name] = path
+        else
+            profile = Profile(path, sim_params)
+            values = [profile.data[dt] .* profile_scales[name] .+ profile_addons[name] for dt in date_range]
+            new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
+            save_to_prf(collect(date_range), values, new_path)
+            new_paths[name] = path
+        end
+    end
+
+    # replace the profile names with the paths to the new profiles
+    function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,Any})
+        for (k, v) in cfg
+            if v isa String && haskey(replacements, v)
+                cfg[k] = replacements[v]
+            elseif v isa AbstractDict
+                replace_profiles!(v, replacements)
+            end
+        end
+
+    end
+
+    replace_profiles!(cfg, new_paths)
+
+    return cfg
 end
 
 end # module
