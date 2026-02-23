@@ -198,9 +198,11 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
     end
 
     #TODO create functions to parse new parameters from input file
-    economy_params = get_economy_params(project_config["economy"])
+    # economy_params = get_economy_params(project_config["economy"])
+    economy_params = project_config["economy"]
 
-    emission_params = get_emission_params(project_config["emission"])
+    # emission_params = get_emission_params(project_config["emission"])
+    emission_params = project_config["emission"]
 
     return sim_params, components, operations, economy_params, emission_params
 end
@@ -474,7 +476,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     output_lock = ReentrantLock()
     results_lock = ReentrantLock()
 
-    #TODO ther maybe better way to do this; maybe take some general parts of prepare_inputs 
+    #TODO there may be better way to do this; maybe take some general parts of prepare_inputs 
     # and put them here
     sim_params = get_simulation_params(project_config)
     
@@ -486,7 +488,6 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     touch(proccesed_results_path)
 
     if !isnothing(project_config["optimizer"])
-        #TODO implement function load_optimizer to process parameter ranges or objective functions (project_loading.jl?)
         optimizer = load_optimizer(project_config["optimizer"])
 
         runidx_global = Atomic{Int}(1)
@@ -496,7 +497,8 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             obj_lock = ReentrantLock()
         end
 
-        @threads for sample_params in optimizer["iterator"]
+        @threads for sample_values in optimizer["iterator"]
+            sample_params = Dict(zip(optimizer["sample_params_keys"], sample_values))
             runidx = atomic_add!(runidx_global, 1)
             sample_ID = uuid4()
             start_time = now()
@@ -537,7 +539,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
         sample_params = Dict()
-        for (key, param) in pairs(optimizer["opt_params"])
+        for (key, param) in pairs(optimizer["optim_params"])
             sample_params[key] = rand(param["min"]:param["max"])
         end
     else
@@ -548,8 +550,9 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
         sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
         
         sample_params = Dict()
-        for (key, param) in pairs(optimizer["opt_params"])
+        for (key, param) in pairs(optimizer["optim_params"])
             range = nbh_scale * temperature * (param["max"] - param["min"])
+            #TODO sample[key] doesn't really make sense right now key=String(category, uac, param_key)
             value = sample[key] + rand((-0.5 * range):(0.5 * range))
             sample_params[key] = clamp(value, param["min"], param["max"])
         end
@@ -580,7 +583,7 @@ function run_sample(sim_params, proccesed_results_path, project_config, sample_p
     # Simulation
     ####################################################
     if sample_params !== nothing
-        project_config = create_variant(sim_params, project_config, sample_params, run_ID)
+        project_config = create_variant(sim_params, project_config, sample_params)
     end
 
     sim_params, components, operations, 
@@ -654,7 +657,7 @@ function run_sample(sim_params, proccesed_results_path, project_config, sample_p
     return results
 end
 
-function create_variant(sim_params::Dict{String, Any}, project_config::AbstractDict{AbstractString,Any}, sample_params::Dict{String,Any}, run_ID::UUID)
+function create_variant(sim_params::Dict{String, Any}, project_config::AbstractDict{AbstractString,Any}, sample_params::Dict{String,Any})
     cfg = deepcopy(project_config)
 
     if cfg["io_settings"]["csv_output_keys"] != "nothing" 
@@ -674,28 +677,25 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
     end
 
     # set up the parameters for this simulation variant
-    for (category, uacs) in pairs(sample_params)
-        for (uac, params) in pairs(uacs)
-            for (key_param, value) in pairs(params)
-                cfg[category][uac][key_param] = value
-                # rename outputs to clarify parameter values if outputfiles for each simulation 
-                # should be generated
-                if cfg["io_settings"]["csv_output_keys"] != "nothing"
-                    name, ext = split(cfg["io_settings"]["csv_output_file"], '.')
-                    cfg["io_settings"]["csv_output_file"] *= name * "_" * uac * "_" * 
-                                                            key_param * "_" * value * "." * ext
-                end
-                if cfg["io_settings"]["output_plot"] != "nothing"
-                    name, ext = split(cfg["io_settings"]["output_plot_file"], '.')
-                    cfg["io_settings"]["output_plot_file"] *= name * "_" * uac * "_" * 
-                                                            key_param * "_" * value * "." * ext
-                end
-                if cfg["io_settings"]["sankey_plot"] != "nothing"
-                    name, ext = split(cfg["io_settings"]["sankey_plot_file"], '.')
-                    cfg["io_settings"]["sankey_plot_file"] *= name * "_" * uac * "_" * 
-                                                            key_param * "_" * value * "." * ext
-                end
-            end
+    for (key, value) in pairs(sample_params)
+        category, uac, param_key = split(key, "_")
+        cfg[category][uac][param_key] = value
+        # rename outputs to clarify parameter values if outputfiles for each simulation 
+        # should be generated
+        if cfg["io_settings"]["csv_output_keys"] != "nothing"
+            name, ext = split(cfg["io_settings"]["csv_output_file"], '.')
+            cfg["io_settings"]["csv_output_file"] *= name * "_" * uac * "_" * 
+                                                    param_key * "_" * value * "." * ext
+        end
+        if cfg["io_settings"]["output_plot"] != "nothing"
+            name, ext = split(cfg["io_settings"]["output_plot_file"], '.')
+            cfg["io_settings"]["output_plot_file"] *= name * "_" * uac * "_" * 
+                                                    param_key * "_" * value * "." * ext
+        end
+        if cfg["io_settings"]["sankey_plot"] != "nothing"
+            name, ext = split(cfg["io_settings"]["sankey_plot_file"], '.')
+            cfg["io_settings"]["sankey_plot_file"] *= name * "_" * uac * "_" * 
+                                                    param_key * "_" * value * "." * ext
         end
     end
 
@@ -751,4 +751,44 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
     return cfg
 end
 
+        
+function load_optimizer(optimizer_config::Dict{String,Any})
+    optimizer = Dict{Strind,Any}()
+    if optimizer_config["type"] == "parametervariation"
+        optim_params = Dict()
+        for (category, uacs) in pairs(optimizer_config["optim_params"])
+            for (uac, params) in pairs(uacs)
+                for (key_param, def) in pairs(params)
+                    if haskey(def, "values")
+                        optim_params[category * "_" * uac * "_" * key_param] = def["values"]
+                    else
+                        def = Dict(Symbol(k) => v for (k, v) in def)
+                        optim_params[category * "_" *uac * "_" * key_param] = range(; def...)
+                    end
+                end
+            end
+        end
+        optimizer["optim_params"] = optim_params
+        optimizer["optim_params_keys"] = keys(optim_params)
+        #TODO integrate keys into iterator
+        optimizer["iterator"] = default(optimizer_config, "iterator", "product")
+        if optimizer["iterator"] == "product"
+            optimizer["iterator"] = Iterators.product(values(optim_params)...)
+        elseif optimizer["iterator"] == "zip"
+            optimizer["iterator"] = zip(values(optim_params)...)
+        elseif split(optimizer["iterator"], "_")[1] == "random" 
+            iter = Iterators.product(values(optim_params)...)
+            n_samples = max(split(optimizer["iterator"], "_")[2], length(iter))
+            optimizer["iterator"] = rand(collect(iter), n_samples)
+        end
+
+    else
+        #TODO parse_objective_function and parameters for more complicated algorithms
+        # whole function may be better suited for project_loading.jl
+    end
+
+    return optimizer
+end
+
 end # module
+

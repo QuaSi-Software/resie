@@ -217,41 +217,46 @@
         "type": "parametervariation",
         "objective": ["total_annuity", "max"],
         "penalty_balance": 1e9,
-        "__alternativ_objective_function__": "",
+        "__alternative_objective_function__": "",
         "objective_function": ["poly:1.0,1.0e9", ["total_annuity", "balance"]],
         "_objective_function": "min(annuity + balance*1000)",
 
         "__choose_one_function_to_generate_the_iterator_only_parametervariation__": "",
-        "combination_func": "product",
-        "_combination_func": "zip",
-        "__combination_func": "random_30",
+        "iterator": "product",
+        "_iterator": "zip",
+        "__iterator": "random_30",
 
         "optim_params": {
-            "__min, max, start__": "",
-            "__min, max, n__": "",
-            "__values: [wert1, wert2, wert3]__": "",
+            "__for parameterstudy:__": "",
+            "__option1: dictionary where keys copy range() arguments": "",
+            "__option2: {values: [wert1, wert2, wert3]}__": "",
             "components": {
-                "HeatPump": {"power_th": {"min": 0,
-                                          "max": 10e6,
-                                          "n": 10
+                "HeatPump": {"power_th": {"start": 0,
+                                          "stop": 10e6,
+                                          "length": 11
                              }
                 },
                 "Boiler": {"power_th": {"values": [0, 1, 2, 3]
                            }
                 },
-                "BufferTank": {"capacity": [20e6, 80e6, 50e6]
+                "BufferTank": {"capacity": {"values": [20e6, 80e6, 50e6]
+                               }
                 }
             },
             "__some_way_to_access_economy_parameters_too__": "",
             "economy": {
-                "HeatPump": {"c_cap_spez": {"min": 0.3,
-                                            "max": 1.0,
-                                            "n": 7
+                "HeatPump": {"c_cap_spez": {"start": 0.3,
+                                            "stop": 1.0,
+                                            "length": 8
                              }
                 }
             },
-            "profiles": {"stock_price": {"scale": [0.0, 1.5, 1.0],
-                                         "addon": [0.0, 100.0, 20.0]
+            "profiles": {"stock_price": {"scale": {"start": 0.0, 
+                                                   "stop": 1.5, 
+                                                   "step": 0.5},
+                                         "addon": {"start": 0.0, 
+                                                   "stop": 100, 
+                                                   "step": 20}
                          }
             }
         }
