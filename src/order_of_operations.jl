@@ -1530,10 +1530,6 @@ function merge_parallel_branches(branches, is_input, is_connecting_branch, paral
         else
             # If the index is not 0, merge the branches
             if haskey(merged_branches_dict, idx)
-                if is_input_dict[idx] !== is_input[i]
-                    # should actually not happen
-                    @warn "The order of operation may be wrong..."
-                end
                 is_input_dict[idx] = copy(is_input[i])
                 is_connecting_branch_dict[idx] = is_connecting_branch_dict[idx] || is_connecting_branch[i]
                 if reverse === nothing
