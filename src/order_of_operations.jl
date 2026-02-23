@@ -2027,6 +2027,8 @@ function find_parallels(components)
                 && end_unit.sys_function in [EnergySystems.sf_bus]
                 # has a length > 2
                 && length(path) > 2
+                # has not the same start and end bus
+                && start_unit.uac != end_unit.uac
                 # path contains at least one transformer in between
                 && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:(end - 1)]])
                 # remove all non-transformers and non-busses from path
