@@ -1,4 +1,3 @@
-using Statistics
 using Plots: Plots
 
 """
@@ -125,35 +124,6 @@ Base.@kwdef mutable struct Battery <: Component
             throw(InputError)      
         end
 
-        # NMC
-        # Q_exp= 2.584
-        # Q_full= 3.2
-        # Q_nom= 3.126
-        # V_exp= 3.53
-        # V_full= 4.2
-        # V_nom= 3.342
-        # V_cut= 2.772
-        # I= 0.64
-        # V_n= 3.6
-        # r_i= 0.001155
-
-        # LFP  
-        # Q_exp = 0.04
-        # Q_full= 2.25
-        # Q_nom = 2.0
-        # V_exp = 4.05
-        # V_full= 4.1
-        # V_nom = 3.4
-        # V_cut = 2.706
-        # V_n = 3.6
-        # I = 0.45
-        # r_i = 0.002
-
-        # A = V_full - V_exp
-        # B = 3/Q_exp
-        # K = ((V_full - V_nom + A*(exp(-B*Q_nom) - 1))*(Q_full - Q_nom))/(Q_nom)
-        # V_0 = V_full + K + r_i*I - A
-
         return new(uac, # uac
                    Controller(default(config, "control_parameters", nothing)),
                    sf_storage, # sys_function
@@ -164,7 +134,7 @@ Base.@kwdef mutable struct Battery <: Component
                    m_heat_lt_out,
                    model_type, # model_type
                    config["capacity"], # capacity of the battery in Wh
-                   default(config, "load", 0.0), # energy load of the battery in Wh
+                   default(config, "initial_load", 0.0) * config["capacity"], # energy load of the battery in Wh
                    default(config, "charge_efficiency", nothing),
                    default(config, "discharge_efficiency", nothing),
                    default(config, "self_discharge_rate", 0.0), # rate of self-discharge including stand-by losses in %/month (month=30days)
@@ -189,7 +159,7 @@ Base.@kwdef mutable struct Battery <: Component
                    default(config, "k_qT", [1.32729e-3, -7.9763e-6]),
                    default(config, "k_n",  [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]),
                    default(config, "k_T", [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]),
-                   default(config, "I_ref", 0.0),
+                   default(config, "I_ref", 100.0),
                    default(config, "T_ref", 25.0),
                    0.0, # load_end_of_last_timestep
                    0.0, # losses
@@ -257,15 +227,15 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
         Q = unit.capacity_cell_Ah * 1 * f_n * f_T
 
         # calculate minimum and maximum cell voltages for SOC_max and SOC_min
-        extracted_charge_empty = Q * (1 - (unit.SOC_min) / 100)
-        unit.V_cell_min = f_V_cell(extracted_charge_empty, unit.I_ref, unit)
+        extracted_charge_empty = Q * (1 - (unit.SOC_min) / 100) #TODO add or remove unit.m
+        unit.V_cell_min = f_V_cell(extracted_charge_empty, unit.I_ref, unit, n, unit.Temp)
         if unit.V_cell_min < 0
-            @error "The cells parameters are not correctly defined."
+            @error "The battery cell parameters of $(unit.uac) are not correctly defined."
             throw(InputError)
         end
 
-        extracted_charge_full = Q * (1 - unit.SOC_max / 100)
-        unit.V_cell_max = f_V_cell(extracted_charge_full, -unit.cell_cutoff_current, unit)
+        extracted_charge_full = Q * (1 - unit.SOC_max / 100) #TODO add or remove unit.m
+        unit.V_cell_max = f_V_cell(extracted_charge_full, -unit.cell_cutoff_current, unit, n, unit.Temp)
         # unit.V_cell_max = f_V_cell(extracted_charge_full, -unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit)
 
         # get starting point for simulation
@@ -277,8 +247,8 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
             unit.V_cell = unit.V_cell_min
         else
             unit.V_cell_last = unit.V_n
-            unit.extracted_charge = Q * (1 - unit.SOC / 100)
-            unit.V_cell = f_V_cell(unit.extracted_charge, unit.I_ref, unit)
+            unit.extracted_charge = unit.m * Q * (1 - unit.SOC / 100) #TODO unit.m keeps the SOC consistent to later calculation
+            unit.V_cell = f_V_cell(unit.extracted_charge, unit.I_ref, unit, n, unit.Temp)
         end
         unit.V_cell_last = copy(unit.V_cell)
         unit.extracted_charge_last = copy(unit.extracted_charge)
@@ -350,7 +320,7 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
         if energy < 0
             V_min = max(unit.V_cell_last * 0.8, unit.V_cell_min)
         elseif energy > 0
-            V_max = min(unit.V_cell_last * 1.2, unit.V_cell_max)
+            V_max = min(unit.V_cell_last * 1.3, unit.V_cell_max) # TODO increased limit on V_max; with very small discharge the Voltage can jump up above V_max and fall through the raster
             try
                 asymp = find_zero(e_cell -> denom(V_min, e_cell, unit, sim_params),
                                   (unit.SOC - unit.SOC_min) / 100 * unit.capacity_cell_Ah * unit.V_n / 2,
@@ -493,6 +463,7 @@ function calc_efficiency_current(current::Number, unit::Battery, sim_params::Dic
         # if very little energy is added the voltage of the battery can drop and give a wrong result
         if current < 0 && abs(current) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_last
+
         # if deeply discharged and little energy is added the voltage of the battery can drop below V_min
         elseif unit.V_cell <= unit.V_cell_min && current < 0 && abs(current) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_min
@@ -705,7 +676,9 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
             # normal calculation if current is not 0
             else
                 n = unit.cycles
-                f_I = (abs(current) / unit.I_ref)^unit.alpha
+                # ignore effect of current on capacity for SOC calculation to stabilize the 
+                # SOC calculation when current changes a lot between time steps
+                f_I = 1
                 f_n = (1 + unit.k_qn[1] * (n - 1) * n / 2 + unit.k_qn[2] * (n - 1) * n * (2 * n - 1) / 2)
                 f_T = (1 + unit.k_qT[1] * (unit.Temp - unit.T_ref) + unit.k_qT[2] * (unit.Temp - unit.T_ref)^2)
                 Q = unit.capacity_cell_Ah * f_I * f_n * f_T
@@ -715,7 +688,6 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                 elseif unit.extracted_charge < 0
                     unit.extracted_charge = 0
                 end
-
                 unit.SOC = ((unit.m * Q) - unit.extracted_charge) / (unit.m * Q) * 100
                 unit.load = unit.capacity * unit.SOC / 100
             end
@@ -883,189 +855,6 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     return true
 end
 
-"""
-I_1, I_2
-V_full (P1)
-V_2, Q_2 in exponential zone (P2)
-V_3, Q_3 in exponential zone Q_3 = 2*Q_2 (P3)
-V_4, Q_4 near end of nominal zone (P4)
-V_cut, Q_full_1 end of curve for I_1 (P5)
-Q_full_1, Q_full_2 capacities for I_1 and I_2 at end of curve
-n_1, n_2 for n_2 > n_1 > 1
-Q_full_1, Q_full_n_2 capacities at n_1 and n_2 cycles at reference Temperature at I_n and n_2 > n_1 > 1
-V_full, V_full_n_2 Voltages at n_1 and n_2 cycles at reference Temperature at I_n and n_2 > n_1 > 1
-V_nom_n_2, Q_nom_n_2 in nominal zone of curve for n_2 (P8)
-T_1, T_2, T_ref for T_1 != T_2 != T_ref
-Q_full_1, Q_full_T_2 capacities at T_1 and T_2 temperature at 1 cycle at I_T
-V_full, V_full_T_2 voltages at T_1 and T_2 temperature at 1 cycle at I_T
-V_nom_T_2, Q_nom_T_2 in nominal zone of curve for T_2 (P11)
-r_i, 
-V_6, Q_6 in nominal zone of curve I_2 only necessary if r_i not given
-
-example Paper SP-LFP1000AHA:
-calc_cell_values(300, 3.4, 3.318, 7.56, 3.301, 15.12, 3.172, 820, 2.0, 1070.4,
-calc_cell_values(300, 3.4, 3.301, 15, 3.284, 30, 3.172, 820, 2.0, 1070.4,
-calc_cell_values(100, 3.4, 3.346, 10, 3.332, 20, 3.216, 820, 2.0, 1087.5,
-                 1000, 1061.5,
-                 nothing, 3.141, 550,
-                 500, 1000, 1026,
-                 3000, 3.2, 3.15, 400, 806,
-                 500, -20, 987,         
-                 55, 3.31, 3.277, 696, 1035,
-                 25)
-
-paper reversed:
-V_full = 3.4
-I_1 = 100
-Q_full_1 = 1090
-AB_5 = 1.31835
-V_cut = 2.0
-V_3 = 3.3293
-Q_3 = 20
-V_2 = 3.3483
-Q_2 = 10
-V_4 = 3.2295
-Q_4 = 800
-I_2 = 1000
-Q_full_2 = 1060
-calc_cell_values(100, 3.4, 3.3483, 10, 3.3293, 20, 3.2295, 800, 2.0, 1090,
-                 1000, 1060,
-                 nothing, 3.141, 550,
-                 500, 1000, 1027,
-                 3000, 3.2, 3.15, 400, 809,
-                 500, -20, 987,
-                 55, 3.4, 3.2782, 757.57, 1102, 
-                 25)
-calc_cell_values(10, 3.4, 3.3483, 1.0, 3.3293, 2.0, 3.2295, 80, 2.0, 109,
-                 100, 106.0,
-                 nothing, 3.141, 55.0,
-                 50, 1000, 102.7,
-                 3000, 3.2, 3.15, 40.0, 80.9,
-                 50, -20, 98.7,
-                 55, 3.4, 3.2782, 75.757, 110.2, 
-                 25)
-"""
-function calc_cell_values(I_1, V_full, V_2, Q_2, V_3, Q_3, V_4, Q_4, V_cut, Q_full_1,
-                          I_2, Q_full_2,
-                          r_i::Union{Number,Nothing}=nothing, V_6=0.0, Q_6=0.0,
-                          I_n=0.0, n_1=0.0, Q_full_n_1=0.0,
-                          n_2::Union{Number,Nothing}=nothing, V_full_n_2=0.0, V_nom_n_2=0.0, Q_nom_n_2=0.0, Q_full_n_2=0.0,
-                          I_T=0.0, T_1=0.0, Q_full_T_1=0.0,
-                          T_2::Union{Number,Nothing}=nothing, V_full_T_2=0.0, V_nom_T_2=0.0, Q_nom_T_2=0.0,Q_full_T_2=0.0,
-                          T_ref=25)
-
-    # basic values new
-    if Q_2 == Q_full_1
-        A=0
-        B=1
-    else
-        B = -1 / Q_2 * log((V_full - V_3) / (V_full - V_2) - 1)
-        A = (V_full - V_3) / (1 - exp(-B * Q_3))
-    end
-
-    AB_4 = V_full - V_4 - A * (1 - exp(-B * Q_4)) # exp(-B*Q_4) -> 0
-    AB_5 = V_full - V_cut - A * (1 - exp(-B * Q_full_1)) # exp(-B*Q_full) -> 0
-
-    m = (1 - AB_5 / AB_4) / (1 - (AB_5 * Q_4) / (AB_4 * Q_full_1)) * (Q_4 / Q_full_1)
-    K = AB_5 * ((m * Q_full_1 / Q_full_1) - 1)
-    if isnothing(r_i)
-        r_i = 1 / (I_1 - I_2) * (V_6 + K * (m * Q_full_2 / (m * Q_full_2 - Q_6)) - A * exp(-B * Q_6) -
-                                 V_3 - K * (m * Q_full_1 / (m * Q_full_1 - Q_3)) + A * exp(-B * Q_3))
-    end
-    V_0 = V_full + K + r_i * I_1 - A
-    alpha = log(Q_full_2 / Q_full_1) / log(I_2 / I_1)
-    I_ref = I_1
-    Q_ref = Q_full_1
-
-    # basic values old
-    # A = V_full - V_exp
-    # B = 3/Q_exp
-    # K = ((V_full - V_nom + A*(exp(-B*Q_nom) - 1))*(Q_full_1 - Q_nom))/(Q_nom)
-    # V_0 = V_full + K + r_i*I_1 - A
-
-    # for aging if the needed values are provided
-    k_qn = [0.0, 0.0]
-    k_n = [0.0, 0.0, 0.0, 0.0]
-    if !isnothing(n_2)
-        N = [(n_1 - 1) * n_1/2 (n_1 - 1) * n_1 * (2 * n_1 - 1)/2
-             (n_2 - 1) * n_2/2 (n_2 - 1) * n_2 * (2 * n_2 - 1)/2]
-        q = [Q_full_n_1 / (Q_ref * (I_n / I_ref)^alpha) - 1
-             Q_full_n_2 / (Q_ref * (I_n / I_ref)^alpha) - 1]
-        # k_qn[1] = (q[2] - q[1]*N[2,2]/N[1,2]) / (N[2,1] - N[1,1]*N[2,2]/N[1,2])
-        # k_qn[2] = (q[1] - k_qn[1]*N[1,1]) / N[1,2]
-        k_qn = N \ q
-
-        Q_n = Q_ref * (I_n / I_ref)^alpha *
-              (1 + k_qn[1] * (n_2 - 1) * n_2 / 2 + k_qn[2] * (n_2 - 1) * n_2 * (2 * n_2 - 1) / 2)
-        b_n = [V_full - (V_0 - r_i * I_1 - K + A)
-               V_full_n_2 - (V_0 - r_i * I_n - K + A)
-               V_nom_n_2 - (V_0 - r_i * I_n - K * (m * Q_n / (m * Q_n - Q_nom_n_2)) + A * exp(-B * Q_nom_n_2))
-               V_cut - (V_0 - r_i * I_n - K * (m * Q_n / (m * Q_n - Q_full_n_2)) + A * exp(-B * Q_full_n_2))]
-        G_n = [V_0 -r_i*I_1 -K A
-               V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2 - 1) A*(n_2 - 1)
-               V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2-1)*(m * Q_n/(m * Q_n - Q_nom_n_2)) A*(n_2-1)*exp(-B * Q_nom_n_2)
-               V_0*(n_2 - 1) -r_i*I_n*(n_2-1) -K*(n_2-1)*(m * Q_n/(m * Q_n - Q_full_n_2)) A*(n_2-1)*exp(-B * Q_full_n_2)]
-        try k_n = G_n \ b_n
-        catch
-            try k_n = svd(G_n) \ b_n
-            catch 
-                k_n = pinv(G_n) * b_n
-            end
-        end
-    end
-
-    k_qT = [0.0, 0.0]
-    k_T = [0.0, 0.0, 0.0, 0.0]
-    if !isnothing(T_2)
-        T = [T_1-T_ref (T_1 - T_ref)^2
-             T_2-T_ref (T_2 - T_ref)^2]
-        q = [Q_full_T_1 / (Q_ref * (I_T / I_ref)^alpha) - 1
-             Q_full_T_2 / (Q_ref * (I_T / I_ref)^alpha) - 1]
-        # k_qT[1] = (q[2] - q[1]*T[2,2]/T[1,2]) / (T[2,1] - T[1,1]*T[2,2]/T[1,2])
-        # k_qT[2] = (q[1] - k_qn[1]*T[1,1]) / T[1,2]
-        k_qT = T \ q
-
-        Q_T = Q_ref * (I_T / I_ref)^alpha *
-              (1 + k_qT[1] * (T_2 - T_ref) + k_qT[2] * (T_2 - T_ref)^2)
-        b_T = [V_full - (V_0 - r_i * I_1 - K + A)
-               V_full_T_2 - (V_0 - r_i * I_T - K + A)
-               V_nom_T_2 - (V_0 - r_i * I_T - K * (m * Q_T / (m * Q_T - Q_nom_T_2)) + A * exp(-B * Q_nom_T_2))
-               V_cut - (V_0 - r_i * I_T - K * (m * Q_T / (m * Q_T - Q_full_T_2)) + A * exp(-B * Q_full_T_2))]
-        G_T = [V_0 -r_i*I_1 -K A
-               V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2 - T_ref) A*(T_2 - T_ref)
-               V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_nom_T_2)) A*(T_2-T_ref)*exp(-B * Q_nom_T_2)
-               V_0*(T_2 - T_ref) -r_i*I_T*(T_2-T_ref) -K*(T_2-T_ref)*(m * Q_T/(m * Q_T - Q_full_T_2)) A*(T_2-T_ref)*exp(-B * Q_full_T_2)]
-        try k_T = G_T \ b_T
-        catch
-            try k_T = svd(G_T) \ b_T
-            catch 
-                k_T = pinv(G_T) * b_T
-            end
-        end
-    end
-
-    return V_0, K, A, B, r_i, m, alpha, k_qn, k_qT, k_n, k_T, I_ref, T_ref
-end
-
-# calculate the voltage level, after charging with a constant current defined from charging 
-# power and voltage level before charging, positive energy = discharging, negative energy = charging
-# changing voltage levels during charging are ignored
-function calc_V_cell_cc_aging(charge::Number, I::Number, n, T, unit::Battery)
-    # functions describing the dependence of the parameters on cycles n and Temperature T
-    Q = unit.capacity_cell_Ah * (abs(I) / unit.I_ref)^unit.alpha *
-        (1 + unit.k_qn[1] * (n - 1) * n / 2 + unit.k_qn[2] * (n - 1) * n * (2 * n - 1) / 2) *
-        (1 + unit.k_qT[1] * (T - unit.T_ref) + unit.k_qT[2] * (T - unit.T_ref)^2)
-    V_0 = unit.V_0 * (1 + unit.k_n[1] * (n - 1)) * (1 + unit.k_T[1] * (T - unit.T_ref))
-    r_i = unit.r_i * (1 + unit.k_n[2] * (n - 1)) * (1 + unit.k_T[2] * (T - unit.T_ref))
-    K = unit.K * (1 + unit.k_n[3] * (n - 1)) * (1 + unit.k_T[3] * (T - unit.T_ref))
-    A = unit.A * (1 + unit.k_n[4] * (n - 1)) * (1 + unit.k_T[4] * (T - unit.T_ref))
-
-    V_0 -
-    K * (unit.m * Q) / (unit.m * Q - (unit.extracted_charge + charge)) +
-    A * exp(-unit.B * (unit.extracted_charge + charge)) -
-    r_i * I
-end
-
 # calculate the voltage level, after charging with a constant current defined from charging 
 # power and voltage level before charging, positive energy = discharging, negative energy = charging
 # changing voltage levels during charging are ignored
@@ -1080,15 +869,23 @@ function f_V_cell(extracted_charge::Number, current::Number, unit::Battery, n::N
     f_T = (1 + unit.k_qT[1] * (T - unit.T_ref) + unit.k_qT[2] * (T - unit.T_ref)^2)
     Q = unit.capacity_cell_Ah * f_I * f_n * f_T
 
-    V_0 = unit.V_0 * (1 + unit.k_n[1] * (n - 1)) * (1 + unit.k_T[1] * (T - unit.T_ref))
-    r_i = unit.r_i * (1 + unit.k_n[2] * (n - 1)) * (1 + unit.k_T[2] * (T - unit.T_ref))
-    K = unit.K * (1 + unit.k_n[3] * (n - 1)) * (1 + unit.k_T[3] * (T - unit.T_ref))
-    A = unit.A * (1 + unit.k_n[4] * (n - 1)) * (1 + unit.k_T[4] * (T - unit.T_ref))
+    if unit.m * Q < extracted_charge
+        V_cell = unit.V_cell_min - 0.1
+    elseif extracted_charge < 0
+        V_cell = unit.V_cell_max + 0.1
+    else
+        V_0 = unit.V_0 * (1 + unit.k_n[1] * (n - 1)) * (1 + unit.k_T[1] * (T - unit.T_ref))
+        r_i = unit.r_i * (1 + unit.k_n[2] * (n - 1)) * (1 + unit.k_T[2] * (T - unit.T_ref))
+        K = unit.K * (1 + unit.k_n[3] * (n - 1)) * (1 + unit.k_T[3] * (T - unit.T_ref))
+        A = unit.A * (1 + unit.k_n[4] * (n - 1)) * (1 + unit.k_T[4] * (T - unit.T_ref))
 
-    V_0 -
-    K * (unit.m * Q) / (unit.m * Q - extracted_charge) +
-    A * exp(-unit.B * extracted_charge) -
-    r_i * current
+        V_cell =
+        V_0 -
+        K * (unit.m * Q) / (unit.m * Q - extracted_charge) +
+        A * exp(-unit.B * extracted_charge) -
+        r_i * current
+    end
+    return V_cell
 end
 
 function output_values(unit::Battery)::Vector{String}
@@ -1145,7 +942,5 @@ function output_value(unit::Battery, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export calc_V_cell_cc_aging # TODO remove
 export f_V_cell # TODO remove
-export calc_cell_values #TODO remove
 export Battery
