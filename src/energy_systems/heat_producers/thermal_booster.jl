@@ -605,7 +605,10 @@ function calculate_energies(unit::ThermalBooster, sim_params::Dict{String,Any}):
     # is available)
     energies.potential_el_in_layered, energies.in_uacs_el = check_el_in_layered(unit, sim_params)
     energies.potential_el_in = sum(energies.potential_el_in_layered)
-    energies.potential_el_in = min(unit.power_el, energies.potential_el_in)
+
+    # limit el_in to max usage fraction from control modules and to maximum power_el
+    max_usage_fraction = upper_plr_limit(unit.controller, sim_params)
+    energies.potential_el_in = min(energies.potential_el_in, unit.power_el * max_usage_fraction)
 
     if energies.potential_el_in > 0.0     # shortcut if we're limited by zero input electricity
         # get vectored values for the input and output heat potentials
