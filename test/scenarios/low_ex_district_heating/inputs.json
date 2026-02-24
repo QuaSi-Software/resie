@@ -1,0 +1,328 @@
+{
+    "io_settings": {
+        "csv_output_file": "./test/scenarios/low_ex_district_heating/out.csv",
+        "sankey_plot_file": "./test/scenarios/low_ex_district_heating/sankey_plot.html",
+        "output_plot_file": "./test/scenarios/low_ex_district_heating/output_plot.html",
+        "auxiliary_info": true,
+        "auxiliary_info_file": "./test/scenarios/low_ex_district_heating/auxiliary_info.md",
+        "sankey_plot": "default",
+        "csv_time_unit": "date",
+        "_csv_output_keys": "all_incl_flows",
+        "csv_output_keys": "nothing",
+        "output_plot": "all_incl_flows"
+    },
+    "simulation_parameters": {
+        "start": "01.01.2024 00:00",
+        "end": "31.12.2024 23:00",
+        "start_end_unit": "dd.mm.yyyy HH:MM",
+        "time_step": 60,
+        "time_step_unit": "minutes",
+        "weather_file_path": "./profiles/weather/TRY2015_Stuttgart.epw",
+        "force_profiles_to_repeat": true
+    },
+    "components": {
+        "DEM_SpaceHeating_01": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "heat_01",
+            "constant_temperature": 45,
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 452
+        },
+        "DEM_SpaceHeating_02": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "heat_01",
+            "constant_temperature": 45,
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
+            "scale": 360
+        },
+        "DEM_DHW_House_01a": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "heat_01",
+            "constant_temperature": 65,
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "scale": 2600
+        },
+        "DEM_DHW_House_02": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "heat_01",
+            "constant_temperature": 65,
+            "energy_profile_file_path": "./profiles/examples/general/dem_heat_nrg_var_hi-amp.prf",
+            "scale": 8900
+        },
+        "BUS_Heat_House_01": {
+            "type": "Bus",
+            "medium": "heat_01",
+            "connections": {
+                "input_order": [
+                    "BUS_DistrictHeating_LowEx",
+                    "TB_House_01",
+                    "BFT_DWH_House_01"
+                ],
+                "output_order": [
+                    "DEM_DHW_House_01a",
+                    "DEM_DHW_House_01b",
+                    "BFT_DWH_House_01",
+                    "DEM_SpaceHeating_01"
+                ],
+                "energy_flow": [
+                    [ 1,1,1,1 ],
+                    [ 1,1,1,0 ],
+                    [ 1,1,1,0 ]
+                ]
+            }
+        },
+        "DEM_DHW_House_01b": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "heat_01",
+            "energy_profile_file_path": "./profiles/examples/district/demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf",
+            "scale": 650,
+            "constant_temperature": 65
+        },
+        "BUS_Heat_House_02": {
+            "type": "Bus",
+            "medium": "heat_01",
+            "connections": {
+                "input_order": [
+                    "BUS_DistrictHeating_LowEx",
+                    "TB_House_02",
+                    "BFT_DHW_House_02"
+                ],
+                "output_order": [
+                    "DEM_SpaceHeating_02",
+                    "DEM_DHW_House_02",
+                    "BFT_DHW_House_02"
+                ],
+                "energy_flow": [
+                    [ 1,1,1 ],
+                    [ 0,1,1 ],
+                    [ 1,1,0 ]
+                ]
+            }
+        },
+        "PV_House_01": {
+            "type": "FixedSupply",
+             "medium": "electricity",
+            "output_refs": ["BUS_Power_Houses"],
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_30_south_Wh_per_square_meter.prf",
+            "scale": 55
+        },
+        "PV_House_02": {
+            "type": "FixedSupply",
+            "medium": "electricity",
+            "output_refs": ["BUS_Power_Houses"],
+            "energy_profile_file_path": "./profiles/examples/district/PV_Stuttgart_10_east_Wh_per_square_meter.prf",
+            "scale": 45
+        },
+        "BUS_Power_Houses": {
+            "type": "Bus",
+            "medium": "electricity",
+            "connections": {
+                "input_order": [
+                    "PV_House_01",
+                    "PV_House_02",
+                    "GRI_Power_01"
+                ],
+                "output_order": [
+                    "DEM_Power_House_01",
+                    "DEM_Power_House_02",
+                    "TB_House_01",
+                    "TB_House_02",
+                    "GRO_Power"
+                ],
+                "energy_flow": [
+                    [ 1,6,3,8,9 ],
+                    [ 5,2,7,4,10 ],
+                    [ 11,12,13,14,0 ]
+                ]
+            }
+        },
+        "GRI_Power_01": {
+            "type": "GridConnection",
+            "output_refs": [
+                "BUS_Power_Houses"
+            ],
+            "medium": "electricity",
+            "is_source": true
+        },
+        "TB_House_01": {
+            "type": "ThermalBooster",
+            "output_refs": [
+                "BUS_Heat_House_01"
+            ],
+            "m_heat_in": "heat_01",
+            "m_heat_out": "heat_01",
+            "m_el_in": "electricity",
+            "power_el": 7200,
+            "constant_demand_input_temperature": 12,
+            "cp_medium_out": 4180,
+            "terminal_dT": 2.0,
+            "heat_losses_factor": 0.95,
+            "power_losses_factor": 0.95,
+            "allow_boost_solely": false,
+            "allow_boost_additional": true
+        },
+        "TB_House_02": {
+            "type": "ThermalBooster",
+            "output_refs": [
+                "BUS_Heat_House_02"
+            ],
+            "m_heat_in": "heat_01",
+            "m_heat_out": "heat_01",
+            "m_el_in": "electricity",
+            "power_el": 3500,
+            "constant_demand_input_temperature": 12,
+            "cp_medium_out": 4180,
+            "terminal_dT": 2.0,
+            "heat_losses_factor": 0.95,
+            "power_losses_factor": 0.95,
+            "allow_boost_solely": false,
+            "allow_boost_additional": true
+        },
+        "BUS_DistrictHeating_LowEx": {
+            "type": "Bus",
+            "medium": "heat_01",
+            "connections": {
+                "input_order": [
+                    "HP_DistrictHeating_LowEx",
+                    "BFT_DistrictHeating_LowEx"
+                ],
+                "output_order": [
+                    "BUS_Heat_House_01",
+                    "BUS_Heat_House_02",
+                    "TB_House_01",
+                    "TB_House_02",
+                    "BFT_DistrictHeating_LowEx"
+                ],
+                "energy_flow": [
+                    [ 1,1,1,1,1 ],
+                    [ 1,1,1,1,1 ]
+                ]
+            }
+        },
+        "HP_DistrictHeating_LowEx": {
+            "type": "HeatPump",
+            "output_refs": [
+                "BUS_DistrictHeating_LowEx"
+            ],
+            "power_th": 56000,
+            "__OPTIONAL_MEDIA__": "",
+            "m_heat_in": "ambient_air",
+            "m_el_in": "electricity",
+            "m_heat_out": "heat_01",
+            "__OPTIONAL_COP_AND_POWER__": "",
+            "cop_function": "carnot:0.45",
+            "bypass_cop": 15,
+            "output_temperature": 45,
+            "min_power_function": "const:0.0",
+            "max_power_function": "const:1.0",
+            "__OPTIONAL_LOSSES__": "",
+            "heat_losses_factor": 0.97,
+            "power_losses_factor": 0.97,
+            "__OPTIONAL_ICING__": "",
+            "consider_icing": true,
+            "icing_coefficients": "3,-0.42,15,2,30",
+            "__OPTIONAL_OPTIMISATION_FOR_INVERTER_HP__": "",
+            "optimise_slice_dispatch": true,
+            "optimal_plr": 0.5,
+            "nr_optimisation_passes": 10
+        },
+        "GRI_Power_02": {
+            "type": "GridConnection",
+            "output_refs": [
+                "HP_DistrictHeating_LowEx"
+            ],
+            "medium": "electricity",
+            "is_source": true
+        },
+        "GRI_Air": {
+            "type": "GridConnection",
+            "output_refs": [
+                "HP_DistrictHeating_LowEx"
+            ],
+            "medium": "ambient_air",
+            "is_source": true,
+            "temperature_profile_file_path": "./profiles/examples/district/ambient_temperature_TRY2015_Stuttgart.prf"
+        },
+        "BFT_DistrictHeating_LowEx": {
+            "type": "BufferTank",
+            "output_refs": [
+                "BUS_DistrictHeating_LowEx"
+            ],
+            "medium": "heat_01",
+            "volume": 5.0,
+            "model_type": "ideally_stratified",
+            "high_temperature": 45,
+            "low_temperature": 10,
+            "consider_losses": true,
+            "h_to_r": 1,
+            "ambient_temperature_from_global_file": "temp_ambient_air",
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 0.8,
+            "thermal_transmission_barrel": 1.0,
+            "thermal_transmission_bottom": 2.5
+        },
+        "BFT_DWH_House_01": {
+            "type": "BufferTank",
+            "output_refs": [
+                "BUS_Heat_House_01"
+            ],
+            "medium": "heat_01",
+            "volume": 1.5,
+            "model_type": "ideally_stratified",
+            "high_temperature": 65,
+            "low_temperature": 15,
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 16,
+            "ground_temperature": 15,
+            "thermal_transmission_lid": 1.5,
+            "thermal_transmission_barrel": 1.6,
+            "thermal_transmission_bottom": 2.5
+        },
+        "BFT_DHW_House_02": {
+            "type": "BufferTank",
+            "output_refs": [
+                "BUS_Heat_House_02"
+            ],
+            "medium": "heat_01",
+            "volume": 0.5,
+            "___MODEL_PARAMETERS___": "",
+            "model_type": "ideally_stratified",
+            "__GENERAL_PARAMETER__": "",
+            "high_temperature": 65,
+            "low_temperature": 15,
+            "consider_losses": true,
+            "h_to_r": 2,
+            "constant_ambient_temperature": 18,
+            "ground_temperature": 12,
+            "thermal_transmission_lid": 0.4,
+            "thermal_transmission_barrel": 0.5,
+            "thermal_transmission_bottom": 0.7
+        },
+        "DEM_Power_House_01": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "electricity",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 650
+        },
+        "DEM_Power_House_02": {
+            "type": "Demand",
+            "output_refs": [],
+            "medium": "electricity",
+            "energy_profile_file_path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
+            "scale": 350
+        },
+        "GRO_Power": {
+            "type": "GridConnection",
+            "output_refs": [],
+            "medium": "electricity",
+            "is_source": false
+        }
+    }
+}
