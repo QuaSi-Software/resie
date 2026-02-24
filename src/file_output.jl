@@ -993,7 +993,7 @@ function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepat
         end      
     end
 
-    println("Profile file at $filepath created.")
+    @info "Profile file at $filepath created."
 end
 
 function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
@@ -1010,5 +1010,5 @@ function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepat
         end      
     end
 
-    println("Profile file at $filepath created.")
+    @info "Profile file at $filepath created."
 end

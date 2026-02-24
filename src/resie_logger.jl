@@ -3,7 +3,7 @@ module Resie_Logger
 using Dates
 using Logging
 
-export @balanceWarn
+export @balanceWarn, @globalInfo
 
 """
 CustomLogger
@@ -61,6 +61,21 @@ macro balanceWarn(exprs...)
     end
 end
 
+"""
+Adding custom level "GlobalInfo" of level 500.
+This can be used with the @balanceWarn macro.
+
+To add further custom levels, you need to define a new constant using the 
+CustomLevel struct, the corresponding macro and export the macro. 
+Also define the behaviour in Base.show() and Logging.handle_message() below.
+"""
+const GlobalInfo = CustomLevel(700, "GlobalInfo")
+macro globalInfo(exprs...)
+    quote
+        @logmsg GlobalInfo $(map(x -> esc(x), exprs)...)
+    end
+end
+
 # define basic functions to handle the CustomLevels
 Base.isless(a::CustomLevel, b::LogLevel) = isless(a.level, b.level)
 Base.isless(a::LogLevel, b::CustomLevel) = isless(a.level, b.level)
@@ -68,6 +83,8 @@ Base.convert(::Type{LogLevel}, level::CustomLevel) = LogLevel(level.level)
 Base.show(io::IO, level::CustomLevel) =
     if level == BalanceWarning
         print(io, "BalanceWarning")
+    elseif level == GlobalInfo
+        print(io, "Info")
     else
         show(io, LogLevel(level))
     end
@@ -88,6 +105,8 @@ function Logging.handle_message(logger::CustomLogger, level, message, _module, g
     if logger.log_to_console
         if level.level == BalanceWarning.level  # directly comparing the levels here as this is easier to implement
             handle_BalanceWarning_message(level, message)
+        elseif level.level == GlobalInfo.level 
+            handle_GlobalInfo_message(level, message)
         else
             default_logger = ConsoleLogger(stderr, logger.min_level)
             Logging.handle_message(default_logger, level, message, _module, group, id, file, line; kwargs...)
@@ -133,6 +152,31 @@ Note that not all terminals support 256 colors..
 """
 function handle_BalanceWarning_message(level, message)
     color = :light_magenta
+    prefix = "[ " * string(level.name, ':')
+
+    stream = stderr
+    buf = IOBuffer()
+    iob = IOContext(buf, stream)
+    printstyled(iob, prefix; bold=true, color=color)
+    print(iob, " ", message, "\n")
+    write(stream, take!(buf))
+end
+
+"""
+    handle_GlobalInfo_message()
+
+defines the console-output of the GlobalInfo messages.
+This is a very simple implementation of the general handle_message()
+of the Logging module of Julia with only the basic functionalities.
+
+Color can be one of  :normal, :default, :bold, :black, :blink, :blue, :cyan, 
+:green, :hidden, :light_black, :light_blue, :light_cyan, :light_green, 
+:light_magenta, :light_red, :light_white, :light_yellow, :magenta, :nothing, 
+:red, :reverse, :underline, :white, or :yellow or an integer between 0 and 255 inclusive. 
+Note that not all terminals support 256 colors..
+"""
+function handle_GlobalInfo_message(level, message)
+    color = :blue
     prefix = "[ " * string(level.name, ':')
 
     stream = stderr
