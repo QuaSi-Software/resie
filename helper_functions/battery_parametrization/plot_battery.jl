@@ -8,7 +8,7 @@ using CSV
 using DataFrames
 p.plotlyjs()
 
-include("../test/test_util.jl")
+include("../../test/test_util.jl")
 
 function get_config_battery_detailed()
     return Dict{String,Any}( 
@@ -124,7 +124,7 @@ function plot_curves(params, V_min, V_max, nominal_cell_capacity, c_rates, cycle
     p.plot!(fig, ; title="Battery discharge curve at different C-rates",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
-                ylims=(battery.V_cell_min, battery.V_cell_max),
+                ylims=(battery.V_cell_min, maximum(hcat(y1, y2, y3))),
                 xlims=(0, Q_max),
                 minorticks=minorticks,
                 size=size,
@@ -166,7 +166,7 @@ function plot_curves(params, V_min, V_max, nominal_cell_capacity, c_rates, cycle
     p.plot!(fig, ; title="Battery discharge curve at different Temperatures",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
-                ylims=(battery.V_cell_min, battery.V_cell_max),
+                ylims=(battery.V_cell_min, maximum(hcat(y1, y2, y3))),
                 xlims=(0, Q_max),
                 minorticks=minorticks,
                 size=size,
@@ -208,7 +208,7 @@ function plot_curves(params, V_min, V_max, nominal_cell_capacity, c_rates, cycle
     p.plot!(fig, ; title="Battery discharge curve after different number of cycles",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
-                ylims=(battery.V_cell_min, battery.V_cell_max),
+                ylims=(battery.V_cell_min, maximum(hcat(y1, y2, y3))),
                 xlims=(0, Q_max),
                 minorticks=minorticks,
                 size=size,
@@ -240,14 +240,17 @@ end
 # parameters = 3.36964, 0.03546, 0.08165, 10.0102, 0.0157, 1.0269, -0.01212, 
 #              [-1.27571e-7, 1.22095e-11], [1.32729e-3, -7.9763e-6], 
 #              [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4], [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2], 1, 25
-# parameters = 3.3694, 0.03543, 0.08174, 10.0102, 0.015747, 1.02687, -0.01212, 
-#              [-9.079645e-8, 6.1242e-12], [1.2999e-3, -8.96904e-6], 
-#              [9.0743e-6, 7.2532e-4, -3.51154e-5, -2.49544e-4], [1.84665e-4, -3.3333e-2, 8.474e-4, -1.3666e-2], 10, 25
-Q_full_1 = 10.9
-parameters = 3.3694, 0.03543, 0.08174, 1.00102, 0.0015747, 1.02687 -0.0121, 
+# Q_full_1 = 10.9
+
+parameters = 3.3694, 0.03543, 0.08174, 1.1375213663044699, 0.0017894160517901536, 1.02687 -0.01212,
+            [-9.079639e-8, 6.1242e-12], [1.2999e-3, -8.96904e-6], 
+            [9.0743e-6, 7.2532e-4, -3.51154e-5, -2.49544e-4], [1.84665e-4, -3.3333e-2, 8.474e-4, -1.3666e-2], 8.8, 25
+Q_full_1 = 
+
+parameters = 3.3694, 0.03543, 0.08174, 1.00102, 0.0015747, 1.02687 -0.01212, 
              [-9.079639e-8, 6.1242e-12], [1.2999e-3, -8.96904e-6], 
              [9.0743e-6, 7.2532e-4, -3.51154e-5, -2.49544e-4], [1.84665e-4, -3.3333e-2, 8.474e-4, -1.3666e-2], 10, 25
-Q_full_1 = 109
+Q_full_1 = 95.92
 V_min = 2.0
 V_max = 3.4
 
@@ -260,12 +263,13 @@ V_max = 3.4
 # Q_full_1 = 0.15627
    
 #LiIon NMC
-# parameters = 4.322089864650338, 0.22465804646851967, 0.08456818181818074, 47.320760004338, 0.03, 1.1738258400234733, -0.013856094648485657, 
-#              [0.0, 0.0], [0.0006298981908737985, 1.1230742938060141e-5], 
-#              [0.0, 0.0, 0.0, 0.0], [-0.0027225713491162828, 2.8346405221964717e-5, -0.00775726863401747, -0.4310834811137324], 1.5, 25
-# V_min = 2.76
-# V_max = 4.137
-# Q_full_1 = 3.034
+parameters = 4.322089864650338, 0.22465804646851967, 0.08456818181818074, 47.320760004338, 0.03, 1.1738258400234733, -0.013856094648485657, 
+             [0.0, 0.0], [0.0006298981908737985, 1.1230742938060141e-5], 
+             [0.0, 0.0, 0.0, 0.0], [-0.0027225713491162828, 2.8346405221964717e-5, -0.00775726863401747, -0.4310834811137324], 1.5, 25
+# parameters = (3.0861331210979475, 0.006036867868709199, 1.1019037467707613, 0.43446189125357165, 0.03, 1.0105910606850004, -0.013856094648485657, [-0.00033189671916846207, 7.662761983144845e-7], [0.004013769867428403, -0.00010156497961375999], [2.1013945960641814e12, 1.441151880757754e14, 0.024157621893313375, -0.01814606253357836], [0.0012233391889071982, -1.783794196189242e-5, 0.005074256913418387, -0.001707011877438885], 1.5, 25.0)
+V_min = 2.76
+V_max = 4.137
+Q_full_1 = 3.034
 
 c_rates = [0.1, 0.5, 1]
 cycles = [1, 500, 1000]
