@@ -179,13 +179,16 @@ function get_output_keys(project_config::AbstractDict{AbstractString,Any},
         output_keys_to_csv = nothing
     end
 
+    #TODO also handle emission and economy keys here
     if do_return_data  # return data from funtion
         if do_return_all_outputs_incl_flows
             output_keys_return = all_output_keys_incl_flows
         elseif do_return_all_outputs_excl_flows
             output_keys_return = all_output_keys_excl_flows
-        else  # get only requested output keys from input file for CSV-export
-            output_keys_return = output_keys(components, io_settings["return_output_keys"])
+        else  # get all keys that are defined on how to be accumulated in input_file
+            output_keys_sum = output_keys(components, project_config["optimizer"]["total_output_keys"]["sum"])
+            output_keys_mean = output_keys(components, project_config["optimizer"]["total_output_keys"]["mean"])
+            output_keys_return = vcat(output_keys_sum, output_keys_mean)
         end
     else
         output_keys_return = nothing
@@ -414,16 +417,33 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
     return outputs
 end
 
-"""
-reset_file(filepath, output_keys)
+function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})
+    keys = Array{String}(undef, length(output_keys))
+    for (idx, outkey) in enumerate(output_keys)
+        if outkey.medium === nothing
+            keys[idx] = "$(outkey.unit.uac) $(outkey.value_key)"
+        else
+            if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
+                keys[idx] = "$(outkey.medium) $(outkey.value_key)"
+            else
+                keys[idx] = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
+            end
+        end
+    end
+    return keys
+end
 
-Reset the output file and add headers for the given outputs.
+
 """
-function reset_file(filepath::String,
-                    output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                    weather_data_keys::Union{Nothing,Vector{String}},
-                    csv_time_unit::String)
-    open(filepath, "w") do file_handle
+get_output_header(output_keys, weather_data_keys, csv_time_unit)
+
+Get the output header for the given outputs to used in output file or dictionary.
+"""
+function get_output_header(output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           csv_time_unit::String)
+    header = Array{String}(undef, 0)
+    if csv_time_unit !== nothing
         if csv_time_unit == "seconds"
             time_unit = "[s]"
         elseif csv_time_unit == "minutes"
@@ -434,43 +454,34 @@ function reset_file(filepath::String,
             time_unit = "[dd.mm.yyyy HH:MM:SS]"
         end
 
-        write(file_handle, "Time $time_unit")
-
-        if output_keys !== nothing
-            for outkey in output_keys
-                if outkey.medium === nothing
-                    header = "$(outkey.unit.uac) $(outkey.value_key)"
-                else
-                    if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
-                        header = "$(outkey.medium) $(outkey.value_key)"
-                    else
-                        header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
-                    end
-                end
-                write(file_handle, ";$header")
-            end
-        end
-        if weather_data_keys !== nothing
-            for key in weather_data_keys
-                write(file_handle, ";Weather $key")
-            end
-        end
-
-        write(file_handle, "\n")
+        push!(header, "Time $time_unit")
     end
+
+    if output_keys !== nothing
+        output_keys_names = parse_outkeys(output_keys)
+        header = vcat(header, output_keys_names)
+    end
+
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            push!(header, "Weather $key")
+        end
+    end
+
+    return header
 end
 
 """
-write_to_file(filepath, output_keys, time)
+get_output_row(output_keys, weather_data_keys, sim_params, csv_time_unit)
 
-Write the given outputs for the given time to file.
+Create a row with values for given outputs to be written to file or dictionary.
 """
-function write_to_file(filepath::String,
-                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                       weather_data_keys::Union{Nothing,Vector{String}},
-                       sim_params::Dict{String,Any},
-                       csv_time_unit::String)
-    open(filepath, "a") do file_handle
+function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                        weather_data_keys::Union{Nothing,Vector{String}},
+                        sim_params::Dict{String,Any},
+                        csv_time_unit::String)
+    row = Array{Float64}(undef, 0)
+    if csv_time_unit !== nothing
         if csv_time_unit == "seconds"
             time = sim_params["time_since_output"]
         elseif csv_time_unit == "minutes"
@@ -481,25 +492,23 @@ function write_to_file(filepath::String,
             time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
         end
 
-        write(file_handle, "$time")
-
-        if output_keys !== nothing
-            for outkey in output_keys
-                value = output_value(outkey.unit, outkey)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
-            end
-        end
-        if weather_data_keys !== nothing
-            for key in weather_data_keys
-                value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
-            end
-        end
-
-        write(file_handle, "\n")
+        push!(row, time)
     end
+
+    if output_keys !== nothing
+        for outkey in output_keys
+            value = output_value(outkey.unit, outkey)
+            push!(row, value)
+        end
+    end
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
+            push!(row, value)
+        end
+    end
+
+    return row
 end
 
 """
@@ -967,4 +976,39 @@ function create_sankey(output_all_sourcenames::Vector{Any},
     # save plot
     file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
     savefig(p, file_path)
+end
+
+function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
+    header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
+                        "# profile_start_date_format:", "# timestamp_format:", 
+                        "# interpolation_type:"]
+    header_values = ["intensive", "startdate_timestamp", "01.01.2024 00:00", 
+                     "dd.mm.yyyy HH:MM", "seconds", "stepwise"]
+    open(filepath, "w") do file_handle
+        for (var, val) in zip(header_variables, header_values)
+            write(file_handle, var * "\t" * val * "\n")
+        end
+        for (ts, val) in zip(timestamps, values)
+            write(file_handle, string(ts) * ";" * string(val) * "\n")
+        end      
+    end
+
+    println("Profile file at $filepath created.")
+end
+
+function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
+    header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:", 
+                        "# time_zone:", "# interpolation_type:"]
+    header_values = ["intensive", "datestamp", "dd.mm.yyyy HH:MM", 
+                     "Europe/Berlin", "stepwise"]
+    open(filepath, "w") do file_handle
+        for (var, val) in zip(header_variables, header_values)
+            write(file_handle, var * "\t" * val * "\n")
+        end
+        for (ts, val) in zip(dates, values)
+            write(file_handle, string(ts) * ";" * string(val) * "\n")
+        end      
+    end
+
+    println("Profile file at $filepath created.")
 end
