@@ -58,8 +58,8 @@ BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an arr
 #  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
 # TODO adjust values
 # Grid Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
-profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
 # define states in control module
@@ -309,7 +309,7 @@ function create_variant(
             values = [profile.data[dt] .* profile_multipliers[p_idx] .+ profile_addons[p_idx] for dt in date_range]
             new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
             save_to_prf(collect(date_range), values, new_path)
-            new_paths[p_idx] = path
+            new_paths[p_idx] = new_path
             profile_values[p_idx, :] = values
         end
     end
@@ -413,7 +413,6 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     println("Parameterstudy starts: $total_runs runs on $(Threads.nthreads()) parallel Threads")
     println("Skipped $skipped_runs invalid runs (HeatPump + ElectrodeBoiler <= 5 MW).")
     println("Input file: $(abspath(base_input_path))")
-    println("VDI2067 Grid_price mode: $vdi_grid_price_mode")
 
     out_file_path = outdir * "/results_$(total_runs)runs_" * Dates.format(now(), "yymmdd_HHMMSS") * ".csv"
     touch(out_file_path)
@@ -445,7 +444,7 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     # balance warnings
     header_balances = ["balance_power", "balance_heat", "Errors"]
     # yearly_CO2-emissions
-    header_co2 = ["CO2_yearly"]
+    header_co2 = ["CO2_yearly / t/a"]
     header = join(vcat(header_parameters, header_annuity_no, header_annuity_mod, 
                        header_annuity_pro, header_co2, header_balances), ';') * "\n"
 

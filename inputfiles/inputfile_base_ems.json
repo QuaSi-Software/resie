@@ -166,13 +166,13 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "max_power_profile_file_path": "./profiles/MA/reserve_call_neg.prf",
             "scale": 0.0
         },
         "PosControlReserve": {
             "type": "FlexibleSink",
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/control_relative.prf",
+            "max_power_profile_file_path": "./profiles/MA/reserve_call_pos.prf",
             "scale": 0.0
         },
         "Grid_OUT": {
@@ -297,7 +297,7 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
-                    [0, 0, 0, 0, 0, 0],
+                    [0, 0, 1, 1, 0, 0],
                     [1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 0, 0],

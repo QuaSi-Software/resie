@@ -6,7 +6,7 @@ using Plots                                              # Plots
 import PlotlyJS
 
 # Konfiguration (hier anpassen)
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_1640runs_260213_110154.csv"             # <- Pfad zur CSV anpassen
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_1100runs_260223_180406.csv"             # <- Pfad zur CSV anpassen
 const OUTDIR   = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"                                 # Plot-Ausgabeordner
 
 # Spaltennamen (wie in deiner CSV)

@@ -17,7 +17,6 @@ struct VDIParams
     r_inst::Float64             # Escalation of repair / reinstatement
     r_misc::Float64             # Escalation of miscellaneous costs (insurance, admin,…)
     r_rev::Float64              # Escalation of revenues (feed-in, control energy)
-    grid_price_addon::Float64   # taxes, levies, grid fees  #TODO is this needed?
     AW_PV::Float64              # "Anzusetzender Wert" bei Direktvermarktung"
     AW_Wind::Float64            # "Anzusetzender Wert" bei Direktvermarktung"
 end
@@ -73,7 +72,6 @@ VDI_SCENARIO_NONE = VDIParams(
     0.000,    # no repair cost (Excel)
     0.000,    # no miscellaneous (Excel)
     0.000,    # no revenues
-    120.0,    # grid price addon €/MWh
     106.8,    # AW_PV €/MWh
     83.496    # AW_Wind €/MWh, 58.8*1.42
     )
@@ -88,8 +86,6 @@ VDI_SCENARIO_MOD = VDIParams(
     0.010,    # repair cost +0.5% (Excel)
     0.010,    # miscellaneous +0.5% (Excel)
     -0.01,    # revenues -10%
-    #TODO grid fees based on historical average data
-    120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     106.8,    # AW_PV €/MWh
     83.496    # AW_Wind €/MWh, 58.8*1.42
@@ -105,8 +101,6 @@ VDI_SCENARIO_PRO = VDIParams(
     0.020,    # repair +1.0% (Excel)
     0.020,    # miscellaneous +1.0% (Excel)
     -0.02,    # revenues -2.0%
-    #TODO grid fees based on historical average data
-    120.0,     # grid price addon €/MWh
     # TODO escalations for AW_PV and AW_Wind?
     106.8,     # AW_PV €/MWh
     83.496    # AW_Wind €/MWh, 58.8*1.42
