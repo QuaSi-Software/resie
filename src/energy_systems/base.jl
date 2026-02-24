@@ -417,6 +417,10 @@ function add!(interface::SystemInterface,
     elseif interface.target.sys_function == sf_bus
         add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
                      interface.is_secondary_interface)
+    elseif interface.sum_abs_change == 0.0
+        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+        # it cannot be reliably detected that the balance has already been written.
+        interface.max_energy = MaxEnergy()
     end
 end
 
@@ -458,6 +462,10 @@ function sub!(interface::SystemInterface,
     elseif interface.target.sys_function == sf_bus
         sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
                      interface.is_secondary_interface)
+    elseif interface.sum_abs_change == 0.0
+        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+        # it cannot be reliably detected that the balance has already been written.
+        interface.max_energy = MaxEnergy()
     end
 end
 
@@ -1329,7 +1337,7 @@ called in 1-to-1 connections. Here, the components take care of matching tempera
     required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
+    balance_written = is_max_energy_nothing(interface.max_energy) || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     if balance_written
