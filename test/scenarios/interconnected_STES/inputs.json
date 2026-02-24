@@ -239,7 +239,7 @@
             "model_type": "ideally_stratified",
             "capacity": 300000,
             "rho_medium": 1000,
-            "cp_medium": 4.18,
+            "cp_medium": 4180,
             "high_temperature": 85.0,
             "low_temperature": 15.0,
             "initial_load": 0.5,
@@ -374,7 +374,7 @@
             "sidewall_angle": 40,
             "shape": "quadratic",
             "rho_medium": 1000,
-            "cp_medium": 4.18,
+            "cp_medium": 4180,
             "diffusion_coefficient": 0.000000143,
             "number_of_layer_total": 25,
             "number_of_layer_above_ground": 1,
@@ -389,7 +389,21 @@
             "thermal_transmission_barrel": 0.375,
             "thermal_transmission_bottom": 0.375,
             "constant_ground_temperature": 20.0,
-            "initial_load": 0.45
+            "initial_load": 0.45,
+            "___FOR_GROUND_MODEL_FVM_ONLY___": "",
+            "ground_model": "FVM",
+            "ground_accuracy_mode": "very_rough",
+            "ground_domain_radius_factor": 1.5,
+            "ground_domain_depth_factor": 2.0,
+            "ground_layers_depths": [0.0, 2.0, 10.0],
+            "ground_layers_k": [1.5, 2.0], 
+            "ground_layers_rho": [ 2100 ],
+            "ground_layers_cp": [ 1330 ],
+            "soil_surface_hconv": 15.5,
+            "has_top_insulation_overlap": true,
+            "top_insulation_overlap_width": 5.0,
+            "thermal_transmission_overlap": 0.1,
+            "ground_bottom_boundary": "Neumann"
         }
     }
 }

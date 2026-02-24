@@ -127,7 +127,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         unit="kg/m^3"
     ),
     "cp_medium" => (
-        default=4.18,
+        default=4180,
         description="Specific heat capacity of the fluid",
         display_name="Spec. heat capacity fluid",
         required=false,
@@ -429,12 +429,12 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but none of them is given."
         throw(InputError())
     elseif unit.capacity === nothing && unit.volume !== nothing
-        unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
+        unit.capacity = unit.volume * unit.rho_medium * unit.cp_medium / 3600 *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
         if unit.consider_losses
             unit.volume = unit.capacity /
-                          (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+                          (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
         end
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."

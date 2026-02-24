@@ -401,7 +401,7 @@
             "hr_ratio": 2,
             "sidewall_angle": 90,
             "rho_medium": 1000,
-            "cp_medium": 4.18,
+            "cp_medium": 4180,
             "diffussion_coefficient": 0.000000143,
             "number_of_layer_total": 25,
             "number_of_layer_above_ground": 1,
@@ -414,7 +414,8 @@
             "thermal_transmission_barrel": 0.375,
             "thermal_transmission_bottom": 0.375,
             "constant_ground_temperature": 9.0,
-            "initial_load": 0.475
+            "initial_load": 0.475,
+            "ground_model": "simplified"
         },
         "TST_HTP_01": {
             "type": "HeatPump",
