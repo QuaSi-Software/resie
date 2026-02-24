@@ -4,7 +4,7 @@ using Printf
 using Dates: now, seconds
 using UUIDs
 using LinearAlgebra
-using .Threads
+using Base.Threads
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -198,11 +198,19 @@ function prepare_inputs(project_config::AbstractDict{AbstractString,Any}, run_ID
     end
 
     #TODO create functions to parse new parameters from input file
-    # economy_params = get_economy_params(project_config["economy"])
-    economy_params = project_config["economy"]
+    if haskey(project_config, "economy")
+        # economy_params = get_economy_params(project_config["economy"])
+        economy_params = project_config["economy"]
+    else
+        economy_params = nothing
+    end
 
-    # emission_params = get_emission_params(project_config["emission"])
-    emission_params = project_config["emission"]
+    if haskey(project_config, "emission")
+        # emission_params = get_emission_params(project_config["emission"])
+        emission_params = project_config["emission"]
+    else
+        emission_params = nothing
+    end
 
     return sim_params, components, operations, economy_params, emission_params
 end
@@ -258,27 +266,16 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
 
     # reset CSV file
     if do_write_CSV
-        reset_file(sim_params["run_path"](csv_output_file_path),
-                   output_keys_to_CSV,
-                   weather_CSV_keys,
-                   csv_time_unit)
+        header = get_output_header(output_keys_to_CSV, weather_CSV_keys, csv_time_unit)
+        # Reset the output file and add headers for the given outputs.
+        open(sim_params["run_path"](csv_output_file_path), "w") do file_handle
+            write(file_handle, join(header, ';') * "\n")
+        end
     end
 
     # create keys consistent with csv_output for return data for return Dict
     if do_return_data
-        output_return_header = ["timestep"]
-        for outkey in output_keys_return
-            if outkey.medium === nothing
-                header = "$(outkey.unit.uac) $(outkey.value_key)"
-            else
-                if startswith(outkey.value_key, "EnergyFlow") || startswith(outkey.value_key, "TemperatureFlow")
-                    header = "$(outkey.medium) $(outkey.value_key)"
-                else
-                    header = "$(outkey.unit.uac) $(outkey.medium) $(outkey.value_key)"
-                end
-            end
-            push!(output_return_header, header)
-        end
+        output_return_header = get_output_header(output_keys_return, nothing, csv_time_unit)
     end
 
     # check if sankey should be plotted
@@ -331,11 +328,15 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             # This is currently done in every time step to keep data even if 
             # an error occurs.
             if do_write_CSV
-                write_to_file(sim_params["run_path"](csv_output_file_path),
-                              output_keys_to_CSV,
-                              weather_CSV_keys,
-                              sim_params,
-                              csv_time_unit)
+                row = get_output_row(output_keys_to_CSV, 
+                                     weather_CSV_keys, 
+                                     sim_params, 
+                                     csv_time_unit)
+                # Write row to the output file
+                open(sim_params["run_path"](csv_output_file_path), "a") do file_handle
+                    row = replace(row, "." => ",")
+                    write(file_handle, join(row, ';') * "\n")
+                end
             end
 
             # get the energy transported through each interface in every timestep for Sankey
@@ -443,9 +444,9 @@ Load a project from the given file and run the simulation with it.
 """
 function load_and_run(filepath::String, run_ID::UUID)::Bool
     start = now()
-    @info "---- Simulation setup ----"
-    @info "-- Starting simulation at $(start)"
-    @info "-- Now reading project config"
+    @globalInfo "---- Simulation setup ----"
+    @globalInfo "-- Starting simulation at $(start)"
+    @globalInfo "-- Now reading project config"
 
     project_config = nothing
 
@@ -470,7 +471,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         return false
     end
 
-    @info "-- Now preparing inputs"
+    @globalInfo "-- Now preparing inputs"
 
     run_lock = ReentrantLock()
     output_lock = ReentrantLock()
@@ -480,16 +481,18 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     # and put them here
     sim_params = get_simulation_params(project_config)
     
+    #TODO discuss if the total_results should be overwritten made individual with e.g. timestamp
     proccesed_results_path = default(project_config["io_settings"], 
                                      "processed_results", 
-                                     "./output/results_$(total_runs)runs_" * 
-                                     Dates.format(now(), "yymmdd_HHMMSS") * ".csv")
+                                     "./output/total_results.csv")
     proccesed_results_path = sim_params["run_path"](proccesed_results_path)
-    touch(proccesed_results_path)
+    open(proccesed_results_path, "w") do f end
 
     if !isnothing(project_config["optimizer"])
+        #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
         optimizer = load_optimizer(project_config["optimizer"])
 
+        total_runs = length(optimizer["iterator"])
         runidx_global = Atomic{Int}(1)
         all_results = OrderedDict()
         if haskey(optimizer, "objective")
@@ -497,48 +500,47 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             obj_lock = ReentrantLock()
         end
 
-        @threads for sample_values in optimizer["iterator"]
-            sample_params = Dict(zip(optimizer["sample_params_keys"], sample_values))
+        #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
+        @threads for sample_values in collect(optimizer["iterator"])
+            sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
             runidx = atomic_add!(runidx_global, 1)
             sample_ID = uuid4()
             start_time = now()
-            #TODO create new Logging level for Info thats overarching mulitple simulations
-            @info("[$runidx/$total_runs] → start simulation: $(basename(input_file))")
 
             # decide which algorithm to run based on type of optimizer
-            if optimizer["type"] == "parameterstudy"
+            if optimizer["type"] == "parametervariation"
                 _ = run_sample(sim_params, proccesed_results_path, project_config, 
-                               sample_params, sample_ID, run_lock, output_lock)
+                               optimizer, sample_params, sample_ID, run_lock, output_lock)
 
             elseif optimizer["type"] == "monte_carlo_annealing"
                 monte_carlo_annealing!(all_results, obj, obj_lock, 
                                        sim_params, proccesed_results_path, project_config, 
-                                       sample_ID, run_lock, output_lock, results_lock)
-
+                                       optimizer, sample_ID, 
+                                       run_lock, output_lock, results_lock)
             end
 
             runtime = round(Int, Dates.seconds(now() - start_time))
             eta = round(Int, (total_runs - runidx) * runtime / Threads.nthreads() / 60)
-            @info "[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min"
+            @globalInfo "[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min"
         end
 
     else
         _ = run_sample(sim_params, proccesed_results_path, project_config, 
-                       nothing, run_ID, run_lock, output_lock)
+                       nothing, nothing, run_ID, run_lock, output_lock)
     end
 
     return true
 end
 
 function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
-                                proccesed_results_path, project_config, run_ID, 
+                                proccesed_results_path, project_config, optimizer, run_ID, 
                                 run_lock, output_lock, results_lock)
     # temperature schedule is simple inverse logistic curve
     temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["nr_tries"] - 0.5)))
 
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
-        sample_params = Dict()
+        sample_params = Dict{String, Any}()
         for (key, param) in pairs(optimizer["optim_params"])
             sample_params[key] = rand(param["min"]:param["max"])
         end
@@ -549,7 +551,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
         sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
         sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
         
-        sample_params = Dict()
+        sample_params = Dict{String, Any}()
         for (key, param) in pairs(optimizer["optim_params"])
             range = nbh_scale * temperature * (param["max"] - param["min"])
             #TODO sample[key] doesn't really make sense right now key=String(category, uac, param_key)
@@ -559,7 +561,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 
     # run sim and calculate objective results
-    results = run_sample(sim_params, proccesed_results_path, project_config, 
+    results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
                          sample_params, run_ID, run_lock, output_lock)
     obj_results = objective_function(results)
 
@@ -578,7 +580,7 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 end
 
-function run_sample(sim_params, proccesed_results_path, project_config, sample_params, run_ID, run_lock, output_lock)
+function run_sample(sim_params, proccesed_results_path, project_config, optimizer, sample_params, run_ID, run_lock, output_lock)
     ####################################################
     # Simulation
     ####################################################
@@ -597,9 +599,16 @@ function run_sample(sim_params, proccesed_results_path, project_config, sample_p
     start = now()
     @info "---- Simulation loop ----"
     results = OrderedDict()
+    
+    if !isnothing(sample_params)
+        for (key, value) in pairs(sample_params)
+            results[key] = value
+        end 
+    end
+
     try
         sim_output = run_simulation_loop(project_config, sim_params, components, operations)
-
+ 
         results["error"] = ""
         #TODO get necessary values from project_config or economy_params, emission_params and optimizer
         if !isnothing(economy_params) || !isnothing(emission_params)
@@ -625,31 +634,46 @@ function run_sample(sim_params, proccesed_results_path, project_config, sample_p
                 # add values to flat dictionary to avoid unnecessary nesting
                 results = calc_emission(sim_output, results)
             end
-            #TODO make smart sums of needed values of sim_output
-            for val_name in sum_output_values
-                results[val_name] = sum(sim_output[val_name])
-            end
         end
+
+        if !isnothing(optimizer) 
+            for key in parse_outkeys(output_keys(components, optimizer["output_keys_sum"]))
+                results[key] = sum(sim_output[key])
+            end
+            for key in parse_outkeys(output_keys(components, optimizer["output_keys_mean"]))
+                results[key] = sum(sim_output[key]) / length(sim_output[key])
+            end 
+        end
+
     catch e
-        sim_output = nothing
+        if filesize(proccesed_results_path) == 0
+            throw(e)
+        end
         # save excact error message to output file
         error_message = sprint(showerror, e)
         full_error_message = error_message * "\n" * sprint(Base.show_backtrace, catch_backtrace())
-        @info full_error_message
+        @globalInfo full_error_message
         results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
     end
 
     # Write results to seperate file after all simulations are finished.
-    row = join(collect(results.values), ';') * "\n"
+    row = join(collect(values(results)), ';') * "\n"
     row = replace(row, '.' => ',')
     # Lock the file writing
     lock(output_lock) do 
+        # create header if file is empty
+        if filesize(proccesed_results_path) == 0
+            header = join(collect(keys(results)), ';') * "\n"
+            open(proccesed_results_path, "w") do file_handle
+                write(file_handle, header)
+            end
+        end
         open(proccesed_results_path, "a") do file_handle
             write(file_handle, row)
         end
     end
         
-    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
+    @globalInfo "-- Simulation loop complete in $(seconds(now() - start)) s"
     lock(run_lock) do 
         close_run(run_ID)
     end
@@ -678,10 +702,13 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
 
     # set up the parameters for this simulation variant
     for (key, value) in pairs(sample_params)
-        category, uac, param_key = split(key, "_")
+        category, uac, param_key = split(key, " ")
         cfg[category][uac][param_key] = value
         # rename outputs to clarify parameter values if outputfiles for each simulation 
         # should be generated
+        #TODO to same for all type of output files that get generated for each simulation
+        # and add Info that this is happening with hint to set the files to nothing of if 
+        # not needed for performance boost
         if cfg["io_settings"]["csv_output_keys"] != "nothing"
             name, ext = split(cfg["io_settings"]["csv_output_file"], '.')
             cfg["io_settings"]["csv_output_file"] *= name * "_" * uac * "_" * 
@@ -714,13 +741,13 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
     # profiles will be overwritten for every run to make sure the profile_scales and 
     # profile_addons calculated correctly.
     # If multiple threads are used each thread gets their own profile.
-    
-    profile_dir = sim_params["run_path"]("./profiles")
+    #TODO change directiory to something better
+    profile_dir = sim_params["run_path"]("./profiles/parallel_runs")
     mkpath(profile_dir)
 
     profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
     date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
-    new_paths = Array{String}(undef, length(profile_paths)) 
+    new_paths = Dict{String,String}() 
 
     for (name, path) in pairs(profile_paths)
         if profile_scales[name] != 1 && profile_addons[name] != 0 && profile_id == 0
@@ -735,7 +762,7 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
     end
 
     # replace the profile names with the paths to the new profiles
-    function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,Any})
+    function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,String})
         for (k, v) in cfg
             if v isa String && haskey(replacements, v)
                 cfg[k] = replacements[v]
@@ -750,27 +777,27 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
 
     return cfg
 end
-
         
-function load_optimizer(optimizer_config::Dict{String,Any})
-    optimizer = Dict{Strind,Any}()
+function load_optimizer(optimizer_config::OrderedDict{String,Any})
+    optimizer = Dict{String,Any}()
+    optimizer["type"] = optimizer_config["type"]
     if optimizer_config["type"] == "parametervariation"
         optim_params = Dict()
         for (category, uacs) in pairs(optimizer_config["optim_params"])
             for (uac, params) in pairs(uacs)
                 for (key_param, def) in pairs(params)
                     if haskey(def, "values")
-                        optim_params[category * "_" * uac * "_" * key_param] = def["values"]
+                        optim_params[category * " " * uac * " " * key_param] = def["values"]
                     else
                         def = Dict(Symbol(k) => v for (k, v) in def)
-                        optim_params[category * "_" *uac * "_" * key_param] = range(; def...)
+                        optim_params[category * " " *uac * " " * key_param] = range(; def...)
                     end
                 end
             end
         end
         optimizer["optim_params"] = optim_params
+        # May be unnecessary but added to make sure the order of keys and values is the same
         optimizer["optim_params_keys"] = keys(optim_params)
-        #TODO integrate keys into iterator
         optimizer["iterator"] = default(optimizer_config, "iterator", "product")
         if optimizer["iterator"] == "product"
             optimizer["iterator"] = Iterators.product(values(optim_params)...)
@@ -782,6 +809,8 @@ function load_optimizer(optimizer_config::Dict{String,Any})
             optimizer["iterator"] = rand(collect(iter), n_samples)
         end
 
+        optimizer["output_keys_sum"] = optimizer_config["total_output_keys"]["sum"]
+        optimizer["output_keys_mean"] = optimizer_config["total_output_keys"]["mean"]
     else
         #TODO parse_objective_function and parameters for more complicated algorithms
         # whole function may be better suited for project_loading.jl

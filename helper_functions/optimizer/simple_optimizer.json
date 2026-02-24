@@ -4,17 +4,7 @@
         "auxiliary_info": false,
         "sankey_plot": "nothing",
         "output_plot": "nothing",
-        "return_output_keys":  {
-            "Demand_Heat":  ["Demand"],
-            "Demand_Power": ["Demand"],
-            "BUS_Power": ["Balance"], 
-            "BUS_Heat": ["Balance"],
-            "Grid_IN": ["m_power:OUT"]
-        },
-        "csv_output_keys": {
-			"economy":  ["annuity_total", "annuity_revenue"],
-            "optimizer": ["objective"]
-        }
+        "csv_output_keys": "nothing"
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
@@ -65,7 +55,7 @@
             "m_el_in": "m_power",
             "m_heat_out": "m_heat",
             "__OPTIONAL_COP_AND_POWER__": "",
-            "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 35, 4.10, 3.92, 3.22",
+            "cop_function": "field: 0, 75, 78, 95; -18, 1.95, 1.90, 1.77; -15, 2.08, 2.00, 1.84; -12, 2.16, 2.10, 1.91; -9, 2.27, 2.20, 1.99; -6, 2.38, 2.30, 2.08; -3, 2.50, 2.42, 2.18; 0, 2.61, 2.53, 2.27; 2, 2.74, 2.66, 2.34; 5, 2.87, 2.78, 2.44; 8, 3.00, 2.90, 2.53; 11, 3.14, 3.04, 2.62; 14, 3.28, 3.17, 2.72; 17, 3.44, 3.31, 2.82; 20, 3.59, 3.45, 2.92; 23, 3.76, 3.60, 3.01; 26, 3.93, 3.75, 3.13; 40, 4.10, 3.92, 3.22",
             "bypass_cop": 15.0,
             "min_power_function": "const:0.0",
             "max_power_function": "poly-2: 0.001119613, -0.06349226, 0.03004031, -0.000400244, 0.002087081, -0.000351640, -0.000003101, -0.0000000655, -0.000013215, 0.000001353",
@@ -179,7 +169,9 @@
             "f_op_h": 5.0,
             "__incetive_structure_with_percentage_of_investment_and_possible_maximum__": "",
             "f_incentive": 0.2,
-            "max_incentive": 0.0
+            "max_incentive": 0.0,
+            "__price_profile_for_inputs_or_outputs__": "",
+            "m_power:IN": "stock_price"
         },
         "BufferTank": {
             "__spezific_investment_cost_per_capacity_Wh__": "",
@@ -203,13 +195,13 @@
         }
     },
     "profiles": {
-        "stock_price": {"path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+        "stock_price": {"path": "profiles/examples/district/ambient_temperature_TRY2015_Stuttgart.prf",
                         "scale": 0.0,
                         "addon": 0.0},
-        "el_demand": {"path": "./profiles/MA/germersheim_power.prf",
+        "el_demand": {"path": "./profiles/examples/district/demand_electricity_85Living_15Business_Wh_per_square_meter.prf",
                       "scale": 0.0,
                       "addon": 0.0},
-        "th_demand": {"path": "./profiles/MA/germersheim_heat.prf",
+        "th_demand": {"path": "profiles/examples/district/demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf",
                       "scale": 0.0,
                       "addon": 0.0}
     },
@@ -220,6 +212,21 @@
         "__alternative_objective_function__": "",
         "objective_function": ["poly:1.0,1.0e9", ["total_annuity", "balance"]],
         "_objective_function": "min(annuity + balance*1000)",
+
+        "__keys_to_be_collected_for_output__": "",
+        "__can_be_intesive_and_extensive_be_used?__": "",
+        "total_output_keys":  { 
+            "sum": {
+                "Demand_Heat":  ["Demand"],
+                "Demand_Power": ["Demand"],
+                "BUS_Power": ["Balance"], 
+                "BUS_Heat": ["Balance"],
+                "Grid_IN": ["m_power:OUT"]
+            },
+            "mean": {
+                "Demand_Heat": ["Temperature"]
+            }
+        },
 
         "__choose_one_function_to_generate_the_iterator_only_parametervariation__": "",
         "iterator": "product",
@@ -235,9 +242,6 @@
                                           "stop": 10e6,
                                           "length": 11
                              }
-                },
-                "Boiler": {"power_th": {"values": [0, 1, 2, 3]
-                           }
                 },
                 "BufferTank": {"capacity": {"values": [20e6, 80e6, 50e6]
                                }
