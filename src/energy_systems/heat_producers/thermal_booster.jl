@@ -468,7 +468,12 @@ function calculate_booster(unit::ThermalBooster,
         # no heat_in available at all -> solely boost (if allowed)
         boost_only = unit.allow_boost_solely && sum(energies.available_heat_in; init=0.0) < EPS
         no_heat_in_in_next_slices = src_idx == length(energies.available_heat_in) ||
-                                    sum(energies.available_heat_in[(src_idx + 1):end]; init=0.0) < EPS
+                                    all(energies.available_heat_in[s] <= EPS ||
+                                        energies.available_heat_out[k] <= EPS ||
+                                        !check_src_to_snk(unit.controller, energies.in_uacs_heat[s],
+                                                          energies.out_uacs[k])
+                                        for s in (src_idx + 1):length(energies.available_heat_in)
+                                        for k in (snk_idx + 1):length(energies.available_heat_out))
         if boost_only
             out_energy = min(energies.available_heat_out[snk_idx], energies.available_el_in)
             required_boost_heat = out_energy
