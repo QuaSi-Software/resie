@@ -1,0 +1,40 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:18:13
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_GRI_natgas', no 'temperature' is set.
+[Info] For 'TST_DEM_01', the 'temperature' is set to the constant value of 85.0.
+[Info] For 'TST_GRI_02', no 'temperature' is set.
+[Info] For 'TST_SRC_01', the 'temperature' is set to the constant value of 20.0.
+[Info] For 'TST_DEM_02', the 'temperature' is set to the constant value of 50.0.
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] In bus TST_BUS_TH, a custom order in the energy flow matrix is used. Note that this feature may not perform as expected for all energy systems.
+[Info] In bus TST_BUS_EL, a custom order in the energy flow matrix is used. Note that this feature may not perform as expected for all energy systems.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\transformer_chain\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/671 in 0.172 s. ETA: 3.3253 s
+[Info] Progress: 66/671 in 0.063 s. ETA: 1.1550 s
+[Info] Progress: 99/671 in 0.062 s. ETA: 1.0747 s
+[Info] Progress: 132/671 in 0.053 s. ETA: 0.8657 s
+[Info] Progress: 165/671 in 0.056 s. ETA: 0.8587 s
+[Info] Progress: 198/671 in 0.069 s. ETA: 0.9890 s
+[Info] Progress: 231/671 in 0.041 s. ETA: 0.5467 s
+[Info] Progress: 264/671 in 0.067 s. ETA: 0.8263 s
+[Info] Progress: 297/671 in 0.065 s. ETA: 0.7367 s
+[Info] Progress: 330/671 in 0.054 s. ETA: 0.5580 s
+[Info] Progress: 363/671 in 0.071 s. ETA: 0.6627 s
+[Info] Progress: 396/671 in 0.066 s. ETA: 0.5500 s
+[Info] Progress: 429/671 in 0.066 s. ETA: 0.4840 s
+[Info] Progress: 462/671 in 0.063 s. ETA: 0.3990 s
+[Info] Progress: 495/671 in 0.065 s. ETA: 0.3467 s
+[Info] Progress: 528/671 in 0.091 s. ETA: 0.3943 s
+[Info] Progress: 561/671 in 0.059 s. ETA: 0.1967 s
+[Info] Progress: 594/671 in 0.13 s. ETA: 0.3033 s
+[Info] Progress: 627/671 in 0.345 s. ETA: 0.4600 s
+[Info] Progress: 660/671 in 0.071 s. ETA: 0.0237 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\transformer_chain\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\transformer_chain\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\transformer_chain\out.csv
+[Info] general log saved to .\test\scenarios\transformer_chain\general.log

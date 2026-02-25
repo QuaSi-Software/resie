@@ -1,0 +1,38 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:17:59
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\PV_Stuttgart_30_south_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_STH_01', the 'temperature' is set to the constant value of 28.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_DEM_01', the 'temperature' is set to the constant value of 55.0.
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] Successfully calculated g-function for geothermal probe field "TST_GTP_01" with 36 probes.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_probe\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 438/8760 in 0.138 s. ETA: 2.6220 s
+[Info] Progress: 876/8760 in 0.099 s. ETA: 1.7820 s
+[Info] Progress: 1314/8760 in 0.191 s. ETA: 3.2470 s
+[Info] Progress: 1752/8760 in 0.191 s. ETA: 3.0560 s
+[Info] Progress: 2190/8760 in 0.327 s. ETA: 4.9050 s
+[Info] Progress: 2628/8760 in 0.241 s. ETA: 3.3740 s
+[Info] Progress: 3066/8760 in 0.523 s. ETA: 6.7990 s
+[Info] Progress: 3504/8760 in 0.635 s. ETA: 7.6200 s
+[Info] Progress: 3942/8760 in 0.658 s. ETA: 7.2380 s
+[Info] Progress: 4380/8760 in 0.546 s. ETA: 5.4600 s
+[Info] Progress: 4818/8760 in 0.413 s. ETA: 3.7170 s
+[Info] Progress: 5256/8760 in 0.282 s. ETA: 2.2560 s
+[Info] Progress: 5694/8760 in 0.271 s. ETA: 1.8970 s
+[Info] Progress: 6132/8760 in 0.263 s. ETA: 1.5780 s
+[Info] Progress: 6570/8760 in 0.304 s. ETA: 1.5200 s
+[Info] Progress: 7008/8760 in 0.294 s. ETA: 1.1760 s
+[Info] Progress: 7446/8760 in 0.274 s. ETA: 0.8220 s
+[Info] Progress: 7884/8760 in 0.358 s. ETA: 0.7160 s
+[Info] Progress: 8322/8760 in 0.421 s. ETA: 0.4210 s
+[Info] Progress: 8760/8760 in 0.395 s. ETA: 0.0000 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_probe\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_probe\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_geothermal_probe\out.csv
+[Info] general log saved to .\test\scenarios\simple_geothermal_probe\general.log
