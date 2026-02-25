@@ -5,6 +5,10 @@
 deps/build.log
 Manifest.toml
 
+# files used for Infiltrator debugging
+Project_with_infil.toml
+src/run_REPL.jl
+
 # output files (force-add new scenario inputs and references)
 output/*
 test/scenarios/*

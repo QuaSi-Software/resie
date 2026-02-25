@@ -5,15 +5,62 @@ using Dates
 using Proj
 using Resie.SolarIrradiance
 
-export WeatherData, gather_weather_data, get_weather_data_keys
+export WeatherData, gather_weather_data, get_weather_data_keys, WeatherFileType, guess_file_format
 
 """
-Custom error handler for exception "InputError".
-Call with throw(InputError)
+Custom exception `InputError` used to signify that an input was not correctly set up,
+outside the allowed range, etc.
+Call with `throw(InputError("msg"))` or `throw(InputError())`.
 """
-struct InputError <: Exception end
+struct InputError <: Exception
+    msg::Union{AbstractString,Nothing}
+end
+InputError() = InputError(nothing)
 
 """
+Types of weather files that are implemented.
+"""
+@enum WeatherFileType wft_dat wft_epw wft_unknown
+
+"""
+    guess_file_format(weather_file_path::String)
+
+Guess the file format of the given weather file.
+
+# Arguments
+- `weather_file_path::String`: The path of the weather file
+# Returns
+- `WeatherFileType`: The weather file type, might be wft_unknown
+"""
+function guess_file_format(weather_file_path::String)
+    # if there's a file ending, use that
+    if endswith(lowercase(weather_file_path), ".dat")
+        return wft_dat
+    elseif endswith(lowercase(weather_file_path), ".epw")
+        return wft_epw
+    end
+
+    # read first line and guess from how it begins
+    line = readline(weather_file_path)
+    if startswith(line, "LOCATION")
+        return wft_epw
+    elseif startswith(line, "Koordinatensystem")
+        return wft_dat
+    end
+
+    # unknown file format or format has changed
+    return wft_unknown
+end
+
+"""
+Struct for holding the data of a weather file. The data can either be a .dat file from the
+DWD (German weather service) or an .epw file (EnergyPlusWeather).
+
+**Definition of time:**
+The weather data in this struct after loading corresponds to the timestep following the time
+indicated. While the ambient temperature is an instantaneous value from half the timestep
+ahead of the current timestamp, the solar radiation data is the mean/sum of the timestep
+ahead of the current timestamp. Data from EWP and DWD-dat files are converted accordingly.
 """
 mutable struct WeatherData
     """Ambient air temperature, in °C."""
@@ -40,29 +87,19 @@ mutable struct WeatherData
     """sunset, in decimal hours."""
     sunset::Profile
 
-    """
-    get_weather_data(weather_file_path, sim_params)
-    
-    Function to read in a weather file and hold the data. The data can either be
-    a .dat file from the DWD (German weather service) or an EPW file (EnergyPlusWeather).
-    
-    The returned values are of type WeaterData containing profiles of type Profile.
-
-    **Definition of time:**
-    The weather data returned from this function corresponds to the timestep following
-    the time indicated. While the ambient temperature is an instantaneous value from half the 
-    timestep ahead of the current timestamp, the solar radiation data is the mean/sum of the 
-    timestep ahead of the current timestamp. Data from EWP and DWD-dat files are converted
-    accordingly.
-
-    """
     function WeatherData(weather_file_path::String,
                          sim_params::Dict{String,Any},
+                         file_format::WeatherFileType,
                          weather_interpolation_type_solar::String,
                          weather_interpolation_type_general::String)
         if !isfile(weather_file_path)
-            @error "The weather file could not be found in: \n $(sim_params["run_path"](weather_file_path))"
-            throw(InputError)
+            @error "The weather file could not be found in $(weather_file_path)"
+            throw(InputError())
+        end
+
+        if file_format == wft_unknown
+            @error "Unknown file type for weather file $(weather_file_path)"
+            throw(InputError())
         end
 
         time_step = Second(3600)  # set fixed time step width for weather data
@@ -73,7 +110,7 @@ mutable struct WeatherData
                                                     step=time_step)))
         nr_of_years = end_year - start_year + 1
 
-        if endswith(lowercase(weather_file_path), ".dat")
+        if file_format == wft_dat
             weatherdata_dict, headerdata = read_dat_file(weather_file_path, sim_params)
 
             # calculate latitude and longitude from Hochwert and Rechtswert from header
@@ -158,7 +195,7 @@ mutable struct WeatherData
             globHorIrr = deepcopy(beamHorIrr)
             globHorIrr.data = Dict(key => globHorIrr.data[key] + difHorIrr.data[key] for key in keys(globHorIrr.data))
 
-        elseif endswith(lowercase(weather_file_path), ".epw")
+        elseif file_format == wft_epw
             weatherdata_dict, headerdata = read_epw_file(weather_file_path, sim_params)
 
             latitude = headerdata["latitude"]
@@ -359,7 +396,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
     catch e
         @error "Error reading the DWD .dat file in $file_path\n" *
                "Please check the file. The following error occurred: $e"
-        throw(InputError)
+        throw(InputError())
     end
 
     # Read header 
@@ -385,7 +422,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
         catch e
             @error "Error reading the header of the DWD .dat file in $file_path\n" *
                    "Check if the header meets the requirements. The following error occurred: $e"
-            throw(InputError)
+            throw(InputError())
         end
         if row[1] == "***"
             break
@@ -428,7 +465,7 @@ function read_dat_file(weather_file_path::String, sim_params::Dict{String,Any})
         @warn "Error reading the .dat weather dataset from $file_path:\n" *
               "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
               "Check the file and make sure the data block starts with ***."
-        throw(InputError)
+        throw(InputError())
     end
 
     @info "The DWD weather dataset '$(headerdata["kind"][2:end])' from the years$(headerdata["years"]) with $(expected_length) data points was successfully read."
@@ -451,7 +488,7 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
     catch e
         @error "Error reading the DWD .dat file in $file_path. Please check the file.\n" *
                "The following error occurred: $e"
-        throw(InputError)
+        throw(InputError())
     end
 
     # Read fist line with metadata
@@ -516,7 +553,7 @@ function read_epw_file(weather_file_path::String, sim_params::Dict{String,Any})
         @error "Error reading the EPW weather dataset from $file_path\n" *
                "The number of datapoints is $(dataline-1) and not as expected $expected_length.\n" *
                "Check the file for corruption."
-        throw(InputError)
+        throw(InputError())
     end
 
     @info "The EPW weather dataset from '$(headerdata["city"])' with $(expected_length) data points was successfully read."

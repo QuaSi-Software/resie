@@ -27,6 +27,10 @@ mutable struct FixedSink <: Component
     constant_demand::Union{Nothing,Float64}
     constant_temperature::Temperature
 
+    treat_profile_as_volume_flow_in_qm_per_hour::Bool
+    rho_medium::Floathing
+    cp_medium::Floathing
+
     function FixedSink(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         energy_profile = "energy_profile_file_path" in keys(config) ?
                          Profile(config["energy_profile_file_path"], sim_params) :
@@ -55,13 +59,24 @@ mutable struct FixedSink <: Component
                    0.0,     # demand
                    nothing, # temperature
                    default(config, "constant_demand", nothing),       # constant_demand (power, not work!)
-                   constant_temperature)   # constant_temperature
+                   constant_temperature,   # constant_temperature
+                   default(config, "treat_profile_as_volume_flow_in_qm_per_hour", false),
+                   default(config, "rho_medium", nothing),  # [kg/m^3]
+                   default(config, "cp_medium", nothing))   # [J/kgK]
     end
 end
 
 function initialise!(unit::FixedSink, sim_params::Dict{String,Any})
     set_storage_transfer!(unit.input_interfaces[unit.medium],
                           unload_storages(unit.controller, unit.medium))
+    if unit.treat_profile_as_volume_flow_in_qm_per_hour
+        if unit.rho_medium === nothing
+            @error "In fixed sink $(unit.uac), the profile should be treated as volume flow. Please provide the medium density rho_medium."
+        end
+        if unit.cp_medium === nothing
+            @error "In fixed sink $(unit.uac), the profile should be treated as volume flow. Please provide the medium thermal capacity cp_medium."
+        end
+    end
 end
 
 function control(unit::FixedSink,
@@ -69,19 +84,29 @@ function control(unit::FixedSink,
                  sim_params::Dict{String,Any})
     update(unit.controller)
 
-    if unit.constant_demand !== nothing
-        unit.demand = sim_params["watt_to_wh"](unit.constant_demand)
-    elseif unit.energy_profile !== nothing
-        unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
-    else
-        unit.demand = 0.0
-    end
-
     if unit.constant_temperature !== nothing
         unit.temperature = unit.constant_temperature
     elseif unit.temperature_profile !== nothing
         unit.temperature = Profiles.value_at_time(unit.temperature_profile, sim_params)
     end
+
+    if unit.constant_demand !== nothing
+        unit.demand = sim_params["watt_to_wh"](unit.constant_demand)
+    elseif unit.energy_profile !== nothing
+        if unit.treat_profile_as_volume_flow_in_qm_per_hour &&
+           isa(unit.input_interfaces[unit.medium].source, LimitCoolingInputTemperatureTarget)
+            t_low = unit.temperature # [°C]
+            t_high = unit.input_interfaces[unit.medium].source.current_max_output_temperature # [°C]
+            volume_flow = unit.scaling_factor * Profiles.power_at_time(unit.energy_profile, sim_params) # [m^3/h]
+            power = unit.rho_medium * volume_flow * unit.cp_medium / 3600 * (t_high - t_low) # [W]
+            unit.demand = sim_params["watt_to_wh"](power)
+        else
+            unit.demand = unit.scaling_factor * Profiles.work_at_time(unit.energy_profile, sim_params)
+        end
+    else
+        unit.demand = 0.0
+    end
+
     set_max_energy!(unit.input_interfaces[unit.medium], unit.demand, unit.temperature, nothing)
 end
 

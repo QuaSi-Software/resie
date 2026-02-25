@@ -28,7 +28,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             do_create_plot = false
         elseif io_settings["output_plot"] == "all"
             @error "For \"output_plot\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -45,7 +45,7 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
             do_write_CSV = false
         elseif io_settings["csv_output_keys"] == "all"
             @error "For \"csv_output_keys\", the input \"all\" is no longer supported. Use \"all_incl_flows\" or \"all_excl_flows\"."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -326,7 +326,7 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
                                "output key. Make sure that the medium \"$(String(medium_key))\" exists in the current " *
                                "component and that you have used \":\" as separator without any extra spaces."
-                        throw(InputError)
+                        throw(InputError())
                     end
                 else
                     medium = nothing
@@ -366,13 +366,13 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                     @error "The requested energy flow between components \"$(value_key)\" for medium \"$(media_key)\" could not " *
                            "be found for the CSV output or the plot output. Note that only connections between " *
                            "components with one or more busses but without any other component in between can be exported!"
-                    throw(InputError)
+                    throw(InputError())
                 end
             end
         else
             @error "The key \"$(key)\" in the provided output keys for CSV output or plot output could not be found. " *
                    "It either has to be a medium or a component used in the current energy system."
-            throw(InputError)
+            throw(InputError())
         end
     end
 
@@ -380,14 +380,14 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
 end
 
 """
-reset_file(filepath, output_keys)
+write_CSV_headers(filepath, output_keys)
 
-Reset the output file and add headers for the given outputs.
+Resets the CSV output file and writes headers for the given outputs.
 """
-function reset_file(filepath::String,
-                    output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                    weather_data_keys::Union{Nothing,Vector{String}},
-                    csv_time_unit::String)
+function write_CSV_headers(filepath::String,
+                           output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           csv_time_unit::String)
     open(filepath, "w") do file_handle
         if csv_time_unit == "seconds"
             time_unit = "[s]"
@@ -426,44 +426,63 @@ function reset_file(filepath::String,
 end
 
 """
-write_to_file(filepath, output_keys, time)
+write_to_CSV_file(filepath, output_keys, time)
 
-Write the given outputs for the given time to file.
+Write the given outputs for the given time to the CSV output file. Alternatively the output
+can be returned as a single row instead, or a matrix of rows can be given to write all at
+once.
 """
-function write_to_file(filepath::String,
-                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                       weather_data_keys::Union{Nothing,Vector{String}},
-                       sim_params::Dict{String,Any},
-                       csv_time_unit::String)
-    open(filepath, "a") do file_handle
-        if csv_time_unit == "seconds"
-            time = sim_params["time_since_output"]
-        elseif csv_time_unit == "minutes"
-            time = sim_params["time_since_output"] / 60
-        elseif csv_time_unit == "hours"
-            time = sim_params["time_since_output"] / 60 / 60
-        elseif csv_time_unit == "date"
-            time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
-        end
-
-        write(file_handle, "$time")
-
-        if output_keys !== nothing
-            for outkey in output_keys
-                value = output_value(outkey.unit, outkey)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
+function write_to_CSV_file(filepath::String,
+                           output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           sim_params::Dict{String,Any},
+                           csv_time_unit::String;
+                           do_return::Bool=false,
+                           output_rows::Union{Nothing,Matrix}=nothing)
+    if output_rows !== nothing
+        open(filepath, "a") do file_handle
+            for row_idx in 1:size(output_rows)[1]
+                write(file_handle, join(output_rows[row_idx, :], ";") * "\n")
             end
         end
-        if weather_data_keys !== nothing
-            for key in weather_data_keys
-                value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
-            end
-        end
+        return
+    end
 
-        write(file_handle, "\n")
+    line = []
+
+    if csv_time_unit == "seconds"
+        time = sim_params["time_since_output"]
+    elseif csv_time_unit == "minutes"
+        time = sim_params["time_since_output"] / 60
+    elseif csv_time_unit == "hours"
+        time = sim_params["time_since_output"] / 60 / 60
+    elseif csv_time_unit == "date"
+        time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+    end
+
+    push!(line, "$time")
+
+    if output_keys !== nothing
+        for outkey in output_keys
+            value = output_value(outkey.unit, outkey)
+            value = replace("$value", "." => ",")
+            push!(line, value)
+        end
+    end
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
+            value = replace("$value", "." => ",")
+            push!(line, value)
+        end
+    end
+
+    if do_return
+        return line
+    else
+        open(filepath, "a") do file_handle
+            write(file_handle, join(line, ";") * "\n")
+        end
     end
 end
 
@@ -873,7 +892,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                 @error "The color for the sankey '$color' of medium '$medium' could not be detected. " *
                        "The following error occurred: $e\n" *
                        "Color has to be one of: $(collect(keys(Colors.color_names)))"
-                throw(InputError)
+                throw(InputError())
             end
         end
         for medium in unique_medium_labels
@@ -883,7 +902,7 @@ function create_sankey(output_all_sourcenames::Vector{Any},
                 color_map[medium] = parse(RGBA, "rgba(0,0,0,0)")
             else
                 @error "The color for the medium '$medium' for the sankey could not be found in the input file. Please add the medium and its color in 'sankey_plot'."
-                throw(InputError)
+                throw(InputError())
             end
         end
     end

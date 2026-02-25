@@ -53,14 +53,14 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
         if !(params["temperature_mode"] in allowed_parameter_temperature_mode)
             @error "The temperature mode of control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "has to be one of $(allowed_parameter_temperature_mode)."
-            throw(InputError)
+            throw(InputError())
         end
 
         # for temperature mode constant_temperature, check if a constant_output_temperature is provided
         if params["temperature_mode"] == "constant_temperature" && params["constant_output_temperature"] === nothing
             @error "The control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "is set to constant_temperature, but no `constant_output_temperature` is given!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if a valid target uac is specified
@@ -69,7 +69,7 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
              && components[params["target_uac"]] isa TemperatureNegotiateTarget)
             @error "The target of the control module `negotiate_temperature` of component $(params["source_uac"]) is " *
                    "not a valid component for this control module!"
-            throw(InputError)
+            throw(InputError())
         end
 
         # check if a valid source uac is specified
@@ -78,14 +78,14 @@ mutable struct CM_Negotiate_Temperature <: ControlModule
              && components[params["source_uac"]] isa TemperatureNegotiateSource)
             @error "The source of the control module `negotiate_temperature` of component $(params["source_uac"]) " *
                    "is not a valid source for this control module"
-            throw(InputError)
+            throw(InputError())
         end
 
         if params["use_hysteresis"] &&
            (params["hysteresis_temp_on"] === nothing || params["hysteresis_temp_off"] === nothing)
             @error "In control module `negotiate_temperature` of component $(params["source_uac"]) the hysteresis " *
                    "is activated but not all temperatures are given. Provide both `hysteresis_temp_on` and `hysteresis_temp_off`!"
-            throw(InputError)
+            throw(InputError())
         end
 
         return new("negotiate_temperature", params)

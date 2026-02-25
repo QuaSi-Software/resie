@@ -4,6 +4,32 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.7
+* Fix reading of global weather file not working correctly in some cases
+* Add option to write CSV output continuously, meaning in every timestep
+  * The old behaviour was to always do it this way. The new behaviour changes the default to writing the output after the simulation loop and adds a IO setting to enable continuous output if desired.
+
+### Version 0.13.6
+* fix bug of missing process step in OOO of transformers connected to grids in middle-bus-branches
+
+### Version 0.13.5
+* Add new FVM-based ground-model for STES to better represent losses into the ground. The model is validated against all relevant IEA ES Task 39 testcases.
+* Update unit for cp from [kJ/kgK] to [J/kgK] for all components for consistency. This is especially relevant for the buffer tank!
+* Add the possibility to treat profiles as volume flow for FixedSink and FixedSource in combination with STES
+* Add new FVM ground model of STES to scenario "interconnected_STES"
+* Update scenario "multisector_district" due to former changes in v0.12.5 and change color of Sankey to be aligned with DrawIO sketch
+* Fix bug in bus to handle energy_flows between -epsilon and zero
+* Fix calling InputError with empty constructor not working correctly
+
+### Version 0.13.4
+* Fix HeatPump producing negative energies in rare cases
+* Fix an erroneous error message in Bus to cause the entire energy system being printed on console
+* Fix BufferTank updating supply temperature between slices
+  * While the previous implementation is a more realistic option for mixed or balanced models below the switch point, it causes problems because the component then writes a higher max energy in its control step than it can actually supply in process. This fix solves that problem but introduces an inaccuracy as the entire energy supplied in a timestep is at the temperature before discharging.
+* Fix internal issue with how some error messages are handled
+* Fix small syntax/logic error in calculation order of operations
+  * It is not clear if this error has ever occured
+
 ### Version 0.13.3
 * hotfix for infinite loop in heat pump with COP=1.0
 

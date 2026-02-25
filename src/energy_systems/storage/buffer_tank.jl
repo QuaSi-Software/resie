@@ -78,7 +78,7 @@ mutable struct BufferTank <: Component
         else
             @error "For the buffer tank $uac, the model_type could not be detected. Is has to be one of: " *
                    "'ideally_stratified', 'balanced', 'ideally_mixed'."
-            throw(InputError)
+            throw(InputError())
         end
 
         consider_losses = default(config, "consider_losses", false)
@@ -108,7 +108,7 @@ mutable struct BufferTank <: Component
                    default(config, "capacity", nothing),       # capacity of the buffer tank [Wh] (either capacity or volume has to be given)
                    default(config, "volume", nothing),         # volume of the buffer tank [m^3] (either capacity or volume has to be given)
                    default(config, "rho_medium", 1000.0),      # density of the medium [kg/m^3]
-                   default(config, "cp_medium", 4.18),         # specific thermal capacity of medium [kJ/kgK]
+                   default(config, "cp_medium", 4180),         # specific thermal capacity of medium [J/kgK]
                    default(config, "high_temperature", 75.0),  # upper temperature of the buffer tank [°C]
                    default(config, "low_temperature", 20),     # lower temperature of the buffer tank [°C]
                    default(config, "max_load_rate", nothing),  # maximum load rate given in 1/h
@@ -145,18 +145,18 @@ function initialise!(unit::BufferTank, sim_params::Dict{String,Any})
     # calculate volume and capacity
     if unit.capacity === nothing && unit.volume === nothing
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but none of them is given."
-        throw(InputError)
+        throw(InputError())
     elseif unit.capacity === nothing && unit.volume !== nothing
-        unit.capacity = unit.volume * unit.rho_medium / 3.6 * unit.cp_medium *
+        unit.capacity = unit.volume * unit.rho_medium * unit.cp_medium / 3600 *
                         (unit.high_temperature - unit.low_temperature)             # [Wh]
     elseif unit.capacity !== nothing && unit.volume === nothing
         if unit.consider_losses
             unit.volume = unit.capacity /
-                          (unit.rho_medium / 3.6 * unit.cp_medium * (unit.high_temperature - unit.low_temperature))  # [m^3]
+                          (unit.rho_medium * unit.cp_medium / 3600 * (unit.high_temperature - unit.low_temperature))  # [m^3]
         end
     else
         @error "For the buffer tank $(unit.uac), either a volume or a capacity has to be given, but both are given."
-        throw(InputError)
+        throw(InputError())
     end
 
     # calculate maximum input and output energy
@@ -294,10 +294,9 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
             continue
         end
 
-        tank_temp = temperature_at_load(unit)
         if (exchange.temperature_min !== nothing
             &&
-            exchange.temperature_min > tank_temp)
+            exchange.temperature_min > unit.current_max_output_temperature)
             # we can only supply energy at a temperature at or below the tank's current
             # output temperature
             continue
@@ -307,10 +306,10 @@ function process(unit::BufferTank, sim_params::Dict{String,Any})
 
         if unit.load > used_heat
             unit.load -= used_heat
-            add!(outface, used_heat, nothing, tank_temp)
+            add!(outface, used_heat, nothing, unit.current_max_output_temperature)
             energy_demanded += used_heat
         else
-            add!(outface, unit.load, nothing, tank_temp)
+            add!(outface, unit.load, nothing, unit.current_max_output_temperature)
             energy_demanded += unit.load
             unit.load = 0.0
         end

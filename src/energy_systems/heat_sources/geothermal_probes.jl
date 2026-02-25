@@ -94,7 +94,7 @@ mutable struct GeothermalProbes <: Component
         model_type_allowed_values = ["simplified", "detailed"]
         if !(model_type in model_type_allowed_values)
             @error "Undefined model type \"$(model_type)\" of unit \"$(uac)\". Has to be one of: $(model_type_allowed_values)."
-            throw(InputError)
+            throw(InputError())
         end
 
         # get probe field geometry from input file
@@ -108,7 +108,7 @@ mutable struct GeothermalProbes <: Component
                                                "L_configuration"]
         if !(probe_field_geometry in probe_field_geometry_allowed_values)
             @error "Undefined probe field configuration \"$(probe_field_geometry)\" of unit \"$(uac)\". Has to be one of: $(probe_field_geometry_allowed_values)."
-            throw(InputError)
+            throw(InputError())
         end
 
         return new(uac,                                 # uac
@@ -191,7 +191,7 @@ function initialise!(unit::GeothermalProbes, sim_params::Dict{String,Any})
     if unit.regeneration && unit.input_interfaces[unit.m_heat_in] === nothing
         @error "In geothermal probe $(unit.uac), the input interface is not connected, " *
                "but regeneration is set to true."
-        throw(InputError)
+        throw(InputError())
     end
     if unit.regeneration
         set_storage_transfer!(unit.input_interfaces[unit.m_heat_in],
@@ -271,7 +271,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
                             probe_field_configurations[unit.probe_field_geometry])
     if !isfile(libfile_path)
         @error "The library for the geothermal probe field \"$(unit.uac)\" could not be found at $libfile_path"
-        throw(InputError)
+        throw(InputError())
     end
 
     # calculate g-functions
@@ -309,7 +309,7 @@ function calculate_g_function(unit::Component, sim_params::Dict{String,Any})
     if library_time_grid_absolute[end] < simulation_end_timestamp
         @error "The duration of the time horizon given for the g_function of \"$(unit.uac)\" does not cover " *
                "the complete simulation time! Reduce the simulation time or provide a g-function with longer time horizon."
-        throw(InputError)
+        throw(InputError())
     end
     # ensure that the transformation can be made
     if simulation_end_timestamp < library_time_grid_absolute[2]
@@ -492,7 +492,7 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
                         @error "The number_of_probes could not be read out of the file with " *
                                "given g-function values for the \"$(unit.uac)\" at " *
                                "$(file_path). Please specify them in the header section."
-                        throw(InputError)
+                        throw(InputError())
                     end
                     continue
                 end
@@ -513,7 +513,7 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
                             @error "Invalid data line \"$line\" in the file with given g-function values for the " *
                                    "\"$(unit.uac)\" at $(file_path). The following error occurred: $e. " *
                                    "Please check the data given in the file."
-                            throw(InputError)
+                            throw(InputError())
                         end
                     end
                 end
@@ -523,11 +523,11 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
         if num_probes == 0
             @error "The number_of_probes could not be read out of the file with given g-function values for the " *
                    "\"$(unit.uac)\" at $(file_path). Please specify them in the header section."
-            throw(InputError)
+            throw(InputError())
         elseif !reading_data || length(ln_time_normalized) == 0 || length(g_func_vals) == 0
             @error "No data could not be read out of the file with given g-function values for the " *
                    "\"$(unit.uac)\" at $(file_path). Please make sure the data starts with ***."
-            throw(InputError)
+            throw(InputError())
         else
             @info "Successfully read out the g-function values from $(file_path) for \"$(unit.uac)\"."
             return g_func_vals, ln_time_normalized, num_probes, nothing
@@ -536,11 +536,11 @@ function get_g_values_from_file(unit::GeothermalProbes, sim_params::Dict{String,
         if isa(e, SystemError)
             @error "Could not open the file with given g-function values for the \"$(unit.uac)\" at " *
                    "$(file_path). The following error occurred: $e"
-            throw(InputError)
+            throw(InputError())
         else
             @error "An error occurred reading the file with given g-function values for the \"$(unit.uac)\" at " *
                    "$(file_path). The following error occurred: $e"
-            throw(InputError)
+            throw(InputError())
         end
     end
 end
@@ -627,7 +627,7 @@ function get_g_values_from_library(unit::Component,
     catch e
         @error "The library with precalculated g-values for the geothermal probe \"$(unit.uac)\" could not be read in. " *
                "The following error occurred: $e\n Check the file located at $libfile_path."
-        throw(InputError)
+        throw(InputError())
     end
 
     # Get a specific configuration from the library
@@ -644,7 +644,7 @@ function get_g_values_from_library(unit::Component,
         @error "The probe field configuration for the geothermal probe  \"$(unit.uac)\" could not be detected from the " *
                "given library. The following error occurred: $e\n" *
                "Check the probe field configuration given as key1 = $key1 and key2 = $key2."
-        throw(InputError)
+        throw(InputError())
     end
 
     # calculate number of probes in probe field
@@ -653,7 +653,7 @@ function get_g_values_from_library(unit::Component,
     if number_of_probes == 1 && borehole_spacing != 5.0
         @error "You are requesting a single probe for the probe field \"$(unit.uac)\". Due to the underlying library, " *
                "the borehole_spacing has to be set to 5 m in this case! Otherwise, a wrong g-function will be calculated."
-        throw(InputError)
+        throw(InputError())
     end
 
     # Getting a specific G-Function for the default configuration

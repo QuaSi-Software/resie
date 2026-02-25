@@ -434,7 +434,20 @@ function wrapper_add_transformer_steps(components_by_function, simulation_order,
                 reverse = false
             elseif count == 15
                 reverse = true
-            elseif count == 20
+            elseif count >= 20
+                # try only leftover transformers
+                transformers_and_busses = [entry
+                                           for entry in transformers_and_busses
+                                           if entry.sys_function === EnergySystems.sf_transformer]
+                if count == 20
+                    reverse = nothing
+                elseif count == 22
+                    reverse = false
+                elseif count == 24
+                    reverse = true
+                end
+            end
+            if count == 26
                 @warn ("The order of operation is potentially wrong as the process-step of one or more transformers " *
                        "are missing in the OoO. Check the input and the order in the aux_info file. May specify a custom OoO!")
                 break
@@ -1986,7 +1999,7 @@ function find_parallels(components)
                  && has_grid_input(unit, outface.target.uac)
                  && !(old_uac !== "" && !has_grid_output(unit, old_uac)))
                 || (old_uac !== "" && !connection_allowed(unit, old_uac, outface.target.uac))
-                || (outface.target === EnergySystems.sf_transformer && !(outface.target in components)))
+                || (outface.target.sys_function === EnergySystems.sf_transformer && !(outface.target in components)))
                 continue
             end
             new_path = copy(path)

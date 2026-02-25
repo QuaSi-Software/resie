@@ -759,7 +759,7 @@ function iterate_balance_table(unit::Bus)
                "Note that this is only allowed for single busses that are not connected to any other bus! " *
                "You can always adjust your input file to meet this requirement by manually merging all directly " *
                "connected busses to one big bus."
-        throw(InputError)
+        throw(InputError())
     end
 
     rows = Vector{Tuple{BTInputRow,BTOutputRow}}()
@@ -805,7 +805,7 @@ function iterate_balance_table(unit::Bus)
             @error "In bus $(unit.uac), the numbers given in the energy flow matrix are not valid. " *
                    "They have to be either all 0 and 1, or they can be 0 and consecutively ascending starting from 1 " *
                    "for a custom order."
-            throw(InputError)
+            throw(InputError())
         end
         has_custom_order = true
     end
@@ -874,9 +874,12 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
                              get_max_energy(output_row.energy_pool_temp, input_row.source.uac))
 
         if available_energy < -unit.epsilon || target_energy < -unit.epsilon
-            @error "A negative energy has been detected during distributing energy in bus $unit. This can have multiple " *
-                   "reasons, e.g. a bug in one of the components or a wrong order of operation. Double check the results " *
-                   "and contact the developers."
+            sim_params = get_run(unit.run_id).parameters
+            @error "A negative energy $(available_energy)/$(target_energy) from $(input_row.source.uac) to " *
+                   "$(output_row.target.uac) has been detected during distributing energy in bus $(unit.uac) at time " *
+                   "$(sim_params["time"])/$(sim_params["current_date"]). This can have multiple reasons, e.g. " *
+                   "negative values in provided profiles, a bug in one of the components or a wrong order of " *
+                   "operation. Double check the results and contact the developers."
             break
         end
 
@@ -895,6 +898,8 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         else
             energy_flow = min(target_energy, available_energy)
         end
+        # trim energy_flows between -epsilon and zero to zero.
+        energy_flow = max(0.0, energy_flow)
 
         unit.balance_table[input_row.priority, output_row.priority * 2 - 1] += energy_flow
         # if both min and max temperature are given and differ (which currently only happens
