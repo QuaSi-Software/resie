@@ -163,9 +163,6 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     # Fuzzy logic returns absolute plr and chargemode
     plr, chargemode = fuzzy_control_chargemode(p_now, p_trend, p_min_temp, p_max_temp)
-    if p_now < 80
-        chargemode = 100.0
-    end
     if isnan(plr) || isnan(chargemode)
         
         @error "Fuzzy Controller $(mod_params["name"]) couldn't be calculated. " *
@@ -197,13 +194,21 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     if th_power_demand > (available_th_power_storage + target_power)
         # add security factor to account for calculation inaccuracies
-        target_power = (th_power_demand * 1.1) - available_th_power_storage 
+        demand_cover_power = (th_power_demand * 1.1) - available_th_power_storage
     else
         min_plr = renewable_el_energy / total_el_power_timestep
-        target_power = max(plr, min_plr) * total_th_power_timestep
+        demand_cover_power = max(plr, min_plr) * total_th_power_timestep
     end
 
-    if chargemode < 50
+    storage_free_energy = max(mod_params["storage"].capacity - mod_params["storage"].load, 0.0)
+    storage_charge_power_soc = sim_params["wh_to_watts"](storage_free_energy)
+    storage_charge_power_rate = sim_params["wh_to_watts"](mod_params["storage"].max_load_rate * mod_params["storage"].capacity)
+    max_storage_charge_power = min(storage_charge_power_soc, storage_charge_power_rate)
+    charge_bonus_power = chargemode > 50 ? max_storage_charge_power : 0.0
+
+    target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power_timestep)
+
+    if chargemode < 0
         mod_params["charging_state"] = 2
     else
         mod_params["charging_state"] = 1
