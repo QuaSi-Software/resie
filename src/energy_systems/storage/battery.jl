@@ -942,5 +942,4 @@ function output_value(unit::Battery, key::OutputKey)::Float64
     throw(KeyError(key.value_key))
 end
 
-export f_V_cell # TODO remove
 export Battery
