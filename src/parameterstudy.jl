@@ -62,106 +62,6 @@ profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
-# define states in control module
-############################################################
-
-# if price_profile_stock > p_stock
-state_save_power = Dict{String,Any}(
-             "input_order"=> [
-                 "NegControlReserve",
-                 "Photovoltaic",
-                 "WindFarm",
-                 "Grid_IN",
-                 "Battery"
-             ],
-             "output_order"=> [
-                 "PosControlReserve",
-                 "Demand_Power",
-                 "HeatPump",
-                 "ElectrodeBoiler",
-                 "Battery",
-                 "Grid_OUT"
-             ],
-             "energy_flow"=> [
-                [0, 0, 0, 0, 0, 0],
-                [1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 0, 0, 1],
-                [1, 0, 0, 0, 0, 1]
-             ])
-
-# if price_profile_stock <= p_stock && price_profile_stock <= 0 (Eigenerzeugung)
-state_earn_power =Dict{String,Any}(
-            "input_order"=> [
-                "NegControlReserve",
-                "Photovoltaic",
-                "WindFarm",
-                "Grid_IN",
-                "Battery"
-            ],
-            "output_order"=> [
-                "PosControlReserve",
-                "Demand_Power",
-                "HeatPump",
-                "ElectrodeBoiler",
-                "Battery",
-                "Grid_OUT"
-            ],
-            "energy_flow"=> [
-                [0, 0, 0, 0, 0, 0],
-                [1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 1, 1, 1],
-                [1, 1, 1, 0, 0, 1],
-                [1, 0, 0, 0, 0, 1]
-            ])
-
-# if price_profile_stock > p_stock
-state_save_heat = Dict{String,Any}(
-             "input_order"=> [
-                "HeatPump",
-                "ElectrodeBoiler",
-                "BufferTank",
-                "HeatPump#secondary",
-                "ElectrodeBoiler#secondary"
-            ],
-            "output_order"=> [
-                "Demand_Heat",
-                "BufferTank"
-            ],
-            "energy_flow"=> [
-                [1, 1],
-                [1, 1],
-                [1, 0],
-                [1, 0],
-                [1, 0]
-            ])
-
-# if price_profile_stock <= p_stock && price_profile_stock <= 0 (Eigenerzeugung)
-state_earn_heat =Dict{String,Any}(
-            "input_order"=> [
-                "HeatPump",
-                "ElectrodeBoiler",
-                "HeatPump#secondary",
-                "ElectrodeBoiler#secondary",
-                "BufferTank"
-            ],
-            "output_order"=> [
-                "Demand_Heat",
-                "BufferTank"
-            ],
-            "energy_flow"=> [
-                [1, 1],
-                [1, 1],
-                [1, 1],
-                [1, 1],
-                [1, 0]
-            ])
-
-
-states_heat_bus = [state_save_heat, state_earn_heat]
-states_power_bus = [state_save_power, state_earn_power]
-
-############################################################
 # helper functions
 ############################################################
 
@@ -225,8 +125,6 @@ function create_variant(
         Pth_ElectrodeBoiler::Number,
         Cap_Wh::Number,
         BattCap_Wh::Number,
-        states_power_bus::Array{Dict{String,Any}},
-        states_heat_bus::Array{Dict{String,Any}},
         profile_addons,
         profile_multipliers,
         run_ID::UUID;
@@ -362,16 +260,6 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     ########################################################
     success, sim_output = Resie.load_and_run(input_file, run_ID)
 
-    # remove addon for used grid electricity to went into PosControlReserve
-    energy_with_addon = max.(sim_output["Grid_IN m_power OUT"] .- sim_output["PosControlReserve m_power IN"], 0)
-    energy_without_addon = min.(sim_output["Grid_IN m_power OUT"], sim_output["PosControlReserve m_power IN"])
-    denom = energy_with_addon .+ energy_without_addon
-    addon_share = similar(denom)
-    addon_share .= 0.0
-    valid = denom .> 0
-    addon_share[valid] .= energy_without_addon[valid] ./ denom[valid]
-    profile_values[1, :] .-= profile_addons[1] .* addon_share
-
     # add the profiles to the sim_output to be used in vdi2067 calculation
     sim_output["Grid_Price"] = profile_values[1, :]    #TODO is this with or without grid add ons? -> with grid_addons for all profiles
     sim_output["Reserve_Power_Price_Neg"] = profile_values[2, :]
@@ -476,7 +364,6 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         profile_values, 
         timestep = create_variant(outdir, base_input, 
                                   Pth_HeatPump, Pth_ElectrodeBoiler, Cap_Wh, BattCap_Wh,
-                                  states_power_bus, states_heat_bus, 
                                   profile_addons, profile_multipliers,
                                   run_ID; 
                                   write_output=write_output)
