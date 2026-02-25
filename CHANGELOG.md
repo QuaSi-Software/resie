@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.8
+* Implemented complex model for battery simulation 
+
 ### Version 0.13.7
 * Fix reading of global weather file not working correctly in some cases
 * Add option to write CSV output continuously, meaning in every timestep
