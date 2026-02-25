@@ -212,17 +212,24 @@ function calc_reserve_power(sim_length::TimePeriod,
                                                     ooo_by_state, components, 
                                                     sim_params)
 
+    end_date = min(add_ignoring_leap_days(sim_params["current_date"], 
+                                            Second(sim_length) - Second(sim_params["time_step_seconds"])),
+                    sim_params["end_date"])
+    date_range = remove_leap_days(collect(range(sim_params["current_date"]; 
+                                                stop=end_date, 
+                                                step=Second(sim_params["time_step_seconds"])
+                                                )))
+    for (idx, dt) in enumerate(date_range)
+        components[mod_params["hp_uac"] * "_baseline_in"].scaling_factor = baseline_el_hp[idx]
+        components[mod_params["hp_uac"] * "_baseline_out"].scaling_factor = baseline_el_hp[idx]
+        components[mod_params["boiler_uac"] * "_baseline_in"].scaling_factor = baseline_el_boiler[idx]
+        components[mod_params["boiler_uac"] * "_baseline_out"].scaling_factor = baseline_el_boiler[idx]
+    end
+
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
     power_pos_bool = power_pos > mod_params["min_reserve_power"]        
     if power_neg_bool || power_pos_bool
-        end_date = min(add_ignoring_leap_days(sim_params["current_date"], 
-                                              Second(sim_length) - Second(sim_params["time_step_seconds"])),
-                       sim_params["end_date"])
-        date_range = remove_leap_days(collect(range(sim_params["current_date"]; 
-                                                    stop=end_date, 
-                                                    step=Second(sim_params["time_step_seconds"])
-                                                    )))
         price_profiles = mod_params["price_profiles"]
 
         if power_neg_bool && power_pos_bool
