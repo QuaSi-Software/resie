@@ -57,12 +57,12 @@
                 "input_order": [
                     "BUS_DistrictHeating_LowEx",
                     "TB_House_01",
-                    "BFT_DWH_House_01"
+                    "BFT_DHW_House_01"
                 ],
                 "output_order": [
                     "DEM_DHW_House_01a",
                     "DEM_DHW_House_01b",
-                    "BFT_DWH_House_01",
+                    "BFT_DHW_House_01",
                     "DEM_SpaceHeating_01"
                 ],
                 "energy_flow": [
@@ -151,10 +151,16 @@
             "output_refs": [
                 "BUS_Heat_House_01"
             ],
+            "control_modules": [{
+                "name": "storage_driven",
+                "high_threshold": 1.0,
+                "low_threshold": 0.5,
+                "storage_uac": "BFT_DHW_House_01"
+            }],
             "m_heat_in": "heat_01",
             "m_heat_out": "heat_01",
             "m_el_in": "electricity",
-            "power_el": 7200,
+            "power_el": 7000,
             "constant_demand_input_temperature": 12,
             "cp_medium_out": 4180,
             "terminal_dT": 2.0,
@@ -263,13 +269,14 @@
             "thermal_transmission_barrel": 1.0,
             "thermal_transmission_bottom": 2.5
         },
-        "BFT_DWH_House_01": {
+        "BFT_DHW_House_01": {
             "type": "BufferTank",
             "output_refs": [
                 "BUS_Heat_House_01"
             ],
             "medium": "heat_01",
-            "volume": 1.5,
+            "volume": 2.5,
+            "initial_load": 0.5,
             "model_type": "ideally_stratified",
             "high_temperature": 65,
             "low_temperature": 15,
