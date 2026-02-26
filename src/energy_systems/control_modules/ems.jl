@@ -219,7 +219,7 @@ function calc_reserve_power(sim_length::TimePeriod,
                                                 stop=end_date, 
                                                 step=Second(sim_params["time_step_seconds"])
                                                 )))
-    if sim_params["time"] >= 5 * 3600 @infiltrate end
+
     for (idx, dt) in enumerate(date_range)
         components[mod_params["hp_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
         components[mod_params["hp_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
@@ -227,7 +227,6 @@ function calc_reserve_power(sim_length::TimePeriod,
         components[mod_params["boiler_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
     end
 
-    if sim_params["time"] >= (5*30 + 12) * 24 * 3600 + 9 * 3600 @infiltrate end
 
     # reset scaling_factors
     components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0

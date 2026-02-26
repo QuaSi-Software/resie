@@ -115,16 +115,17 @@ function output_values(unit::FlexibleSink)::Vector{String}
 end
 
 function output_value(unit::FlexibleSink, key::OutputKey)::Float64
-    if key.value_key == "IN"
+    value_key = strip(key.value_key)
+    if value_key == "IN"
         return calculate_energy_flow(unit.input_interfaces[key.medium])
-    elseif key.value_key == "Max_Energy"
+    elseif value_key == "Max_Energy"
         return unit.max_energy
-    elseif key.value_key == "Scaling_Factor"
+    elseif value_key == "Scaling_Factor" || value_key == "scaling_factor" || value_key == "ScalingFactor"
         return unit.scaling_factor
-    elseif key.value_key == "Temperature"
+    elseif value_key == "Temperature"
         return unit.temperature
     end
-    throw(KeyError(key.value_key))
+    throw(KeyError(value_key))
 end
 
 export FlexibleSink
