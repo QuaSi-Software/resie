@@ -100,13 +100,13 @@
 				"scale_factor": 0.001	
             },
             "13": {
-				"key":{"NegControlReserve":["m_power:OUT"]},
+				"key":{"NegControlReserve_in":["m_power:OUT"]},
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001
             },
             "21": {
-				"key":{"PosControlReserve":["m_power:IN"]},
+				"key":{"PosControlReserve_out":["m_power:IN"]},
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001
@@ -160,7 +160,7 @@
 				"scale_factor": 0.001
             },
             "25": {
-				"key":{"ElectrodeBoiler_baseline_in":["m_power:IN"]},
+				"key":{"ElectrodeBoiler_baseline_in":["m_power:OUT"]},
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001
@@ -192,6 +192,21 @@
             ],
             "medium": "m_power",
             "is_source": true
+        },
+        "StockMarket_IN": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "StockMarket_OUT"
+            ],
+            "medium": "m_money",
+            "max_power_profile_file_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",
+            "scale": 1.0
+        },
+        "StockMarket_OUT": {
+            "type": "FlexibleSink",
+            "medium": "m_money",
+            "max_power_profile_file_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",
+            "scale": 1.0
         },
         "NegControlReserve_in": {
             "type": "FlexibleSupply",
@@ -229,13 +244,13 @@
                 "HeatPump_baseline_out"
             ],
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "max_power_profile_file_path": "./profiles/MA/quarters.prf",
             "scale": 0.0
         },
         "HeatPump_baseline_out": {
             "type": "FlexibleSink",
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "max_power_profile_file_path": "./profiles/MA/quarters.prf",
             "scale": 0.0
         },
         "ElectrodeBoiler_baseline_in": {
@@ -244,13 +259,13 @@
                 "ElectrodeBoiler_baseline_out"
             ],
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "max_power_profile_file_path": "./profiles/MA/quarters.prf",
             "scale": 0.0
         },
         "ElectrodeBoiler_baseline_out": {
             "type": "FlexibleSink",
             "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "max_power_profile_file_path": "./profiles/MA/quarters.prf",
             "scale": 0.0
         },
         "Grid_OUT": {
@@ -349,6 +364,7 @@
             "__OPTIONAL_COP_AND_POWER__": "",
             "cop_function": "const:1.0",
             "bypass_cop": 15.0,
+            "min_usage_fraction": 0.1,
             "min_power_function": "const:0.0",
             "max_power_function": "const:1.0",
             "__OPTIONAL_LOSSES__": "",

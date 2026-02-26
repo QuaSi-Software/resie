@@ -1,8 +1,8 @@
 using CSV
 using DataFrames
-filepath = raw"c:\Users\jenter\Documents\resie\profiles\MA\csv\DE_Grosshandelspreise_2024_ext.csv" # TODO change
+filepath = raw"c:\Users\jenter\Documents\resie\profiles\MA\csv\reserve_call_pos.csv" # TODO change
 timestep_col_name = "timestep" # TODO change
-profile_start_date = "01.12.2023 00:00" # TODO change
+profile_start_date = "01.01.2024 00:00" # TODO change
 
 df = CSV.read(filepath, DataFrame, delim=";", decimal=',')
 # allowmissing!(df)
