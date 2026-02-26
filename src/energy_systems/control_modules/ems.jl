@@ -1,7 +1,7 @@
 using Dates
 using ..Resie
 using OrderedCollections: OrderedDict
-
+using Infiltrator
 """
 Control module for setting limits to the PLR of a component according to a price_profiles and 
 available storage capacity or demand.
@@ -219,16 +219,25 @@ function calc_reserve_power(sim_length::TimePeriod,
                                                 stop=end_date, 
                                                 step=Second(sim_params["time_step_seconds"])
                                                 )))
+    if sim_params["time"] >= 5 * 3600 @infiltrate end
     for (idx, dt) in enumerate(date_range)
-        components[mod_params["hp_uac"] * "_baseline_in"].scaling_factor = baseline_el_hp[idx]
-        components[mod_params["hp_uac"] * "_baseline_out"].scaling_factor = baseline_el_hp[idx]
-        components[mod_params["boiler_uac"] * "_baseline_in"].scaling_factor = baseline_el_boiler[idx]
-        components[mod_params["boiler_uac"] * "_baseline_out"].scaling_factor = baseline_el_boiler[idx]
+        components[mod_params["hp_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
+        components[mod_params["hp_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
+        components[mod_params["boiler_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
+        components[mod_params["boiler_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
     end
+
+    if sim_params["time"] >= (5*30 + 12) * 24 * 3600 + 9 * 3600 @infiltrate end
+
+    # reset scaling_factors
+    components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0
+    components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
+    components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
+    components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
 
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
-    power_pos_bool = power_pos > mod_params["min_reserve_power"]        
+    power_pos_bool = power_pos > mod_params["min_reserve_power"]      
     if power_neg_bool || power_pos_bool
         price_profiles = mod_params["price_profiles"]
 
@@ -262,18 +271,16 @@ function calc_reserve_power(sim_length::TimePeriod,
         energy_weighted_values = Array{Float64}(undef, length(date_range))
         for (idx, dt) in enumerate(date_range)
             if power_neg_bool
-                energy_weighted_values[idx] = power_value * price_profiles[4].data[dt]
+                energy_weighted_values[idx] = sim_params["wh_to_watts"](power_value * price_profiles[4].data[dt])
             elseif power_pos_bool
-                energy_weighted_values[idx] = power_value * price_profiles[7].data[dt]
+                energy_weighted_values[idx] = sim_params["wh_to_watts"](power_value * price_profiles[7].data[dt])
             end
         end
 
         # negative control reserve
         if power_neg_bool
             components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=-6)
-            components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0
             components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=-6)
-            components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
             
             #set plr_limit to baseline + offered negative control reserve
             el_power_hp = max.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
@@ -287,9 +294,7 @@ function calc_reserve_power(sim_length::TimePeriod,
         # positive control reserve
         elseif power_pos_bool
             components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = ceil(power_value, digits=-6)
-            components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0       
             components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = ceil(power_value, digits=-6)
-            components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0       
             
             #set plr_limit to baseline - offered positive control reserve
             el_power_boiler = max.(baseline_el_boiler .- energy_weighted_values, 0)
@@ -477,7 +482,7 @@ function future_sim(sim_length::TimePeriod,
     # max_plr for positve control reserve
     used_el_power_boiler = used_th_power_boiler
     max_el_power_boiler = fill(comps[boiler_uac].design_power_th, 
-                                length(used_el_power_boiler))
+                               length(used_el_power_boiler))
 
     used_el_power_hp = used_th_power_hp ./ cops_hp
     max_el_power_hp = hp.design_power_th ./ cops_hp

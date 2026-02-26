@@ -20,6 +20,7 @@ mutable struct CM_StorageDrivenStorage <: ControlModule
             "low_threshold" => 0.2,
             "high_threshold" => 0.95,
             "min_run_time" => 0,
+            "charge_is_allowed" => true
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -36,10 +37,15 @@ mutable struct CM_StorageDrivenStorage <: ControlModule
                                                                          return params["storage"].load_end_of_last_timestep <
                                                                                 params["storage"].capacity *
                                                                                 params["low_threshold"]
+                                                                     end,
+                                                                     function (state_machine)
+                                                                        return params["charge_is_allowed"]
                                                                      end],
                                                          table_data=Dict{Tuple,UInt}(
-                                                             (false,) => 1,
-                                                             (true,) => 2,
+                                                             (false,true) => 1,
+                                                             (true, true) => 2,
+                                                             (false,false) => 1,
+                                                             (true, false) => 1,
                                                          )),
                                          2 => TruthTable(;  # State: Load
                                                          conditions=[function (state_machine)
@@ -51,12 +57,19 @@ mutable struct CM_StorageDrivenStorage <: ControlModule
                                                                          return state_machine.time_in_state *
                                                                                 sim_params["time_step_seconds"] >=
                                                                                 params["min_run_time"]
+                                                                     end,
+                                                                     function (state_machine)
+                                                                        return params["charge_is_allowed"]
                                                                      end],
                                                          table_data=Dict{Tuple,UInt}(
-                                                             (true, true) => 1,
-                                                             (false, true) => 2,
-                                                             (true, false) => 2,
-                                                             (false, false) => 2,
+                                                             (true, true, true) => 1,
+                                                             (false,true, true) => 2,
+                                                             (true, false,true) => 2,
+                                                             (false,false,true) => 2,
+                                                             (true, true, false) => 1,
+                                                             (false,true, false) => 1,
+                                                             (true, false,false) => 1,
+                                                             (false,false,false) => 1,
                                                          )),
                                      ))
 

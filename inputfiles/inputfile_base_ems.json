@@ -245,13 +245,13 @@
             ],
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/quarters.prf",
-            "scale": 0.0
+            "scale": 1.0
         },
         "HeatPump_baseline_out": {
             "type": "FlexibleSink",
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/quarters.prf",
-            "scale": 0.0
+            "scale": 1.0
         },
         "ElectrodeBoiler_baseline_in": {
             "type": "FlexibleSupply",
@@ -260,13 +260,13 @@
             ],
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/quarters.prf",
-            "scale": 0.0
+            "scale": 1.0
         },
         "ElectrodeBoiler_baseline_out": {
             "type": "FlexibleSink",
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/quarters.prf",
-            "scale": 0.0
+            "scale": 1.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
