@@ -2838,12 +2838,10 @@ end
 """
     reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
 
-Handle process/load steps of flexible sinks, sources and storages that are directly connected to a transformer and
-may be between the potential and produce of the connected transformer:
-- Ensure that flexible sources and storages have their process-step after the process step of a directly 
-connected transformers. 
-- Ensure that flexible sinks and storages have their load/process-step after the process step of a directly 
-connected transformers.
+Handle process/load steps of flexible sinks, flexible sources and storages that are connected to a transformer (directly 
+or via one ore more buses) and may be between the potential and produce of the connected transformer:
+- Ensure that flexible sources and storages have their process-step after the process step of the connected transformers. 
+- Ensure that flexible sinks and storages have their load/process-step after the process step of the connected transformers.
 
 # Arguments
 -`simulation_order`: A global parameter holding the simulation order
@@ -2859,8 +2857,8 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
     # For every flexible source/storage directly connected to a transformer...
     for source in sources_to_consider
         source_medium = hasproperty(source, :m_heat_out) ? source.m_heat_out : source.medium
-        connected_target_transformer = get_directly_connected_transformer(source.output_interfaces[source_medium],
-                                                                          "output")
+        connected_target_transformer = get_connected_transformer(source.output_interfaces[source_medium],
+                                                                 "output")
         for connected_transformer in connected_target_transformer
             # make sure the process of the source/storage comes after the process of the connected transformer.
             place_one_lower!(simulation_order,
@@ -2878,7 +2876,7 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
         end
         sink_medium = hasproperty(sink, :m_heat_in) ? sink.m_heat_in : sink.medium
         sink_step = sink.sys_function === EnergySystems.sf_storage ? EnergySystems.s_load : EnergySystems.s_process
-        connected_source_transformer = get_directly_connected_transformer(sink.input_interfaces[sink_medium], "input")
+        connected_source_transformer = get_connected_transformer(sink.input_interfaces[sink_medium], "input")
         for connected_transformer in connected_source_transformer
             # make sure the process/load of the sink/storage comes after the process of the connected transformer
             place_one_lower!(simulation_order,
@@ -3063,7 +3061,7 @@ function check_interface_for_transformer(interface, type)
 end
 
 """
-    get_directly_connected_transformer(interface::SystemInterface, type::String)
+    get_connected_transformer(interface::SystemInterface, type::String)
 
 Checks a given interface if there is one or more transformer in the following or previous chain.
 The function search only across busses but not through other components!
@@ -3074,9 +3072,9 @@ The function search only across busses but not through other components!
                  be handled as an input or an output interface.
 
 # Returns
-Returns a list of the directly connected transformer.
+Returns a list of the connected transformer.
 """
-function get_directly_connected_transformer(interface, type)
+function get_connected_transformer(interface, type)
     if type == "input"
         input_transformer = []
         add_transformer_in_input! = function (current_node, last_node_uac, checked_interfaces)
