@@ -234,6 +234,8 @@ function calc_reserve_power(sim_length::TimePeriod,
     components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
     components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
     components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
+    components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
+
 
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
@@ -281,6 +283,7 @@ function calc_reserve_power(sim_length::TimePeriod,
         if power_neg_bool
             components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=-6)
             components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=-6)
+            components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
             
             #set plr_limit to baseline + offered negative control reserve
             el_power_hp = max.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
