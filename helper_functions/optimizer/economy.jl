@@ -22,7 +22,6 @@ struct VDIParams
     AW_Wind::Float64            # "Anzusetzender Wert" bei Direktvermarktung"
 end
 
-
 ############################################################
 #  COMPONENT DEFINITION — COST GROUP 420/430
 ############################################################
@@ -43,71 +42,59 @@ end
 # The technical component lifetime and maintenance/repair/operating factors are hard-coded according to VDI specification and own assumptions
 
 "HeatPump: maintenance 1.5 %, repair 1.0 % of A0 in first year."
-heatpump_component(A0::Real) =
-    VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.2, 0.0)
+heatpump_component(A0::Real) = VDIComponent("HeatPump", float(A0), 20.0, 0.015, 0.01, 5.0, 0.2, 0.0)
 
 "ElectrodeBoiler / electric heater: maintenance 2.0 %, repair 1.0 %."
-ElectrodeBoiler_component(A0::Real) =
-    VDIComponent("ElectrodeBoiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.2, 0.0)
+ElectrodeBoiler_component(A0::Real) = VDIComponent("ElectrodeBoiler", float(A0), 15.0, 0.02, 0.01, 5.0, 0.2, 0.0)
 
 "BufferTank: maintenance 0.5 %, repair 0.5 %."
-buffertank_component(A0::Real) =
-    VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.2, 0.0)
+buffertank_component(A0::Real) = VDIComponent("BufferTank", float(A0), 15.0, 0.005, 0.005, 0.0, 0.2, 0.0)
 
 "Battery: maintenance 1.0 %, repair 2.0 %."
-battery_component(A0::Real) =
-    VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0, 0.0, 0.0)
-
+battery_component(A0::Real) = VDIComponent("Battery", float(A0), 12.0, 0.01, 0.02, 0.0, 0.0, 0.0)
 
 ############################################################
 #  SCENARIO DEFINITIONS for different cost escalation (NONE / MODERATE / PROGRESSIVE)
 ############################################################
 
 # Scenario 1 — no escalation
-VDI_SCENARIO_NONE = VDIParams(
-    20,       # Evaluation period (years)
-    0.03,     # discount rate +3.0%
-    0.000,    # no capital cost (Excel)
-    0.000,    # no energy cost (Excel)
-    0.000,    # no maintenance cost (Excel)
-    0.000,    # no repair cost (Excel)
-    0.000,    # no miscellaneous (Excel)
-    0.000,    # no revenues
-    120.0,    # grid price addon €/MWh based on historical average data
-    106.8,    # AW_PV €/MWh
-    83.496    # AW_Wind €/MWh, 58.8*1.42
-    )
+VDI_SCENARIO_NONE = VDIParams(20,       # Evaluation period (years)
+                              0.03,     # discount rate +3.0%
+                              0.000,    # no capital cost (Excel)
+                              0.000,    # no energy cost (Excel)
+                              0.000,    # no maintenance cost (Excel)
+                              0.000,    # no repair cost (Excel)
+                              0.000,    # no miscellaneous (Excel)
+                              0.000,    # no revenues
+                              120.0,    # grid price addon €/MWh based on historical average data
+                              106.8,    # AW_PV €/MWh
+                              83.496)   # AW_Wind €/MWh, 58.8*1.42
 
 # Scenario 2 — moderate escalation
-VDI_SCENARIO_MOD = VDIParams(
-    20,       # Evaluation period (years)
-    0.03,     # discount rate +3.0%
-    0.010,    # capital cost +1.2% (Excel)
-    0.010,    # energy cost +1.0% (Excel)
-    0.010,    # maintenance cost +0.5% (Excel)
-    0.010,    # repair cost +0.5% (Excel)
-    0.010,    # miscellaneous +0.5% (Excel)
-    -0.01,    # revenues -10%
-    120.0,    # grid price addon €/MWh based on historical average data
-    106.8,    # AW_PV €/MWh                 # TODO escalations?
-    83.496    # AW_Wind €/MWh, 58.8*1.42    # TODO escalations?
-    )
+VDI_SCENARIO_MOD = VDIParams(20,       # Evaluation period (years)
+                             0.03,     # discount rate +3.0%
+                             0.010,    # capital cost +1.2% (Excel)
+                             0.010,    # energy cost +1.0% (Excel)
+                             0.010,    # maintenance cost +0.5% (Excel)
+                             0.010,    # repair cost +0.5% (Excel)
+                             0.010,    # miscellaneous +0.5% (Excel)
+                             -0.01,    # revenues -10%
+                             120.0,    # grid price addon €/MWh based on historical average data
+                             106.8,    # AW_PV €/MWh                 # TODO escalations?
+                             83.496)   # AW_Wind €/MWh, 58.8*1.42    # TODO escalations?
 
 # Scenario 3 — progressive escalation
-VDI_SCENARIO_PRO = VDIParams(
-    20,       # Evaluation period (years)
-    0.03,     # discount rate +3.0%
-    0.020,    # capital +1.8% (Excel)
-    0.020,    # energy cost +2.0% (Excel)
-    0.020,    # maintenance +1.0% (Excel)
-    0.020,    # repair +1.0% (Excel)
-    0.020,    # miscellaneous +1.0% (Excel)
-    -0.02,    # revenues -2.0%
-    120.0,    # grid price addon €/MWh based on historical average data
-    106.8,    # AW_PV €/MWh                 # TODO escalations?
-    83.496    # AW_Wind €/MWh, 58.8*1.42    # TODO escalations?
-    )
-
+VDI_SCENARIO_PRO = VDIParams(20,       # Evaluation period (years)
+                             0.03,     # discount rate +3.0%
+                             0.020,    # capital +1.8% (Excel)
+                             0.020,    # energy cost +2.0% (Excel)
+                             0.020,    # maintenance +1.0% (Excel)
+                             0.020,    # repair +1.0% (Excel)
+                             0.020,    # miscellaneous +1.0% (Excel)
+                             -0.02,    # revenues -2.0%
+                             120.0,    # grid price addon €/MWh based on historical average data
+                             106.8,    # AW_PV €/MWh                 # TODO escalations?
+                             83.496)   # AW_Wind €/MWh, 58.8*1.42    # TODO escalations?
 
 ############################################################
 #  VDI 2067 MATHEMATICAL FUNCTIONS
@@ -118,7 +105,7 @@ VDI_SCENARIO_PRO = VDIParams(
 function annuity_factor(i, T)
     q = 1 + i
     T == 0 && return 0.0
-    isapprox(q, 1.0) && return 1/T
+    isapprox(q, 1.0) && return 1 / T
     return (q^T * (q - 1)) / (q^T - 1)
 end
 
@@ -128,14 +115,12 @@ function price_change_factor(r, i, T)
     q = 1 + i
     qv = 1 + r
     isapprox(q, qv) && return T / q
-    return (1 - (qv/q)^T) / (q - qv)
+    return (1 - (qv / q)^T) / (q - qv)
 end
 
 # Accept scalar or vector price input
-vecize_price(p, N) =
-    isa(p, Number) ? fill(p, N) :
-    (length(p) == N ? p : error("Price vector length mismatch."))
-
+vecize_price(p, N) = isa(p, Number) ? fill(p, N) :
+                     (length(p) == N ? p : error("Price vector length mismatch."))
 
 ############################################################
 #  CAPITAL COSTS — REPLACEMENTS AND RESIDUAL VALUE
@@ -145,8 +130,8 @@ function npv_replacements(A0, TN, T, i, r)      # net present value of component
     npv = 0.0
     t = TN
     while t < T
-        cost_t = A0 * (1+r)^t
-        npv += cost_t / (1+i)^t
+        cost_t = A0 * (1 + r)^t
+        npv += cost_t / (1 + i)^t
         t += TN
     end
     return npv
@@ -162,32 +147,30 @@ function residual_value(A0, TN, T, i, r)    # residual value at end of evaluatio
     if t_last_repl == T
         return 0.0                       # replacement at the end of the evaluation period → no residual value
     end
-    
-    
+
     A_last = A0 * qv^t_last_repl    # cost of last replacement in the evaluation period
 
     write_off = ((n + 1) * TN - T) / TN     # function for linear write off / depreciation
 
     RW_T = A_last * write_off       # residual value of last replacement at the end of evaluation period
-    
+
     return RW_T / q^T   # Discounting residual value to t=0
 end
 
 function capital_annuity(comp::VDIComponent, p::VDIParams)      # capital cost-related annuity
-    return  (comp.A0 +
+    return (comp.A0 +
             npv_replacements(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap) -
-            residual_value(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap)) * 
-            annuity_factor(p.i_cap, p.T)
+            residual_value(comp.A0, comp.TN, p.T, p.i_cap, p.r_cap)) *
+           annuity_factor(p.i_cap, p.T)
 end
 
 function capital_annuity_incentive(comp::VDIComponent, p::VDIParams)      # capital cost-related annuity with incentive considered
     A0_inc = max(comp.A0 * comp.incentive_p, comp.incentive_max)
-    return  (A0_inc +
+    return (A0_inc +
             npv_replacements(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap) -
-            residual_value(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap)) * 
-            annuity_factor(p.i_cap, p.T)
+            residual_value(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap)) *
+           annuity_factor(p.i_cap, p.T)
 end
-
 
 ############################################################
 #  OPERATING COSTS: OPERATION (B) + MAINTENANCE (IN)
@@ -196,25 +179,24 @@ end
 function op_annuity(components::Vector{VDIComponent}, p::VDIParams)     # operation cost-related annuity
 
     # first year operating costs (f_bedien in h/a, hourly labor cost -> 30 EUR/h)
-    A_B1 = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0, init=0.0)  # only use f_bedien if component is actually used -> p_th > 0
+    A_B1 = sum((c.f_bedien * 30.0) for c in components if c.A0 > 0; init=0.0)  # only use f_bedien if component is actually used -> p_th > 0
 
     # First-year inspection, maintenance, repair and reinstatement cost
-    A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components if c.A0 > 0, init=0.0)
+    A_IN1 = sum(c.A0 * (c.f_instand + c.f_wartung) for c in components if c.A0 > 0; init=0.0)
 
-    a   = annuity_factor(p.i_cap, p.T)
-    b_B  = price_change_factor(p.r_op,   p.i_cap, p.T)
+    a = annuity_factor(p.i_cap, p.T)
+    b_B = price_change_factor(p.r_op, p.i_cap, p.T)
     b_IN = price_change_factor(p.r_inst, p.i_cap, p.T)
 
     return A_B1 * a * b_B + A_IN1 * a * b_IN
 end
-
 
 ############################################################
 #  MISCELLANEOUS COSTS (INSURANCE, ADMIN,…)
 ############################################################
 
 function misc_annuity(components::Vector{VDIComponent}, p::VDIParams)
-    total_cap = sum(c.A0 for c in components if c.A0 > 0, init=0.0)
+    total_cap = sum(c.A0 for c in components if c.A0 > 0; init=0.0)
     A1 = 0.02 * total_cap        # rule-of-thumb: 2% of investment
 
     a = annuity_factor(p.i_cap, p.T)
@@ -222,7 +204,6 @@ function misc_annuity(components::Vector{VDIComponent}, p::VDIParams)
 
     return A1 * a * b
 end
-
 
 ############################################################
 #  ENERGY COSTS — TIME-RESOLVED → ANNUITY
@@ -234,14 +215,13 @@ function energy_annuity(sim::Dict, p::VDIParams)
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
-    A1 = sum(IN .* base_price)  
+    A1 = sum(IN .* base_price)
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
 
     return A1 * a * b
 end
-
 
 ############################################################
 #  REVENUE — CONTROL ENERGY + CONTROL CAPACITY
@@ -347,8 +327,7 @@ function co2_yearly(sim::Dict)
 
     #TODO what about PV and Wind? Gutschrift für eingespeiste Energie?
 
-    return sum(IN .* co2_intensity)  
-
+    return sum(IN .* co2_intensity)
 end
 
 ############################################################
@@ -357,13 +336,17 @@ end
 
 function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
     sim_new = Dict()
-    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
+    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+
+                         sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
                          sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+ sim["m_power EnergyFlow Grid_IN->Battery"]
-    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
-                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
-                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
+    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+
+                                  sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+
+                                  sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+
+                                  sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
     sim_new["Power_Demand_Demand"] = sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+
-                                     sim["m_power EnergyFlow Photovoltaic->Demand_Power"].+
+                                     sim["m_power EnergyFlow Photovoltaic->Demand_Power"] .+
                                      sim["m_power EnergyFlow WindFarm->Demand_Power"] .+
                                      sim["m_power EnergyFlow Battery->Demand_Power"]
     sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
@@ -378,34 +361,33 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
 
     sim = OrderedDict()
 
-    A_cap   = sum(capital_annuity(c, p) for c in components)
-    A_op    = op_annuity(components, p)
-    A_misc  = misc_annuity(components, p)
+    A_cap = sum(capital_annuity(c, p) for c in components)
+    A_op = op_annuity(components, p)
+    A_misc = misc_annuity(components, p)
     A_energy = energy_annuity(sim_new, p)
     A_cap_incentive = sum(capital_annuity_incentive(c, p) for c in components)
     A_rev_control = revenue_control(sim_new, p)
-    A_rev_feed    = revenue_feedin(sim_new, p)
+    A_rev_feed = revenue_feedin(sim_new, p)
 
     A_total = A_cap + A_op + A_misc + A_energy -
               (A_rev_control + A_rev_feed)
-              
+
     A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
                         (A_rev_control + A_rev_feed)
-    
+
     # CO2_yearly = co2_yearly(sim_new) #TODO implement
 
-    return OrderedDict(
-        "A_cap" => A_cap,
-        "A_cap_incentive" => A_cap_incentive,
-        "A_op" => A_op,
-        "A_misc" => A_misc,
-        "A_energy" => A_energy,
-        "A_rev_control" => A_rev_control,
-        "A_rev_feed" => A_rev_feed,
-        "A_total" => A_total,
-        "A_total_incentive" => A_total_incentive,
-        # "CO2_yearly" => CO2_yearly  #TODO implement
-    )
+    return OrderedDict("A_cap" => A_cap,
+                       "A_cap_incentive" => A_cap_incentive,
+                       "A_op" => A_op,
+                       "A_misc" => A_misc,
+                       "A_energy" => A_energy,
+                       "A_rev_control" => A_rev_control,
+                       "A_rev_feed" => A_rev_feed,
+                       "A_total" => A_total,
+                       "A_total_incentive" => A_total_incentive
+                       # "CO2_yearly" => CO2_yearly  #TODO implement
+                       )
 end
 
 end # module
