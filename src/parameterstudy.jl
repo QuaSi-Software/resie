@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
 
 
 ############################################################
@@ -30,20 +30,20 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 0.0e6         # lower limit
-Pth_HeatPump_hi   = 10.0e6         # upper limit
+Pth_HeatPump_lo   = 6.0e6         # lower limit
+Pth_HeatPump_hi   = 7.0e6         # upper limit
 Pth_HeatPump_step = 1.0e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 0.0e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 10.0e6     # upper limit
+Pth_ElectrodeBoiler_lo   = 2.0e6     # lower limit
+Pth_ElectrodeBoiler_hi   = 3.0e6     # upper limit
 Pth_ElectrodeBoiler_step = 1.0e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 0.0e6        # lower limit
-Cap_hi_Wh   = 100.0e6        # upper limit
+Cap_lo_Wh   = 30.0e6        # lower limit
+Cap_hi_Wh   = 40.0e6        # upper limit
 Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
@@ -106,7 +106,7 @@ function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepat
             write(file_handle, var * "\t" * val * "\n")
         end
         for (ts, val) in zip(dates, values)
-            write(file_handle, string(ts) * ";" * string(val) * "\n")
+            write(file_handle, Dates.format(ts, "dd.mm.yyyy HH:MM") * ";" * string(val) * "\n")
         end      
     end
 
@@ -218,13 +218,13 @@ function create_variant(
     if haskey(cfg["components"], "BUS_Power") &&
        haskey(cfg["components"]["BUS_Power"], "control_modules")
         cm = cfg["components"]["BUS_Power"]["control_modules"][1]
-        cm["grid_price_path"]: new_paths[1], 
-        cm["reserve_power_price_neg_path"]: new_paths[2],   
-        cm["reserve_energy_price_neg_path"]: new_paths[3],   
-        cm["reserve_call_neg_path"]: new_paths[4],   
-        cm["reserve_power_price_pos_path"]: new_paths[5],   
-        cm["reserve_energy_price_pos_path"]: new_paths[6],   
-        cm["reserve_call_pos_path"]: new_paths[7]    
+        cm["grid_price_path"] = new_paths[1]
+        cm["reserve_power_price_neg_path"] = new_paths[2]
+        cm["reserve_energy_price_neg_path"] = new_paths[3]
+        cm["reserve_call_neg_path"] = new_paths[4]
+        cm["reserve_power_price_pos_path"] = new_paths[5]
+        cm["reserve_energy_price_pos_path"] = new_paths[6]
+        cm["reserve_call_pos_path"] = new_paths[7]
         # cm["price_profile_paths"] = new_paths[1:5]
         # cm["bus_uacs"] = ["BUS_Power", "BUS_Heat"]
         # cm["new_connections_below_limits"] = Dict("BUS_Power" => states_power_bus, 
@@ -271,6 +271,9 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     sim_output["Market_Price_PV"] = profile_values[8, :]
     sim_output["Market_Price_Wind"] = profile_values[9, :]
     sim_output["CO2_Grid"] = profile_values[10, :]
+    cfg = Resie.read_JSON(input_file)
+    cm = cfg["components"]["BUS_Power"]["control_modules"][1]
+    sim_output["Offer_only_freebids"] = get(cm, "offer_only_freebids", false)
 
     return sim_output
 end

@@ -104,10 +104,12 @@ end
 function output_values(unit::FlexibleSink)::Vector{String}
     if unit.temperature_profile === nothing && unit.constant_temperature === nothing
         return [string(unit.medium) * ":IN",
-                "Max_Energy"]
+                "Max_Energy",
+                "Scaling_Factor"]
     else
         return [string(unit.medium) * ":IN",
                 "Max_Energy",
+                "Scaling_Factor",
                 "Temperature"]
     end
 end
@@ -117,6 +119,8 @@ function output_value(unit::FlexibleSink, key::OutputKey)::Float64
         return calculate_energy_flow(unit.input_interfaces[key.medium])
     elseif key.value_key == "Max_Energy"
         return unit.max_energy
+    elseif key.value_key == "Scaling_Factor"
+        return unit.scaling_factor
     elseif key.value_key == "Temperature"
         return unit.temperature
     end

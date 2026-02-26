@@ -102,6 +102,12 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
+            "33": {
+                "key":{"HeatPump": ["m_power:IN"]},
+                "axis":"left",
+                "unit": "kWh",
+                "scale_factor": 0.001
+            },
             "14": {
                 "key":{"ElectrodeBoiler": ["m_heat:OUT"]},
                 "axis":"left",
