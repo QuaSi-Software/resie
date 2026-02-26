@@ -11,8 +11,6 @@
 			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",
                         "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->ElectrodeBoiler", "WindFarm->Demand_Power", 
                         "Battery->Demand_Power"],
-	        "NegControlReserve": ["m_power:OUT"],
-            "PosControlReserve": ["m_power:IN"],
             "Demand_Heat":  ["Demand"],
             "Demand_Power": ["Demand"],
             "BUS_Power": ["Balance"], 
@@ -56,6 +54,18 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
+            "21": {
+				"key":{"Photovoltaic":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
+            "22": {
+				"key":{"WindFarm":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
             "7": {
                 "key": {"Demand_Power": ["Demand"]},
                 "axis": "left",
@@ -91,12 +101,6 @@
 				"axis": "left",
 				"unit": "kWh",
 				"scale_factor": 0.001	
-            },
-            "12": {
-				"key":{"NegControlReserve":["m_power:OUT"]},
-				"axis": "left",
-				"unit": "kWh",
-				"scale_factor": 0.001
             },
             "13": {
                 "key":{"HeatPump": ["m_heat:OUT"]},
@@ -140,24 +144,6 @@
                 "unit": "kWh",
                 "scale_factor": 0.001
             },
-            "20": {
-                "key": {"StockMarket_IN": ["m_money:OUT"]},
-                "axis":"right",
-                "unit": "EUR/MWh",
-                "scale_factor": 1.0
-            },
-            "21": {
-				"key":{"Photovoltaic":["m_power:OUT"]},
-				"axis": "left",
-				"unit": "kWh",
-				"scale_factor": 0.001
-            },
-            "22": {
-				"key":{"WindFarm":["m_power:OUT"]},
-				"axis": "left",
-				"unit": "kWh",
-				"scale_factor": 0.001
-            },
             "23": {
                 "key":{"HeatPump": ["secondary_m_heat:OUT"]},
                 "axis":"left",
@@ -169,6 +155,12 @@
                 "axis":"left",
                 "unit": "kWh",
                 "scale_factor": 0.001
+            },
+            "20": {
+                "key": {"StockMarket_IN": ["m_money:OUT"]},
+                "axis":"right",
+                "unit": "EUR/MWh",
+                "scale_factor": 1.0
             }
         }
     },
@@ -205,21 +197,6 @@
             "medium": "m_money",
             "max_power_profile_file_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",
             "scale": 1.0
-        },
-        "NegControlReserve": {
-            "type": "FlexibleSupply",
-            "output_refs": [
-                "BUS_Power"
-            ],
-            "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/reserve_call_neg.prf",
-            "scale": 0.0
-        },
-        "PosControlReserve": {
-            "type": "FlexibleSink",
-            "medium": "m_power",
-            "max_power_profile_file_path": "./profiles/MA/reserve_call_pos.prf",
-            "scale": 0.0
         },
         "Grid_OUT": {
             "type": "GridConnection",
@@ -278,7 +255,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": true,
-            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
+            "primary_el_sources": ["Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
             "power_th": 6.0e6,
             "__OPTIONAL_MEDIA__": "",
@@ -312,7 +289,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": true,
-            "primary_el_sources": ["NegControlReserve", "Photovoltaic", "WindFarm"],
+            "primary_el_sources": ["Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
             "power_th": 3.0e6,
             "__OPTIONAL_MEDIA__": "",
@@ -333,14 +310,12 @@
             "medium": "m_power",
             "connections": {
                 "input_order": [
-                    "NegControlReserve",
                     "Photovoltaic",
                     "WindFarm",
                     "Battery",
                     "Grid_IN"
                 ],
                 "output_order": [
-                    "PosControlReserve",
                     "Demand_Power",
                     "HeatPump",
                     "ElectrodeBoiler",
@@ -348,11 +323,10 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
-                    [0, 0, 0, 0, 0, 0],
-                    [1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1],
-                    [0, 1, 0, 0, 0, 0],
-                    [1, 1, 1, 1, 0, 0]
+                    [1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1],
+                    [1, 0, 0, 0, 0],
+                    [1, 1, 1, 0, 0]
 					
                 ]
             }           

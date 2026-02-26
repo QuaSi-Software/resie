@@ -208,10 +208,10 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power_timestep)
 
-    if chargemode < 0
-        mod_params["charging_state"] = 2
+    if chargemode < 50
+        mod_params["charging_state"] = 2 # charging off
     else
-        mod_params["charging_state"] = 1
+        mod_params["charging_state"] = 1 # charging on
     end
 
     ### old Implementation with SOC_target got replaced by chargemode
@@ -244,6 +244,8 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     remaining_power = max(target_power - mod_params["plr_limit_primary"] * available_th_power_primary, 0.0)
     mod_params["plr_limit_secondary"] = secondary_power > 0 ? clamp(remaining_power / available_th_power_secondary, 0.0, 1.0) : 0.0
 
+    if sim_params["time"] >= (11*30 + 12) * 24 * 3600 + 4 * 3600 @infiltrate end
+    
     # # Check how much heat both heat sources and storage can provide
     # storage_power_by_soc = SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
     # storage_power_limit = hasproperty(mod_params["storage"], :max_output_energy) ?

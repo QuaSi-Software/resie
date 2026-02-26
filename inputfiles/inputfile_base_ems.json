@@ -10,8 +10,10 @@
 			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",
                         "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->ElectrodeBoiler", "WindFarm->Demand_Power", 
                         "Battery->Demand_Power"],
-	        "NegControlReserve": ["m_power:OUT"],
-            "PosControlReserve": ["m_power:IN"],
+	        "NegControlReserve_in": ["m_power:OUT"],
+            "PosControlReserve_in": ["m_power:OUT"],
+            "HeatPump_baseline_in": ["m_power:OUT"],
+            "ElectrodeBoiler_baseline_in": ["m_power:OUT"],
             "Demand_Heat":  ["Demand"],
             "Demand_Power": ["Demand"],
             "BUS_Power": ["Balance"], 
@@ -54,6 +56,18 @@
                 "axis": "left",
                 "unit": "kWh",
                 "scale_factor": 0.001
+            },
+            "28": {
+				"key":{"Photovoltaic":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
+            "29": {
+				"key":{"WindFarm":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
             },
             "8": {
                 "key": {"Demand_Power": ["Demand"]},
@@ -138,12 +152,31 @@
                 "axis":"left",
                 "unit": "kWh",
                 "scale_factor": 0.001
+            },
+            "24": {
+				"key":{"HeatPump_baseline_in":["m_power:OUT"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
+            "25": {
+				"key":{"ElectrodeBoiler_baseline_in":["m_power:IN"]},
+				"axis": "left",
+				"unit": "kWh",
+				"scale_factor": 0.001
+            },
+            "30": {
+                "key": {"StockMarket_IN": ["m_money:OUT"]},
+                "axis":"right",
+                "unit": "EUR/MWh",
+                "scale_factor": 1.0
             }
+            
         }
     },
     "simulation_parameters": {
         "start": "01.01.2024 00:00",
-        "end": "31.12.2024 22:00",
+        "end": "31.12.2024 23:45",
         "start_end_unit": "dd.mm.yyyy HH:MM",
         "time_step": 900,
         "time_step_unit": "seconds",
@@ -160,19 +193,64 @@
             "medium": "m_power",
             "is_source": true
         },
-        "NegControlReserve": {
+        "NegControlReserve_in": {
             "type": "FlexibleSupply",
             "output_refs": [
-                "BUS_Power"
+                "NegControlReserve_out"
             ],
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/reserve_call_neg.prf",
             "scale": 0.0
         },
-        "PosControlReserve": {
+        "NegControlReserve_out": {
+            "type": "FlexibleSink",
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/reserve_call_neg.prf",
+            "scale": 0.0
+        },
+        "PosControlReserve_in": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "PosControlReserve_out"
+            ],
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/reserve_call_pos.prf",
+            "scale": 0.0
+        },
+        "PosControlReserve_out": {
             "type": "FlexibleSink",
             "medium": "m_power",
             "max_power_profile_file_path": "./profiles/MA/reserve_call_pos.prf",
+            "scale": 0.0
+        },
+        "HeatPump_baseline_in": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "HeatPump_baseline_out"
+            ],
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "scale": 0.0
+        },
+        "HeatPump_baseline_out": {
+            "type": "FlexibleSink",
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "scale": 0.0
+        },
+        "ElectrodeBoiler_baseline_in": {
+            "type": "FlexibleSupply",
+            "output_refs": [
+                "ElectrodeBoiler_baseline_out"
+            ],
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/ones.prf",
+            "scale": 0.0
+        },
+        "ElectrodeBoiler_baseline_out": {
+            "type": "FlexibleSink",
+            "medium": "m_power",
+            "max_power_profile_file_path": "./profiles/MA/ones.prf",
             "scale": 0.0
         },
         "Grid_OUT": {
@@ -196,7 +274,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
@@ -282,14 +360,12 @@
             "medium": "m_power",
             "connections": {
                 "input_order": [
-                    "NegControlReserve",
                     "Photovoltaic",
                     "WindFarm",
-                    "Grid_IN",
-                    "Battery"
+                    "Battery",
+                    "Grid_IN"
                 ],
                 "output_order": [
-                    "PosControlReserve",
                     "Demand_Power",
                     "HeatPump",
                     "ElectrodeBoiler",
@@ -297,11 +373,10 @@
                     "Grid_OUT"
                 ],
                 "energy_flow": [
-                    [0, 0, 1, 1, 0, 0],
-                    [1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 1, 1],
-                    [1, 1, 1, 1, 0, 0],
-					[1, 1, 0, 0, 0, 0]
+                    [1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1],
+                    [1, 0, 0, 0, 0],
+					[1, 1, 1, 0, 0]
                 ]
             },
             "control_modules": [
