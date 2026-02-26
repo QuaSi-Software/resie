@@ -270,8 +270,10 @@ function calc_reserve_power(sim_length::TimePeriod,
 
         # negative control reserve
         if power_neg_bool
-            components[mod_params["neg_reserve_uac"]].scaling_factor = floor(power_value, digits=-6)
-            components[mod_params["pos_reserve_uac"]].scaling_factor = 0.0
+            components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=-6)
+            components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0
+            components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=-6)
+            components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
             
             #set plr_limit to baseline + offered negative control reserve
             el_power_hp = max.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
@@ -284,8 +286,10 @@ function calc_reserve_power(sim_length::TimePeriod,
             end
         # positive control reserve
         elseif power_pos_bool
-            components[mod_params["pos_reserve_uac"]].scaling_factor = ceil(power_value, digits=-6)
-            components[mod_params["neg_reserve_uac"]].scaling_factor = 0.0       
+            components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = ceil(power_value, digits=-6)
+            components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0       
+            components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = ceil(power_value, digits=-6)
+            components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0       
             
             #set plr_limit to baseline - offered positive control reserve
             el_power_boiler = max.(baseline_el_boiler .- energy_weighted_values, 0)

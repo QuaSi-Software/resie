@@ -342,7 +342,7 @@
                 "storage_uac": "BufferTank",
                 "demand_uac": "Demand_Heat",
                 "renewable_source_uacs": ["Photovoltaic", "WindFarm"],
-                "price_profile_path": "profiles/MA/boersenpreis_EUR_MWh.prf",
+                "price_profile_path": "profiles/MA/stock_price_EUR_MWh.prf",
                 "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
                 "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf",
                 "min_storage_load": 0.1,
