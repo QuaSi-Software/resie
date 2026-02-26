@@ -12,6 +12,7 @@ src/run_REPL.jl
 # output files (force-add new scenario inputs and references)
 output/*
 test/scenarios/*
+profiles/parallel_runs/*
 
 # input files (force-add new examples)
 examples/*.json

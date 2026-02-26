@@ -285,3 +285,33 @@ end
 
 # calculation of the order of operations has its own include files due to its complexity
 include("order_of_operations.jl")
+
+
+function parse_optimizer_function(eff_def::String)::Function
+    splitted = split(eff_def, ":")
+
+    if length(splitted) > 1
+        method = lowercase(splitted[1])
+        data = splitted[2]
+
+        #TODO get more function definitions analog to different optimization packages
+        if method == "poly-2"
+            params = parse.(Float64, split(data, ","))
+            return function (x, y)
+                return params[1] +
+                       params[2] * x +
+                       params[3] * y +
+                       params[4] * x * x +
+                       params[5] * x * y +
+                       params[6] * y * y +
+                       params[7] * x * x * x +
+                       params[8] * x * x * y +
+                       params[9] * x * y * y +
+                       params[10] * y * y * y
+            end
+        end
+    end
+
+    @error "Cannot parse 2-dimensional function from: $eff_def"
+    return (x, y) -> 0.0
+end

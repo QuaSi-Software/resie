@@ -1,6 +1,6 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
-
+using Infiltrator
 """
 get_output_keys(config[io_settings], components)
 
@@ -430,6 +430,30 @@ function parse_outkeys(output_keys::Vector{EnergySystems.OutputKey})
             end
         end
     end
+    return keys
+end
+
+function parse_outkeys(output_keys::AbstractDict{String,Any})
+    keys = Array{String}(undef, 0)
+    for (uac, values) in pairs(output_keys)
+        for entry in values
+            splitted = split(String(entry), ":")
+            if length(splitted) > 1
+                medium = splitted[1]
+                value_key = splitted[2]
+                if startswith(value_key, "EnergyFlow") || startswith(value_key, "TemperatureFlow")
+                    push!(keys, "$medium $value_key")
+                else
+                    push!(keys, "$uac $medium $value_key")
+                end
+            else
+                medium = nothing
+                value_key = splitted[1]
+                push!(keys, "$uac $value_key")
+            end
+        end
+    end
+
     return keys
 end
 
@@ -975,6 +999,26 @@ function create_sankey(output_all_sourcenames::Vector{Any},
 
     # save plot
     file_path = sim_params["run_path"](default(io_settings, "sankey_plot_file", "./output/output_sankey.html"))
+    savefig(p, file_path)
+end
+
+# create matrix with 2d plots with each parameter over each other parameter and show "objective" as color 
+function create_matrix_plot(results::Vector{Any}, optimizer::Dict{String,Any}, sim_params::Dict{String,Any})
+    param_names = collect(keys(optimizer["optim_params"]))
+    N = length(param_names)
+
+    results_dict = Dict(k => [d[k] for d in results] for k in keys(results[1]))
+    objective = results_dict["objective"]
+
+    scatter_traces = splom(
+        dimensions = [attr(label=k, values=results_dict[k]) for k in param_names],
+        marker = attr(color=objective, colorscale="Viridis", size=5, showscale=true)
+    )
+    p = plot(scatter_traces)
+    
+    file_path = sim_params["run_path"](default(optimizer, 
+                                               "matrix_plot_file",
+                                               "./output/matrix_plot.html"))
     savefig(p, file_path)
 end
 

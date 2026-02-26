@@ -492,38 +492,60 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
         #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
         optimizer = load_optimizer(project_config["optimizer"])
 
-        total_runs = length(optimizer["iterator"])
         runidx_global = Atomic{Int}(1)
-        all_results = OrderedDict()
-        if haskey(optimizer, "objective")
-            obj = zeros(length(keys(optimizer["objective"])))
+        all_results = []
+        if haskey(optimizer, "objective_params")
+            obj = Array{Union{Float64,Nothing}}(nothing, length(parse_outkeys(optimizer["objective_params"])))
             obj_lock = ReentrantLock()
         end
 
+        @globalInfo "Starting $(Threads.nthreads()) parallel simulations"
         #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
         @threads for sample_values in collect(optimizer["iterator"])
-            sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
             runidx = atomic_add!(runidx_global, 1)
             sample_ID = uuid4()
             start_time = now()
 
             # decide which algorithm to run based on type of optimizer
             if optimizer["type"] == "parametervariation"
-                _ = run_sample(sim_params, proccesed_results_path, project_config, 
-                               optimizer, sample_params, sample_ID, run_lock, output_lock)
+                sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
+                results = run_sample(sim_params, proccesed_results_path, project_config, 
+                                     optimizer, sample_params, sample_ID, 
+                                     run_lock, output_lock)
+                lock(results_lock) do 
+                    push!(all_results, results) 
+                end
 
             elseif optimizer["type"] == "monte_carlo_annealing"
                 monte_carlo_annealing!(all_results, obj, obj_lock, 
                                        sim_params, proccesed_results_path, project_config, 
-                                       optimizer, sample_ID, 
+                                       optimizer, sample_values, sample_ID, 
                                        run_lock, output_lock, results_lock)
             end
 
             runtime = round(Int, Dates.seconds(now() - start_time))
-            eta = round(Int, (total_runs - runidx) * runtime / Threads.nthreads() / 60)
-            @globalInfo "[$runidx/$total_runs] → completed in $runtime s. ETA: $eta min"
+            eta = round(Int, (optimizer["total_runs"] - runidx) * runtime / Threads.nthreads() / 60)
+            @globalInfo "[$runidx/$(optimizer["total_runs"])] → completed in $runtime s. ETA: $eta min"
         end
 
+        if !optimizer["continuous_output"]
+            open(proccesed_results_path, "w") do file_handle
+                # write header
+                header = join(collect(keys(all_results[1])), ';') * "\n"
+                write(file_handle, header)
+
+                # write rows TODO can probably speed up by collecting data and writing once
+                for results in all_results            
+                    row = join(collect(values(results)), ';') * "\n"
+                    row = replace(row, '.' => ',')
+                    write(file_handle, row)
+                end
+            end
+        end
+
+        if optimizer["do_matrix_plot"]
+            create_matrix_plot(all_results, optimizer, sim_params)
+        end
     else
         _ = run_sample(sim_params, proccesed_results_path, project_config, 
                        nothing, nothing, run_ID, run_lock, output_lock)
@@ -533,28 +555,29 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
 end
 
 function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
-                                proccesed_results_path, project_config, optimizer, run_ID, 
-                                run_lock, output_lock, results_lock)
+                                proccesed_results_path, project_config, optimizer, idx,
+                                run_ID, run_lock, output_lock, results_lock)
     # temperature schedule is simple inverse logistic curve
-    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["nr_tries"] - 0.5)))
+    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["total_runs"] - 0.5)))
 
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
         sample_params = Dict{String, Any}()
         for (key, param) in pairs(optimizer["optim_params"])
-            sample_params[key] = rand(param["min"]:param["max"])
+            #TODO maybe define optim params also as ranges but use minimum(range) and maximum(range) as limits
+            sample_params[key] = rand(range(start=param["min"], stop=param["max"], length=100))
         end
     else
         # set parameters to neighborhood of existing result, drawn from the top results
         # by global measure, where temperature determines the results pool and size of
         # neighborhood
         sample_idx = rand(1:max(1, Int(round(length(all_results) * temperature))))
-        sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
+        # sample = sample_idx >= 1 && sample_idx <= length(all_results) ? all_results[sample_idx] : all_results[1]
+        sample = all_results[sample_idx]
         
         sample_params = Dict{String, Any}()
         for (key, param) in pairs(optimizer["optim_params"])
-            range = nbh_scale * temperature * (param["max"] - param["min"])
-            #TODO sample[key] doesn't really make sense right now key=String(category, uac, param_key)
+            range = optimizer["nbh_scale"] * temperature * (param["max"] - param["min"])
             value = sample[key] + rand((-0.5 * range):(0.5 * range))
             sample_params[key] = clamp(value, param["min"], param["max"])
         end
@@ -563,18 +586,27 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     # run sim and calculate objective results
     results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
                          sample_params, run_ID, run_lock, output_lock)
-    obj_results = objective_function(results)
+
+    obj_input = zeros(length(obj))
+    for (idx, key) in enumerate(parse_outkeys(optimizer["objective_params"]))
+        obj_input[idx] = results[key]
+    end
+    results["objective"] = optimizer["objective_function"](obj_input...)
 
     # calculate minimum of results
-    @lock obj_lock obj .= min.(min_obj, obj_results) 
+    if any(!isnothing(obj))
+        @lock obj_lock obj = results["objective"]
+    else
+        @lock obj_lock obj .= min.(obj, results["objective"]) 
+    end
 
     # write output to all_results
     lock(results_lock) do 
-        all_results[run_ID] = results
+        push!(all_results, results)
 
         # calculate global measure and sort by it
         for res in all_results
-            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(keys(optimizer["objective"]), min_obj))
+            res["gm"] = norm(res[k] / m - 1 for (k, m) in zip(parse_outkeys(optimizer["objective_params"]), obj))
         end
         sort!(all_results; by=x -> x["gm"])
     end
@@ -619,10 +651,8 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
             # years_emission_data = length(emission_profile) / sim_params["time_step_seconds"]
             if years_sim < 1
                 #TODO repeat whole sim_output until 1 year full
-                sim_output
-            elseif  years > 1
+            elseif years_sim > 1
                 #TODO repeat last year until economy_params["eval_time"]
-                sim_output
             end
             if !isnothing(economy_params)
                 #TODO annuity and total_costs for each value for each component
@@ -637,10 +667,10 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
         end
 
         if !isnothing(optimizer) 
-            for key in parse_outkeys(output_keys(components, optimizer["output_keys_sum"]))
+            for key in parse_outkeys(optimizer["output_keys_sum"])
                 results[key] = sum(sim_output[key])
             end
-            for key in parse_outkeys(output_keys(components, optimizer["output_keys_mean"]))
+            for key in parse_outkeys(optimizer["output_keys_mean"])
                 results[key] = sum(sim_output[key]) / length(sim_output[key])
             end 
         end
@@ -656,24 +686,26 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
         results["error"] =  "\"" * replace(full_error_message, "\"" => "\"\"") * "\"\n"
     end
 
-    # Write results to seperate file after all simulations are finished.
-    row = join(collect(values(results)), ';') * "\n"
-    row = replace(row, '.' => ',')
-    # Lock the file writing
-    lock(output_lock) do 
-        # create header if file is empty
-        if filesize(proccesed_results_path) == 0
-            header = join(collect(keys(results)), ';') * "\n"
-            open(proccesed_results_path, "w") do file_handle
-                write(file_handle, header)
+    if optimizer["continuous_output"]
+        # Write results to seperate file after all simulations are finished.
+        row = join(collect(values(results)), ';') * "\n"
+        row = replace(row, '.' => ',')
+        # Lock the file writing
+        lock(output_lock) do 
+            # create header if file is empty
+            if filesize(proccesed_results_path) == 0
+                header = join(collect(keys(results)), ';') * "\n"
+                open(proccesed_results_path, "w") do file_handle
+                    write(file_handle, header)
+                end
             end
-        end
-        open(proccesed_results_path, "a") do file_handle
-            write(file_handle, row)
+            open(proccesed_results_path, "a") do file_handle
+                write(file_handle, row)
+            end
         end
     end
         
-    @globalInfo "-- Simulation loop complete in $(seconds(now() - start)) s"
+    @info "-- Simulation loop complete in $(seconds(now() - start)) s"
     lock(run_lock) do 
         close_run(run_ID)
     end
@@ -728,92 +760,126 @@ function create_variant(sim_params::Dict{String, Any}, project_config::AbstractD
 
     #TODO maybe this should be moved to profile processing to allow the profiles to be 
     # defined with "profiles" group, scale and addon without optimizer
-    profile_paths = Dict{String,String}()
-    profile_scales = Dict{String,Float64}()
-    profile_addons = Dict{String,Float64}()
-    for (name, profile) in pairs(cfg["profiles"])
-        profile_paths[name] = profile["path"]
-        profile_scales[name] = profile["scale"]
-        profile_addons[name] = profile["addon"]
-    end
-   
-    # create correct profiles from price_profile_paths and add the to sim_output.
-    # profiles will be overwritten for every run to make sure the profile_scales and 
-    # profile_addons calculated correctly.
-    # If multiple threads are used each thread gets their own profile.
-    #TODO change directiory to something better
-    profile_dir = sim_params["run_path"]("./profiles/parallel_runs")
-    mkpath(profile_dir)
-
-    profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
-    date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
-    new_paths = Dict{String,String}() 
-
-    for (name, path) in pairs(profile_paths)
-        if profile_scales[name] != 1 && profile_addons[name] != 0 && profile_id == 0
-            new_paths[name] = path
-        else
-            profile = Profile(path, sim_params)
-            values = [profile.data[dt] .* profile_scales[name] .+ profile_addons[name] for dt in date_range]
-            new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
-            save_to_prf(collect(date_range), values, new_path)
-            new_paths[name] = path
+    if haskey(cfg, "profiles")
+        profile_paths = Dict{String,String}()
+        profile_scales = Dict{String,Float64}()
+        profile_addons = Dict{String,Float64}()
+        for (name, profile) in pairs(cfg["profiles"])
+            profile_paths[name] = profile["path"]
+            profile_scales[name] = profile["scale"]
+            profile_addons[name] = profile["addon"]
         end
-    end
+    
+        # create correct profiles from price_profile_paths and add the to sim_output.
+        # profiles will be overwritten for every run to make sure the profile_scales and 
+        # profile_addons calculated correctly.
+        # If multiple threads are used each thread gets their own profile.
+        #TODO change directiory to something better
+        profile_dir = sim_params["run_path"]("./profiles/parallel_runs")
+        mkpath(profile_dir)
 
-    # replace the profile names with the paths to the new profiles
-    function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,String})
-        for (k, v) in cfg
-            if v isa String && haskey(replacements, v)
-                cfg[k] = replacements[v]
-            elseif v isa AbstractDict
-                replace_profiles!(v, replacements)
+        profile_id = ifelse(Threads.nthreads() > 1, Threads.threadid(), 0)
+        date_range = remove_leap_days(collect(sim_params["start_date"]:Second(sim_params["time_step_seconds"]):sim_params["end_date"]))
+        new_paths = Dict{String,String}() 
+
+        for (name, path) in pairs(profile_paths)
+            if profile_scales[name] != 1 && profile_addons[name] != 0 && profile_id == 0
+                new_paths[name] = path
+            else
+                profile = Profile(path, sim_params)
+                values = [profile.data[dt] .* profile_scales[name] .+ profile_addons[name] for dt in date_range]
+                new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
+                save_to_prf(collect(date_range), values, new_path)
+                new_paths[name] = path
             end
         end
 
-    end
+        # replace the profile names with the paths to the new profiles
+        function replace_profiles!(cfg::AbstractDict, replacements::Dict{String,String})
+            for (k, v) in cfg
+                if v isa String && haskey(replacements, v)
+                    cfg[k] = replacements[v]
+                elseif v isa AbstractDict
+                    replace_profiles!(v, replacements)
+                end
+            end
 
-    replace_profiles!(cfg, new_paths)
+        end
+
+        replace_profiles!(cfg, new_paths)
+    end
 
     return cfg
 end
-        
+
+#TODO whole function may be better suited for project_loading.jl
 function load_optimizer(optimizer_config::OrderedDict{String,Any})
     optimizer = Dict{String,Any}()
     optimizer["type"] = optimizer_config["type"]
-    if optimizer_config["type"] == "parametervariation"
-        optim_params = Dict()
-        for (category, uacs) in pairs(optimizer_config["optim_params"])
-            for (uac, params) in pairs(uacs)
-                for (key_param, def) in pairs(params)
-                    if haskey(def, "values")
-                        optim_params[category * " " * uac * " " * key_param] = def["values"]
-                    else
-                        def = Dict(Symbol(k) => v for (k, v) in def)
-                        optim_params[category * " " *uac * " " * key_param] = range(; def...)
-                    end
+
+    optim_params = Dict()
+    for (category, uacs) in pairs(optimizer_config["optim_params"])
+        for (uac, params) in pairs(uacs)
+            for (key_param, def) in pairs(params)
+                if haskey(def, "values")
+                    optim_params[category * " " * uac * " " * key_param] = def["values"]
+                elseif haskey(def, "min") && haskey(def, "max")
+                    optim_params[category * " " * uac * " " * key_param] = def
+                else
+                    def = Dict(Symbol(k) => v for (k, v) in def)
+                    optim_params[category * " " *uac * " " * key_param] = range(; def...)
                 end
             end
         end
-        optimizer["optim_params"] = optim_params
+    end
+    optimizer["optim_params"] = optim_params
+    
+    optimizer["output_keys_sum"] = Dict{String,Any}()
+    optimizer["output_keys_mean"] = Dict{String,Any}()
+    if haskey(optimizer_config, "objective_params")
+        if haskey(optimizer_config["objective_params"], "sum")
+            optimizer["output_keys_sum"] = optimizer_config["objective_params"]["sum"]
+        end
+        if haskey(optimizer_config["objective_params"], "mean")
+            optimizer["output_keys_mean"] = optimizer_config["objective_params"]["mean"]
+        end
+    end
+
+    optimizer["continuous_output"] = default(optimizer_config, "continuous_output", true)
+    optimizer["do_matrix_plot"] = haskey(optimizer_config, "matrix_plot") &&
+                                  optimizer_config["matrix_plot"] !== "nothing"
+    if haskey(optimizer_config, "matrix_plot_file")          
+        optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
+    end                                       
+
+    if optimizer_config["type"] == "parametervariation"
+
         # May be unnecessary but added to make sure the order of keys and values is the same
-        optimizer["optim_params_keys"] = keys(optim_params)
+        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
         optimizer["iterator"] = default(optimizer_config, "iterator", "product")
         if optimizer["iterator"] == "product"
-            optimizer["iterator"] = Iterators.product(values(optim_params)...)
+            optimizer["iterator"] = Iterators.product(values(optimizer["optim_params"])...)
         elseif optimizer["iterator"] == "zip"
-            optimizer["iterator"] = zip(values(optim_params)...)
+            optimizer["iterator"] = zip(values(optimizer["optim_params"])...)
         elseif split(optimizer["iterator"], "_")[1] == "random" 
-            iter = Iterators.product(values(optim_params)...)
+            iter = Iterators.product(values(optimizer["optim_params"])...)
             n_samples = max(split(optimizer["iterator"], "_")[2], length(iter))
             optimizer["iterator"] = rand(collect(iter), n_samples)
         end
 
-        optimizer["output_keys_sum"] = optimizer_config["total_output_keys"]["sum"]
-        optimizer["output_keys_mean"] = optimizer_config["total_output_keys"]["mean"]
+        optimizer["total_runs"] = lenght(optimizer["iterator"])
+
+    elseif optimizer_config["type"] == "monte_carlo_annealing"
+        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
+
+        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
+
+        optimizer["total_runs"] = optimizer_config["max_runs"]
+        optimizer["iterator"] = range(1, optimizer["total_runs"]; step=1)
+        optimizer["nbh_scale"] = default(optimizer_config, "nbh_scale", 0.5)
+
     else
         #TODO parse_objective_function and parameters for more complicated algorithms
-        # whole function may be better suited for project_loading.jl
     end
 
     return optimizer
