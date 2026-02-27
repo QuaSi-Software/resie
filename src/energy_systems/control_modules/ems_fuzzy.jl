@@ -26,8 +26,10 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "price_trend_profile_path" => nothing,
             "price_volatility_profile_path" => nothing,
             "min_storage_load" => 0.0,
-            "rolling_horizon_hours" => 8760.0
-
+            "rolling_horizon_hours" => 8760.0,
+            "power_bus_uac" => nothing,
+            "battery_uac" => nothing,
+            "el_grid_uac" => nothing
         )
         params = Base.merge(default_parameters, parameters)
         if haskey(parameters, "rolling_horizion_hours") && !haskey(parameters, "rolling_horizon_hours")
@@ -50,6 +52,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
         params["demand"] = components[params["demand_uac"]]
         params["renewable_sources"] = [components[uac] for uac in params["renewable_source_uacs"]]
         
+        # create new connectivity for BufferTank charging
         connectivity_by_state = Dict{String,Dict{Int,ConnectionMatrix}}()
         connectivity_by_state[unit_uac] = Dict{Int,ConnectionMatrix}()
         # record already calculated original connectivities for each bus
@@ -68,8 +71,29 @@ mutable struct CM_EMSFuzzy <: ControlModule
         end
 
         connectivity_by_state[unit_uac][2] = new_connectivity
+        params["charging_state_buffer"] = 1
+
+        if !isnothing(params["power_bus_uac"]) && 
+           !isnothing(params["battery_uac"]) && 
+           !isnothing(params["el_grid_uac"])
+
+            # create new connectivity for Battery charging
+            connectivity_by_state[params["power_bus_uac"]] = Dict{Int,ConnectionMatrix}()
+            # record already calculated original connectivities for each bus
+            connectivity_by_state[params["power_bus_uac"]][1] = components[params["power_bus_uac"]].connectivity
+
+            new_connectivity = deepcopy(components[params["power_bus_uac"]].connectivity)
+
+            battery_idx = findfirst(isequal(params["battery_uac"]), new_connectivity.output_order)
+            primary_idx = findfirst(isequal(params["el_grid_uac"]), new_connectivity.input_order)
+            new_connectivity.energy_flow[primary_idx][battery_idx] = 0.0
+
+            connectivity_by_state[params["power_bus_uac"]][2] = new_connectivity
+            params["charging_state_battery"] = 2
+        end
+
         params["connectivity_by_state"] = connectivity_by_state
-        params["charging_state"] = 1
+
        
         return new(params["name"], params, unit_uac)
     end
@@ -97,8 +121,11 @@ function change_bus_priorities!(mod::CM_EMSFuzzy,
     mod.parameters["primary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_primary"]
     mod.parameters["secondary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_secondary"]
     # set connectivity to allow or disallow charging from secondary interfaces
-    components[mod.unit_uac].connectivity = mod.parameters["connectivity_by_state"][mod.unit_uac][mod.parameters["charging_state"]]
-
+    components[mod.unit_uac].connectivity = mod.parameters["connectivity_by_state"][mod.unit_uac][mod.parameters["charging_state_buffer"]]
+    if !isnothing(mod.parameters["power_bus_uac"])
+        power_bus_uac = mod.parameters["power_bus_uac"]
+        components[power_bus_uac].connectivity = mod.parameters["connectivity_by_state"][power_bus_uac][mod.parameters["charging_state_battery"]]
+    end
 end
 
 function reorder_operations(mod::CM_EMSFuzzy,
@@ -208,10 +235,18 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power_timestep)
 
-    if chargemode < 50
-        mod_params["charging_state"] = 2 # charging off
+    # set state for BufferTank charging
+    if chargemode >= 50
+        mod_params["charging_state_buffer"] = 1 # charging on
     else
-        mod_params["charging_state"] = 1 # charging on
+        mod_params["charging_state_buffer"] = 2 # charging off
+    end
+
+    # set state for Battery charging
+    if chargemode >= 50 && plr >= 0.5
+        mod_params["charging_state_battery"] = 1 # charging on
+    else
+        mod_params["charging_state_battery"] = 2 # charging off
     end
 
     ### old Implementation with SOC_target got replaced by chargemode
