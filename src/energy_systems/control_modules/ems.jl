@@ -235,6 +235,7 @@ function calc_reserve_power(sim_length::TimePeriod,
     components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
     components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
 
+    if sim_params["time"] >= (31+3) * 24 * 3600 + 16 * 3600 @infiltrate end
 
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
@@ -245,21 +246,21 @@ function calc_reserve_power(sim_length::TimePeriod,
         if power_neg_bool && power_pos_bool
             # decide which direction to offer based on the earnings
             # calculate total revenue over length of future simulation
-            rev_neg = 0
-            rev_pos = 0
             if length(date_range) > 1
+                rev_neg = value_at_time(price_profiles[2], sim_params)
+                rev_pos = value_at_time(price_profiles[5], sim_params)
                 for dt in date_range
-                    rev_neg += (price_profiles[2].data[dt] + price_profiles[3].data[dt] * price_profiles[4].data[dt]) * 
+                    rev_neg += price_profiles[3].data[dt] * price_profiles[4].data[dt] * 
                                sim_params["time_step_seconds"]/3600
-                    rev_pos += (price_profiles[5].data[dt] + price_profiles[6].data[dt] * price_profiles[7].data[dt]) * 
+                    rev_pos += price_profiles[6].data[dt] * price_profiles[7].data[dt] * 
                                sim_params["time_step_seconds"]/3600
                 end
             else
                 rev_neg = value_at_time(price_profiles[3], sim_params) * 
                           value_at_time(price_profiles[4], sim_params) * 
                           sim_params["time_step_seconds"]/3600
-                rev_pos = value_at_time(price_profiles[3], sim_params) * 
-                          value_at_time(price_profiles[4], sim_params) * 
+                rev_pos = value_at_time(price_profiles[6], sim_params) * 
+                          value_at_time(price_profiles[7], sim_params) * 
                           sim_params["time_step_seconds"]/3600
             end
             power_neg_bool = rev_neg * power_neg_bool >= rev_pos * power_pos_bool
@@ -285,9 +286,9 @@ function calc_reserve_power(sim_length::TimePeriod,
             components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
             
             #set plr_limit to baseline + offered negative control reserve
-            el_power_hp = max.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
-            left_energy_weighted_values = energy_weighted_values .- (el_power_hp .- baseline_el_hp)
-            el_power_boiler = max.(baseline_el_boiler .+ left_energy_weighted_values, max_el_boiler)
+            el_power_hp = min.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
+            left_energy_weighted_values = max.(energy_weighted_values .- (el_power_hp.-baseline_el_hp), 0)
+            el_power_boiler = min.(baseline_el_boiler .+ left_energy_weighted_values, max_el_boiler)
 
             for (idx, dt) in enumerate(date_range)
                 components[mod_params["boiler_uac"]].controller.modules[1].profile.data[dt] = el_power_boiler[idx] / max_el_boiler[idx]

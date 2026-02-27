@@ -117,17 +117,16 @@ function output_values(unit::FlexibleSupply)::Vector{String}
 end
 
 function output_value(unit::FlexibleSupply, key::OutputKey)::Float64
-    value_key = strip(key.value_key)
-    if value_key == "OUT"
+    if key.value_key == "OUT"
         return calculate_energy_flow(unit.output_interfaces[key.medium])
-    elseif value_key == "Max_Energy"
+    elseif key.value_key == "Max_Energy"
         return unit.max_energy
-    elseif value_key == "Scaling_Factor" || value_key == "scaling_factor" || value_key == "ScalingFactor"
+    elseif key.value_key == "Scaling_Factor"
         return unit.scaling_factor
-    elseif value_key == "Temperature"
+    elseif key.value_key == "Temperature"
         return unit.temperature
     end
-    throw(KeyError(value_key))
+    throw(KeyError(key.value_key))
 end
 
 export FlexibleSupply
