@@ -33,7 +33,7 @@ mutable struct Storage <: Component
                    InterfaceMap(medium => nothing), # output_interfaces
                    medium,
                    config["capacity"],  # capacity
-                   config["load"],      # load
+                   default(config, "initial_load", 0.0) * config["capacity"], # load
                    0.0,                 # load_end_of_last_timestep::Float64
                    0.0,                 # losses
                    false,  # process_done, bool indicating if the process step has already been performed in the current time step
