@@ -291,13 +291,13 @@ function parse_cop_function(eff_def::String)::Tuple{Floathing,Function}
                    function (src, snk)
                        src_idx = nothing
                        for idx in 2:(dim_src - 1)
-                           if src >= values[idx, 1] && src < values[idx + 1, 1]
+                           if src >= values[idx, 1] && src <= values[idx + 1, 1]
                                src_idx = idx
                            end
                        end
                        snk_idx = nothing
                        for idx in 2:(dim_snk - 1)
-                           if snk >= values[1, idx] && snk < values[1, idx + 1]
+                           if snk >= values[1, idx] && snk <= values[1, idx + 1]
                                snk_idx = idx
                            end
                        end

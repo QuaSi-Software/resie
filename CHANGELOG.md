@@ -4,6 +4,18 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.8
+* Implement complex model for battery simulation
+  * A simple model remains with adjusted parameters. This model includes constant efficiency of dis-/charging, dis-/charging rate limitations and self-discharge as well as simple load/capacity tracking
+  * The complex model is designed around calculating the state of the battery with a detailed electrical model. The capacity, current load and dis-/charging power is calculated dynamically and includes effect such as aging (through cycling and chemical deterioration), heat build-up and varying efficiency of dis-/charging depending on power and cell temperature.
+  * The complex model works for different battery chemistries if manufacturer data is available. Redox-flow batteries are not included in the model.
+* Rename parameter `load` of generic model `Storage` to `initial_load` and change meaning to a percentage of capacity as initial charge
+* Fix typo in default parameters of control module `storage_driven`
+* Fix problem with loading profiles for model `GenericHeatSource`
+* Fix wrong check for control module functionality in callback `reorder_operations`
+* Fix that the exact value of the upper limit of `field` COP-functions was not included in the interpolation, leading to errors even though the value was within the field definition
+* Fix an issue with auxiliary output plots formats
+
 ### Version 0.13.7
 * Fix reading of global weather file not working correctly in some cases
 * Add option to write CSV output continuously, meaning in every timestep

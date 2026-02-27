@@ -45,7 +45,7 @@ mutable struct GenericHeatSource <: Component
                                                                 "temperature_profile_file_path",
                                                                 "temperature_from_global_file",
                                                                 "constant_temperature",
-                                                                uac)
+                                                                uac; required=true)
 
         medium = Symbol(config["medium"])
         register_media([medium])

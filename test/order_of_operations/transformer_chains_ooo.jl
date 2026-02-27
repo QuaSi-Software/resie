@@ -88,7 +88,9 @@ function test_base_order()
             "type" => "Battery",
             "output_refs" => ["TST_01_ELT_01_BUS"],
             "capacity" => 10000,
-            "load" => 5000,
+            "initial_load" => 0.5,
+            "charge_efficiency" => 1.0,
+            "discharge_efficiency" => 1.0,
         ),
         "TST_01_HZG_01_GRI" => Dict{String,Any}(
             "type" => "GridConnection",
