@@ -89,7 +89,13 @@ Base.@kwdef mutable struct Battery <: Component
         if !(model_type in model_type_allowed_values)
             @error "Undefined model type \"$(model_type)\" of battery \"$(uac)\". " *
                    "Has to be one of: $(model_type_allowed_values)."
-            throw(InputError)
+            throw(InputError())
+        end
+
+        if model_type == "simplified"
+            V_n_bat = 0.0
+        else
+            V_n_bat = config["V_n_bat"]
         end
 
         if model_type == "Li-LFP"
@@ -139,7 +145,7 @@ Base.@kwdef mutable struct Battery <: Component
                    default(config, "max_discharge_C_rate", 1.0), # maximum continuos discharge power in W
                    default(config, "SOC_min", 0),
                    default(config, "SOC_max", 100),
-                   config["V_n_bat"], # nominal voltage of the battery pack
+                   V_n_bat, # nominal voltage of the battery pack
                    default(config, "cell_cutoff_current", 0.003 * default(config, "capacity_cell_Ah", 0.0)),
                    default(config, "cycles", 1.0), # number of cycles
                    default(config, "Temp", 25.0), # cell temperature in °C
@@ -227,7 +233,7 @@ function initialise!(unit::Battery, sim_params::Dict{String,Any})
         unit.V_cell_min = f_V_cell(extracted_charge_empty, unit.I_ref, unit, n, unit.Temp)
         if unit.V_cell_min < 0
             @error "The battery cell parameters of $(unit.uac) are not correctly defined."
-            throw(InputError)
+            throw(InputError())
         end
 
         extracted_charge_full = Q * (1 - unit.SOC_max / 100)
