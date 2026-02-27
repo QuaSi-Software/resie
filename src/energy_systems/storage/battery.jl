@@ -346,7 +346,7 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                                unit.V_cell_last,
                                Roots.Order1())
             max_energy_cell = 0.0
-        # check if the resulting voltage with given energy is between V_min & V_max
+            # check if the resulting voltage with given energy is between V_min & V_max
         elseif cell_energy < asymp &&
                sign(V_cell_function(V_min, cell_energy, sim_params["time_step_seconds"], unit)) !=
                sign(V_cell_function(V_max, cell_energy, sim_params["time_step_seconds"], unit))
@@ -358,16 +358,16 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
                                Roots.Brent())
             max_energy_cell = cell_energy
 
-        # if very little energy is added the voltage of the battery can drop and give a wrong result
+            # if very little energy is added the voltage of the battery can drop and give a wrong result
         elseif energy < 0 && abs(cell_energy) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_last
             max_energy_cell = cell_energy
-        # if deeply discharged and little energy is added the voltage of the battery can drop below V_min
+            # if deeply discharged and little energy is added the voltage of the battery can drop below V_min
         elseif unit.V_cell <= unit.V_cell_min && energy < 0 && abs(cell_energy) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_min
             max_energy_cell = cell_energy
 
-        # if battery is discharged but less energy can be removed than given
+            # if battery is discharged but less energy can be removed than given
         elseif energy > 0
             ul = min(asymp * 0.999, cell_energy)
             try
@@ -381,7 +381,7 @@ function calc_efficiency(energy::Number, unit::Battery, sim_params::Dict{String,
             end
             V_cell = V_min
 
-        # if battery is charged but less energy can be charged than given
+            # if battery is charged but less energy can be charged than given
         elseif energy < 0
             if sign(V_cell_function(V_max, cell_energy, sim_params["time_step_seconds"], unit)) !=
                sign(V_cell_function(V_max, -unit.capacity_cell_Ah * 0.0001, sim_params["time_step_seconds"], unit))
@@ -474,7 +474,7 @@ function calc_efficiency_current(current::Number, unit::Battery, sim_params::Dic
         if current < 0 && abs(current) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_last
 
-        # if deeply discharged and little energy is added the voltage of the battery can drop below V_min
+            # if deeply discharged and little energy is added the voltage of the battery can drop below V_min
         elseif unit.V_cell <= unit.V_cell_min && current < 0 && abs(current) < 0.1 * unit.capacity_cell_Ah
             V_cell = unit.V_cell_min
 
@@ -674,8 +674,8 @@ function handle_component_update!(unit::Battery, step::String, sim_params::Dict{
                 end
                 unit.SOC = unit.load / unit.capacity * 100
 
-            # check for constant voltage charging cutoff point 
-            # CV charging current cutoff is set at 0.3% of the nominal cell capacity
+                # check for constant voltage charging cutoff point 
+                # CV charging current cutoff is set at 0.3% of the nominal cell capacity
             elseif unit.V_cell == unit.V_cell_max && abs(current) < unit.cell_cutoff_current
                 unit.SOC = unit.SOC_max
                 unit.load = unit.capacity * unit.SOC / 100
@@ -724,8 +724,8 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     # discharge curves of the cell chemistry at different discharge rates
     Q_max = unit.capacity_cell_Ah * 1.3
     try
-        Q_max = find_zero(Q -> f_V_cell(Q, 
-                                        unit.max_discharge_C_rate * unit.capacity_cell_Ah, 
+        Q_max = find_zero(Q -> f_V_cell(Q,
+                                        unit.max_discharge_C_rate * unit.capacity_cell_Ah,
                                         unit, 1, 50) -
                                unit.V_cell_min,
                           unit.capacity_cell_Ah) * 1.001
@@ -736,21 +736,21 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     y2 = fill(NaN, length(x))
     y3 = fill(NaN, length(x))
     for (idx, Q) in enumerate(x)
-        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            unit.cycles, unit.T_ref)
         if y1[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * 2 * unit.capacity_cell_Ah, unit, 
+        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * 2 * unit.capacity_cell_Ah, unit,
                            unit.cycles, unit.T_ref)
         if y2[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate / 2 * unit.capacity_cell_Ah, unit, 
+        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate / 2 * unit.capacity_cell_Ah, unit,
                            unit.cycles, unit.T_ref)
         if y3[idx] <= unit.V_cell_min
             break
@@ -761,7 +761,7 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
                                "$(unit.max_discharge_C_rate*2)C",
                                "$(unit.max_discharge_C_rate/2)C"),
                    lw=3)
-    Plots.plot!(p, ; title="Battery discharge curve for $(unit.uac) at different C-rates",
+    Plots.plot!(p,; title="Battery discharge curve for $(unit.uac) at different C-rates",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
                 ylims=(unit.V_cell_min, unit.V_cell_max),
@@ -786,21 +786,21 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     y2 = fill(NaN, length(x))
     y3 = fill(NaN, length(x))
     for (idx, Q) in enumerate(x)
-        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            unit.cycles, unit.T_ref)
         if y1[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            unit.cycles, 0)
         if y2[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            unit.cycles, 50)
         if y3[idx] <= unit.V_cell_min
             break
@@ -809,7 +809,7 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     p = Plots.plot(x, [y1, y2, y3];
                    labels=["$(unit.T_ref) °C" "0 °C" "50 °C"],
                    lw=3)
-    Plots.plot!(p; 
+    Plots.plot!(p;
                 title="Battery discharge curve for $(unit.uac) at different Temperatures",
                 xlabel="Removed Cell Charge / Ah",
                 ylabel="Cell Voltage / V",
@@ -835,21 +835,21 @@ function plot_optional_figures_begin(unit::Battery, output_path::String, output_
     y2 = fill(NaN, length(x))
     y3 = fill(NaN, length(x))
     for (idx, Q) in enumerate(x)
-        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y1[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            unit.cycles, unit.T_ref)
         if y1[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y2[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            1000, unit.T_ref)
         if y2[idx] <= unit.V_cell_min
             break
         end
     end
     for (idx, Q) in enumerate(x)
-        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit, 
+        y3[idx] = f_V_cell(Q, unit.max_discharge_C_rate * unit.capacity_cell_Ah, unit,
                            3000, unit.T_ref)
         if y3[idx] <= unit.V_cell_min
             break
