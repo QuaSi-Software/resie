@@ -1,0 +1,58 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:17:20
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted using linear interpolation to fit the simulation start time. 
+[Info] For 'TST_STC_01', the 'ambient_temperature' is taken from the project-wide weather file: temp_ambient_air
+[Info] For 'TST_STC_01', the 'beam_solar_radiation' is taken from the project-wide weather file: beamHorIrr
+[Info] For 'TST_STC_01', the 'infrared_sky_radiation' is taken from the project-wide weather file: longWaveIrr
+[Info] For 'TST_STC_01', the 'diffuse_solar_radiation' is taken from the project-wide weather file: difHorIrr
+[Info] For 'TST_STC_01', the 'wind_speed' is taken from the project-wide weather file: wind_speed
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\PV_Stuttgart_30_south_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\PV_Stuttgart_10_west_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_SRC_03', the 'temperature' is set to the constant value of 60.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_DEM_01', the 'temperature' is set to the constant value of 45.0.
+[Info] For 'TST_STS_01', the 'ambient_temperature' is taken from the project-wide weather file: temp_ambient_air
+[Info] For 'TST_STS_01', the 'ground_temperature' is set to the constant value of 20.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_DEM_02', the 'temperature' is set to the constant value of 85.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\4000hours_with_least_CO2_2022.prf (intensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'TST_SRC_02', no 'temperature' is set.
+[Info] For 'TST_GRO_01', no 'temperature' is set.
+[Info] For 'TST_BFT_01', the 'ambient_temperature' is set to the constant value of 18.0.
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\p2h_stes_stc\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 36/720 in 1.692 s. ETA: 32.1480 s
+[Info] Progress: 72/720 in 0.148 s. ETA: 2.6640 s
+[Info] Progress: 108/720 in 0.136 s. ETA: 2.3120 s
+[Info] Progress: 144/720 in 0.175 s. ETA: 2.8000 s
+[Info] Progress: 180/720 in 0.096 s. ETA: 1.4400 s
+[Info] Progress: 216/720 in 0.101 s. ETA: 1.4140 s
+[Info] Progress: 252/720 in 0.092 s. ETA: 1.1960 s
+[Info] Progress: 288/720 in 0.279 s. ETA: 3.3480 s
+[Info] Progress: 324/720 in 0.088 s. ETA: 0.9680 s
+[Info] Progress: 360/720 in 0.1 s. ETA: 1.0000 s
+[Info] Progress: 396/720 in 0.148 s. ETA: 1.3320 s
+[Info] Progress: 432/720 in 0.102 s. ETA: 0.8160 s
+[Info] Progress: 468/720 in 0.172 s. ETA: 1.2040 s
+[Info] Progress: 504/720 in 0.133 s. ETA: 0.7980 s
+[Info] Progress: 540/720 in 0.097 s. ETA: 0.4850 s
+[Info] Progress: 576/720 in 0.187 s. ETA: 0.7480 s
+[Info] Progress: 612/720 in 0.178 s. ETA: 0.5340 s
+[Info] Progress: 648/720 in 0.158 s. ETA: 0.3140 s
+[Info] Progress: 684/720 in 0.169 s. ETA: 0.1690 s
+[Info] Progress: 720/720 in 0.178 s. ETA: 0.0000 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\p2h_stes_stc\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\p2h_stes_stc\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\p2h_stes_stc\out.csv
+[Info] general log saved to .\test\scenarios\p2h_stes_stc\general.log

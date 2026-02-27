@@ -175,20 +175,22 @@ function control(unit::Electrolyser,
 end
 
 function set_max_energies!(unit::Electrolyser,
+                           is_transformer_potential::Bool,
                            el_in::Float64,
                            heat_ht_out::Union{Floathing,Vector{<:Floathing}},
                            heat_lt_out::Float64,
                            h2_out::Float64,
                            o2_out::Float64,
                            purpose_uac_ht::Union{Stringing,Vector{<:Stringing}}=nothing)
-    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in; is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_ht_out], heat_ht_out, nothing, unit.output_temperature_ht,
-                    purpose_uac_ht)
+                    purpose_uac_ht; is_transformer_potential=is_transformer_potential)
     if unit.heat_lt_is_usable
-        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt)
+        set_max_energy!(unit.output_interfaces[unit.m_heat_lt_out], heat_lt_out, nothing, unit.output_temperature_lt;
+                        is_transformer_potential=is_transformer_potential)
     end
-    set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out)
-    set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out)
+    set_max_energy!(unit.output_interfaces[unit.m_h2_out], h2_out; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_o2_out], o2_out; is_transformer_potential=is_transformer_potential)
 end
 
 """
@@ -352,9 +354,9 @@ function potential(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0, 0.0, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2], energies[3], energies[4], energies[5], energies[6])
+        set_max_energies!(unit, true, energies[1], energies[2], energies[3], energies[4], energies[5], energies[6])
     end
 end
 
@@ -362,7 +364,7 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success
-        set_max_energies!(unit, 0.0, 0.0, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0, 0.0, 0.0, 0.0)
         return
     end
 

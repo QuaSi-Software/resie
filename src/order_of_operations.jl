@@ -105,6 +105,7 @@ function calculate_order_of_operations(components::Grouping)::OrderOfOperations
     reorder_for_input_priorities(simulation_order, components, components_by_function)
     reorder_distribution_of_busses(simulation_order, components, components_by_function)
     reorder_storage_loading(simulation_order, components, components_by_function)
+    reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
 
     fn_first = function (entry)
         return entry[1]
@@ -1502,6 +1503,9 @@ function merge_parallel_branches(branches, is_input, is_connecting_branch, paral
     parallel_branch_idx = fill(0, length(is_input))
     for (idx_branch, branch) in enumerate(branches)
         for component in branch
+            if component.sys_function !== EnergySystems.sf_transformer
+                continue
+            end
             for (idx_parallel_branch, parallel_branch) in enumerate(parallel_branches)
                 for branch in parallel_branch[2]
                     if component in branch
@@ -1526,10 +1530,6 @@ function merge_parallel_branches(branches, is_input, is_connecting_branch, paral
         else
             # If the index is not 0, merge the branches
             if haskey(merged_branches_dict, idx)
-                if is_input_dict[idx] !== is_input[i]
-                    # should actually not happen
-                    @warn "The order of operation may be wrong..."
-                end
                 is_input_dict[idx] = copy(is_input[i])
                 is_connecting_branch_dict[idx] = is_connecting_branch_dict[idx] || is_connecting_branch[i]
                 if reverse === nothing
@@ -2020,12 +2020,16 @@ function find_parallels(components)
             end_unit = path[end]
             # filter paths for...
             if (
-                # starting with either a bus or transformer
+                # starting with a bus
                 start_unit.sys_function in [EnergySystems.sf_bus]
-                # ending with either a bus or transformer
+                # ending with a bus
                 && end_unit.sys_function in [EnergySystems.sf_bus]
                 # has a length > 2
                 && length(path) > 2
+                # has not the same start and end bus
+                &&
+                ((start_unit.proxy !== nothing ? start_unit.proxy.uac : start_unit.uac) !=
+                 (end_unit.proxy !== nothing ? end_unit.proxy.uac : end_unit.uac))
                 # path contains at least one transformer in between
                 && EnergySystems.sf_transformer in [unit.sys_function for unit in path[2:(end - 1)]])
                 # remove all non-transformers and non-busses from path
@@ -2277,9 +2281,22 @@ function add_non_recursive_indirect_outputs!(node_set,
                     && (last_unit_uac == "" ? false : has_grid_output(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, last_unit_uac, outface.target.uac)
+                if outface.target.sys_function === EnergySystems.sf_bus && outface.target.proxy !== nothing
+                    target = outface.target.proxy
+                    proxy_interface = []
+                    for proxy_inface in target.input_interfaces
+                        if proxy_inface.source.uac == unit.uac
+                            proxy_interface = proxy_inface
+                            break
+                        end
+                    end
+                    push!(checked_interfaces, proxy_interface)
+                else
+                    target = outface.target
+                end
                 push!(checked_interfaces, outface)
                 add_non_recursive_indirect_outputs!(node_set,
-                                                    outface.target,
+                                                    target,
                                                     checked_interfaces,
                                                     sys_function,
                                                     unit.uac,
@@ -2349,9 +2366,22 @@ function add_non_recursive_indirect_inputs!(node_set,
                     && (last_unit_uac == "" ? false : has_grid_input(unit, last_unit_uac)))
                 continue
             elseif last_unit_uac == "" || connection_allowed(unit, inface.source.uac, last_unit_uac)
+                if inface.source.sys_function === EnergySystems.sf_bus && inface.source.proxy !== nothing
+                    source = inface.source.proxy
+                    proxy_interface = []
+                    for proxy_outface in source.output_interfaces
+                        if proxy_outface.target.uac == unit.uac
+                            proxy_interface = proxy_outface
+                            break
+                        end
+                    end
+                    push!(checked_interfaces, proxy_interface)
+                else
+                    source = inface.source
+                end
                 push!(checked_interfaces, inface)
                 add_non_recursive_indirect_inputs!(node_set,
-                                                   inface.source,
+                                                   source,
                                                    checked_interfaces,
                                                    sys_function,
                                                    unit.uac,
@@ -2806,6 +2836,58 @@ function reorder_storage_loading(simulation_order, components, components_by_fun
 end
 
 """
+    reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
+
+Handle process/load steps of flexible sinks, flexible sources and storages that are connected to a transformer (directly 
+or via one ore more buses) and may be between the potential and produce of the connected transformer:
+- Ensure that flexible sources and storages have their process-step after the process step of the connected transformers. 
+- Ensure that flexible sinks and storages have their load/process-step after the process step of the connected transformers.
+
+# Arguments
+-`simulation_order`: A global parameter holding the simulation order
+-`components`: All components of the current energy system
+-`components_by_function`: The mapping of component functions
+"""
+function reorder_src_snk_connected_to_transformer(simulation_order, components, components_by_function)
+    # flexible source, storages
+    sources_to_consider = vcat((values(components_by_function[i]) for i in (6, 5))...)
+    # flexible sink, storages
+    sinks_to_consider = vcat((values(components_by_function[i]) for i in (7, 5))...)
+
+    # For every flexible source/storage directly connected to a transformer...
+    for source in sources_to_consider
+        source_medium = hasproperty(source, :m_heat_out) ? source.m_heat_out : source.medium
+        connected_target_transformer = get_connected_transformer(source.output_interfaces[source_medium],
+                                                                 "output")
+        for connected_transformer in connected_target_transformer
+            # make sure the process of the source/storage comes after the process of the connected transformer.
+            place_one_lower!(simulation_order,
+                             (connected_transformer.uac, EnergySystems.s_process),
+                             (source.uac, EnergySystems.s_process);
+                             force=false)
+        end
+    end
+
+    # For every flexible sink/storage directly connected to a transformer...
+    for sink in sinks_to_consider
+        if hasproperty(sink, :regeneration) && !sink.regeneration
+            # skip components with deactivated input interfaces (geothermal heat collector, geothermal probes)
+            continue
+        end
+        sink_medium = hasproperty(sink, :m_heat_in) ? sink.m_heat_in : sink.medium
+        sink_step = sink.sys_function === EnergySystems.sf_storage ? EnergySystems.s_load : EnergySystems.s_process
+        connected_source_transformer = get_connected_transformer(sink.input_interfaces[sink_medium], "input")
+        for connected_transformer in connected_source_transformer
+            # make sure the process/load of the sink/storage comes after the process of the connected transformer
+            place_one_lower!(simulation_order,
+                             (connected_transformer.uac, EnergySystems.s_process),
+                             (sink.uac, sink_step);
+                             force=false)
+        end
+    end
+end
+
+"""
     contains_double_potential_produce(step_order)
 
 Checks the simulation step order for directly consecutive transformers potential and produce step to later 
@@ -2975,6 +3057,86 @@ function check_interface_for_transformer(interface, type)
     else
         @error "The function check_interface_for_transformer() was not able to detect if it is an output or an input interface. Check the function call."
         exit()
+    end
+end
+
+"""
+    get_connected_transformer(interface::SystemInterface, type::String)
+
+Checks a given interface if there is one or more transformer in the following or previous chain.
+The function search only across busses but not through other components!
+
+# Arguments
+-`interface::SystemInterface`: The interface that should be checked
+-`type::String`: Can be either "input" or "output". Defines if the "interface" should 
+                 be handled as an input or an output interface.
+
+# Returns
+Returns a list of the connected transformer.
+"""
+function get_connected_transformer(interface, type)
+    if type == "input"
+        input_transformer = []
+        add_transformer_in_input! = function (current_node, last_node_uac, checked_interfaces)
+            if current_node.sys_function === EnergySystems.sf_transformer
+                push!(input_transformer, current_node)
+            else
+                for inface in values(current_node.input_interfaces)
+                    if inface !== nothing
+                        inface.is_secondary_interface && continue
+                        if inface.source.sys_function === EnergySystems.sf_bus && startswith(inface.source.uac, "Proxy")
+                            continue
+                        elseif inface in checked_interfaces || inface.source == current_node
+                            continue
+                        elseif !connection_allowed(current_node, inface.source.uac, last_node_uac)
+                            continue
+                        elseif inface.source.sys_function === EnergySystems.sf_transformer
+                            push!(input_transformer, inface.source)
+                        elseif !(inface.source.sys_function === EnergySystems.sf_bus)
+                            continue
+                        else
+                            push!(checked_interfaces, inface)
+                            add_transformer_in_input!(inface.source, current_node.uac, checked_interfaces)
+                        end
+                    end
+                end
+            end
+        end
+
+        add_transformer_in_input!(interface.source, interface.target.uac, [])
+        return input_transformer
+
+    elseif type == "output"
+        output_transformer = []
+        add_transformer_in_output! = function (current_node, last_node_uac, checked_interfaces)
+            if current_node.sys_function === EnergySystems.sf_transformer
+                push!(output_transformer, current_node)
+            else
+                for outface in values(current_node.output_interfaces)
+                    if outface !== nothing
+                        outface.is_secondary_interface && continue
+                        if outface.target.sys_function === EnergySystems.sf_bus &&
+                           startswith(outface.target.uac, "Proxy")
+                            continue
+                        elseif outface in checked_interfaces || outface.target == current_node
+                            continue
+                        elseif !connection_allowed(current_node, last_node_uac, outface.target.uac)
+                            continue
+                        elseif outface.target.sys_function === EnergySystems.sf_transformer
+                            push!(output_transformer, outface.target)
+                        elseif !(outface.target.sys_function === EnergySystems.sf_bus)
+                            continue
+                        else
+                            push!(checked_interfaces, outface)
+                            add_transformer_in_output!(outface.target, current_node.uac, checked_interfaces)
+                        end
+                    end
+                end
+            end
+        end
+
+        add_transformer_in_output!(interface.target, interface.source.uac, [])
+        return output_transformer
     end
 end
 

@@ -1,0 +1,39 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:18:08
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_SRC_01', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\source_heat_temperature.prf
+[Info] For 'TST_DEM_01', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] For 'TST_GRI_01', no 'temperature' is set.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_heat_pump\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 4/96 in 0.001 s. ETA: 0.0230 s
+[Info] Progress: 8/96 in 0.001 s. ETA: 0.0220 s
+[Info] Progress: 12/96 in 0.002 s. ETA: 0.0420 s
+[Info] Progress: 16/96 in 0.001 s. ETA: 0.0200 s
+[Info] Progress: 20/96 in 0.001 s. ETA: 0.0190 s
+[Info] Progress: 24/96 in 0.001 s. ETA: 0.0180 s
+[Info] Progress: 28/96 in 0.001 s. ETA: 0.0170 s
+[Info] Progress: 32/96 in 0.002 s. ETA: 0.0320 s
+[Info] Progress: 36/96 in 0.001 s. ETA: 0.0150 s
+[Info] Progress: 40/96 in 0.001 s. ETA: 0.0140 s
+[Info] Progress: 44/96 in 0.001 s. ETA: 0.0130 s
+[Info] Progress: 48/96 in 0.001 s. ETA: 0.0120 s
+[Info] Progress: 52/96 in 0.002 s. ETA: 0.0220 s
+[Info] Progress: 56/96 in 0.001 s. ETA: 0.0100 s
+[Info] Progress: 60/96 in 0.001 s. ETA: 0.0090 s
+[Info] Progress: 64/96 in 0.001 s. ETA: 0.0080 s
+[Info] Progress: 68/96 in 0.001 s. ETA: 0.0070 s
+[Info] Progress: 72/96 in 0.001 s. ETA: 0.0060 s
+[Info] Progress: 76/96 in 0.001 s. ETA: 0.0050 s
+[Info] Progress: 80/96 in 0.001 s. ETA: 0.0040 s
+[Info] Progress: 84/96 in 0.002 s. ETA: 0.0060 s
+[Info] Progress: 88/96 in 0.004 s. ETA: 0.0040 s
+[Info] Progress: 92/96 in 0.002 s. ETA: 0.0020 s
+[Info] Progress: 96/96 in 0.001 s. ETA: 0.0000 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_heat_pump\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_heat_pump\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\simple_heat_pump\out.csv
+[Info] general log saved to .\test\scenarios\simple_heat_pump\general.log

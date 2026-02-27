@@ -4,6 +4,16 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.9
+* Add new transformer component ThermalBooster that uses low temperature heat to preheat a thermal demand and a second energy source to reach the desired output temperature
+* Add new scenario low_ex_district_heating to show the use of a ThermalBooster
+* Ensure correct handling of add!() or sub!() of a value of zero for direct connections between transformers and other components that have some interfaces set to an energy > 0 and one interface to an energy of 0 in their process step
+* Improve handling of 1-to-1 interfaces between transformers and other components (except buses and transformers) in set_max_energy() to allow transformers to increase the demanded or delivered energy in process compared to the potential step; therefore the max energy is no longer written into the interface of the direct 1-to-1 connections during the potential step of transformers
+* Fix ooo to always place the process/load step of flexible sources, flexible sinks and storages that are connected to a transformer directly or via busses always behind the process of this transformer in the order of operations
+* Add possibility to calculate the ooo for energy systems with multiple transformers that are all connected in their input and output to the same (proxy) bus without a warning saying that contradictions were found or other ooo warnings
+* Add general_log as reference in all scenarios
+* Update scenarios interconnected_STES and p2h_stes_stc due to changed ooo (results have not changed)
+
 ### Version 0.13.8
 * Implement complex model for battery simulation
   * A simple model remains with adjusted parameters. This model includes constant efficiency of dis-/charging, dis-/charging rate limitations and self-discharge as well as simple load/capacity tracking
