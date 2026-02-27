@@ -30,12 +30,12 @@ mutable struct CM_EMS <: ControlModule
             "offer_only_freebids" => false,
             "min_storage_load" => 0.0,
             "new_connections_below_limits" => Dict{String,Any}(), # (Normalbetrieb), Sparbetrieb, Einnahmenbetrieb
-            "bus_uacs" => [],
             "storage_uac" => nothing,
             "hp_uac" => nothing,
             "boiler_uac" => nothing,
             "neg_reserve_uac" => nothing,
-            "pos_reserve_uac" => nothing
+            "pos_reserve_uac" => nothing,
+            "control_state" => nothing,
         )
         params = Base.merge(default_parameters, parameters)
 
@@ -58,11 +58,6 @@ mutable struct CM_EMS <: ControlModule
             params["price_profiles"][idx] = Profile(price_profile_paths[idx], sim_params)
         end
 
-        if xor(isempty(params["new_connections_below_limits"]), isempty(params["bus_uacs"]))
-            @error "bus_uacs and new_connections_below_limits must be given together for" * 
-                   " the control module EMS."
-        end
-
         for (key, value) in params
             if endswith(key, "uac") && value === nothing
                 @error "The parameter $key must be given for control module EMS."
@@ -77,11 +72,11 @@ mutable struct CM_EMS <: ControlModule
         #     end
         # end
 
-        if isempty(params["bus_uacs"])
+        if isempty(params["new_connections_below_limits"])
             bus_uacs = [unit_uac]
             params["new_connections_below_limits"][unit_uac] = []
         else
-            bus_uacs = params["bus_uacs"]
+            bus_uacs = collect(keys(params["new_connections_below_limits"]))
         end
 
         connectivity_by_state = Dict{String,Dict{UInt,ConnectionMatrix}}()
@@ -233,9 +228,8 @@ function calc_reserve_power(sim_length::TimePeriod,
     components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
     components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
     components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
-    components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
-
-    if sim_params["time"] >= (31+3) * 24 * 3600 + 16 * 3600 @infiltrate end
+    mod_params["control_state"] = 1
+    # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
 
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
@@ -281,9 +275,10 @@ function calc_reserve_power(sim_length::TimePeriod,
 
         # negative control reserve
         if power_neg_bool
-            components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=-6)
-            components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=-6)
-            components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
+            components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=0)
+            components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=0)
+            mod_params["control_state"] = 2
+            # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
             
             #set plr_limit to baseline + offered negative control reserve
             el_power_hp = min.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
@@ -296,8 +291,8 @@ function calc_reserve_power(sim_length::TimePeriod,
             end
         # positive control reserve
         elseif power_pos_bool
-            components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = ceil(power_value, digits=-6)
-            components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = ceil(power_value, digits=-6)
+            components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = ceil(power_value, digits=0)
+            components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = ceil(power_value, digits=0)
             
             #set plr_limit to baseline - offered positive control reserve
             el_power_boiler = max.(baseline_el_boiler .- energy_weighted_values, 0)
@@ -329,6 +324,7 @@ function future_sim(sim_length::TimePeriod,
     hp_uac = mod_params["hp_uac"]
     boiler_uac = mod_params["boiler_uac"]
     storage_uac = mod_params["storage_uac"]
+    heat_src_hp_uac = comps[hp_uac].input_interfaces[comps[hp_uac].m_heat_in].source.uac
 
     # define how long the future simulation will be
     end_date = min(add_ignoring_leap_days(sp["current_date"], Second(sim_length) - Second(sp["time_step_seconds"])),
@@ -336,7 +332,8 @@ function future_sim(sim_length::TimePeriod,
     sim_range = remove_leap_days(collect(range(sp["current_date"]; stop=end_date, step=Second(sp["time_step_seconds"]))))
 
     # disallow charging of storage for baseline simulation
-    comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
+    mod_params["control_state"] = 1
+    # comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
     
     # define relevant output_keys to be able to gather data after future simulation
     if comps[hp_uac].has_secondary_interface
@@ -345,6 +342,7 @@ function future_sim(sim_length::TimePeriod,
             hp_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT", 
                         "MixingTemperature_Input", "MixingTemperature_Output"],
             boiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT"],
+            heat_src_hp_uac => ["Temperature_snk_out"]
         )
     else
         output_keys_dict = OrderedDict{String, Any}(
@@ -352,6 +350,7 @@ function future_sim(sim_length::TimePeriod,
             hp_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", 
                         "MixingTemperature_Input", "MixingTemperature_Output"],
             boiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP"],
+            heat_src_hp_uac => ["Temperature_snk_out"]
         )
     end
     output_data_keys = Resie.output_keys(comps, output_keys_dict)
@@ -404,18 +403,21 @@ function future_sim(sim_length::TimePeriod,
     end
     available_th_power_hp_neg = zeros(length(used_th_power_hp))
     available_el_power_hp_neg = zeros(length(used_th_power_hp))
+    max_th_power_hp = zeros(length(used_th_power_hp))
     cops_hp = zeros(length(used_th_power_hp))
     for (idx, th_power) in enumerate(used_th_power_hp)
         if th_power == 0
-            src_temp = comps[hp.input_interfaces[hp.m_heat_in].source.uac].temperature_snk_out
+            src_temp = output_data[heat_src_hp_uac * "Temperature_snk_out"][idx]
             snk_temp = comps[storage_uac].high_temperature
-            available_th_power_hp_neg[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
+            max_th_power_hp[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
+            available_th_power_hp_neg[idx] = max_th_power_hp[idx]
             available_th_power_hp_neg[idx] = min(available_storage_power_neg[idx], 
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = hp.dynamic_cop(src_temp, snk_temp)
             available_el_power_hp_neg[idx] = available_th_power_hp_neg[idx] / cops_hp[idx]
         else
-            available_th_power_hp_neg[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx] - th_power
+            max_th_power_hp[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx]
+            available_th_power_hp_neg[idx] = max_th_power_hp[idx] - th_power
             available_th_power_hp_neg[idx] = min(available_storage_power_neg[idx], 
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = output_data[hp_uac * "COP"][idx]
@@ -488,7 +490,7 @@ function future_sim(sim_length::TimePeriod,
                                length(used_el_power_boiler))
 
     used_el_power_hp = used_th_power_hp ./ cops_hp
-    max_el_power_hp = hp.design_power_th ./ cops_hp
+    max_el_power_hp = max_th_power_hp ./ cops_hp
 
     return available_el_power_neg, available_el_power_pos, used_el_power_hp, 
             max_el_power_hp, used_el_power_boiler, max_el_power_boiler
@@ -512,7 +514,12 @@ function reorder_operations(mod::CM_EMS,
                             sim_params::Dict{String,Any})::OrderOfOperations
     # record "original" ooo since it might be the first time the module has access to it
     # and also it might've changed due to other control modules
-    state = mod.state_machine.state
+    if !isnothing(mod.parameters["control_state"])
+        state = mod.parameters["control_state"]
+    else
+        state = mod.state_machine.state
+    end
+
     if state == 1 || mod.ooo_by_state[state] === nothing
         mod.ooo_by_state[state] = order_of_operations
     end
@@ -524,7 +531,11 @@ function change_bus_priorities!(mod::CM_EMS,
                                 components::Grouping,
                                 sim_params::Dict{String,Any})
     # perform update outside of normal order of operations
-    old_state = mod.state_machine.state
+    if !isnothing(mod.parameters["control_state"])
+        state = mod.parameters["control_state"]
+    else
+        state = mod.state_machine.state
+    end
     
     move_state(mod.state_machine)
     if mod.state_machine.state == length(mod.state_machine.transitions)
@@ -538,10 +549,10 @@ function change_bus_priorities!(mod::CM_EMS,
 
     # now reorder bus interfaces, but only if the state changed and the control module 
     # actually has multiple connectivities
-    if old_state != mod.state_machine.state && length(mod.connectivity_by_state) > 1
-        for bus_uac in mod.parameters["bus_uacs"]
+    for bus_uac in keys(mod.connectivity_by_state)
+        if length(mod.connectivity_by_state[bus_uac]) > 1
             bus = components[bus_uac]
-            bus.connectivity = mod.connectivity_by_state[bus_uac][mod.state_machine.state]
+            bus.connectivity = mod.connectivity_by_state[bus_uac][state]
             Resie.reorder_interfaces_of_bus!(bus)
             initialise!(bus, sim_params)
         end
