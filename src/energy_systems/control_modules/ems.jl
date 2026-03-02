@@ -228,7 +228,7 @@ function calc_reserve_power(sim_length::TimePeriod,
     components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
     components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
     components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
-    mod_params["control_state"] = 1
+    mod_params["control_state"] = 2 # charging off
     # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
 
     # decision logic for amount of reserve power
@@ -241,23 +241,19 @@ function calc_reserve_power(sim_length::TimePeriod,
             # decide which direction to offer based on the earnings
             # calculate total revenue over length of future simulation
             if length(date_range) > 1
-                rev_neg = value_at_time(price_profiles[2], sim_params)
-                rev_pos = value_at_time(price_profiles[5], sim_params)
+                rev_neg = value_at_time(price_profiles[2], sim_params) * Hour(sim_length).value
+                rev_pos = value_at_time(price_profiles[5], sim_params) * Hour(sim_length).value
                 for dt in date_range
-                    rev_neg += price_profiles[3].data[dt] * price_profiles[4].data[dt] * 
-                               sim_params["time_step_seconds"]/3600
-                    rev_pos += price_profiles[6].data[dt] * price_profiles[7].data[dt] * 
-                               sim_params["time_step_seconds"]/3600
+                    rev_neg += price_profiles[3].data[dt] * price_profiles[4].data[dt]
+                    rev_pos += price_profiles[6].data[dt] * price_profiles[7].data[dt]
                 end
             else
                 rev_neg = value_at_time(price_profiles[3], sim_params) * 
-                          value_at_time(price_profiles[4], sim_params) * 
-                          sim_params["time_step_seconds"]/3600
+                          value_at_time(price_profiles[4], sim_params)
                 rev_pos = value_at_time(price_profiles[6], sim_params) * 
-                          value_at_time(price_profiles[7], sim_params) * 
-                          sim_params["time_step_seconds"]/3600
+                          value_at_time(price_profiles[7], sim_params)
             end
-            power_neg_bool = rev_neg * power_neg_bool >= rev_pos * power_pos_bool
+            power_neg_bool = rev_neg * power_neg >= rev_pos * power_pos
             power_pos_bool = !power_pos_bool
         end
 
@@ -277,7 +273,7 @@ function calc_reserve_power(sim_length::TimePeriod,
         if power_neg_bool
             components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=0)
             components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=0)
-            mod_params["control_state"] = 2
+            mod_params["control_state"] = 1 # charging on
             # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
             
             #set plr_limit to baseline + offered negative control reserve
@@ -332,7 +328,7 @@ function future_sim(sim_length::TimePeriod,
     sim_range = remove_leap_days(collect(range(sp["current_date"]; stop=end_date, step=Second(sp["time_step_seconds"]))))
 
     # disallow charging of storage for baseline simulation
-    mod_params["control_state"] = 1
+    mod_params["control_state"] = 2 # charging off
     # comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
     
     # define relevant output_keys to be able to gather data after future simulation
@@ -530,13 +526,7 @@ end
 function change_bus_priorities!(mod::CM_EMS,
                                 components::Grouping,
                                 sim_params::Dict{String,Any})
-    # perform update outside of normal order of operations
-    if !isnothing(mod.parameters["control_state"])
-        state = mod.parameters["control_state"]
-    else
-        state = mod.state_machine.state
-    end
-    
+    # perform update outside of normal order of operations  
     move_state(mod.state_machine)
     if mod.state_machine.state == length(mod.state_machine.transitions)
         move_state(mod.state_machine)
@@ -547,6 +537,11 @@ function change_bus_priorities!(mod::CM_EMS,
                            mod.ooo_by_state, components, sim_params)
     end
 
+    if !isnothing(mod.parameters["control_state"])
+        state = mod.parameters["control_state"]
+    else
+        state = mod.state_machine.state
+    end
     # now reorder bus interfaces, but only if the state changed and the control module 
     # actually has multiple connectivities
     for bus_uac in keys(mod.connectivity_by_state)
