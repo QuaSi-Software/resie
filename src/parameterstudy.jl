@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
 
 
 ############################################################
@@ -30,27 +30,27 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.js
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 6.0e6         # lower limit
-Pth_HeatPump_hi   = 7.0e6         # upper limit
-Pth_HeatPump_step = 1.0e6         # step size
+Pth_HeatPump_lo   = 6.25e6         # lower limit
+Pth_HeatPump_hi   = 5.25e6         # upper limit
+Pth_HeatPump_step = 0.5e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 2.0e6     # lower limit
+Pth_ElectrodeBoiler_lo   = 3.0e6     # lower limit
 Pth_ElectrodeBoiler_hi   = 3.0e6     # upper limit
-Pth_ElectrodeBoiler_step = 1.0e6     # step size
+Pth_ElectrodeBoiler_step = 0.5e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
 Cap_lo_Wh   = 30.0e6        # lower limit
-Cap_hi_Wh   = 40.0e6        # upper limit
-Cap_step_Wh = 10.0e6         # step size
+Cap_hi_Wh   = 30.0e6        # upper limit
+Cap_step_Wh = 5.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 1000e3          # lower limit
-Batt_hi_Wh   = 1000e3        # upper limit
-Batt_step_Wh = 0.5e3        # step size
+Batt_lo_Wh   = 0.0e3          # lower limit
+Batt_hi_Wh   = 100000.0e3        # upper limit
+Batt_step_Wh = 1000.0e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -58,7 +58,7 @@ BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an arr
 #  reserve_energy_pos_price, market_value_pv, market_value_wind, co2_value_grid]
 # TODO adjust values
 # Grid Price Addon consists for Grid Fees of 40 €/MWh and Taxes of 65 €/MWh
-profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+profile_addons = [105.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   #TODO CHANGED VALUES FROM 105.0
 profile_multipliers = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 ############################################################
@@ -271,9 +271,10 @@ function run_resie_variant(input_file::String, run_ID::UUID, profile_values, pro
     sim_output["Market_Price_PV"] = profile_values[8, :]
     sim_output["Market_Price_Wind"] = profile_values[9, :]
     sim_output["CO2_Grid"] = profile_values[10, :]
-    cfg = Resie.read_JSON(input_file)
-    cm = cfg["components"]["BUS_Power"]["control_modules"][1]
-    sim_output["Offer_only_freebids"] = get(cm, "offer_only_freebids", false)
+    # TODO activate for parameterstudy with ems
+    #cfg = Resie.read_JSON(input_file)
+    #cm = cfg["components"]["BUS_Power"]["control_modules"][1]
+    #sim_output["Offer_only_freebids"] = get(cm, "offer_only_freebids", false)
 
     return sim_output
 end
@@ -422,14 +423,14 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         ]
 
         if !isnothing(raw_sim)
-            sim_output[runidx]["VDI_NO"] = 
-                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_NONE)
+            sim_output[runidx]["VDI_NO"] =
+                Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_NONE)
 
-            sim_output[runidx]["VDI_MOD"] = 
-                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
+            sim_output[runidx]["VDI_MOD"] =
+                Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
 
-            sim_output[runidx]["VDI_PRO"] = 
-                VDI2067.vdi2067_annuity(raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
+            sim_output[runidx]["VDI_PRO"] =
+                Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
 
             # get values for writing into output file
             annuities_no = [sim_output[runidx]["VDI_NO"][k] for k in vdi_annuity_keys]
@@ -466,4 +467,4 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
     println("✔ Parameterstudy completed with $(erridx_global[]) Errors.")
 end
 
-main(base_input_path, false, true)
+Base.invokelatest(main, base_input_path, false, true)

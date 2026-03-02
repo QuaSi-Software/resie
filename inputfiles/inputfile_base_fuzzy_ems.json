@@ -263,7 +263,7 @@
             "has_secondary_interface": true,
             "primary_el_sources": ["Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
-            "power_th": 6.0e6,
+            "power_th": 6.25e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -387,7 +387,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 40.0e6,
+            "capacity": 30.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,
@@ -412,7 +412,7 @@
                 "BUS_Power"
             ],
             "medium": "m_power",
-            "capacity": 1000e3,
+            "capacity": 10000e3,
             "load": 0.9
         },
         "Demand_Heat": {

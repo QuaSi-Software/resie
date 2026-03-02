@@ -182,7 +182,7 @@ function capital_annuity_incentive(comp::VDIComponent, p::VDIParams)      # capi
     A0_inc = min(comp.A0 * comp.incentive_p, comp.incentive_max)
     return  (A0_inc +
             npv_replacements(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap) -
-            residual_value(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap)) * S
+            residual_value(A0_inc, comp.TN, p.T, p.i_cap, p.r_cap)) *
             annuity_factor(p.i_cap, p.T)
 end
 
@@ -228,7 +228,7 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
-    base_price = 214.0  #vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
@@ -247,9 +247,8 @@ end
 
 function revenue_control(sim::Dict, p::VDIParams)
 
-    # Fixed model time step
-    dt_h = 0.25  # hours (15 minutes)
-    steps_per_block = Int(round(4 / dt_h))
+    dt_h = 0.25  # model timestep in hours (15 min)
+    steps_per_block = Int(round(4 / dt_h))  # 4h capacity product blocks: 00-04, 04-08, ...
 
     get_len(v) = isa(v, Number) ? 1 : length(v)
     candidate_keys = [
@@ -257,13 +256,9 @@ function revenue_control(sim::Dict, p::VDIParams)
         "PosControlReserve_in m_power OUT",
         "NegControlReserve_in Scaling_Factor",
         "PosControlReserve_in Scaling_Factor",
-        "NegControlReserve_in Max_Energy",
-        "PosControlReserve_in Max_Energy",
         "Reserve_Energy_Price_Neg", "Reserve_Energy_Price_Pos",
         "Reserve_Power_Price_Neg", "Reserve_Power_Price_Pos",
-        "Reserve_Call_Neg", "Reserve_Call_Pos",
-        "Reserve_Freebid_Mask", "Offer_only_freebids",
-        "Control_energy", "Control_energy_price", "Control_power_price"
+        "Offer_only_freebids"
     ]
     lengths = [get_len(sim[k]) for k in candidate_keys if haskey(sim, k)]
     N = isempty(lengths) ? 0 : maximum(lengths)
@@ -273,72 +268,54 @@ function revenue_control(sim::Dict, p::VDIParams)
         for k in keys
             if haskey(sim, k)
                 v = sim[k]
-                return vecize_price(v, N)
+                return vecize_price(v, N)  # normalize scalar/vector to simulation length N
             end
         end
-        return fill(default, N)
+        return fill(default, N)  # fallback if key is missing
     end
 
-    function hold_power_4h(power_W::Vector{Float64})
-        held = similar(power_W)
+    function remunerated_power_4h(power_W::Vector{Float64})
+        held = zeros(Float64, length(power_W))
         for idx in 1:steps_per_block:length(power_W)
             idx_end = min(idx + steps_per_block - 1, length(power_W))
-            p_block = maximum(power_W[idx:idx_end])
-            held[idx:idx_end] .= p_block
+            block = power_W[idx:idx_end]
+            if !isempty(block) && all(isapprox.(block, block[1]; atol=1e-3, rtol=0.0))  # only constant offer in block is remunerated
+                held[idx:idx_end] .= block[1]  # apply constant offered power to whole 4h block
+            end
         end
         return held
     end
 
-    # 1) CONTROL ENERGY (WORK) REVENUE: use one side only (in/out are identical by model design)
-    E_neg_Wh = abs.(get_series(["NegControlReserve_in m_power OUT", "Control_energy"]))
-    E_pos_Wh = abs.(get_series(["PosControlReserve_in m_power OUT"]))
-    price_E_neg = get_series(["Reserve_Energy_Price_Neg", "Control_energy_price"])
-    price_E_pos = get_series(["Reserve_Energy_Price_Pos"])
-    A_E_energy = sum((E_neg_Wh .* 1e-6) .* price_E_neg .+ (E_pos_Wh .* 1e-6) .* price_E_pos)
+    E_neg_Wh = abs.(get_series(["NegControlReserve_in m_power OUT"]))  # executed negative reserve energy [Wh]
+    E_pos_Wh = abs.(get_series(["PosControlReserve_in m_power OUT"]))  # executed positive reserve energy [Wh]
+    price_E_neg = get_series(["Reserve_Energy_Price_Neg"])  # EUR/MWh
+    price_E_pos = get_series(["Reserve_Energy_Price_Pos"])  # EUR/MWh
+    A_E_energy = sum((E_neg_Wh .* 1e-6) .* price_E_neg .+ (E_pos_Wh .* 1e-6) .* price_E_pos)  # Wh->MWh, then revenue [EUR]
 
-    # 2) CONTROL CAPACITY (POWER) REVENUE:
-    # preferred source is the offered power from reserve component scaling factor (W)
-    P_neg_W = abs.(get_series(["NegControlReserve_in Scaling_Factor"]))
-    P_pos_W = abs.(get_series(["PosControlReserve_in Scaling_Factor"]))
+    P_neg_W = abs.(get_series(["NegControlReserve_in Scaling_Factor"]))  # offered negative reserve power [W] from EMS decision
+    P_pos_W = abs.(get_series(["PosControlReserve_in Scaling_Factor"]))  # offered positive reserve power [W] from EMS decision
+    P_neg_hold_MW = remunerated_power_4h(P_neg_W) .* 1e-6  # only constant 4h blocks -> remunerated MW
+    P_pos_hold_MW = remunerated_power_4h(P_pos_W) .* 1e-6  # variable blocks are treated as free-bid -> 0 MW remuneration
 
-    # fallback: reconstruct offered power from Max_Energy / reserve_call
-    maxE_neg_Wh = abs.(get_series(["NegControlReserve_in Max_Energy"]))
-    maxE_pos_Wh = abs.(get_series(["PosControlReserve_in Max_Energy"]))
-    call_neg_h = get_series(["Reserve_Call_Neg"], default=0.0)
-    call_pos_h = get_series(["Reserve_Call_Pos"], default=0.0)
-    missing_neg = P_neg_W .<= 0
-    missing_pos = P_pos_W .<= 0
-    idx_neg = missing_neg .& (call_neg_h .> 0)
-    idx_pos = missing_pos .& (call_pos_h .> 0)
-    offered_neg_Wh = max.(maxE_neg_Wh, E_neg_Wh)
-    offered_pos_Wh = max.(maxE_pos_Wh, E_pos_Wh)
-    P_neg_W[idx_neg] .= offered_neg_Wh[idx_neg] ./ call_neg_h[idx_neg]
-    P_pos_W[idx_pos] .= offered_pos_Wh[idx_pos] ./ call_pos_h[idx_pos]
-
-    # Settlement over 4h product blocks
-    P_neg_hold_MW = hold_power_4h(P_neg_W) .* 1e-6
-    P_pos_hold_MW = hold_power_4h(P_pos_W) .* 1e-6
-
-    price_P_neg = get_series(["Reserve_Power_Price_Neg", "Control_power_price"])
-    price_P_pos = get_series(["Reserve_Power_Price_Pos"])
+    price_P_neg = get_series(["Reserve_Power_Price_Neg"])  # EUR/(MW*h)
+    price_P_pos = get_series(["Reserve_Power_Price_Pos"])  # EUR/(MW*h)
 
     freebid_all = false
     if haskey(sim, "Offer_only_freebids")
         v = sim["Offer_only_freebids"]
         freebid_all = isa(v, Bool) ? v : (isa(v, Number) ? v != 0 : false)
     end
-    freebid_mask = get_series(["Reserve_Freebid_Mask"], default=freebid_all ? 1.0 : 0.0) .> 0.5
-    price_P_neg[freebid_mask] .= 0.0
-    price_P_pos[freebid_mask] .= 0.0
+    if freebid_all
+        P_neg_hold_MW .= 0.0  # free-bid-only mode: no capacity remuneration at all
+        P_pos_hold_MW .= 0.0  # free-bid-only mode: no capacity remuneration at all
+    end
 
-    A_E_capacity = sum((P_neg_hold_MW .* price_P_neg .+ P_pos_hold_MW .* price_P_pos) .* dt_h)
+    A_E_capacity = sum((P_neg_hold_MW .* price_P_neg .+ P_pos_hold_MW .* price_P_pos) .* dt_h)  # MW * EUR/(MW*h) * h = EUR
 
-    # 3) TOTAL FIRST-YEAR CONTROL RESERVE REVENUE
-    A_E1 = A_E_energy + A_E_capacity
+    A_E1 = A_E_energy + A_E_capacity  # first-year total control revenue [EUR]
 
-    # 4) ANNUITIZATION
-    a = annuity_factor(p.i_cap, p.T)
-    b = price_change_factor(p.r_rev, p.i_cap, p.T)
+    a = annuity_factor(p.i_cap, p.T)  # annuity factor
+    b = price_change_factor(p.r_rev, p.i_cap, p.T)  # escalation/discount factor for revenues
 
     return A_E1 * a * b
 end
@@ -416,9 +393,6 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
                                      sim["m_power EnergyFlow Battery->Demand_Power"]
     sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
     sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
-    if haskey(sim, "NegControlReserve m_power OUT")
-        sim_new["Control_energy"] = sim["NegControlReserve m_power OUT"]  # legacy key
-    end
     for k in [
         "NegControlReserve_in m_power OUT", "NegControlReserve_out m_power IN",
         "PosControlReserve_in m_power OUT", "PosControlReserve_out m_power IN",
@@ -432,12 +406,6 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         if haskey(sim, k)
             sim_new[k] = sim[k]
         end
-    end
-    if haskey(sim, "Reserve_Power_Price_Neg")
-        sim_new["Control_power_price"] = sim["Reserve_Power_Price_Neg"]   # legacy fallback
-    end
-    if haskey(sim, "Reserve_Energy_Price_Neg")
-        sim_new["Control_energy_price"] = sim["Reserve_Energy_Price_Neg"] # legacy fallback
     end
     sim_new["Grid_price"] = sim["Grid_Price"]
     sim_new["Market_Value_PV"] = sim["Market_Price_PV"]
