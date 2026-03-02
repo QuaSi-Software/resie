@@ -102,7 +102,7 @@ function test_validations_fail()
             "output_refs" => ["TST_BUS_01"],
             "medium" => "m_h_w_ht1",
             "capacity" => 10000,
-            "load" => 11000,
+            "initial_load" => 1.1,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

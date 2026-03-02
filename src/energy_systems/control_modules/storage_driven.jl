@@ -17,7 +17,7 @@ mutable struct CM_StorageDriven <: ControlModule
         default_parameters = Dict{String,Any}(
             "name" => "storage_driven",
             "low_threshold" => 0.2,
-            "high_treshold" => 0.95,
+            "high_threshold" => 0.95,
             "min_run_time" => 1800,
             "storage_uac" => nothing,
         )

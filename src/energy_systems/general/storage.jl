@@ -20,18 +20,18 @@ const STORAGE_PARAMETERS = Dict(
         json_type="number",
         unit="Wh"
     ),
-    "load" => (
-        default=nothing,
-        description="Initial load as absolute energy value",
+    "initial_load" => (
+        default=0.0,
+        description="Initial load relative to capacity",
         display_name="Initial load",
-        required=true,
+        required=false,
         validations=[
-            ("self", "value_gt_num", 0.0),
-            ("self", "value_lte_rel", "capacity")
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0),
         ],
         type=Float64,
         json_type="number",
-        unit="Wh"
+        unit="-"
     ),
 )
 #! format: on
@@ -94,7 +94,7 @@ function init_from_params(x::Type{Storage}, uac::String, params::Dict{String,Any
             InterfaceMap(medium => nothing), # output_interfaces
             medium,                          # medium
             params["capacity"],              # capacity
-            params["load"],                  # load
+            params["initial_load"] * params["capacity"], # load
             0.0,                             # load_end_of_last_timestep
             0.0,                             # losses
             false,                           # process_done

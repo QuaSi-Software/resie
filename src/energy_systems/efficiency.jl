@@ -289,13 +289,13 @@ function parse_cop_function(eff_def::String)::Function
             return function (src, snk)
                 src_idx = nothing
                 for idx in 2:(dim_src - 1)
-                    if src >= values[idx, 1] && src < values[idx + 1, 1]
+                    if src >= values[idx, 1] && src <= values[idx + 1, 1]
                         src_idx = idx
                     end
                 end
                 snk_idx = nothing
                 for idx in 2:(dim_snk - 1)
-                    if snk >= values[1, idx] && snk < values[1, idx + 1]
+                    if snk >= values[1, idx] && snk <= values[1, idx + 1]
                         snk_idx = idx
                     end
                 end
@@ -645,7 +645,7 @@ uacs of the sources as vectors.
     floating point value signifying an infinite value
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR},
+function check_el_in_layered(unit::Union{Electrolyser,HeatPump,UTIR,ThermalBooster},
                              sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_el_in].source.sys_function == sf_transformer
         &&
@@ -681,7 +681,7 @@ Checks the available energy on the input heat interface.
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per source.
 - `Vector{Stringing}`: The UACs of the sources on the interface.
 """
-function check_heat_in_layered(unit::HeatPump, sim_params::Dict{String,Any})
+function check_heat_in_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
     if (unit.input_interfaces[unit.m_heat_in].source.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.input_interfaces[unit.m_heat_in].max_energy))
@@ -996,11 +996,12 @@ actual input priority of the primary and secondary input interface at the target
 - `Vector{Temperature}`: The maximum temperatures on the interface as one layer per target.
 - `Vector{Stringing}`: The UACs of the targets on the interface.
 """
-function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
+function check_heat_out_layered(unit::Union{HeatPump,ThermalBooster}, sim_params::Dict{String,Any})
+    has_secondary_interface = hasproperty(unit, :has_secondary_interface) && unit.has_secondary_interface
     if (unit.output_interfaces[unit.m_heat_out].target.sys_function == sf_transformer
         &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out].max_energy)) ||
-       (unit.has_secondary_interface &&
+       (has_secondary_interface &&
         unit.output_interfaces[unit.m_heat_out_secondary].target.sys_function == sf_transformer &&
         is_max_energy_nothing(unit.output_interfaces[unit.m_heat_out_secondary].max_energy))
         # direct connection to transformer that has not had its potential
@@ -1012,7 +1013,7 @@ function check_heat_out_layered(unit::HeatPump, sim_params::Dict{String,Any})
         exchanges = balance_on(unit.output_interfaces[unit.m_heat_out],
                                unit.output_interfaces[unit.m_heat_out].target)
         if unit.controller.parameters["consider_m_heat_out"]
-            if unit.has_secondary_interface
+            if has_secondary_interface
                 # If a secondary interface exists, call balance_on on this interface as well...
                 exchanges_secondary = balance_on(unit.output_interfaces[unit.m_heat_out_secondary],
                                                  unit.output_interfaces[unit.m_heat_out_secondary].target)

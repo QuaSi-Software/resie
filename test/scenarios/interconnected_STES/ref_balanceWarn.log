@@ -1,4 +1,4 @@
-ReSiE balanceWarn log file of simulation started at: 2026-02-05 19:47:29
+ReSiE balanceWarn log file of simulation started at: 2026-02-23 18:09:00
 This log file contains only balance warnings written by ReSiE.
 ---------------------------------
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 194400: -341460.72681911755
@@ -8,7 +8,7 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 288000: -938633.7201310867
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 291600: -188502.8303995675
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1836000: -8403.26897312235
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1839600: -550626.2012750003
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1839600: -550626.2012750013
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1843200: -1.3637398227652623e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1846800: -1.3906610530936853e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 1850400: -706663.5217021052
@@ -30,13 +30,13 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2102400: -1.3142894826728934e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2106000: -451908.5176453842
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2181600: -2.2512277184983147e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2185200: -1.702247345137896e6
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2185200: -1.7022473451378932e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2188800: -2.0239095222228942e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2192400: -842308.5832677931
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2221200: -23355.300799702294
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2268000: -463145.9398917891
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2275200: -355750.2003907701
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2451600: -6750.4523562649265
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2451600: -6750.452356263995
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2527200: -2.3950090892881593e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2530800: -1.946081151170773e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2534400: -2.2165544204020873e6
@@ -50,7 +50,7 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2628000: -1.7532058190684216e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2631600: -726905.3955852641
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2635200: -133089.16289052553
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2696400: -62061.78142757993
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2696400: -62061.78142757807
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2700000: -2.5643739941984024e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2703600: -1.9322020329557704e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2707200: -2.151419474346299e6
@@ -60,7 +60,7 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2786400: -2.778946764453403e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2790000: -2.1250045934357736e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2793600: -2.3999817234128774e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2797200: -1.4361901528649703e6
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2797200: -1.4361901528649684e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2826000: -212071.3304647021
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2829600: -233481.48881763313
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2833200: -358013.45693657734
@@ -69,11 +69,11 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2876400: -3.010474024917895e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2880000: -3.4494086179465773e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2883600: -2.137450971221301e6
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2912400: -2.144213699400844e6
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2912400: -2.144213699400842e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2916000: -1.3076908765326333e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2919600: -1.1031973990765791e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2923200: -243110.25547105353
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2926800: -506307.9253434194
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2926800: -506307.92534342036
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2959200: -43357.59512073826
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2962800: -418479.48546340317
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 2966400: -1.2554820420055087e6
@@ -81,13 +81,13 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3052800: -185287.61443652585
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3056400: -690653.5537005104
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3060000: -132629.4379810365
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3132000: -1.0346945791617897e6
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3132000: -1.0346945791617888e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3135600: -638079.4783857716
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3139200: -990331.6031957711
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3142800: -538453.0553831393
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3142800: -538453.0553831402
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3146400: -432912.85683261603
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3391200: -101176.53383678943
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3477600: -1.3871337414739123e6
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3477600: -1.3871337414739132e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3481200: -1.0636756075878935e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3484800: -1.5345830800828924e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3488400: -759240.5454418315
@@ -100,28 +100,28 @@ This log file contains only balance warnings written by ReSiE.
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3740400: -975898.6831902475
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3744000: -1.3441173489260357e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3747600: -601981.0144080073
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3823200: -777667.467476788
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3823200: -777667.4674767889
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3826800: -340349.9800207736
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3830400: -696173.9083373505
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3909600: -541230.1596539142
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3830400: -696173.90833735
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3909600: -541230.1596539123
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3913200: -218098.44349289406
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3916800: -658994.3630928979
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3916800: -658994.3630928961
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 3920400: -19593.06100526359
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5810400: -384445.71023470256
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5814000: -199268.44178263145
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5817600: -534023.1207313174
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5814000: -199268.44178263005
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5817600: -534023.120731316
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5896800: -1.282058936829703e6
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 5900400: -596820.867276317
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6156000: -136946.88687257888
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6933600: -887494.9019331224
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6937200: -655702.8856499991
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6940800: -232327.8643436851
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7106400: -508550.527172334
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 6940800: -232327.86434368463
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7106400: -508550.5271723345
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7110000: -484049.16631552624
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7113600: -298581.7211410529
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7196400: -135706.09297215426
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7196400: -135706.09297215287
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 7279200: -42543.7523220689
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29484000: -300967.73885858315
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29491200: -173550.71724183438
 [BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29743200: -233788.8625072937
-[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29750400: -98014.28486585733
+[BalanceWarning] Balance for component Proxy-TST_BUS_04|Proxy-TST_BUS_01|TST_BUS_03 was not zero in timestep 29750400: -98014.28486585547

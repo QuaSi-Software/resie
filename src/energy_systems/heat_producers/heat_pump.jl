@@ -797,6 +797,7 @@ function control(unit::HeatPump, components::Grouping, sim_params::Dict{String,A
 end
 
 function set_max_energies!(unit::HeatPump,
+                           is_transformer_potential::Bool,
                            el_in::Union{Floathing,Vector{<:Floathing}},
                            heat_in::Union{Floathing,Vector{<:Floathing}},
                            heat_out::Union{Floathing,Vector{<:Floathing}},
@@ -809,15 +810,17 @@ function set_max_energies!(unit::HeatPump,
                            purpose_uac_heat_out_secondary::Union{<:Stringing,Vector{<:Stringing}}=nothing,
                            has_calculated_all_maxima_heat_in::Bool=false,
                            has_calculated_all_maxima_heat_out::Bool=false)
-    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in)
+    set_max_energy!(unit.input_interfaces[unit.m_el_in], el_in; is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.input_interfaces[unit.m_heat_in], heat_in, slices_heat_in_temperature, nothing,
-                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in)
+                    purpose_uac_heat_in, has_calculated_all_maxima_heat_in;
+                    is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
-                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out)
+                    purpose_uac_heat_out, has_calculated_all_maxima_heat_out;
+                    is_transformer_potential=is_transformer_potential)
     if unit.has_secondary_interface
         set_max_energy!(unit.output_interfaces[unit.m_heat_out_secondary], heat_out_secondary, nothing,
                         slices_heat_out_secondary_temperature, purpose_uac_heat_out_secondary,
-                        has_calculated_all_maxima_heat_out)
+                        has_calculated_all_maxima_heat_out; is_transformer_potential=is_transformer_potential)
     end
 end
 
@@ -1466,7 +1469,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
     energies = calculate_energies(unit, sim_params)
 
     if sum(energies.slices_heat_out; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
+        set_max_energies!(unit, true, sum(energies.slices_el_in; init=0.0), 0.0, 0.0, 0.0)
         return
     end
 
@@ -1485,6 +1488,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                                                             sim_params["epsilon"])
 
         set_max_energies!(unit,
+                          true,
                           energies.slices_el_in,
                           energies.slices_heat_in,
                           primary.slices_heat_out,
@@ -1499,6 +1503,7 @@ function potential(unit::HeatPump, sim_params::Dict{String,Any})
                           energies.heat_out_has_inf_energy)
     else
         set_max_energies!(unit,
+                          true,
                           energies.slices_el_in,
                           energies.slices_heat_in,
                           energies.slices_heat_out,
@@ -1674,7 +1679,7 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
         # due to constant losses we are guaranteed to have an electricity slice, though
         # it might be zero. we also need to set the max_energy values to zero for the
         # heat input and output, as the sub! and add! methods do that when called
-        set_max_energies!(unit, el_in, 0.0, 0.0, 0.0)
+        set_max_energies!(unit, false, el_in, 0.0, 0.0, 0.0)
         sub!(unit.input_interfaces[unit.m_el_in], el_in)
     else
         sub!(unit.input_interfaces[unit.m_el_in], el_in)

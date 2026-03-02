@@ -315,9 +315,12 @@
             "output_refs": [
                 "BUS_Power"
             ],
-            "medium": "m_power",
+            "m_el_in": "m_power",
+            "m_el_out": "m_power",
             "capacity": 4e5,
-            "load": 3e5
+            "initial_load": 0.75,
+            "charge_efficiency": 1.0,
+            "discharge_efficiency": 1.0
         },
         "Demand_Heat": {
             "type": "Demand",
