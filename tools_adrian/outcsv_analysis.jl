@@ -47,6 +47,23 @@ end
 colsum(df::DataFrame, col::String) = col in names(df) ? sum(skipmissing(replace(df[!, col], NaN => missing)); init=0.0) : 0.0
 hascol(df::DataFrame, col::String) = col in names(df)
 
+function aggregate_series(df::DataFrame, cols::Vector{String})
+    n = nrow(df)
+    existing = [c for c in cols if hascol(df, c)]
+    isempty(existing) && return zeros(Float64, n)
+
+    acc = zeros(Float64, n)
+    for c in existing
+        vals = replace(df[!, c], NaN => missing)
+        for i in eachindex(vals)
+            v = vals[i]
+            ismissing(v) && continue
+            acc[i] += v
+        end
+    end
+    return acc
+end
+
 function positive_hours(series, dt_h::Real)
     vals = collect(skipmissing(replace(series, NaN => missing)))
     return count(>(EPS), vals) * dt_h
@@ -60,10 +77,10 @@ end
 
 function make_duration_curve(df::DataFrame, dt_h::Real, outdir::String)
     generators = Dict(
-        "HeatPump" => "HeatPump m_heat OUT",
-        "ElectrodeBoiler" => "ElectrodeBoiler m_heat OUT",
+        "HeatPump" => ["HeatPump m_heat OUT", "HeatPump secondary_m_heat OUT"],
+        "ElectrodeBoiler" => ["ElectrodeBoiler m_heat OUT", "ElectrodeBoiler secondary_m_heat OUT"],
     )
-    available = filter(p -> hascol(df, p.second), collect(generators))
+    available = filter(p -> any(c -> hascol(df, c), p.second), collect(generators))
     isempty(available) && return nothing
 
     p = plot(
@@ -74,8 +91,9 @@ function make_duration_curve(df::DataFrame, dt_h::Real, outdir::String)
         linewidth = 2,
     )
 
-    for (name, col) in available
-        vals = [v for v in replace(df[!, col], NaN => missing) if !ismissing(v) && v >= 0]
+    for (name, cols) in available
+        series = aggregate_series(df, cols)
+        vals = [v for v in series if v >= 0]
         isempty(vals) && continue
         sorted_vals = sort(vals; rev=true)
         x = (1:length(sorted_vals)) .* dt_h
@@ -90,20 +108,21 @@ end
 
 function unit_statistics(df::DataFrame, dt_h::Real)
     units = [
-        ("HeatPump", "Waerme", "HeatPump m_heat OUT"),
-        ("ElectrodeBoiler", "Waerme", "ElectrodeBoiler m_heat OUT"),
-        ("Photovoltaic", "Strom", "Photovoltaic m_power OUT"),
-        ("WindFarm", "Strom", "WindFarm m_power OUT"),
-        ("Battery (Discharge)", "Strom", "Battery m_power OUT"),
-        ("BufferTank (Discharge)", "Waerme", "BufferTank m_heat OUT"),
+        ("HeatPump", "Waerme", ["HeatPump m_heat OUT", "HeatPump secondary_m_heat OUT"]),
+        ("ElectrodeBoiler", "Waerme", ["ElectrodeBoiler m_heat OUT", "ElectrodeBoiler secondary_m_heat OUT"]),
+        ("Photovoltaic", "Strom", ["Photovoltaic m_power OUT"]),
+        ("WindFarm", "Strom", ["WindFarm m_power OUT"]),
+        ("Battery (Discharge)", "Strom", ["Battery m_power OUT"]),
+        ("BufferTank (Discharge)", "Waerme", ["BufferTank m_heat OUT"]),
     ]
 
     rows = NamedTuple[]
-    for (unit, medium, col) in units
-        hascol(df, col) || continue
-        e_wh = colsum(df, col)
-        h = positive_hours(df[!, col], dt_h)
-        p_peak_w = peak_power_w(df[!, col], dt_h)
+    for (unit, medium, cols) in units
+        any(c -> hascol(df, c), cols) || continue
+        series = aggregate_series(df, cols)
+        e_wh = sum(series; init=0.0)
+        h = positive_hours(series, dt_h)
+        p_peak_w = peak_power_w(series, dt_h)
         flh = p_peak_w > EPS ? e_wh / p_peak_w : missing
         push!(rows, (
             anlage = unit,
@@ -119,22 +138,22 @@ end
 
 function partial_load_statistics(df::DataFrame, dt_h::Real)
     units = [
-        ("HeatPump", "HeatPump Avg_PLR", "HeatPump m_heat OUT"),
-        ("ElectrodeBoiler", "ElectrodeBoiler Avg_PLR", "ElectrodeBoiler m_heat OUT"),
+        ("HeatPump", "HeatPump Avg_PLR", ["HeatPump m_heat OUT", "HeatPump secondary_m_heat OUT"]),
+        ("ElectrodeBoiler", "ElectrodeBoiler Avg_PLR", ["ElectrodeBoiler m_heat OUT", "ElectrodeBoiler secondary_m_heat OUT"]),
     ]
     bins = collect(0.0:0.1:1.0)
     rows = NamedTuple[]
 
-    for (unit, plr_col, fallback_energy_col) in units
+    for (unit, plr_col, fallback_energy_cols) in units
         plr = nothing
         if hascol(df, plr_col)
             vals = replace(df[!, plr_col], NaN => missing)
             plr = [v for v in vals if !ismissing(v) && v >= 0]
-        elseif hascol(df, fallback_energy_col)
-            p_peak = peak_power_w(df[!, fallback_energy_col], dt_h)
+        elseif any(c -> hascol(df, c), fallback_energy_cols)
+            series = aggregate_series(df, fallback_energy_cols)
+            p_peak = peak_power_w(series, dt_h)
             if p_peak > EPS
-                vals = replace(df[!, fallback_energy_col], NaN => missing)
-                plr = [min(max((v / dt_h) / p_peak, 0.0), 1.0) for v in vals if !ismissing(v)]
+                plr = [min(max((v / dt_h) / p_peak, 0.0), 1.0) for v in series if v >= 0]
             end
         end
 

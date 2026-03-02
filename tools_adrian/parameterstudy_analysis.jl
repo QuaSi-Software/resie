@@ -5,7 +5,7 @@ using Tables
 using XLSX
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_4745runs_260227_163742.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_264runs_260301_152005.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 
 const XCOLS = [
@@ -219,7 +219,7 @@ function create_matrix_plot(df::DataFrame; xcols::Vector{String}=XCOLS, objectiv
 end
 
 function main()
-    df = CSV.read(CSV_PATH, DataFrame)
+    df = CSV.read(CSV_PATH, DataFrame; delim=';', decimal=',')
 
     required_cols = vcat(XCOLS, ANNUITY_COST_COLS, ANNUITY_REV_COLS, [YCOL_NO], BAL_COLS)
     missing_required = [c for c in required_cols if !(c in names(df))]
