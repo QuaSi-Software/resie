@@ -201,6 +201,13 @@ function calc_reserve_power(sim_length::TimePeriod,
                             components::Grouping, 
                             sim_params::Dict{String,Any})::Bool
 
+    # reset scaling_factors
+    components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0
+    components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
+    components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
+    components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
+    mod_params["control_state"] = 2 # charging off
+
     power_neg, power_pos, 
     baseline_el_hp, max_el_hp, 
     baseline_el_boiler, max_el_boiler = future_sim(sim_length, mod_params, 
@@ -220,16 +227,9 @@ function calc_reserve_power(sim_length::TimePeriod,
         components[mod_params["hp_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_hp[idx]
         components[mod_params["boiler_uac"] * "_baseline_in"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
         components[mod_params["boiler_uac"] * "_baseline_out"].max_power_profile.data[dt] = 0.25 * baseline_el_boiler[idx]
+        components[mod_params["boiler_uac"]].controller.modules[1].profile.data[dt] = 1.0
+        components[mod_params["hp_uac"]].controller.modules[1].profile.data[dt] = 1.0
     end
-
-
-    # reset scaling_factors
-    components[mod_params["pos_reserve_uac"] * "_out"].scaling_factor = 0.0
-    components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = 0.0   
-    components[mod_params["pos_reserve_uac"] * "_in"].scaling_factor = 0.0
-    components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = 0.0
-    mod_params["control_state"] = 2 # charging off
-    # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = false
 
     # decision logic for amount of reserve power
     power_neg_bool = power_neg > mod_params["min_reserve_power"]
@@ -273,9 +273,11 @@ function calc_reserve_power(sim_length::TimePeriod,
         if power_neg_bool
             components[mod_params["neg_reserve_uac"] * "_out"].scaling_factor = floor(power_value, digits=0)
             components[mod_params["neg_reserve_uac"] * "_in"].scaling_factor = floor(power_value, digits=0)
-            mod_params["control_state"] = 1 # charging on
-            # components[mod_params["storage_uac"]].controller.modules[1].parameters["charge_is_allowed"] = true
             
+            if sum(energy_weighted_values) > 0
+                mod_params["control_state"] = 1 # charging on
+            end
+
             #set plr_limit to baseline + offered negative control reserve
             el_power_hp = min.(baseline_el_hp .+ energy_weighted_values, max_el_hp)
             left_energy_weighted_values = max.(energy_weighted_values .- (el_power_hp.-baseline_el_hp), 0)
@@ -326,18 +328,16 @@ function future_sim(sim_length::TimePeriod,
     end_date = min(add_ignoring_leap_days(sp["current_date"], Second(sim_length) - Second(sp["time_step_seconds"])),
                    sim_params["end_date"])
     sim_range = remove_leap_days(collect(range(sp["current_date"]; stop=end_date, step=Second(sp["time_step_seconds"]))))
-
-    # disallow charging of storage for baseline simulation
-    mod_params["control_state"] = 2 # charging off
-    # comps[storage_uac].controller.modules[1].parameters["charge_is_allowed"] = false
     
     # define relevant output_keys to be able to gather data after future simulation
     if comps[hp_uac].has_secondary_interface
         output_keys_dict = OrderedDict{String, Any}(
             storage_uac => ["Load", "Capacity"],
-            hp_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT", 
-                        "MixingTemperature_Input", "MixingTemperature_Output"],
-            boiler_uac => ["m_power:IN", "m_heat:OUT", "Avg_PLR", "COP", "secondary_m_heat:OUT"],
+            hp_uac => ["m_power:IN", "m_heat:OUT", "secondary_m_heat:OUT", 
+                       "Avg_PLR", "COP", "Effective_COP", 
+                       "MixingTemperature_Input", "MixingTemperature_Output"],
+            boiler_uac => ["m_power:IN", "m_heat:OUT", "secondary_m_heat:OUT", 
+                           "Avg_PLR", "COP", "Effective_COP"],
             heat_src_hp_uac => ["Temperature_snk_out"]
         )
     else
@@ -381,7 +381,7 @@ function future_sim(sim_length::TimePeriod,
 
     # calculate available el. power for negative reserve control power
     # ---------------------------------------------------------------
-
+    if sim_params["time"] >= (1) * 24 * 3600 + 2.25 * 3600 @infiltrate end
 
     # calculate the availalble storage power to be put into the storage each timestep
     available_storage_capacity = sim_params["wh_to_watts"].(output_data[storage_uac * "Capacity"] .-
@@ -400,17 +400,19 @@ function future_sim(sim_length::TimePeriod,
     available_th_power_hp_neg = zeros(length(used_th_power_hp))
     available_el_power_hp_neg = zeros(length(used_th_power_hp))
     max_th_power_hp = zeros(length(used_th_power_hp))
+    max_el_power_hp = zeros(length(used_th_power_hp))
     cops_hp = zeros(length(used_th_power_hp))
     for (idx, th_power) in enumerate(used_th_power_hp)
+        src_temp = output_data[heat_src_hp_uac * "Temperature_snk_out"][idx]
+        snk_temp = comps[storage_uac].high_temperature
         if th_power == 0
-            src_temp = output_data[heat_src_hp_uac * "Temperature_snk_out"][idx]
-            snk_temp = comps[storage_uac].high_temperature
             max_th_power_hp[idx] = hp.max_power_function(src_temp, snk_temp) * hp.design_power_th
             available_th_power_hp_neg[idx] = max_th_power_hp[idx]
             available_th_power_hp_neg[idx] = min(available_storage_power_neg[idx], 
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = hp.dynamic_cop(src_temp, snk_temp)
             available_el_power_hp_neg[idx] = available_th_power_hp_neg[idx] / cops_hp[idx]
+            max_el_power_hp[idx] = max_th_power_hp[idx] / (hp.plf_function(1.0) * cops_hp[idx])
         else
             max_th_power_hp[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx]
             available_th_power_hp_neg[idx] = max_th_power_hp[idx] - th_power
@@ -418,6 +420,7 @@ function future_sim(sim_length::TimePeriod,
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = output_data[hp_uac * "COP"][idx]
             available_el_power_hp_neg[idx] = available_th_power_hp_neg[idx] / cops_hp[idx]
+            max_el_power_hp[idx] = max_th_power_hp[idx] / (hp.plf_function(1.0) * hp.dynamic_cop(src_temp, snk_temp))
         end
     end
 
@@ -471,7 +474,7 @@ function future_sim(sim_length::TimePeriod,
         if th_power > 0
             available_th_power_hp_pos[idx] = min(available_storage_power_pos[idx] - available_th_power_boiler_pos[idx], 
                                                     th_power)
-            available_el_power_hp_pos[idx] = available_th_power_hp_pos[idx] / cops_hp[idx]
+            available_el_power_hp_pos[idx] = available_th_power_hp_pos[idx] / output_data[hp_uac * "Effective_COP"][idx]
         end
     end
 
@@ -481,12 +484,14 @@ function future_sim(sim_length::TimePeriod,
 
     # calculate used and maximum el power for hp and boiler for calculation of 
     # max_plr for positve control reserve
-    used_el_power_boiler = used_th_power_boiler
+    used_el_power_boiler = sim_params["wh_to_watts"].(output_data[boiler_uac * "m_power" * "IN"])
     max_el_power_boiler = fill(comps[boiler_uac].design_power_th, 
                                length(used_el_power_boiler))
 
-    used_el_power_hp = used_th_power_hp ./ cops_hp
-    max_el_power_hp = max_th_power_hp ./ cops_hp
+    used_el_power_hp = sim_params["wh_to_watts"].(output_data[hp_uac * "m_power" * "IN"])
+    max_el_power_hp = max_th_power_hp ./ cops_hp # plf_function(1.0) * cop_function(src_temp, snk_temp)
+    
+    if sim_params["time"] >= (1) * 24 * 3600 + 2.25 * 3600 @infiltrate end
 
     return available_el_power_neg, available_el_power_pos, used_el_power_hp, 
             max_el_power_hp, used_el_power_boiler, max_el_power_boiler
@@ -542,6 +547,7 @@ function change_bus_priorities!(mod::CM_EMS,
     else
         state = mod.state_machine.state
     end
+
     # now reorder bus interfaces, but only if the state changed and the control module 
     # actually has multiple connectivities
     for bus_uac in keys(mod.connectivity_by_state)
