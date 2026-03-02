@@ -236,13 +236,13 @@
                 "StockMarket_OUT"
             ],
             "medium": "m_money",
-            "max_power_profile_file_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",
+            "max_power_profile_file_path": "./profiles/MA/stock_price_EUR_MWh.prf",
             "scale": 1.0
         },
         "StockMarket_OUT": {
             "type": "FlexibleSink",
             "medium": "m_money",
-            "max_power_profile_file_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",
+            "max_power_profile_file_path": "./profiles/MA/stock_price_EUR_MWh.prf",
             "scale": 1.0
         },
         "NegControlReserve_in": {
@@ -441,11 +441,11 @@
                 {
                     "name": "EMS",  
                     "grid_price_path": "./profiles/MA/stock_price_EUR_MWh.prf",
-                    "reserve_power_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                    "reserve_energy_price_neg_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
+                    "reserve_power_price_neg_path": "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf",   
+                    "reserve_energy_price_neg_path": "./profiles/MA/cbmp_down_mean_15min.prf",   
                     "reserve_call_neg_path": "./profiles/MA/reserve_call_neg.prf",   
-                    "reserve_power_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
-                    "reserve_energy_price_pos_path": "./profiles/MA/boersenpreis_EUR_MWh.prf",   
+                    "reserve_power_price_pos_path": "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf",   
+                    "reserve_energy_price_pos_path": "./profiles/MA/cbmp_up_mean_15min.prf",   
                     "reserve_call_pos_path": "./profiles/MA/reserve_call_pos.prf",
                     "min_reserve_power": 0.5e6,
                     "offer_only_freebids": false,
@@ -455,6 +455,7 @@
                     "boiler_uac": "ElectrodeBoiler",
                     "neg_reserve_uac": "NegControlReserve",
                     "pos_reserve_uac": "PosControlReserve",
+                    "control_state": 2,
 
                     "new_connections_below_limits": {
                         "BUS_Heat":[{
