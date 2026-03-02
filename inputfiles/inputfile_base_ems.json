@@ -336,7 +336,7 @@
             ],
             "medium": "m_heat_source",
             "temperature_from_global_file": "temp_ambient_air",
-            "constant_power": 1e7,
+            "constant_power": 1e10,
             "is_source": true
         },
         "Heat_Source_ElectrodeBoiler": {
@@ -346,7 +346,7 @@
             ],
             "medium": "m_heat_source",
             "constant_temperature": 0,
-            "constant_power": 1e7,
+            "constant_power": 1e10,
             "is_source": true
         },
         "HeatPump": {
@@ -377,8 +377,8 @@
             "min_power_function": "const:0.0",
             "max_power_function": "poly-2: 0.001119613, -0.06349226, 0.03004031, -0.000400244, 0.002087081, -0.000351640, -0.000003101, -0.0000000655, -0.000013215, 0.000001353",
             "__OPTIONAL_LOSSES__": "",
-            "heat_losses_factor": 0.95,
-            "power_losses_factor": 0.97,
+            "heat_losses_factor": 1.0,
+            "power_losses_factor": 1.0,
             "__OPTIONAL_ICING__": "",
             "consider_icing": true,
             "icing_coefficients": "3,-0.42,15,2,30"
@@ -461,8 +461,8 @@
                         "BUS_Heat":[{
                             "input_order": [
                                 "HeatPump",
-                                "ElectrodeBoiler",
                                 "HeatPump#secondary",
+                                "ElectrodeBoiler",
                                 "ElectrodeBoiler#secondary",
                                 "BufferTank"
                             ],
@@ -472,8 +472,8 @@
                             ],
                             "energy_flow": [
                                 [1, 1],
-                                [1, 1],
                                 [1, 0],
+                                [1, 1],
                                 [1, 0],
                                 [1, 0]
                             ]
@@ -488,8 +488,8 @@
             "connections": {
                 "input_order": [
                     "HeatPump",
-                    "ElectrodeBoiler",
                     "HeatPump#secondary",
+                    "ElectrodeBoiler",
                     "ElectrodeBoiler#secondary",
                     "BufferTank"
                 ],
@@ -510,11 +510,6 @@
             "type": "BufferTank",
             "output_refs": [
                 "BUS_Heat"
-            ],
-            "control_modules":[
-                {
-                    "name": "charge_control"
-                }
             ],
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
