@@ -4,6 +4,9 @@ In general the development follows the [semantic versioning](https://semver.org/
 ## Pre-1.0-releases
 As per the definition of semantic versioning and the reality of early development, in versions prior to 1.0.0 any release might break compatibility. To alleviate this somewhat, the meaning of major-minor-patch is "downshifted" to zero-major-minor. However some breaking changes may slip beneath notice.
 
+### Version 0.13.10
+* Fix function reorder_src_snk_connected_to-transformer not working after merges of new battery model
+
 ### Version 0.13.9
 * Add new transformer component ThermalBooster that uses low temperature heat to preheat a thermal demand and a second energy source to reach the desired output temperature
 * Add new scenario low_ex_district_heating to show the use of a ThermalBooster

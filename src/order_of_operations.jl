@@ -2856,7 +2856,14 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
 
     # For every flexible source/storage directly connected to a transformer...
     for source in sources_to_consider
-        source_medium = hasproperty(source, :m_heat_out) ? source.m_heat_out : source.medium
+        if hasproperty(source, :m_heat_out)
+            source_medium = source.m_heat_out
+        elseif hasproperty(source, :m_el_out)
+            source_medium = source.m_el_out
+        else
+            source_medium = source.medium
+        end
+
         connected_target_transformer = get_connected_transformer(source.output_interfaces[source_medium],
                                                                  "output")
         for connected_transformer in connected_target_transformer
@@ -2874,7 +2881,14 @@ function reorder_src_snk_connected_to_transformer(simulation_order, components, 
             # skip components with deactivated input interfaces (geothermal heat collector, geothermal probes)
             continue
         end
-        sink_medium = hasproperty(sink, :m_heat_in) ? sink.m_heat_in : sink.medium
+        if hasproperty(sink, :m_heat_in)
+            sink_medium = sink.m_heat_in
+        elseif hasproperty(sink, :m_el_in)
+            sink_medium = sink.m_el_in
+        else
+            sink_medium = sink.medium
+        end
+
         sink_step = sink.sys_function === EnergySystems.sf_storage ? EnergySystems.s_load : EnergySystems.s_process
         connected_source_transformer = get_connected_transformer(sink.input_interfaces[sink_medium], "input")
         for connected_transformer in connected_source_transformer
