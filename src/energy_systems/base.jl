@@ -1632,12 +1632,6 @@ function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_n
         throw(InputError("Missing required parameter $param_name"))
     end
 
-    # check if it is required but has a value of nothing (meaning both the default is
-    # nothing and no value was given)
-    if param_def.required && value === nothing
-        throw(InputError("Required parameter $param_name has no given value and no default."))
-    end
-
     # cast to the type of the component, unless the value is nothing
     if value !== nothing
         try
@@ -1755,6 +1749,42 @@ function check_validation(validation::Tuple, name::String, value::Any, extracted
 end
 
 """
+    conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+
+Returns if all conditionals for the given parameter apply.
+
+A parameter can be active, meaning it should be validated and will be used, when all
+conditionals that are defined for it evaluate to true. A parameter without conditionals
+therefore is always active.
+
+# Args
+- `name::String`: The name of the parameter to check
+- `extracted::Dict{String,Any}`: The parameters extracted via `extract_parameter`
+- `type_def::Dict{String,NamedTuple}`: Parameter definitions for the type
+# Returns
+- `Bool`: True if the parameter is active, false if not
+"""
+function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def::Dict{String,NamedTuple})::Bool
+    if !(name in keys(type_def) && isdefined(type_def[name], :conditionals))
+        return true
+    end
+
+    for conditional in type_def[name].conditionals
+        other_name = conditional[1]
+        operator = conditional[2]
+        operand = length(conditional) > 2 ? conditional[3] : nothing
+
+        if operator == "has_value"
+            return haskey(extracted, other_name) && extracted[other_name] === operand
+        elseif operator == "is_not"
+            return haskey(extracted, other_name) && extracted[other_name] != operand
+        else
+            throw(InputError("Unknown conditional operator $operator"))
+        end
+    end
+end
+
+"""
     validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String, type_def::Dict{String,NamedTuple})
 
 Validates the given configuration for interdependencies and consistency.
@@ -1772,6 +1802,19 @@ Throws `InputError` if validation fails.
 function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::String,
                          sim_params::Dict{String,Any}, type_def::Dict{String,NamedTuple})
     for (name, value) in pairs(extracted)
+        # skip control_parameters, as they have their own validation. also skip is_source
+        # from GridConnection as it is an internal parameter
+        if name == "control_parameters" || name == "is_source"
+            continue
+        end
+
+        # check if it is required but has a value of nothing (meaning both the default is
+        # nothing and no value was given). but also check if conditionals would "turn off"
+        # the parameter in any case, in which case the value does not matter
+        if type_def[name].required && value === nothing && conditionals_apply(name, extracted, type_def)
+            throw(InputError("Required parameter $name has no given value and no default."))
+        end
+
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
             if !(value in type_def[name].options)
