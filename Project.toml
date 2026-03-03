@@ -1,7 +1,7 @@
 name = "Resie"
 uuid = "2e0f99b1-0d8f-4296-8d0c-1c50a50d04c8"
-version = "0.13.6"
 authors = ["Elias Demartin <elias.demartin@siz-energieplus.de>", "Maksim Helmann <maksim.helmann@siz-energieplus.de>", "Etienne Ott <etienne.ott@siz-energieplus.de>", "Heiner Steinacker <heiner.steinacker@siz-energieplus.de>", "Adrian Vollmer <adrian.vollmer@siz-energieplus.de>"]
+version = "0.13.10"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -32,7 +32,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 UUIDs = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
 XLSX = "fdbf4ff8-1666-58a4-91e7-1b58723a45e0"
-
-[compat]
-Tables = "1.12.1"
-XLSX = "0.10.4"

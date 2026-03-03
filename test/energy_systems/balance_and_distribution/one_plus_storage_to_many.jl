@@ -34,7 +34,7 @@ function test_one_plus_storage_to_many()
             "medium" => "m_h_w_ht1",
             "output_refs" => ["TST_BUS_TH_01"],
             "capacity" => 10000,
-            "load" => 5000,
+            "initial_load" => 0.5,
         ),
         "TST_BUS_TH_01" => Dict{String,Any}(
             "type" => "Bus",

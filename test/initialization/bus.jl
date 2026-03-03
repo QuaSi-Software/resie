@@ -27,7 +27,9 @@ function energy_system()::Dict{String,Any}
             "type" => "Battery",
             "output_refs" => ["TST_BUS_01"],
             "capacity" => 10000,
-            "load" => 5000,
+            "initial_load" => 0.5,
+            "charge_efficiency" => 1.0,
+            "discharge_efficiency" => 1.0,
         ),
         "TST_DEM_01" => Dict{String,Any}(
             "type" => "Demand",

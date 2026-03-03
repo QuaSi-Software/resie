@@ -200,6 +200,7 @@ Set the reference outputs by copying relevant output files.
 function set_reference(name, subdir)
     outputs_to_set = ["auxiliary_info.md",
                       "balanceWarn.log",
+                      "general.log",
                       "out.csv",
                       "output_plot.html",
                       "sankey_plot.html"]
@@ -265,6 +266,7 @@ function rebuild_overview(scenarios_dir)
                    "out.csv",
                    "ref_auxiliary_info.md",
                    "ref_balanceWarn.log",
+                   "ref_general.log",
                    "ref_out.csv"]
 
     scenarios_list_html = ""

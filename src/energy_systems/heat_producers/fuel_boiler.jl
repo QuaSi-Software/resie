@@ -92,9 +92,10 @@ end
 """
 Set maximum energies that can be taken in and put out by the unit
 """
-function set_max_energies!(unit::FuelBoiler, fuel_in::Float64, heat_out::Float64)
-    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in)
-    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature)
+function set_max_energies!(unit::FuelBoiler, is_transformer_potential::Bool, fuel_in::Float64, heat_out::Float64)
+    set_max_energy!(unit.input_interfaces[unit.m_fuel_in], fuel_in; is_transformer_potential=is_transformer_potential)
+    set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, unit.output_temperature;
+                    is_transformer_potential=is_transformer_potential)
 end
 
 function calculate_energies(unit::FuelBoiler,
@@ -112,9 +113,9 @@ function potential(unit::FuelBoiler, sim_params::Dict{String,Any})
     success, energies = calculate_energies(unit, sim_params)
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
-        set_max_energies!(unit, 0.0, 0.0)
+        set_max_energies!(unit, true, 0.0, 0.0)
     else
-        set_max_energies!(unit, energies[1], energies[2])
+        set_max_energies!(unit, true, energies[1], energies[2])
     end
 end
 
@@ -123,7 +124,7 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
 
     if !success || sum(energies[1]; init=0.0) < sim_params["epsilon"]
         unit.losses = 0.0
-        set_max_energies!(unit, 0.0, 0.0)
+        set_max_energies!(unit, false, 0.0, 0.0)
         return
     end
 

@@ -417,6 +417,10 @@ function add!(interface::SystemInterface,
     elseif interface.target.sys_function == sf_bus
         add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
                      interface.is_secondary_interface)
+    elseif interface.sum_abs_change == 0.0
+        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+        # it cannot be reliably detected that the balance has already been written.
+        interface.max_energy = MaxEnergy()
     end
 end
 
@@ -458,6 +462,10 @@ function sub!(interface::SystemInterface,
     elseif interface.target.sys_function == sf_bus
         sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
                      interface.is_secondary_interface)
+    elseif interface.sum_abs_change == 0.0
+        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+        # it cannot be reliably detected that the balance has already been written.
+        interface.max_energy = MaxEnergy()
     end
 end
 
@@ -514,7 +522,8 @@ function set_max_energy!(interface::SystemInterface,
                          temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
                          purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing,
                          has_calculated_all_maxima::Bool=false,
-                         recalculate_max_energy::Bool=false)
+                         recalculate_max_energy::Bool=false;
+                         is_transformer_potential::Bool=false)
     # add nothing elements to temperature if there is only a single one
     energy = convert_to_vector(energy, Vector{Floathing})
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
@@ -564,7 +573,15 @@ function set_max_energy!(interface::SystemInterface,
             temp_max = temperature_max
             uac = purpose_uac
         else
-            # limit max_energy to existing max_energy and get temperatures
+            # limit max_energy to existing max_energy and get 
+            if is_transformer_potential  # --> caller is transformer and is calling from potential step.
+                # if other side is not also a transformer --> do not update MaxEnergy!
+                if !(interface.source.sys_function === EnergySystems.sf_transformer &&
+                     interface.target.sys_function === EnergySystems.sf_transformer)
+                    return
+                end
+            end
+
             energy_new = Vector{Floathing}()
             temp_min = Vector{Temperature}()
             temp_max = Vector{Temperature}()
@@ -1320,7 +1337,7 @@ called in 1-to-1 connections. Here, the components take care of matching tempera
     required to perform the energy flow calculations.
 """
 function balance_on(interface::SystemInterface, unit::Component)::Vector{EnergyExchange}
-    balance_written = interface.max_energy.max_energy[1] === nothing || interface.sum_abs_change > 0.0
+    balance_written = is_max_energy_nothing(interface.max_energy) || interface.sum_abs_change > 0.0
     purpose_uac = unit.uac == interface.target.uac ? interface.target.uac : interface.source.uac
 
     if balance_written
@@ -1612,6 +1629,7 @@ include("electric_producers/utir.jl")
 include("others/electrolyser.jl")
 include("heat_producers/fuel_boiler.jl")
 include("heat_producers/heat_pump.jl")
+include("heat_producers/thermal_booster.jl")
 include("electric_producers/pv_plant.jl")
 
 # additional functionality applicable to multiple component types, that belongs in the

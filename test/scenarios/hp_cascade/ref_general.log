@@ -1,0 +1,36 @@
+ReSiE general log file of simulation started at: 2026-02-24 13:10:36
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] For 'TST_01_ELT_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_GRI', no 'temperature' is set.
+[Info] For 'TST_01_O2_DEM', no 'temperature' is set.
+[Info] For 'TST_01_H2_DEM', no 'temperature' is set.
+[Info] For 'TST_01_HZG_01_DEM', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\tests\demand_heating_temperature.prf
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\hp_cascade\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 33/672 in 0.137 s. ETA: 2.6528 s
+[Info] Progress: 66/672 in 0.041 s. ETA: 0.7529 s
+[Info] Progress: 99/672 in 0.038 s. ETA: 0.6598 s
+[Info] Progress: 132/672 in 0.021 s. ETA: 0.3436 s
+[Info] Progress: 165/672 in 0.047 s. ETA: 0.7221 s
+[Info] Progress: 198/672 in 0.036 s. ETA: 0.5171 s
+[Info] Progress: 231/672 in 0.034 s. ETA: 0.4544 s
+[Info] Progress: 264/672 in 0.033 s. ETA: 0.4080 s
+[Info] Progress: 297/672 in 0.033 s. ETA: 0.3750 s
+[Info] Progress: 330/672 in 0.036 s. ETA: 0.3731 s
+[Info] Progress: 363/672 in 0.031 s. ETA: 0.2903 s
+[Info] Progress: 396/672 in 0.02 s. ETA: 0.1673 s
+[Info] Progress: 429/672 in 0.047 s. ETA: 0.3314 s
+[Info] Progress: 462/672 in 0.033 s. ETA: 0.2100 s
+[Info] Progress: 495/672 in 0.017 s. ETA: 0.0912 s
+[Info] Progress: 528/672 in 0.05 s. ETA: 0.2182 s
+[Info] Progress: 561/672 in 0.033 s. ETA: 0.1110 s
+[Info] Progress: 594/672 in 0.03 s. ETA: 0.0709 s
+[Info] Progress: 627/672 in 0.035 s. ETA: 0.0477 s
+[Info] Progress: 660/672 in 0.024 s. ETA: 0.0087 s
+[Info] -- Finished time step loop
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\hp_cascade\sankey_plot.html
+[Info] CSV-file with outputs written to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\hp_cascade\out.csv
+[Info] general log saved to .\test\scenarios\hp_cascade\general.log

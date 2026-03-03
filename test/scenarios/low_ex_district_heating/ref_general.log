@@ -1,0 +1,74 @@
+ReSiE general log file of simulation started at: 2026-02-25 18:10:46
+This log file contains general warnings, errors and information written by ReSiE
+---------------------------------
+[Info] Logging set up
+[Info] The EPW weather dataset from 'Neu-Stuttgart' with 8760 data points was successfully read.
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:LongWaveIrradiation was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:AmbientTemperature was shifted using linear interpolation to fit the simulation start time. 
+[Info] The timestamp of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted by 1800 seconds.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed has been extended by one timestep at the begin by doubling the first value.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\weather\TRY2015_Stuttgart.epw:WindSpeed was shifted using linear interpolation to fit the simulation start time. 
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_electricity_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_Power_House_02', no 'temperature' is set.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_SpaceHeating_02', the 'temperature' is set to the constant value of 45.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf was repeated 4 times to cover the simulation time.
+[Warn] The repeating of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf was done even the profile parameter "repeat_profile" is not true! (C:\Users\steinacker\Lokal\git_ReSiE_new\resie\src\profiles\base.jl:297)
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_DHW_House_01a', the 'temperature' is set to the constant value of 65.0.
+[Info] For 'GRI_Power_01', no 'temperature' is set.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\PV_Stuttgart_30_south_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'PV_House_01', no 'temperature' is set.
+[Info] For 'GRI_Air', the 'temperature' is taken from the user-defined .prf file located at: C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\ambient_temperature_TRY2015_Stuttgart.prf
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\ambient_temperature_TRY2015_Stuttgart.prf (intensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'BFT_DHW_House_02', the 'ambient_temperature' is set to the constant value of 18.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf was repeated 4 times to cover the simulation time.
+[Warn] The repeating of the profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf was done even the profile parameter "repeat_profile" is not true! (C:\Users\steinacker\Lokal\git_ReSiE_new\resie\src\profiles\base.jl:297)
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\general\dem_heat_nrg_var_hi-amp.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_DHW_House_02', the 'temperature' is set to the constant value of 65.0.
+[Info] For 'TB_House_02', the 'demand_input_temperature' is set to the constant value of 12.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_25Living_75Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_DHW_House_01b', the 'temperature' is set to the constant value of 65.0.
+[Info] For 'BFT_DistrictHeating_LowEx', the 'ambient_temperature' is taken from the project-wide weather file: temp_ambient_air
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_electricity_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_Power_House_01', no 'temperature' is set.
+[Info] For 'BFT_DHW_House_01', the 'ambient_temperature' is set to the constant value of 16.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\PV_Stuttgart_10_east_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'PV_House_02', no 'temperature' is set.
+[Info] For 'TB_House_01', the 'demand_input_temperature' is set to the constant value of 12.0.
+[Info] The profile at C:\Users\steinacker\Lokal\git_ReSiE_new\resie\profiles\examples\district\demand_heating_and_water_85Living_15Business_Wh_per_square_meter.prf (extensive profile) was converted from the profile timestep 900 seconds to the simulation timestep of 3600 seconds.
+[Info] For 'DEM_SpaceHeating_01', the 'temperature' is set to the constant value of 45.0.
+[Info] For 'GRI_Power_02', no 'temperature' is set.
+[Info] For 'GRO_Power', no 'temperature' is set.
+[Info] In bus BUS_Power_Houses, a custom order in the energy flow matrix is used. Note that this feature may not perform as expected for all energy systems.
+[Info] Auxiliary info dumped to file C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\low_ex_district_heating\auxiliary_info.md
+[Info] -- Start time step loop
+[Info] -- No preheating activated. Starting output from beginning.
+[Info] Progress: 37/744 in 23.574 s. ETA: 450.1488 s
+[Info] Progress: 74/744 in 0.117 s. ETA: 2.1186 s
+[Info] Progress: 111/744 in 0.18 s. ETA: 3.0795 s
+[Info] Progress: 148/744 in 0.142 s. ETA: 2.2874 s
+[Info] Progress: 185/744 in 0.281 s. ETA: 4.2454 s
+[Info] Progress: 222/744 in 0.151 s. ETA: 2.1303 s
+[Info] Progress: 259/744 in 0.17 s. ETA: 2.2284 s
+[Info] Progress: 296/744 in 0.197 s. ETA: 2.3853 s
+[Info] Progress: 333/744 in 0.102 s. ETA: 1.1330 s
+[Info] Progress: 370/744 in 0.199 s. ETA: 2.0115 s
+[Info] Progress: 407/744 in 0.165 s. ETA: 1.5028 s
+[Info] Progress: 444/744 in 0.199 s. ETA: 1.6135 s
+[Info] Progress: 481/744 in 0.149 s. ETA: 1.0591 s
+[Info] Progress: 518/744 in 0.104 s. ETA: 0.6352 s
+[Info] Progress: 555/744 in 0.187 s. ETA: 0.9552 s
+[Info] Progress: 592/744 in 0.112 s. ETA: 0.4601 s
+[Info] Progress: 629/744 in 0.18 s. ETA: 0.5595 s
+[Info] Progress: 666/744 in 0.112 s. ETA: 0.2361 s
+[Info] Progress: 703/744 in 0.161 s. ETA: 0.1784 s
+[Info] Progress: 740/744 in 0.178 s. ETA: 0.0192 s
+[Info] -- Finished time step loop
+[Info] Line plot created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\low_ex_district_heating\output_plot.html
+[Info] Sankey created and saved to C:\Users\steinacker\Lokal\git_ReSiE_new\resie\test\scenarios\low_ex_district_heating\sankey_plot.html
+[Info] general log saved to .\test\scenarios\low_ex_district_heating\general.log

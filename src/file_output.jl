@@ -414,14 +414,14 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
 end
 
 """
-reset_file(filepath, output_keys)
+write_CSV_headers(filepath, output_keys)
 
-Reset the output file and add headers for the given outputs.
+Resets the CSV output file and writes headers for the given outputs.
 """
-function reset_file(filepath::String,
-                    output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                    weather_data_keys::Union{Nothing,Vector{String}},
-                    csv_time_unit::String)
+function write_CSV_headers(filepath::String,
+                           output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           csv_time_unit::String)
     open(filepath, "w") do file_handle
         if csv_time_unit == "seconds"
             time_unit = "[s]"
@@ -460,44 +460,63 @@ function reset_file(filepath::String,
 end
 
 """
-write_to_file(filepath, output_keys, time)
+write_to_CSV_file(filepath, output_keys, time)
 
-Write the given outputs for the given time to file.
+Write the given outputs for the given time to the CSV output file. Alternatively the output
+can be returned as a single row instead, or a matrix of rows can be given to write all at
+once.
 """
-function write_to_file(filepath::String,
-                       output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
-                       weather_data_keys::Union{Nothing,Vector{String}},
-                       sim_params::Dict{String,Any},
-                       csv_time_unit::String)
-    open(filepath, "a") do file_handle
-        if csv_time_unit == "seconds"
-            time = sim_params["time_since_output"]
-        elseif csv_time_unit == "minutes"
-            time = sim_params["time_since_output"] / 60
-        elseif csv_time_unit == "hours"
-            time = sim_params["time_since_output"] / 60 / 60
-        elseif csv_time_unit == "date"
-            time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
-        end
-
-        write(file_handle, "$time")
-
-        if output_keys !== nothing
-            for outkey in output_keys
-                value = output_value(outkey.unit, outkey)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
+function write_to_CSV_file(filepath::String,
+                           output_keys::Union{Nothing,Vector{EnergySystems.OutputKey}},
+                           weather_data_keys::Union{Nothing,Vector{String}},
+                           sim_params::Dict{String,Any},
+                           csv_time_unit::String;
+                           do_return::Bool=false,
+                           output_rows::Union{Nothing,Matrix}=nothing)
+    if output_rows !== nothing
+        open(filepath, "a") do file_handle
+            for row_idx in 1:size(output_rows)[1]
+                write(file_handle, join(output_rows[row_idx, :], ";") * "\n")
             end
         end
-        if weather_data_keys !== nothing
-            for key in weather_data_keys
-                value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
-                value = replace("$value", "." => ",")
-                write(file_handle, ";$value")
-            end
-        end
+        return
+    end
 
-        write(file_handle, "\n")
+    line = []
+
+    if csv_time_unit == "seconds"
+        time = sim_params["time_since_output"]
+    elseif csv_time_unit == "minutes"
+        time = sim_params["time_since_output"] / 60
+    elseif csv_time_unit == "hours"
+        time = sim_params["time_since_output"] / 60 / 60
+    elseif csv_time_unit == "date"
+        time = Dates.format(sim_params["current_date"], "dd.mm.yyyy HH:MM:SS")
+    end
+
+    push!(line, "$time")
+
+    if output_keys !== nothing
+        for outkey in output_keys
+            value = output_value(outkey.unit, outkey)
+            value = replace("$value", "." => ",")
+            push!(line, value)
+        end
+    end
+    if weather_data_keys !== nothing
+        for key in weather_data_keys
+            value = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(key)), sim_params)
+            value = replace("$value", "." => ",")
+            push!(line, value)
+        end
+    end
+
+    if do_return
+        return line
+    else
+        open(filepath, "a") do file_handle
+            write(file_handle, join(line, ";") * "\n")
+        end
     end
 end
 
@@ -571,6 +590,7 @@ function dump_auxiliary_outputs(project_config::AbstractDict{AbstractString,Any}
                                                                "auxiliary_plots_path",
                                                                "./output/"))
         aux_plots_formats = default(project_config["io_settings"], "auxiliary_plots_formats", ["png"])
+        aux_plots_formats = Vector{String}(aux_plots_formats)
         component_list = []
         for component in components
             if plot_optional_figures_begin(component[2], aux_plots_output_path, aux_plots_formats, sim_params)
