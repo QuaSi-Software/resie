@@ -201,13 +201,13 @@
 				"key":{"NegControlReserve_in":["Scaling_Factor"]},
 				"axis": "left",
 				"unit": "kW",
-				"scale_factor": 0.001
+				"scale_factor": 0.00025
             },
             "32": {
 				"key":{"PosControlReserve_out":["Scaling_Factor"]},
 				"axis": "left",
 				"unit": "kW",
-				"scale_factor": 0.001
+				"scale_factor": 0.00025
             }
         }
     },
@@ -364,7 +364,7 @@
             "has_secondary_interface": true,
             "primary_el_sources": ["Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
-            "power_th": 8.0e6,
+            "power_th": 9.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -398,7 +398,7 @@
             "has_secondary_interface": true,
             "primary_el_sources": ["Photovoltaic", "WindFarm"],
             "secondary_el_sources": ["Grid_IN"],
-            "power_th": 1.0e6,
+            "power_th": 0.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -535,12 +535,19 @@
         },
         "Battery": {
             "type": "Battery",
-            "output_refs": [
-                "BUS_Power"
-            ],
-            "medium": "m_power",
-            "capacity": 200e3,
-            "load": 0.9
+            "output_refs": ["BUS_Power"],
+            "m_el_in": "m_power",
+            "m_el_out": "m_power",
+            "model_type": "simplified",
+            "charge_efficiency": 0.99,
+            "discharge_efficiency": 0.99,
+            "capacity": 1000e3,
+            "initial_load": 0.9,
+            "self_discharge_rate": 0.03,
+            "max_charge_C_rate": 0.5,
+            "max_discharge_C_rate": 0.5,
+            "SOC_min": 10,
+            "SOC_max": 100
         },
         "Demand_Heat": {
             "type": "Demand",

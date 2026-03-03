@@ -228,7 +228,7 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
-    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = 214.0  #vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR

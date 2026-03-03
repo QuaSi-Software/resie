@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
 
 
 ############################################################
@@ -30,27 +30,27 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 6.25e6         # lower limit
-Pth_HeatPump_hi   = 5.25e6         # upper limit
-Pth_HeatPump_step = 0.5e6         # step size
+Pth_HeatPump_lo   = 4.0e6         # lower limit
+Pth_HeatPump_hi   = 10.0e6         # upper limit
+Pth_HeatPump_step = 1.0e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 3.0e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 3.0e6     # upper limit
-Pth_ElectrodeBoiler_step = 0.5e6     # step size
+Pth_ElectrodeBoiler_lo   = 0.0e6     # lower limit
+Pth_ElectrodeBoiler_hi   = 5.0e6     # upper limit
+Pth_ElectrodeBoiler_step = 1.0e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 30.0e6        # lower limit
-Cap_hi_Wh   = 30.0e6        # upper limit
-Cap_step_Wh = 5.0e6         # step size
+Cap_lo_Wh   = 20.0e6        # lower limit
+Cap_hi_Wh   = 100.0e6        # upper limit
+Cap_step_Wh = 10.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 0.0e3          # lower limit
-Batt_hi_Wh   = 100000.0e3        # upper limit
-Batt_step_Wh = 1000.0e3        # step size
+Batt_lo_Wh   = 1.0e3          # lower limit
+Batt_hi_Wh   = 1.0e3        # upper limit
+Batt_step_Wh = 0.5e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
 # define adjustments to the different price profiles in the order of
@@ -78,11 +78,14 @@ function display_MWh(Wh)
 end
 
 
-function save_to_prf(timestamps::Array{Int,1}, values::Array{Float64,1}, filepath::String)
+function save_to_prf(timestamps::Array{Int,1},
+                     values::Array{Float64,1},
+                     filepath::String;
+                     profile_start_date::DateTime=DateTime(2024, 1, 1, 0, 0))
     header_variables = ["# data_type:", "# time_definition:", "# profile_start_date:", 
                         "# profile_start_date_format:", "# timestamp_format:", 
                         "# interpolation_type:"]
-    header_values = ["intensive", "startdate_timestamp", "01.01.2024 00:00", 
+    header_values = ["intensive", "startdate_timestamp", Dates.format(profile_start_date, "dd.mm.yyyy HH:MM"), 
                      "dd.mm.yyyy HH:MM", "seconds", "stepwise"]
     open(filepath, "w") do file_handle
         for (var, val) in zip(header_variables, header_values)
@@ -205,8 +208,13 @@ function create_variant(
         else
             profile = Profile(path, sim_params)
             values = [profile.data[dt] .* profile_multipliers[p_idx] .+ profile_addons[p_idx] for dt in date_range]
+            timestamps = collect(0:Int(sim_params["time_step_seconds"]):
+                                 Int(sim_params["time_step_seconds"]) * (length(values) - 1))
             new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
-            save_to_prf(collect(date_range), values, new_path)
+            save_to_prf(timestamps,
+                        values,
+                        new_path;
+                        profile_start_date=sim_params["start_date"])
             new_paths[p_idx] = new_path
             profile_values[p_idx, :] = values
         end

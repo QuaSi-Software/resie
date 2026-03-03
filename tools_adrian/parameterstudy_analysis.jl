@@ -15,6 +15,7 @@ const XCOLS = [
     "Battery_Capacity / Wh",
 ]
 const YCOL_NO = "annuity_no A_total / €"
+const CO2_COL = "CO2_yearly / t/a"
 const BAL_COLS = ["balance_power", "balance_heat"]
 const BAL_THRESHOLD = 1.0
 const ANNUITY_COST_COLS = [
@@ -68,10 +69,35 @@ function topn_annuity(df::DataFrame, n::Int; xcols::Vector{String}=XCOLS, ycol::
     return bestn
 end
 
+function topn_co2(df::DataFrame, n::Int; xcols::Vector{String}=XCOLS, co2col::String=CO2_COL, ycol::String=YCOL_NO)
+    dfv = filter_balance(df)
+    dfv = dfv[.!ismissing.(dfv[!, co2col]), :]
+    sort!(dfv, co2col)
+
+    nshow = min(n, nrow(dfv))
+    keep_cols = [xcols; [co2col, ycol]]
+    bestn = copy(dfv[1:nshow, keep_cols])
+
+    for c in xcols
+        bestn[!, c] = to_million.(bestn[!, c])
+    end
+    bestn[!, co2col] = to_million.(bestn[!, co2col])
+    bestn[!, ycol] = to_million.(bestn[!, ycol])
+
+    return bestn
+end
+
 function save_topn_xlsx(topn::DataFrame; outdir::String=OUTDIR, filename::String="top100_annuity_no.xlsx")
     isdir(outdir) || mkpath(outdir)
     path = joinpath(outdir, filename)
     XLSX.writetable(path, Tables.columntable(topn); sheetname="Top100")
+    return path
+end
+
+function save_topn_csv(topn::DataFrame; outdir::String=OUTDIR, filename::String)
+    isdir(outdir) || mkpath(outdir)
+    path = joinpath(outdir, filename)
+    CSV.write(path, topn)
     return path
 end
 
@@ -221,7 +247,7 @@ end
 function main()
     df = CSV.read(CSV_PATH, DataFrame; delim=';', decimal=',')
 
-    required_cols = vcat(XCOLS, ANNUITY_COST_COLS, ANNUITY_REV_COLS, [YCOL_NO], BAL_COLS)
+    required_cols = vcat(XCOLS, ANNUITY_COST_COLS, ANNUITY_REV_COLS, [YCOL_NO, CO2_COL], BAL_COLS)
     missing_required = [c for c in required_cols if !(c in names(df))]
     @assert isempty(missing_required) "Fehlende Pflichtspalten: $(join(missing_required, ", "))"
 
@@ -229,6 +255,8 @@ function main()
 
     best100 = topn_annuity(df, 100)
     xlsx_path = save_topn_xlsx(best100)
+    top10_co2 = topn_co2(df, 10)
+    co2_csv_path = save_topn_csv(top10_co2; filename="top10_lowest_co2_yearly.csv")
 
     best10 = topn_annuity(df, 10)
     plot_top10_annuity(best10)
@@ -237,6 +265,7 @@ function main()
 
     println("\nFertig. Dateien in: $OUTDIR")
     println("- $(basename(xlsx_path))")
+    println("- $(basename(co2_csv_path))")
     println("- top10_annuity_no.png")
     println("- 3d_parameter_space.html")
     println("- matrix_plot.html")
