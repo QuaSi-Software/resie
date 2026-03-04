@@ -215,7 +215,11 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    output_keys_lineplot, output_keys_to_CSV = get_output_keys(project_config["io_settings"], components)
+    output_keys_lineplot, output_keys_to_CSV, output_keys_economy, output_keys_emissions = get_output_keys(project_config["io_settings"],
+                                                                                                           project_config["economy_parameter"],
+                                                                                                           project_config["emissions_parameter"],
+                                                                                                           components)
+    # all_output_keys = merge_keys(output_keys_lineplot, output_keys_economy, output_keys_emissions)
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
     do_create_plot_weather = weather_data_keys !== nothing &&
@@ -233,6 +237,8 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError())
     end
+    do_calculate_economy = default(project_config["economy_parameter"], "calculate_economy", false)
+    do_calculate_emissions = default(project_config["emissions_parameter"], "calculate_emissions", false)
 
     # Initialize the arrays for output
     output_data_lineplot = do_create_plot_data ?
@@ -245,6 +251,13 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                  Matrix{String}(undef, sim_params["number_of_time_steps_output"],
                                 1 + length(output_keys_to_CSV) + (do_write_CSV_weather ? length(weather_data_keys) : 0)) :
                  nothing
+    output_data_economy = do_calculate_economy ?
+                          zeros(Float64, sim_params["number_of_time_steps_output"], 1 + length(output_keys_economy)) :
+                          nothing
+    output_data_emissions = do_calculate_emissions ?
+                            zeros(Float64, sim_params["number_of_time_steps_output"],
+                                  1 + length(output_keys_emissions)) :
+                            nothing
 
     # write CSV file headers
     if do_write_CSV
@@ -330,6 +343,14 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
             if do_create_plot_weather
                 output_weather_lineplot[output_steps, :] = gather_weather_data(weather_data_keys, sim_params)
             end
+            if do_calculate_economy
+                output_data_economy[output_steps, :] = gather_output_data(output_keys_economy,
+                                                                          sim_params["time_since_output"])
+            end
+            if do_calculate_emissions
+                output_data_emissions[output_steps, :] = gather_output_data(output_keys_emissions,
+                                                                            sim_params["time_since_output"])
+            end
 
             # simulation update
             sim_params["time_since_output"] += Int(sim_params["time_step_seconds"])
@@ -347,11 +368,17 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                    /
                    sim_params["step_info_interval"])
             @info "Progress: $(steps)/$(sim_params["number_of_time_steps"]) in" *
-                  " $(seconds(now() - start)) s. ETA: $(@sprintf("%.4f", eta)) s"
+                  " $(seconds(now() -  start)) s. ETA: $(@sprintf("%.4f", eta)) s"
             start = now()
         end
     end
     @info "-- Finished time step loop"
+
+    # calculate economy
+    if do_calculate_economy
+        # calculate_and_output_economy(components, output_keys_economy, output_data_economy, sim_params,
+        #  project_config["economy_parameter"])
+    end
 
     # write output to CSV if not done continuously
     if do_write_CSV && !do_write_CSV_continuously
