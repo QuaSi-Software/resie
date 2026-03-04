@@ -331,9 +331,7 @@
                     "high_threshold": 0.995
                 }
             ],
-            "output_refs": [
-                "BUS_Heat"
-            ],
+            "output_refs": ["BUS_Heat"],
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
@@ -358,12 +356,19 @@
         },
         "Battery": {
             "type": "Battery",
-            "output_refs": [
-                "BUS_Power"
-            ],
-            "medium": "m_power",
+            "output_refs": ["BUS_Power"],
+            "m_el_in": "m_power",
+            "m_el_out": "m_power",
+            "model_type": "simplified",
+            "charge_efficiency": 0.99,
+            "discharge_efficiency": 0.99,
             "capacity": 1000e3,
-            "load": 0.9
+            "initial_load": 0.9,
+            "self_discharge_rate": 0.03,
+            "max_charge_C_rate": 0.5,
+            "max_discharge_C_rate": 0.5,
+            "SOC_min": 10,
+            "SOC_max": 100
         },
         "Demand_Heat": {
             "type": "Demand",
