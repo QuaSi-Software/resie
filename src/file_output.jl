@@ -16,8 +16,8 @@ For each output channel:
       - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
-                         economy_parameter::AbstractDict{Any,Any},
-                         emissions_parameter::AbstractDict{Any,Any},
+                         economy_parameter::AbstractDict{String,Any},
+                         emissions_parameter::AbstractDict{String,Any},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
