@@ -1,5 +1,161 @@
 using ..Resie: get_run
 
+#! format: off
+const THERMAL_BOOSTER_PARAMETERS = Dict(
+    "m_el_in" => (
+        default="m_e_ac_230v",
+        description="Electrical input medium",
+        display_name="Medium el_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_ht1",
+        description="Heat output medium",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_in" => (
+        default="m_h_w_lt1",
+        description="Heat input medium",
+        display_name="Medium heat_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "output_temperature" => (
+        default=nothing,
+        description="Fixed output temperature, or nothing for auto-detection",
+        display_name="Output temperature",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "input_temperature" => (
+        default=nothing,
+        description="Fixed input temperature, or nothing for auto-detection",
+        display_name="Input temperature",
+        required=false,
+        type=Temperature,
+        json_type="number",
+        unit="°C"
+    ),
+    "power_el" => (
+        default=nothing,
+        description="Electrical power of the thermal booster",
+        display_name="Electrical power",
+        required=true,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W"
+    ),
+    "power_losses_factor" => (
+        default=0.97,
+        description="Factor accounting for electrical power losses",
+        display_name="Power losses factor",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "heat_losses_factor" => (
+        default=0.95,
+        description="Factor accounting for heat losses",
+        display_name="Heat losses factor",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "cp_medium_out" => (
+        default=4180.0,
+        description="Specific heat capacity of output medium",
+        display_name="c_p output medium",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "terminal_dT" => (
+        default=2.0,
+        description="Temperature difference at terminal",
+        display_name="Terminal dT",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="K"
+    ),
+    "demand_input_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to a demand input temperature profile file",
+        display_name="Demand temp. profile file",
+        required=false,
+        conditionals=[
+            ("constant_demand_input_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_demand_input_temperature" => (
+        default=nothing,
+        description="Constant demand input temperature value",
+        display_name="Const. demand input temp.",
+        required=false,
+        conditionals=[
+            ("demand_input_temperature_profile_file_path", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "allow_boost_solely" => (
+        default=true,
+        description="Allow use of electrical energy if no heat input is available at all",
+        display_name="Allow boost solely?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "allow_boost_additional" => (
+        default=true,
+        description="Allow the use of electrical energy to increase mass flow if the " *
+                    "heat input is insufficient. This allows the intermediate " *
+                    "temperature to be lower than the heat_in temperature.",
+        display_name="Allow boost additional?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Thermal Booster
 
@@ -41,48 +197,65 @@ mutable struct ThermalBooster <: Component
     losses_heat::Float64
 
     function ThermalBooster(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_lt1"))
-        register_media([m_el_in, m_heat_out, m_heat_in])
-
-        constant_demand_input_temperature,
-        demand_input_temperature_profile = get_parameter_profile_from_config(config,
-                                                                             sim_params,
-                                                                             "demand_input_temperature",
-                                                                             "demand_input_temperature_profile_file_path",
-                                                                             "",
-                                                                             "constant_demand_input_temperature",
-                                                                             uac;
-                                                                             required=true)
-
-        return new(uac,
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_transformer,
-                   InterfaceMap(m_heat_in => nothing,
-                                m_el_in => nothing),
-                   InterfaceMap(m_heat_out => nothing),
-                   m_el_in,
-                   m_heat_out,
-                   m_heat_in,
-                   default(config, "output_temperature", nothing),    # [°C]
-                   default(config, "input_temperature", nothing),     # [°C]
-                   default(config, "power_losses_factor", 0.97),      # [-]
-                   default(config, "heat_losses_factor", 0.95),       # [-]
-                   config["power_el"],                                # [W]
-                   default(config, "cp_medium_out", 4180.0),          # [J/(kgK)]
-                   default(config, "terminal_dT", 2.0),               # [K]
-                   demand_input_temperature_profile,                  # [°C] demand_input_temperature_profile
-                   constant_demand_input_temperature,                 # [°C] demand_input_temperature
-                   default(config, "allow_boost_solely", true),       # allow_boost_solely: allow use of energy if no heat_in is available at all
-                   default(config, "allow_boost_additional", true),   # allow_boost_additional: allow use of energy to increase mass flow if heat_in is not sufficient --> allow intermediate temperature to be lower than heat_in temperature
-                   0.0,                                               # mean_intermediate_temperature
-                   Temperature[],                                     # intermediate_temperatures
-                   Float64[],                                         # intermediate_temperature_energies
-                   0.0,                                               # losses
-                   0.0,                                               # losses_power
-                   0.0)                                               # losses_heat
+        return new(SSOT_parameter_constructor(ThermalBooster, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{ThermalBooster})::Dict{String,NamedTuple}
+    return deepcopy(THERMAL_BOOSTER_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{ThermalBooster}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name == "demand_input_temperature_profile_file_path"
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name == "constant_demand_input_temperature"
+        return convert(Temperature, default(config, param_name, nothing))
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{ThermalBooster}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(ThermalBooster))
+end
+
+function init_from_params(x::Type{ThermalBooster}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    m_el_in = Symbol(params["m_el_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    m_heat_in = Symbol(params["m_heat_in"])
+    register_media([m_el_in, m_heat_out, m_heat_in])
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_transformer,
+            InterfaceMap(m_heat_in => nothing,
+                         m_el_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_el_in,
+            m_heat_out,
+            m_heat_in,
+            params["output_temperature"],
+            params["input_temperature"],
+            params["power_losses_factor"],
+            params["heat_losses_factor"],
+            params["power_el"],
+            params["cp_medium_out"],
+            params["terminal_dT"],
+            params["demand_input_temperature_profile_file_path"],
+            params["constant_demand_input_temperature"],
+            params["allow_boost_solely"],
+            params["allow_boost_additional"],
+            0.0,           # mean_intermediate_temperature
+            Temperature[], # intermediate_temperatures
+            Float64[],     # intermediate_temperature_energies
+            0.0,           # losses
+            0.0,           # losses_power
+            0.0)           # losses_heat
 end
 
 mutable struct TBEnergies
