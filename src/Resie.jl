@@ -26,7 +26,7 @@ end
 # this registry should be the only global state in the package and contains the state for
 # ongoing or paused simulation runs
 current_runs::Dict{UUID,SimulationRun} = Dict{UUID,SimulationRun}()
-
+const run_lock = ReentrantLock()
 """
     get_run(id)
 
@@ -38,7 +38,9 @@ Get the simulation run container for the given ID.
 - `SimulationRun`: The simulation run container
 """
 function get_run(id::UUID)::SimulationRun
-    return current_runs[id]
+    lock(run_lock) do
+        return current_runs[id]
+    end
 end
 
 """
@@ -50,7 +52,9 @@ Closes the given run, removing it from the run registry.
 - `id:UUID`: The ID of the run
 """
 function close_run(id::UUID)
-    delete!(current_runs, id)
+    lock(run_lock) do
+        delete!(current_runs, id)
+    end
 end
 
 """
@@ -480,7 +484,6 @@ function load_and_run(filepath::String, run_ID::UUID)::Tuple{Bool, Union{Ordered
         @error "Could not find or parse project config file at $(abspath(filepath))"
         return false, nothing
     end
-    run_lock = ReentrantLock()
     @info "-- Now preparing inputs"
     sim_params, components, operations = prepare_inputs(project_config, run_ID)
     Threads.lock(run_lock) do 
