@@ -570,12 +570,12 @@ function get_weather_data_keys(sim_params::Dict{String,Any})
 end
 
 function gather_weather_data(weather_data_keys, sim_params)
-    return_values = Vector{Any}()
-    append!(return_values, sim_params["time_since_output"])
+    return_values = zeros(Float64, 1 + length(weather_data_keys))
+    return_values[1] = sim_params["time_since_output"]
 
-    for weather_data_key in weather_data_keys
-        append!(return_values,
-                Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)), sim_params))
+    for (idx, weather_data_key) in enumerate(weather_data_keys)
+        return_values[idx + 1] = Profiles.value_at_time(getfield(sim_params["weather_data"], Symbol(weather_data_key)),
+                                                        sim_params)
     end
     return return_values
 end
