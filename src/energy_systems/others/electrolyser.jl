@@ -165,7 +165,7 @@ const ELECTROLYSER_PARAMETERS = Dict(
         description="Part-load ratio of a single unit when operation is optimal",
         display_name="Optimal unit PLR",
         required=false,
-        conditionals=[("dispatch_strategy", "has_value", "try_optimal")],
+        conditionals=[("dispatch_strategy", "is", "try_optimal")],
         validations=[
             ("self", "value_gt_num", 0.0),
             ("self", "value_lte_num", 1.0)

@@ -1769,19 +1769,31 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
         return true
     end
 
+    all_apply = true
     for conditional in type_def[name].conditionals
         other_name = conditional[1]
         operator = conditional[2]
         operand = length(conditional) > 2 ? conditional[3] : nothing
 
-        if operator == "has_value"
-            return haskey(extracted, other_name) && extracted[other_name] === operand
+        if operator == "is"
+            all_apply = all_apply && (haskey(extracted, other_name) && extracted[other_name] == operand)
         elseif operator == "is_not"
-            return haskey(extracted, other_name) && extracted[other_name] != operand
+            all_apply = all_apply && (haskey(extracted, other_name) && extracted[other_name] != operand)
+        elseif operator == "is_true"
+            all_apply = all_apply && (haskey(extracted, other_name) && Bool(extracted[other_name]))
+        elseif operator == "is_not_nothing"
+            all_apply = all_apply && (haskey(extracted, other_name) && !isnothing(extracted[other_name]))
+        elseif operator == "is_one_of"
+            has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
+            all_apply = all_apply & has_match
+        elseif operator == "mutex"
+            all_apply = all_apply # mutex doesn't factor into the calculation and is handled elsewhere
         else
             throw(InputError("Unknown conditional operator $operator"))
         end
     end
+
+    return all_apply
 end
 
 """

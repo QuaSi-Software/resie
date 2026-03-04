@@ -258,7 +258,7 @@ const BUFFER_TANK_PARAMETERS = Dict(
         display_name="Switch point",
         required=false,
         conditionals=[
-            ("model_type", "has_value", "balanced"),
+            ("model_type", "is", "balanced"),
         ],
         validations=[
             ("self", "value_gt_num", 0.0),

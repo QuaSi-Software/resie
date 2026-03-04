@@ -77,7 +77,7 @@ const BATTERY_PARAMETERS = Dict(
         description="Charge efficienc for simplified model",
         display_name="Charge efficiency",
         required=true,
-        conditionals=[("model_type", "has_value", "simplified")],
+        conditionals=[("model_type", "is", "simplified")],
         validations=[
             ("self", "value_gte_num", 0.0),
             ("self", "value_lte_num", 1.0)
@@ -91,7 +91,7 @@ const BATTERY_PARAMETERS = Dict(
         description="Discharge efficiency for simplified model",
         display_name="Discharge efficiency",
         required=true,
-        conditionals=[("model_type", "has_value", "simplified")],
+        conditionals=[("model_type", "is", "simplified")],
         validations=[
             ("self", "value_gte_num", 0.0),
             ("self", "value_lte_num", 1.0)
