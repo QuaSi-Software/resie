@@ -345,8 +345,8 @@
                 "name": "ems_fuzzy",
                 "primary_source_uac": "HeatPump",
                 "secondary_source_uac": "ElectrodeBoiler",
-                "storage_uac": "BufferTank",
-                "demand_uac": "Demand_Heat",
+                "heat_storage_uac": "BufferTank",
+                "heat_demand_uac": "Demand_Heat",
                 "renewable_source_uacs": ["Photovoltaic", "WindFarm"],
                 "price_profile_path": "profiles/MA/stock_price_EUR_MWh.prf",
                 "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
@@ -355,7 +355,8 @@
                 "rolling_horizon_hours": 12,
                 "power_bus_uac": "BUS_Power",
                 "battery_uac": "Battery",
-                "el_grid_uac": "Grid_IN"
+                "el_grid_uac": "Grid_IN",
+                "el_demand_uac": "Demand_Power"
                 }
             ],
             "connections": {

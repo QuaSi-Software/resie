@@ -19,8 +19,8 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "name" => "ems_fuzzy",
             "primary_source_uac" => nothing,
             "secondary_source_uac" => nothing,
-            "storage_uac" => nothing,
-            "demand_uac" => nothing,
+            "heat_storage_uac" => nothing,
+            "heat_heat_demand_uac" => nothing,
             "renewable_source_uacs" => [],
             "price_profile_path" => nothing,
             "price_trend_profile_path" => nothing,
@@ -29,38 +29,39 @@ mutable struct CM_EMSFuzzy <: ControlModule
             "rolling_horizon_hours" => 8760.0,
             "power_bus_uac" => nothing,
             "battery_uac" => nothing,
-            "el_grid_uac" => nothing
+            "el_grid_uac" => nothing,
+            "el_demand_uac" => nothing
         )
         params = Base.merge(default_parameters, parameters)
         if haskey(parameters, "rolling_horizion_hours") && !haskey(parameters, "rolling_horizon_hours")
             params["rolling_horizon_hours"] = parameters["rolling_horizion_hours"]
         end
 
-        if !(params["storage_uac"] !== nothing
-             && params["storage_uac"] in keys(components)
-             && components[params["storage_uac"]] isa StorageComponent)
+        if !(params["heat_storage_uac"] !== nothing
+             && params["heat_storage_uac"] in keys(components)
+             && components[params["heat_storage_uac"]] isa StorageComponent)
             @error "Required storage component for control module ems_fuzzy not given"
             throw(InputError)
         end
-        params["storage"] = components[params["storage_uac"]]
+        params["storage"] = components[params["heat_storage_uac"]]
         params["price_profile"] = Profile(params["price_profile_path"], sim_params)
         params["price_trend_profile"] = Profile(params["price_trend_profile_path"], sim_params)
         params["price_volatility_profile"] = Profile(params["price_volatility_profile_path"], sim_params)
         params["plr_limit"] = 1.0
         params["primary_source"] = components[params["primary_source_uac"]]
         params["secondary_source"] = components[params["secondary_source_uac"]]
-        params["demand"] = components[params["demand_uac"]]
+        params["demand"] = components[params["heat_demand_uac"]]
         params["renewable_sources"] = [components[uac] for uac in params["renewable_source_uacs"]]
         
         # create new connectivity for BufferTank charging
         connectivity_by_state = Dict{String,Dict{Int,ConnectionMatrix}}()
         connectivity_by_state[unit_uac] = Dict{Int,ConnectionMatrix}()
-        # record already calculated original connectivities for each bus
+        # record already calculated original connectivities
         connectivity_by_state[unit_uac][1] = components[unit_uac].connectivity
 
         new_connectivity = deepcopy(components[unit_uac].connectivity)
 
-        storage_idx = findfirst(isequal(params["storage_uac"]), new_connectivity.output_order)
+        storage_idx = findfirst(isequal(params["heat_storage_uac"]), new_connectivity.output_order)
         if params["primary_source"].has_secondary_interface
             primary_idx = findfirst(isequal(params["primary_source_uac"] * "#secondary"), new_connectivity.input_order)
             new_connectivity.energy_flow[primary_idx][storage_idx] = 0.0
@@ -75,18 +76,22 @@ mutable struct CM_EMSFuzzy <: ControlModule
 
         if !isnothing(params["power_bus_uac"]) && 
            !isnothing(params["battery_uac"]) && 
-           !isnothing(params["el_grid_uac"])
+           !isnothing(params["el_grid_uac"]) &&
+           !isnothing(params["el_demand_uac"])
 
             # create new connectivity for Battery charging
             connectivity_by_state[params["power_bus_uac"]] = Dict{Int,ConnectionMatrix}()
-            # record already calculated original connectivities for each bus
+            # record already calculated original connectivities
             connectivity_by_state[params["power_bus_uac"]][1] = components[params["power_bus_uac"]].connectivity
 
             new_connectivity = deepcopy(components[params["power_bus_uac"]].connectivity)
 
-            battery_idx = findfirst(isequal(params["battery_uac"]), new_connectivity.output_order)
-            primary_idx = findfirst(isequal(params["el_grid_uac"]), new_connectivity.input_order)
-            new_connectivity.energy_flow[primary_idx][battery_idx] = 0.0
+            battery_in_idx = findfirst(isequal(params["battery_uac"]), new_connectivity.output_order)
+            battery_out_idx = findfirst(isequal(params["battery_uac"]), new_connectivity.input_order)
+            grid_idx = findfirst(isequal(params["el_grid_uac"]), new_connectivity.input_order)
+            el_demand_idx = findfirst(isequal(params["el_demand_uac"]), new_connectivity.output_order)
+            new_connectivity.energy_flow[grid_idx][battery_in_idx] = 0.0
+            new_connectivity.energy_flow[battery_out_idx][el_demand_idx] = 0.0
 
             connectivity_by_state[params["power_bus_uac"]][2] = new_connectivity
             params["charging_state_battery"] = 2
@@ -279,8 +284,8 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     remaining_power = max(target_power - mod_params["plr_limit_primary"] * available_th_power_primary, 0.0)
     mod_params["plr_limit_secondary"] = secondary_power > 0 ? clamp(remaining_power / available_th_power_secondary, 0.0, 1.0) : 0.0
 
-    if sim_params["time"] >= (11*30 + 12) * 24 * 3600 + 4 * 3600 @infiltrate end
-    
+    # if sim_params["time"] >= (11*30 + 12) * 24 * 3600 + 4 * 3600 @infiltrate end
+
     # # Check how much heat both heat sources and storage can provide
     # storage_power_by_soc = SOC_now * sim_params["wh_to_watts"](mod_params["storage"].capacity)
     # storage_power_limit = hasproperty(mod_params["storage"], :max_output_energy) ?
