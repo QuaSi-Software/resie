@@ -206,7 +206,17 @@ function create_variant(
             profile = Profile(path, sim_params)
             values = [profile.data[dt] .* profile_multipliers[p_idx] .+ profile_addons[p_idx] for dt in date_range]
             new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
-            save_to_prf(collect(date_range), values, new_path)
+            try 
+                save_to_prf(collect(date_range), values, new_path)
+            catch
+                sleep(5)
+                try 
+                    save_to_prf(collect(date_range), values, new_path)
+                catch
+                    new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$(rand(Int)).prf"  
+                    save_to_prf(collect(date_range), values, new_path)
+                end
+            end
             new_paths[p_idx] = new_path
             profile_values[p_idx, :] = values
         end
