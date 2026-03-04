@@ -101,9 +101,9 @@ end
 
 function save_to_prf(dates::Array{DateTime,1}, values::Array{Float64,1}, filepath::String)
     header_variables = ["# data_type:", "# time_definition:", "# timestamp_format:", 
-                        "# time_zone:", "# interpolation_type:"]
+                        "# interpolation_type:"]
     header_values = ["intensive", "datestamp", "dd.mm.yyyy HH:MM", 
-                     "Europe/Berlin", "stepwise"]
+                     "stepwise"]
     open(filepath, "w") do file_handle
         for (var, val) in zip(header_variables, header_values)
             write(file_handle, var * "\t" * val * "\n")
@@ -208,18 +208,16 @@ function create_variant(
         else
             profile = Profile(path, sim_params)
             values = [profile.data[dt] .* profile_multipliers[p_idx] .+ profile_addons[p_idx] for dt in date_range]
-            timestamps = collect(0:Int(sim_params["time_step_seconds"]):
-                                 Int(sim_params["time_step_seconds"]) * (length(values) - 1))
             new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$profile_id.prf" 
             try 
-                save_to_prf(timestamps, values, new_path)
+                save_to_prf(date_range, values, new_path)
             catch
                 sleep(5)
                 try 
-                    save_to_prf(timestamps, values, new_path)
+                    save_to_prf(date_range, values, new_path)
                 catch
                     new_path = profile_dir * "/" * split(path[1:end-4], '/')[end] * "_$(rand(Int)).prf"  
-                    save_to_prf(timestamps, values, new_path)
+                    save_to_prf(date_range, values, new_path)
                 end
             end
             new_paths[p_idx] = new_path
