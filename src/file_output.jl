@@ -16,8 +16,8 @@ For each output channel:
       - only requested keys from input file
 """
 function get_output_keys(io_settings::AbstractDict{String,Any},
-                         economy_parameter::AbstractDict{String,Any},
-                         emissions_parameter::AbstractDict{String,Any},
+                         economy_parameter::Union{Nothing,AbstractDict{String,Any}},
+                         emissions_parameter::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
@@ -133,8 +133,10 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output_keys")
-    do_economy = haskey(economy_parameter, "calculate_economy") && economy_parameter["calculate_economy"]
-    do_emissions = haskey(emissions_parameter, "calculate_emissions") && emissions_parameter["calculate_emissions"]
+    do_economy = economy_parameter !== nothing && haskey(economy_parameter, "calculate_economy") &&
+                 economy_parameter["calculate_economy"]
+    do_emissions = emissions_parameter !== nothing && haskey(emissions_parameter, "calculate_emissions") &&
+                   emissions_parameter["calculate_emissions"]
 
     # Decide if we need all-keys lists
     need_all_excl = do_plot_all_excl || do_csv_all_excl || do_economy || do_emissions

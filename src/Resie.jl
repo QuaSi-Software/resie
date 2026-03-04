@@ -215,10 +215,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
                              components::Grouping,
                              operations::OrderOfOperations)
     # get list of requested output keys for lineplot and csv export
-    economy_parameter = haskey(project_config, "economy_parameter") ? project_config["economy_parameter"] :
-                        AbstractDict{String,Any}
+    economy_parameter = haskey(project_config, "economy_parameter") ? project_config["economy_parameter"] : nothing
     emissions_parameter = haskey(project_config, "emissions_parameter") ? project_config["emissions_parameter"] :
-                          AbstractDict{String,Any}
+                          nothing
     output_keys_lineplot, output_keys_to_CSV, output_keys_economy, output_keys_emissions = get_output_keys(project_config["io_settings"],
                                                                                                            economy_parameter,
                                                                                                            emissions_parameter,
@@ -246,9 +245,9 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         @error "The `csv_time_unit` has to be one of: seconds, minutes, hours, date!"
         throw(InputError())
     end
-    do_calculate_economy = haskey(project_config, "economy_parameter") ?
+    do_calculate_economy = economy_parameter !== nothing ?
                            default(project_config["economy_parameter"], "calculate_economy", false) : false
-    do_calculate_emissions = haskey(project_config, "emissions_parameter") ?
+    do_calculate_emissions = emissions_parameter !== nothing ?
                              default(project_config["emissions_parameter"], "calculate_emissions", false) : false
 
     # Initialize the arrays for output
@@ -372,18 +371,18 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     @info "-- Finished time step loop"
 
     # extract output data per category including the time step in the first column
-    outputkey_sig(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
+    output_key_signature(k::EnergySystems.OutputKey) = (String(k.unit.uac), k.medium, k.value_key)
     function subset_cols(key_indexes, keys::Union{Nothing,Vector{EnergySystems.OutputKey}})
         keys === nothing && return Int[]
-        return 1 .+ [key_indexes[outputkey_sig(k)] for k in keys]
+        return 1 .+ [key_indexes[output_key_signature(k)] for k in keys]
     end
     time_and_subset_cols(key_indexes, keys) = vcat(1, subset_cols(key_indexes, keys))
-    key_indexes = Dict(outputkey_sig(k) => i for (i, k) in pairs(all_requested_output_keys))
+    key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
 
     if do_calculate_economy
         output_data_economy = Matrix(view(output_data_all_requested, :,
                                           time_and_subset_cols(key_indexes, output_keys_economy)))
-        # calculate economy
+        # calculate economy TODO
         # calculate_and_output_economy(components, output_keys_economy, output_data_economy, sim_params,
         #                              project_config["economy_parameter"])
     end
@@ -391,7 +390,7 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         output_data_emissions = Matrix(view(output_data_all_requested, :,
                                             time_and_subset_cols(key_indexes, output_keys_emissions)))
 
-        # calculate emissions
+        # calculate emissions TODO
     end
 
     # write output to CSV if not done continuously
