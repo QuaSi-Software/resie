@@ -1224,6 +1224,12 @@ function output_values(unit::Bus)::Vector{String}
                        for outface in unit.output_interfaces
                        if outface.target.sys_function == sf_bus]
 
+    # balance only for non-proxy busses of single busses
+    if startswith(unit.uac, "Proxy-")
+        balance = []
+    else
+        balance = ["Balance"]
+    end
     # energyFlow between inputs and outputs, only for proxy busses or busses without a proxy and for
     # allowed connections
     if unit.proxy === nothing
@@ -1259,9 +1265,9 @@ function output_values(unit::Bus)::Vector{String}
                                             unit.balance_table_outputs[o]) &&
                      unit.balance_table_inputs[i].is_secondary_interface)])
 
-        return ["Balance"; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
+        return [balance; outputs_proxies; outputs_energy_flow; outputs_temperature_flow]
     else
-        return ["Balance"; outputs_proxies]
+        return [balance; outputs_proxies]
     end
 end
 
