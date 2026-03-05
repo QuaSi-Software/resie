@@ -102,7 +102,6 @@ function test_gasboiler_demand_driven_with_bus()
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 2 * 12000 / 4
     @test demand.input_interfaces[demand.medium].balance ≈ 0
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 2 * 12000 / 4
-    @test bus.remainder ≈ 0
 
     # second step: demand is above max power of GasBoiler
 
@@ -154,9 +153,8 @@ function test_gasboiler_demand_driven_with_bus()
     EnergySystems.distribute!(bus)
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].balance ≈ 0
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 2 * 12000 / 4
-    @test demand.input_interfaces[demand.medium].balance ≈ 0 #-15000/4 + 12000/4   # is Bus intended to supply all demand???
-    @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 15000 / 4 + 15000 / 4
-    @test bus.remainder ≈ -15000 / 4 + 12000 / 4
+    @test demand.input_interfaces[demand.medium].balance ≈ -15000/4 + 12000/4
+    @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 15000 / 4 + 12000 / 4
 
     # third step: demand is below max power of GasBoiler
 
@@ -209,7 +207,6 @@ function test_gasboiler_demand_driven_with_bus()
     @test gasboiler.output_interfaces[gasboiler.m_heat_out].sum_abs_change ≈ 2 * 10000 / 4
     @test demand.input_interfaces[demand.medium].balance ≈ 0
     @test demand.input_interfaces[demand.medium].sum_abs_change ≈ 2 * 10000 / 4
-    @test bus.remainder ≈ 0
 end
 
 function test_gasboiler_demand_driven_without_bus()

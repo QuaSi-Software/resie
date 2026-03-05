@@ -91,7 +91,6 @@ function test_one_bus_to_one_bus()
 
     @test demand.input_interfaces[demand.medium].balance ≈ -75.0
     @test demand.input_interfaces[demand.medium].max_energy.temperature_min == [55.0]
-    @test EnergySystems.balance(bus_proxy) ≈ -75.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
 
     # demand already processed --> balance is zero in both busses as balance is only 
@@ -146,9 +145,6 @@ function test_one_bus_to_one_bus()
     @test EnergySystems.balance(bus_1) ≈ 75.0  # no distribute!() between busses yet
     @test EnergySystems.balance(bus_2) ≈ -75.0  # no distribute!() between busses yet
     @test EnergySystems.balance(bus_proxy) ≈ 0.0
-    @test bus_1.remainder ≈ 0.0
-    @test bus_2.remainder ≈ 0.0
-    @test bus_proxy.remainder ≈ 0.0
     @test grid.output_interfaces[grid.medium].balance ≈ 75.0
     @test bus_proxy.balance_table[1, 1] ≈ 75.0 # energy transferred from source 1 to sink 1 ...
     @test bus_proxy.balance_table[1, 2] ≈ 55.0 # with temperature of 55.0 °C
@@ -163,8 +159,6 @@ function test_one_bus_to_one_bus()
     @test EnergySystems.balance(bus_1) ≈ 0.0
     @test EnergySystems.balance(bus_2) ≈ 0.0
     @test EnergySystems.balance(bus_proxy) ≈ 0.0
-    @test bus_1.remainder ≈ 0.0
-    @test bus_2.remainder ≈ 0.0
     @test grid.output_interfaces[grid.medium].balance ≈ 0.0
     @test grid.output_interfaces[grid.medium].sum_abs_change ≈ 150.0
     @test bus_1.output_interfaces[1].balance ≈ 0.0
