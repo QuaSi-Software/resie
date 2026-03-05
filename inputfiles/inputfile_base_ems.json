@@ -5,6 +5,7 @@
         "auxiliary_info_file": "./output/auxiliary_info.md",
         "sankey_plot": "default",
         "csv_time_unit": "date",
+        "csv_output_keys": "all_incl_flows",
         "return_output_keys":  {
 	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->ElectrodeBoiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
 			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",

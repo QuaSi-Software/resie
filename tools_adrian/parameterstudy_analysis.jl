@@ -5,7 +5,7 @@ using Tables
 using XLSX
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_264runs_260301_152005.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_450runs_260304_111428.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 
 const XCOLS = [
@@ -67,6 +67,14 @@ function topn_annuity(df::DataFrame, n::Int; xcols::Vector{String}=XCOLS, ycol::
     end
 
     return bestn
+end
+
+function topn_annuity_rows(df::DataFrame, n::Int; ycol::String=YCOL_NO)
+    dfv = filter_balance(df)
+    dfv = dfv[.!ismissing.(dfv[!, ycol]), :]
+    sort!(dfv, ycol)
+    nshow = min(n, nrow(dfv))
+    return copy(dfv[1:nshow, :])
 end
 
 function topn_co2(df::DataFrame, n::Int; xcols::Vector{String}=XCOLS, co2col::String=CO2_COL, ycol::String=YCOL_NO)
@@ -206,7 +214,13 @@ function plot_3d_parameter_space(df::DataFrame; outdir::String=OUTDIR)
     return p
 end
 
-function create_matrix_plot(df::DataFrame; xcols::Vector{String}=XCOLS, objective_col::String=YCOL_NO, outdir::String=OUTDIR)
+function create_matrix_plot(
+    df::DataFrame;
+    xcols::Vector{String}=XCOLS,
+    objective_col::String=YCOL_NO,
+    outdir::String=OUTDIR,
+    filename::String="matrix_plot.html",
+)
     dfv = filter_balance(df)
 
     needed = [xcols; [objective_col]]
@@ -232,7 +246,7 @@ function create_matrix_plot(df::DataFrame; xcols::Vector{String}=XCOLS, objectiv
         marker=PlotlyJS.attr(
             color=objective,
             colorscale="Viridis",
-            size=5,
+            size=10,
             showscale=true,
             colorbar=PlotlyJS.attr(title="A_total [Mio. EUR]"),
         ),
@@ -240,7 +254,7 @@ function create_matrix_plot(df::DataFrame; xcols::Vector{String}=XCOLS, objectiv
 
     p = PlotlyJS.plot(trace, PlotlyJS.Layout(title="Parameter-Matrix (SPLOM)"))
     isdir(outdir) || mkpath(outdir)
-    PlotlyJS.savefig(p, joinpath(outdir, "matrix_plot.html"))
+    PlotlyJS.savefig(p, joinpath(outdir, filename))
     return p
 end
 
@@ -259,16 +273,17 @@ function main()
     co2_csv_path = save_topn_csv(top10_co2; filename="top10_lowest_co2_yearly.csv")
 
     best10 = topn_annuity(df, 10)
+    best25_rows = topn_annuity_rows(df, 25)
     plot_top10_annuity(best10)
     plot_3d_parameter_space(df)
-    create_matrix_plot(df)
+    create_matrix_plot(best25_rows; xcols=XCOLS[1:3], filename="matrix_plot_top25_no_battery.html")
 
     println("\nFertig. Dateien in: $OUTDIR")
     println("- $(basename(xlsx_path))")
     println("- $(basename(co2_csv_path))")
     println("- top10_annuity_no.png")
     println("- 3d_parameter_space.html")
-    println("- matrix_plot.html")
+    println("- matrix_plot_top25_no_battery.html")
 end
 
 main()

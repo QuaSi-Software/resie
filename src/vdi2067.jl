@@ -290,7 +290,7 @@ function revenue_control(sim::Dict, p::VDIParams)
     E_pos_Wh = abs.(get_series(["PosControlReserve_in m_power OUT"]))  # executed positive reserve energy [Wh]
     price_E_neg = get_series(["Reserve_Energy_Price_Neg"])  # EUR/MWh
     price_E_pos = get_series(["Reserve_Energy_Price_Pos"])  # EUR/MWh
-    A_E_energy = sum((E_neg_Wh .* 1e-6) .* price_E_neg .+ (E_pos_Wh .* 1e-6) .* price_E_pos)  # Wh->MWh, then revenue [EUR]
+    A_E_energy = sum((-E_neg_Wh .* 1e-6) .* price_E_neg .+ (E_pos_Wh .* 1e-6) .* price_E_pos)  # Wh->MWh, then revenue [EUR]
 
     P_neg_W = abs.(get_series(["NegControlReserve_in Scaling_Factor"]))  # offered negative reserve power [W] from EMS decision
     P_pos_W = abs.(get_series(["PosControlReserve_in Scaling_Factor"]))  # offered positive reserve power [W] from EMS decision

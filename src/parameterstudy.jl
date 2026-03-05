@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_no_ems.json"
 
 
 ############################################################
@@ -37,14 +37,14 @@ Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  
 
 # ElectrodeBoiler power (W)
 Pth_ElectrodeBoiler_lo   = 0.0e6     # lower limit
-Pth_ElectrodeBoiler_hi   = 5.0e6     # upper limit
+Pth_ElectrodeBoiler_hi   = 10.0e6     # upper limit
 Pth_ElectrodeBoiler_step = 1.0e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 20.0e6        # lower limit
-Cap_hi_Wh   = 100.0e6        # upper limit
-Cap_step_Wh = 10.0e6         # step size
+Cap_lo_Wh   = 0.0e6        # lower limit
+Cap_hi_Wh   = 20.0e6        # upper limit
+Cap_step_Wh = 5.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
@@ -170,10 +170,10 @@ function create_variant(
     # set price profiles paths
     price_profile_path_grid = "./profiles/MA/boersenpreis_EUR_MWh.prf"
     price_profile_path_reserve_power_neg = "./profiles/MA/aFRR_neg_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_mean_15min.prf"
+    price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_min_15min.prf"
     profile_path_reserve_call_neg = "./profiles/MA/reserve_call_neg.prf" #TODO Abrufprofil negativ hinterlegen
     price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_mean_15min.prf"
+    price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_min_15min.prf"
     profile_path_reserve_call_pos = "./profiles/MA/reserve_call_pos.prf" #TODO Abrufprofil positiv hinterlegen
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"
@@ -423,8 +423,8 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
         ####################################################
         # function for component investment costs based on installed capacity (EUR/kW)
         # TODO Adjust factors in front (EUR/kW or EUR/kWh)
-        A0_HeatPump     = 700 * (Pth_HeatPump / 1e3)        #   alter Wert 700
-        A0_ElectrodeBoiler = 285  * (Pth_ElectrodeBoiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen  # alter Wert: 285
+        A0_HeatPump     = 900 * (Pth_HeatPump / 1e3)        #   alter Wert 700
+        A0_ElectrodeBoiler = 60  * (Pth_ElectrodeBoiler / 1e3)   # circa 1 Mio. € per 3.5 MW #TODO Christian fragen  # alter Wert: 285
         A0_Buffer = 39  * (Cap_Wh / 1e3)        # from FACT document
         A0_Batt   = 375 * (BattCap_Wh / 1e3)    # TODO Jule fragen
        

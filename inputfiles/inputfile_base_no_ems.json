@@ -207,7 +207,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 0,
+            "scale": 1,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
@@ -237,7 +237,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 6.5e6,
+            "power_th": 6.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -262,7 +262,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 3.5e6,
+            "power_th": 4.0e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",

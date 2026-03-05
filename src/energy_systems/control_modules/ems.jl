@@ -246,12 +246,12 @@ function calc_reserve_power(sim_length::TimePeriod,
                 rev_neg = value_at_time(price_profiles[2], sim_params) * Hour(sim_length).value
                 rev_pos = value_at_time(price_profiles[5], sim_params) * Hour(sim_length).value
                 for dt in date_range
-                    rev_neg += price_profiles[3].data[dt] * price_profiles[4].data[dt]
+                    rev_neg += -price_profiles[3].data[dt] * price_profiles[4].data[dt]
                     rev_pos += price_profiles[6].data[dt] * price_profiles[7].data[dt]
                 end
             else
-                rev_neg = value_at_time(price_profiles[3], sim_params) * 
-                          value_at_time(price_profiles[4], sim_params)
+                rev_neg = -value_at_time(price_profiles[3], sim_params) * 
+                          value_at_time(price_profiles[4], sim_params) 
                 rev_pos = value_at_time(price_profiles[6], sim_params) * 
                           value_at_time(price_profiles[7], sim_params)
             end
