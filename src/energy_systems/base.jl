@@ -20,9 +20,9 @@ to the simulation as a whole as well as provide functionality on groups of compo
 """
 module EnergySystems
 
-export check_balances, Component, each, Grouping, link_output_with, perform_operations,
-       output_values, output_value, OrderOfOperations, calculate_energy_flow, highest,
-       default, plot_optional_figures_begin, plot_optional_figures_end,
+export check_balances_of_components, check_balances_of_interfaces, Component, each, Grouping,
+       link_output_with, perform_operations, output_values, output_value, OrderOfOperations,
+       calculate_energy_flow, highest, default, plot_optional_figures_begin, plot_optional_figures_end,
        reorder_operations_in_time_step, trim_secondary_medium, adjust_name_if_secondary,
        create_secondary_name
 
@@ -2236,7 +2236,7 @@ function merge_bus_chains(chains::Vector{Set{Component}},
 end
 
 """
-    check_balances(components, epsilon)
+    check_balances_of_components(components, epsilon, io_settings)
 
 Check the energy balance of the given components and return warnings of any violations.
 
@@ -2244,22 +2244,65 @@ Check the energy balance of the given components and return warnings of any viol
 - `component::Grouping`: The components to check
 - `epsilon::Float64`: A balance is only considered violated if the absolute value of the
     sum is larger than this value. This helps with spurious floating point issues
+- `io_settings::AbstractDict{String,Any}`: Input and output parameter from the input file
 
 # Returns
 - `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the key of the
     component that has a non-zero energy balance and the value of that balance.
 """
-function check_balances(components::Grouping,
-                        epsilon::Float64)::Vector{Tuple{String,Float64}}
+function check_balances_of_components(components::Grouping,
+                                      epsilon::Float64,
+                                      io_settings::AbstractDict{String,Any})::Vector{Tuple{String,Float64}}
     warnings = []
-
-    for (key, unit) in pairs(components)
-        unit_balance = balance(unit)
-        if unit_balance > epsilon || unit_balance < -epsilon
-            push!(warnings, (key, unit_balance))
+    if default(io_settings, "balance_warnings", "interfaces") in ["all", "components"]
+        for (key, unit) in pairs(components)
+            unit_balance = balance(unit)
+            if unit_balance > epsilon || unit_balance < -epsilon
+                push!(warnings, (key, unit_balance))
+            end
         end
     end
+    return warnings
+end
 
+"""
+    check_balances_of_interfaces(components, epsilon, io_settings)
+
+Check the energy balance of all interfaces returning warnings of any violations.
+
+# Arguments
+- `component::Grouping`: All components of the energy systems
+- `epsilon::Float64`: A balance is only considered violated if the absolute value of the
+    sum is larger than this value. This helps with spurious floating point issues
+- `io_settings::AbstractDict{String,Any}`: Input and output parameter from the input file
+
+# Returns
+- `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the String of the 
+    source and target uac of the components of the interface that has a non-zero energy balance
+    and the value of that balance.
+"""
+function check_balances_of_interfaces(components::Grouping,
+                                      epsilon::Float64,
+                                      io_settings::AbstractDict{String,Any})::Vector{Tuple{String,Float64}}
+    warnings = []
+    if default(io_settings, "balance_warnings", "interfaces") in ["all", "interfaces"]
+        for (key, component) in pairs(components)
+            if startswith(component.uac, "Proxy-") && component.sys_function === EnergySystems.sf_bus
+                # ignore proxy busses
+                continue
+            else
+                for outface in component.output_interfaces
+                    outface = isa(outface, Pair) ? outface[2] : outface # some interfaces are wrapped in a Tuple
+                    outface === nothing && continue
+                    interface_balance = outface.balance
+                    if interface_balance > epsilon || interface_balance < -epsilon
+                        interface_name = outface.source.uac * " -> " * outface.target.uac
+                        push!(warnings, (interface_name, interface_balance))
+                    end
+                end
+            end
+        end
+    end
     return warnings
 end
 

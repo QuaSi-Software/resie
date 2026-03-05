@@ -308,12 +308,21 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
         perform_operations(components, operations_adjusted, sim_params)
 
         if do_output
-            # check if any component was not balanced
-            warnings = check_balances(components, sim_params["epsilon"])
-            if length(warnings) > 0
-                for (key, balance) in warnings
-                    @balanceWarn "Balance for component $key was not zero in timestep " *
-                                 "$(sim_params["time_since_output"]): $balance"
+            # check if any component and/or interface was not balanced
+            interface_warnings = check_balances_of_interfaces(components, sim_params["epsilon"],
+                                                              project_config["io_settings"])
+            component_warnings = check_balances_of_components(components, sim_params["epsilon"],
+                                                              project_config["io_settings"])
+            if length(interface_warnings) > 0
+                for (key, balance) in interface_warnings
+                    @balanceWarn "In timestep $(sim_params["current_date"]), the balance in interface " *
+                                 "$key was not zero: $balance"
+                end
+            end
+            if length(component_warnings) > 0
+                for (key, balance) in component_warnings
+                    @balanceWarn "In timestep $(sim_params["current_date"]), the balance for component " *
+                                 "$key was not zero: $balance"
                 end
             end
 
