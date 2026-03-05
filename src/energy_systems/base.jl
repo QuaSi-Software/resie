@@ -396,7 +396,8 @@ function add!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
               temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
               temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
-              purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing)
+              purpose_uac::Union{Stringing,Vector{<:Stringing}}=nothing;
+              final::Bool=false)
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
@@ -422,16 +423,19 @@ function add!(interface::SystemInterface,
         end
         @warn warn_message
     end
-
-    if interface.source.sys_function == sf_bus
-        add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
-    elseif interface.target.sys_function == sf_bus
-        add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
-                     interface.is_secondary_interface)
-    elseif interface.sum_abs_change == 0.0
-        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
-        # it cannot be reliably detected that the balance has already been written.
-        interface.max_energy = MaxEnergy()
+    if !final
+        if interface.source.sys_function == sf_bus
+            add_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max,
+                         purpose_uac)
+        elseif interface.target.sys_function == sf_bus
+            add_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max,
+                         purpose_uac,
+                         interface.is_secondary_interface)
+        elseif interface.sum_abs_change == 0.0
+            # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+            # it cannot be reliably detected that the balance has already been written.
+            interface.max_energy = MaxEnergy()
+        end
     end
 end
 
@@ -446,7 +450,8 @@ function sub!(interface::SystemInterface,
               change::Union{Floathing,Vector{<:Floathing}},
               temperature_min::Union{Temperature,Vector{<:Temperature}}=nothing,
               temperature_max::Union{Temperature,Vector{<:Temperature}}=nothing,
-              purpose_uac::Union{Stringing,Vector{Stringing}}=nothing)
+              purpose_uac::Union{Stringing,Vector{Stringing}}=nothing;
+              final::Bool=false)
     temperature_min = convert_to_vector(temperature_min, Vector{Temperature})
     temperature_max = convert_to_vector(temperature_max, Vector{Temperature})
     change = convert_to_vector(change, Vector{Floathing})
@@ -468,15 +473,19 @@ function sub!(interface::SystemInterface,
                "-> $(interface.target.uac) higher than maximum $(interface.max_energy.temperature_max[1])")
     end
 
-    if interface.source.sys_function == sf_bus
-        sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max, purpose_uac)
-    elseif interface.target.sys_function == sf_bus
-        sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max, purpose_uac,
-                     interface.is_secondary_interface)
-    elseif interface.sum_abs_change == 0.0
-        # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
-        # it cannot be reliably detected that the balance has already been written.
-        interface.max_energy = MaxEnergy()
+    if !final
+        if interface.source.sys_function == sf_bus
+            sub_balance!(interface.source, interface.target, false, change, temperature_min, temperature_max,
+                         purpose_uac)
+        elseif interface.target.sys_function == sf_bus
+            sub_balance!(interface.target, interface.source, true, change, temperature_min, temperature_max,
+                         purpose_uac,
+                         interface.is_secondary_interface)
+        elseif interface.sum_abs_change == 0.0
+            # In 1-to-1 interfaces, MaxEnergy has to be reset if add(zero energy) is called, otherwise 
+            # it cannot be reliably detected that the balance has already been written.
+            interface.max_energy = MaxEnergy()
+        end
     end
 end
 
