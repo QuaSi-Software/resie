@@ -256,7 +256,7 @@ function calc_reserve_power(sim_length::TimePeriod,
                           value_at_time(price_profiles[7], sim_params)
             end
             power_neg_bool = rev_neg * power_neg >= rev_pos * power_pos
-            power_pos_bool = !power_pos_bool
+            power_pos_bool = !power_neg_bool
         end
 
         # control reserve realted values are always positive for ease of use and handle pos
