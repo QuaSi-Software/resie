@@ -34,7 +34,8 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
     ),
     "ambient_temperature_from_global_file" => (
         default=nothing,
-        description="If given points to a key in the global weather data file with the ambient temperature profile",
+        description="If given points to a key in the global weather data file with the ambient " *
+                    "temperature profile. Use `temp_ambient_air` as key.",
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
@@ -73,7 +74,8 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
     ),
     "beam_solar_radiation_from_global_file" => (
         default=nothing,
-        description="If given points to a key in the global weather data file with beam solar radiation",
+        description="If given points to a key in the global weather data file with beam solar radiation. " *
+                    "Use `beamHorIrr` as key.",
         display_name="Global file beam rad. key",
         required=false,
         conditionals=[
@@ -112,7 +114,8 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
     ),
     "diffuse_solar_radiation_from_global_file" => (
         default=nothing,
-        description="If given points to a key in the global weather data file with diffuse solar radiation",
+        description="If given points to a key in the global weather data file with diffuse solar radiation. " *
+                    "Use `difHorIrr` as key.",
         display_name="Global file diffuse rad. key",
         required=false,
         conditionals=[
@@ -151,7 +154,8 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
     ),
     "infrared_sky_radiation_from_global_file" => (
         default=nothing,
-        description="If given points to a key in the global weather data file with infrared sky radiation",
+        description="If given points to a key in the global weather data file with infrared sky radiation. " *
+                    "Use `longWaveIrr` as key.",
         display_name="Global file infrared rad. key",
         required=false,
         conditionals=[
@@ -190,7 +194,8 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
     ),
     "wind_speed_from_global_file" => (
         default=nothing,
-        description="If given points to a key in the global weather data file with wind speed",
+        description="If given points to a key in the global weather data file with wind speed. " *
+                    "Use `wind_speed` as key.",
         display_name="Global file wind speed key",
         required=false,
         conditionals=[
@@ -219,6 +224,7 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         description="Gross area of the solarthermal collector",
         display_name="Collector gross area",
         required=true,
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="m^2"
@@ -228,6 +234,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         description="Tilt angle of the collector between 0° (horizontal) and 90° (vertical)",
         display_name="Tilt angle",
         required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 90.0),
+        ],
         type=Float64,
         json_type="number",
         unit="°"
@@ -238,6 +248,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
                     "with 0°=south, -90°=east, 90°=west",
         display_name="Azimuth angle",
         required=true,
+        validations=[
+            ("self", "value_gte_num", -180.0),
+            ("self", "value_lte_num", 180.0),
+        ],
         type=Float64,
         json_type="number",
         unit="°"
@@ -247,6 +261,10 @@ const SOLARTHERMAL_COLLECTOR_PARAMETERS = Dict(
         description="Reflectance (albedo) of the ground around the collector",
         display_name="Ground reflectance",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0),
+        ],
         type=Float64,
         json_type="number",
         unit="-"

@@ -1696,56 +1696,64 @@ fails or is misconfigured.
 function check_validation(validation::Tuple, name::String, value::Any, extracted::Dict{String,Any}, uac::String)
     # currently only one primary operand is implemented
     if validation[1] != "self"
-        throw(InputError("Unknown validation operand $(validation[1]) for component $uac"))
+        throw(InputError("Unknown validation operand `$(validation[1])` for component `$uac`"))
     end
 
     # most current operators expect a not-nothing value, so we can catch it here
     if !occursin("or_nothing", validation[2]) && value === nothing
-        throw(InputError("Value of $name was `nothing` but must be numeric"))
+        throw(InputError("Value of `$name` in component `$uac` was `nothing` but must be numeric"))
     end
 
     if validation[2] == "value_lt_num"
         if !(value < validation[3])
-            throw(InputError("Value of $name must be less than $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be less than $(validation[3])"))
         end
     elseif validation[2] == "value_lte_num"
         if !(value <= validation[3])
-            throw(InputError("Value of $name must be less than or equal to $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be less than or equal to $(validation[3])"))
         end
     elseif validation[2] == "value_gt_num"
         if !(value > validation[3])
-            throw(InputError("Value of $name must be greater than $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
         end
     elseif validation[2] == "value_gte_num"
         if !(value >= validation[3])
-            throw(InputError("Value of $name must be greater than or equal to $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be greater than or equal to $(validation[3])"))
         end
     elseif validation[2] == "value_gt_num_or_nothing"
         if !(value === nothing || value > validation[3])
-            throw(InputError("Value of $name must be greater than $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be greater than $(validation[3])"))
+        end
+    elseif validation[2] == "value_gte_num_or_nothing"
+        if !(value === nothing || value >= validation[3])
+            throw(InputError("Value of `$name` in component `$uac` must be greater or equal than $(validation[3])"))
         end
     elseif validation[2] == "value_lt_rel"
         other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
         if !(value < other_value)
-            throw(InputError("Value of $name must be less than value of parameter $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be less than value of parameter " *
+                             "`$(validation[3])`"))
         end
     elseif validation[2] == "value_lte_rel"
         other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
         if !(value <= other_value)
-            throw(InputError("Value of $name must be less than or equal to $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be less than or equal to the value of " *
+                             "parameter `$(validation[3])`"))
         end
     elseif validation[2] == "value_gt_rel"
         other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
         if !(value > other_value)
-            throw(InputError("Value of $name must be greater than $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be greater than the value of " *
+                             "parameter `$(validation[3])`"))
         end
     elseif validation[2] == "value_gte_rel"
         other_value = validation[3] in keys(extracted) ? extracted[validation[3]] : NaN
         if !(value >= other_value)
-            throw(InputError("Value of $name must be greater than or equal to $(validation[3])"))
+            throw(InputError("Value of `$name` in component `$uac` must be greater than or equal to the value " *
+                             "of parameter `$(validation[3])`"))
         end
     else
-        throw(InputError("Unknown validation operand $(validation[2]) for component $uac"))
+        throw(InputError("Unknown validation operand `$(validation[2])` for parameter `$name` in component `$uac`"))
     end
 end
 
@@ -1784,6 +1792,8 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
             all_apply = all_apply && (haskey(extracted, other_name) && Bool(extracted[other_name]))
         elseif operator == "is_not_nothing"
             all_apply = all_apply && (haskey(extracted, other_name) && !isnothing(extracted[other_name]))
+        elseif operator == "is_nothing"
+            all_apply = all_apply && (haskey(extracted, other_name) && isnothing(extracted[other_name]))
         elseif operator == "is_one_of"
             has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
             all_apply = all_apply & has_match

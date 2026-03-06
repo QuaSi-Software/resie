@@ -63,7 +63,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
     "ambient_temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "ambient temperature profile to be used",
+                    "ambient temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
@@ -104,7 +104,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
     "global_solar_radiation_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "global solar radiation profile to be used",
+                    "global solar radiation profile to be used. Use `globHorIrr` as key.",
         display_name="Global file glob. rad. key",
         required=false,
         conditionals=[
@@ -144,7 +144,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
     "infrared_sky_radiation_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "infrared sky radiation profile to be used",
+                    "infrared sky radiation profile to be used. Use `longWaveIrr` as key.",
         display_name="Global file infr. sky rad. key",
         required=false,
         conditionals=[
@@ -185,6 +185,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Thickness of the collector pipe",
         display_name="Pipe thickness",
         required=false,
+        conditionals=[("model_type", "is", "detailed")],
         validations=[
             ("self", "value_gt_num", 0.0)
         ],
@@ -197,6 +198,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Heat conductivity of pipe material",
         display_name="Pipe heat conductivity",
         required=false,
+        conditionals=[("model_type", "is", "detailed")],
         validations=[
             ("self", "value_gt_num", 0.0)
         ],
@@ -236,7 +238,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         validations=[
             ("self", "value_gte_num", 1.0)
         ],
-        type=Float64,
+        type=Int,
         json_type="number",
         unit="-"
     ),
@@ -257,8 +259,9 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Thermal resistance between pipe and soil",
         display_name="Pipe-soil thermal resistance",
         required=false,
+        conditionals=[("model_type", "is", "simplified")],
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -362,6 +365,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Lower boundary temperature for phase change",
         display_name="Phase change lower boundary",
         required=false,
+        validations=[("self", "value_lt_rel", "phase_change_upper_boundary_temperature")],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -372,7 +376,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Surface convective heat transfer",
         required=false,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -409,9 +413,8 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Specific heat capacity of heat transfer fluid",
         display_name="Fluid specific heat capacity",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0)
-        ],
+        conditionals=[("model_type", "is", "detailed")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="J/kg*K"
@@ -421,9 +424,8 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Density of heat transfer fluid; default for 30 % glycol at 0 °C",
         display_name="Fluid density",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0)
-        ],
+        conditionals=[("model_type", "is", "detailed")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="kg/m^3"
@@ -433,9 +435,8 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Prandtl number of heat transfer fluid; default for 30 % glycol at 0 °C",
         display_name="Fluid Prandtl number",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0)
-        ],
+        conditionals=[("model_type", "is", "detailed")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="-"
@@ -445,9 +446,8 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Kinematic viscosity of heat transfer fluid; default for 30 % glycol at 0 °C",
         display_name="Fluid kinematic viscosity",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0)
-        ],
+        conditionals=[("model_type", "is", "detailed")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="m^2/s"
@@ -457,9 +457,8 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Heat conductivity of heat transfer fluid; default for 30 % glycol at 0 °C",
         display_name="Fluid heat conductivity",
         required=false,
-        validations=[
-            ("self", "value_gt_num", 0.0)
-        ],
+        conditionals=[("model_type", "is", "detailed")],
+        validations=[("self", "value_gt_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="W/m*K"
@@ -467,9 +466,10 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
     "use_dynamic_fluid_properties" => (
         default=false,
         description="Use temperature-dependent fluid properties; false for constant, true " *
-                    "for temperature-dependent fluid properties accoring to TRNSYS Type 710",
+                    "for temperature-dependent fluid properties according to TRNSYS Type 710",
         display_name="Use dynamic fluid properties",
         required=false,
+        conditionals=[("model_type", "is", "detailed")],
         type=Bool,
         json_type="boolean",
         unit="-"
@@ -479,6 +479,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         description="Approach for Nusselt number calculation",
         display_name="Nusselt approach",
         required=false,
+        conditionals=[("model_type", "is", "detailed")],
         type=String,
         json_type="string",
         options=["Stephan", "Ramming"],
@@ -509,7 +510,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Maximum output power",
         required=false,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -522,7 +523,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Maximum input power",
         required=false,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -534,7 +535,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Unloading temperature spread",
         required=false,
         validations=[
-            ("self", "value_gte_num", 0.0)
+            ("self", "value_gt_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -546,7 +547,7 @@ const GEOTHERMAL_HEAT_COLLECTOR_PARAMETERS = Dict(
         display_name="Loading temperature spread",
         required=false,
         validations=[
-            ("self", "value_gte_num", 0.0)
+            ("self", "value_gt_num", 0.0)
         ],
         type=Float64,
         json_type="number",

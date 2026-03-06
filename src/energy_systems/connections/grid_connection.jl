@@ -35,7 +35,7 @@ const GRID_CONNECTION_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[

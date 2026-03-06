@@ -132,7 +132,7 @@ const ELECTROLYSER_PARAMETERS = Dict(
         display_name="Electric power",
         required=true,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",

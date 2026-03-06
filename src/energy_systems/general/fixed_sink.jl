@@ -24,7 +24,7 @@ const FIXED_SINK_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
@@ -53,9 +53,7 @@ const FIXED_SINK_PARAMETERS = Dict(
         description="Path to a profile file with energy values",
         display_name="Energy profile file",
         required=false,
-        conditionals=[
-            ("constant_demand", "mutex"),
-        ],
+        conditionals=[("constant_demand", "mutex")],
         type=String,
         json_type="string",
         unit="-"
@@ -65,9 +63,8 @@ const FIXED_SINK_PARAMETERS = Dict(
         description="Constant demand (power, not work)",
         display_name="Constant demand",
         required=false,
-        conditionals=[
-            ("energy_profile_file_path", "mutex"),
-        ],
+        conditionals=[("energy_profile_file_path", "mutex")],
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Float64,
         json_type="number",
         unit="W"
@@ -88,6 +85,7 @@ const FIXED_SINK_PARAMETERS = Dict(
                     "with a unit of [m^3/h]",
         display_name="Medium density",
         required=false,
+        conditionals=[("energy_profile_file_path", "is_not_nothing")],
         type=Bool,
         json_type="boolean",
         unit="-"

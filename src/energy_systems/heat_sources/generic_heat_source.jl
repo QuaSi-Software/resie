@@ -24,7 +24,7 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
     "temperature_from_global_file" => (
         default=nothing,
         description="If given points to a key in the global weather data file with the " *
-                    "temperature profile to be used",
+                    "temperature profile to be used. Use `temp_ambient_air` as key.",
         display_name="Global file temp. key",
         required=false,
         conditionals=[
@@ -68,6 +68,7 @@ const GENERIC_HEAT_SOURCE_PARAMETERS = Dict(
         conditionals=[
             ("max_power_profile_file_path", "mutex"),
         ],
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Float64,
         json_type="number",
         unit="W"

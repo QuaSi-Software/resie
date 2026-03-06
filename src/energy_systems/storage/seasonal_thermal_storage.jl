@@ -39,7 +39,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         display_name="Volume",
         required=true,
         validations=[
-            ("self", "value_gt_num", 0.0),
+            ("self", "value_gte_num", 0.0),
         ],
         type=Float64,
         json_type="number",
@@ -50,6 +50,9 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Ratio of the height to the mean radius",
         display_name="Height/radius ratio",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -59,6 +62,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Angle of the sidewall relative to horizon (°)",
         display_name="Sidewall angle",
         required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 90.0),
+        ],
         type=Float64,
         json_type="number",
         unit="°"
@@ -86,7 +93,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     ),
     "rho_medium" => (
         default=1000.0,
-        description="Density of the medium",
+        description="Density of the medium (fluid in STES)",
         display_name="Density medium",
         required=false,
         validations=[("self", "value_gt_num", 0.0)],
@@ -96,7 +103,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     ),
     "cp_medium" => (
         default=4180,
-        description="Mass-specific heat capacity of medium",
+        description="Mass-specific heat capacity of medium (fluid in STES)",
         display_name="Specific th. capacity",
         required=false,
         validations=[("self", "value_gt_num", 0.0)],
@@ -106,7 +113,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     ),
     "diffusion_coefficient" => (
         default=0.143 * 10^-6,
-        description="Diffusion coefficient of the medium",
+        description="Diffusion coefficient of the medium (fluid in STES)",
         display_name="Diffusion coefficient",
         required=false,
         validations=[("self", "value_gt_num", 0.0)],
@@ -164,6 +171,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Lower temperature of the STES",
         display_name="Low temperature",
         required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lt_rel", "high_temperature")
+        ],
         type=Float64,
         json_type="number",
         unit="°C"
@@ -173,6 +184,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Max load rate relative to total energy capacity",
         display_name="Max load rate (energy)",
         required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -182,6 +194,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Max unload rate relative to volume",
         display_name="Max unload rate (energy)",
         required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -191,6 +204,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Max load rate as mass flow per interface relative to volume",
         display_name="Max load rate (mass)",
         required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -200,6 +214,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Max unload rate as mass flow in total relative to volume",
         display_name="Max unload rate (mass)",
         required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
         type=Floathing,
         json_type="number",
         unit="1/h"
@@ -209,7 +224,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Thermal transmission coefficient of the lid",
         display_name="Transmission lid",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -219,7 +234,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Thermal transmission coefficient of the barrel above ground",
         display_name="Transmission barrel above ground",
         required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -229,7 +244,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Thermal transmission coefficient of the barrel below ground",
         display_name="Transmission barrel below ground",
         required=false,
-        validations=[("self","value_gt_num",0.0)],
+        validations=[("self","value_gte_num",0.0)],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -239,7 +254,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Thermal transmission coefficient of the bottom",
         display_name="Transmission bottom",
         required=false,
-        validations=[("self","value_gt_num",0.0)],
+        validations=[("self","value_gte_num",0.0)],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -259,7 +274,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
     ),
     "ambient_temperature_from_global_file" => (
         default=nothing,
-        description="Key in global weather file for ambient temperature profile",
+        description="Key in global weather file for ambient temperature profile. Use `temp_ambient_air` as key.",
         display_name="Global file amb. temp. key",
         required=false,
         conditionals=[
@@ -310,17 +325,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         display_name="Ground domain radius factor",
         required=false,
         validations=[("self", "value_gt_num", 0.0)],
-        type=Float64,
-        json_type="number",
-        unit="-"
-    ),
-    "ground_domain_depth_factor" => (
-        default=2.0,
-        description="Factor for the ground domain depth, is multiplied with the total " *
-                    "height of the storage",
-        display_name="Ground domain depth factor",
-        required=false,
-        validations=[("self", "value_gt_num", 0.0)],
+        conditionals=[
+            ("ground_domain_radius", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
         type=Float64,
         json_type="number",
         unit="-"
@@ -332,9 +340,28 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         display_name="Ground domain radius",
         required=false,
         validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        conditionals=[
+            ("ground_domain_radius_factor", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
         type=Floathing,
         json_type="number",
         unit="m"
+    ),
+    "ground_domain_depth_factor" => (
+        default=2.0,
+        description="Factor for the ground domain depth, is multiplied with the total " *
+                    "height of the storage",
+        display_name="Ground domain depth factor",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        conditionals=[
+            ("ground_domain_depth", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
     ),
     "ground_domain_depth" => (
         default=nothing,
@@ -343,6 +370,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         display_name="Ground domain depth",
         required=false,
         validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        conditionals=[
+            ("ground_domain_depth_factor", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
         type=Floathing,
         json_type="number",
         unit="m"
@@ -352,6 +383,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Mesh accuracy mode for ground FVM",
         display_name="Ground accuracy mode",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=String,
         json_type="string",
         options=["very_rough", "rough", "normal", "high", "very_high"],
@@ -364,6 +396,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "< ground_domain_depth, it will be set to ground_domain_depth.",
         display_name="Ground layers depths",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Floathing},
         json_type="array",
         unit="m"
@@ -374,6 +407,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "last value is repeated if shorter.",
         display_name="Ground layers conductivity",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Float64},
         json_type="array",
         unit="W/m*K"
@@ -383,6 +417,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Mass density per layer. Same broadcasting rule as for ground_layers_k.",
         display_name="Ground layers density",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Float64},
         json_type="array",
         unit="kg/m^3"
@@ -393,6 +428,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "ground_layers_k.",
         display_name="Ground layers capacity",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Vector{Float64},
         json_type="array",
         unit="J/kg*K"
@@ -402,6 +438,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Ground surface convective heat transfer coefficient",
         display_name="Soil surface h_conv",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -411,6 +448,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Whether the STES has top insulation overlap",
         display_name="Top insulation overlap?",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=Bool,
         json_type="boolean",
         unit="-"
@@ -420,6 +458,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Width of top insulation overlap",
         display_name="Top insulation overlap width",
         required=false,
+        conditionals=[
+            ("ground_model", "is", "FVM"),
+            ("has_top_insulation_overlap", "is_true")
+        ],
         type=Float64,
         json_type="number",
         unit="m"
@@ -429,6 +471,10 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
         description="Thermal transmission coefficient of overlap",
         display_name="Transmission overlap",
         required=false,
+        conditionals=[
+            ("ground_model", "is", "FVM"),
+            ("has_top_insulation_overlap", "is_true")
+        ],
         type=Float64,
         json_type="number",
         unit="W/m^2*K"
@@ -441,6 +487,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "boundary (adiabatic)",
         display_name="Ground bottom boundary",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=String,
         json_type="string",
         options=["Dirichlet", "Neumann"],
@@ -465,6 +512,7 @@ const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
                     "constant temperature of 30°C for input flow during discharge.",
         display_name="Reproduce IEA ES Task39?",
         required=false,
+        conditionals=[("ground_model", "is", "FVM")],
         type=String,
         json_type="string",
         options=["", "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG"],

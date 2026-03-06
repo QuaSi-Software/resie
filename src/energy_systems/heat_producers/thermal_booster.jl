@@ -53,7 +53,7 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         display_name="Electrical power",
         required=true,
         validations=[
-            ("self", "value_gt_num", 0.0)
+            ("self", "value_gte_num", 0.0)
         ],
         type=Float64,
         json_type="number",
@@ -61,11 +61,11 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
     ),
     "power_losses_factor" => (
         default=0.97,
-        description="Factor accounting for electrical power losses",
+        description="Factor accounting for electrical power losses (losses: 1 - factor)",
         display_name="Power losses factor",
         required=false,
         validations=[
-            ("self", "value_gt_num", 0.0),
+            ("self", "value_gte_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
         type=Float64,
@@ -74,11 +74,11 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
     ),
     "heat_losses_factor" => (
         default=0.95,
-        description="Factor accounting for heat losses",
+        description="Factor accounting for heat losses (losses: 1 - factor)",
         display_name="Heat losses factor",
         required=false,
         validations=[
-            ("self", "value_gt_num", 0.0),
+            ("self", "value_gte_num", 0.0),
             ("self", "value_lte_num", 1.0)
         ],
         type=Float64,
@@ -129,6 +129,7 @@ const THERMAL_BOOSTER_PARAMETERS = Dict(
         conditionals=[
             ("demand_input_temperature_profile_file_path", "mutex")
         ],
+        validations=[("self", "value_gte_num", 0.0)],
         type=Float64,
         json_type="number",
         unit="°C"
