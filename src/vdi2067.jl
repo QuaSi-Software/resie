@@ -228,10 +228,10 @@ end
 
 function energy_annuity(sim::Dict, p::VDIParams)
     Grid_IN = sim["Grid_IN"] .* 1e-6                             # convert Wh time series in MWh
-    Photovoltaic_IN = sim["Photovoltaic m_power OUT"] .* 1e-6    # convert Wh time series in MWh
-    Wind_In = sim["WindFarm m_power OUT"] .* 1e-6                # convert Wh time series in MWh
+    Photovoltaic_IN = sim["Photovoltaic_IN"] .* 1e-6    # convert Wh time series in MWh
+    Wind_In = sim["Wind_IN"] .* 1e-6                # convert Wh time series in MWh
     
-    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = vecize_price(sim["Grid_price"], length(Grid_IN))    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
@@ -401,6 +401,8 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
                                      sim["m_power EnergyFlow Battery->Demand_Power"]
     sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
     sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
+    sim_new["Photovoltaic_IN"] = sim["Photovoltaic m_power OUT"]
+    sim_new["Wind_IN"] = sim["WindFarm m_power OUT"]
     for k in [
         "NegControlReserve_in m_power OUT", "NegControlReserve_out m_power IN",
         "PosControlReserve_in m_power OUT", "PosControlReserve_out m_power IN",
