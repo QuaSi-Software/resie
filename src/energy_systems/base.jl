@@ -1796,7 +1796,7 @@ function conditionals_apply(name::String, extracted::Dict{String,Any}, type_def:
             all_apply = all_apply && (haskey(extracted, other_name) && isnothing(extracted[other_name]))
         elseif operator == "is_one_of"
             has_match = haskey(extracted, other_name) && any([extracted[other_name] == v for v in operand])
-            all_apply = all_apply & has_match
+            all_apply = all_apply && has_match
         elseif operator == "mutex"
             all_apply = all_apply # mutex doesn't factor into the calculation and is handled elsewhere
         else
