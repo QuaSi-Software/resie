@@ -91,7 +91,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
             grid_idx = findfirst(isequal(params["el_grid_uac"]), new_connectivity.input_order)
             el_demand_idx = findfirst(isequal(params["el_demand_uac"]), new_connectivity.output_order)
             new_connectivity.energy_flow[grid_idx][battery_in_idx] = 0.0
-            new_connectivity.energy_flow[battery_out_idx][el_demand_idx] = 0.0
+            new_connectivity.energy_flow[battery_out_idx][el_demand_idx] = 1.0
 
             connectivity_by_state[params["power_bus_uac"]][2] = new_connectivity
             params["charging_state_battery"] = 2
