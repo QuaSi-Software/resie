@@ -9,7 +9,6 @@ the load has reached the upper threshold and the minimum run time has passed.
 mutable struct CM_EMSFuzzy <: ControlModule
     name::String
     parameters::Dict{String,Any}
-    unit_uac::String
 
     function CM_EMSFuzzy(parameters::Dict{String,Any},
                          components::Grouping,
@@ -43,6 +42,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
             @error "Required storage component for control module ems_fuzzy not given"
             throw(InputError)
         end
+        params["heat_bus_uac"] = unit_uac
         params["storage"] = components[params["heat_storage_uac"]]
         params["price_profile"] = Profile(params["price_profile_path"], sim_params)
         params["price_trend_profile"] = Profile(params["price_trend_profile_path"], sim_params)
@@ -53,6 +53,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
         params["demand"] = components[params["heat_demand_uac"]]
         params["renewable_sources"] = [components[uac] for uac in params["renewable_source_uacs"]]
         
+        params["charging_state"] = Dict{String, Int64}()
         # create new connectivity for BufferTank charging
         connectivity_by_state = Dict{String,Dict{Int,ConnectionMatrix}}()
         connectivity_by_state[unit_uac] = Dict{Int,ConnectionMatrix}()
@@ -72,7 +73,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
         end
 
         connectivity_by_state[unit_uac][2] = new_connectivity
-        params["charging_state_buffer"] = 1
+        params["charging_state"][unit_uac] = 1
 
         if !isnothing(params["power_bus_uac"]) && 
            !isnothing(params["battery_uac"]) && 
@@ -94,13 +95,13 @@ mutable struct CM_EMSFuzzy <: ControlModule
             new_connectivity.energy_flow[battery_out_idx][el_demand_idx] = 1.0
 
             connectivity_by_state[params["power_bus_uac"]][2] = new_connectivity
-            params["charging_state_battery"] = 2
+            params["charging_state"][params["power_bus_uac"]] = 2
         end
 
         params["connectivity_by_state"] = connectivity_by_state
 
        
-        return new(params["name"], params, unit_uac)
+        return new(params["name"], params)
     end
 end
 
@@ -120,16 +121,28 @@ end
 function change_bus_priorities!(mod::CM_EMSFuzzy,
                                 components::Grouping,
                                 sim_params::Dict{String,Any})
+    mod_params = mod.parameters
     # perform update outside of normal order of operations
-    run_fuzzy_ems!(mod.parameters, sim_params)
+    run_fuzzy_ems!(mod_params, sim_params)
     # set limits by using the profile limited control module thats attached to each source
-    mod.parameters["primary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_primary"]
-    mod.parameters["secondary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod.parameters["plr_limit_secondary"]
-    # set connectivity to allow or disallow charging from secondary interfaces
-    components[mod.unit_uac].connectivity = mod.parameters["connectivity_by_state"][mod.unit_uac][mod.parameters["charging_state_buffer"]]
-    if !isnothing(mod.parameters["power_bus_uac"])
-        power_bus_uac = mod.parameters["power_bus_uac"]
-        components[power_bus_uac].connectivity = mod.parameters["connectivity_by_state"][power_bus_uac][mod.parameters["charging_state_battery"]]
+    mod_params["primary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod_params["plr_limit_primary"]
+    mod_params["secondary_source"].controller.modules[1].profile.data[sim_params["current_date"]] = mod_params["plr_limit_secondary"]
+    # heat_bus_uac = mod_params["heat_bus_uac"]
+    # components[heat_bus_uac].connectivity = mod_params["connectivity_by_state"][heat_bus_uac][mod_params["charging_state"][heat_bus_uac]]
+    # if !isnothing(mod_params["power_bus_uac"])
+    #     power_bus_uac = mod_params["power_bus_uac"]
+    #     components[power_bus_uac].connectivity = mod_params["connectivity_by_state"][power_bus_uac][mod_params["charging_state"][power_bus_uac]]
+    # end
+
+    # set connectivity to allow or disallow charging from secondary interfaces by reordering 
+    # bus interfaces, but only if the control module has multiple connectivities
+    for bus_uac in keys(mod_params["connectivity_by_state"])
+        if length(mod_params["connectivity_by_state"][bus_uac]) > 1
+            bus = components[bus_uac]
+            bus.connectivity = mod_params["connectivity_by_state"][bus_uac][mod_params["charging_state"][bus_uac]]
+            Resie.reorder_interfaces_of_bus!(bus)
+            initialise!(bus, sim_params)
+        end
     end
 end
 
@@ -242,16 +255,16 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     # set state for BufferTank charging
     if chargemode >= 50
-        mod_params["charging_state_buffer"] = 1 # charging on
+        mod_params["charging_state"][mod_params["heat_bus_uac"]] = 1 # charging on
     else
-        mod_params["charging_state_buffer"] = 2 # charging off
+        mod_params["charging_state"][mod_params["heat_bus_uac"]] = 2 # charging off
     end
 
     # set state for Battery charging
     if chargemode >= 50 && plr >= 0.5
-        mod_params["charging_state_battery"] = 1 # charging on
+        mod_params["charging_state"][mod_params["power_bus_uac"]] = 1 # charging on
     else
-        mod_params["charging_state_battery"] = 2 # charging off
+        mod_params["charging_state"][mod_params["power_bus_uac"]] = 2 # charging off
     end
 
     ### old Implementation with SOC_target got replaced by chargemode
