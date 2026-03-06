@@ -70,6 +70,10 @@ const LEFT_SERIES = [
     (col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->Demand_Heat", name="Elektrodenkessel #2 -> Wärmebedarf", scale=1 / 1e3 * 4),
     #BufferTank
     (col="m_heat EnergyFlow BufferTank->Demand_Heat", name="Wärmespeicher -> Bedarf", scale=1 / 1e3 * 4),
+    #Battery
+    (col="m_power EnergyFlow Battery->Demand_Power", name="Batterie -> Strombedarf", scale=1 / 1e3 * 4),
+    (col="m_power EnergyFlow Battery->Grid_OUT", name="Batterie -> Stromnetz", scale=1 / 1e3 * 4),
+    (col="m_power EnergyFlow Grid_IN->Battery", name="Stromnetz -> Batterie", scale=1 / 1e3 * 4),
 ]
 
 const RIGHT_SERIES = [

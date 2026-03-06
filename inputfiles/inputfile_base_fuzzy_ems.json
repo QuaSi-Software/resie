@@ -415,7 +415,7 @@
             "model_type": "simplified",
             "charge_efficiency": 0.99,
             "discharge_efficiency": 0.99,
-            "capacity": 1000e3,
+            "capacity": 5000e3,
             "initial_load": 0.9,
             "self_discharge_rate": 0.03,
             "max_charge_C_rate": 0.5,

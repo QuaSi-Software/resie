@@ -3,10 +3,14 @@ using DataFrames
 using Plots
 using Tables
 using XLSX
+using Dates
+using JSON
 import PlotlyJS
 
 const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_450runs_260304_111428.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
+const OUT_CSV_PATH = "C:/Users/jenter/Documents/resie/output/out.csv"
+const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_ems.json"
 
 const XCOLS = [
     "HeatPump_Power / W",
@@ -141,7 +145,6 @@ function plot_top10_annuity(best10::DataFrame; ycol::String=YCOL_NO, outdir::Str
     bar!(p, x_cost, stack_up .+ energy; fillrange=stack_up, bar_width=bw, label="A_energy")
     stack_up .+= energy
 
-    # Erloese als eigener, daneben liegender "haengender" Stack
     top_down = copy(stack_up)
     bar!(p, x_rev, top_down; fillrange=top_down .- rev_control, bar_width=bw, label="A_rev_control")
     top_down .-= rev_control
@@ -258,6 +261,151 @@ function create_matrix_plot(
     return p
 end
 
+function read_prf_values(path::String)
+    vals = Float64[]
+    for line in eachline(path)
+        s = strip(line)
+        isempty(s) && continue
+        startswith(s, "#") && continue
+        parts = split(s, ';')
+        length(parts) < 2 && continue
+        push!(vals, something(tryparse(Float64, replace(strip(parts[2]), "," => ".")), 0.0))
+    end
+    return vals
+end
+
+function fit_length(v::Vector{Float64}, n::Int)
+    if length(v) == n
+        return v
+    elseif isempty(v)
+        return zeros(n)
+    elseif length(v) > n
+        return v[1:n]
+    else
+        out = Vector{Float64}(undef, n)
+        for i in 1:n
+            out[i] = v[mod1(i, length(v))]
+        end
+        return out
+    end
+end
+
+function clean_col(df::DataFrame, col::String)
+    @assert col in names(df) "Spalte '$col' fehlt in out.csv."
+    return [ismissing(v) || isnan(v) ? 0.0 : abs(v) for v in to_float.(df[!, col])]
+end
+
+function detect_dt_hours(df::DataFrame)
+    tcol = "Time [dd.mm.yyyy HH:MM:SS]"
+    if !(tcol in names(df)) || nrow(df) < 2
+        return 0.25
+    end
+    fmt = dateformat"dd.mm.yyyy HH:MM:SS"
+    t1 = DateTime(df[1, tcol], fmt)
+    t2 = DateTime(df[2, tcol], fmt)
+    return Dates.value(t2 - t1) / 3_600_000
+end
+
+function remunerated_power_4h(power_w::Vector{Float64}, dt_h::Float64)
+    steps = max(1, Int(round(4 / dt_h)))
+    held = zeros(Float64, length(power_w))
+    for idx in 1:steps:length(power_w)
+        idx_end = min(idx + steps - 1, length(power_w))
+        block = power_w[idx:idx_end]
+        if !isempty(block) && all(isapprox.(block, block[1]; atol=1e-3, rtol=0.0))
+            held[idx:idx_end] .= block[1]
+        end
+    end
+    return held, steps
+end
+
+function count_held_blocks_4h(held_w::Vector{Float64}, steps_per_block::Int)
+    c = 0
+    for idx in 1:steps_per_block:length(held_w)
+        idx_end = min(idx + steps_per_block - 1, length(held_w))
+        if any(>(1e-9), held_w[idx:idx_end])
+            c += 1
+        end
+    end
+    return c
+end
+
+function reserve_detail_from_outcsv(
+    out_csv_path::String=OUT_CSV_PATH,
+    input_json_path::String=INPUT_JSON_PATH;
+    outdir::String=OUTDIR,
+    filename::String="reserve_detail_from_outcsv.csv",
+)
+    df = CSV.read(out_csv_path, DataFrame; delim=';', decimal=',')
+    cfg = JSON.parsefile(input_json_path)
+    cm = cfg["components"]["BUS_Power"]["control_modules"][1]
+
+    N = nrow(df)
+    dt_h = detect_dt_hours(df)
+
+    E_neg_Wh = clean_col(df, "NegControlReserve_in m_power OUT")
+    E_pos_Wh = clean_col(df, "PosControlReserve_in m_power OUT")
+    P_neg_W = clean_col(df, "NegControlReserve_in Scaling_Factor")
+    P_pos_W = clean_col(df, "PosControlReserve_in Scaling_Factor")
+
+    price_E_neg = fit_length(read_prf_values(abspath(cm["reserve_energy_price_neg_path"])), N)
+    price_E_pos = fit_length(read_prf_values(abspath(cm["reserve_energy_price_pos_path"])), N)
+    price_P_neg = fit_length(read_prf_values(abspath(cm["reserve_power_price_neg_path"])), N)
+    price_P_pos = fit_length(read_prf_values(abspath(cm["reserve_power_price_pos_path"])), N)
+
+    P_neg_hold_W, steps = remunerated_power_4h(P_neg_W, dt_h)
+    P_pos_hold_W, _ = remunerated_power_4h(P_pos_W, dt_h)
+
+    # Keep this exactly aligned with current vdi2067.jl logic:
+    # down energy contribution uses negative sign in front of executed energy.
+    energy_down_eur = sum((-E_neg_Wh .* 1e-6) .* price_E_neg)
+    energy_up_eur = sum((E_pos_Wh .* 1e-6) .* price_E_pos)
+    capacity_down_eur = sum((P_neg_hold_W .* 1e-6) .* price_P_neg .* dt_h)
+    capacity_up_eur = sum((P_pos_hold_W .* 1e-6) .* price_P_pos .* dt_h)
+    total_rev_control_year1_eur = energy_down_eur + energy_up_eur + capacity_down_eur + capacity_up_eur
+
+    called_energy_down_mwh = sum(E_neg_Wh) * 1e-6
+    called_energy_up_mwh = sum(E_pos_Wh) * 1e-6
+    held_blocks_down_4h = count_held_blocks_4h(P_neg_hold_W, steps)
+    held_blocks_up_4h = count_held_blocks_4h(P_pos_hold_W, steps)
+    calls_down_count = count(>(1e-9), E_neg_Wh)
+    calls_up_count = count(>(1e-9), E_pos_Wh)
+
+    # Free-bid call in a timestep:
+    # reserve energy is called (>0), but remunerated 4h held power is zero in that direction.
+    freebid_calls_down_count = count(((E_neg_Wh .> 1e-9) .& (P_neg_hold_W .<= 1e-9)))
+    freebid_calls_up_count = count(((E_pos_Wh .> 1e-9) .& (P_pos_hold_W .<= 1e-9)))
+    freebid_energy_down_mwh = sum(E_neg_Wh[(E_neg_Wh .> 1e-9) .& (P_neg_hold_W .<= 1e-9)]) * 1e-6
+    freebid_energy_up_mwh = sum(E_pos_Wh[(E_pos_Wh .> 1e-9) .& (P_pos_hold_W .<= 1e-9)]) * 1e-6
+    freebid_calls_total = freebid_calls_down_count + freebid_calls_up_count
+    freebid_energy_total_mwh = freebid_energy_down_mwh + freebid_energy_up_mwh
+
+    out = DataFrame([(
+        energy_down_eur = energy_down_eur,
+        energy_up_eur = energy_up_eur,
+        capacity_down_eur = capacity_down_eur,
+        capacity_up_eur = capacity_up_eur,
+        total_rev_control_year1_eur = total_rev_control_year1_eur,
+        called_energy_down_mwh = called_energy_down_mwh,
+        called_energy_up_mwh = called_energy_up_mwh,
+        calls_down_count = calls_down_count,
+        calls_up_count = calls_up_count,
+        held_blocks_down_4h = held_blocks_down_4h,
+        held_blocks_up_4h = held_blocks_up_4h,
+        freebid_calls_down_count = freebid_calls_down_count,
+        freebid_calls_up_count = freebid_calls_up_count,
+        freebid_energy_down_mwh = freebid_energy_down_mwh,
+        freebid_energy_up_mwh = freebid_energy_up_mwh,
+        freebid_calls_total = freebid_calls_total,
+        freebid_energy_total_mwh = freebid_energy_total_mwh,
+    )])
+
+    isdir(outdir) || mkpath(outdir)
+    path = joinpath(outdir, filename)
+    CSV.write(path, out)
+    return path, out
+end
+
 function main()
     df = CSV.read(CSV_PATH, DataFrame; delim=';', decimal=',')
 
@@ -277,13 +425,32 @@ function main()
     plot_top10_annuity(best10)
     plot_3d_parameter_space(df)
     create_matrix_plot(best25_rows; xcols=XCOLS[1:3], filename="matrix_plot_top25_no_battery.html")
+    reserve_csv_path, reserve_out = reserve_detail_from_outcsv()
 
     println("\nFertig. Dateien in: $OUTDIR")
     println("- $(basename(xlsx_path))")
     println("- $(basename(co2_csv_path))")
+    println("- $(basename(reserve_csv_path))")
     println("- top10_annuity_no.png")
     println("- 3d_parameter_space.html")
     println("- matrix_plot_top25_no_battery.html")
+    println("\nReserve-Details aus out.csv:")
+    println("  energy_down: $(round(reserve_out[1, :energy_down_eur]; digits=2)) €")
+    println("  energy_up: $(round(reserve_out[1, :energy_up_eur]; digits=2)) €")
+    println("  capacity_down: $(round(reserve_out[1, :capacity_down_eur]; digits=2)) €")
+    println("  capacity_up: $(round(reserve_out[1, :capacity_up_eur]; digits=2)) €")
+    println("  called_energy_down: $(round(reserve_out[1, :called_energy_down_mwh]; digits=3)) MWh")
+    println("  called_energy_up: $(round(reserve_out[1, :called_energy_up_mwh]; digits=3)) MWh")
+    println("  calls_down_count: $(reserve_out[1, :calls_down_count])")
+    println("  calls_up_count: $(reserve_out[1, :calls_up_count])")
+    println("  held_blocks_down_4h: $(reserve_out[1, :held_blocks_down_4h])")
+    println("  held_blocks_up_4h: $(reserve_out[1, :held_blocks_up_4h])")
+    println("  freebid_calls_down_count: $(reserve_out[1, :freebid_calls_down_count])")
+    println("  freebid_calls_up_count: $(reserve_out[1, :freebid_calls_up_count])")
+    println("  freebid_energy_down: $(round(reserve_out[1, :freebid_energy_down_mwh]; digits=3)) MWh")
+    println("  freebid_energy_up: $(round(reserve_out[1, :freebid_energy_up_mwh]; digits=3)) MWh")
+    println("  freebid_calls_total: $(reserve_out[1, :freebid_calls_total])")
+    println("  freebid_energy_total: $(round(reserve_out[1, :freebid_energy_total_mwh]; digits=3)) MWh")
 end
 
 main()

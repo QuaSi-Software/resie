@@ -227,12 +227,17 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    IN = sim["Grid_IN"] .* 1e-6        # convert Wh time series in MWh
+    Grid_IN = sim["Grid_IN"] .* 1e-6                             # convert Wh time series in MWh
+    Photovoltaic_IN = sim["Photovoltaic m_power OUT"] .* 1e-6    # convert Wh time series in MWh
+    Wind_In = sim["WindFarm m_power OUT"] .* 1e-6                # convert Wh time series in MWh
+    
     base_price = 214.0  #vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    Photovoltaic_price = 50.0
+    Wind_price = 80.0
 
     # A_V1: energy costs of first year [EUR]
     # MWh * EUR/MWh → EUR
-    A1 = sum(IN .* base_price)  
+    A1 = sum(Grid_IN .* base_price) + sum(Photovoltaic_IN .* Photovoltaic_price) + sum(Wind_In .* Wind_price)  
 
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
@@ -312,7 +317,10 @@ function revenue_control(sim::Dict, p::VDIParams)
 
     A_E_capacity = sum((P_neg_hold_MW .* price_P_neg .+ P_pos_hold_MW .* price_P_pos) .* dt_h)  # MW * EUR/(MW*h) * h = EUR
 
-    A_E1 = A_E_energy + A_E_capacity  # first-year total control revenue [EUR]
+    #TODO adjust value?
+    share_virtual_power_plant = 0.15  # assumption: 15% of  remuneration is paid to virtual power plant operator
+
+    A_E1 = (A_E_energy + A_E_capacity) * (1 - share_virtual_power_plant)  # first-year total control revenue [EUR]
 
     a = annuity_factor(p.i_cap, p.T)  # annuity factor
     b = price_change_factor(p.r_rev, p.i_cap, p.T)  # escalation/discount factor for revenues
