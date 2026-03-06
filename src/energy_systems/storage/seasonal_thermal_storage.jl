@@ -13,8 +13,518 @@ using SparseArrays
 using LinearAlgebra
 using GLMakie
 
+#! format: off
+const SEASONAL_THERMAL_STORAGE_PARAMETERS = Dict(
+    "m_heat_in" => (
+        default="m_h_w_ht1",
+        description="Heat input medium (for loading)",
+        display_name="Medium heat_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_out" => (
+        default="m_h_w_lt1",
+        description="Heat output medium (for unloading)",
+        display_name="Medium heat_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "volume" => (
+        default=nothing,
+        description="Volume of the STES",
+        display_name="Volume",
+        required=true,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m^3"
+    ),
+    "hr_ratio" => (
+        default=0.5,
+        description="Ratio of the height to the mean radius",
+        display_name="Height/radius ratio",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "sidewall_angle" => (
+        default=40.0,
+        description="Angle of the sidewall relative to horizon (°)",
+        display_name="Sidewall angle",
+        required=false,
+        validations=[
+            ("self", "value_gt_num", 0.0),
+            ("self", "value_lte_num", 90.0),
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°"
+    ),
+    "shape" => (
+        default="quadratic",
+        description="Shape: 'round' for cylinder/truncated cone or 'quadratic' for tank " *
+                    "or truncated quadratic pyramid (pit)",
+        display_name="Shape",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["round", "quadratic"],
+        unit="-"
+    ),
+    "ground_model" => (
+        default="simplified",
+        description="Ground model: 'simplified' or 'FVM'",
+        display_name="Ground model",
+        required=false,
+        type=String,
+        json_type="string",
+        options=["simplified", "FVM"],
+        unit="-"
+    ),
+    "rho_medium" => (
+        default=1000.0,
+        description="Density of the medium (fluid in STES)",
+        display_name="Density medium",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="kg/m^3"
+    ),
+    "cp_medium" => (
+        default=4180,
+        description="Mass-specific heat capacity of medium (fluid in STES)",
+        display_name="Specific th. capacity",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="J/kg*K"
+    ),
+    "diffusion_coefficient" => (
+        default=0.143 * 10^-6,
+        description="Diffusion coefficient of the medium (fluid in STES)",
+        display_name="Diffusion coefficient",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="m^2/s"
+    ),
+    "number_of_layer_total" => (
+        default=25,
+        description="Total number of layers in STES",
+        display_name="Total layers",
+        required=false,
+        validations=[("self", "value_gte_num", 1.0)],
+        type=Int,
+        json_type="number",
+        unit="-"
+    ),
+    "number_of_layer_above_ground" => (
+        default=5,
+        description="Number of layers above ground",
+        display_name="Layers above ground",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_rel", "number_of_layer_total")
+        ],
+        type=Int,
+        json_type="number",
+        unit="-"
+    ),
+    "output_layer_from_top" => (
+        default=1,
+        description="Layer number of the output layer counted from top starting at 1",
+        display_name="Output layer (from top)",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 1.0),
+            ("self", "value_lte_rel", "number_of_layer_total")
+        ],
+        type=Int,
+        json_type="number",
+        unit="-"
+    ),
+    "high_temperature" => (
+        default=90.0,
+        description="Upper temperature of the STES",
+        display_name="High temperature",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "low_temperature" => (
+        default=15.0,
+        description="Lower temperature of the STES",
+        display_name="Low temperature",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lt_rel", "high_temperature")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "max_load_rate_energy" => (
+        default=nothing,
+        description="Max load rate relative to total energy capacity",
+        display_name="Max load rate (energy)",
+        required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "max_unload_rate_energy" => (
+        default=nothing,
+        description="Max unload rate relative to volume",
+        display_name="Max unload rate (energy)",
+        required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "max_load_rate_mass" => (
+        default=nothing,
+        description="Max load rate as mass flow per interface relative to volume",
+        display_name="Max load rate (mass)",
+        required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "max_unload_rate_mass" => (
+        default=nothing,
+        description="Max unload rate as mass flow in total relative to volume",
+        display_name="Max unload rate (mass)",
+        required=false,
+        validations=[("self", "value_gte_num_or_nothing", 0.0)],
+        type=Floathing,
+        json_type="number",
+        unit="1/h"
+    ),
+    "thermal_transmission_lid" => (
+        default=0.25,
+        description="Thermal transmission coefficient of the lid",
+        display_name="Transmission lid",
+        required=false,
+        validations=[("self", "value_gte_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "thermal_transmission_barrel_above_ground" => (
+        default=0.375,
+        description="Thermal transmission coefficient of the barrel above ground",
+        display_name="Transmission barrel above ground",
+        required=false,
+        validations=[("self", "value_gte_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "thermal_transmission_barrel_below_ground" => (
+        default=0.375,
+        description="Thermal transmission coefficient of the barrel below ground",
+        display_name="Transmission barrel below ground",
+        required=false,
+        validations=[("self","value_gte_num",0.0)],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "thermal_transmission_bottom" => (
+        default=0.375,
+        description="Thermal transmission coefficient of the bottom",
+        display_name="Transmission bottom",
+        required=false,
+        validations=[("self","value_gte_num",0.0)],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "ambient_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to ambient temperature profile file",
+        display_name="Ambient temp. profile",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_from_global_file", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "ambient_temperature_from_global_file" => (
+        default=nothing,
+        description="Key in global weather file for ambient temperature profile. Use `temp_ambient_air` as key.",
+        display_name="Global file amb. temp. key",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("constant_ambient_temperature", "mutex")
+        ],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_ambient_temperature" => (
+        default=nothing,
+        description="Constant ambient temperature value",
+        display_name="Constant ambient temp.",
+        required=false,
+        conditionals=[
+            ("ambient_temperature_profile_file_path", "mutex"),
+            ("ambient_temperature_from_global_file", "mutex")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "ground_temperature_profile_file_path" => (
+        default=nothing,
+        description="Path to ground temperature profile file",
+        display_name="Ground temp. profile",
+        required=false,
+        conditionals=[("constant_ground_temperature","mutex")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "constant_ground_temperature" => (
+        default=nothing,
+        description="Constant ground temperature value",
+        display_name="Constant ground temp.",
+        required=false,
+        conditionals=[("ground_temperature_profile_file_path", "mutex")],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "ground_domain_radius_factor" => (
+        default=1.5,
+        description="Factor for the ground domain width, is multiplied with the radius " *
+                    "of the storage at the ground surface",
+        display_name="Ground domain radius factor",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        conditionals=[
+            ("ground_domain_radius", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "ground_domain_radius" => (
+        default=nothing,
+        description="Soil domain radius. If none given, it will be derived from the " *
+                    "STES geometry.",
+        display_name="Ground domain radius",
+        required=false,
+        validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        conditionals=[
+            ("ground_domain_radius_factor", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
+        type=Floathing,
+        json_type="number",
+        unit="m"
+    ),
+    "ground_domain_depth_factor" => (
+        default=2.0,
+        description="Factor for the ground domain depth, is multiplied with the total " *
+                    "height of the storage",
+        display_name="Ground domain depth factor",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        conditionals=[
+            ("ground_domain_depth", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "ground_domain_depth" => (
+        default=nothing,
+        description="Soil depth from surface. If none given, it will be derived from " *
+                    "the STES geometry.",
+        display_name="Ground domain depth",
+        required=false,
+        validations=[("self", "value_gt_num_or_nothing", 0.0)],
+        conditionals=[
+            ("ground_domain_depth_factor", "mutex"),
+            ("ground_model", "is", "FVM")
+        ],
+        type=Floathing,
+        json_type="number",
+        unit="m"
+    ),
+    "ground_accuracy_mode" => (
+        default="normal",
+        description="Mesh accuracy mode for ground FVM",
+        display_name="Ground accuracy mode",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=String,
+        json_type="string",
+        options=["very_rough", "rough", "normal", "high", "very_high"],
+        unit="-"
+    ),
+    "ground_layers_depths" => (
+        default=[nothing],
+        description="Defines piecewise-constant soil layers by intervals [d[i], d[i+1]) " *
+                    "in depths from surface (0.0) downward. If last value is " *
+                    "< ground_domain_depth, it will be set to ground_domain_depth.",
+        display_name="Ground layers depths",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Vector{Floathing},
+        json_type="array",
+        unit="m"
+    ),
+    "ground_layers_k" => (
+        default=Float64[1.5],
+        description="Thermal conductivity per layer. Length may be ≤ (length(depths)-1); " *
+                    "last value is repeated if shorter.",
+        display_name="Ground layers conductivity",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="W/m*K"
+    ),
+    "ground_layers_rho" => (
+        default=Float64[2000.0],
+        description="Mass density per layer. Same broadcasting rule as for ground_layers_k.",
+        display_name="Ground layers density",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="kg/m^3"
+    ),
+    "ground_layers_cp" => (
+        default=Float64[1000.0],
+        description="Specific heat capacity per layer. Same broadcasting rule as for " *
+                    "ground_layers_k.",
+        display_name="Ground layers capacity",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="J/kg*K"
+    ),
+    "soil_surface_hconv" => (
+        default=14.7,
+        description="Ground surface convective heat transfer coefficient",
+        display_name="Soil surface h_conv",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "has_top_insulation_overlap" => (
+        default=false,
+        description="Whether the STES has top insulation overlap",
+        display_name="Top insulation overlap?",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "top_insulation_overlap_width" => (
+        default=5.0,
+        description="Width of top insulation overlap",
+        display_name="Top insulation overlap width",
+        required=false,
+        conditionals=[
+            ("ground_model", "is", "FVM"),
+            ("has_top_insulation_overlap", "is_true")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="m"
+    ),
+    "thermal_transmission_overlap" => (
+        default=0.25,
+        description="Thermal transmission coefficient of overlap",
+        display_name="Transmission overlap",
+        required=false,
+        conditionals=[
+            ("ground_model", "is", "FVM"),
+            ("has_top_insulation_overlap", "is_true")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="W/m^2*K"
+    ),
+    "ground_bottom_boundary" => (
+        default="Neumann",
+        description="Ground bottom boundary condition Can be either \"Dirichlet\" for a " *
+                    "constant-temperature bottom boundary condition with the temperature " *
+                    "\"constant_ground_temperature\" or \"Neumann\" for zero-flux bottom " *
+                    "boundary (adiabatic)",
+        display_name="Ground bottom boundary",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=String,
+        json_type="string",
+        options=["Dirichlet", "Neumann"],
+        unit="-"
+    ),
+    "initial_load" => (
+        default=0.0,
+        description="Initial load assuming perfectly mixed storage at the begin",
+        display_name="Initial load",
+        required=false,
+        validations=[
+            ("self","value_gte_num", 0.0),
+            ("self","value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "reproduce_IEA_ES_Task39" => (
+        default="",
+        description="Task39 scenario for validation. Enables additional outputs and set " *
+                    "constant temperature of 30°C for input flow during discharge.",
+        display_name="Reproduce IEA ES Task39?",
+        required=false,
+        conditionals=[("ground_model", "is", "FVM")],
+        type=String,
+        json_type="string",
+        options=["", "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG"],
+        unit="-"
+    )
+)
+
 mutable struct SeasonalThermalStorage <: Component
-    # general
+    # Note: layer numbering within the STES starts at the bottom with index 1 and ends at
+    # the top with index number_of_layer_total
+
+    ## general
     uac::String
     controller::Controller
     sys_function::SystemFunction
@@ -24,7 +534,8 @@ mutable struct SeasonalThermalStorage <: Component
     m_heat_in::Symbol
     m_heat_out::Symbol
 
-    # geometry and physical properties
+    ## geometry and physical properties
+    # capacity of the STES [Wh]
     capacity::Float64
     volume::Float64
     hr_ratio::Float64
@@ -37,36 +548,54 @@ mutable struct SeasonalThermalStorage <: Component
     surface_area_lid::Float64
     surface_area_bottom::Float64
     surface_area_barrel_segments::Vector{Float64}
+    # volume of the segments of the STES [m^3]
     volume_segments::Vector{Float64}
+    # height of the STES [m]
     height::Float64
+    # radius_small, small (lower) radius of the STES [m]
     radius_small::Float64
+    # radius_large, large (upper) radius of the STES [m]
     radius_large::Float64
     number_of_layer_total::Int64
     number_of_layer_above_ground::Int64
     number_of_STES_layer_below_ground::Int64
     h_stes_buried::Float64
     output_layer_from_top::Int64
+    # dz, thickness of the layers of the STES [m]
     dz::Vector{Float64}
+    # dz_normalized, normalized dz with respect to to the volume of each section
     dz_normalized::Vector{Float64}
+    # [1/h] sigma factor for losses to ambient through bottom:
+    #       area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
     sigma_bottom_only::Float64
+    # [1/h] sigma factor for losses to ambient through top:
+    #       area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
     sigma_lid_only::Float64
+    # [1/h] sigma factor for losses to ambient through barrels:
+    #       area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
     sigma_barrel::Vector{Float64}
+    # [K/kJ] factor for input/output energy: 1 / (rho * cp * volume_segment)
     lambda::Vector{Float64}
+    # [1/kg] factor for input/output mass flow: 1 / (rho * volume_segment)
     phi::Vector{Float64}
+    # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
     theta::Vector{Float64}
+    # mass of the medium in each layer [kg]
     layer_masses::Vector{Float64}
 
-    # loading and unloading
+    ## loading and unloading
     high_temperature::Temperature
     low_temperature::Temperature
     max_load_rate_energy::Floathing
     max_unload_rate_energy::Floathing
     max_load_rate_mass::Floathing
     max_unload_rate_mass::Floathing
+    # maximum input energy per time step [Wh]
     max_input_energy::Floathing
+    # maximum output energy per time step [Wh]
     max_output_energy::Floathing
 
-    # losses
+    ## losses
     thermal_transmission_lid::Float64
     thermal_transmission_barrel_above_ground::Float64
     thermal_transmission_barrel_below_ground::Float64
@@ -76,11 +605,12 @@ mutable struct SeasonalThermalStorage <: Component
     ambient_temperature::Temperature
     ground_temperature_profile::Union{Profile,Nothing}
     ground_temperature::Temperature
+    # effective ambient temperature corresponding to each layer [°C] 
     effective_ambient_temperature_barrels::Vector{Temperature}
     effective_ambient_temperature_top::Temperature
     effective_ambient_temperature_bottom::Temperature
 
-    # ground coupling FVM (optional)
+    ## ground coupling FVM (optional)
     ground_domain_radius_factor::Float64
     ground_domain_depth_factor::Float64
     ground_domain_radius::Floathing
@@ -90,8 +620,11 @@ mutable struct SeasonalThermalStorage <: Component
     ground_layers_k::Vector{Float64}
     ground_layers_rho::Vector{Float64}
     ground_layers_cp::Vector{Float64}
+    # Thermal conductivity per row
     row_k::Vector{Float64}
+    # Mass density per row
     row_rho::Vector{Float64}
+    # Specific heat capacity per row
     row_cp::Vector{Float64}
     soil_surface_hconv::Float64
     has_top_insulation_overlap::Bool
@@ -99,7 +632,7 @@ mutable struct SeasonalThermalStorage <: Component
     thermal_transmission_overlap::Float64
     ground_bottom_boundary::String
 
-    # FVM state (unified axisymmetric r-z soil domain)
+    ## FVM state (unified axisymmetric r-z soil domain)
     soil_dr::Vector{Float64}
     soil_dz::Vector{Float64}
     soil_dr_mesh::Vector{Float64}
@@ -114,30 +647,46 @@ mutable struct SeasonalThermalStorage <: Component
     sidewall_increase_factor::Float64
     first_soil_row_below_STES::Int
 
-    # state variables
+    ## state variables
     current_max_output_temperature::Float64
     current_min_input_temperature::Float64
     initial_load::Float64
+    # set to initial_load at the beginning [Wh]
     load::Float64
+    # stores the load of the previous time step without losses
     load_end_of_last_timestep::Float64
+    # losses total in current time step [Wh]
     losses::Float64
     losses_top::Float64
     losses_sidewalls::Float64
     losses_bottom::Float64
+    # temperatures of the segments
     temperature_segments::Vector{Temperature}
+    # energy input in current time step [Wh]
     current_energy_input::Vector{Float64}
+    # temperature of the input in current time step [°C]
     current_temperature_input::Vector{Temperature}
+    # energy output in current time step [Wh]
     current_energy_output::Float64
+    # temperature of the output in current time step [°C]
     current_temperature_output::Temperature
+    # maximum output energy in current time step [Wh]
     current_max_output_energy::Float64
+    # temperatures of the possible inputs from exchange in current time step [°C]
     temperatures_charging::Vector{Temperature}
+    # current return temperature for the energy input for control module LimitCoolingInputTemperature
     current_energy_input_return_temperature::Float64
+    # bool indicating if the process step has already been performed in the current time step
     process_done::Bool
+    # bool indicating if the load step has already been performed in the current time step
     load_done::Bool
 
-    # additional output
+    ## additional output
+    # [°C], holds temperature field of layers for output plot
     temp_distribution_output::Array{Float64}
+    # [°C], holds temperature difference of storage temperature and surroundings for output plot
     temp_difference_to_surrounding_output::Array{Float64}
+    # (time × nz × nr)
     soil_temperature_field_output::Array{Float64}
 
     mass_in_sum::Float64
@@ -148,158 +697,166 @@ mutable struct SeasonalThermalStorage <: Component
     reproduce_IEA_ES_Task39::String
 
     function SeasonalThermalStorage(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_heat_in = Symbol(default(config, "m_heat_in", "m_h_w_ht1"))
-        m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_lt1"))
-        register_media([m_heat_in, m_heat_out])
-
-        constant_ambient_temperature,
-        ambient_temperature_profile = get_parameter_profile_from_config(config,
-                                                                        sim_params,
-                                                                        "ambient_temperature",
-                                                                        "ambient_temperature_profile_file_path",
-                                                                        "ambient_temperature_from_global_file",
-                                                                        "constant_ambient_temperature",
-                                                                        uac;
-                                                                        required=true)
-
-        constant_ground_temperature,
-        ground_temperature_profile = get_parameter_profile_from_config(config,
-                                                                       sim_params,
-                                                                       "ground_temperature",
-                                                                       "ground_temperature_profile_file_path",
-                                                                       "",
-                                                                       "constant_ground_temperature",
-                                                                       uac;
-                                                                       required=true)
-
-        # Note: layer numbering within the STES starts at the bottom with index 1 and ends at the top with index number_of_layer_total
-        return new(uac,                                            # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage,                                     # sys_function
-                   InterfaceMap(m_heat_in => nothing),             # input_interfaces
-                   InterfaceMap(m_heat_out => nothing),            # output_interfaces
-                   m_heat_in,                                      # medium in the STES   
-                   m_heat_out,                                     # medium out of the STES
-
-                   # geometry and physical properties
-                   0.0,                                            # capacity of the STES [Wh]
-                   default(config, "volume", nothing),             # volume of the STES [m^3]
-                   default(config, "hr_ratio", 0.5),               # ratio of the height to the mean radius of the STES
-                   default(config, "sidewall_angle", 40.0),        # angle of the sidewall of the STES with respect to the horizon [°]
-                   default(config, "shape", "quadratic"),          # can be "round" for cylinder/truncated cone or "quadratic" for tank or truncated quadratic pyramid (pit)
-                   default(config, "ground_model", "simplified"),  # ground_model. Can be one of "simplified" or "FVM"
-                   default(config, "rho_medium", 1000.0),          # [kg/m^3] density of the medium 
-                   default(config, "cp_medium", 4180),             # [J/kgK] specific thermal capacity of medium 
-                   default(config, "diffusion_coefficient", 0.143 * 10^-6), # diffusion coefficient of the medium [m^2/s]
-                   0.0,                                            # surface_area_lid, surface of the lid of the STES [m^2]
-                   0.0,                                            # surface_area_bottom, surface of the bottom of the STES [m^2]
-                   Float64[],                                      # surface_area_barrel_segments, surface of the barrel segments of the STES [m^2]
-                   Float64[],                                      # volume_segments, volume of the segments of the STES [m^3]
-                   0.0,                                            # height of the STES [m]
-                   0.0,                                            # radius_small, small (lower) radius of the STES [m]
-                   0.0,                                            # radius_large, large (upper) radius of the STES [m]
-                   default(config, "number_of_layer_total", 25),   # number of layers in the STES
-                   default(config, "number_of_layer_above_ground", 5), # number of layers above ground in the STES
-                   0,                                              # number_of_STES_layer_below_ground
-                   0.0,                                            # h_stes_buried
-                   default(config, "output_layer_from_top", 1),    # layer number of the output layer, counted from the top
-                   Float64[],                                      # dz, thickness of the layers of the STES [m]
-                   Float64[],                                      # dz_normalized, normalized dz with respect to to the volume of each section
-                   0.0,                                            # [1/h] sigma factor for losses to ambient through bottom: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
-                   0.0,                                            # [1/h] sigma factor for losses to ambient through top: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
-                   Float64[],                                      # [1/h] sigma factor for losses to ambient through barrels: area_of_losses * U[kJ/m^2K] / (rho * cp * volume_segment)
-                   Float64[],                                      # [K/kJ] factor for input/output energy:  1 / (rho * cp * volume_segment ) 
-                   Float64[],                                      # [1/kg] factor for input/output mass flow:  1 / (rho  * volume_segment )
-                   Float64[],                                      # volume-ratios of sections: V_section[n-1] / (V_section[n] + V_section[n-1])
-                   Float64[],                                      # layer_masses, mass of the medium in each layer [kg]
-
-                   # loading and unloading
-                   default(config, "high_temperature", 90.0),          # upper temperature of the STES [°C]
-                   default(config, "low_temperature", 15.0),           # lower temperature of the STES [°C]
-                   default(config, "max_load_rate_energy", nothing),   # maximum load rate given in 1/h, total energy input related to the total energy capacity of the STES
-                   default(config, "max_unload_rate_energy", nothing), # maximum unload rate given in 1/h, total energy input related to the total volume of the STES
-                   default(config, "max_load_rate_mass", nothing),     # maximum load rate given in 1/h, mass flow per Interface related to the total volume of the STES
-                   default(config, "max_unload_rate_mass", nothing),   # maximum unload rate given in 1/h, mass flow in total related to the total volume of the STES
-                   nothing,                                            # max_input_energy, maximum input energy per time step [Wh]
-                   nothing,                                            # max_output_energy, maximum output energy per time step [Wh]
-
-                   # Losses
-                   default(config, "thermal_transmission_lid", 0.25),                  # [W/(m^2K)]
-                   default(config, "thermal_transmission_barrel_above_ground", 0.375), # [W/(m^2K)]
-                   default(config, "thermal_transmission_barrel_below_ground", 0.375), # [W/(m^2K)]
-                   Float64[],                                                          # thermal_transmission_barrels
-                   default(config, "thermal_transmission_bottom", 0.375),              # [W/(m^2K)]
-                   ambient_temperature_profile,                           # [°C]
-                   constant_ambient_temperature,                          # ambient_temperature [°C]
-                   ground_temperature_profile,                            # [°C]
-                   constant_ground_temperature,                           # ground_temperature [°C]
-                   Temperature[],                                         # effective_ambient_temperature_barrels corresponding to each layer [°C]          
-                   0.0,                                                   # effective_ambient_temperature_top 
-                   0.0,                                                   # effective_ambient_temperature_bottom
-
-                   # ground coupling FVM (unified)
-                   default(config, "ground_domain_radius_factor", 1.5),         # [m] ground_domain_radius_factor: Factor for the ground domain width, is multiplied with the radius of the storage at the ground surface.
-                   default(config, "ground_domain_depth_factor", 2.0),          # [m] ground_domain_depth_factor: Factor for the ground domain depth, is multiplied with the total height of the storage.
-                   default(config, "ground_domain_radius", nothing),            # [m] soil domain radius. If none given, it will be derived from the STES geometry.
-                   default(config, "ground_domain_depth", nothing),             # [m] soil depth from surface. If none given, it will be derived from the STES geometry.
-                   default(config, "ground_accuracy_mode", "normal"),           # mesh preset: very_rough|rough|normal|high|very_high
-                   default(config, "ground_layers_depths", [nothing]),          # [m] defines piecewise-constant soil layers by intervals [d[i], d[i+1]) in depths from surface (0.0) downward. If last value is < ground_domain_depth, it will be set to ground_domain_depth.
-                   default(config, "ground_layers_k", Float64[1.5]),            # [W/(m·K)] Thermal conductivity per layer. Length may be ≤ (length(depths)-1); last value is repeated if shorter.
-                   default(config, "ground_layers_rho", Float64[2000.0]),       # [kg/m³] Mass density per layer. Same broadcasting rule as above.
-                   default(config, "ground_layers_cp", Float64[1000.0]),        # [J/(kg·K)] Specific heat capacity per layer 
-                   Float64[],                                                   # row_k: Thermal conductivity per row
-                   Float64[],                                                   # row_rho: Mass density per row
-                   Float64[],                                                   # row_cp: Specific heat capacity per row
-                   default(config, "soil_surface_hconv", 14.7),                 # [W/(m²·K)] ground surface convective heat transfer coefficient
-                   default(config, "has_top_insulation_overlap", false),        # [Bool] has_top_insulation_overlap
-                   default(config, "top_insulation_overlap_width", 5.0),        # [m] top_insulation_overlap_width
-                   default(config, "thermal_transmission_overlap", 0.25),       # [W/(m²·K)] thermal_transmission_overlap
-                   default(config, "ground_bottom_boundary", "Neumann"),        # ground_bottom_boundary condition. Can be either "Dirichlet" for a constant-temperature bottom boundary condition with the temperature "constant_ground_temperature" or "Neumann" for zero-flux bottom boundary (adiabatic)
-
-                   # FVM state (unified axisymmetric r-z soil domain)
-                   Float64[],                                  # soil_dr
-                   Float64[],                                  # soil_dz
-                   Float64[],                                  # soil_dr_mesh
-                   Float64[],                                  # soil_dz_mesh
-                   Float64[],                                  # soil_r_centers
-                   Float64[],                                  # soil_z_centers
-                   Array{Float64}(undef, 0, 0),                # soil_t1
-                   Array{Float64}(undef, 0, 0),                # soil_t2
-                   Matrix{Bool}(undef, 0, 0),                  # cells_active
-                   Float64[],                                  # radius_at_row
-                   0.0,                                        # equivalent_radius_bottom
-                   0.0,                                        # sidewall_increase_factor
-                   0,                                          # first_soil_row_below_STES
-
-                   # state variables
-                   0.0,                                            # current_max_output_temperature
-                   0.0,                                            # current_min_input_temperature
-                   default(config, "initial_load", 0.0),           # initial_load [%/100] assuming perfectly mixed storage at the begin
-                   0.0,                                            # load, set to initial_load at the beginning [Wh]
-                   0.0,                                            # load_end_of_last_timestep, stores the load of the previous time step without losses
-                   0.0,                                            # losses total in current time step [Wh]
-                   0.0,                                            # losses_top  [Wh]
-                   0.0,                                            # losses_sidewalls [Wh]
-                   0.0,                                            # losses_bottom [Wh]
-                   Float64[],                                      # temperature_segments: temperatures of the segments
-                   Float64[],                                      # current_energy_input, energy input in current time step [Wh]
-                   Temperature[],                                  # current_temperature_input, temperature of the input in current time step [°C]
-                   0.0,                                            # current_energy_output, energy output in current time step [Wh]
-                   0.0,                                            # current_temperature_output, temperature of the output in current time step [°C]
-                   0.0,                                            # current_max_output_energy, maximum output energy in current time step [Wh]
-                   Float64[],                                      # temperatures_charging, temperatures of the possible inputs from exchange in current time step [°C]
-                   0.0,                                            # current_energy_input_return_temperature, current return temperature for the energy input for control module LimitCoolingInputTemperature
-                   false,                                          # process_done, bool indicating if the process step has already been performed in the current time step
-                   false,                                          # load_done, bool indicating if the load step has already been performed in the current time step
-                   # additional output
-                   Array{Float64}(undef, 0, 0),                    # temp_distribution_output [°C], holds temperature field of layers for output plot
-                   Array{Float64}(undef, 0, 0),                    # temp_difference_to_surrounding_output [°C], holds temperature difference of storage temperature and surroundings for output plot
-                   Array{Float64}(undef, 0, 0, 0),                 # soil_temperature_field_output  (time × nz × nr)
-                   0.0,                                            # mass_in_sum [kg]
-                   0.0,                                            # mass_out_sum [kg]
-                   1e-9,                                           # epsilon_geometry
-                   default(config, "reproduce_IEA_ES_Task39", "")) # reproduce_IEA_ES_Task39: enables additional outputs and set constant temperature of 30°C for input flow during discharge. Can be one of "PTES-1-C", "PTES-1-P", "TTES-1-AG", "TTES-1-UG"
+        new(SSOT_parameter_constructor(SeasonalThermalStorage, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{SeasonalThermalStorage})::Dict{String,NamedTuple}
+    return deepcopy(SEASONAL_THERMAL_STORAGE_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name == "ambient_temperature_from_global_file"
+        return load_profile_from_global_weather_file(config, param_name, sim_params, uac)
+    elseif param_name in ("ambient_temperature_profile_file_path", "ground_temperature_profile_file_path")
+        return load_optional_profile(config, param_name, sim_params)
+    elseif param_name in ("constant_ambient_temperature", "constant_ground_temperature")
+        return convert(Temperature, default(config, param_name, nothing))
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{SeasonalThermalStorage}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(SeasonalThermalStorage))
+end
+
+function init_from_params(x::Type{SeasonalThermalStorage}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    m_heat_in = Symbol(params["m_heat_in"])
+    m_heat_out = Symbol(params["m_heat_out"])
+    register_media([m_heat_in, m_heat_out])
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_storage,
+            InterfaceMap(m_heat_in => nothing),
+            InterfaceMap(m_heat_out => nothing),
+            m_heat_in,
+            m_heat_out,
+
+            # geometry and physical properties
+            0.0, # capacity
+            params["volume"],
+            params["hr_ratio"],
+            params["sidewall_angle"],
+            params["shape"],
+            params["ground_model"],
+            params["rho_medium"],
+            params["cp_medium"],
+            params["diffusion_coefficient"],
+            0.0,       # surface_area_lid
+            0.0,       # surface_area_bottom
+            Float64[], # surface_area_barrel_segments
+            Float64[], # volume_segments
+            0.0,       # height
+            0.0,       # radius_small
+            0.0,       # radius_large
+            params["number_of_layer_total"],
+            params["number_of_layer_above_ground"],
+            0,         # number_of_STES_layer_below_ground
+            0.0,       # h_stes_buried
+            params["output_layer_from_top"],
+            Float64[], # dz
+            Float64[], # dz_normalized
+            0.0,       # sigma_bottom_only
+            0.0,       # sigma_lid_only
+            Float64[], # sigma_barrel
+            Float64[], # lambda
+            Float64[], # phi
+            Float64[], # theta
+            Float64[], # layer_masses
+
+            # loading and unloading
+            params["high_temperature"],
+            params["low_temperature"],
+            params["max_load_rate_energy"],
+            params["max_unload_rate_energy"],
+            params["max_load_rate_mass"],
+            params["max_unload_rate_mass"],
+            nothing, # max_input_energy
+            nothing, # max_output_energy
+
+            # Losses
+            params["thermal_transmission_lid"],
+            params["thermal_transmission_barrel_above_ground"],
+            params["thermal_transmission_barrel_below_ground"],
+            Float64[], # thermal_transmission_barrels
+            params["thermal_transmission_bottom"],
+            some_or_none(params["ambient_temperature_profile_file_path"],
+                         params["ambient_temperature_from_global_file"]),
+            params["constant_ambient_temperature"],
+            some_or_none(params["ground_temperature_profile_file_path"]),
+            params["constant_ground_temperature"],
+            Temperature[], # effective_ambient_temperature_barrels
+            0.0,           # effective_ambient_temperature_top 
+            0.0,           # effective_ambient_temperature_bottom
+
+            # ground coupling FVM (unified)
+            params["ground_domain_radius_factor"],
+            params["ground_domain_depth_factor"],
+            params["ground_domain_radius"],
+            params["ground_domain_depth"],
+            params["ground_accuracy_mode"],
+            params["ground_layers_depths"],
+            params["ground_layers_k"],
+            params["ground_layers_rho"],
+            params["ground_layers_cp"],
+            Float64[], # row_k
+            Float64[], # row_rho
+            Float64[], # row_cp
+            params["soil_surface_hconv"],
+            params["has_top_insulation_overlap"],
+            params["top_insulation_overlap_width"],
+            params["thermal_transmission_overlap"],
+            params["ground_bottom_boundary"],
+
+            # FVM state (unified axisymmetric r-z soil domain)
+            Float64[],                   # soil_dr
+            Float64[],                   # soil_dz
+            Float64[],                   # soil_dr_mesh
+            Float64[],                   # soil_dz_mesh
+            Float64[],                   # soil_r_centers
+            Float64[],                   # soil_z_centers
+            Array{Float64}(undef, 0, 0), # soil_t1
+            Array{Float64}(undef, 0, 0), # soil_t2
+            Matrix{Bool}(undef, 0, 0),   # cells_active
+            Float64[],                   # radius_at_row
+            0.0,                         # equivalent_radius_bottom
+            0.0,                         # sidewall_increase_factor
+            0,                           # first_soil_row_below_STES
+
+            # state variables
+            0.0,           # current_max_output_temperature
+            0.0,           # current_min_input_temperature
+            params["initial_load"],
+            0.0,           # load
+            0.0,           # load_end_of_last_timestep
+            0.0,           # losses
+            0.0,           # losses_top
+            0.0,           # losses_sidewalls
+            0.0,           # losses_bottom
+            Float64[],     # temperature_segments
+            Float64[],     # current_energy_input
+            Temperature[], # current_temperature_input
+            0.0,           # current_energy_output
+            0.0,           # current_temperature_output
+            0.0,           # current_max_output_energy
+            Float64[],     # temperatures_charging
+            0.0,           # current_energy_input_return_temperature
+            false,         # process_done
+            false,         # load_done
+
+            # additional output
+            Array{Float64}(undef, 0, 0),    # temp_distribution_output
+            Array{Float64}(undef, 0, 0),    # temp_difference_to_surrounding_output
+            Array{Float64}(undef, 0, 0, 0), # soil_temperature_field_output
+            0.0,                            # mass_in_sum
+            0.0,                            # mass_out_sum
+            1e-9,                           # epsilon_geometry
+            params["reproduce_IEA_ES_Task39"])
 end
 
 function initialise!(unit::SeasonalThermalStorage, sim_params::Dict{String,Any})

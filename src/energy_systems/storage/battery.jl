@@ -1,5 +1,357 @@
 using Plots: Plots
 
+#! format: off
+const BATTERY_PARAMETERS = Dict(
+    "m_el_in" => (
+        default="m_e_ac_230v",
+        description="Electricity input medium",
+        display_name="Medium el_in",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_el_out" => (
+        default="m_e_ac_230v",
+        description="Electricity output medium",
+        display_name="Medium el_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "m_heat_lt_out" => (
+        default="m_h_w_lt1",
+        description="Low-temperature heat output medium",
+        display_name="Medium heat_lt_out",
+        required=false,
+        conditionals=[("heat_lt_is_usable", "is_true")],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "heat_lt_is_usable" => (
+        default=false,
+        description="Toggle if the low temperature heat output is usable",
+        display_name="LT-heat is usable?",
+        required=false,
+        type=Bool,
+        json_type="boolean",
+        unit="-"
+    ),
+    "model_type" => (
+        default="simplified",
+        description="Operation model: 'simplified', 'detailed' or 'Li-LFP'",
+        display_name="Model type",
+        required=false,
+        options=["simplified", "detailed", "Li-LFP"],
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "capacity" => (
+        default=nothing,
+        description="Capacity of the battery",
+        display_name="Capacity",
+        required=true,
+        validations=[("self", "value_gte_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="Wh"
+    ),
+    "initial_load" => (
+        default=0.0,
+        description="Initial load as relative fraction of capacity",
+        display_name="Initial load",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "charge_efficiency" => (
+        default=nothing,
+        description="Charge efficienc for simplified model",
+        display_name="Charge efficiency",
+        required=true,
+        conditionals=[("model_type", "is", "simplified")],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "discharge_efficiency" => (
+        default=nothing,
+        description="Discharge efficiency for simplified model",
+        display_name="Discharge efficiency",
+        required=true,
+        conditionals=[("model_type", "is", "simplified")],
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 1.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "self_discharge_rate" => (
+        default=0.0,
+        description="Self-discharge rate including stand-by losses",
+        display_name="Self-discharge rate",
+        required=false,
+        validations=[("self", "value_gte_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="%/month"
+    ),
+    "max_charge_C_rate" => (
+        default=1.0,
+        description="Maximum continuous charge C-rate",
+        display_name="Charge C-rate",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "max_discharge_C_rate" => (
+        default=1.0,
+        description="Maximum continuous discharge C-rate",
+        display_name="Discharge C-rate",
+        required=false,
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "SOC_min" => (
+        default=0,
+        description="Minimum state of charge",
+        display_name="SOC min",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 100.0),
+            ("self", "value_lt_rel", "SOC_max")
+        ],
+        type=Float64,
+        json_type="number",
+        unit="%"
+    ),
+    "SOC_max" => (
+        default=100,
+        description="Maximum state of charge",
+        display_name="SOC max",
+        required=false,
+        validations=[
+            ("self", "value_gte_num", 0.0),
+            ("self", "value_lte_num", 100.0)
+        ],
+        type=Float64,
+        json_type="number",
+        unit="%"
+    ),
+    "V_n_bat" => (
+        default=nothing,
+        description="Nominal voltage of the battery pack",
+        display_name="Nominal voltage pack",
+        required=true,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="V"
+    ),
+    "cell_cutoff_current" => (
+        default=nothing,
+        description="Cell cutoff current in A",
+        display_name="Cell cutoff current",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="A"
+    ),
+    "cycles" => (
+        default=1.0,
+        description="Number of cycles",
+        display_name="Cycles",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "Temp" => (
+        default=25.0,
+        description="Cell temperature",
+        display_name="Cell temperature",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+    "V_n" => (
+        default=3.2,
+        description="Nominal cell voltage",
+        display_name="Nominal cell voltage",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="V"
+    ),
+    "r_i" => (
+        default=0.00016,
+        description="Internal resistance of the cell",
+        display_name="Cell internal resistance",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="Ω"
+    ),
+    "V_0" => (
+        default=3.36964,
+        description="Battery constant voltage V_0",
+        display_name="Const. voltage",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="V"
+    ),
+    "K" => (
+        default=0.03546,
+        description="Polarisation voltage K",
+        display_name="Polarisation voltage",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="V"
+    ),
+    "A" => (
+        default=0.08165,
+        description="Exponential zone amplitude A",
+        display_name="Exp. amplitude",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="V"
+    ),
+    "B" => (
+        default=0.1003,
+        description="Exponential zone time constant inverse B",
+        display_name="Exp. time constant",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="1/Ah"
+    ),
+    "capacity_cell_Ah" => (
+        default=1090,
+        description="Nominal cell capacity",
+        display_name="Cell capacity",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        validations=[("self", "value_gt_num", 0.0)],
+        type=Float64,
+        json_type="number",
+        unit="Ah"
+    ),
+    "m" => (
+        default=1.0269,
+        description="Empirical exponent m",
+        display_name="Empirical m",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "alpha" => (
+        default=-0.01212,
+        description="Temperature coefficient alpha",
+        display_name="Alpha",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+    "k_qn" => (
+        default=[-1.27571e-7, 1.22095e-11],
+        description="Polynomial coefficients k_qn (aging)",
+        display_name="k_qn",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "k_qT" => (
+        default=[1.32729e-3, -7.9763e-6],
+        description="Polynomial coefficients k_qT (aging)",
+        display_name="k_qT",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "k_n" => (
+        default=[9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4],
+        description="Polynomial coefficients k_n (aging)",
+        display_name="k_n",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "k_T" => (
+        default=[1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2],
+        description="Polynomial coefficients k_T (aging)",
+        display_name="k_T",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Vector{Float64},
+        json_type="array",
+        unit="-"
+    ),
+    "I_ref" => (
+        default=100.0,
+        description="Reference current I_ref (aging)",
+        display_name="I_ref",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="A"
+    ),
+    "T_ref" => (
+        default=25.0,
+        description="Reference temperature T_ref (aging)",
+        display_name="T_ref",
+        required=false,
+        conditionals=[("model_type", "is_not", "simplified")],
+        type=Float64,
+        json_type="number",
+        unit="°C"
+    ),
+)
+#! format: on
+
 """
 Implementation of a battery component holding electric charge.
 """
@@ -50,140 +402,156 @@ Base.@kwdef mutable struct Battery <: Component
 
     load_end_of_last_timestep::Float64
     losses::Float64
+    # maximum charge energy in current timestep
     max_charge_energy::Float64
+    # maximum discharge energy in current timestep
     max_discharge_energy::Float64
+    # battery voltage in V
     V_cell::Float64
+    # battery voltage at the end of the last timestep in V
     V_cell_last::Float64
+    # minimum cell voltage that defines the battery as empty in V
     V_cell_min::Float64
+    # maximum cell voltage that defines the battery as full in V
     V_cell_max::Float64
+    # battery voltage after charging
     V_cell_charge::Float64
+    # battery voltage after discharging
     V_cell_discharge::Float64
+    # number of cells connected in parallel
     n_cell_p::Float64
+    # number of cells connected in series
     n_cell_s::Float64
+    # sum of all added and removed charge to the cell in Ah
     extracted_charge::Float64
+    # sum of all added and removed charge to the cell in the last timestep in Ah
     extracted_charge_last::Float64
+    # SOC in the current time step
     SOC::Float64
 
     heat_lt_is_usable::Bool
+    # heat output if the heat from the losses are usable
     heat_out::Float64
 
+    # indicating if the process step has already been performed in the current time step
     process_done::Bool
+    # indicating if the load step has already been performed in the current time step
     load_done::Bool
 
     function Battery(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        heat_lt_is_usable = default(config, "heat_lt_is_usable", false)
-
-        m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
-        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
-        m_heat_lt_out = Symbol(default(config, "m_heat_lt_out", "m_h_w_lt1"))
-
-        register_media([m_el_in, m_el_out, m_heat_lt_out])
-        output_interfaces = InterfaceMap(m_el_out => nothing)
-        if heat_lt_is_usable
-            output_interfaces[m_heat_lt_out] = nothing
-        end
-
-        # get model type from input file
-        model_type = default(config, "model_type", "simplified")
-        model_type_allowed_values = ["simplified", "detailed", "Li-LFP"]
-        if !(model_type in model_type_allowed_values)
-            @error "Undefined model type \"$(model_type)\" of battery \"$(uac)\". " *
-                   "Has to be one of: $(model_type_allowed_values)."
-            throw(InputError())
-        end
-
-        if model_type == "simplified"
-            V_n_bat = 0.0
-        else
-            V_n_bat = config["V_n_bat"]
-        end
-
-        if model_type == "Li-LFP"
-            config["V_n"] = 3.2
-            config["r_i"] = 0.00016
-            config["V_0"] = 3.36964
-            config["K"] = 0.03546
-            config["A"] = 0.08165
-            config["B"] = 0.1003
-            config["capacity_cell_Ah"] = 1090
-            config["m"] = 1.0269
-            config["alpha"] = -0.01212
-            config["k_qn"] = [-1.27571e-7, 1.22095e-11]
-            config["k_qT"] = [1.32729e-3, -7.9763e-6]
-            config["k_n"] = [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]
-            config["k_T"] = [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]
-            config["I_ref"] = 100
-            config["T_ref"] = 25
-        end
-
-        # check that charge_efficiency and discharge_efficiency are set for simplified model
-        charge_efficiency = default(config, "charge_efficiency", nothing)
-        discharge_efficiency = default(config, "discharge_efficiency", nothing)
-        if model_type == "simplified" &&
-           (charge_efficiency === nothing || discharge_efficiency === nothing)
-            # end of expression
-            @error "If model \"simplified\" is used for battery \"$(uac)\" then " *
-                   "\"charge_efficiency\" and \"discharge_efficiency\" must be given."
-            throw(InputError())
-        end
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_storage, # sys_function
-                   InterfaceMap(m_el_in => nothing), # input_interfaces
-                   output_interfaces, # output_interfaces
-                   m_el_in,
-                   m_el_out,
-                   m_heat_lt_out,
-                   model_type, # model_type
-                   config["capacity"], # capacity of the battery in Wh
-                   default(config, "initial_load", 0.0) * config["capacity"], # energy load of the battery in Wh
-                   default(config, "charge_efficiency", nothing),
-                   default(config, "discharge_efficiency", nothing),
-                   default(config, "self_discharge_rate", 0.0), # rate of self-discharge including stand-by losses in %/month (month=30days)
-                   default(config, "max_charge_C_rate", 1.0), # maximum continuos charge power in W
-                   default(config, "max_discharge_C_rate", 1.0), # maximum continuos discharge power in W
-                   default(config, "SOC_min", 0),
-                   default(config, "SOC_max", 100),
-                   V_n_bat, # nominal voltage of the battery pack
-                   default(config, "cell_cutoff_current", 0.003 * default(config, "capacity_cell_Ah", 0.0)),
-                   default(config, "cycles", 1.0), # number of cycles
-                   default(config, "Temp", 25.0), # cell temperature in °C
-                   default(config, "V_n", 3.2), # nominal voltage of the cell in V
-                   default(config, "r_i", 0.00016), # internal resistance of the cell in Ohm
-                   default(config, "V_0", 3.36964), # battery constant voltage in V
-                   default(config, "K", 0.03546), # polarisation voltage in V
-                   default(config, "A", 0.08165), # exponential zone amplitude in V
-                   default(config, "B", 0.1003), # exponential zone time constant inverse in 1/(Ah)
-                   default(config, "capacity_cell_Ah", 1090), # nominal cell capacity in Ah
-                   default(config, "m", 1.0269),
-                   default(config, "alpha", -0.01212),
-                   default(config, "k_qn", [-1.27571e-7, 1.22095e-11]),
-                   default(config, "k_qT", [1.32729e-3, -7.9763e-6]),
-                   default(config, "k_n", [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]),
-                   default(config, "k_T", [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]),
-                   default(config, "I_ref", 100.0),
-                   default(config, "T_ref", 25.0),
-                   0.0, # load_end_of_last_timestep
-                   0.0, # losses
-                   0.0, # maximum charge energy in current timestep
-                   0.0, # maximum discharge energy in current timestep
-                   0.0, # battery voltage in V
-                   0.0, # battery voltage at the end of the last timestep in V
-                   0.0, # minimum cell voltage that defines the battery as empty in V
-                   0.0, # maximum cell voltage that defines the battery as full in V
-                   0.0, # battery voltage after charging
-                   0.0, # battery voltage after discharging
-                   1.0, # number of cells connected in parallel 
-                   1.0, # number of cells connected in series
-                   0.0, # sum of all added and removed charge to the cell in Ah
-                   0.0, # sum of all added and removed charge to the cell in the last timestep in Ah
-                   0.0, # SOC in the current time step
-                   heat_lt_is_usable,
-                   0.0, # heat output if the heat from the losses are usable
-                   false, # process_done, bool indicating if the process step has already been performed in the current time step
-                   false) # load_done, bool indicating if the load step has already been performed in the current time step
+        return new(SSOT_parameter_constructor(Battery, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{Battery})::Dict{String,NamedTuple}
+    return deepcopy(BATTERY_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{Battery}, config::Dict{String,Any}, param_name::String,
+                           param_def::NamedTuple, sim_params::Dict{String,Any}, uac::String)
+    if param_name == "cell_cutoff_current" && !haskey(config, "cell_cutoff_current")
+        return 0.003 * Float64(default(config, "capacity_cell_Ah", 0.0))
+    end
+
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{Battery}, config::Dict{String,Any}, extracted::Dict{String,Any},
+                         uac::String, sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(Battery))
+end
+
+function init_from_params(x::Type{Battery}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    heat_lt_is_usable = params["heat_lt_is_usable"]
+    m_el_in = Symbol(params["m_el_in"])
+    m_el_out = Symbol(params["m_el_out"])
+    m_heat_lt_out = Symbol(params["m_heat_lt_out"])
+    register_media([m_el_in, m_el_out, m_heat_lt_out])
+
+    output_interfaces = InterfaceMap(m_el_in => nothing, m_el_out => nothing)
+    if heat_lt_is_usable
+        output_interfaces[m_heat_lt_out] = nothing
+    end
+
+    # choosing a specific model type overwrites the chemistry-specific parameters of the
+    # detailed model
+    if params["model_type"] == "Li-LFP"
+        params["V_n"] = 3.2
+        params["r_i"] = 0.00016
+        params["V_0"] = 3.36964
+        params["K"] = 0.03546
+        params["A"] = 0.08165
+        params["B"] = 0.1003
+        params["capacity_cell_Ah"] = 1090
+        params["m"] = 1.0269
+        params["alpha"] = -0.01212
+        params["k_qn"] = [-1.27571e-7, 1.22095e-11]
+        params["k_qT"] = [1.32729e-3, -7.9763e-6]
+        params["k_n"] = [9.71249e-6, 7.51635e-4, -8.59363e-5, -2.92489e-4]
+        params["k_T"] = [1.05135e-3, 1.83721e-2, -7.72438e-3, -4.31833e-2]
+        params["I_ref"] = 100
+        params["T_ref"] = 25
+    end
+
+    # return tuple in the order expected by new()
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_storage,
+            InterfaceMap(m_el_in => nothing),
+            output_interfaces,
+            m_el_in,
+            m_el_out,
+            m_heat_lt_out,
+            params["model_type"],
+            params["capacity"],
+            params["initial_load"] * params["capacity"],
+            params["charge_efficiency"],
+            params["discharge_efficiency"],
+            params["self_discharge_rate"],
+            params["max_charge_C_rate"],
+            params["max_discharge_C_rate"],
+            params["SOC_min"],
+            params["SOC_max"],
+            params["model_type"] == "simplified" ? 0.0 : params["V_n_bat"],
+            params["cell_cutoff_current"],
+            params["cycles"],
+            params["Temp"],
+            params["V_n"],
+            params["r_i"],
+            params["V_0"],
+            params["K"],
+            params["A"],
+            params["B"],
+            params["capacity_cell_Ah"],
+            params["m"],
+            params["alpha"],
+            params["k_qn"],
+            params["k_qT"],
+            params["k_n"],
+            params["k_T"],
+            params["I_ref"],
+            params["T_ref"],
+            0.0, # load_end_of_last_timestep
+            0.0, # losses
+            0.0, # max_charge_energy
+            0.0, # max_discharge_energy
+            0.0, # V_cell
+            0.0, # V_cell_last
+            0.0, # V_cell_min
+            0.0, # V_cell_max
+            0.0, # V_cell_charge
+            0.0, # V_cell_discharge
+            1.0, # n_cell_p
+            1.0, # n_cell_s
+            0.0, # extracted_charge
+            0.0, # extracted_charge_last
+            0.0, # SOC in the current time step
+            heat_lt_is_usable,
+            0.0, # heat_out
+            false, # process_done
+            false) # load_done
 end
 
 function initialise!(unit::Battery, sim_params::Dict{String,Any})

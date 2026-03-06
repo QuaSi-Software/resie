@@ -1,3 +1,34 @@
+#! format: off
+const PV_PLANT_PARAMETERS = Dict(
+    "m_el_out" => (
+        default="m_e_ac_230v",
+        description="Medium of the output electricity",
+        display_name="Medium el_out",
+        required=false,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "energy_profile_file_path" => (
+        description="Path to a profile file with the energy values",
+        display_name="Energy profile file",
+        required=true,
+        type=String,
+        json_type="string",
+        unit="-"
+    ),
+    "scale" => (
+        default=1.0,
+        description="Scaling factor for the energy profile",
+        display_name="Energy scale",
+        required=false,
+        type=Float64,
+        json_type="number",
+        unit="-"
+    ),
+)
+#! format: on
+
 """
 Implementation of a photovoltaic (PV) power plant.
 
@@ -20,22 +51,42 @@ mutable struct PVPlant <: Component
     supply::Float64
 
     function PVPlant(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
-        m_el_out = Symbol(default(config, "m_el_out", "m_e_ac_230v"))
-        register_media([m_el_out])
-
-        # load energy profile from path
-        energy_profile = Profile(config["energy_profile_file_path"], sim_params)
-
-        return new(uac, # uac
-                   Controller(default(config, "control_parameters", nothing)),
-                   sf_fixed_source,                   # sys_function
-                   InterfaceMap(),                    # input_interfaces
-                   InterfaceMap(m_el_out => nothing), # output_interfaces
-                   m_el_out,
-                   energy_profile,  # energy_profile
-                   config["scale"], # scaling_factor
-                   0.0)             # supply
+        return new(SSOT_parameter_constructor(PVPlant, uac, config, sim_params)...)
     end
+end
+
+function component_parameters(x::Type{PVPlant})::Dict{String,NamedTuple}
+    return deepcopy(PV_PLANT_PARAMETERS) # return a copy to prevent external modification
+end
+
+function extract_parameter(x::Type{PVPlant}, config::Dict{String,Any}, param_name::String, param_def::NamedTuple,
+                           sim_params::Dict{String,Any}, uac::String)
+    return extract_parameter(Component, config, param_name, param_def, sim_params, uac)
+end
+
+function validate_config(x::Type{PVPlant}, config::Dict{String,Any}, extracted::Dict{String,Any}, uac::String,
+                         sim_params::Dict{String,Any})
+    validate_config(Component, extracted, uac, sim_params, component_parameters(PVPlant))
+end
+
+function init_from_params(x::Type{PVPlant}, uac::String, params::Dict{String,Any},
+                          raw_params::Dict{String,Any}, sim_params::Dict{String,Any})::Tuple
+    # turn media names into Symbol and register them
+    m_el_out = Symbol(params["m_el_out"])
+    register_media([m_el_out])
+
+    # load energy profile from path
+    energy_profile = Profile(params["energy_profile_file_path"], sim_params)
+
+    return (uac,
+            Controller(params["control_parameters"]),
+            sf_fixed_source,
+            InterfaceMap(),
+            InterfaceMap(m_el_out => nothing),
+            m_el_out,
+            energy_profile,
+            params["scale"],
+            0.0)  # supply
 end
 
 function initialise!(unit::PVPlant, sim_params::Dict{String,Any})
