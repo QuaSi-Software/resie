@@ -1629,7 +1629,7 @@ function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_n
     elseif param_name in keys(config)
         value = config[param_name]
     else
-        throw(InputError("Missing required parameter $param_name"))
+        throw(InputError("Missing required parameter `$param_name` in component `$uac`."))
     end
 
     # cast to the type of the component, unless the value is nothing
@@ -1637,7 +1637,8 @@ function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_n
         try
             value = convert(param_def.type, value)
         catch
-            throw(InputError("Can't convert given value for parameter $param_name to type $(param_def.type)"))
+            throw(InputError("Can't convert given value for parameter `$param_name` to type `$(param_def.type)` " *
+                             "in component `$uac`."))
         end
     end
 
@@ -1650,7 +1651,7 @@ function extract_parameter(x::Type{Component}, config::Dict{String,Any}, param_n
         elseif param_def.function_type == "2dim"
             return parse_2dim_function(value)
         else
-            throw(InputError("Unknown function type $(param_def.function_type)"))
+            throw(InputError("Unknown function type `$(param_def.function_type)` in component `$uac`."))
         end
     end
 
@@ -1824,14 +1825,14 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
         # nothing and no value was given). but also check if conditionals would "turn off"
         # the parameter in any case, in which case the value does not matter
         if type_def[name].required && value === nothing && conditionals_apply(name, extracted, type_def)
-            throw(InputError("Required parameter $name has no given value and no default."))
+            throw(InputError("Required parameter `$name` in component `$uac` has no given value and no default."))
         end
 
         # check, for parameters with field options, if the value is one of the options
         if name in keys(type_def) && isdefined(type_def[name], :options)
             if !(value in type_def[name].options)
                 throw(InputError("Given value $value is not in the allowed options for " *
-                                 "parameter $name of component $uac."))
+                                 "parameter `$name` of component `$uac`."))
             end
         end
 
@@ -1846,7 +1847,7 @@ function validate_config(x::Type{Component}, extracted::Dict{String,Any}, uac::S
                        ((type_def[other_name].type != Bool && other_value !== nothing) ||
                         (type_def[other_name].type == Bool && other_value === true))
                         # end of condition
-                        throw(InputError("Parameters $name and $other_name of component $uac are mutually exclusive."))
+                        throw(InputError("Parameters `$name` and `$other_name` of component `$uac` are mutually exclusive."))
                     end
                 end
             end
