@@ -15,7 +15,9 @@
             "Demand_Power": ["Demand"],
             "BUS_Power": ["Balance"], 
             "BUS_Heat": ["Balance"],
-            "Grid_IN": ["m_power:OUT"]
+            "Grid_IN": ["m_power:OUT"],
+            "Photovoltaic": ["m_power:OUT"],
+            "WindFarm": ["m_power:OUT"]
         },
         "output_plot": {
              "1": {

@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
 
 
 ############################################################
@@ -43,13 +43,13 @@ Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_st
 
 # BufferTank capacity (Wh)
 Cap_lo_Wh   = 0.0e6        # lower limit
-Cap_hi_Wh   = 50.0e6        # upper limit
+Cap_hi_Wh   = 60.0e6        # upper limit
 Cap_step_Wh = 5.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
-Batt_lo_Wh   = 0.0e3          # lower limit
-Batt_hi_Wh   = 0.0e3        # upper limit
+Batt_lo_Wh   = 1.0e3         # lower limit
+Batt_hi_Wh   = 1.0e3        # upper limit
 Batt_step_Wh = 0.5e3        # step size
 BattCap_vals_Wh = collect(Batt_lo_Wh:Batt_step_Wh:Batt_hi_Wh)   # creates an array of values
 
@@ -173,7 +173,7 @@ function create_variant(
     price_profile_path_reserve_energy_neg = "./profiles/MA/cbmp_down_min_15min.prf"
     profile_path_reserve_call_neg = "./profiles/MA/reserve_call_neg.prf" #TODO Abrufprofil negativ hinterlegen
     price_profile_path_reserve_power_pos = "./profiles/MA/aFRR_pos_cap_EUR_MW_h.prf"
-    price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_min_15min.prf"
+    price_profile_path_reserve_energy_pos = "./profiles/MA/cbmp_up_max_15min.prf"
     profile_path_reserve_call_pos = "./profiles/MA/reserve_call_pos.prf" #TODO Abrufprofil positiv hinterlegen
     price_profile_path_market_value_pv = "./profiles/MA/MW_Solar.prf"
     price_profile_path_market_value_wind = "./profiles/MA/MW_Wind.prf"

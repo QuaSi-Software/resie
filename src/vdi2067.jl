@@ -231,7 +231,7 @@ function energy_annuity(sim::Dict, p::VDIParams)
     Photovoltaic_IN = sim["Photovoltaic m_power OUT"] .* 1e-6    # convert Wh time series in MWh
     Wind_In = sim["WindFarm m_power OUT"] .* 1e-6                # convert Wh time series in MWh
     
-    base_price = 214.0  #vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
+    base_price = vecize_price(sim["Grid_price"], length(IN))    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
