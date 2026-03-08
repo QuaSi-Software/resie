@@ -239,7 +239,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 6.0e6,
+            "power_th": 5.5e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -264,7 +264,7 @@
                 "BUS_Heat"
             ],
             "has_secondary_interface": false,
-            "power_th": 4.0e6,
+            "power_th": 3.75e6,
             "__OPTIONAL_MEDIA__": "",
             "m_heat_in": "m_heat_source",
             "m_el_in": "m_power",
@@ -337,7 +337,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 0.0e6,
+            "capacity": 2.5e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,

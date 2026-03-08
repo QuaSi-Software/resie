@@ -517,7 +517,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 40.0e6,
+            "capacity": 20.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,
