@@ -10,7 +10,7 @@
 	        "m_power":  ["Grid_IN->HeatPump", "Grid_IN->ElectrodeBoiler", "Grid_IN->Demand_Power", "Grid_IN->Battery", 
 			            "Photovoltaic->Grid_OUT", "Photovoltaic->HeatPump", "Photovoltaic->ElectrodeBoiler", "Photovoltaic->Demand_Power",
                         "WindFarm->Grid_OUT", "WindFarm->HeatPump", "WindFarm->ElectrodeBoiler", "WindFarm->Demand_Power", 
-                        "Battery->Demand_Power"],
+                        "Battery->Demand_Power", "WindFarm->Battery", "Photovoltaic->Battery"],
 	        "NegControlReserve_in": ["m_power:OUT", "Max_Energy", "Scaling_Factor"],
             "NegControlReserve_out": ["m_power:IN", "Max_Energy"],
             "PosControlReserve_in": ["m_power:OUT", "Max_Energy", "Scaling_Factor"],
@@ -320,7 +320,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "WindFarm": {
@@ -329,7 +329,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
@@ -517,7 +517,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 20.0e6,
+            "capacity": 30.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,

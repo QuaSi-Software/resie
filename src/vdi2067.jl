@@ -376,9 +376,15 @@ end
 function co2_yearly(sim::Dict)
     IN = sim["Grid_IN"] .* 1e-3        # convert Wh time series in kWh
     co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh  #TODO fixed value if no dynamic prices
-    yearly_co2 = sum(IN .* co2_intensity) .* 1e-6   # t CO2 per year, convert g to t
     
-    #TODO what about PV and Wind?
+    Wind = sim["Wind_usage"] .* 1e-3        # convert Wh time series in kWh
+    co2_intensity_Wind = 15.0  # g/kWh, assumption
+
+    PV = sim["Photovoltaic_usage"] .* 1e-3        # convert Wh time series in kWh
+    co2_intensity_PV = 50.0  # g/kWh, assumption
+    
+    yearly_co2 = (sum(IN .* co2_intensity) + sum(Wind .* co2_intensity_Wind) + sum(PV .* co2_intensity_PV)) .* 1e-6   # t CO2 per year, convert g to t
+
 
     return yearly_co2 
 
@@ -403,6 +409,10 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
     sim_new["Photovoltaic_IN"] = sim["Photovoltaic m_power OUT"]
     sim_new["Wind_IN"] = sim["WindFarm m_power OUT"]
+    sim_new["Photovoltaic_usage"] = sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow Photovoltaic->Demand_Power"] .+ sim["m_power EnergyFlow Photovoltaic->Battery"]
+    sim_new["Wind_usage"] = sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"] .+
+                                  sim["m_power EnergyFlow WindFarm->Demand_Power"] .+ sim["m_power EnergyFlow WindFarm->Battery"]
     for k in [
         "NegControlReserve_in m_power OUT", "NegControlReserve_out m_power IN",
         "PosControlReserve_in m_power OUT", "PosControlReserve_out m_power IN",

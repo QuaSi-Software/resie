@@ -7,7 +7,7 @@ using Dates
 using JSON
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_125runs_260308_154521.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_297runs_260309_135212.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 const OUT_CSV_PATH = "C:/Users/jenter/Documents/resie/output/out.csv"
 const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_fuzzy_ems.json"
