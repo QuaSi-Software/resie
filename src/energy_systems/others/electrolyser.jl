@@ -290,6 +290,8 @@ mutable struct Electrolyser <: Component
     losses_heat::Float64
     losses_hydrogen::Float64
 
+    balance::Float64
+
     function Electrolyser(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         return new(SSOT_parameter_constructor(Electrolyser, uac, config, sim_params)...)
     end
@@ -376,7 +378,8 @@ function init_from_params(x::Type{Electrolyser}, uac::String, params::Dict{Strin
             params["output_temperature_lt"],
             0.0, # losses
             0.0, # losses_heat
-            0.0) # losses_hydrogen
+            0.0, # losses_hydrogen
+            0.0) # balance
 end
 
 function initialise!(unit::Electrolyser, sim_params::Dict{String,Any})
@@ -629,6 +632,13 @@ function process(unit::Electrolyser, sim_params::Dict{String,Any})
     end
     add!(unit.output_interfaces[unit.m_h2_out], energies[4])
     add!(unit.output_interfaces[unit.m_o2_out], energies[5])
+
+    # calculate energy balance of the electrolyser
+    unit.balance = energies[1] -                   # input
+                   sum(energies[2]; init=0.0) -    # output ht
+                   sum(energies[4]; init=0.0) -    # output h2
+                   (unit.heat_lt_is_usable ? energies[3] : 0.0) -   # output lt
+                   unit.losses                     # losses
 end
 
 # has its own reset function as here more losses are present that need to be reset in every timestep
@@ -644,10 +654,11 @@ function reset(unit::Electrolyser)
         end
     end
 
-    # reset losses
+    # reset other parameter
     unit.losses = 0.0
     unit.losses_hydrogen = 0.0
     unit.losses_heat = 0.0
+    unit.balance = 0.0
 end
 
 function component_has_minimum_part_load(unit::Electrolyser)

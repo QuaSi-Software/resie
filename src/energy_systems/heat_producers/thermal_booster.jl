@@ -40,6 +40,8 @@ mutable struct ThermalBooster <: Component
     losses_power::Float64
     losses_heat::Float64
 
+    balance::Float64
+
     function ThermalBooster(uac::String, config::Dict{String,Any}, sim_params::Dict{String,Any})
         m_el_in = Symbol(default(config, "m_el_in", "m_e_ac_230v"))
         m_heat_out = Symbol(default(config, "m_heat_out", "m_h_w_ht1"))
@@ -81,7 +83,8 @@ mutable struct ThermalBooster <: Component
                    Float64[],                                         # intermediate_temperature_energies
                    0.0,                                               # losses
                    0.0,                                               # losses_power
-                   0.0)                                               # losses_heat
+                   0.0,                                               # losses_heat
+                   0.0)                                               # balance
     end
 end
 
@@ -747,6 +750,12 @@ function process(unit::ThermalBooster, sim_params::Dict{String,Any})
     # calculate mean intermediate temperature
     unit.mean_intermediate_temperature = sum(unit.intermediate_temperatures .* unit.intermediate_temperature_energies) /
                                          sum(unit.intermediate_temperature_energies)
+
+    # calculate energy balance of the thermal booster 
+    unit.balance = el_in +       # input boost energy
+                   sum(energies.slices_heat_in; init=0.0) -  # input heat in
+                   heat_out -    # outputs
+                   unit.losses   # losses
 end
 
 # ThermalBooster has its own reset function as here more parameters are present 
@@ -758,6 +767,7 @@ function reset(unit::ThermalBooster)
     unit.losses = 0.0
     unit.losses_heat = 0.0
     unit.losses_power = 0.0
+    unit.balance = 0.0
 end
 
 function output_values(unit::ThermalBooster)::Vector{String}

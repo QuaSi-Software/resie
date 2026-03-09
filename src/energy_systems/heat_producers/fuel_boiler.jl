@@ -246,6 +246,8 @@ function process(unit::FuelBoiler, sim_params::Dict{String,Any})
     add!(unit.output_interfaces[unit.m_heat_out], energies[2], nothing, unit.output_temperature)
 
     unit.losses = check_epsilon(energies[1] - energies[2], sim_params)
+
+    # no balance here, as losses are calculated from the energy balance and balance would be always zero.
 end
 
 function component_has_minimum_part_load(unit::FuelBoiler)

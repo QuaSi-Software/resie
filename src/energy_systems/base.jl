@@ -1388,29 +1388,16 @@ end
 """
     balance(unit)
 
-Calculate the energy balance of the given unit as a whole.
-
-This is expected to start at zero at the beginning of a time step and return to zero at
-the end of it. If it is not zero, either the simulation failed to correctly calculate the
-energy balance of the energy system or the simulated network was not able to ensure the
-balance on the current time step. In either case, something went wrong.
+Get the energy balance of the given unit as a whole. The balance is calculated within transformers 
+during their process step. Note that some transformer calculate their losses from a balance,
+therefore their energy balance is always zero.
 """
 function balance(unit::Component)::Float64
-    balance = 0.0
-
-    for inface in values(unit.input_interfaces)
-        if inface !== nothing
-            balance += inface.balance
-        end
+    if unit.sys_function == EnergySystems.sf_transformer && hasfield(typeof(unit), :balance)
+        return unit.balance
+    else
+        return 0.0
     end
-
-    for outface in values(unit.output_interfaces)
-        if outface !== nothing
-            balance += outface.balance
-        end
-    end
-
-    return balance
 end
 
 """
@@ -2239,23 +2226,22 @@ end
     check_balances_of_components(components, epsilon, io_settings)
 
 Check the energy balance of the given components and return warnings of any violations.
+Only transformer are checked for their energy balance in the current time step.
 
 # Arguments
 - `component::Grouping`: The components to check
 - `epsilon::Float64`: A balance is only considered violated if the absolute value of the
     sum is larger than this value. This helps with spurious floating point issues
-- `io_settings::AbstractDict{String,Any}`: Input and output parameter from the input file
 
 # Returns
 - `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the key of the
     component that has a non-zero energy balance and the value of that balance.
 """
 function check_balances_of_components(components::Grouping,
-                                      epsilon::Float64,
-                                      io_settings::AbstractDict{String,Any})::Vector{Tuple{String,Float64}}
+                                      epsilon::Float64)::Vector{Tuple{String,Float64}}
     warnings = []
-    if default(io_settings, "balance_warnings", "interfaces") in ["all", "components"]
-        for (key, unit) in pairs(components)
+    for (key, unit) in pairs(components)
+        if unit.sys_function == EnergySystems.sf_transformer
             unit_balance = balance(unit)
             if unit_balance > epsilon || unit_balance < -epsilon
                 push!(warnings, (key, unit_balance))
@@ -2274,7 +2260,6 @@ Check the energy balance of all interfaces returning warnings of any violations.
 - `component::Grouping`: All components of the energy systems
 - `epsilon::Float64`: A balance is only considered violated if the absolute value of the
     sum is larger than this value. This helps with spurious floating point issues
-- `io_settings::AbstractDict{String,Any}`: Input and output parameter from the input file
 
 # Returns
 - `Vector{Tuple{String, Float64}}`: A list of tuples, where each tuple is the String of the 
@@ -2282,23 +2267,20 @@ Check the energy balance of all interfaces returning warnings of any violations.
     and the value of that balance.
 """
 function check_balances_of_interfaces(components::Grouping,
-                                      epsilon::Float64,
-                                      io_settings::AbstractDict{String,Any})::Vector{Tuple{String,Float64}}
+                                      epsilon::Float64)::Vector{Tuple{String,Float64}}
     warnings = []
-    if default(io_settings, "balance_warnings", "interfaces") in ["all", "interfaces"]
-        for (key, component) in pairs(components)
-            if startswith(component.uac, "Proxy-") && component.sys_function === EnergySystems.sf_bus
-                # ignore proxy busses
-                continue
-            else
-                for outface in component.output_interfaces
-                    outface = isa(outface, Pair) ? outface[2] : outface # some interfaces are wrapped in a Tuple
-                    outface === nothing && continue
-                    interface_balance = outface.balance
-                    if interface_balance > epsilon || interface_balance < -epsilon
-                        interface_name = outface.source.uac * " -> " * outface.target.uac
-                        push!(warnings, (interface_name, interface_balance))
-                    end
+    for (key, component) in pairs(components)
+        if startswith(component.uac, "Proxy-") && component.sys_function === EnergySystems.sf_bus
+            # ignore proxy busses
+            continue
+        else
+            for outface in component.output_interfaces
+                outface = isa(outface, Pair) ? outface[2] : outface # some interfaces are wrapped in a Tuple
+                outface === nothing && continue
+                interface_balance = outface.balance
+                if interface_balance > epsilon || interface_balance < -epsilon
+                    interface_name = outface.source.uac * " -> " * outface.target.uac
+                    push!(warnings, (interface_name, interface_balance))
                 end
             end
         end

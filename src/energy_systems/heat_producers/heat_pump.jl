@@ -389,6 +389,7 @@ mutable struct HeatPump <: Component
     losses_power::Float64
     losses_heat::Float64
     losses::Float64
+    balance::Float64
 
     cop::Float64
     effective_cop::Float64
@@ -506,6 +507,7 @@ function init_from_params(x::Type{HeatPump}, uac::String, params::Dict{String,An
             0.0,  # losses_power
             0.0,  # losses_heat
             0.0,  # losses
+            0.0,  # balance
             0.0,  # cop
             0.0,  # effective_cop
             0.0,  # mix_temp_input
@@ -1732,6 +1734,12 @@ function process(unit::HeatPump, sim_params::Dict{String,Any})
 
     # calculate active time as fraction of the simulation time step
     unit.time_active = sum(energies.slices_times; init=0.0) / sim_params["time_step_seconds"]
+
+    # calculate energy balance of the heat pump
+    unit.balance = el_in +                                   # input el
+                   sum(energies.slices_heat_in; init=0.0) -  # input heat
+                   heat_out -                                # outputs
+                   unit.losses                               # losses
 end
 
 function component_has_minimum_part_load(unit::HeatPump)
@@ -1753,6 +1761,7 @@ function reset(unit::HeatPump)
     unit.losses_power = 0.0
     unit.avg_plr = 0.0
     unit.time_active = 0.0
+    unit.balance = 0.0
 end
 
 function output_values(unit::HeatPump)::Vector{String}
