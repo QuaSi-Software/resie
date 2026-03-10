@@ -1928,10 +1928,9 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
         catch e
             io = IOBuffer()
             showerror(io, e)
-            print(io, stacktrace(catch_backtrace()))
+            print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
             msg = String(take!(io))
             @error msg
-            # @error "$(sprint(showerror, e))" exception=(e, [catch_backtrace()[1]])
             constructor_errored = true
         end
     end
@@ -1945,10 +1944,9 @@ function SSOT_parameter_constructor(T::Type, uac::String, config::Dict{String,An
     catch e
         io = IOBuffer()
         showerror(io, e)
-        print(io, stacktrace(catch_backtrace()))
+        print(io, sim_params["show_detailed_errors"] ? stacktrace(catch_backtrace()) : "")
         msg = String(take!(io))
         @error msg
-        # @error "$(sprint(showerror, e))" exception=(e, [catch_backtrace()[1]])
         constructor_errored = true
     end
 
