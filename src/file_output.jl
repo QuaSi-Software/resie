@@ -354,7 +354,9 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 if length(splitted) > 1
                     medium_key = splitted[1]
                     medium = Symbol(String(medium_key))
-                    if medium in EnergySystems.medium_categories
+                    #TODO temporary fix if no 1-to-1 connections exist
+                    if String(medium_key) in all_current_media
+                    # if medium in EnergySystems.medium_categories
                         value_key = splitted[2]
                     else
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *
