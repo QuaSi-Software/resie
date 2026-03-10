@@ -1,6 +1,6 @@
 # this file contains functionality for writing output of the simulation to files.
 using Dates
-
+using Infiltrator
 """
 get_output_keys(config[io_settings], components)
 
@@ -353,8 +353,10 @@ function output_keys(components::Grouping, from_config::AbstractDict{String,Any}
                 splitted = split(String(entry), ":")
                 if length(splitted) > 1
                     medium_key = splitted[1]
-                    medium = Symbol(String(medium_key))
-                    if medium in EnergySystems.medium_categories
+                    medium = Symbol(medium_key)
+                    unit_fields = fieldnames(typeof(unit))
+                    unit_media = [getfield(unit, f) for f in unit_fields if startswith(String(f), "m_") || String(f) == "medium"]
+                    if medium in unit_media
                         value_key = splitted[2]
                     else
                         @error "In unit \"$(unit.uac)\", the given output key \"$entry\" could not be mapped to an " *

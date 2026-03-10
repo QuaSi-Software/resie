@@ -92,9 +92,10 @@ register_media(categories)
 Add the given medium categories to the set of all medium categories.
 """
 function register_media(categories::Vector{Symbol})
-    for cat in categories
-        push!(medium_categories, cat)
-    end
+    #TODO temporary fix
+    # for cat in categories
+    #     push!(medium_categories, cat)
+    # end
 end
 
 register_media(category::Symbol) = register_media([category])
