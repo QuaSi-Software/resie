@@ -231,7 +231,7 @@ function energy_annuity(sim::Dict, p::VDIParams)
     Photovoltaic_IN = sim["Photovoltaic_IN"] .* 1e-6    # convert Wh time series in MWh
     Wind_In = sim["Wind_IN"] .* 1e-6                # convert Wh time series in MWh
     
-    base_price = vecize_price(sim["Grid_price"], length(Grid_IN))    # €/MWh (market price)   # 214.0
+    base_price = sim["Grid_price"]    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
@@ -396,8 +396,7 @@ end
 
 function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
     sim_new = Dict()
-    sim_new["Grid_IN"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
-                         sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+ sim["m_power EnergyFlow Grid_IN->Battery"]
+    sim_new["Grid_IN"] = sim["Grid_IN m_power OUT"]
     sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
                                   sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
                                   sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]

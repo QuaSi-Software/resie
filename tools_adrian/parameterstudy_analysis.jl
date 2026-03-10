@@ -5,12 +5,13 @@ using Tables
 using XLSX
 using Dates
 using JSON
+using Statistics
 import PlotlyJS
 
-const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_297runs_260309_135212.csv"
+const CSV_PATH = "C:/Users/jenter/Documents/resie/output/parameterstudy/results_550runs_260309_161836.csv"
 const OUTDIR = "c:/Users/jenter/Documents/resie/output/parameterstudy/plots/"
 const OUT_CSV_PATH = "C:/Users/jenter/Documents/resie/output/out.csv"
-const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_fuzzy_ems.json"
+const INPUT_JSON_PATH = "C:/Users/jenter/Documents/resie/inputfiles/inputfile_base_no_ems.json"
 
 const XCOLS = [
     "HeatPump_Power / W",
@@ -261,6 +262,142 @@ function create_matrix_plot(
     return p
 end
 
+function parameter_unit_scale(col::String)
+    return (contains(col, "/W") || contains(col, "/Wh")) ? 1e6 : 1.0
+end
+
+function parameter_unit_label(col::String)
+    if contains(col, "/W")
+        return "MW"
+    elseif contains(col, "/Wh")
+        return "MWh"
+    end
+    return "unit"
+end
+
+function parameter_display_name(col::String)
+    return split(col, " / ")[1]
+end
+
+function compute_parameter_sensitivities(
+    df::DataFrame;
+    xcols::Vector{String}=XCOLS,
+    ycol::String=YCOL_NO,
+)
+    dfv = filter_balance(df)
+
+    needed = [xcols; [ycol]]
+    mask = trues(nrow(dfv))
+    for c in needed
+        mask .&= .!ismissing.(dfv[!, c])
+    end
+    d = copy(dfv[mask, needed])
+
+    detail_rows = NamedTuple[]
+    context_cols = [Symbol("fixed_" * replace(parameter_display_name(c), " " => "_") * "_" * parameter_unit_label(c)) for c in xcols]
+
+    for param_col in xcols
+        other_cols = [c for c in xcols if c != param_col]
+        grouped = isempty(other_cols) ? [d] : groupby(d, other_cols; sort=true)
+        scale = parameter_unit_scale(param_col)
+        unit = parameter_unit_label(param_col)
+        sens_unit = "Mio. EUR/$unit"
+
+        for sdf in grouped
+            nrow(sdf) < 2 && continue
+
+            ordered = sort(DataFrame(sdf), param_col)
+            pvals = Vector{Float64}(ordered[!, param_col])
+            avals = Vector{Float64}(ordered[!, ycol])
+
+            for i in 1:(length(pvals) - 1)
+                delta_param_raw = pvals[i + 1] - pvals[i]
+                isapprox(delta_param_raw, 0.0; atol=1e-9, rtol=0.0) && continue
+
+                delta_a_raw = avals[i + 1] - avals[i]
+                delta_param_scaled = delta_param_raw / scale
+                delta_a_scaled = delta_a_raw / 1e6
+                sensitivity = delta_a_scaled / delta_param_scaled
+
+                row = (
+                    parameter=parameter_display_name(param_col),
+                    parameter_column=param_col,
+                    parameter_unit=unit,
+                    sensitivity_unit=sens_unit,
+                    parameter_from=pvals[i] / scale,
+                    parameter_to=pvals[i + 1] / scale,
+                    delta_parameter=delta_param_scaled,
+                    a_total_from=avals[i] / 1e6,
+                    a_total_to=avals[i + 1] / 1e6,
+                    delta_a_total=delta_a_scaled,
+                    sensitivity=sensitivity,
+                )
+
+                for (ctx_col, xcol) in zip(context_cols, xcols)
+                    ctx_value = xcol == param_col ? missing : ordered[i, xcol] / parameter_unit_scale(xcol)
+                    row = merge(row, (ctx_col => ctx_value,))
+                end
+
+                push!(detail_rows, row)
+            end
+        end
+    end
+
+    details = DataFrame(detail_rows)
+    if nrow(details) == 0
+        return details, DataFrame(
+            parameter=String[],
+            parameter_column=String[],
+            parameter_unit=String[],
+            sensitivity_unit=String[],
+            n_pairs=Int[],
+            mean_sensitivity=Float64[],
+            median_sensitivity=Float64[],
+            min_sensitivity=Float64[],
+            max_sensitivity=Float64[],
+            mean_abs_sensitivity=Float64[],
+        )
+    end
+
+    summary = combine(groupby(details, [:parameter, :parameter_column, :parameter_unit, :sensitivity_unit])) do sdf
+        sens = Vector{Float64}(sdf.sensitivity)
+        DataFrame(
+            n_pairs=length(sens),
+            mean_sensitivity=mean(sens),
+            median_sensitivity=median(sens),
+            min_sensitivity=minimum(sens),
+            max_sensitivity=maximum(sens),
+            mean_abs_sensitivity=mean(abs.(sens)),
+        )
+    end
+
+    sort!(summary, :mean_abs_sensitivity, rev=true)
+    return details, summary
+end
+
+function save_parameter_sensitivities(
+    details::DataFrame,
+    summary::DataFrame;
+    outdir::String=OUTDIR,
+    csv_filename::String="parameter_sensitivities_detail.csv",
+    xlsx_filename::String="parameter_sensitivities_summary.xlsx",
+)
+    isdir(outdir) || mkpath(outdir)
+
+    csv_path = joinpath(outdir, csv_filename)
+    xlsx_path = joinpath(outdir, xlsx_filename)
+
+    CSV.write(csv_path, details)
+    XLSX.openxlsx(xlsx_path, mode="w") do xf
+        XLSX.addsheet!(xf, "Summary")
+        XLSX.writetable!(xf["Summary"], Tables.columntable(summary); anchor_cell=XLSX.CellRef("A1"))
+        XLSX.addsheet!(xf, "Details")
+        XLSX.writetable!(xf["Details"], Tables.columntable(details); anchor_cell=XLSX.CellRef("A1"))
+    end
+
+    return csv_path, xlsx_path
+end
+
 function read_prf_values(path::String)
     vals = Float64[]
     for line in eachline(path)
@@ -350,6 +487,8 @@ function main()
     plot_top10_annuity(best10)
     plot_3d_parameter_space(df)
     create_matrix_plot(best25_rows; xcols=XCOLS[1:3], filename="matrix_plot_top25_no_battery.html")
+    sensitivity_details, sensitivity_summary = compute_parameter_sensitivities(df)
+    sensitivity_csv_path, sensitivity_xlsx_path = save_parameter_sensitivities(sensitivity_details, sensitivity_summary)
 
 
     println("\nFertig. Dateien in: $OUTDIR")
@@ -358,6 +497,8 @@ function main()
     println("- top10_annuity_no.png")
     println("- 3d_parameter_space.html")
     println("- matrix_plot_top25_no_battery.html")
+    println("- $(basename(sensitivity_csv_path))")
+    println("- $(basename(sensitivity_xlsx_path))")
     
 end
 

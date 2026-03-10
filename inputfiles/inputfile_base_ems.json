@@ -320,7 +320,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
-            "scale": 0,
+            "scale": 1,
             "m_el_out": "m_power"
         },
         "WindFarm": {
@@ -329,7 +329,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 0,
+            "scale": 1,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
