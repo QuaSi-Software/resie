@@ -52,6 +52,7 @@ mutable struct CM_EMSFuzzy <: ControlModule
         params["secondary_source"] = components[params["secondary_source_uac"]]
         params["demand"] = components[params["heat_demand_uac"]]
         params["renewable_sources"] = [components[uac] for uac in params["renewable_source_uacs"]]
+        params["el_demand"] = components[params["el_demand_uac"]]
         
         params["charging_state"] = Dict{String, Int64}()
         # create new connectivity for BufferTank charging
@@ -220,38 +221,45 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
 
     src_temp_primary = mod_params["primary_source"].input_interfaces[mod_params["primary_source"].m_heat_in].source.temperature_snk_out
     available_th_power_primary = mod_params["primary_source"].max_power_function(src_temp_primary, snk_temp) * primary_power
-    cop_primary = mod_params["primary_source"].dynamic_cop(src_temp_primary, snk_temp)
+    cop_primary = EnergySystems.icing_correction(mod_params["primary_source"], 
+                                                 mod_params["primary_source"].plf_function(1.0) * mod_params["primary_source"].dynamic_cop(src_temp_primary, snk_temp), 
+                                                 src_temp_primary)
     available_el_power_primary = available_th_power_primary / cop_primary
 
     src_temp_secondary = mod_params["secondary_source"].input_interfaces[mod_params["secondary_source"].m_heat_in].source.temperature_snk_out
     available_th_power_secondary = mod_params["secondary_source"].max_power_function(src_temp_secondary, snk_temp) * secondary_power
-    cop_secondary = mod_params["secondary_source"].dynamic_cop(src_temp_secondary, snk_temp)
+    cop_secondary = EnergySystems.icing_correction(mod_params["secondary_source"], 
+                                                   mod_params["secondary_source"].plf_function(1.0) * mod_params["secondary_source"].dynamic_cop(src_temp_secondary, snk_temp), 
+                                                   src_temp_secondary)
     available_el_power_secondary = available_th_power_secondary / cop_secondary
 
-    renewable_el_energy = sum(source.supply for source in mod_params["renewable_sources"]; init=0.0)
+    renewable_el_power = sum(Profiles.power_at_time(source.energy_profile, sim_params) * source.scaling_factor for source in mod_params["renewable_sources"]; init=0.0)
+    el_demand_power = Profiles.power_at_time(mod_params["el_demand"].energy_profile, sim_params) * mod_params["el_demand"].scaling_factor
+    available_renewable_el_power = renewable_el_power - el_demand_power
     available_th_power_storage = sim_params["wh_to_watts"](min(mod_params["storage"].load - mod_params["min_storage_load"] * mod_params["storage"].capacity, mod_params["storage"].max_output_energy))
-    th_power_demand = sim_params["wh_to_watts"](mod_params["demand"].scaling_factor * Profiles.work_at_time(mod_params["demand"].energy_profile, sim_params))
+    th_power_demand = Profiles.power_at_time(mod_params["demand"].energy_profile, sim_params) * mod_params["demand"].scaling_factor
 
     total_th_power_timestep = available_th_power_primary + available_th_power_secondary
     total_el_power_timestep = available_el_power_primary + available_el_power_secondary
     target_power = clamp(plr * total_th_power_timestep, 0.0, total_th_power_timestep)
 
-
+    if sim_params["time"] >= 20*3600 @infiltrate end # 1.01. 17:00 1525500
     if th_power_demand > (available_th_power_storage + target_power)
         # add security factor to account for calculation inaccuracies
-        demand_cover_power = (th_power_demand * 1.1) - available_th_power_storage
-    else
-        min_plr = renewable_el_energy / total_el_power_timestep
-        demand_cover_power = max(plr, min_plr) * total_th_power_timestep
+        target_power = (th_power_demand * 1.1) - available_th_power_storage
     end
 
-    storage_free_energy = max(mod_params["storage"].capacity - mod_params["storage"].load, 0.0)
-    storage_charge_power_soc = sim_params["wh_to_watts"](storage_free_energy)
-    storage_charge_power_rate = sim_params["wh_to_watts"](mod_params["storage"].max_load_rate * mod_params["storage"].capacity)
-    max_storage_charge_power = min(storage_charge_power_soc, storage_charge_power_rate)
-    charge_bonus_power = chargemode > 50 ? max_storage_charge_power : 0.0
+    # make sure all renewable_energy is being used
+    min_plr = available_renewable_el_power / total_el_power_timestep
+    target_power = max(max(plr, min_plr) * total_th_power_timestep, target_power)
 
-    target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power_timestep)
+    # storage_free_energy = max(mod_params["storage"].capacity - mod_params["storage"].load, 0.0)
+    # storage_charge_power_soc = sim_params["wh_to_watts"](storage_free_energy)
+    # storage_charge_power_rate = sim_params["wh_to_watts"](mod_params["storage"].max_load_rate * mod_params["storage"].capacity)
+    # max_storage_charge_power = min(storage_charge_power_soc, storage_charge_power_rate)
+    # charge_bonus_power = chargemode > 50 ? max_storage_charge_power : 0.0
+
+    # target_power = clamp(demand_cover_power + charge_bonus_power, 0.0, total_th_power_timestep)
 
     # set state for BufferTank charging
     if chargemode >= 50
