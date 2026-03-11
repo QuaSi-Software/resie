@@ -475,11 +475,13 @@ function set_max_energies!(unit::HeatPump,
                     is_transformer_potential=is_transformer_potential)
     set_max_energy!(unit.output_interfaces[unit.m_heat_out], heat_out, nothing, slices_heat_out_temperature,
                     purpose_uac_heat_out, has_calculated_all_maxima_heat_out;
-                    is_transformer_potential=is_transformer_potential)
+                    is_transformer_potential=(is_transformer_potential && !unit.has_secondary_interface))
     if unit.has_secondary_interface
         set_max_energy!(unit.output_interfaces[unit.m_heat_out_secondary], heat_out_secondary, nothing,
                         slices_heat_out_secondary_temperature, purpose_uac_heat_out_secondary,
-                        has_calculated_all_maxima_heat_out; is_transformer_potential=is_transformer_potential)
+                        has_calculated_all_maxima_heat_out; is_transformer_potential=false)
+        # if unit.has_secondary_interface, always write max energy to allow communication  
+        # across the two interfaces. This may can lead to problems in very complex energy systems.
     end
 end
 
