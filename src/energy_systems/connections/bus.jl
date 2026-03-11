@@ -351,7 +351,8 @@ function set_max_energy!(unit::Bus,
                          purpose_uac::Union{Stringing,Vector{<:Stringing}},
                          has_calculated_all_maxima::Bool,
                          recalculate_max_energy::Bool,
-                         is_secondary_interface::Bool=false)
+                         is_secondary_interface::Bool=false,
+                         is_transformer_potential::Bool=false)
     bus = unit.proxy === nothing ? unit : unit.proxy
     com_uac = adjust_name_if_secondary(comp.uac, is_secondary_interface)
 
@@ -373,7 +374,8 @@ function set_max_energy!(unit::Bus,
                         recalculate_max_energy)
     end
 
-    if unit.proxy !== nothing
+    # update also proxy interface, but only in process-step, not in potential
+    if unit.proxy !== nothing && !is_transformer_potential
         proxy_interface = is_input ?
                           bus.input_interfaces[bus.balance_table_inputs[com_uac].priority] :
                           bus.output_interfaces[bus.balance_table_outputs[comp.uac].priority]
@@ -601,7 +603,11 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy) # the caller has not calculated its potential
+                if unit.balance_table[input_row.priority, output_row.priority * 2 - 1] == 0.0 &&
+                   is_max_energy_nothing(interface.max_energy)
+                    # the caller has not calculated its potential OR has another potential AND 
+                    # no energy has been distributed in the bus balance table due to other restrictions,
+                    # so get the original energy that are required by the output, including the temperatures.
                     temperature_min = get_min_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
                                                           input_row.source.uac)
                     temperature_max = get_max_temperature(output_row.energy_potential_temp, output_row.energy_pool_temp,
@@ -660,8 +666,11 @@ function balance_on(interface::SystemInterface, unit::Bus)::Vector{EnergyExchang
                     energy_pot = 0.0
                 end
             else
-                if is_max_energy_nothing(interface.max_energy)
-                    # no max_energy is written, but maybe temperatures --> get infos from input_row
+                if unit.balance_table[input_row.priority, output_row.priority * 2 - 1] == 0.0 &&
+                   is_max_energy_nothing(interface.max_energy)
+                    # the caller has not calculated its potential OR has another potential AND 
+                    # no energy has been distributed in the bus balance table due to other restrictions,
+                    # so get the original energy that are supplied by the input, including the temperatures
                     temperature_min = get_min_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
                                                           output_row.target.uac)
                     temperature_max = get_max_temperature(input_row.energy_potential_temp, input_row.energy_pool_temp,
