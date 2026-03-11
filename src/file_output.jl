@@ -20,7 +20,6 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
                          emissions_parameter::Union{Nothing,AbstractDict{String,Any}},
                          components::Grouping)::Tuple{Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}},
-                                                      Union{Nothing,Vector{EnergySystems.OutputKey}},
                                                       Union{Nothing,Vector{EnergySystems.OutputKey}}}
     function parse_all_mode(io_settings, setting_name::String)
         do_create = false
@@ -124,12 +123,11 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         end
     end
 
-    # Economy filter
-    is_economy_key(ok::EnergySystems.OutputKey) = occursin("OUT", ok.value_key) || occursin("IN", ok.value_key)
-
-    # Emissions filter
-    is_emissions_key = is_economy_key
-
+    # Economy and emission filter
+    is_economy_emission_key(ok::EnergySystems.OutputKey) = occursin("OUT", ok.value_key) ||
+                                                           occursin("IN", ok.value_key) ||
+                                                           occursin("Supply", ok.value_key) ||
+                                                           occursin("Demand", ok.value_key)
     # get requirements
     do_create_plot, do_plot_all_excl, do_plot_all_incl = parse_all_mode(io_settings, "output_plot")
     do_write_CSV, do_csv_all_excl, do_csv_all_incl = parse_all_mode(io_settings, "csv_output_keys")
@@ -175,27 +173,17 @@ function get_output_keys(io_settings::AbstractDict{String,Any},
         output_keys_to_csv = nothing
     end
 
-    # Economy keys
-    if do_economy
+    # Economy or emissions keys
+    if do_economy || do_emissions
         # Use excl_flows "all" as base
-        output_keys_economy = copy(all_output_keys_excl_flows)
-        filter!(is_economy_key, output_keys_economy)
+        output_keys_economy_emissions = copy(all_output_keys_excl_flows)
+        filter!(is_economy_emission_key, output_keys_economy_emissions)
         # keep stable ordering (all_output_keys_excl_flows is already sorted)
     else
-        output_keys_economy = nothing
+        output_keys_economy_emissions = nothing
     end
 
-    # Emissions keys
-    if do_economy
-        # Use excl_flows "all" as base
-        output_keys_emissions = copy(all_output_keys_excl_flows)
-        filter!(is_emissions_key, output_keys_emissions)
-        # keep stable ordering (all_output_keys_excl_flows is already sorted)
-    else
-        output_keys_emissions = nothing
-    end
-
-    return output_keys_lineplot, output_keys_to_csv, output_keys_economy, output_keys_emissions
+    return output_keys_lineplot, output_keys_to_csv, output_keys_economy_emissions
 end
 
 """

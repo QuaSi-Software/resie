@@ -81,6 +81,7 @@ using .EnergySystems
 
 include("project_loading.jl")
 include("file_output.jl")
+include("economy.jl")
 
 include("resie_logger.jl")
 using .Resie_Logger
@@ -218,15 +219,13 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     economy_parameter = haskey(project_config, "economy_parameter") ? project_config["economy_parameter"] : nothing
     emissions_parameter = haskey(project_config, "emissions_parameter") ? project_config["emissions_parameter"] :
                           nothing
-    output_keys_lineplot, output_keys_to_CSV, output_keys_economy, output_keys_emissions = get_output_keys(project_config["io_settings"],
-                                                                                                           economy_parameter,
-                                                                                                           emissions_parameter,
-                                                                                                           components)
+    output_keys_lineplot, output_keys_to_CSV, output_keys_economy_emission = get_output_keys(project_config["io_settings"],
+                                                                                             economy_parameter,
+                                                                                             emissions_parameter,
+                                                                                             components)
     all_requested_output_keys = Vector{Resie.EnergySystems.OutputKey}(unique(vcat(something(output_keys_lineplot,
                                                                                             String[]),
-                                                                                  something(output_keys_economy,
-                                                                                            String[]),
-                                                                                  something(output_keys_emissions,
+                                                                                  something(output_keys_economy_emission,
                                                                                             String[]))))
     weather_data_keys = get_weather_data_keys(sim_params)
     do_create_plot_data = output_keys_lineplot !== nothing
@@ -386,18 +385,18 @@ function run_simulation_loop(project_config::AbstractDict{AbstractString,Any},
     time_and_subset_cols(key_indexes, keys) = vcat(1, subset_cols(key_indexes, keys))
     key_indexes = Dict(output_key_signature(k) => i for (i, k) in pairs(all_requested_output_keys))
 
-    if do_calculate_economy
-        output_data_economy = Matrix(view(output_data_all_requested, :,
-                                          time_and_subset_cols(key_indexes, output_keys_economy)))
-        # calculate economy TODO
-        # calculate_and_output_economy(components, output_keys_economy, output_data_economy, sim_params,
-        #                              project_config["economy_parameter"])
-    end
-    if do_calculate_emissions
-        output_data_emissions = Matrix(view(output_data_all_requested, :,
-                                            time_and_subset_cols(key_indexes, output_keys_emissions)))
-
-        # calculate emissions TODO
+    if do_calculate_economy || do_calculate_emissions
+        output_data_economy_emissions = Matrix(view(output_data_all_requested, :,
+                                                    time_and_subset_cols(key_indexes, output_keys_economy_emission)))
+        economy_emissions_data = prepare_economy_emissions_data(components, output_keys_economy_emission,
+                                                                output_data_economy_emissions)
+        economy_result = do_calculate_economy ?
+                         calculate_economy(economy_emissions_data, sim_params, project_config["economy_parameter"]) :
+                         nothing
+        emissions_result = do_calculate_emissions ?
+                           calculate_emissions(economy_emissions_data, sim_params,
+                                               project_config["economy_parameter"]) :
+                           nothing
     end
 
     # write output to CSV if not done continuously
