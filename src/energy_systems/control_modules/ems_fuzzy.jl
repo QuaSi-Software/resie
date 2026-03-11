@@ -1,5 +1,5 @@
 using Dates
-using Infiltrator
+
 """
 Control module for running a component depending on the state of a linked storage component.
 In particular it switches to a state of allowing operation of the component when the load
@@ -228,7 +228,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
         src_temp_primary = prim.input_interfaces[prim.m_heat_in].source.temperature_snk_out
     end
     available_th_power_primary = prim.max_power_function(src_temp_primary, snk_temp) * 
-                                 primary_power * prim.heat_losses_factor
+                                 primary_power
     cop_primary = prim.plf_function(1.0) * prim.dynamic_cop(src_temp_primary, snk_temp)
     if prim.consider_icing
         cop_primary = EnergySystems.icing_correction(prim, cop_primary, src_temp_primary)
@@ -243,7 +243,7 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
         src_temp_secondary = sec.input_interfaces[sec.m_heat_in].source.temperature_snk_out
     end
     available_th_power_secondary = sec.max_power_function(src_temp_secondary, snk_temp) * 
-                                   secondary_power * sec.heat_losses_factor
+                                   secondary_power
     cop_secondary = sec.plf_function(1.0) * sec.dynamic_cop(src_temp_secondary, snk_temp)
     if sec.consider_icing
         cop_secondary = EnergySystems.icing_correction(sec, cop_secondary, src_temp_secondary)
@@ -271,7 +271,6 @@ function run_fuzzy_ems!(mod_params::Dict{String,Any}, sim_params::Dict{String,An
     remaining_renewable_el_power = max(available_renewable_el_power - min_plr_primary * available_el_power_primary, 0.0)
     min_plr_secondary = clamp(remaining_renewable_el_power / available_el_power_secondary, 0.0, 1.0)
     
-    if sim_params["time"] >= 20*3600 @infiltrate end # 1.01. 17:00 1525500
     min_plr = (min_plr_primary * available_th_power_primary + min_plr_secondary * available_th_power_secondary) /
               total_th_power
     target_power = max(max(plr, min_plr) * total_th_power, target_power)

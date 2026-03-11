@@ -424,7 +424,8 @@ function future_sim(sim_length::TimePeriod,
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = max_cop
             available_el_power_hp_neg[idx] = available_th_power_hp_neg[idx] / cops_hp[idx]
-            max_el_power_hp[idx] = max_th_power_hp[idx] / max_cop
+            max_el_power_hp[idx] = max_th_power_hp[idx] / max_cop / hp.power_losses_factor + 
+                                   hp.current_constant_loss
         else
             max_th_power_hp[idx] = th_power / output_data[hp_uac * "Avg_PLR"][idx]
             available_th_power_hp_neg[idx] = max_th_power_hp[idx] - th_power
@@ -432,7 +433,8 @@ function future_sim(sim_length::TimePeriod,
                                                     available_th_power_hp_neg[idx])
             cops_hp[idx] = output_data[hp_uac * "COP"][idx]
             available_el_power_hp_neg[idx] = available_th_power_hp_neg[idx] / cops_hp[idx]
-            max_el_power_hp[idx] = max_th_power_hp[idx] / max_cop
+            max_el_power_hp[idx] = max_th_power_hp[idx] / max_cop / hp.power_losses_factor + 
+                                   hp.current_constant_loss
         end
     end
 
@@ -453,7 +455,9 @@ function future_sim(sim_length::TimePeriod,
         end
     end
     available_el_power_boiler_neg = min.(available_storage_power_neg .- available_th_power_hp_neg, 
-                                            available_th_power_boiler_neg)
+                                         available_th_power_boiler_neg) ./ 
+                                    comps[boiler_uac].power_losses_factor .+ 
+                                    comps[boiler_uac].current_constant_loss
 
     # calculate total marketable negative control reserve
     available_el_power_neg = minimum(available_el_power_hp_neg .+ available_el_power_boiler_neg)
@@ -475,7 +479,9 @@ function future_sim(sim_length::TimePeriod,
             available_th_power_boiler_pos[idx] = min(available_storage_power_pos[idx], th_power)
         end
     end
-    available_el_power_boiler_pos = available_th_power_boiler_pos
+    available_el_power_boiler_pos = available_th_power_boiler_pos ./ 
+                                    comps[boiler_uac].power_losses_factor .+ 
+                                    comps[boiler_uac].current_constant_loss
 
     # calculate how much the power from the hp can be reduced additionally to the boiler
     available_th_power_hp_pos = zeros(length(used_th_power_hp))
