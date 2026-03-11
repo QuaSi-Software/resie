@@ -916,7 +916,7 @@ function inner_distribute!(unit::Bus; caller_uac_transformer_only::Stringing=not
         unit.balance_table[input_row.priority, output_row.priority * 2] = lowest(temperature_highest_min,
                                                                                  temperature_lowest_max)
 
-        if energy_flow !== 0.0
+        if energy_flow !== 0.0 && !isinf(energy_flow)
             # extract the already distributed energy from the balance table
             already_distributed_input_energies = Float64.(unit.balance_table[input_row.priority, 1:2:end])
             already_distributed_input_temperatures = unit.balance_table[input_row.priority, 2:2:end]
