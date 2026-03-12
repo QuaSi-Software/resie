@@ -5,6 +5,8 @@ using Dates: now, seconds
 using UUIDs
 using LinearAlgebra
 using Base.Threads
+using Optim
+using BlackBoxOptim
 
 """
 Contains the parameters, instantiated components and the order of operations for a simulation run.
@@ -488,44 +490,59 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     proccesed_results_path = sim_params["run_path"](proccesed_results_path)
     open(proccesed_results_path, "w") do f end
 
-    if !isnothing(project_config["optimizer"])
+    if haskey(project_config, "optimizer")
         #TODO maybe write optimizer back to project_config to be easily accesible anywhere else
         optimizer = load_optimizer(project_config["optimizer"])
 
-        runidx_global = Atomic{Int}(1)
         all_results = []
         if haskey(optimizer, "objective_params")
             obj = Array{Union{Float64,Nothing}}(nothing, length(parse_outkeys(optimizer["objective_params"])))
             obj_lock = ReentrantLock()
         end
 
-        @globalInfo "Starting $(Threads.nthreads()) parallel simulations"
+        @globalInfo "Starting Simulations on $(Threads.nthreads()) Threads"
         #TODO find a way to cancel all the runs with STRG+C besides smashing the keys
-        @threads for sample_values in collect(optimizer["iterator"])
-            runidx = atomic_add!(runidx_global, 1)
-            sample_ID = uuid4()
-            start_time = now()
+        if length(optimizer["iterator"]) > 1
+            @threads for sample_values in collect(optimizer["iterator"])
+                sample_ID = uuid4()
+                start_time = now()
 
-            # decide which algorithm to run based on type of optimizer
-            if optimizer["type"] == "parametervariation"
-                sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
-                results = run_sample(sim_params, proccesed_results_path, project_config, 
-                                     optimizer, sample_params, sample_ID, 
-                                     run_lock, output_lock)
-                lock(results_lock) do 
-                    push!(all_results, results) 
+                # decide which algorithm to run based on type of optimizer
+                if optimizer["type"] == "parametervariation"
+                    sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
+                    results = run_sample(sim_params, proccesed_results_path, project_config, 
+                                         optimizer, sample_params, sample_ID, 
+                                         run_lock, output_lock)
+                    lock(results_lock) do 
+                        push!(all_results, results) 
+                    end
+
+                elseif optimizer["type"] == "monte_carlo_annealing"
+                    monte_carlo_annealing!(all_results, obj, obj_lock, 
+                                           sim_params, proccesed_results_path, project_config, 
+                                           optimizer, sample_values, sample_ID, 
+                                           run_lock, output_lock, results_lock)
                 end
-
-            elseif optimizer["type"] == "monte_carlo_annealing"
-                monte_carlo_annealing!(all_results, obj, obj_lock, 
-                                       sim_params, proccesed_results_path, project_config, 
-                                       optimizer, sample_values, sample_ID, 
-                                       run_lock, output_lock, results_lock)
+                runtime = round(Int, Dates.seconds(now() - start_time))
+                max_runs = length(optimizer["iterator"])
+                eta = round(Int, (max_runs - length(all_results)) * runtime / Threads.nthreads() / 60)
+                @globalInfo "[$(length(all_results))/$max_runs] → completed in $runtime s. ETA: $eta min"
             end
-
+        else
+            start_time = now()
+            if optimizer["type"] == "Optim"
+                optimize(sample_values -> optim_func!(all_results, sim_params, proccesed_results_path, 
+                                                      project_config, optimizer, sample_values, 
+                                                      run_lock, output_lock, results_lock), 
+                         optimizer["args"]...)
+            elseif optimizer["type"] == "BlackBoxOptim"
+                bboptimize(sample_values -> optim_func!(all_results, sim_params, proccesed_results_path, 
+                                                        project_config, optimizer, sample_values, 
+                                                        run_lock, output_lock, results_lock),
+                           optimizer["args"]...; optimizer["kwargs"]...)
+            end
             runtime = round(Int, Dates.seconds(now() - start_time))
-            eta = round(Int, (optimizer["total_runs"] - runidx) * runtime / Threads.nthreads() / 60)
-            @globalInfo "[$runidx/$(optimizer["total_runs"])] → completed in $runtime s. ETA: $eta min"
+            @globalInfo "[$(length(all_results)) runs → completed in $runtime s."
         end
 
         if !optimizer["continuous_output"]
@@ -543,7 +560,7 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
             end
         end
 
-        if optimizer["do_matrix_plot"]
+        if !isnothing(optimizer["matrix_plot_objective"])
             create_matrix_plot(all_results, optimizer, sim_params)
         end
     else
@@ -554,11 +571,12 @@ function load_and_run(filepath::String, run_ID::UUID)::Bool
     return true
 end
 
+#TODO move everything connected to optimization to new file
 function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params, 
                                 proccesed_results_path, project_config, optimizer, idx,
                                 run_ID, run_lock, output_lock, results_lock)
     # temperature schedule is simple inverse logistic curve
-    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / optimizer["total_runs"] - 0.5)))
+    temperature = 1.0 - 1.0 / (1.0 + exp(-8.0 * (idx / length(optimizer["iterator"]) - 0.5)))
 
     if length(all_results) == 0 || rand() < temperature
         # set parameters to equally distributed random values across whole parameter space
@@ -587,12 +605,6 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
                          sample_params, run_ID, run_lock, output_lock)
 
-    obj_input = zeros(length(obj))
-    for (idx, key) in enumerate(parse_outkeys(optimizer["objective_params"]))
-        obj_input[idx] = results[key]
-    end
-    results["objective"] = optimizer["objective_function"](obj_input...)
-
     # calculate minimum of results
     if any(!isnothing(obj))
         @lock obj_lock obj = results["objective"]
@@ -612,10 +624,23 @@ function monte_carlo_annealing!(all_results, obj, obj_lock, sim_params,
     end
 end
 
+function optim_func!(all_results, sim_params, proccesed_results_path, project_config, 
+                     optimizer, sample_values, run_lock, output_lock, results_lock)
+
+    sample_params = Dict{String, Any}(zip(optimizer["optim_params_keys"], sample_values))
+    run_ID = uuid4()
+    results = run_sample(sim_params, proccesed_results_path, project_config, optimizer,
+                         sample_params, run_ID, run_lock, output_lock)
+
+    lock(results_lock) do 
+        push!(all_results, results)
+    end
+
+    return results["objective"]
+end
+
 function run_sample(sim_params, proccesed_results_path, project_config, optimizer, sample_params, run_ID, run_lock, output_lock)
-    ####################################################
-    # Simulation
-    ####################################################
+
     if sample_params !== nothing
         project_config = create_variant(sim_params, project_config, sample_params)
     end
@@ -673,6 +698,14 @@ function run_sample(sim_params, proccesed_results_path, project_config, optimize
             for key in parse_outkeys(optimizer["output_keys_mean"])
                 results[key] = sum(sim_output[key]) / length(sim_output[key])
             end 
+            if haskey(optimizer, "objective_function")
+                obj_param_keys = parse_outkeys(optimizer["objective_params"])
+                obj_input = zeros(length(obj_param_keys))
+                for (idx, key) in enumerate(obj_param_keys)
+                    obj_input[idx] = results[key]
+                end
+                results["objective"] = optimizer["objective_function"](obj_input...)
+            end
         end
 
     catch e
@@ -846,11 +879,14 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
     end
 
     optimizer["continuous_output"] = default(optimizer_config, "continuous_output", true)
-    optimizer["do_matrix_plot"] = haskey(optimizer_config, "matrix_plot") &&
-                                  optimizer_config["matrix_plot"] !== "nothing"
-    if haskey(optimizer_config, "matrix_plot_file")          
-        optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
-    end                                       
+    if haskey(optimizer_config, "matrix_plot") && optimizer_config["matrix_plot"] !== "nothing"
+        optimizer["matrix_plot_objective"] = optimizer_config["matrix_plot"]
+    else
+        optimizer["matrix_plot_objective"] = nothing
+    end
+    optimizer["matrix_plot_file"] = optimizer_config["matrix_plot_file"]
+
+                                           
 
     if optimizer_config["type"] == "parametervariation"
 
@@ -867,16 +903,108 @@ function load_optimizer(optimizer_config::OrderedDict{String,Any})
             optimizer["iterator"] = rand(collect(iter), n_samples)
         end
 
-        optimizer["total_runs"] = lenght(optimizer["iterator"])
-
     elseif optimizer_config["type"] == "monte_carlo_annealing"
         optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
-
         optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
 
-        optimizer["total_runs"] = optimizer_config["max_runs"]
-        optimizer["iterator"] = range(1, optimizer["total_runs"]; step=1)
+        optimizer["iterator"] = range(1, optimizer_config["max_runs"]; step=1)
         optimizer["nbh_scale"] = default(optimizer_config, "nbh_scale", 0.5)
+
+    elseif optimizer_config["type"] == "Optim"
+        upper_bounds = zeros(length(optimizer["optim_params"]))
+        lower_bounds = zeros(length(optimizer["optim_params"]))
+        start_values = zeros(length(optimizer["optim_params"]))
+        for (idx, param) in enumerate(values(optimizer["optim_params"]))
+            if haskey(param, "max")
+                upper_bounds[idx] = param["max"]
+            end
+            if haskey(param, "min")
+                lower_bounds[idx] = param["min"]
+            end
+            start_values[idx] = param["start"]
+        end
+
+        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
+
+        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
+        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
+
+        optimizer["iterator"] = [1]
+
+        optimizer["args"] = []
+
+        if optimizer_config["algorithm"] == "NelderMead"
+            alg = NelderMead()
+
+        elseif optimizer_config["algorithm"] == "SimulatedAnnealing"
+            alg = SimulatedAnnealing()
+
+        elseif optimizer_config["algorithm"] == "SAMIN"
+            alg = SAMIN()
+            push!(optimizer["args"], lower_bounds)
+            push!(optimizer["args"], upper_bounds)
+
+        elseif optimizer_config["algorithm"] == "ParticleSwarm"
+            alg = ParticleSwarm(; upper=upper_bounds, lower=lower_bounds)
+        else
+            @error "For optimization type 'Optim' the algorithm has to be one of " *
+            "'NelderMead', 'SimulatedAnnealing', 'SAMIN', 'ParticleSwarm'."
+            throw(InputError())
+        end
+
+        push!(optimizer["args"], start_values)
+        push!(optimizer["args"], alg)
+        
+        optimizer["kwargs"] = Dict{Symbol,Any}()
+        optimizer["kwargs"][Symbol("show_trace")] = true
+        if haskey(optimizer_config, "optim_kwargs")
+            for (keyword, val) in pairs(optimizer_config["optim_kwargs"])
+                optimizer["kwargs"][Symbol(keyword)] = val
+            end
+        end
+        if haskey(optimizer_config, "max_runs")
+            optimizer["kwargs"][Symbol("iterations")] = optimizer_config["max_runs"]
+        end
+        if !isempty(optimizer["kwargs"])
+            push!(optimizer["args"], Optim.Options(; optimizer["kwargs"]...))
+        end
+
+    elseif optimizer_config["type"] == "BlackBoxOptim"
+        bounds = Array{Tuple{Float64, Float64}, 1}()
+        start_values = Array{Float64, 1}()
+        for param in values(optimizer["optim_params"])
+            if haskey(param, "max") && haskey(param, "min")
+                push!(bounds, (param["min"], param["max"]))
+            end
+            push!(start_values, param["start"])
+        end
+
+        optimizer["optim_params_keys"] = keys(optimizer["optim_params"])
+
+        optimizer["objective_function"] = parse_optimizer_function(optimizer_config["objective_function"])
+        optimizer["objective_params"] = merge(optimizer["output_keys_sum"], optimizer["output_keys_mean"])
+
+        optimizer["iterator"] = [1]
+
+        alg = Symbol(optimizer_config["algorithm"])
+
+        optimizer["args"] = [start_values]
+
+        optimizer["kwargs"] = Dict{Symbol,Any}()
+        optimizer["kwargs"][:Method] = alg
+        if !isempty(bounds)
+            optimizer["kwargs"][:SearchRange] = bounds
+        end
+        optimizer["kwargs"][:NumDimensions] = length(start_values)
+        optimizer["kwargs"][:NThreads] = Threads.nthreads() - 1
+        if haskey(optimizer_config, "max_runs")
+            optimizer["kwargs"][:MaxFuncEvals] = optimizer_config["max_runs"]
+        end
+        if haskey(optimizer_config, "optim_kwargs")
+            for (keyword, val) in pairs(optimizer_config["optim_kwargs"])
+                optimizer["kwargs"][Symbol(keyword)] = val
+            end
+        end
 
     else
         #TODO parse_objective_function and parameters for more complicated algorithms

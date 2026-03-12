@@ -504,7 +504,7 @@ function get_output_row(output_keys::Union{Nothing,Vector{EnergySystems.OutputKe
                         weather_data_keys::Union{Nothing,Vector{String}},
                         sim_params::Dict{String,Any},
                         csv_time_unit::String)
-    row = Array{Float64}(undef, 0)
+    row = Array{Union{Float64, String}}(undef, 0)
     if csv_time_unit !== nothing
         if csv_time_unit == "seconds"
             time = sim_params["time_since_output"]
@@ -1008,12 +1008,22 @@ function create_matrix_plot(results::Vector{Any}, optimizer::Dict{String,Any}, s
     N = length(param_names)
 
     results_dict = Dict(k => [d[k] for d in results] for k in keys(results[1]))
-    objective = results_dict["objective"]
-
-    scatter_traces = splom(
+    objective = results_dict[optimizer["matrix_plot_objective"]]
+    objective = replace(objective, NaN=>missing)
+    min_obj = minimum(skipmissing(objective))
+    low_quartile_obj = sort(objective)[length(objective) ÷ 4]
+    scatter_traces = splom(  
         dimensions = [attr(label=k, values=results_dict[k]) for k in param_names],
-        marker = attr(color=objective, colorscale="Viridis", size=5, showscale=true)
-    )
+        marker = attr(color=objective, 
+                      colorscale=reverse(ColorSchemes.viridis), 
+                      cmin=min_obj,
+                      cmax=low_quartile_obj,
+                      showscale=true,
+                      line=attr(color="red", width=objective.==min_obj * 1)
+                      ),
+        text = string.(objective),
+        hovertemplate = "%{x}, %{y}, %{text}"
+        )
     p = plot(scatter_traces)
     
     file_path = sim_params["run_path"](default(optimizer, 
