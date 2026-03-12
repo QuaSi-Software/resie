@@ -218,7 +218,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/pv_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "WindFarm": {
@@ -227,7 +227,7 @@
                 "BUS_Power"
             ],
             "energy_profile_file_path": "./profiles/MA/wind_power_w_germersheim.prf",
-            "scale": 1,
+            "scale": 0,
             "m_el_out": "m_power"
         },
         "Heat_Source_HeatPump": {
@@ -354,7 +354,7 @@
                 "price_trend_profile_path": "profiles/MA/stock_trend_EUR_MWh_per_h.prf",
                 "price_volatility_profile_path": "profiles/MA/stock_volatility_EUR_MWh.prf",
                 "min_storage_load": 0.1,
-                "rolling_horizon_hours": 12,
+                "rolling_horizon_hours": 14,
                 "power_bus_uac": "BUS_Power",
                 "battery_uac": "Battery",
                 "el_grid_uac": "Grid_IN",
@@ -390,7 +390,7 @@
             "medium": "m_heat",
             "___GENERAL PARAMETER___": "",
             "model_type": "ideally_stratified",
-            "capacity": 25.0e6,
+            "capacity": 30.0e6,
             "rho_medium": 1000,
             "cp_medium": 4180.0,
             "high_temperature": 90.0,

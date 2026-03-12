@@ -377,11 +377,11 @@ function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
 
       a1 = min_temp - 1
       b1 = min_temp
-      c1 = (max_temp + min_temp) / 2
+      c1 = 0.5*(max_temp + min_temp)
       a2 = min_temp
-      b2 = (max_temp + min_temp) / 2
+      b2 = 0.5*(max_temp + min_temp)
       c2 = max_temp
-      a3 = (max_temp + min_temp) / 2
+      a3 = 0.5*(max_temp + min_temp)
       b3 = max_temp
       c3 = max_temp + 1
       
@@ -395,6 +395,7 @@ function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
         # expensive = max(min((p_now - 100) / 20, 1, (1001 - p_now) / 1), 0)
     
     # definition of membership functions for price trend
+    # TrapezoidalMF max(min((x - a) / (b - a), 1, (d - x) / (d - c)), 0)
       falling = max(min((p_trend - -258) / 1, 1, (1 - p_trend) / 8), 0)
       stable = max(min((p_trend - -7) / 7, (6 - p_trend) / 6), 0)
       rising = max(min((p_trend - -1) / 7, 1, (247 - p_trend) / 1), 0)
@@ -420,6 +421,7 @@ function fuzzy_control_chargemode(p_now, p_trend, temp_min, temp_max)
       plr_max = plr_den == 0 ? NaN : plr_num / plr_den
       chargemode_agg = collect(LinRange{Float64}(-1.0, 101.0, 101))
       @inbounds for (i, x) = enumerate(chargemode_agg)
+    # TriangularMF max(min((x - a) / (b - a), (c - x) / (c - b)), 0)
               off = max(min((x - -1.0) / 1.0, (51.0 - x) / 51.0), 0)
               on = max(min((x - 49.0) / 51.0, (101.0 - x) / 1.0), 0)
               chargemode_agg[i] = max(max(max(max(max(max(max(max(min(ant1, off), min(ant2, on)), min(ant3, on)), min(ant4, off)), min(ant5, on)), min(ant6, on)), min(ant7, off)), min(ant8, off)), min(ant9, on))

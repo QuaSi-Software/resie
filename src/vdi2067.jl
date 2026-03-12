@@ -227,22 +227,28 @@ end
 ############################################################
 
 function energy_annuity(sim::Dict, p::VDIParams)
-    Grid_IN = sim["Grid_IN"] .* 1e-6                             # convert Wh time series in MWh
-    Photovoltaic_IN = sim["Photovoltaic_IN"] .* 1e-6    # convert Wh time series in MWh
-    Wind_In = sim["Wind_IN"] .* 1e-6                # convert Wh time series in MWh
-    
-    base_price = sim["Grid_price"]    # €/MWh (market price)   # 214.0
+    base_price = 214.0  #sim["Grid_price"]    # €/MWh (market price)   # 214.0
     Photovoltaic_price = 50.0
     Wind_price = 80.0
 
-    # A_V1: energy costs of first year [EUR]
-    # MWh * EUR/MWh → EUR
-    A1 = sum(Grid_IN .* base_price) + sum(Photovoltaic_IN .* Photovoltaic_price) + sum(Wind_In .* Wind_price)  
-
     a = annuity_factor(p.i_cap, p.T)
     b = price_change_factor(p.r_energy, p.i_cap, p.T)
+    annuitize_energy(flow_Wh, price) = sum(flow_Wh .* 1e-6 .* price) * a * b
 
-    return A1 * a * b
+    A_energy_grid_heat = annuitize_energy(sim["Grid_IN_Heat"], base_price)
+    A_energy_grid_power = annuitize_energy(sim["Grid_IN_Power"], base_price)
+    A_energy_pv_heat = annuitize_energy(sim["Photovoltaic_IN_Heat"], Photovoltaic_price)
+    A_energy_pv_power = annuitize_energy(sim["Photovoltaic_IN_Power"], Photovoltaic_price)
+    A_energy_wind_heat = annuitize_energy(sim["Wind_IN_Heat"], Wind_price)
+    A_energy_wind_power = annuitize_energy(sim["Wind_IN_Power"], Wind_price)
+
+    A_energy_heat = A_energy_grid_heat + A_energy_pv_heat + A_energy_wind_heat
+    A_energy_power = A_energy_grid_power + A_energy_pv_power + A_energy_wind_power
+
+    return OrderedDict(
+        "A_energy_heat" => A_energy_heat,
+        "A_energy_power" => A_energy_power
+    )
 end
 
 
@@ -374,19 +380,29 @@ function revenue_feedin(sim::Dict, p::VDIParams)
 end
 
 function co2_yearly(sim::Dict)
-    IN = sim["Grid_IN"] .* 1e-3        # convert Wh time series in kWh
-    co2_intensity = vecize_price(sim["CO2_Grid"], length(IN))    # g/kWh  #TODO fixed value if no dynamic prices
-    
-    Wind = sim["Wind_usage"] .* 1e-3        # convert Wh time series in kWh
+    Grid_heat = sim["Grid_IN_Heat"] .* 1e-3
+    Grid_power = sim["Grid_IN_Power"] .* 1e-3
+    co2_intensity = vecize_price(sim["CO2_Grid"], length(Grid_heat))    # g/kWh  #TODO fixed value if no dynamic prices
+
+    Wind_heat = sim["Wind_IN_Heat"] .* 1e-3
+    Wind_power = sim["Wind_IN_Power"] .* 1e-3
     co2_intensity_Wind = 15.0  # g/kWh, assumption
 
-    PV = sim["Photovoltaic_usage"] .* 1e-3        # convert Wh time series in kWh
+    PV_heat = sim["Photovoltaic_IN_Heat"] .* 1e-3
+    PV_power = sim["Photovoltaic_IN_Power"] .* 1e-3
     co2_intensity_PV = 50.0  # g/kWh, assumption
-    
-    yearly_co2 = (sum(IN .* co2_intensity) + sum(Wind .* co2_intensity_Wind) + sum(PV .* co2_intensity_PV)) .* 1e-6   # t CO2 per year, convert g to t
 
+    yearly_co2_heat = (sum(Grid_heat .* co2_intensity) +
+                       sum(Wind_heat .* co2_intensity_Wind) +
+                       sum(PV_heat .* co2_intensity_PV)) .* 1e-6
+    yearly_co2_power = (sum(Grid_power .* co2_intensity) +
+                        sum(Wind_power .* co2_intensity_Wind) +
+                        sum(PV_power .* co2_intensity_PV)) .* 1e-6
 
-    return yearly_co2 
+    return OrderedDict(
+        "CO2_yearly_heat" => yearly_co2_heat,
+        "CO2_yearly_power" => yearly_co2_power
+    )
 
 end
 
@@ -397,12 +413,24 @@ end
 function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDIComponent}, p::VDIParams)
     sim_new = Dict()
     sim_new["Grid_IN"] = sim["Grid_IN m_power OUT"]
-    sim_new["Power_Demand_P2H"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+ sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"] .+
-                                  sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+ sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"] .+
-                                  sim["m_power EnergyFlow WindFarm->HeatPump"] .+ sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
-    sim_new["Power_Demand_Demand"] = sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+
-                                     sim["m_power EnergyFlow Photovoltaic->Demand_Power"].+
-                                     sim["m_power EnergyFlow WindFarm->Demand_Power"] .+
+    sim_new["Grid_IN_Heat"] = sim["m_power EnergyFlow Grid_IN->HeatPump"] .+
+                              sim["m_power EnergyFlow Grid_IN->ElectrodeBoiler"]
+    sim_new["Grid_IN_Power"] = sim["m_power EnergyFlow Grid_IN->Demand_Power"] .+
+                               sim["m_power EnergyFlow Grid_IN->Battery"]
+    sim_new["Photovoltaic_IN_Heat"] = sim["m_power EnergyFlow Photovoltaic->HeatPump"] .+
+                                      sim["m_power EnergyFlow Photovoltaic->ElectrodeBoiler"]
+    sim_new["Photovoltaic_IN_Power"] = sim["m_power EnergyFlow Photovoltaic->Demand_Power"] .+
+                                       sim["m_power EnergyFlow Photovoltaic->Battery"]
+    sim_new["Wind_IN_Heat"] = sim["m_power EnergyFlow WindFarm->HeatPump"] .+
+                              sim["m_power EnergyFlow WindFarm->ElectrodeBoiler"]
+    sim_new["Wind_IN_Power"] = sim["m_power EnergyFlow WindFarm->Demand_Power"] .+
+                               sim["m_power EnergyFlow WindFarm->Battery"]
+    sim_new["Power_Demand_P2H"] = sim_new["Grid_IN_Heat"] .+
+                                  sim_new["Photovoltaic_IN_Heat"] .+
+                                  sim_new["Wind_IN_Heat"]
+    sim_new["Power_Demand_Demand"] = sim_new["Grid_IN_Power"] .+
+                                     sim_new["Photovoltaic_IN_Power"] .+
+                                     sim_new["Wind_IN_Power"] .+
                                      sim["m_power EnergyFlow Battery->Demand_Power"]
     sim_new["Grid_Out_PV"] = sim["m_power EnergyFlow Photovoltaic->Grid_OUT"]
     sim_new["Grid_Out_Wind"] = sim["m_power EnergyFlow WindFarm->Grid_OUT"]
@@ -441,10 +469,10 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
     A_rev_control = revenue_control(sim_new, p)
     A_rev_feed    = revenue_feedin(sim_new, p)
 
-    A_total = A_cap + A_op + A_misc + A_energy -
+    A_total = A_cap + A_op + A_misc + A_energy["A_energy"] -
               (A_rev_control + A_rev_feed)
               
-    A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy -
+    A_total_incentive = A_cap_incentive + A_op + A_misc + A_energy["A_energy"] -
                         (A_rev_control + A_rev_feed)
     
     CO2_yearly = co2_yearly(sim_new)
@@ -454,12 +482,14 @@ function vdi2067_annuity(sim::Union{Dict,OrderedDict}, components::Vector{VDICom
         "A_cap_incentive" => A_cap_incentive,
         "A_op" => A_op,
         "A_misc" => A_misc,
-        "A_energy" => A_energy,
+        "A_energy_heat" => A_energy["A_energy_heat"],
+        "A_energy_power" => A_energy["A_energy_power"],
         "A_rev_control" => A_rev_control,
         "A_rev_feed" => A_rev_feed,
         "A_total" => A_total,
         "A_total_incentive" => A_total_incentive,
-        "CO2_yearly" => CO2_yearly
+        "CO2_yearly_heat" => CO2_yearly["CO2_yearly_heat"],
+        "CO2_yearly_power" => CO2_yearly["CO2_yearly_power"]
     )
 end
 

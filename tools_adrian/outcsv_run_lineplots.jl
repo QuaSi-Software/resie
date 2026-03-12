@@ -28,77 +28,94 @@ const LEFT_SERIES = [
     #(col="HeatPump_baseline_in m_power OUT", name="Wärmepumpe Strom-Input Baseline", scale=1 / 1e3 * 4),
     #(col="HeatPump m_power IN", name="Wärmepumpe Strom-Input", scale=1 / 1e3 * 4),    
     ### Demands
-    #(col="Demand_Heat Demand", name="Wärmebedarf", scale=1 / 1e3 * 4),
-    #(col="Demand_Power Demand", name="Strombedarf", scale=1 / 1e3 * 4),
+    (col="Demand_Heat Demand", name="Wärmebedarf th. Leistung [kW]", scale=1 / 1e3 * 4),
+    #(col="Demand_Power Demand", name="Strombedarf el. Leistung [kW]", scale=1 / 1e3 * 4),
     ### Regelreserve
-    #(col="NegControlReserve_in Scaling_Factor", name="Negative Leistungsvorhaltung", scale=1 / 1e3),
-    #(col="PosControlReserve_out Scaling_Factor", name="Positive Leistungsvorhaltung", scale=1 / 1e3),
-    (col="NegControlReserve_in m_power OUT", name="Negativer Regelreserveabruf", scale=1 / 1e3 * 4),
-    (col="PosControlReserve_out m_power IN", name="Positiver Regelreserveabruf", scale=1 / 1e3 * 4),
+    #(col="NegControlReserve_in Scaling_Factor", name="Negative Leistungsvorhaltung (el.) [kW]", scale=1 / 1e3),
+    #(col="PosControlReserve_out Scaling_Factor", name="Positive Leistungsvorhaltung (el.) [kW]", scale=1 / 1e3),
+    #(col="NegControlReserve_in m_power OUT", name="Negativer Regelreserveabruf (el.) [kW]", scale=1 / 1e3 * 4),
+    #(col="PosControlReserve_out m_power IN", name="Positiver Regelreserveabruf (el.) [kW]", scale=1 / 1e3 * 4),
     ### Grid
-    #(col="Grid_IN m_power OUT", name="Strombezug aus Netz", scale=1 / 1e3 * 4),
-    #(col="Grid_OUT m_power IN", name="Stromeinspeisung ins Netz", scale=1 / 1e3 * 4),
+    #(col="Grid_IN m_power OUT", name="Stromnetzbezug el. Leistung [kW]", scale=1 / 1e3 * 4),
+    #(col="Grid_OUT m_power IN", name="Stromnetzeinspeisung el. Leistung [kW]", scale=1 / 1e3 * 4),
     ### PV
-    #(col="Photovoltaic m_power OUT", name="PV Erzeugung", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Photovoltaic->Battery", name="PV -> Batterie", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Photovoltaic->Demand_Power", name="PV -> Strombedarf", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Photovoltaic->HeatPump", name="PV -> Wärmepumpe", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Photovoltaic->ElectrodeBoiler", name="PV -> Elektrodenkessel", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Photovoltaic->Grid_OUT", name="PV -> Stromnetz", scale=1 / 1e3 * 4),
+    #(col="Photovoltaic m_power OUT", name="PV Erzeugung el. Leistung [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Photovoltaic->Battery", name="el. Leistung PV in Batterie [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Photovoltaic->Demand_Power", name="el. Leistung PV in Strombedarf [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Photovoltaic->HeatPump", name="el. Leistung PV in Wärmepumpe [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Photovoltaic->ElectrodeBoiler", name="el. Leistung PV in Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Photovoltaic->Grid_OUT", name="el. Leistung PV in Stromnetz [kW]", scale=1 / 1e3 * 4),
     ### Wind
-    #(col="WindFarm m_power OUT", name="Windenergie Erzeugung", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow WindFarm->Battery", name="Windenergie -> Batterie", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow WindFarm->Demand_Power", name="Windenergie -> Strombedarf", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow WindFarm->HeatPump", name="Windenergie -> Wärmepumpe", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow WindFarm->ElectrodeBoiler", name="Windenergie -> Elektrodenkessel", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow WindFarm->Grid_OUT", name="Windenergie -> Stromnetz", scale=1 / 1e3 * 4),
+    #(col="WindFarm m_power OUT", name="Windenergie Erzeugung el. Leistung [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow WindFarm->Battery", name="el. Leistung Windenergie in Batterie [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow WindFarm->Demand_Power", name="el. Leistung Windenergie in Strombedarf [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow WindFarm->HeatPump", name="el. Leistung Windenergie in Wärmepumpe [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow WindFarm->ElectrodeBoiler", name="el. Leistung Windenergie in Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow WindFarm->Grid_OUT", name="el. Leistung Windenergie in Stromnetz [kW]", scale=1 / 1e3 * 4),
     ### HeatPump
-    #(col="HeatPump_baseline_in m_power OUT", name="Wärmepumpe Strom-Input Baseline", scale=1 / 1e3 * 4),
-    #(col="HeatPump m_power IN", name="Wärmepumpe Strom-Input", scale=1 / 1e3 * 4),
-    #(col="HeatPump m_heat OUT", name="Wärmepumpe Wärme-Output (aus Eigenstrom)", scale=1 / 1e3 * 4),
-    #(col="HeatPump secondary_m_heat OUT", name="Wärmepumpe Wärme-Output (aus Stromnetz)", scale=1 / 1e3 * 4),
-    #(col="m_heat EnergyFlow HeatPump->BufferTank", name="Wärmepumpe -> Wärmespeicher", scale=1 / 1e3 * 4),
-    #(col="secondary_m_heat EnergyFlow secondary_HeatPump->BufferTank", name="Wärmepumpe #2 -> Wärmespeicher", scale=1 / 1e3 * 4),
-    #(col="m_heat EnergyFlow HeatPump->Demand_Heat", name="Wärmepumpe -> Wärmebedarf", scale=1 / 1e3 * 4),
-    #(col="secondary_m_heat EnergyFlow secondary_HeatPump->Demand_Heat", name="Wärmepumpe #2 -> Wärmebedarf", scale=1 / 1e3 * 4),
+    #(col="HeatPump_baseline_in m_power OUT", name="el. Leistung Wärmepumpen (Baseline) [kW]", scale=1 / 1e3 * 4),
+    #(col="HeatPump m_power IN", name="el. Leistung Wärmepumpe [kW]", scale=1 / 1e3 * 4),
+    #(col="HeatPump m_heat OUT", name="th. Leistung Wärmepumpe [kW]", scale=1 / 1e3 * 4),
+    (col="HeatPump secondary_m_heat OUT", name="th. Leistung Wärmepumpen [kW]", scale=1 / 1e3 * 4),
+    #(col="m_heat EnergyFlow HeatPump->BufferTank", name="th. Leistung Wärmepumpe in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
+    #(col="secondary_m_heat EnergyFlow secondary_HeatPump->BufferTank", name="th. Leistung Wärmepumpe in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
+    #(col="m_heat EnergyFlow HeatPump->Demand_Heat", name="th. Leistung Wärmepumpe in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
+    #(col="secondary_m_heat EnergyFlow secondary_HeatPump->Demand_Heat", name="th. Leistung Wärmepumpe in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
     ### ElectrodeBoiler
-    #(col="ElectrodeBoiler_baseline_in m_power OUT", name="Elektrodenkessel Strom-Input Baseline", scale=1 / 1e3 * 4),
-    #(col="ElectrodeBoiler m_power IN", name="Elektrodenkessel Strom-Input", scale=1 / 1e3 * 4),
-    #(col="ElectrodeBoiler m_heat OUT", name="Elektrodenkessel Wärme-Output", scale=1 / 1e3 * 4),
-    #(col="ElectrodeBoiler secondary_m_heat OUT", name="Elektrodenkessel Wärme-Output #2", scale=1 / 1e3 * 4),
-    #(col="m_heat EnergyFlow ElectrodeBoiler->BufferTank", name="Elektrodenkessel -> Wärmespeicher", scale=1 / 1e3 * 4),
-    #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->BufferTank", name="Elektrodenkessel #2 -> Wärmespeicher", scale=1 / 1e3 * 4),
-    #(col="m_heat EnergyFlow ElectrodeBoiler->Demand_Heat", name="Elektrodenkessel -> Wärmebedarf", scale=1 / 1e3 * 4),
-    #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->Demand_Heat", name="Elektrodenkessel #2 -> Wärmebedarf", scale=1 / 1e3 * 4),
+    #(col="ElectrodeBoiler_baseline_in m_power OUT", name="el. Leistung Elektrodenkessel (Baseline) [kW]", scale=1 / 1e3 * 4),
+    #(col="ElectrodeBoiler m_power IN", name="el. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    #(col="ElectrodeBoiler m_heat OUT", name="th. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    (col="ElectrodeBoiler secondary_m_heat OUT", name="th. Leistung Elektrodenkessel [kW]", scale=1 / 1e3 * 4),
+    #(col="m_heat EnergyFlow ElectrodeBoiler->BufferTank", name="th. Leistung Elektrodenkessel in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
+    #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->BufferTank", name="th. Leistung Elektrodenkessel in Wärmespeicher [kW]", scale=1 / 1e3 * 4),
+    #(col="m_heat EnergyFlow ElectrodeBoiler->Demand_Heat", name="th. Leistung Elektrodenkessel in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
+    #(col="secondary_m_heat EnergyFlow secondary_ElectrodeBoiler->Demand_Heat", name="th. Leistung Elektrodenkessel in Wärmebedarf [kW]", scale=1 / 1e3 * 4),
     ### BufferTank
-    #(col="m_heat EnergyFlow BufferTank->Demand_Heat", name="Wärmespeicher -> Bedarf", scale=1 / 1e3 * 4),
+    (col="m_heat EnergyFlow BufferTank->Demand_Heat", name="Wärmespeicher Wärme-Output", scale=1 / 1e3 * 4),
     ### Battery
-    #(col="m_power EnergyFlow Battery->Demand_Power", name="Batterie -> Strombedarf", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Battery->Grid_OUT", name="Batterie -> Stromnetz", scale=1 / 1e3 * 4),
-    #(col="m_power EnergyFlow Grid_IN->Battery", name="Stromnetz -> Batterie", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Battery->Demand_Power", name="el. Leistung Batterie in Strombedarf [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Battery->Grid_OUT", name="el. Leistung Batterie in Stromnetz [kW]", scale=1 / 1e3 * 4),
+    #(col="m_power EnergyFlow Grid_IN->Battery", name="el. Leistung Stromnetz in Batterie [kW]", scale=1 / 1e3 * 4),
 ]
 
 const RIGHT_SERIES = [
     ### Börsenstrompreis
-    #(col="StockMarket_IN m_money OUT", name="Börsenstrompreis", scale=1.0),
+    (col="StockMarket_IN m_money OUT", name="Börsenstrompreis [€/MWh]", scale=1.0),
     ### Speicherstände
-    (col="BufferTank Load%", name="SOC Wärmespeicher", scale=1.0),
-    #(col="Battery Load%", name="SOC Batterie", scale=1.0),   
+    (col="BufferTank Load%", name="SOC Wärmespeicher [%]", scale=1.0),
+    #(col="Battery Load%", name="SOC Batterie [%]", scale=1.0),   
 ]
 
 # Optional fixed colors per CSV column to keep categories consistent across plots.
 const LEFT_COLOR_BY_COL = Dict(
-    "Demand_Heat Demand" => "#0057FF",
-    "HeatPump m_heat OUT" => "#FF7A00",
-    "ElectrodeBoiler m_heat OUT" => "#E60000",
-    "m_heat EnergyFlow BufferTank->Demand_Heat" => "#00A651",
+    "NegControlReserve_in m_power OUT" => "#1F77B4",
+    "PosControlReserve_out m_power IN" => "#D62728",
+    "NegControlReserve_in Scaling_Factor" => "#6BAED6",
+    "PosControlReserve_out Scaling_Factor" => "#FF9896",
+    "Demand_Heat Demand" => "#EE4000",
+    "Demand_Power Demand" => "#17BECF",
+    "HeatPump_baseline_in m_power OUT" => "#FDBF6F",
+    "HeatPump m_power IN" => "#FF7F0E",
+    "HeatPump m_heat OUT" => "#8B008B",
+    "HeatPump secondary_m_heat OUT" => "#D15FEE",
+    "ElectrodeBoiler m_heat OUT" => "#698B69",
+    "ElectrodeBoiler secondary_m_heat OUT" => "#8FBC8F",
+    "m_heat EnergyFlow BufferTank->Demand_Heat" => "#4169E1",
 )
 
 const RIGHT_COLOR_BY_COL = Dict(
-    "BufferTank Load%" => "#8B1FB0",
+    "BufferTank Load%" => "#595959",
     "Battery Load%" => "#00B8D9",
-    "StockMarket_IN m_money OUT" => "#000000",
+    "StockMarket_IN m_money OUT" => "#8B5A2B",
 )
+
+const STACKED_LEFT_SERIES_ORDER = [
+    "HeatPump m_heat OUT",
+    "HeatPump secondary_m_heat OUT",
+    "ElectrodeBoiler m_heat OUT",
+    "ElectrodeBoiler secondary_m_heat OUT",
+    "m_heat EnergyFlow BufferTank->Demand_Heat",
+]
 
 # Available out.csv columns (copy/paste helper):
 
@@ -182,6 +199,16 @@ end
 
 function sanitize_filename(s::AbstractString)
     replace(strip(s), r"[^A-Za-z0-9_\\-]+" => "_")
+end
+
+function hex_to_rgba(hex::AbstractString, alpha::Real)
+    code = strip(hex)
+    startswith(code, "#") || error("Hex-Farbe ohne #: $hex")
+    length(code) == 7 || error("Nur 6-stellige Hex-Farben werden unterstuetzt: $hex")
+    r = parse(Int, code[2:3], base=16)
+    g = parse(Int, code[4:5], base=16)
+    b = parse(Int, code[6:7], base=16)
+    return "rgba($r,$g,$b,$alpha)"
 end
 
 function read_out_csv(path::String)
@@ -345,9 +372,12 @@ function make_run_plot(
     left_colors = ["#000000", "#0057FF", "#00A651", "#FF7A00", "#8B1FB0"]
     right_colors = ["#E60000", "#00B8D9", "#FFD400", "#6B3F1D", "#FF4FA3"]
     traces = PlotlyJS.GenericTrace[]
+    stacked_left_set = Set(STACKED_LEFT_SERIES_ORDER)
+    left_series_by_col = Dict(s.col => s for s in LEFT_SERIES)
+    stacked_left_series = [left_series_by_col[col] for col in STACKED_LEFT_SERIES_ORDER if haskey(left_series_by_col, col)]
 
     plotted = false
-    for (i, s) in enumerate(LEFT_SERIES)
+    for (i, s) in enumerate(stacked_left_series)
         y = clean_series(df, s.col, idx, s.scale)
         y === nothing && continue
         color = get(LEFT_COLOR_BY_COL, s.col, left_colors[mod1(i, length(left_colors))])
@@ -358,7 +388,31 @@ function make_run_plot(
                 y=y,
                 mode="lines",
                 name=s.name * " (left)",
-                line=PlotlyJS.attr(width=2, color=color),
+                stackgroup="left_heat_stack",
+                fillcolor=hex_to_rgba(color, 0.55),
+                line=PlotlyJS.attr(width=0, color=color),
+                yaxis="y",
+                hovertemplate="%{x|%d.%m.%Y %H:%M:%S}<br>%{y:.3f}<extra>%{fullData.name}</extra>",
+            ),
+        )
+        plotted = true
+    end
+
+    left_fallback_idx = 0
+    for s in LEFT_SERIES
+        s.col in stacked_left_set && continue
+        y = clean_series(df, s.col, idx, s.scale)
+        y === nothing && continue
+        left_fallback_idx += 1
+        color = get(LEFT_COLOR_BY_COL, s.col, left_colors[mod1(left_fallback_idx, length(left_colors))])
+        push!(
+            traces,
+            PlotlyJS.scatter(
+                x=x_iso,
+                y=y,
+                mode="lines",
+                name=s.name * " (left)",
+                line=PlotlyJS.attr(width=3, color=color),
                 yaxis="y",
                 hovertemplate="%{x|%d.%m.%Y %H:%M:%S}<br>%{y:.3f}<extra>%{fullData.name}</extra>",
             ),
@@ -377,7 +431,7 @@ function make_run_plot(
                 y=y,
                 mode="lines",
                 name=s.name * " (right)",
-                line=PlotlyJS.attr(width=2, color=color),
+                line=PlotlyJS.attr(width=3, color=color),
                 yaxis="y2",
                 hovertemplate="%{x|%d.%m.%Y %H:%M:%S}<br>%{y:.3f}<extra>%{fullData.name}</extra>",
             ),

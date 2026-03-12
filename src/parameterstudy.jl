@@ -22,7 +22,7 @@ using Infiltrator
 # Load base input
 ############################################################
 
-base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_ems.json"
+base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_ems.json"
 
 
 ############################################################
@@ -30,21 +30,21 @@ base_input_path = length(ARGS) > 0 ? ARGS[1] : "inputfiles/inputfile_base_fuzzy_
 ############################################################
 
 # HeatPump power (W)
-Pth_HeatPump_lo   = 5.5e6         # lower limit
-Pth_HeatPump_hi   = 5.5e6         # upper limit
+Pth_HeatPump_lo   = 5.0e6         # lower limit
+Pth_HeatPump_hi   = 6.0e6         # upper limit
 Pth_HeatPump_step = 0.25e6         # step size
 Pth_HeatPump_vals = collect(Pth_HeatPump_lo:Pth_HeatPump_step:Pth_HeatPump_hi)  # array of values
 
 # ElectrodeBoiler power (W)
-Pth_ElectrodeBoiler_lo   = 3.75e6     # lower limit
+Pth_ElectrodeBoiler_lo   = 2.5e6     # lower limit
 Pth_ElectrodeBoiler_hi   = 3.75e6     # upper limit
 Pth_ElectrodeBoiler_step = 0.25e6     # step size
 Pth_ElectrodeBoiler_vals = collect(Pth_ElectrodeBoiler_lo:Pth_ElectrodeBoiler_step:Pth_ElectrodeBoiler_hi)  # creates an array of values
 
 # BufferTank capacity (Wh)
-Cap_lo_Wh   = 25.0e6        # lower limit
-Cap_hi_Wh   = 25.0e6        # upper limit
-Cap_step_Wh = 2.5e6         # step size
+Cap_lo_Wh   = 15.0e6        # lower limit
+Cap_hi_Wh   = 30.0e6        # upper limit
+Cap_step_Wh = 5.0e6         # step size
 Cap_vals_Wh = collect(Cap_lo_Wh:Cap_step_Wh:Cap_hi_Wh)  # creates an array of values
 
 # Battery capacity (Wh)
@@ -344,14 +344,18 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
                           "annuity_pro A_total_incentive / €"]
     vdi_annuity_keys = [
         "A_cap", "A_cap_incentive", "A_misc", "A_op", "A_energy",
+        "A_energy_heat", "A_energy_power",
         "A_rev_control", "A_rev_feed", "A_total", "A_total_incentive"
     ]
+    make_annuity_headers(prefix) = ["$prefix $key / EUR" for key in vdi_annuity_keys]
+    header_annuity_no = ["$key / EUR" for key in vdi_annuity_keys]
+    # header_annuity_mod = make_annuity_headers("annuity_mod")
+    # header_annuity_pro = make_annuity_headers("annuity_pro")
     # balance warnings
     header_balances = ["balance_power", "balance_heat", "Errors"]
     # yearly_CO2-emissions
-    header_co2 = ["CO2_yearly / t/a"]
-    header = join(vcat(header_parameters, header_annuity_no, header_annuity_mod, 
-                       header_annuity_pro, header_co2, header_balances), ';') * "\n"
+    header_co2 = ["CO2_yearly_heat / t/a", "CO2_yearly_power / t/a"]
+    header = join(vcat(header_parameters, header_annuity_no, header_co2, header_balances), ';') * "\n"
 
     open(out_file_path, "a") do file_handle
         write(file_handle, header)
@@ -439,27 +443,28 @@ function main(base_input_path::String, write_output::Bool=false, save_input_file
             sim_output[runidx]["VDI_NO"] =
                 Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_NONE)
 
-            sim_output[runidx]["VDI_MOD"] =
-                Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
+            # sim_output[runidx]["VDI_MOD"] =
+            #     Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_MOD)
 
-            sim_output[runidx]["VDI_PRO"] =
-                Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
+            # sim_output[runidx]["VDI_PRO"] =
+            #     Base.invokelatest(VDI2067.vdi2067_annuity, raw_sim, components, VDI2067.VDI_SCENARIO_PRO)
 
             # get values for writing into output file
             annuities_no = [sim_output[runidx]["VDI_NO"][k] for k in vdi_annuity_keys]
-            annuities_mod = [sim_output[runidx]["VDI_MOD"][k] for k in vdi_annuity_keys]
-            annuities_pro = [sim_output[runidx]["VDI_PRO"][k] for k in vdi_annuity_keys]
-            co2_yearly = sim_output[runidx]["VDI_NO"]["CO2_yearly"]
+            # annuities_mod = [sim_output[runidx]["VDI_MOD"][k] for k in vdi_annuity_keys]
+            # annuities_pro = [sim_output[runidx]["VDI_PRO"][k] for k in vdi_annuity_keys]
+            co2_yearly = [sim_output[runidx]["VDI_NO"]["CO2_yearly_heat"],
+                          sim_output[runidx]["VDI_NO"]["CO2_yearly_power"]]
         else
             annuities_no = fill(missing, length(header_annuity_no))
-            annuities_mod = fill(missing, length(header_annuity_mod))
-            annuities_pro = fill(missing, length(header_annuity_pro))
-            co2_yearly = missing
+            # annuities_mod = fill(missing, length(header_annuity_mod))
+            # annuities_pro = fill(missing, length(header_annuity_pro))
+            co2_yearly = fill(missing, length(header_co2))
         end
         # write important results to seperate file
         parameters = [Pth_HeatPump, Pth_ElectrodeBoiler, Cap_Wh, BattCap_Wh]
         balances = collect(getindex.(Ref(sim_output[runidx]), ("Balance_power", "Balance_heat", "Errors")))
-        row = join(vcat(parameters, annuities_no, annuities_mod, annuities_pro, co2_yearly, balances), ';') * "\n"
+        row = join(vcat(parameters, annuities_no, co2_yearly, balances), ';') * "\n"
         row = replace(row, '.' => ',')
         # Lock the file writing
         Threads.lock(output_lock)
