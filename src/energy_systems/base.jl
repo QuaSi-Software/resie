@@ -556,8 +556,12 @@ function set_max_energy!(interface::SystemInterface,
     end
 
     if interface.source.sys_function == sf_bus
-        set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
-                        has_calculated_all_maxima, recalculate_max_energy)
+        # in process, update the interface. Keep it empty in potential to handel multiple potential steps correctly.
+        if !is_transformer_potential
+            set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
+                            has_calculated_all_maxima, recalculate_max_energy)
+        end
+        # update bus 
         set_max_energy!(interface.source,
                         interface.target,
                         false,
@@ -566,10 +570,16 @@ function set_max_energy!(interface::SystemInterface,
                         temperature_max,
                         purpose_uac,
                         has_calculated_all_maxima,
-                        recalculate_max_energy)
+                        recalculate_max_energy,
+                        false,
+                        is_transformer_potential)
     elseif interface.target.sys_function == sf_bus
-        set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
-                        has_calculated_all_maxima, recalculate_max_energy)
+        # in process, update the interface. Keep it empty in potential to handel multiple potential steps correctly.
+        if !is_transformer_potential
+            set_max_energy!(interface.max_energy, energy, temperature_min, temperature_max, purpose_uac,
+                            has_calculated_all_maxima, recalculate_max_energy)
+        end
+        # update bus 
         set_max_energy!(interface.target,
                         interface.source,
                         true,
@@ -579,7 +589,8 @@ function set_max_energy!(interface::SystemInterface,
                         purpose_uac,
                         has_calculated_all_maxima,
                         recalculate_max_energy,
-                        interface.is_secondary_interface)
+                        interface.is_secondary_interface,
+                        is_transformer_potential)
     else
         # 1-to-1 interface between two components.
         # Assuming that temperatures always match: This is valid as currently only heat pumps
@@ -820,7 +831,6 @@ function reduce_max_energy!(max_energy::EnergySystems.MaxEnergy,
                     end
                 end
             else
-                test = 1
                 @error "The uac could not be found in the max_energy."
             end
         end
